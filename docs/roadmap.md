@@ -107,11 +107,7 @@ What NSGo's issue [#49](https://github.com/nsgo-dev/nsgo/issues/49) asks for fol
 | iOS multitasking and `Info.plist` values | `UIRequiresFullScreen`, `UIApplicationSupportsMultipleScenes` | `apple.requires_full_screen` and `apple.multiple_scenes` set what `cmd/nsgo/ios.go` hardcodes to true and false, keeping those defaults, so an iPad build multitasks, and `apple.info` takes booleans, numbers, arrays and dictionaries as well as strings, so keys such as `CFBundleURLTypes` need no fork of the tool |
 
 ## Android embedding and process lifetime
-The current `-embed` runtime starts one Go process per `NsgoView` and stops it
-from the Activity. Issue #12 requires the process to outlive an Activity and be
-shared by multiple surfaces before recording, floating windows or push delivery
-can depend on it. The design and staged protocol work are in [Android engine and
-view lifetime](architecture/android-lifecycle.md).
+An `NsgoEngine` a host keeps runs the app on while its one `NsgoView` is detached ([embedding](architecture/embedding.md)). Issue #12 also needs a fresh Activity's view to show a running engine and several surfaces to share one process before recording, floating windows or push delivery can depend on it; the design and staged protocol work are in [Android engine and view lifetime](architecture/android-lifecycle.md).
 | Android engine and view lifetime | #12, [Android engine and view lifetime](architecture/android-lifecycle.md) | A host retains one `NsgoEngine` in its Application or foreground service, Activities attach and detach `NsgoView` surfaces without killing the Go process, two surfaces share one process with independent trees, and explicit engine destruction closes the process once |
 ## Terminal
 
