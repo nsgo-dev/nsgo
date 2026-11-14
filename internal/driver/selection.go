@@ -347,16 +347,12 @@ func (m *SelectionModel) Ranges(texts SelectionTexts) []SelectionRange {
 	return out
 }
 
-// SelectionSpans is what SelectionTexts whose texts have spans also tell:
-// text i's spans, whose hidden ones a copy leaves out.
+// SelectionSpans is what SelectionTexts whose texts have spans also tell: text i's spans, whose hidden ones a copy leaves out and whose Copy it takes in place of the attachment each styles.
 type SelectionSpans interface {
 	Spans(i int) []TextSpan
 }
 
-// Text returns the selected text as a copy gives it: each text's selected
-// part, attachments (U+FFFC) and hidden spans left out, texts on one row
-// (their frames overlap vertically) joined by a tab and the others by a
-// line break.
+// Text returns the selected text as a copy gives it (CopiedText): each text's selected part, hidden spans left out and each attachment (U+FFFC) the selection holds whole as its span's Copy, or left out without one, texts on one row (their frames overlap vertically) joined by a tab and the others by a line break.
 func (m *SelectionModel) Text(texts SelectionTexts) string {
 	spans, _ := texts.(SelectionSpans)
 	var out strings.Builder
