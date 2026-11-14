@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -74,6 +75,26 @@ func InstallUpdate(cx *Scope, path string, done func(error)) {
 			}
 		})
 	})
+}
+
+// updateDownloadTimeout bounds InstallUpdateInBackground's download, which a stalled connection would otherwise hold forever.
+const updateDownloadTimeout = 10 * time.Minute
+
+// InstallUpdateInBackground is the core's part of the Update action of package updater's alert on Linux and Android: off the graph's goroutine it downloads and verifies update's package into dir (DownloadUpdate), within updateDownloadTimeout, then hands it to the platform's installer (InstallUpdate). The work belongs to the app's root scope rather than cx, so it finishes though the scope that offered the update is disposed meanwhile; done runs on the graph's goroutine under the root scope, which it is given, with the package's path and what failed, nil once Linux's package manager installed it or Android's installer started.
+func InstallUpdateInBackground(cx *Scope, update UpdateCheck, dir string, done func(app *Scope, path string, err error)) {
+	app := cx.rt.root
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), updateDownloadTimeout)
+		path, err := DownloadUpdate(ctx, update, dir, nil)
+		cancel()
+		app.Post(func() {
+			if err != nil {
+				done(app, path, err)
+				return
+			}
+			InstallUpdate(app, path, func(err error) { done(app, path, err) })
+		})
+	}()
 }
 
 // CheckForUpdates is the core's part of updater.Check and

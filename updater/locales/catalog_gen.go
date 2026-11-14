@@ -41,6 +41,7 @@ var Parameters = map[string][]string{
 	"UpdateAvailable":        {"app"},
 	"UpdateAvailableMessage": {"app", "version", "current"},
 	"UpToDateMessage":        {"app", "version"},
+	"InstallErrorMessage":    {"app", "version"},
 }
 
 // Translation is a language's messages another package supplies:
@@ -52,6 +53,7 @@ type Translation struct {
 	UpdateAvailable        func(app string) string
 	UpdateAvailableMessage func(app string, version string, current string) string
 	UpToDateMessage        func(app string, version string) string
+	InstallErrorMessage    func(app string, version string) string
 }
 
 var supplied = map[string]Translation{}
@@ -63,6 +65,8 @@ const (
 	textUpToDate
 	textUpdateError
 	textUpdateErrorMessage
+	textInstallError
+	textOpenPage
 	textOk
 	numTexts
 )
@@ -75,6 +79,8 @@ var keyOfText = [numTexts]string{
 	"upToDate",
 	"updateError",
 	"updateErrorMessage",
+	"installError",
+	"openPage",
 	"ok",
 }
 
@@ -85,6 +91,8 @@ var textsEn = i18n.NewTexts(""+
 	"You’re up to date"+
 	"Can’t check for updates"+
 	"Something went wrong while checking for updates. Try again later."+
+	"Can’t install the update"+
+	"Open Page"+
 	"OK",
 	[]uint16{
 		6,
@@ -92,6 +100,8 @@ var textsEn = i18n.NewTexts(""+
 		19,
 		25,
 		65,
+		26,
+		9,
 		2,
 	})
 
@@ -102,6 +112,8 @@ var textsZhHans = i18n.NewTexts(""+
 	"已是最新版本"+
 	"无法检查更新"+
 	"检查更新时出错，请稍后再试。"+
+	"无法安装更新"+
+	"打开页面"+
 	"好",
 	[]uint16{
 		6,
@@ -109,6 +121,8 @@ var textsZhHans = i18n.NewTexts(""+
 		18,
 		18,
 		42,
+		18,
+		12,
 		3,
 	})
 
@@ -174,6 +188,9 @@ func Supply(lang string, t Translation) {
 	}
 	if t.UpToDateMessage != nil {
 		s.UpToDateMessage = t.UpToDateMessage
+	}
+	if t.InstallErrorMessage != nil {
+		s.InstallErrorMessage = t.InstallErrorMessage
 	}
 	supplied[lang] = s
 	Catalog.Add(lang)
@@ -241,7 +258,7 @@ func (msgs Messages) UpdateAvailableMessage(app string, version string, current 
 // Update says "Update"
 // in the language the app shows under cx.
 //
-// The button of the alert offering a newer version, which opens its page in the App Store or a browser.
+// The button of the alert offering a newer version, which installs it, or opens its page in the App Store or a browser.
 func Update(cx *core.Scope) string { return For(cx).Update() }
 
 // Update is the package's Update in the language of msgs.
@@ -306,6 +323,50 @@ func UpdateErrorMessage(cx *core.Scope) string { return For(cx).UpdateErrorMessa
 
 // UpdateErrorMessage is the package's UpdateErrorMessage in the language of msgs.
 func (msgs Messages) UpdateErrorMessage() string { return msgs.text(textUpdateErrorMessage) }
+
+// InstallError says "Can’t install the update"
+// in the language the app shows under cx.
+//
+// The title of the alert saying the newer version the user chose to install could not be downloaded or installed.
+func InstallError(cx *core.Scope) string { return For(cx).InstallError() }
+
+// InstallError is the package's InstallError in the language of msgs.
+func (msgs Messages) InstallError() string { return msgs.text(textInstallError) }
+
+// InstallErrorMessage says "{app} {version} couldn’t be downloaded or installed. You can get it from its page instead."
+// in the language the app shows under cx.
+//
+// The alert saying the newer version could not be installed, which names it and offers its page.
+func InstallErrorMessage(cx *core.Scope, app string, version string) string {
+	return For(cx).InstallErrorMessage(app, version)
+}
+
+// InstallErrorMessage is the package's InstallErrorMessage in the language of msgs.
+func (msgs Messages) InstallErrorMessage(app string, version string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.InstallErrorMessage(app, version))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].InstallErrorMessage; f != nil {
+			return f(app, version)
+		}
+		switch lang {
+		case "", "en":
+			return msgs.arg(app) + " " + msgs.arg(version) + " couldn’t be downloaded or installed. You can get it from its page instead."
+		case "zh-Hans":
+			return app + " " + version + " 下载或安装失败，你可以从它的页面获取。"
+		}
+	}
+}
+
+// OpenPage says "Open Page"
+// in the language the app shows under cx.
+//
+// The button of the alert saying the newer version could not be installed, which opens its page in a browser.
+func OpenPage(cx *core.Scope) string { return For(cx).OpenPage() }
+
+// OpenPage is the package's OpenPage in the language of msgs.
+func (msgs Messages) OpenPage() string { return msgs.text(textOpenPage) }
 
 // Ok says "OK"
 // in the language the app shows under cx.

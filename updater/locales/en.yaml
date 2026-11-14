@@ -6,7 +6,7 @@ updateAvailableMessage:
   description: The alert offering a newer version, which names it and the running one.
 update:
   message: "Update"
-  description: The button of the alert offering a newer version, which opens its page in the App Store or a browser.
+  description: The button of the alert offering a newer version, which installs it, or opens its page in the App Store or a browser.
 later:
   message: "Later"
   description: The button closing the alert offering a newer version.
@@ -20,4 +20,13 @@ updateError:
   message: "Can’t check for updates"
   description: The title of the alert saying the check for a newer version failed.
 updateErrorMessage: "Something went wrong while checking for updates. Try again later."
+installError:
+  message: "Can’t install the update"
+  description: The title of the alert saying the newer version the user chose to install could not be downloaded or installed.
+installErrorMessage:
+  message: "{app} {version} couldn’t be downloaded or installed. You can get it from its page instead."
+  description: The alert saying the newer version could not be installed, which names it and offers its page.
+openPage:
+  message: "Open Page"
+  description: The button of the alert saying the newer version could not be installed, which opens its page in a browser.
 ok: "OK"

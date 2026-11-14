@@ -8,9 +8,9 @@
 package updater
 
 import (
-	"context"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -134,31 +134,39 @@ func check(cx *core.Scope, background bool, answered func(core.UpdateCheck)) {
 	})
 }
 
-// downloadAndInstall keeps network and package-manager work off the app's
-// graph and main threads. The dialog's Update action is the user's explicit
-// approval; package managers still ask for their own elevation or install
-// permission.
-func downloadAndInstall(cx *core.Scope, c core.UpdateCheck) {
+// stagingDir is the directory under the app's cache that holds the packages downloadAndInstall stages.
+const stagingDir = "nsgo.updater"
+
+// staging is where downloadAndInstall stages packages: under the app's cache, else the system's temporary directory.
+func staging(cx *core.Scope) string {
 	dir := cx.CacheDir()
 	if dir == "" {
 		dir = os.TempDir()
 	}
-	go func() {
-		path, err := Download(context.Background(), c, dir, nil)
-		cx.Post(func() {
-			if err != nil {
-				log.Printf("updater: %v", err)
-				return
-			}
-			Install(cx, path, func(err error) {
-				if err != nil {
-					log.Printf("updater: install: %v", err)
-					return
-				}
-				if cx.Env().OS() == core.OSLinux {
-					cx.Restart()
+	return filepath.Join(dir, stagingDir)
+}
+
+// downloadAndInstall downloads, verifies and installs c's package off the app's graph and main threads, after the user chose Update, which is their approval; package managers still ask for their own elevation or install permission. The work outlives the scope that offered the update. Linux restarts into the new version once its package manager installed it; a failure is logged and offers the release's page, where the user can get the package themselves.
+func downloadAndInstall(cx *core.Scope, c core.UpdateCheck) {
+	core.InstallUpdateInBackground(cx, c, staging(cx), func(app *core.Scope, path string, err error) {
+		if err != nil {
+			log.Printf("updater: %v", err)
+			msgs := locales.For(app)
+			app.ShowAlert(core.AlertConfig{
+				Title:   msgs.InstallError(),
+				Message: msgs.InstallErrorMessage(c.App, c.Version),
+				Actions: []core.AlertAction{{Label: msgs.OpenPage(), Role: core.AlertDefault},
+					{Label: msgs.Later(), Role: core.AlertCancel}},
+				Cancelable: true,
+			}, func(index int) {
+				if index == 0 {
+					app.OpenURL(c.URL, nil)
 				}
 			})
-		})
-	}()
+			return
+		}
+		if app.Env().OS() == core.OSLinux {
+			app.Restart()
+		}
+	})
 }
