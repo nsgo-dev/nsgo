@@ -378,6 +378,8 @@ Section
   File /r{{range .Excludes}} /x {{q .}}{{end}} "*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateShortCut {{path "$SMPROGRAMS\\" .Name ".lnk"}} {{path "$INSTDIR\\" .Exe}}
+  ; Give desktop toasts a COM activator CLSID on the Start menu shortcut.
+  ExecWait '{{path "$INSTDIR\\" .Exe}} --register-toast {{path "$SMPROGRAMS\\" .Name ".lnk"}}'
   WriteRegStr HKCU {{q .UninstallKey}} "DisplayName" {{q .Name}}
   WriteRegStr HKCU {{q .UninstallKey}} "DisplayVersion" {{q .Version}}
   WriteRegStr HKCU {{q .UninstallKey}} "DisplayIcon" {{path "$INSTDIR\\" .Exe}}
@@ -404,6 +406,8 @@ FunctionEnd
 
 Section "Uninstall"
   Call un.CloseApp
+  ; Remove the per-user toast COM registration before deleting the EXE.
+  ExecWait '{{path "$INSTDIR\\" .Exe}} --unregister-toast'
   Delete {{path "$SMPROGRAMS\\" .Name ".lnk"}}
   Delete {{path "$DESKTOP\\" .Name ".lnk"}}
   DeleteRegKey HKCU {{q .UninstallKey}}

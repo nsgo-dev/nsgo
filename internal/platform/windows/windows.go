@@ -499,6 +499,15 @@ func wide(s string) *uint16 {
 // Run opens a window showing app and runs the message loop. Call it from
 // main; it does not return until the window closes.
 func Run(app engine.App, opts Options) {
+	comApartment()
+	if registerToastShortcutCommand(opts.ID) {
+		return
+	}
+	if unregisterToastCommand(opts.ID) {
+		return
+	}
+	registerToastActivator(opts.ID)
+	defer unregisterToastActivator()
 	if opts.Width == 0 {
 		opts.Width, opts.Height = 480, 640
 	}
@@ -544,6 +553,8 @@ func Run(app engine.App, opts Options) {
 		w.placeAt(opts.Frame)
 	}
 	windows[hwnd] = w
+	beginToastActivation(w)
+	defer endToastActivation(w)
 	// Nothing has the focus yet: typing must not open a composition.
 	w.updateIME()
 	w.configureGestures()
@@ -563,6 +574,7 @@ func Run(app engine.App, opts Options) {
 	getClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 	size := w.point(client.Right, client.Bottom)
 	w.startEngine(app, opts, driver.Size{Width: size.X, Height: size.Y})
+	attachToastActivation(w, w.engine)
 	showWindow.Call(hwnd, swShow)
 	if opts.test != nil {
 		opts.test.ready <- w
