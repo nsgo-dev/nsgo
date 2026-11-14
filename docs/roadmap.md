@@ -23,7 +23,6 @@ What NSH added between 0.4.0 and 0.5.0 that NSGo has not, in the order to build 
 | --- | --- | --- |
 | Notifications on screens | #931, #1373 | With the permission granted, a notification shows, its press reaches the app and the badge shows on a Mac, an iPhone, Windows in a signed-in session and an Android 13 device, and a toast pressed after the app ended starts it through a COM activator; so far Linux and the Android emulator (API 29) showed and closed one, macOS, iOS's simulator and the web answered the permission without asking, and Windows, over SSH, reached its notifier, which reports the platform unavailable there (2026-11-12) |
 | Sounds and audio | `audio-design.md` (The API, The platforms) | `audio.Sound` plays a short sound from a file or bytes and `audio.Player`, NSH's `AudioPlayer`, plays, pauses, seeks and loops audio on every target, decoding off the main thread, as [audio playback](architecture/audio.md) designs it, and the gallery gives each kind of moment a sound |
-| Foldable and dual-screen displays | #49, [foldable design](architecture/foldable.md) | A shared environment reports usable regions, obstructions and posture atomically, while components choose any adaptive layout explicitly |
 | Haptics felt | #1328 | `mobile.PlayHaptic` is felt on an iPhone and an Android phone; so far it ran in the iOS simulator and the Android emulator, which have none (2026-11-12) |
 | Biometric authentication | #55 | `core` asks for enrolled Face ID, Touch ID or Android biometrics and reports authentication results through LocalAuthentication and BiometricPrompt, with nsgotest fakes and sandbox capability checks |
 | More of a web view's loads | #1038, #1028, #1233, #1496, #1439 | A load carries the app's request headers, `Incognito` keeps the website data in memory, the app serves URL schemes of its own to its pages, a page from the app's own files loads on macOS, and `Env` says where the platform shows no web view |
@@ -88,6 +87,14 @@ What Windows and Linux still lack of what macOS opens for an app, and Android of
 | Tray titles and bounds | #1479, #1355, #1582 | A tray icon shows a title beside it in macOS's menu bar, and its click reports the icon's bounds, so an app places its own popup there |
 | Transparent windows and the taskbar on Windows | #987 | A window opens transparent, showing what is behind it where the app draws nothing, and `SkipTaskbar` keeps it off the taskbar |
 | Panels of windows out of sight on macOS | `macos.md`, #1488 | An open or save panel or an alert shows in a window of its own while the window it belongs to is hidden, minimized or off every screen, as a tray app's often is, where it is a sheet of that window now and stays out of sight with it |
+
+## Foldable displays
+
+What NSGo's issue [#49](https://github.com/nsgo-dev/nsgo/issues/49) asks for foldable and dual-screen phones, which NSH has no equivalent of ([foldable displays](architecture/foldable.md)); its open decisions come first.
+
+| Item | Reference | Done when |
+| --- | --- | --- |
+| Fold geometry | `androidx.window.extensions`' `WindowLayoutComponent` | A surface reports its regions and obstructions with its size in one resize, each obstruction's occlusion, separation and state apart, from a foldable Android emulator or device, while components choose any adaptive layout explicitly |
 
 ## Terminal
 
