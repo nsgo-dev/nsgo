@@ -55,13 +55,13 @@ What 0.5.0 changed in how the keyboard's focus, popups and assistive technology 
 
 ## Application and windows
 
-What Windows and Linux still lack of what macOS opens for an app ([application and windows](architecture/application.md)): there `OpenWindow`, `OpenPanel` and `NewTray` return nil, and the main view fills the one window. Avalonia's desktop lifetime is the reference for the model, and NSH 0.5.0, which opens windows, tray icons, global shortcuts and one instance on Windows and Linux too, for each platform's mechanism.
+What Windows and Linux still lack of what macOS opens for an app ([application and windows](architecture/application.md)): there `OpenPanel` still lacks non-activating behavior, while supported desktop backends still process `NewTray`, and the main view fills the one window. Avalonia's desktop lifetime is the reference for the model, and NSH 0.5.0, which opens windows, tray icons, global shortcuts and one instance on Windows and Linux too, for each platform's mechanism.
 
 | Item | Reference | Done when |
 | --- | --- | --- |
-| Surfaces on Windows and Linux | macOS's `own` surface; NSH's `Window.open` (#989, #1011, #1137) | The backends run the app on a surface in no window and attach each one the app opens: windows, and panels that take the keyboard and hide as they lose it |
+| Surfaces on Windows and Linux | macOS's `own` surface; NSH's `Window.open` (#989, #1011, #1137) | Windows and Linux attach opened window surfaces; both backends' panels take focus and hide on blur, with non-activating behavior remaining |
 | Window limits on Linux | `XSetWMNormalHints` on X11, `xdg_toplevel.set_max_size` on Wayland; `GtkHeaderBar`'s decoration layout | GTK 4 reaches neither from its API: a maximum other than a fixed size holds, and `NoMinimize` and `NoMaximize` take the system title bar's buttons |
-| Tray icons on Windows | `Shell_NotifyIcon`; #988 | An icon shows its image, its panel above or under it (`Shell_NotifyIconGetRect`) and its menu; a drawn icon is an element rasterized into the icon whenever it changes |
+| Tray icons on Windows | `Shell_NotifyIcon`; #988 | An icon shows its image and menu, reports clicks and anchors a panel with `Shell_NotifyIconGetRect`; rasterizing a drawn icon whenever it changes remains |
 | Tray icons on Linux | StatusNotifierItem over D-Bus; #988, #1209 | KDE and GNOME with its AppIndicator extension show the icon and its menu; GNOME without one shows none |
 | Global shortcuts on Windows and Linux | `RegisterHotKey`; `XGrabKey`, the GlobalShortcuts portal; #988 | A shortcut shows a panel from any app, on Wayland once the user grants it |
 | One instance on Windows and Linux | A named mutex and pipe; a Unix socket; #1563 | A second launch hands its arguments to the running app, which hears `OnReopen`, and the files it names `OnOpenFiles` |

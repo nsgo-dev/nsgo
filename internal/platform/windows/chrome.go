@@ -257,6 +257,10 @@ func (w *window) chromeChanged() {
 // windowCommand carries out an ItemWindow.
 func (w *window) windowCommand(c *driver.WindowCommand) {
 	switch c.Action {
+	case driver.WindowDestroy:
+		w.destroying = true
+		w.visible = false
+		destroyWindow.Call(w.hwnd)
 	case driver.WindowSetTitleBar:
 		if c.TitleBar != w.chrome.titleBar || c.Height != w.chrome.height {
 			w.chrome.titleBar, w.chrome.height = c.TitleBar, c.Height
@@ -270,12 +274,26 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 	case driver.WindowToggleFullScreen:
 		w.toggleFullScreen()
 	case driver.WindowClose:
+		w.destroying = true
+		w.visible = false
 		postMessageW.Call(w.hwnd, wmClose, 0, 0)
+	case driver.WindowShow:
+		w.visible, w.focused = true, false
+		if w.kind == driver.SurfacePanel {
+			w.placeAtTray(c.Anchor)
+			w.orderFront()
+		} else {
+			showWindow.Call(w.hwnd, swShow)
+		}
+	case driver.WindowHide:
+		w.visible = false
+		showWindow.Call(w.hwnd, swHide)
 	case driver.WindowSetFrame:
 		w.setWindowFrame(c.Frame)
 	case driver.WindowSetLevel:
 		w.setLevel(c.Level)
 	case driver.WindowOrderFront:
+		w.visible, w.focused = true, false
 		w.orderFront()
 	case driver.WindowSetMenuBar:
 		w.setMenuBar(c.MenuBar)
