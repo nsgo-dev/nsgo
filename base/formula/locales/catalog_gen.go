@@ -168,7 +168,6 @@ const (
 	textRowSeparator
 	textEmptyCell
 	textEmptyRow
-	textEmpty
 	textMissing
 	textSymPlus
 	textSymMinus
@@ -287,6 +286,26 @@ const (
 	textOpRank
 	textOpArgmax
 	textOpArgmin
+	textOpArcsin
+	textOpArccos
+	textOpArctan
+	textOpArccot
+	textOpCoth
+	textOpSech
+	textOpCsch
+	textOpDeg
+	textOpHom
+	textOpLg
+	textOpLiminf
+	textOpLimsup
+	textOpPr
+	textOpPlim
+	textOpInjlim
+	textOpProjlim
+	textOpSinc
+	textOpId
+	textOpIm
+	textOpTr
 	numTexts
 )
 
@@ -320,7 +339,6 @@ var keyOfText = [numTexts]string{
 	"rowSeparator",
 	"emptyCell",
 	"emptyRow",
-	"empty",
 	"missing",
 	"symPlus",
 	"symMinus",
@@ -439,6 +457,26 @@ var keyOfText = [numTexts]string{
 	"opRank",
 	"opArgmax",
 	"opArgmin",
+	"opArcsin",
+	"opArccos",
+	"opArctan",
+	"opArccot",
+	"opCoth",
+	"opSech",
+	"opCsch",
+	"opDeg",
+	"opHom",
+	"opLg",
+	"opLiminf",
+	"opLimsup",
+	"opPr",
+	"opPlim",
+	"opInjlim",
+	"opProjlim",
+	"opSinc",
+	"opId",
+	"opIm",
+	"opTr",
 }
 
 // textsEn are the messages without arguments in en.
@@ -470,7 +508,6 @@ var textsEn = i18n.NewTexts(""+
 	"; "+
 	"empty cell"+
 	"empty row"+
-	"empty"+
 	"missing content"+
 	"plus"+
 	"minus"+
@@ -588,7 +625,27 @@ var textsEn = i18n.NewTexts(""+
 	"dimension"+
 	"rank"+
 	"arg max"+
-	"arg min",
+	"arg min"+
+	"arcsine"+
+	"arccosine"+
+	"arctangent"+
+	"arccotangent"+
+	"hyperbolic cotangent"+
+	"hyperbolic secant"+
+	"hyperbolic cosecant"+
+	"degree"+
+	"homomorphisms"+
+	"common logarithm"+
+	"limit inferior"+
+	"limit superior"+
+	"probability"+
+	"probability limit"+
+	"direct limit"+
+	"inverse limit"+
+	"cardinal sine"+
+	"identity"+
+	"image"+
+	"trace",
 	[]uint16{
 		7,
 		3,
@@ -617,7 +674,6 @@ var textsEn = i18n.NewTexts(""+
 		2,
 		10,
 		9,
-		5,
 		15,
 		4,
 		5,
@@ -736,6 +792,26 @@ var textsEn = i18n.NewTexts(""+
 		4,
 		7,
 		7,
+		7,
+		9,
+		10,
+		12,
+		20,
+		17,
+		19,
+		6,
+		13,
+		16,
+		14,
+		14,
+		11,
+		17,
+		12,
+		13,
+		13,
+		8,
+		5,
+		5,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -767,7 +843,6 @@ var textsZhHans = i18n.NewTexts(""+
 	"；"+
 	"空单元格"+
 	"空行"+
-	"空"+
 	"缺少内容"+
 	"加"+
 	"减"+
@@ -885,7 +960,27 @@ var textsZhHans = i18n.NewTexts(""+
 	"维数"+
 	"秩"+
 	"最大值点"+
-	"最小值点",
+	"最小值点"+
+	"反正弦"+
+	"反余弦"+
+	"反正切"+
+	"反余切"+
+	"双曲余切"+
+	"双曲正割"+
+	"双曲余割"+
+	"次数"+
+	"同态"+
+	"常用对数"+
+	"下极限"+
+	"上极限"+
+	"概率"+
+	"依概率极限"+
+	"正向极限"+
+	"逆向极限"+
+	"抽样函数"+
+	"恒等映射"+
+	"像"+
+	"迹",
 	[]uint16{
 		6,
 		6,
@@ -914,7 +1009,6 @@ var textsZhHans = i18n.NewTexts(""+
 		3,
 		12,
 		6,
-		3,
 		12,
 		3,
 		3,
@@ -1033,6 +1127,26 @@ var textsZhHans = i18n.NewTexts(""+
 		3,
 		12,
 		12,
+		9,
+		9,
+		9,
+		9,
+		12,
+		12,
+		12,
+		6,
+		6,
+		12,
+		9,
+		9,
+		6,
+		15,
+		12,
+		12,
+		12,
+		12,
+		3,
+		3,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -2301,13 +2415,6 @@ func EmptyRow(cx *core.Scope) string { return For(cx).EmptyRow() }
 // EmptyRow is the package's EmptyRow in the language of msgs.
 func (msgs Messages) EmptyRow() string { return msgs.text(textEmptyRow) }
 
-// Empty says "empty"
-// in the language the app shows under cx.
-func Empty(cx *core.Scope) string { return For(cx).Empty() }
-
-// Empty is the package's Empty in the language of msgs.
-func (msgs Messages) Empty() string { return msgs.text(textEmpty) }
-
 // Boxed says "boxed {body}"
 // in the language the app shows under cx.
 func Boxed(cx *core.Scope, body string) string { return For(cx).Boxed(body) }
@@ -3315,3 +3422,151 @@ func OpArgmin(cx *core.Scope) string { return For(cx).OpArgmin() }
 
 // OpArgmin is the package's OpArgmin in the language of msgs.
 func (msgs Messages) OpArgmin() string { return msgs.text(textOpArgmin) }
+
+// OpArcsin says "arcsine"
+// in the language the app shows under cx.
+func OpArcsin(cx *core.Scope) string { return For(cx).OpArcsin() }
+
+// OpArcsin is the package's OpArcsin in the language of msgs.
+func (msgs Messages) OpArcsin() string { return msgs.text(textOpArcsin) }
+
+// OpArccos says "arccosine"
+// in the language the app shows under cx.
+func OpArccos(cx *core.Scope) string { return For(cx).OpArccos() }
+
+// OpArccos is the package's OpArccos in the language of msgs.
+func (msgs Messages) OpArccos() string { return msgs.text(textOpArccos) }
+
+// OpArctan says "arctangent"
+// in the language the app shows under cx.
+func OpArctan(cx *core.Scope) string { return For(cx).OpArctan() }
+
+// OpArctan is the package's OpArctan in the language of msgs.
+func (msgs Messages) OpArctan() string { return msgs.text(textOpArctan) }
+
+// OpArccot says "arccotangent"
+// in the language the app shows under cx.
+func OpArccot(cx *core.Scope) string { return For(cx).OpArccot() }
+
+// OpArccot is the package's OpArccot in the language of msgs.
+func (msgs Messages) OpArccot() string { return msgs.text(textOpArccot) }
+
+// OpCoth says "hyperbolic cotangent"
+// in the language the app shows under cx.
+func OpCoth(cx *core.Scope) string { return For(cx).OpCoth() }
+
+// OpCoth is the package's OpCoth in the language of msgs.
+func (msgs Messages) OpCoth() string { return msgs.text(textOpCoth) }
+
+// OpSech says "hyperbolic secant"
+// in the language the app shows under cx.
+func OpSech(cx *core.Scope) string { return For(cx).OpSech() }
+
+// OpSech is the package's OpSech in the language of msgs.
+func (msgs Messages) OpSech() string { return msgs.text(textOpSech) }
+
+// OpCsch says "hyperbolic cosecant"
+// in the language the app shows under cx.
+func OpCsch(cx *core.Scope) string { return For(cx).OpCsch() }
+
+// OpCsch is the package's OpCsch in the language of msgs.
+func (msgs Messages) OpCsch() string { return msgs.text(textOpCsch) }
+
+// OpDeg says "degree"
+// in the language the app shows under cx.
+func OpDeg(cx *core.Scope) string { return For(cx).OpDeg() }
+
+// OpDeg is the package's OpDeg in the language of msgs.
+func (msgs Messages) OpDeg() string { return msgs.text(textOpDeg) }
+
+// OpHom says "homomorphisms"
+// in the language the app shows under cx.
+func OpHom(cx *core.Scope) string { return For(cx).OpHom() }
+
+// OpHom is the package's OpHom in the language of msgs.
+func (msgs Messages) OpHom() string { return msgs.text(textOpHom) }
+
+// OpLg says "common logarithm"
+// in the language the app shows under cx.
+//
+// lg, the logarithm to base 10.
+func OpLg(cx *core.Scope) string { return For(cx).OpLg() }
+
+// OpLg is the package's OpLg in the language of msgs.
+func (msgs Messages) OpLg() string { return msgs.text(textOpLg) }
+
+// OpLiminf says "limit inferior"
+// in the language the app shows under cx.
+func OpLiminf(cx *core.Scope) string { return For(cx).OpLiminf() }
+
+// OpLiminf is the package's OpLiminf in the language of msgs.
+func (msgs Messages) OpLiminf() string { return msgs.text(textOpLiminf) }
+
+// OpLimsup says "limit superior"
+// in the language the app shows under cx.
+func OpLimsup(cx *core.Scope) string { return For(cx).OpLimsup() }
+
+// OpLimsup is the package's OpLimsup in the language of msgs.
+func (msgs Messages) OpLimsup() string { return msgs.text(textOpLimsup) }
+
+// OpPr says "probability"
+// in the language the app shows under cx.
+func OpPr(cx *core.Scope) string { return For(cx).OpPr() }
+
+// OpPr is the package's OpPr in the language of msgs.
+func (msgs Messages) OpPr() string { return msgs.text(textOpPr) }
+
+// OpPlim says "probability limit"
+// in the language the app shows under cx.
+func OpPlim(cx *core.Scope) string { return For(cx).OpPlim() }
+
+// OpPlim is the package's OpPlim in the language of msgs.
+func (msgs Messages) OpPlim() string { return msgs.text(textOpPlim) }
+
+// OpInjlim says "direct limit"
+// in the language the app shows under cx.
+//
+// injlim, the inductive limit.
+func OpInjlim(cx *core.Scope) string { return For(cx).OpInjlim() }
+
+// OpInjlim is the package's OpInjlim in the language of msgs.
+func (msgs Messages) OpInjlim() string { return msgs.text(textOpInjlim) }
+
+// OpProjlim says "inverse limit"
+// in the language the app shows under cx.
+//
+// projlim, the projective limit.
+func OpProjlim(cx *core.Scope) string { return For(cx).OpProjlim() }
+
+// OpProjlim is the package's OpProjlim in the language of msgs.
+func (msgs Messages) OpProjlim() string { return msgs.text(textOpProjlim) }
+
+// OpSinc says "cardinal sine"
+// in the language the app shows under cx.
+func OpSinc(cx *core.Scope) string { return For(cx).OpSinc() }
+
+// OpSinc is the package's OpSinc in the language of msgs.
+func (msgs Messages) OpSinc() string { return msgs.text(textOpSinc) }
+
+// OpId says "identity"
+// in the language the app shows under cx.
+func OpId(cx *core.Scope) string { return For(cx).OpId() }
+
+// OpId is the package's OpId in the language of msgs.
+func (msgs Messages) OpId() string { return msgs.text(textOpId) }
+
+// OpIm says "image"
+// in the language the app shows under cx.
+//
+// im, the image of a map.
+func OpIm(cx *core.Scope) string { return For(cx).OpIm() }
+
+// OpIm is the package's OpIm in the language of msgs.
+func (msgs Messages) OpIm() string { return msgs.text(textOpIm) }
+
+// OpTr says "trace"
+// in the language the app shows under cx.
+func OpTr(cx *core.Scope) string { return For(cx).OpTr() }
+
+// OpTr is the package's OpTr in the language of msgs.
+func (msgs Messages) OpTr() string { return msgs.text(textOpTr) }

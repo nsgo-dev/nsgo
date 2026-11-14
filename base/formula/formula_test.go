@@ -305,6 +305,18 @@ func TestSpeech(t *testing.T) {
 		{`\mathbb{R}`, "double-struck R", "双线体R"},
 		{`\notacommand`, `error: \notacommand`, `错误：\notacommand`},
 		{`\sin x`, "sine x", "正弦 x"},
+		{`\arcsin x`, "arcsine x", "反正弦 x"},
+		{`\arccos x + \arctan y`, "arccosine x plus arctangent y", "反余弦 x 加 反正切 y"},
+		{`\coth x`, "hyperbolic cotangent x", "双曲余切 x"},
+		{`\deg p`, "degree p", "次数 p"},
+		{`\hom(A, B)`, "homomorphisms left parenthesis A comma B right parenthesis", "同态 左括号 A 逗号 B 右括号"},
+		{`\lg x`, "common logarithm x", "常用对数 x"},
+		{`\liminf_{n} a_n`, "limit inferior from n a sub n", "下极限，从n a下标n"},
+		{`\limsup a_n`, "limit superior a sub n", "上极限 a下标n"},
+		{`\argmax_x f`, "arg max from x f", "最大值点，从x f"},
+		{`\Pr(A)`, "probability left parenthesis A right parenthesis", "概率 左括号 A 右括号"},
+		{`\tg x + \ctg x + \sh x + \ch x`, "tangent x plus cotangent x plus hyperbolic sine x plus hyperbolic cosine x", "正切 x 加 余切 x 加 双曲正弦 x 加 双曲余弦 x"},
+		{`\arctg x + \cosec x`, "arctangent x plus cosecant x", "反正切 x 加 余割 x"},
 		{`16.7\,\text{ms} = \tfrac{1000}{60}`, "16.7 ms equals 1000 over 60", "16.7 ms 等于 60分之1000"},
 	} {
 		d := untie.ParseTeX(c.src, untie.Inline, untie.ParseOptions{}).Alt().Description

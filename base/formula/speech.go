@@ -77,6 +77,9 @@ func literal(n display.AltNode) string {
 
 func (s speaker) node(n display.AltNode) string {
 	m := s.m
+	if name, ok := operatorName(m, n); ok {
+		return name
+	}
 	switch n.Kind {
 	case display.AltKindRow:
 		words := make([]string, 0, len(n.Parts))
@@ -98,9 +101,6 @@ func (s speaker) node(n display.AltNode) string {
 	case display.AltKindText:
 		return n.Text
 	case display.AltKindOperator:
-		if f, ok := operatorNames[strings.TrimSpace(n.Text)]; ok {
-			return f(m)
-		}
 		return s.glyph(n.Text)
 	case display.AltKindFraction:
 		num, den := s.part(n, display.AltPartNumerator), s.part(n, display.AltPartDenominator)
@@ -518,7 +518,44 @@ var symbolNames = map[string]func(locales.Messages) string{
 	"∅": locales.Messages.SymEmptySet,
 }
 
-// operatorNames name the operators a formula says by name, as sin's sine.
+// operatorName says n by name if it is a named operator: one, as sin, or a row of them TeX writes in two words, as lim inf.
+func operatorName(m locales.Messages, n display.AltNode) (string, bool) {
+	var key strings.Builder
+	switch n.Kind {
+	case display.AltKindOperator:
+		key.WriteString(n.Text)
+	case display.AltKindRow:
+		words := 0
+		for _, p := range n.Parts {
+			switch p.Node.Kind {
+			case display.AltKindOperator:
+				key.WriteString(p.Node.Text)
+				words++
+			case display.AltKindSpace:
+			default:
+				return "", false
+			}
+		}
+		if words < 2 {
+			return "", false
+		}
+	default:
+		return "", false
+	}
+	// Untie writes some names with a thin space, as lim inf and arg max.
+	f, ok := operatorNames[strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, key.String())]
+	if !ok {
+		return "", false
+	}
+	return f(m), true
+}
+
+// operatorNames name the operators a formula says by name, as sin's sine, with the other spellings Untie knows of the same ones, as tg's tangent.
 var operatorNames = map[string]func(locales.Messages) string{
 	"sin": locales.Messages.OpSin,
 	"cos": locales.Messages.OpCos,
@@ -547,4 +584,35 @@ var operatorNames = map[string]func(locales.Messages) string{
 	"rank": locales.Messages.OpRank,
 	"argmax": locales.Messages.OpArgmax,
 	"argmin": locales.Messages.OpArgmin,
+	"arcsin": locales.Messages.OpArcsin,
+	"arccos": locales.Messages.OpArccos,
+	"arctan": locales.Messages.OpArctan,
+	"arccot": locales.Messages.OpArccot,
+	"coth": locales.Messages.OpCoth,
+	"sech": locales.Messages.OpSech,
+	"csch": locales.Messages.OpCsch,
+	"deg": locales.Messages.OpDeg,
+	"hom": locales.Messages.OpHom,
+	"lg": locales.Messages.OpLg,
+	"liminf": locales.Messages.OpLiminf,
+	"limsup": locales.Messages.OpLimsup,
+	"Pr": locales.Messages.OpPr,
+	"plim": locales.Messages.OpPlim,
+	"injlim": locales.Messages.OpInjlim,
+	"projlim": locales.Messages.OpProjlim,
+	"sinc": locales.Messages.OpSinc,
+	"id": locales.Messages.OpId,
+	"im": locales.Messages.OpIm,
+	"tr": locales.Messages.OpTr,
+	// Other spellings, as Russian texts write them.
+	"tg": locales.Messages.OpTan,
+	"ctg": locales.Messages.OpCot,
+	"cotg": locales.Messages.OpCot,
+	"cosec": locales.Messages.OpCsc,
+	"sh": locales.Messages.OpSinh,
+	"ch": locales.Messages.OpCosh,
+	"th": locales.Messages.OpTanh,
+	"cth": locales.Messages.OpCoth,
+	"arctg": locales.Messages.OpArctan,
+	"arcctg": locales.Messages.OpArccot,
 }
