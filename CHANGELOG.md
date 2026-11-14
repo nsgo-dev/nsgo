@@ -4,6 +4,7 @@
 
 - Add Windows notification-area tray icons, opened window surfaces and focus-hiding panels with PNG images, tooltips, click events, menus and `Shell_NotifyIconGetRect` panel anchoring (#31).
 - Add a reactive Go engine with owners, memos, effects, resources loaded off the engine's goroutine with suspense boundaries, selectors, keyed collections, values with undo and redo or kept in storage, sources on other goroutines and regions that lays out and sends only what each update changed, to native views in one batch, with a performance monitor over the app on macOS, iOS, Windows and Linux that any build shows when started with `--nsgo-fps`, as `--nsgo-lang` and `--nsgo-appearance` start it in a locale and an appearance.
+- nsgotest can return target screenshots to tests, preserve screenshot subdirectories and spaces, and choose the output directory with `-screenshots`.
 - Web views can add headers to their initial URL request on Apple, Windows, Linux and Android.
 - Web views can use an in-memory website data store on Apple, Windows and Linux, and disable local web storage on Android.
 - Apps can serve custom URL schemes from web views on Apple, Windows and Linux.

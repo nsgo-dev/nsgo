@@ -1,11 +1,15 @@
 package nsgotest
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -432,26 +436,53 @@ func (t *target) scroll(v *View, d driver.Points) {
 	t.check(t.surface.Scroll(at, delta))
 }
 
-// Screenshot captures the app as the platform shows it, as name.png in
-// the directory `nsgo test -target` saves screenshots to. Headless runs
-// have no pixels: it logs and does nothing.
+// CapturePNG captures the app as the platform shows it and returns its PNG.
+// Headless runs skip the test because they have no native pixels.
+func (a *App) CapturePNG() []byte {
+	a.t.Helper()
+	if a.target == nil {
+		a.t.Skip("nsgotest: no pixels headless; run under nsgo test -target")
+	}
+	png, err := a.target.screenshotPNG()
+	if err != nil {
+		a.t.Fatalf("nsgotest: capture: %v", err)
+	}
+	return append([]byte(nil), png...)
+}
+
+// Capture captures the app as the platform shows it and decodes its PNG.
+// Headless runs skip the test because they have no native pixels.
+func (a *App) Capture() image.Image {
+	pngData := a.CapturePNG()
+	img, err := png.Decode(bytes.NewReader(pngData))
+	if err != nil {
+		a.t.Fatalf("nsgotest: decode capture: %v", err)
+	}
+	return img
+}
+
+// Screenshot captures the app as the platform shows it. name is a relative
+// path under the directory `nsgo test -target` saves screenshots to; its
+// extension is optional and .png is added when absent. Headless runs have no
+// pixels and keep the historical log-only behavior.
 func (a *App) Screenshot(name string) {
 	a.t.Helper()
+	if name == "" || filepath.IsAbs(name) || pathHasParent(name) {
+		a.t.Fatalf("nsgotest: screenshot name must be a relative path without ..: %q", name)
+	}
 	if a.target == nil {
 		a.t.Logf("nsgotest: no screenshot %q headless; nsgo test -target takes it", name)
 		return
 	}
-	png, err := a.target.screenshotPNG()
-	if err != nil {
-		a.t.Fatalf("nsgotest: screenshot %q: %v", name, err)
-	}
+	png := a.CapturePNG()
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(name))
 	// The tool saves it: the app may run on a phone, or in a browser. A
 	// device's log keeps lines of a few kilobytes, so it goes in chunks.
 	data := base64.StdEncoding.EncodeToString(png)
 	const chunk = 3000
 	n := (len(data) + chunk - 1) / chunk
 	for i := range n {
-		fmt.Printf("nsgo-screenshot %s %d/%d %s\n", name, i+1, n, data[i*chunk:min((i+1)*chunk, len(data))])
+		fmt.Printf("nsgo-screenshot ~%s %d/%d %s\n", encoded, i+1, n, data[i*chunk:min((i+1)*chunk, len(data))])
 	}
 }
 
@@ -459,4 +490,13 @@ func (a *App) Screenshot(name string) {
 func (t *target) screenshotPNG() ([]byte, error) {
 	t.settle()
 	return t.surface.Screenshot()
+}
+
+func pathHasParent(name string) bool {
+	for _, part := range strings.FieldsFunc(filepath.ToSlash(name), func(r rune) bool { return r == '/' }) {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
 }

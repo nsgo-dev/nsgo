@@ -68,8 +68,17 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	}
 	progress.done(fmt.Sprintf("built the tests for %s", opts.target), "")
 	defer runner.close()
-	shots := filepath.Join(p.Dir, ".nsgo", "test", "screenshots", opts.target)
+	shots := opts.screenshots
+	if shots == "" {
+		shots = filepath.Join(p.Dir, ".nsgo", "test", "screenshots", opts.target)
+	} else if !filepath.IsAbs(shots) {
+		shots, err = filepath.Abs(shots)
+		if err != nil {
+			return err
+		}
+	}
 	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, trace: opts.trace, out: os.Stderr}
+	savedPaths := map[string]bool{}
 	// A package that links no platform, as a library's, runs headless in
 	// the target's runtime: the web's engine, say.
 	env := slices.Clone(opts.env)
@@ -94,7 +103,10 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		text, saved := saveScreenshots(out.String(), shots)
+		text, saved, err := saveScreenshots(out.String(), shots, savedPaths)
+		if err != nil {
+			return err
+		}
 		t := parseTestOutput(name, text, code, err)
 		if t.Elapsed == 0 {
 			t.Elapsed = time.Since(started)
@@ -287,13 +299,14 @@ func parseTestOutput(name, out string, code int, runErr error) *testResult {
 	return t
 }
 
-// screenshotLine is how nsgotest hands the tool a screenshot: its name,
-// then the PNG in base64, in chunks a device's log keeps whole.
+// screenshotLine is how nsgotest hands the tool a screenshot: its encoded
+// name, then the PNG in base64, in chunks a device's log keeps whole.
 var screenshotLine = regexp.MustCompile(`nsgo-screenshot (\S+) (\d+)/(\d+) (\S*)`)
 
 // saveScreenshots saves the screenshots out carries in dir and returns
-// out without them, and the files written.
-func saveScreenshots(out, dir string) (string, []string) {
+// out without them, the files written and an error for invalid or duplicate
+// paths.
+func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, error) {
 	var kept strings.Builder
 	parts := map[string][]string{}
 	var order []string
@@ -307,6 +320,14 @@ func saveScreenshots(out, dir string) (string, []string) {
 			continue
 		}
 		name := m[1]
+		if strings.HasPrefix(name, "~") {
+			decoded, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(name, "~"))
+			if err != nil {
+				kept.WriteString("screenshot: invalid name encoding\n")
+				continue
+			}
+			name = string(decoded)
+		}
 		i, _ := strconv.Atoi(m[2])
 		n, _ := strconv.Atoi(m[3])
 		if parts[name] == nil {
@@ -324,16 +345,35 @@ func saveScreenshots(out, dir string) (string, []string) {
 			kept.WriteString("screenshot " + name + ": " + err.Error() + "\n")
 			continue
 		}
-		path := filepath.Join(dir, filepath.Base(name))
+		if name == "" || filepath.IsAbs(name) || screenshotPathHasParent(name) {
+			return kept.String(), saved, fmt.Errorf("screenshot %q: name must be a relative path without ..", name)
+		}
+		path := filepath.Join(dir, name)
 		if filepath.Ext(path) != ".png" {
 			path += ".png"
 		}
-		os.MkdirAll(dir, 0o755)
+		path = filepath.Clean(path)
+		if seen[path] {
+			return kept.String(), saved, fmt.Errorf("screenshot %q resolves to %s more than once", name, path)
+		}
+		seen[path] = true
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return kept.String(), saved, fmt.Errorf("screenshot %q: create directory: %w", name, err)
+		}
 		if err := os.WriteFile(path, data, 0o644); err == nil {
 			saved = append(saved, path)
 		}
 	}
-	return kept.String(), saved
+	return kept.String(), saved, nil
+}
+
+func screenshotPathHasParent(name string) bool {
+	for _, part := range strings.FieldsFunc(filepath.ToSlash(name), func(r rune) bool { return r == '/' }) {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // targetFor builds the tests as opts.target's package and returns how to

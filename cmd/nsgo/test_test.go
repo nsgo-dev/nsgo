@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,5 +100,28 @@ func TestIsTestName(t *testing.T) {
 		if got := isTestName(name); got != want {
 			t.Errorf("isTestName(%q) = %v", name, got)
 		}
+	}
+}
+
+func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
+	dir := t.TempDir()
+	encode := func(name string) string { return "~" + base64.RawURLEncoding.EncodeToString([]byte(name)) }
+	line := func(name string) string { return "nsgo-screenshot " + encode(name) + " 1/1 iVBORw0KGgo=" }
+	seen := map[string]bool{}
+	if _, saved, err := saveScreenshots(line("en/my library")+"\n"+line("ja/my library")+"\n", dir, seen); err != nil {
+		t.Fatal(err)
+	} else if len(saved) != 2 {
+		t.Fatalf("saved %v, want two screenshots", saved)
+	}
+	for _, name := range []string{"en/my library.png", "ja/my library.png"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("screenshot %s: %v", name, err)
+		}
+	}
+	if _, _, err := saveScreenshots(line("en/my library")+"\n", dir, seen); err == nil {
+		t.Fatal("duplicate screenshot path succeeded")
+	}
+	if _, _, err := saveScreenshots(line("../outside")+"\n", dir, map[string]bool{}); err == nil {
+		t.Fatal("parent screenshot path succeeded")
 	}
 }
