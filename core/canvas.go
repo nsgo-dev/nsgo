@@ -32,8 +32,46 @@ type Canvas struct {
 	OnPress   func(PressEvent)
 	OnLayout  func(Bounds)
 	Ref       *Ref
+	// Label names the drawing for assistive technology, which reads it as an image; LabelFunc follows what it reads, as Text's does.
 	Label     string
+	LabelFunc func() string
 	TestID    string
+	// Em sizes the canvas where its style sets no size, in ems of the font size it inherits, scaled by the user's text size setting as text is: Em.Width wide and Em.Ascent+Em.Descent high, so it grows with the text around it as an icon does. In a text's attachment aligned to the baseline (VerticalAlignBaseline), its baseline, Em.Descent ems above its bottom, sits on the line's, and the text's NoFontScaling and MaxFontSizeMultiplier hold it too. EmFunc follows what it reads, laying the canvas out again; base/formula sizes its formulas so.
+	Em     EmBox
+	EmFunc func() EmBox
+}
+
+// EmBox is a canvas's natural size in ems of its font size (Canvas.Em): Width wide, reaching Ascent above its baseline and Descent below it.
+type EmBox struct {
+	Width, Ascent, Descent float32
+}
+
+// sized reports whether e sizes a canvas.
+func (e EmBox) sized() bool { return e.Width > 0 || e.Ascent+e.Descent > 0 }
+
+// emNode is what an Em canvas is sized by.
+type emNode struct {
+	box EmBox
+	// fontSize is the scaled font size it inherits, in points.
+	fontSize Points
+}
+
+// naturalSize is what an Em canvas measures without a style size.
+func (e *emNode) naturalSize() Size {
+	fs := e.fontSize
+	if fs <= 0 {
+		fs = DefaultFontSize
+	}
+	return Size{Width: Points(max(e.box.Width, 0)) * fs, Height: Points(max(e.box.Ascent, 0)+max(e.box.Descent, 0)) * fs}
+}
+
+// descent is how far below its baseline the bottom of an Em canvas height high reaches: Em.Descent's share of it.
+func (e *emNode) descent(height Points) Points {
+	asc, desc := max(e.box.Ascent, 0), max(e.box.Descent, 0)
+	if asc+desc <= 0 {
+		return 0
+	}
+	return height * Points(desc/(asc+desc))
 }
 
 // Render implements Node.
@@ -52,6 +90,8 @@ type canvasNode struct {
 	color Color
 	// paintKey is what paint was resolved from.
 	paintKey canvasPaintKey
+	// em sizes a canvas with Em or EmFunc.
+	em *emNode
 }
 
 // canvasPaintKey is what a canvas's view paints are resolved from.
@@ -92,9 +132,21 @@ func (t *Tree) mountCanvas(cx *Scope, parent *node, c Canvas) {
 	t.setRef(n, c.Ref)
 	n.h = handlers{press: c.OnPress, layout: c.OnLayout}
 	n.props = driver.ViewProps{Role: RoleImage, Label: c.Label, TestID: c.TestID}
+	t.bindAccessibility(cx, n, a11y{labelFunc: c.LabelFunc})
 	cn := &canvasNode{draw: c.Draw, size: NewSignal(cx, Size{})}
 	n.canvas = cn
 	t.canvases = append(t.canvases, n)
+	if c.Em.sized() || c.EmFunc != nil {
+		cn.em = &emNode{box: c.Em}
+	}
+	if c.EmFunc != nil {
+		cx.renderEffect(func() {
+			if box := c.EmFunc(); box != cn.em.box {
+				cn.em.box = box
+				t.relayout(n)
+			}
+		})
+	}
 	cx.renderEffect(func() {
 		size := cn.size.Get()
 		if size == (Size{}) || cn.draw == nil {

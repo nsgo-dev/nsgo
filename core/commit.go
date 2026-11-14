@@ -358,6 +358,17 @@ func (t *Tree) resolve(n *node, inherited textFields, force bool) {
 		t.within(n.owner, func() { in.color.Set(in.text.Color) })
 	case n.canvas != nil:
 		t.resolvePaint(n, &inherited)
+		if em := n.canvas.em; em != nil {
+			// An Em canvas follows its font as text does, in an attachment as far as the text's own scaling goes.
+			scale := t.fontScale
+			if inherited.attachScale > 0 {
+				scale = inherited.attachScale
+			}
+			if fs := scaleText(inherited.textStyle(), scale).Font.Size; fs != em.fontSize {
+				em.fontSize = fs
+				t.markLayout(n)
+			}
+		}
 	case n.text != nil:
 		n.props.SelectionColor = inherited.SelectionColor
 		tn := n.text
@@ -387,7 +398,7 @@ func (t *Tree) resolve(n *node, inherited textFields, force bool) {
 		ts := scaleText(inherited.textStyle(), scale)
 		ts.RTL = n.textRTL(inherited, tn.content)
 		ts.Align = sidedAlign(ts.Align, ts.RTL)
-		sized := tn.attachments > 0 && t.sizeAttachments(n, inherited, kids)
+		sized := tn.attachments > 0 && t.sizeAttachments(n, inherited, scale, kids)
 		shadow := inherited.textShadow()
 		if tn.stale || sized || tn.prepared == nil || ts != tn.style || shadow != tn.text.Shadow {
 			lines, ellipsize := n.textLimits()
@@ -403,8 +414,8 @@ func (t *Tree) resolve(n *node, inherited textFields, force bool) {
 					if w := sp.attach; w != nil {
 						b.WriteRune(driver.AttachmentRune)
 						at.Attachments = append(at.Attachments, driver.TextAttachment{Offset: start,
-							Size: w.attach.size, Align: w.verticalAlign()})
-						at.Spans = append(at.Spans, driver.TextSpan{Start: start, End: b.Len(), Style: ts})
+							Size: w.attach.size, Align: w.attach.align, Descent: w.attach.descent})
+						at.Spans = append(at.Spans, driver.TextSpan{Start: start, End: b.Len(), Style: ts, Copy: sp.content})
 						continue
 					}
 					own := sp.style.inherit(inherited)
@@ -505,7 +516,9 @@ func (n *node) textRTL(inherited textFields, content string) bool {
 		if n.text != nil && len(n.text.spans) > 0 {
 			var b strings.Builder
 			for _, sp := range n.text.spans {
-				b.WriteString(sp.content)
+				if sp.attach == nil { // an attachment's content is what it copies as
+					b.WriteString(sp.content)
+				}
 			}
 			content = b.String()
 		}
@@ -519,27 +532,55 @@ func (n *node) textRTL(inherited textFields, content string) bool {
 const attachmentSpace = 1 << 20
 
 // sizeAttachments resolves and lays out the attachments of text n, each a
-// layout root at its content size, and reports whether a size changed.
-func (t *Tree) sizeAttachments(n *node, inherited textFields, force bool) bool {
+// layout root at its content size, with scale the user's text size setting as far as the text takes it, and reports whether a size or where one sits in its line changed.
+func (t *Tree) sizeAttachments(n *node, inherited textFields, scale float32, force bool) bool {
 	changed := false
+	inherited.attachScale = scale
 	for _, sp := range n.text.spans {
 		w := sp.attach
 		if w == nil {
 			continue
 		}
 		t.resolve(w, inherited, force)
-		if !w.layoutDirty {
-			continue
+		if w.layoutDirty {
+			t.layoutRoot(w, Size{Width: attachmentSpace, Height: attachmentSpace}, false)
+			t.syncFrames(w)
+			l := &w.lstate.Rounded
+			if size := (Size{Width: Points(l.Size.Width), Height: Points(l.Size.Height)}); size != w.attach.size {
+				w.attach.size = size
+				changed = true
+			}
 		}
-		t.layoutRoot(w, Size{Width: attachmentSpace, Height: attachmentSpace}, false)
-		t.syncFrames(w)
-		l := &w.lstate.Rounded
-		if size := (Size{Width: Points(l.Size.Width), Height: Points(l.Size.Height)}); size != w.attach.size {
-			w.attach.size = size
+		align := w.verticalAlign()
+		descent := w.baselineDescent(align)
+		if align != w.attach.align || descent != w.attach.descent {
+			w.attach.align, w.attach.descent = align, descent
 			changed = true
 		}
 	}
 	return changed
+}
+
+// baselineDescent is how far attachment view w, aligned as align says, reaches below the line's baseline: where the one view it made is an Em canvas, its baseline's height above w's bottom.
+func (w *node) baselineDescent(align VerticalAlign) Points {
+	if align != 0 && align != VerticalAlignBaseline {
+		return 0
+	}
+	c := w
+	if kids := w.flatChildren(); len(kids) == 1 {
+		c = kids[0]
+	}
+	if c.canvas == nil || c.canvas.em == nil {
+		return 0
+	}
+	l := &c.lstate.Rounded
+	h := Points(w.lstate.Rounded.Size.Height)
+	if c != w {
+		// Its frame in w's.
+		bottom := Points(l.Location.Y) + Points(l.Size.Height)
+		return max(h-bottom+c.canvas.em.descent(Points(l.Size.Height)), 0)
+	}
+	return c.canvas.em.descent(h)
 }
 
 // verticalAlign is where attachment view w sits in its line: its span's

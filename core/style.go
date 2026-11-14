@@ -950,6 +950,8 @@ type textFields struct {
 	// StrokeDash holds the dashes' bits, so the fields stay comparable;
 	// empty is unset.
 	StrokeDash string
+	// attachScale is, inside a text's attachments, what the user's text size setting multiplies the text's sizes by, which its Em canvases take; 0 elsewhere.
+	attachScale float32
 }
 
 // inherit returns s's text fields, falling back to parent's. A line

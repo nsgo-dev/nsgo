@@ -100,7 +100,7 @@ func (n *node) sentProps() driver.ViewProps {
 	}
 	if tn := n.text; tn != nil && p.Label == "" && tn.text.HasHidden() {
 		// Screen readers leave hidden spans out.
-		p.Label = driver.ShownText(tn.text.Text, tn.text.Spans)
+		p.Label = driver.ShownText(tn.text.Text, tn.text.Spans, tn.attachmentLabels())
 	}
 	if p.Accessible == AccessibleYes && p.Label == "" && n.text == nil {
 		var b strings.Builder
@@ -122,7 +122,7 @@ func (n *node) appendText(b *strings.Builder) {
 		case c.props.Label != "":
 			s = c.props.Label
 		case c.text != nil:
-			s = driver.ShownText(c.text.text.Text, c.text.text.Spans)
+			s = driver.ShownText(c.text.text.Text, c.text.text.Spans, c.text.attachmentLabels())
 		}
 		if s = strings.TrimSpace(s); s != "" {
 			if b.Len() > 0 {
@@ -133,4 +133,26 @@ func (n *node) appendText(b *strings.Builder) {
 		}
 		c.appendText(b)
 	}
+}
+
+// attachmentLabels are what assistive technology reads for each of the text's attachments, in order: the view's label, else the labels and texts inside it.
+func (tn *textNode) attachmentLabels() []string {
+	if tn.attachments == 0 {
+		return nil
+	}
+	var labels []string
+	for _, sp := range tn.spans {
+		w := sp.attach
+		if w == nil {
+			continue
+		}
+		label := w.props.Label
+		if label == "" {
+			var b strings.Builder
+			w.appendText(&b)
+			label = b.String()
+		}
+		labels = append(labels, label)
+	}
+	return labels
 }

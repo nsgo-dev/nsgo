@@ -46,6 +46,8 @@ type TextSpan struct {
 	// from the font's ascent to its descent, behind the selection and
 	// the glyphs.
 	Background TextBackground
+	// Copy is what a copy takes in place of the attachment the span styles, as a formula copies as its TeX; empty leaves the attachment out. Screen readers read the attachment's label instead (ShownText).
+	Copy string
 }
 
 // PressesAt reports whether a pressable text takes a press on byte
@@ -82,38 +84,90 @@ func (t *AttributedText) HasHidden() bool {
 	return false
 }
 
-// CopiedText is what a copy of text's bytes from to to takes: its hidden
-// spans and attachments left out.
+// CopiedText is what a copy of text's bytes from to to takes: its hidden spans left out, and each attachment the copy takes whole replaced by its span's Copy, or left out without one.
 func CopiedText(text string, spans []TextSpan, from, to int) string {
-	return strings.ReplaceAll(withoutHidden(text, spans, from, to), string(AttachmentRune), "")
+	var b strings.Builder
+	eachShown(text, spans, from, to, func(s string, start int) {
+		for {
+			i := strings.IndexRune(s, AttachmentRune)
+			if i < 0 {
+				b.WriteString(s)
+				return
+			}
+			b.WriteString(s[:i])
+			b.WriteString(attachmentCopy(spans, start+i))
+			n := len(string(AttachmentRune))
+			s, start = s[i+n:], start+i+n
+		}
+	})
+	return b.String()
+}
+
+// attachmentCopy is the Copy of the span styling the attachment at byte offset i.
+func attachmentCopy(spans []TextSpan, i int) string {
+	for _, sp := range spans {
+		if sp.Start == i && sp.End == i+len(string(AttachmentRune)) {
+			return sp.Copy
+		}
+	}
+	return ""
 }
 
 // VisibleText is text with its hidden spans left out, its attachments'
 // places kept.
-func VisibleText(text string, spans []TextSpan) string { return withoutHidden(text, spans, 0, len(text)) }
-
-func withoutHidden(text string, spans []TextSpan, from, to int) string {
+func VisibleText(text string, spans []TextSpan) string {
 	var b strings.Builder
+	eachShown(text, spans, 0, len(text), func(s string, _ int) { b.WriteString(s) })
+	return b.String()
+}
+
+// eachShown calls f with each piece of text's bytes from to to outside its hidden spans, in order, with its offset in text.
+func eachShown(text string, spans []TextSpan, from, to int, f func(s string, start int)) {
 	at := from
 	for _, sp := range spans {
 		if !sp.Hidden || sp.End <= at || sp.Start >= to {
 			continue
 		}
 		if sp.Start > at {
-			b.WriteString(text[at:sp.Start])
+			f(text[at:sp.Start], at)
 		}
 		at = max(at, sp.End)
 	}
 	if at < to {
-		b.WriteString(text[at:to])
+		f(text[at:to], at)
 	}
-	return b.String()
 }
 
-// ShownText is text as screen readers read it: its hidden spans left
-// out.
-func ShownText(text string, spans []TextSpan) string {
-	return CopiedText(text, spans, 0, len(text))
+// ShownText is text as screen readers read it: its hidden spans left out, and its attachments, in order, read as labels say, separated from the text around them by a space; one past the labels is left out. A span's Copy is never read: a formula reads as its spoken label, not its TeX.
+func ShownText(text string, spans []TextSpan, labels []string) string {
+	var b strings.Builder
+	// write writes a label, apart from what comes before it.
+	write := func(label string) {
+		if b.Len() > 0 && b.String()[b.Len()-1] != ' ' {
+			b.WriteByte(' ')
+		}
+		b.WriteString(label)
+	}
+	eachShown(text, spans, 0, len(text), func(s string, start int) {
+		n := len(string(AttachmentRune))
+		for {
+			i := strings.IndexRune(s, AttachmentRune)
+			if i < 0 {
+				b.WriteString(s)
+				return
+			}
+			b.WriteString(s[:i])
+			// Attachments in hidden spans count too, so labels keep their order.
+			if k := strings.Count(text[:start+i], string(AttachmentRune)); k < len(labels) && labels[k] != "" {
+				write(labels[k])
+				if rest := s[i+n:]; rest != "" && rest[0] != ' ' {
+					b.WriteByte(' ')
+				}
+			}
+			s, start = s[i+n:], start+i+n
+		}
+	})
+	return b.String()
 }
 
 // AttachmentRune stands in a text for an attachment, as the object
@@ -129,6 +183,8 @@ type TextAttachment struct {
 	Offset int
 	Size   Size
 	Align  VerticalAlign
+	// Descent is how far an attachment aligned to the baseline reaches below it: the height of its own baseline above its bottom, as a formula's. 0 puts its bottom on the baseline; other aligns ignore it.
+	Descent Points
 }
 
 // FontExtent is the vertical metrics of the font around an attachment:
@@ -152,7 +208,7 @@ func (a TextAttachment) Ascent(font FontExtent) Points {
 	case VerticalAlignMiddle:
 		return (h + font.XHeight) / 2
 	}
-	return h
+	return h - a.Descent
 }
 
 // Extent returns what a's line reserves for it above and below the

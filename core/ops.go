@@ -267,7 +267,11 @@ func (t *Tree) setText(cx *Scope, n *node, v Text) {
 			t.setClasses(w, sp.Class)
 			t.restyle(w)
 			t.mount(cx, w, sp.Attachment)
-			tn.spans = append(tn.spans, spanNode{attach: w})
+			copied := sp.Content
+			if sp.ContentFunc != nil {
+				copied = sp.ContentFunc()
+			}
+			tn.spans = append(tn.spans, spanNode{content: copied, attach: w})
 			tn.attachments++
 			continue
 		}

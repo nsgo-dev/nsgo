@@ -488,8 +488,11 @@ type spanNode struct {
 // attachNode is the view of a text's attachment: a layout root of its own
 // at its content size, which the text places in its lines.
 type attachNode struct {
-	size Size // what the text was prepared with
-	cut  bool // cut off by the text's line limit
+	// size, align and descent are what the text was prepared with.
+	size    Size
+	align   VerticalAlign
+	descent Points
+	cut     bool // cut off by the text's line limit
 }
 
 type inputNode struct {
@@ -794,11 +797,11 @@ func (t *Tree) reorder(n *node) {
 	t.markGroups(n)
 }
 
-// markGroups marks the groups n is in that read their texts for a label
-// (sentProps): what n shows of its own may have changed.
+// markGroups marks the groups n is in that read their texts for a label, and the texts it is an attachment of, which read its label (sentProps): what n shows of its own may have changed.
 func (t *Tree) markGroups(n *node) {
 	for p := n.parent; p != nil; p = p.parent {
-		if p.props.Accessible == AccessibleYes && p.props.Label == "" && p.text == nil {
+		// A text reads its attachments' labels where it has hidden spans.
+		if p.props.Accessible == AccessibleYes && p.props.Label == "" && p.text == nil || p.text != nil && p.text.attachments > 0 {
 			t.mark(p)
 		}
 	}
@@ -1641,13 +1644,13 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 			t.setClasses(w, sp.Class)
 			t.bindStyle(cx, w, sp.Style, sp.StyleFunc)
 			t.mount(cx, w, sp.Attachment)
-			n.text.spans = append(n.text.spans, spanNode{attach: w})
+			n.text.spans = append(n.text.spans, spanNode{content: sp.Content, attach: w})
 			n.text.attachments++
-			continue
+		} else {
+			style, cls := t.spanStyle(n, sp.Class, sp.Style)
+			n.text.spans = append(n.text.spans, spanNode{content: sp.Content, style: style, press: sp.OnPress, long: sp.OnLongPress, cls: cls})
+			t.listenForSpan(n, sp)
 		}
-		style, cls := t.spanStyle(n, sp.Class, sp.Style)
-		n.text.spans = append(n.text.spans, spanNode{content: sp.Content, style: style, press: sp.OnPress, long: sp.OnLongPress, cls: cls})
-		t.listenForSpan(n, sp)
 		if sp.ContentFunc != nil {
 			cx.renderEffect(func() {
 				if s := sp.ContentFunc(); s != n.text.spans[i].content {
@@ -1657,7 +1660,7 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 				}
 			})
 		}
-		if sp.StyleFunc != nil {
+		if sp.StyleFunc != nil && sp.Attachment == nil {
 			cx.renderEffect(func() {
 				s := sp.Style.Merge(sp.StyleFunc())
 				if c := n.text.spans[i].cls; c != nil {
@@ -1724,7 +1727,7 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 					t.setClasses(w, sp.Class)
 					t.bindStyle(attached, w, sp.Style, nil)
 					t.within(attached, func() { t.mount(attached, w, sp.Attachment) })
-					n.text.spans = append(n.text.spans, spanNode{attach: w})
+					n.text.spans = append(n.text.spans, spanNode{content: sp.Content, attach: w})
 					n.text.attachments++
 					continue
 				}

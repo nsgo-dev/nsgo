@@ -40,8 +40,7 @@ const (
 type VerticalAlign uint8
 
 const (
-	// VerticalAlignBaseline puts its bottom on the baseline; it is the
-	// default.
+	// VerticalAlignBaseline puts its bottom on the baseline, or its own baseline where it has one (TextAttachment.Descent); it is the default.
 	VerticalAlignBaseline VerticalAlign = iota + 1
 	// VerticalAlignTextTop puts its top at the font's ascent.
 	VerticalAlignTextTop

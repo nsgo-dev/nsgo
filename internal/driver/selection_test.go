@@ -433,3 +433,69 @@ func TestCopiedTextCutsHiddenSpansAtTheRangesEnds(t *testing.T) {
 		t.Errorf("VisibleText = %q: attachments keep their place", got)
 	}
 }
+
+// A copy takes an attachment it holds whole as its span's Copy, and screen readers its label, never the Copy.
+func TestCopiesTakeAttachmentsCopies(t *testing.T) {
+	obj := string(AttachmentRune)
+	text := "a " + obj + " b" + obj + "HID"
+	spans := []TextSpan{
+		{Start: 0, End: 2},
+		{Start: 2, End: 2 + len(obj), Copy: "$x$"},
+		{Start: 2 + len(obj), End: 4 + len(obj)},
+		{Start: 4 + len(obj), End: 4 + 2*len(obj)}, // no Copy: left out
+		{Start: 4 + 2*len(obj), End: len(text), Hidden: true},
+	}
+	for _, c := range []struct {
+		from, to int
+		want     string
+	}{
+		{0, len(text), "a $x$ b"},
+		{0, 2, "a "},
+		{2 + len(obj), len(text), " b"},
+		{1, 3 + len(obj), " $x$ "},
+	} {
+		if got := CopiedText(text, spans, c.from, c.to); got != c.want {
+			t.Errorf("CopiedText(%d, %d) = %q, want %q", c.from, c.to, got, c.want)
+		}
+	}
+	if got := ShownText(text, spans, []string{"x", "an image"}); got != "a x b an image" {
+		t.Errorf("ShownText = %q: attachments read as their labels", got)
+	}
+	if got := ShownText(text, spans, nil); got != "a  b" {
+		t.Errorf("ShownText without labels = %q", got)
+	}
+	if got := ShownText("E"+obj+"=", []TextSpan{{Start: 1, End: 1 + len(obj), Copy: "$x$"}}, []string{"x"}); got != "E x =" {
+		t.Errorf("ShownText = %q: a label stands apart from the words around it", got)
+	}
+
+	// Across texts, as backends copy a selection.
+	texts := spannedTexts{newFake("E "+obj+" m", frame{0, 0, 200, 20}, "Last", frame{0, 40, 200, 20}),
+		[][]TextSpan{{{Start: 0, End: 2}, {Start: 2, End: 2 + len(obj), Copy: "$E=mc^2$"}, {Start: 2 + len(obj), End: 4 + len(obj)}}, nil}}
+	var m SelectionModel
+	m.Press(texts, at(0, 5), 1, false)
+	m.Drag(texts, at(200, 50))
+	wantText(t, &m, texts, "E $E=mc^2$ m\nLast")
+}
+
+func TestAttachmentDescent(t *testing.T) {
+	font := FontExtent{Ascent: 15, Descent: 5, XHeight: 8}
+	for _, c := range []struct {
+		align       VerticalAlign
+		descent     Points
+		ascent      Points
+		above, blow Points
+	}{
+		{0, 0, 20, 20, 0},
+		{VerticalAlignBaseline, 6, 14, 14, 6},
+		{0, 6, 14, 14, 6},
+		{VerticalAlignTextTop, 6, 15, 15, 5},
+		{VerticalAlignTextBottom, 6, 15, 15, 5},
+		{VerticalAlignMiddle, 6, 14, 14, 6},
+	} {
+		a := TextAttachment{Size: Size{Width: 10, Height: 20}, Align: c.align, Descent: c.descent}
+		above, below := a.Extent(font)
+		if got := a.Ascent(font); got != c.ascent || above != c.above || below != c.blow {
+			t.Errorf("align %d, descent %v: ascent %v, extent %v/%v; want %v, %v/%v", c.align, c.descent, got, above, below, c.ascent, c.above, c.blow)
+		}
+	}
+}

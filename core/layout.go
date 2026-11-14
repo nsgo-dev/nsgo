@@ -89,6 +89,8 @@ func (n *node) Measure(known layout.Size[layout.Opt], available layout.Size[layo
 		m = fitNatural(n.image.naturalSize(), known)
 	case n.icon != nil:
 		m = fitNatural(n.icon.naturalSize(), known)
+	case n.canvas != nil && n.canvas.em != nil:
+		m = fitNatural(n.canvas.em.naturalSize(), known)
 	case n.native != nil:
 		m = fitNatural(n.native.size, known)
 	default:
@@ -312,6 +314,10 @@ func (n *node) layoutStyle() layout.Style {
 	l.Gap = layout.Size[layout.Length]{Width: layout.Px(float32(colGap)), Height: layout.Px(float32(rowGap))}
 
 	l.AlignItems = s.AlignItems.items()
+	if n.attach != nil && s.AlignItems == 0 {
+		// An attachment takes its content's size: stretched across the space it is laid out in, a leaf sized by its aspect, as an icon or an Em canvas, would fill it.
+		l.AlignItems = AlignStart.items()
+	}
 	l.AlignSelf = s.AlignSelf.items()
 	l.JustifyItems = s.JustifyItems.items()
 	l.JustifySelf = s.JustifySelf.items()

@@ -371,13 +371,7 @@ type Span struct {
 	// over the Text's.
 	OnPress     func(PressEvent)
 	OnLongPress func(PressEvent)
-	// Attachment, when set, is a view in the text's lines in place of
-	// Content: laid out at its content size, it wraps with the words
-	// around it and takes its own presses. Style is then its view's
-	// style, and Style.VerticalAlign places it in its line, else the
-	// VerticalAlign of the one view Attachment makes. Copying text leaves
-	// attachments out. A Text's SpansFunc makes its attachments' views
-	// again whenever its spans change.
+	// Attachment, when set, is a view in the text's lines in place of Content: laid out at its content size, it wraps with the words around it and takes its own presses. Style is then its view's style, and Style.VerticalAlign places it in its line, else the VerticalAlign of the one view Attachment makes; aligned to the baseline, an Em canvas puts its own baseline on the line's (Canvas.Em). Content is then what copying text takes in its place, as a formula copies as its TeX, and without it a copy leaves the attachment out; screen readers read the attachment's labels instead. A Text's SpansFunc makes its attachments' views again whenever its spans change.
 	Attachment Node
 }
 
