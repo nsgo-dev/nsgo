@@ -80,8 +80,14 @@ func (s speaker) node(n display.AltNode) string {
 	switch n.Kind {
 	case display.AltKindRow:
 		words := make([]string, 0, len(n.Parts))
-		for _, p := range n.Parts {
-			words = append(words, s.node(p.Node))
+		for i := 0; i < len(n.Parts); i++ {
+			if number := numberAt(n.Parts, i); number != "" {
+				// A number's digits read as the number, as 16.7.
+				words = append(words, number)
+				i += len([]rune(number)) - 1
+				continue
+			}
+			words = append(words, s.node(n.Parts[i].Node))
 		}
 		return join(words...)
 	case display.AltKindGlyph, display.AltKindSizedDelimiter:
@@ -316,6 +322,34 @@ func (s speaker) variant(v display.AltVariant, letter string) string {
 		return s.m.Fraktur(letter)
 	}
 	return letter
+}
+
+// numberAt returns the number whose digits, one a part, start at parts[i]: digits with at most one decimal point between them; "" when parts[i] is no digit.
+func numberAt(parts []display.AltPart, i int) string {
+	digit := func(k int) bool {
+		if k >= len(parts) {
+			return false
+		}
+		n := parts[k].Node
+		return n.Kind == display.AltKindGlyph && len(n.Text) == 1 && n.Text[0] >= '0' && n.Text[0] <= '9' && n.Variant == ""
+	}
+	if !digit(i) {
+		return ""
+	}
+	var b strings.Builder
+	point := false
+	for k := i; k < len(parts); k++ {
+		switch {
+		case digit(k):
+			b.WriteString(parts[k].Node.Text)
+		case !point && parts[k].Node.Kind == display.AltKindGlyph && parts[k].Node.Text == "." && digit(k+1):
+			point = true
+			b.WriteByte('.')
+		default:
+			return b.String()
+		}
+	}
+	return b.String()
 }
 
 func hasFlag(n display.AltNode, f display.AltFlag) bool {

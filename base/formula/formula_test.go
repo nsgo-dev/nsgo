@@ -275,6 +275,7 @@ func TestSpeech(t *testing.T) {
 		{`\mathbb{R}`, "double-struck R", "双线体R"},
 		{`\notacommand`, `error: \notacommand`, `错误：\notacommand`},
 		{`\sin x`, "sine x", "正弦 x"},
+		{`16.7\,\text{ms} = \tfrac{1000}{60}`, "16.7 ms equals 1000 over 60", "16.7 ms 等于 60分之1000"},
 	} {
 		d := untie.ParseTeX(c.src, untie.Inline, untie.ParseOptions{}).Alt().Description
 		if got := speak(en, d); got != c.en {

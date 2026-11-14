@@ -1888,3 +1888,24 @@ func TestSystemPermissionsOnTheWeb(t *testing.T) {
 		t.Error("the page lists Accessibility")
 	}
 }
+
+// The TextView demo typesets its formulas: the number of frames inline, on its text's baseline, and a block of its own, which copy as their TeX.
+func TestTextViewFormulas(t *testing.T) {
+	app := startDesktop(t)
+	open(app, "TextView")
+	sixty := app.WaitFor("label:60", 10*time.Second)
+	if sixty.Kind != driver.KindCanvas {
+		t.Errorf("$60$ shows as %v, not typeset", sixty.Kind)
+	}
+	paragraph := sixty.Parent.Parent
+	copies := []string{}
+	for _, sp := range paragraph.Spans {
+		if sp.Copy != "" {
+			copies = append(copies, sp.Copy)
+		}
+	}
+	if got := strings.Join(copies, " "); got != `$60$ $16.7\,\text{ms}$` {
+		t.Errorf("the paragraph's formulas copy as %q", got)
+	}
+	app.Find(`label:t sub frame equals 1000 over 60 ms`)
+}
