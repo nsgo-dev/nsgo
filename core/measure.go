@@ -103,7 +103,7 @@ func (c *measureCache) hash(at *driver.AttributedText) uint64 {
 	for _, a := range at.Attachments {
 		word(uint64(a.Offset))
 		word(uint64(math.Float32bits(float32(a.Size.Width)))<<32 | uint64(math.Float32bits(float32(a.Size.Height))))
-		word(uint64(a.Align))
+		word(uint64(a.Align) | uint64(math.Float32bits(float32(a.Descent)))<<32)
 	}
 	return h.Sum64()
 }

@@ -76,8 +76,12 @@ func TestEmCanvasAttachment(t *testing.T) {
 		t.Errorf("a group around a formula reads %q", got)
 	}
 	frame := h.find("formula").parent.frame
+	height := text.frame.Size.Height
 	descent.Set(0.5)
 	h.commit()
+	if got := text.frame.Size.Height; got <= height {
+		t.Errorf("text height %v after the formula reached further below the baseline, was %v: the text was measured from its old size", got, height)
+	}
 	if got := text.text.text.Attachments[0].Descent; got != 10 {
 		t.Errorf("descent %v after Em.Descent changed: the text was not prepared again", got)
 	}

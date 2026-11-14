@@ -20,7 +20,7 @@ const (
 	Typst
 )
 
-// View draws a formula. It sizes itself in ems of the font size it inherits, following the user's text size as text does, and paints in the text color it inherits, keeping the colors the formula names (\color{red}). As a core.Span's attachment it sits on the line's baseline. With Display it is a formula on a line of its own: larger operators, and limits above and below. What failed to parse is marked in ErrorStyle's color, the text color without one; a formula past Untie's limits shows its source as text in ErrorStyle. Until its renderer's font has loaded, it is an empty em square. Assistive technology reads it as an image labelled with what the formula says, in the language the app shows.
+// View draws a formula. It sizes itself in ems of the font size it inherits, following the user's text size as text does, and paints in the text color it inherits, keeping the colors the formula names (\color{red}). As a core.Span's attachment it sits on the line's baseline. With Display it is a formula on a line of its own: larger operators, and limits above and below. What failed to parse is marked in ErrorStyle's color, the text color without one; a formula past Untie's limits shows its source as text in ErrorStyle. It keeps its size in a container that stretches its children, standing at the start of the cross axis unless its style sets AlignSelf. Until its renderer's font has loaded, it is an empty em square. Assistive technology reads it as an image labelled with what the formula says, in the language the app shows.
 type View struct {
 	// Source is the formula without its delimiters ($…$); SourceFunc follows what it reads.
 	Source     string
@@ -73,7 +73,8 @@ func (v View) Render(cx *core.Scope) core.Node {
 	}, func(a, b *layout) bool { return a == b })
 	failed := core.NewMemo(cx, func() bool { return lay.Get().failed })
 	msgs := func() locales.Messages { return locales.For(cx) }
-	base := core.Style{Fill: core.PaintCurrentColor}.Merge(v.Style)
+	// AlignSelf keeps a container's stretch from widening it, which its em box would follow in height too.
+	base := core.Style{Fill: core.PaintCurrentColor, AlignSelf: core.AlignStart}.Merge(v.Style)
 	return core.Show{
 		When: failed.Get,
 		Then: func(cx *core.Scope) core.Node {

@@ -45,10 +45,19 @@ func BenchmarkDefaultLoad(b *testing.B) {
 	}
 }
 
-// waitForFont waits for r's font to load, as Views wait for it.
-func waitForFont(app *nsgotest.App, r *Renderer) {
-	app.WaitUntil(10*time.Second, r.loaded.Load)
-	app.Settle()
+// waitForFont waits for r's font to load and for the formulas selectors find to draw with it: a View learns of the font from a resource, after the renderer has it.
+func waitForFont(app *nsgotest.App, r *Renderer, selectors ...string) {
+	app.WaitUntil(10*time.Second, func() bool {
+		if !r.loaded.Load() {
+			return false
+		}
+		for _, sel := range selectors {
+			if vs := app.Query(sel); len(vs) != 1 || len(vs[0].Ops) == 0 {
+				return false
+			}
+		}
+		return true
+	})
 }
 
 // A formula laid out once at the reference size scales to any other: its size in ems is the same at 16 points.
@@ -125,7 +134,7 @@ func TestViewSizesByFontAndReads(t *testing.T) {
 			t.Errorf("before its font, a formula is %v, want an em square", got)
 		}
 	}
-	waitForFont(app, r)
+	waitForFont(app, r, "id:half", "id:inline")
 	half := app.Find("id:half")
 	small := half.Frame.Size
 	if small.Height <= 16 || small.Width <= 0 {
@@ -167,6 +176,25 @@ func TestViewSizesByFontAndReads(t *testing.T) {
 	}
 }
 
+// A View in a container that stretches its children keeps the size its font gives it.
+func TestViewKeepsItsSizeInAStretchingColumn(t *testing.T) {
+	r := newRenderer(Fonts{Math: newCMMath})
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Style: core.Style{FontSize: 16}, Children: []core.Node{
+			View{TestID: "stretched", Source: `\frac{1}{2}`, Display: true, Renderer: r},
+			core.View{Style: core.Style{AlignItems: core.AlignStart}, Children: []core.Node{
+				View{TestID: "start", Source: `\frac{1}{2}`, Display: true, Renderer: r},
+			}},
+		}}
+	}, nsgotest.Size(400, 300))
+	waitForFont(app, r, "id:stretched", "id:start")
+	// Frames round to pixels where they fall, so the two may differ by one.
+	got, want := app.Find("id:stretched").Frame.Size, app.Find("id:start").Frame.Size
+	if math.Abs(float64(got.Width-want.Width)) > 1 || math.Abs(float64(got.Height-want.Height)) > 1 || want.Width >= 400 {
+		t.Errorf("in a stretching column a formula is %v, at the start %v", got, want)
+	}
+}
+
 // A formula paints in the text color, which it follows without drawing again, keeps its own colors, and marks errors in ErrorStyle's color.
 func TestViewPaints(t *testing.T) {
 	r := Default()
@@ -179,7 +207,7 @@ func TestViewPaints(t *testing.T) {
 			View{TestID: "error", Source: `\notacommand`, ErrorStyle: core.Style{Color: core.RGB(0x00ff00)}},
 		}}
 	})
-	waitForFont(app, r)
+	waitForFont(app, r, "id:ink", "id:blue", "id:error")
 	fills := func(id string) []core.Color {
 		var out []core.Color
 		for _, op := range app.Find("id:" + id).Ops {
@@ -228,7 +256,7 @@ func TestRenderMath(t *testing.T) {
 		return textview.TextView{TestID: "doc", RenderMath: RenderMath,
 			Markdown: "Energy $E=mc^2$.\n\n$$\nx^2\n$$\n\n$$\n" + strings.Repeat(`a+`, 60) + "b\n$$"}
 	}, nsgotest.Size(300, 400))
-	waitForFont(app, r)
+	waitForFont(app, r, "label:E equals m c squared", "label:x squared")
 	app.Screenshot("formula-textview")
 	paragraph := app.Find("text:Energy ￼.")
 	if paragraph.Spans[1].Copy != "$E=mc^2$" {
