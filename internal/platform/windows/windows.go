@@ -381,6 +381,7 @@ type window struct {
 	popupChoice *uint32
 	// popupShown are the items of the context menu tracking.
 	popupShown []driver.MenuEntry
+	trays      map[uint32]*trayIcon
 	// appearance is the one the app forces, or the system's; host the one
 	// an embedding host sets in place of the system's.
 	appearance, host driver.Appearance
@@ -642,7 +643,7 @@ func (w *window) placeAt(f driver.WindowFrame) {
 
 // newWindow returns the state of a window showing an app.
 func newWindow(opts Options) *window {
-	w := &window{title: opts.Title, scale: 1, webs: map[*webView]bool{}, touchWebs: map[uint32]*webView{},
+	w := &window{title: opts.Title, scale: 1, webs: map[*webView]bool{}, touchWebs: map[uint32]*webView{}, trays: map[uint32]*trayIcon{},
 		epoch: time.Now(), components: opts.Components, hosts: map[*component]bool{}, missing: map[string]bool{},
 		drops: map[*view]bool{}}
 	w.animator = driver.NewAnimator(func(ev driver.Event) { w.engine.Dispatch(ev) })
@@ -919,6 +920,12 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemPopupMenu:
 			w.popupMenu(it.Menu, it.Point, it.Count)
+			continue
+		case driver.ItemTray:
+			w.applyTray(*it.Tray)
+			continue
+		case driver.ItemTrayMenu:
+			w.trayMenu(it.Tray.ID, it.Menu, it.Count)
 			continue
 		case driver.ItemAppearance:
 			w.setAppearance(it.Appearance)
@@ -1798,6 +1805,9 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 	case wmAlert:
 		w.showAlert()
 		return 0
+	case trayCallbackMessage:
+		w.trayMessage(wParam, lParam)
+		return 0
 	case wmDialog:
 		w.showDialog()
 		return 0
@@ -2071,6 +2081,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 			return r
 		}
 	case wmDestroy:
+		w.removeTrays()
 		// Clients let the window's providers go.
 		if uiaReturnRawElementProvider.Find() == nil {
 			uiaReturnRawElementProvider.Call(hwnd, 0, 0, 0)
