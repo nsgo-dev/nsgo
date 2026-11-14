@@ -633,6 +633,8 @@ type richText struct {
 	style       map[string]string
 	spans       []span
 	attachments []driver.TextAttachment
+	// copies are what a copy takes in place of each attachment (driver.TextSpan.Copy).
+	copies []string
 	// drawn is CSS over style for the element that draws the text: a
 	// clipped text is measured as clamped and drawn cut by its box.
 	drawn    map[string]string
@@ -832,8 +834,19 @@ func (s *surface) Prepare(t *driver.AttributedText) driver.PreparedText {
 		spans = append(spans, span{start, end, css, sp.Link})
 		at = end
 	}
+	var copies []string
+	for i, a := range t.Attachments {
+		for _, sp := range t.Spans {
+			if sp.Start == a.Offset && sp.Copy != "" {
+				if copies == nil {
+					copies = make([]string, len(t.Attachments))
+				}
+				copies[i] = sp.Copy
+			}
+		}
+	}
 	p := &preparedText{s: s, richText: richText{text: t.Text, style: style, spans: spans,
-		attachments: t.Attachments, drawn: drawn, maxLines: t.MaxLines, para: ps}}
+		attachments: t.Attachments, copies: copies, drawn: drawn, maxLines: t.MaxLines, para: ps}}
 	if len(spans) == 0 && len(t.Attachments) == 0 && oneLine(t.Text) {
 		p.line = ps.line
 	}
@@ -963,10 +976,7 @@ var verticalAligns = map[driver.VerticalAlign]string{
 	driver.VerticalAlignMiddle:     "middle",
 }
 
-// appendText appends the text from byte start to end to el, an empty
-// inline block of its size in place of each attachment's character: the
-// line holds it as core.TextAttachment.Extent says, and its view is drawn
-// over it.
+// appendText appends the text from byte start to end to el, an empty inline block of its size in place of each attachment's character: the line holds it as core.TextAttachment.Extent says, its baseline its bottom less its Descent, and its view is drawn over it. A block carries what a copy takes in its place in data-copy.
 func (r *richText) appendText(doc, el js.Value, start, end int) {
 	for i, a := range r.attachments {
 		if a.Offset < start || a.Offset >= end {
@@ -978,9 +988,16 @@ func (r *richText) appendText(doc, el js.Value, start, end int) {
 		align := verticalAligns[a.Align]
 		if align == "" {
 			align = "baseline"
+			if a.Descent > 0 {
+				// An empty inline block's baseline is its bottom: lowered, it reaches Descent below the line's.
+				align = webstyle.Px(-a.Descent)
+			}
 		}
 		ph := doc.Call("createElement", "span")
 		ph.Call("setAttribute", "data-attachment", i)
+		if i < len(r.copies) && r.copies[i] != "" {
+			ph.Call("setAttribute", "data-copy", r.copies[i])
+		}
 		setStyle(ph, map[string]string{
 			"display": "inline-block", "vertical-align": align,
 			"width": webstyle.Px(a.Size.Width), "height": webstyle.Px(a.Size.Height),

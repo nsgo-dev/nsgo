@@ -146,10 +146,7 @@ func (s *surface) selectionScope(node js.Value) js.Value {
 	return scope
 }
 
-// copySelection writes a selection across texts as core.SelectionModel
-// copies one: each text's selected part, attachments left out, texts on
-// one row joined by a tab and the others by a line break. The browser
-// would run the absolutely placed texts together.
+// copySelection writes a selection across texts as core.SelectionModel copies one: each text's selected part, an attachment as its copy text (data-copy) or else left out, texts on one row joined by a tab and the others by a line break. The browser would run the absolutely placed texts together, and leave attachments' copy texts out.
 func (s *surface) copySelection(e js.Value) {
 	sel := js.Global().Call("getSelection")
 	if !sel.Truthy() || sel.Get("rangeCount").Int() == 0 || sel.Get("isCollapsed").Bool() {
@@ -161,6 +158,7 @@ func (s *surface) copySelection(e js.Value) {
 	}
 	var parts []string
 	var rows []js.Value
+	copied := false
 	texts := s.host.Call("querySelectorAll", ".nsgo-text")
 	for i := range texts.Length() {
 		el := texts.Index(i)
@@ -175,14 +173,22 @@ func (s *surface) copySelection(e js.Value) {
 		if r.Call("compareBoundaryPoints", 2, part).Int() < 0 { // END_TO_END
 			part.Call("setEnd", r.Get("endContainer"), r.Get("endOffset"))
 		}
-		text := strings.ReplaceAll(part.Call("toString").String(), "￼", "")
+		// The selected nodes, each attachment's placeholder replaced by its copy text.
+		frag := part.Call("cloneContents")
+		placeholders := frag.Call("querySelectorAll", "[data-copy]")
+		for j := range placeholders.Length() {
+			ph := placeholders.Index(j)
+			ph.Call("replaceWith", ph.Call("getAttribute", "data-copy"))
+			copied = true
+		}
+		text := strings.ReplaceAll(frag.Get("textContent").String(), "￼", "")
 		if text == "" {
 			continue
 		}
 		parts = append(parts, text)
 		rows = append(rows, el.Call("getBoundingClientRect"))
 	}
-	if len(parts) < 2 {
+	if len(parts) < 2 && !copied {
 		return // the browser's copy is right
 	}
 	var out strings.Builder

@@ -625,6 +625,7 @@ func (s *surface) Prepare(t *driver.AttributedText) driver.PreparedText {
 			w.points(a.Size.Width)
 			w.points(a.Size.Height)
 			w.byte(byte(a.Align))
+			w.points(a.Descent)
 		}
 		// Where the line limit cuts, the shadow, then the decorations'
 		// styles, colors, thicknesses and underline offsets (NaN: the

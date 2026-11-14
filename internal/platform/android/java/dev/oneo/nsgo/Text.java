@@ -264,16 +264,17 @@ final class Text {
         }
     }
 
-    /** An attachment: the byte offset of its placeholder, its size and alignment, as android.go writes it. */
+    /** An attachment: the byte offset of its placeholder, its size, alignment and descent, as android.go writes it. */
     static final class Attachment {
         final int offset;
-        final int width, height, align;
+        final int width, height, align, descent;
 
         Attachment(DataInputStream in, float density) throws IOException {
             offset = in.readInt();
             width = Math.round(in.readFloat() * density);
             height = Math.round(in.readFloat() * density);
             align = in.readUnsignedByte();
+            descent = Math.round(in.readFloat() * density);
         }
     }
 
@@ -320,7 +321,7 @@ final class Text {
                 for (Attachment a : attachments) {
                     int at = offsets.index(a.offset);
                     if (at >= text.length()) continue;
-                    spanned.setSpan(new Placeholder(a.width, a.height, a.align), at, at + 1,
+                    spanned.setSpan(new Placeholder(a.width, a.height, a.align, a.descent), at, at + 1,
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
                 this.text = spanned;
@@ -602,15 +603,17 @@ final class Text {
      * Draws nothing: the attachment's view is a child of the text's.
      */
     static final class Placeholder extends ReplacementSpan {
-        final int width, height, align;
+        /** descent is how far below the baseline it reaches aligned to it, as a formula's baseline puts it. */
+        final int width, height, align, descent;
         /** How far its top is above the baseline in pixels, below it when negative; set by getSize. */
         int ascent;
 
-        Placeholder(int width, int height, int align) {
+        Placeholder(int width, int height, int align, int descent) {
             this.width = width;
             this.height = height;
             this.align = align;
-            this.ascent = height;
+            this.descent = descent;
+            this.ascent = height - descent;
         }
 
         @Override
@@ -630,7 +633,7 @@ final class Text {
                     break;
                 }
                 default:
-                    ascent = height;
+                    ascent = height - descent;
             }
             if (fm != null) {
                 // The line grows where the attachment reaches past the font.
