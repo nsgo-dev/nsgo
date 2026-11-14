@@ -61,6 +61,7 @@ Linux cannot tell a distribution's package from a downloaded one, so its package
 - WinSparkle saves `updates.automatic` as the user's choice on the first start, so a later change in `nsgo.yaml` reaches only new installs.
 - An app that closes its main window into the tray keeps running through WinSparkle's shutdown request; the installer then stops it.
 - The Linux appcast offers the release's Debian package, which the app installs through `pkexec dpkg` only where dpkg owns its executable; an install from the Arch package or the AppImage, or one outside any package, gets the release's page, as the backend asks `dpkg-query` and `pacman` before offering the package. Android hands its APK to `mobile.InstallPackage`, which asks the user and keeps store installs out of the direct channel.
+- A package downloads whole into memory, through the backend's HTTP client that images use, before it is verified and staged; on Android one larger than the Java heap allows fails its download, and the app offers the release's page, rather than crashing ([roadmap](../roadmap.md#updates)).
 
 ## Verification
 

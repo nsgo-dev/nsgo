@@ -73,7 +73,7 @@ final class Downloads {
             for (int i = 0; i < headers.length; i += 2) c.addRequestProperty(headers[i], headers[i + 1]);
             int status = c.getResponseCode();
             long total = Math.max(c.getContentLengthLong(), 0);
-            ByteArrayOutputStream body = new ByteArrayOutputStream((int) Math.min(total, 64 << 20));
+            Body body = new Body((int) Math.min(total, 64 << 20));
             InputStream stream = status >= 400 ? c.getErrorStream() : c.getInputStream();
             if (stream != null) {
                 try (InputStream s = stream) {
@@ -92,6 +92,9 @@ final class Downloads {
             done(id, "", status, c.getHeaderFields(), body);
         } catch (IOException | RuntimeException e) {
             if (!d.cancelled) done(id, String.valueOf(e.getMessage()), 0, null, null);
+        } catch (OutOfMemoryError e) {
+            // A body larger than the heap, such as an update's APK on a small device, fails its download rather than the app; its buffers are garbage once the stack unwinds.
+            if (!d.cancelled) done(id, "out of memory reading the response", 0, null, null);
         } finally {
             running.remove(id);
             if (c != null) c.disconnect();
@@ -112,9 +115,21 @@ final class Downloads {
         out.write(Protocol.FETCHED, bytes.toByteArray());
     }
 
+    /** A response body whose bytes go into the message without another copy of the whole body. */
+    private static final class Body extends ByteArrayOutputStream {
+        Body(int size) {
+            super(size);
+        }
+
+        /** Copies the body into to at offset. */
+        void copyTo(byte[] to, int offset) {
+            System.arraycopy(buf, 0, to, offset, count);
+        }
+    }
+
     /** Reports the download's response, or its error when not "". */
-    private void done(int id, String error, int status, Map<String, List<String>> headers, ByteArrayOutputStream body) {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream((body == null ? 0 : body.size()) + 1024);
+    private void done(int id, String error, int status, Map<String, List<String>> headers, Body body) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream(1024);
         DataOutputStream b = new DataOutputStream(bytes);
         try {
             b.writeInt(id);
@@ -136,11 +151,18 @@ final class Downloads {
                     }
                 }
                 b.writeInt(body.size());
-                body.writeTo(b);
             }
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
         }
-        out.write(Protocol.FETCHED, bytes.toByteArray());
+        if (body == null || !error.isEmpty()) {
+            out.write(Protocol.FETCHED, bytes.toByteArray());
+            return;
+        }
+        // The message is its head and then the body, built in one array: the body is the only other copy.
+        byte[] payload = new byte[bytes.size() + body.size()];
+        System.arraycopy(bytes.toByteArray(), 0, payload, 0, bytes.size());
+        body.copyTo(payload, bytes.size());
+        out.write(Protocol.FETCHED, payload);
     }
 }
