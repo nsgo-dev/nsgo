@@ -104,6 +104,8 @@ func vetEnv(ctx context.Context, target string) ([]string, error) {
 		return []string{"GOOS=" + os, "GOARCH=" + goArch(arch), "CGO_ENABLED=0"}, nil
 	case "web", "miniprogram":
 		return []string{"GOOS=js", "GOARCH=wasm"}, nil
+	case "harmonyos":
+		return []string{"GOOS=js", "GOARCH=wasm"}, nil
 	case "ios", "tvos":
 		sys, _, _ := appleOSOf(os)
 		return iosEnv(ctx, sys, arch == "simulator")
