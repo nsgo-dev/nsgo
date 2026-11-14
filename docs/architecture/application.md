@@ -29,7 +29,7 @@ func App(app *core.Scope) {
 
 ## Surfaces
 
-The engine runs one graph with a tree per surface (`core.Tree`). Where the platform opens windows (`core.RootOptions.Windows`, the main window's options), the first tree is the app's own surface: it shows no view, and the platform gives it no window.
+The engine runs one graph with a tree per surface (`core.Tree`). Where the platform opens windows (`core.RootOptions.Windows`, the main window's options), the first tree is the app's own surface: it shows no view, and the platform gives it no window, or a hidden one on Windows.
 
 - `OpenWindow`, `OpenPanel` and a drawn tray icon make a tree under a scope of the opener's owner, so the window closes when that owner goes. Every scope under it knows its tree (`Scope.surf`), so services, key bindings and `desktop`'s window functions act on the window the code is in, and the app's own scope on the first tree.
 - Each tree has its own `Env`: size, scale, safe area and title bar. What the app forces, its locale, appearance and host tokens, is one signal shared by every window's.
@@ -91,4 +91,4 @@ The Windows backend supports notification-area icons, click events and menus, an
 
 ## Verification
 
-`core/window_test.go` opens windows, panels and tray icons on a platform that opens windows, headless: shared signals, shutdown modes, canceled closes, reopening, keys and owners, tray clicks and menus, shortcuts, the Dock and the login item, and the main view where no windows open. `internal/engine` attaches an opened window and destroys it. On macOS `examples/tray` was run: its welcome window, its panel under the icon after a click, a close that keeps the app, and the gallery ending with its window.
+`core/window_test.go` opens windows, panels and tray icons on a platform that opens windows, headless: shared signals, shutdown modes, canceled closes, reopening, keys and owners, tray clicks and menus, shortcuts, the Dock and the login item, and the main view where no windows open. `internal/engine` attaches an opened window and destroys it, and the Windows backend's tests decode the notification area's callbacks. On macOS `examples/tray` was run: its welcome window, its panel under the icon after a click, a close that keeps the app, and the gallery ending with its window.
