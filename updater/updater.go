@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
@@ -110,8 +111,10 @@ func check(cx *core.Scope, background bool, answered func(core.UpdateCheck)) {
 					Actions: ok, Cancelable: true}, func(int) {})
 			}
 		case c.Version == "":
-			// The running version is the newest, so a package staged for an earlier update has been installed or is out of date.
-			discardStaged(cx)
+			// The running version is the newest, so a package staged for an earlier update has been installed or is out of date. One still downloading or installing stays.
+			if !installing.Load() {
+				discardStaged(cx)
+			}
 			if !background {
 				cx.ShowAlert(core.AlertConfig{Title: msgs.UpToDate(), Message: msgs.UpToDateMessage(c.App, c.Current),
 					Actions: ok, Cancelable: true}, func(int) {})
@@ -158,11 +161,19 @@ func discardStaged(cx *core.Scope) {
 	}
 }
 
-// downloadAndInstall downloads, verifies and installs c's package off the app's graph and main threads, after the user chose Update, which is their approval; package managers still ask for their own elevation or install permission. The work outlives the scope that offered the update. Linux restarts into the new version once its package manager installed it; a failure is logged and offers the release's page, where the user can get the package themselves.
+// installing is set while downloadAndInstall's download and install run, from the user choosing Update until Linux's package manager finished or Android's installer started. The alert shows nothing meanwhile, so a user may choose Update again, and a second run would discard the first's staged package and stage its own under the same name.
+var installing atomic.Bool
+
+// downloadAndInstall downloads, verifies and installs c's package off the app's graph and main threads, after the user chose Update, which is their approval; package managers still ask for their own elevation or install permission. The work outlives the scope that offered the update. Linux restarts into the new version once its package manager installed it; a failure is logged and offers the release's page, where the user can get the package themselves. Update chosen again while one runs is ignored.
 func downloadAndInstall(cx *core.Scope, c core.UpdateCheck) {
+	if !installing.CompareAndSwap(false, true) {
+		log.Printf("updater: an update is already downloading or installing")
+		return
+	}
 	dir := staging(cx)
 	discardStaged(cx)
 	core.InstallUpdateInBackground(cx, c, dir, func(app *core.Scope, path string, err error) {
+		installing.Store(false)
 		if err != nil {
 			log.Printf("updater: %v", err)
 			msgs := locales.For(app)

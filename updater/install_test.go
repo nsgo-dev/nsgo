@@ -105,6 +105,35 @@ func TestUpdateHandsTheAPKToAndroidsInstaller(t *testing.T) {
 	}
 }
 
+// A user who sees nothing happen while the package downloads may choose Update again, and a check may find the app up to date meanwhile; neither touches the package on its way.
+func TestUpdateRunsOnceAtATime(t *testing.T) {
+	in := fakeInstaller(t)
+	in.release = make(chan struct{})
+	apk := signedNewer
+	apk.Download = "https://example.com/hello-1.1-android-arm64.apk"
+	app := startOn(t, driver.OSAndroid, apk)
+	app.Press("text:Check")
+	app.Answer(0)
+	app.Press("text:Check")
+	app.Answer(0)
+	app.Update = func(bool) core.UpdateCheck { return core.UpdateCheck{App: "Hello", Current: "1.1"} }
+	app.Press("text:Check")
+	app.Answer(0)
+	close(in.release)
+	app.WaitUntil(5*time.Second, func() bool { return len(app.Installs) == 1 })
+	if len(in.downloaded) != 1 || app.Installs[0].Path != in.downloaded[0] {
+		t.Fatalf("installs %+v, downloaded %v", app.Installs, in.downloaded)
+	}
+	if _, err := os.Stat(in.downloaded[0]); err != nil {
+		t.Errorf("the package handed to the installer is gone: %v", err)
+	}
+	// Once the installer started, Update installs again, as after the user cancelled it.
+	app.Update = func(bool) core.UpdateCheck { return apk }
+	app.Press("text:Check")
+	app.Answer(0)
+	app.WaitUntil(5*time.Second, func() bool { return len(app.Installs) == 2 })
+}
+
 func TestFailedInstallsOfferThePage(t *testing.T) {
 	for _, c := range []struct {
 		name                    string
