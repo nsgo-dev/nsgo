@@ -340,6 +340,9 @@ type window struct {
 	primary    bool
 	kind       driver.SurfaceKind
 	destroying bool
+	hideOnBlur bool
+	visible    bool
+	focused    bool
 	// language is what the menus say (driver.ItemDirection).
 	language string
 	// rtl is the app's direction (driver.ItemDirection), which the menus
@@ -789,8 +792,14 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 		opts.Height = cfg.Height
 	}
 	opts.Frame, opts.Material, opts.Constraints, opts.Hidden = cfg.Frame, cfg.Material, cfg.Constraints, cfg.Hidden
+	if cfg.Kind == driver.SurfaceTrayIcon {
+		// The notification-area icon does not yet host a drawn surface on
+		// Windows, so keep its attached tree out of sight.
+		opts.Hidden = true
+	}
 	child := newWindow(opts)
-	child.opts, child.kind = opts, cfg.Kind
+	child.opts, child.kind, child.hideOnBlur = opts, cfg.Kind, cfg.HideOnBlur
+	child.visible = !opts.Hidden
 	child.chrome.constraints = opts.Constraints
 	style := constrainedStyle(wsOverlappedWindow|wsClipChildren, opts.Constraints)
 	if cfg.Kind == driver.SurfacePanel {
@@ -834,8 +843,12 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 	child.engine = w.engine.Attach(cfg.ID, child)
 	child.engine.Resize(driver.Size{Width: size.X, Height: size.Y})
 	child.engine.SetEnvironment(child.env)
-	if !cfg.Hidden {
-		showWindow.Call(hwnd, swShow)
+	if !opts.Hidden {
+		if cfg.Kind == driver.SurfacePanel {
+			child.orderFront()
+		} else {
+			showWindow.Call(hwnd, swShow)
+		}
 	}
 }
 
