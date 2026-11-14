@@ -146,7 +146,7 @@ func (s *surface) selectionScope(node js.Value) js.Value {
 	return scope
 }
 
-// copySelection writes a selection across texts as core.SelectionModel copies one: each text's selected part, an attachment as its copy text (data-copy) or else left out, texts on one row joined by a tab and the others by a line break. The browser would run the absolutely placed texts together, and leave attachments' copy texts out.
+// copySelection writes a selection across texts as core.SelectionModel copies one: each text's selected part, hidden spans left out and an attachment as its copy text (data-copy) or else left out, texts on one row joined by a tab and the others by a line break. The browser would run the absolutely placed texts together, and leave attachments' copy texts out.
 func (s *surface) copySelection(e js.Value) {
 	sel := js.Global().Call("getSelection")
 	if !sel.Truthy() || sel.Get("rangeCount").Int() == 0 || sel.Get("isCollapsed").Bool() {
@@ -173,8 +173,12 @@ func (s *surface) copySelection(e js.Value) {
 		if r.Call("compareBoundaryPoints", 2, part).Int() < 0 { // END_TO_END
 			part.Call("setEnd", r.Get("endContainer"), r.Get("endOffset"))
 		}
-		// The selected nodes, each attachment's placeholder replaced by its copy text.
+		// The selected nodes, hidden spans left out and each attachment's placeholder replaced by its copy text.
 		frag := part.Call("cloneContents")
+		hidden := frag.Call("querySelectorAll", "[data-hidden]")
+		for j := range hidden.Length() {
+			hidden.Index(j).Call("remove")
+		}
 		placeholders := frag.Call("querySelectorAll", "[data-copy]")
 		for j := range placeholders.Length() {
 			ph := placeholders.Index(j)

@@ -649,6 +649,8 @@ type span struct {
 	start, end int
 	style      map[string]string
 	link       bool
+	// hidden marks a hidden span's element with data-hidden, which copySelection leaves out as the browser's copy does.
+	hidden bool
 }
 
 // preparedText is text styled for the browser to lay out.
@@ -831,7 +833,7 @@ func (s *surface) Prepare(t *driver.AttributedText) driver.PreparedText {
 			// and screen readers too.
 			css["visibility"] = "hidden"
 		}
-		spans = append(spans, span{start, end, css, sp.Link})
+		spans = append(spans, span{start, end, css, sp.Link, sp.Hidden})
 		at = end
 	}
 	var copies []string
@@ -1033,6 +1035,9 @@ func (r *richText) fill(s *surface, el js.Value, interactive bool) {
 		}
 		r.appendText(doc, e, sp.start, sp.end)
 		e.Call("setAttribute", "data-start", sp.start)
+		if sp.hidden {
+			e.Call("setAttribute", "data-hidden", "")
+		}
 		if link {
 			e.Call("setAttribute", "role", "link")
 			e.Call("setAttribute", "tabindex", "0")
