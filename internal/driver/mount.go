@@ -323,6 +323,9 @@ const (
 	ItemCloseNotification
 	// ItemBadge shows Count on the app's icon; 0 clears it.
 	ItemBadge
+	// ItemQuitResponse answers EventQuitRequest Count. On permits the
+	// platform's pending termination request; false cancels it.
+	ItemQuitResponse
 )
 
 // Notification is a system notification (ItemShowNotification), as

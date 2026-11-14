@@ -42,6 +42,7 @@ The engine runs one graph with a tree per surface (`core.Tree`). Where the platf
 
 - `SetShutdownMode`: `ShutdownOnLastWindowClose` (the default), `ShutdownOnMainWindowClose` or `ShutdownOnExplicit`, which only `Scope.Quit` ends. Panels and tray views are not windows here.
 - `OnQuit` handlers clean up as the app ends, however it does, with 200 ms for their work ([services](services.md#appearance-and-quitting)).
+- `OnQuitRequest` handles a user-initiated app quit such as Cmd+Q or a tray menu's Quit on macOS. Handlers run newest first and can cancel with `q.Cancel()` or defer with `done := q.Defer()`, then answer with `done(true)` or `done(false)`; `Scope.Quit` and `Restart` remain immediate ([services](services.md#appearance-and-quitting)).
 - A close the user asks for is `EventWindowClose`: the window's `OnClosing` handlers run newest first and may cancel it, as a window that hides instead does. `Window.Close` and its owner going close it without asking.
 - `nsgo.SetMainView` sets the main view: it opens the main window at `nsgo.WindowSize` and makes it main, and a later call replaces the view in it. `nsgo.Run(Root)` is `SetMainView(Root)`.
 - `OnReopen` hears a click on the Dock icon and a second launch (`EventReopen`); without a handler the main window shows and takes the focus.
