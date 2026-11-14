@@ -944,12 +944,13 @@ func (w *window) menuChosen(ref menuRef) bool {
 		}
 		w.chrome.fullScreen = !w.chrome.fullScreen
 		w.updateEnvironment()
-	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuSelectAll:
+	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuPasteAndMatchStyle, driver.MenuDelete, driver.MenuSelectAll:
 		if w.focus != nil {
 			action := map[driver.MenuRole]string{
 				driver.MenuUndo: "text.undo", driver.MenuRedo: "text.redo",
 				driver.MenuCut: "clipboard.cut", driver.MenuCopy: "clipboard.copy",
-				driver.MenuPaste: "clipboard.paste", driver.MenuSelectAll: "selection.select-all",
+				driver.MenuPaste: "clipboard.paste", driver.MenuPasteAndMatchStyle: "clipboard.paste",
+				driver.MenuDelete: "selection.delete", driver.MenuSelectAll: "selection.select-all",
 			}[ref.role]
 			gtkWidgetActivateAction(w.focus.entry, cstr(action), 0)
 			return true

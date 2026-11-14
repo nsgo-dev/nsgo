@@ -745,7 +745,8 @@ func (w *window) webEdit(role driver.MenuRole) bool {
 	v := w.focusedWeb()
 	command := map[driver.MenuRole]string{
 		driver.MenuUndo: "Undo", driver.MenuRedo: "Redo", driver.MenuCut: "Cut",
-		driver.MenuCopy: "Copy", driver.MenuPaste: "Paste", driver.MenuSelectAll: "SelectAll",
+		driver.MenuCopy: "Copy", driver.MenuPaste: "Paste", driver.MenuPasteAndMatchStyle: "PasteAsPlainText",
+		driver.MenuDelete: "Delete", driver.MenuSelectAll: "SelectAll",
 	}[role]
 	if v == nil || command == "" {
 		return false

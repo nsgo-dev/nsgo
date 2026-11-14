@@ -907,22 +907,30 @@ const (
 )
 
 const (
-	MenuRoleNone         = driver.MenuRoleNone
-	MenuAbout            = driver.MenuAbout
-	MenuHide             = driver.MenuHide
-	MenuHideOthers       = driver.MenuHideOthers
-	MenuShowAll          = driver.MenuShowAll
-	MenuQuit             = driver.MenuQuit
-	MenuUndo             = driver.MenuUndo
-	MenuRedo             = driver.MenuRedo
-	MenuCut              = driver.MenuCut
-	MenuCopy             = driver.MenuCopy
-	MenuPaste            = driver.MenuPaste
-	MenuSelectAll        = driver.MenuSelectAll
-	MenuMinimize         = driver.MenuMinimize
-	MenuZoom             = driver.MenuZoom
-	MenuToggleFullScreen = driver.MenuToggleFullScreen
-	MenuClose            = driver.MenuClose
+	MenuRoleNone           = driver.MenuRoleNone
+	MenuAbout              = driver.MenuAbout
+	MenuHide               = driver.MenuHide
+	MenuHideOthers         = driver.MenuHideOthers
+	MenuShowAll            = driver.MenuShowAll
+	MenuQuit               = driver.MenuQuit
+	MenuUndo               = driver.MenuUndo
+	MenuRedo               = driver.MenuRedo
+	MenuCut                = driver.MenuCut
+	MenuCopy               = driver.MenuCopy
+	MenuPaste              = driver.MenuPaste
+	MenuSelectAll          = driver.MenuSelectAll
+	MenuMinimize           = driver.MenuMinimize
+	MenuZoom               = driver.MenuZoom
+	MenuToggleFullScreen   = driver.MenuToggleFullScreen
+	MenuClose              = driver.MenuClose
+	MenuPasteAndMatchStyle = driver.MenuPasteAndMatchStyle
+	MenuDelete             = driver.MenuDelete
+	MenuStartSpeaking      = driver.MenuStartSpeaking
+	MenuStopSpeaking       = driver.MenuStopSpeaking
+	MenuBringAllToFront    = driver.MenuBringAllToFront
+	MenuServices           = driver.MenuServices
+	MenuWindowMenu         = driver.MenuWindowMenu
+	MenuHelpMenu           = driver.MenuHelpMenu
 )
 
 const (

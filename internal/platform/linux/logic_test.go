@@ -385,7 +385,8 @@ func TestMenuShortcutsLeaveFieldsTheirKeys(t *testing.T) {
 }
 
 func TestMenuHelpers(t *testing.T) {
-	for _, r := range []driver.MenuRole{driver.MenuAbout, driver.MenuHide, driver.MenuHideOthers, driver.MenuShowAll} {
+	for _, r := range []driver.MenuRole{driver.MenuAbout, driver.MenuHide, driver.MenuHideOthers, driver.MenuShowAll,
+		driver.MenuServices, driver.MenuStartSpeaking, driver.MenuStopSpeaking, driver.MenuBringAllToFront} {
 		if !unsupported(r) {
 			t.Errorf("%v is supported", r)
 		}

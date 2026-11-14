@@ -75,3 +75,9 @@ permissionMediaLibrary:
 authSessionDone:
   message: "You can close this page and return to the app."
   description: The page the default browser shows once a sign-in started from the app redirects back to it on desktops.
+pasteAndMatchStyle: "Paste and Match Style"
+startSpeaking: "Start Speaking"
+stopSpeaking: "Stop Speaking"
+bringAllToFront: "Bring All to Front"
+services: "Services"
+help: "Help"

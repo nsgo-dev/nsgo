@@ -8,12 +8,12 @@ export declare const isAvailable: boolean;
 /** The system's title bar area, in which the app's own bar leaves room for the window controls. */
 export interface TitleBarArea { height: number; left: number; right: number }
 export declare const titleBar: Accessor<TitleBarArea>;
-export type MenuRole = "about" | "hide" | "hideOthers" | "showAll" | "quit" | "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll" | "minimize" | "zoom" | "toggleFullScreen" | "close";
+export type MenuRole = "about" | "hide" | "hideOthers" | "showAll" | "quit" | "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll" | "minimize" | "zoom" | "toggleFullScreen" | "close" | "pasteAndMatchStyle" | "delete" | "startSpeaking" | "stopSpeaking" | "bringAllToFront" | "services" | "windowMenu" | "helpMenu";
 export type MenuItem =
   | { type: "separator" }
   | { label?: string; role?: MenuRole; shortcut?: string;
       /** Whether the shortcut chooses it while a text field has the keyboard focus: "always" (default), "auto" (unless the field uses the key) or "notEditing". */
-      when?: "always" | "auto" | "notEditing"; disabled?: boolean; checked?: boolean; onSelect?: () => void; submenu?: readonly (MenuItem | null | undefined | false)[] };
+      when?: "always" | "auto" | "notEditing"; disabled?: boolean; checked?: boolean; radio?: boolean; onSelect?: () => void; submenu?: readonly (MenuItem | null | undefined | false)[] };
 export interface MenuModule {
   setApplicationMenu(items: readonly (MenuItem | null | undefined | false)[] | null): void;
   popup(items: readonly (MenuItem | null | undefined | false)[], at?: Point): Promise<void>;

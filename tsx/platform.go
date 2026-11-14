@@ -96,7 +96,11 @@ var menuRoles = map[string]core.MenuRole{"about": core.MenuAbout, "hide": core.M
 	"hideOthers": core.MenuHideOthers, "showAll": core.MenuShowAll, "quit": core.MenuQuit, "undo": core.MenuUndo,
 	"redo": core.MenuRedo, "cut": core.MenuCut, "copy": core.MenuCopy, "paste": core.MenuPaste,
 	"selectAll": core.MenuSelectAll, "minimize": core.MenuMinimize, "zoom": core.MenuZoom,
-	"toggleFullScreen": core.MenuToggleFullScreen, "close": core.MenuClose}
+	"toggleFullScreen": core.MenuToggleFullScreen, "close": core.MenuClose,
+	"pasteAndMatchStyle": core.MenuPasteAndMatchStyle, "delete": core.MenuDelete,
+	"startSpeaking": core.MenuStartSpeaking, "stopSpeaking": core.MenuStopSpeaking,
+	"bringAllToFront": core.MenuBringAllToFront, "services": core.MenuServices,
+	"windowMenu": core.MenuWindowMenu, "helpMenu": core.MenuHelpMenu}
 
 // menuItems reads a menu's items, falsy ones left out.
 func (r *runtime) menuItems(v js.Value) []core.MenuItem {
@@ -112,7 +116,7 @@ func (r *runtime) menuItems(v js.Value) []core.MenuItem {
 		}
 		item := core.MenuItem{Label: o.str("label", ""), Shortcut: o.str("shortcut", ""),
 			Role: menuRoles[o.str("role", "")], Disabled: o.bool("disabled", false), Checkable: o.has("checked"),
-			Checked: o.bool("checked", false), Items: r.menuItems(o.get("submenu")),
+			Checked: o.bool("checked", false), Radio: o.bool("radio", false), Items: r.menuItems(o.get("submenu")),
 			When: map[string]core.MenuWhen{"auto": core.MenuAuto, "notEditing": core.MenuNotEditing}[o.str("when", "")]}
 		if fn := o.get("onSelect"); isFunction(fn) {
 			item.OnSelect = func() { r.call(fn) }

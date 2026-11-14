@@ -492,11 +492,11 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 			continue
 		}
 		items := e.Items
-		if len(items) == 0 {
+		if len(items) == 0 && !submenuRole(e.Role) {
 			// A top-level action gets a menu of its own.
 			items = []driver.MenuEntry{e}
 		}
-		holder := s.holder(e.Label, e.Disabled, items)
+		holder := s.holder(e.Role, menutext.Label(s.language, &e, s.name()), e.Disabled, items)
 		bar.Send(sel("addItem:"), holder)
 		holder.Send(selRelease)
 	}
@@ -699,7 +699,7 @@ func (s *surface) relabelMenus() {
 var selMenuDisabled = sel("nsgoMenuItemDisabled:")
 
 // holder returns a new item holding a submenu of items.
-func (s *surface) holder(label string, disabled bool, items []driver.MenuEntry) objc.ID {
+func (s *surface) holder(role driver.MenuRole, label string, disabled bool, items []driver.MenuEntry) objc.ID {
 	var action objc.SEL
 	if disabled {
 		action = selMenuDisabled
@@ -709,6 +709,17 @@ func (s *surface) holder(label string, disabled bool, items []driver.MenuEntry) 
 	it.Send(selSetIdentifier, ownItem())
 	sub := s.submenu(label, items)
 	it.Send(sel("setSubmenu:"), sub)
+	if role != driver.MenuRoleNone {
+		nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+		switch role {
+		case driver.MenuServices:
+			nsApp.Send(sel("setServicesMenu:"), sub)
+		case driver.MenuWindowMenu:
+			nsApp.Send(sel("setWindowsMenu:"), sub)
+		case driver.MenuHelpMenu:
+			nsApp.Send(sel("setHelpMenu:"), sub)
+		}
+	}
 	sub.Send(selRelease)
 	return it
 }
@@ -727,8 +738,8 @@ func (s *surface) submenu(title string, items []driver.MenuEntry) objc.ID {
 				lastSeparator = true
 			}
 			continue
-		case len(e.Items) > 0:
-			holder := s.holder(e.Label, e.Disabled, e.Items)
+		case len(e.Items) > 0 || submenuRole(e.Role):
+			holder := s.holder(e.Role, menutext.Label(s.language, &e, s.name()), e.Disabled, e.Items)
 			m.Send(sel("addItem:"), holder)
 			holder.Send(selRelease)
 		default:
@@ -744,13 +755,20 @@ func (s *surface) submenu(title string, items []driver.MenuEntry) objc.ID {
 	return m
 }
 
+func submenuRole(role driver.MenuRole) bool {
+	return role == driver.MenuServices || role == driver.MenuWindowMenu || role == driver.MenuHelpMenu
+}
+
 // The standard actions of the menu roles, sent down the responder chain.
 var roleActions = map[driver.MenuRole]string{
 	driver.MenuAbout: "orderFrontStandardAboutPanel:", driver.MenuHide: "hide:",
 	driver.MenuHideOthers: "hideOtherApplications:", driver.MenuShowAll: "unhideAllApplications:",
 	driver.MenuQuit: "terminate:", driver.MenuUndo: "undo:", driver.MenuRedo: "redo:", driver.MenuCut: "cut:",
 	driver.MenuCopy: "copy:", driver.MenuPaste: "paste:", driver.MenuSelectAll: "selectAll:",
-	driver.MenuMinimize: "performMiniaturize:", driver.MenuZoom: "performZoom:", driver.MenuClose: "performClose:",
+	driver.MenuPasteAndMatchStyle: "pasteAsPlainText:", driver.MenuDelete: "delete:",
+	driver.MenuStartSpeaking: "startSpeaking:", driver.MenuStopSpeaking: "stopSpeaking:",
+	driver.MenuBringAllToFront: "arrangeInFront:", driver.MenuMinimize: "performMiniaturize:",
+	driver.MenuZoom: "performZoom:", driver.MenuClose: "performClose:",
 }
 
 // item returns a new menu item of e.

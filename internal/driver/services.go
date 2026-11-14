@@ -510,10 +510,19 @@ const (
 	MenuZoom
 	MenuToggleFullScreen
 	MenuClose
+	MenuPasteAndMatchStyle
+	MenuDelete
+	MenuStartSpeaking
+	MenuStopSpeaking
+	MenuBringAllToFront
+	MenuServices
+	MenuWindowMenu
+	MenuHelpMenu
 )
 
 var menuRoleLabels = [...]string{"", "About", "Hide", "Hide Others", "Show All", "Quit", "Undo", "Redo",
-	"Cut", "Copy", "Paste", "Select All", "Minimize", "Zoom", "Toggle Full Screen", "Close"}
+	"Cut", "Copy", "Paste", "Select All", "Minimize", "Zoom", "Toggle Full Screen", "Close",
+	"Paste and Match Style", "Delete", "Start Speaking", "Stop Speaking", "Bring All to Front", "Services", "Window", "Help"}
 
 // Label returns the label of an item with role r and no label of its own.
 func (r MenuRole) Label() string {
@@ -557,13 +566,17 @@ func (r MenuRole) Shortcut(mac bool) string {
 		return pick("ctrl+meta+f", "f11")
 	case MenuClose:
 		return "mod+w"
+	case MenuPasteAndMatchStyle:
+		return "alt+shift+meta+v"
 	}
 	return ""
 }
 
 // EditsText reports whether r acts on the focused text field, whose own
 // shortcut it then is.
-func (r MenuRole) EditsText() bool { return r >= MenuUndo && r <= MenuSelectAll }
+func (r MenuRole) EditsText() bool {
+	return r >= MenuUndo && r <= MenuSelectAll || r == MenuPasteAndMatchStyle || r == MenuDelete
+}
 
 // MenuEntry is a MenuItem as an ItemMenu carries it: the item's handler
 // replaced by an ID the platform reports with EventMenu (0: none), its
@@ -577,6 +590,7 @@ type MenuEntry struct {
 	Disabled  bool
 	Checkable bool
 	Checked   bool
+	Radio     bool
 	Separator bool
 	Items     []MenuEntry
 	// NotInText leaves the shortcut to a text input or a web view with

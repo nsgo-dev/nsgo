@@ -80,6 +80,7 @@ type MenuItem struct {
 	Disabled  bool
 	Checkable bool
 	Checked   bool
+	Radio     bool
 	Separator bool
 	Items     []MenuItem
 	// When says whether the shortcut chooses the item while a text input
@@ -263,7 +264,7 @@ func (t *Tree) menuEntries(items []MenuItem, owner *Scope, actions map[uint32]me
 	out := make([]MenuEntry, 0, len(items))
 	for _, it := range items {
 		e := MenuEntry{Label: it.Label, Shortcut: it.Shortcut, Role: it.Role, Disabled: it.Disabled,
-			Checkable: it.Checkable || it.Checked, Checked: it.Checked, Separator: it.Separator}
+			Checkable: it.Checkable || it.Checked || it.Radio, Checked: it.Checked, Radio: it.Radio, Separator: it.Separator}
 		if e.Label == "" {
 			e.Label = it.Role.Label()
 		}
@@ -274,7 +275,7 @@ func (t *Tree) menuEntries(items []MenuItem, owner *Scope, actions map[uint32]me
 		if shortcut == "" && it.Role != MenuRoleNone {
 			shortcut = driver.NormalizeKey(it.Role.Shortcut(false))
 		}
-		e.NotInText = it.When == MenuNotEditing || it.When == MenuAuto && shortcut != "" && EditsText(shortcut)
+		e.NotInText = it.When == MenuNotEditing || it.When == MenuAuto && (it.Role.EditsText() || shortcut != "" && EditsText(shortcut))
 		if len(it.Items) > 0 {
 			e.Items = t.menuEntries(it.Items, owner, actions)
 		}

@@ -91,11 +91,12 @@ const (
 	tmeLeave           = 0x02
 	tmeNonClient       = 0x10
 
-	mfString    = 0x0000
-	mfGrayed    = 0x0001
-	mfChecked   = 0x0008
-	mfPopup     = 0x0010
-	mfSeparator = 0x0800
+	mfString     = 0x0000
+	mfGrayed     = 0x0001
+	mfChecked    = 0x0008
+	mfRadioCheck = 0x0200
+	mfPopup      = 0x0010
+	mfSeparator  = 0x0800
 	// mfRightOrder lays a menu out right to left: its items' text, and
 	// the bar's and its submenus' order.
 	mfRightOrder = 0x2000
@@ -766,7 +767,8 @@ func (w *window) setMenu(entries []driver.MenuEntry) {
 
 // unsupported reports the roles Windows has no use for.
 func unsupported(r driver.MenuRole) bool {
-	return r == driver.MenuAbout || r == driver.MenuHide || r == driver.MenuHideOthers || r == driver.MenuShowAll
+	return r == driver.MenuAbout || r == driver.MenuHide || r == driver.MenuHideOthers || r == driver.MenuShowAll ||
+		r == driver.MenuServices || r == driver.MenuStartSpeaking || r == driver.MenuStopSpeaking || r == driver.MenuBringAllToFront
 }
 
 // shortcutOf returns e's shortcut, its role's when it has none.
@@ -932,6 +934,9 @@ func (w *window) appendMenuTo(menu uintptr, entries []driver.MenuEntry, refs *[]
 			if e.Checked {
 				flags |= mfChecked
 			}
+			if e.Radio {
+				flags |= mfRadioCheck
+			}
 			*refs = append(*refs, menuRef{e.ID, e.Role, e.NotInText})
 			appendMenuW.Call(menu, flags, uintptr(len(*refs)), uintptr(unsafe.Pointer(wide(label))))
 		}
@@ -1006,11 +1011,19 @@ func (w *window) chooseMenu(ref menuRef) {
 		w.toggleMaximize()
 	case driver.MenuToggleFullScreen:
 		w.toggleFullScreen()
-	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuSelectAll:
+	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuPasteAndMatchStyle, driver.MenuDelete, driver.MenuSelectAll:
 		// The focused field's own keys.
-		vk := map[driver.MenuRole]uintptr{driver.MenuUndo: 'Z', driver.MenuRedo: 'Y', driver.MenuCut: 'X',
-			driver.MenuCopy: 'C', driver.MenuPaste: 'V', driver.MenuSelectAll: 'A'}[ref.role]
-		w.editKey(vk, true, false, false)
+		if ref.role == driver.MenuPasteAndMatchStyle {
+			if in := w.focusedField(); in != nil {
+				w.paste(in)
+			}
+		} else if ref.role == driver.MenuDelete {
+			w.editKey(vkDelete, false, false, false)
+		} else {
+			vk := map[driver.MenuRole]uintptr{driver.MenuUndo: 'Z', driver.MenuRedo: 'Y', driver.MenuCut: 'X',
+				driver.MenuCopy: 'C', driver.MenuPaste: 'V', driver.MenuSelectAll: 'A'}[ref.role]
+			w.editKey(vk, true, false, false)
+		}
 	}
 	if ref.id != 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: ref.id})

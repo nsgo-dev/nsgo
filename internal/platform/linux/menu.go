@@ -117,12 +117,15 @@ func (w *window) buildSubmenu(entries []driver.MenuEntry) uintptr {
 
 // buildItem returns a GMenuItem of e with an action when it has one.
 func (w *window) buildItem(e *driver.MenuEntry) uintptr {
+	if unsupported(e.Role) {
+		return 0
+	}
 	label := menutext.Label(w.language, e, "")
 	action := ""
-	if e.ID != 0 {
-		action = w.addAction(e.ID, e.Role, e.Disabled, e.Checkable, e.Checked)
+	if e.ID != 0 && !unsupported(e.Role) {
+		action = w.addAction(e.ID, e.Role, e.Disabled, e.Checkable, e.Checked, e.Radio)
 	} else if e.Role != driver.MenuRoleNone && !unsupported(e.Role) {
-		action = w.addAction(0, e.Role, e.Disabled, false, false)
+		action = w.addAction(0, e.Role, e.Disabled, false, false, false)
 	}
 	if action == "" {
 		return gMenuItemNew(cstr(label), nil)
@@ -131,21 +134,29 @@ func (w *window) buildItem(e *driver.MenuEntry) uintptr {
 	if w.building.prefix != "" {
 		prefix = w.building.prefix
 	}
-	return gMenuItemNew(cstr(label), cstr(prefix+action))
+	item := gMenuItemNew(cstr(label), cstr(prefix+action))
+	if item != 0 && e.Radio {
+		gMenuItemSetAttributeValue(item, cstr("target"), gVariantNewString(cstr("selected")))
+	}
+	return item
 }
 
 // addAction registers a menu item's action on the window and returns its
 // name; "" when the item does nothing.
-func (w *window) addAction(id uint32, role driver.MenuRole, disabled, checkable, checked bool) string {
+func (w *window) addAction(id uint32, role driver.MenuRole, disabled, checkable, checked, radio bool) string {
 	w.menuCounter++
 	name := fmt.Sprintf("nsgo.item-%d", w.menuCounter)
 	var action uintptr
-	if checkable {
+	if checkable && !radio {
 		// The action sinks the floating variant and owns it.
 		state := gVariantNewBoolean(boolInt(checked))
 		action = gSimpleActionNewStateful(cstr(name), 0, state)
 	} else {
-		action = gSimpleActionNew(cstr(name), 0)
+		if radio {
+			action = gSimpleActionNewStateful(cstr(name), 0, gVariantNewString(cstr(map[bool]string{true: "selected", false: ""}[checked])))
+		} else {
+			action = gSimpleActionNew(cstr(name), 0)
+		}
 	}
 	if action == 0 {
 		return ""

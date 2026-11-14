@@ -344,6 +344,38 @@ func TestApplicationMenuSetAgainKeepsTheBar(t *testing.T) {
 	}
 }
 
+func TestApplicationMenuStandardRolesAndRadios(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		cx.SetApplicationMenu([]MenuItem{
+			{Role: MenuServices},
+			{Role: MenuWindowMenu},
+			{Role: MenuHelpMenu},
+			{Label: "Edit", Items: []MenuItem{
+				{Role: MenuPasteAndMatchStyle, When: MenuAuto}, {Role: MenuDelete, When: MenuAuto},
+				{Role: MenuStartSpeaking}, {Role: MenuStopSpeaking}, {Role: MenuBringAllToFront},
+				{Label: "One", Radio: true, Checked: true}, {Label: "Two", Radio: true},
+			}},
+		})
+		return View{}
+	})
+	var menu []MenuEntry
+	for _, it := range h.commit().Items {
+		if it.Kind == driver.ItemMenu {
+			menu = it.Menu
+		}
+	}
+	if len(menu) != 4 || menu[0].Role != MenuServices || menu[1].Role != MenuWindowMenu || menu[2].Role != MenuHelpMenu {
+		t.Fatalf("roles = %+v", menu)
+	}
+	items := menu[3].Items
+	if len(items) != 7 || items[0].Role != MenuPasteAndMatchStyle || !items[0].NotInText || items[1].Role != MenuDelete || !items[1].NotInText {
+		t.Fatalf("editing roles = %+v", items)
+	}
+	if !items[5].Radio || !items[5].Checkable || !items[5].Checked || !items[6].Radio || items[6].Checked {
+		t.Fatalf("radios = %+v", items[5:])
+	}
+}
+
 func TestBordersPerSide(t *testing.T) {
 	red, blue := RGB(0xff0000), RGB(0x0000ff)
 	for _, c := range []struct {

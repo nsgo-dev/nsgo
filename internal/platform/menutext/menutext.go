@@ -53,6 +53,22 @@ func Label(lang string, e *driver.MenuEntry, app string) string {
 		return msgs.ToggleFullScreen()
 	case driver.MenuClose:
 		return msgs.Close()
+	case driver.MenuPasteAndMatchStyle:
+		return msgs.PasteAndMatchStyle()
+	case driver.MenuDelete:
+		return msgs.Delete()
+	case driver.MenuStartSpeaking:
+		return msgs.StartSpeaking()
+	case driver.MenuStopSpeaking:
+		return msgs.StopSpeaking()
+	case driver.MenuBringAllToFront:
+		return msgs.BringAllToFront()
+	case driver.MenuServices:
+		return msgs.Services()
+	case driver.MenuWindowMenu:
+		return msgs.Window()
+	case driver.MenuHelpMenu:
+		return msgs.Help()
 	}
 	return e.Label
 }

@@ -92,6 +92,12 @@ const (
 	textPermissionBluetooth
 	textPermissionMediaLibrary
 	textAuthSessionDone
+	textPasteAndMatchStyle
+	textStartSpeaking
+	textStopSpeaking
+	textBringAllToFront
+	textServices
+	textHelp
 	numTexts
 )
 
@@ -130,6 +136,12 @@ var keyOfText = [numTexts]string{
 	"permissionBluetooth",
 	"permissionMediaLibrary",
 	"authSessionDone",
+	"pasteAndMatchStyle",
+	"startSpeaking",
+	"stopSpeaking",
+	"bringAllToFront",
+	"services",
+	"help",
 }
 
 // textsEn are the messages without arguments in en.
@@ -165,7 +177,13 @@ var textsEn = i18n.NewTexts(""+
 	"Developer Tools"+
 	"Bluetooth"+
 	"Media & Apple Music"+
-	"You can close this page and return to the app.",
+	"You can close this page and return to the app."+
+	"Paste and Match Style"+
+	"Start Speaking"+
+	"Stop Speaking"+
+	"Bring All to Front"+
+	"Services"+
+	"Help",
 	[]uint16{
 		4,
 		6,
@@ -199,6 +217,12 @@ var textsEn = i18n.NewTexts(""+
 		9,
 		19,
 		46,
+		21,
+		14,
+		13,
+		18,
+		8,
+		4,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -234,7 +258,13 @@ var textsZhHans = i18n.NewTexts(""+
 	"开发者工具"+
 	"蓝牙"+
 	"媒体与Apple Music"+
-	"现在可以关闭此页面并返回应用。",
+	"现在可以关闭此页面并返回应用。"+
+	"粘贴并匹配样式"+
+	"开始朗读"+
+	"停止朗读"+
+	"将全部窗口置于最前"+
+	"服务"+
+	"帮助",
 	[]uint16{
 		6,
 		6,
@@ -268,6 +298,12 @@ var textsZhHans = i18n.NewTexts(""+
 		6,
 		20,
 		45,
+		21,
+		12,
+		12,
+		27,
+		6,
+		6,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -712,3 +748,45 @@ func AuthSessionDone(cx *core.Scope) string { return For(cx).AuthSessionDone() }
 
 // AuthSessionDone is the package's AuthSessionDone in the language of msgs.
 func (msgs Messages) AuthSessionDone() string { return msgs.text(textAuthSessionDone) }
+
+// PasteAndMatchStyle says "Paste and Match Style"
+// in the language the app shows under cx.
+func PasteAndMatchStyle(cx *core.Scope) string { return For(cx).PasteAndMatchStyle() }
+
+// PasteAndMatchStyle is the package's PasteAndMatchStyle in the language of msgs.
+func (msgs Messages) PasteAndMatchStyle() string { return msgs.text(textPasteAndMatchStyle) }
+
+// StartSpeaking says "Start Speaking"
+// in the language the app shows under cx.
+func StartSpeaking(cx *core.Scope) string { return For(cx).StartSpeaking() }
+
+// StartSpeaking is the package's StartSpeaking in the language of msgs.
+func (msgs Messages) StartSpeaking() string { return msgs.text(textStartSpeaking) }
+
+// StopSpeaking says "Stop Speaking"
+// in the language the app shows under cx.
+func StopSpeaking(cx *core.Scope) string { return For(cx).StopSpeaking() }
+
+// StopSpeaking is the package's StopSpeaking in the language of msgs.
+func (msgs Messages) StopSpeaking() string { return msgs.text(textStopSpeaking) }
+
+// BringAllToFront says "Bring All to Front"
+// in the language the app shows under cx.
+func BringAllToFront(cx *core.Scope) string { return For(cx).BringAllToFront() }
+
+// BringAllToFront is the package's BringAllToFront in the language of msgs.
+func (msgs Messages) BringAllToFront() string { return msgs.text(textBringAllToFront) }
+
+// Services says "Services"
+// in the language the app shows under cx.
+func Services(cx *core.Scope) string { return For(cx).Services() }
+
+// Services is the package's Services in the language of msgs.
+func (msgs Messages) Services() string { return msgs.text(textServices) }
+
+// Help says "Help"
+// in the language the app shows under cx.
+func Help(cx *core.Scope) string { return For(cx).Help() }
+
+// Help is the package's Help in the language of msgs.
+func (msgs Messages) Help() string { return msgs.text(textHelp) }

@@ -14,22 +14,30 @@ type (
 )
 
 const (
-	MenuRoleNone         = core.MenuRoleNone
-	MenuAbout            = core.MenuAbout
-	MenuHide             = core.MenuHide
-	MenuHideOthers       = core.MenuHideOthers
-	MenuShowAll          = core.MenuShowAll
-	MenuQuit             = core.MenuQuit
-	MenuUndo             = core.MenuUndo
-	MenuRedo             = core.MenuRedo
-	MenuCut              = core.MenuCut
-	MenuCopy             = core.MenuCopy
-	MenuPaste            = core.MenuPaste
-	MenuSelectAll        = core.MenuSelectAll
-	MenuMinimize         = core.MenuMinimize
-	MenuZoom             = core.MenuZoom
-	MenuToggleFullScreen = core.MenuToggleFullScreen
-	MenuClose            = core.MenuClose
+	MenuRoleNone           = core.MenuRoleNone
+	MenuAbout              = core.MenuAbout
+	MenuHide               = core.MenuHide
+	MenuHideOthers         = core.MenuHideOthers
+	MenuShowAll            = core.MenuShowAll
+	MenuQuit               = core.MenuQuit
+	MenuUndo               = core.MenuUndo
+	MenuRedo               = core.MenuRedo
+	MenuCut                = core.MenuCut
+	MenuCopy               = core.MenuCopy
+	MenuPaste              = core.MenuPaste
+	MenuSelectAll          = core.MenuSelectAll
+	MenuMinimize           = core.MenuMinimize
+	MenuZoom               = core.MenuZoom
+	MenuToggleFullScreen   = core.MenuToggleFullScreen
+	MenuClose              = core.MenuClose
+	MenuPasteAndMatchStyle = core.MenuPasteAndMatchStyle
+	MenuDelete             = core.MenuDelete
+	MenuStartSpeaking      = core.MenuStartSpeaking
+	MenuStopSpeaking       = core.MenuStopSpeaking
+	MenuBringAllToFront    = core.MenuBringAllToFront
+	MenuServices           = core.MenuServices
+	MenuWindowMenu         = core.MenuWindowMenu
+	MenuHelpMenu           = core.MenuHelpMenu
 )
 
 // SetApplicationMenu replaces the application menu: macOS's menu bar, the
