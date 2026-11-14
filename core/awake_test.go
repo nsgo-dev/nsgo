@@ -25,3 +25,26 @@ func TestKeepAwakeReleaseIsIdempotent(t *testing.T) {
 		t.Fatal("release was sent twice")
 	}
 }
+
+func TestKeepAwakeReleaseBeforeDisposeStillReleases(t *testing.T) {
+	var cx *Scope
+	h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node { cx = c; return View{} })
+	h.commit()
+	child := cx.Child()
+	release := child.KeepAwake("playing", KeepAwakeOptions{Display: true})
+	hold := command(h.commit(), driver.ItemKeepAwake)
+	if hold == nil {
+		t.Fatal("no hold")
+	}
+	release()
+	child.Dispose()
+	h.drain()
+	if it := command(h.commit(), driver.ItemReleaseAwake); it == nil || it.Count != hold.Count {
+		t.Fatalf("release = %+v, want ID %d", it, hold.Count)
+	}
+	release()
+	h.drain()
+	if command(h.commit(), driver.ItemReleaseAwake) != nil {
+		t.Fatal("release was sent twice")
+	}
+}

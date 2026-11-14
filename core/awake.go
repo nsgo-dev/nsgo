@@ -33,12 +33,12 @@ func (cx *Scope) KeepAwake(reason string, opts KeepAwakeOptions) (release func()
 			t.changed = true
 		}
 	}
+	// The posted release marks the hold done only as it runs: Post drops it when the owner is disposed first, and the cleanup then releases the hold instead.
 	release = func() {
-		if !done.CompareAndSwap(false, true) {
-			return
-		}
 		owner.Post(func() {
-			releaseNow()
+			if done.CompareAndSwap(false, true) {
+				releaseNow()
+			}
 		})
 	}
 	owner.addCleanup(func() {
