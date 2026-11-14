@@ -57,6 +57,10 @@ func init() {
 type Options struct {
 	Title         string
 	Width, Height driver.Points
+	// Hidden keeps the backend's root window out of the taskbar and screen.
+	// It hosts app-level services such as tray icons until surfaces are
+	// supported on this backend.
+	Hidden bool
 	// Frame is where the window opens (nsgo.WindowFrame).
 	Frame driver.WindowFrame
 	// ID names the app's directories and storage (engine.AppDirs).
@@ -564,7 +568,9 @@ func Run(app engine.App, opts Options) {
 	getClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 	size := w.point(client.Right, client.Bottom)
 	w.startEngine(app, opts, driver.Size{Width: size.X, Height: size.Y})
-	showWindow.Call(hwnd, swShow)
+	if !opts.Hidden {
+		showWindow.Call(hwnd, swShow)
+	}
 	if opts.test != nil {
 		opts.test.ready <- w
 	} else if paths := engine.LaunchFiles(); len(paths) > 0 {
