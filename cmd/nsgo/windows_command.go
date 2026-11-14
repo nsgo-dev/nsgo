@@ -13,6 +13,8 @@ import (
 // GUI executable remains the one Explorer and the Start menu launch.
 //
 // The app, a GUI program, is attached to no console, so the console's Ctrl+C, Ctrl+Break and close reach the companion alone: the companion ends the app before it exits, and a job that kills its processes as its last handle closes ends the app when the companion is killed outright. The job lets the app's own children break away, so an app that restarts itself or runs its updater's installer keeps them.
+//
+// Win+R and the other launchers that look a bare name up through Path find the .com before the .exe too, and Windows opens a new console for it: with that console its own and nothing reading its output, the companion starts the app untied to it and exits, so the console closes and the app runs as from the Start menu.
 const windowsCommandSource = `package main
 
 import (
@@ -63,7 +65,18 @@ var (
 	createJobObject          = kernel32.NewProc("CreateJobObjectW")
 	setInformationJobObject  = kernel32.NewProc("SetInformationJobObject")
 	assignProcessToJobObject = kernel32.NewProc("AssignProcessToJobObject")
+	getConsoleProcessList    = kernel32.NewProc("GetConsoleProcessList")
 )
+
+// ownConsole reports whether Windows opened a console for the companion alone, as it does when Win+R, Task Manager's "Run new task", Explorer's address bar or cmd's start find the .com through Path, and its output goes to that console rather than to a pipe or a file a caller reads.
+func ownConsole() bool {
+	var processes [2]uint32
+	if n, _, _ := getConsoleProcessList.Call(uintptr(unsafe.Pointer(&processes[0])), uintptr(len(processes))); n != 1 {
+		return false
+	}
+	var mode uint32
+	return syscall.GetConsoleMode(syscall.Stdout, &mode) == nil
+}
 
 // killWithCompanion puts the process in a job that Windows ends as the companion's handle to it closes, when the companion exits or is killed. Without one, which an old system's job may refuse, the companion still ends the app on the console's events.
 func killWithCompanion(pid int) {
@@ -96,6 +109,15 @@ func main() {
 	}
 	target := filepath.Join(filepath.Dir(self), filepath.Base(self[:len(self)-len(filepath.Ext(self))])+".exe")
 	command := exec.Command(target, os.Args[1:]...)
+	// No shell waits on a console of the companion's own: start the app as Explorer would and exit, which closes the console, rather than keep an empty window whose close or Ctrl+C would end the app.
+	if ownConsole() {
+		if err := command.Start(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		command.Process.Release()
+		return
+	}
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 	// Ctrl+C and Ctrl+Break arrive as os.Interrupt, the console's close, logoff and shutdown as SIGTERM.
 	signals := make(chan os.Signal, 1)
