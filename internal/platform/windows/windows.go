@@ -503,6 +503,9 @@ func Run(app engine.App, opts Options) {
 	if registerToastShortcutCommand(opts.ID) {
 		return
 	}
+	if unregisterToastCommand(opts.ID) {
+		return
+	}
 	registerToastActivator(opts.ID)
 	defer unregisterToastActivator()
 	if opts.Width == 0 {
