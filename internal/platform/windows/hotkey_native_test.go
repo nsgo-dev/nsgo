@@ -91,6 +91,8 @@ func TestGlobalHotKeysReachTheApp(t *testing.T) {
 		Run(app, Options{Title: title, Width: 360, Height: 240, Hidden: true})
 	}()
 	hwnd := waitForWindow(t, title, done)
+	// The window has its title as it is created, before Run records it; a sent message returns only once its thread takes messages, by when it has.
+	sendMessage.Call(hwnd, 0, 0, 0)
 	closed := false
 	t.Cleanup(func() {
 		if closed {
