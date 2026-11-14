@@ -146,6 +146,7 @@ Record a design question here, and confirm the answer with the user before choos
 | [Foldable displays](docs/architecture/foldable.md) | Hinge geometry, reserved regions or a hinge's state in the environment |
 | [Mention completion](docs/architecture/mention-completion.md) | Suggestion state, text-field key capture or composer rows |
 | [Android recording](docs/architecture/android-recording.md) | Long-running microphone capture, foreground services or level metering |
+| [Bluetooth Low Energy](docs/architecture/bluetooth.md) | Bluetooth central sessions, GATT operations or platform permissions |
 | [Updates](docs/architecture/updates.md) | `updater`, an update check, the updaters `nsgo build` bundles or a release channel |
 | [Application and windows](docs/architecture/application.md) | `nsgo.Run`, the windows, panels and tray icons an app opens, global shortcuts or shutdown |
 | [Hosted views](docs/architecture/native-views.md) | `WebView`, `Video` or `Native` components |
