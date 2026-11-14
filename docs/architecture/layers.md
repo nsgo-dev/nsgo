@@ -38,7 +38,7 @@ nsgo
 │   │   └── internal/                    What they share
 │   ├── mobile                           What only phones have
 │   ├── desktop                          What only desktops have
-│   │   └── locales                      Its menus' words, which backends read
+│   │   └── locales                      Its menus' and permission guide's words, which backends read
 │   ├── updater                          Updating the app the platform's way
 │   │   └── locales                      Its alerts' words
 │   ├── icons/lucide                     The bundled icons
@@ -54,6 +54,7 @@ nsgo
 │       ├── web                          WebAssembly and the DOM
 │       ├── miniprogram                  WebAssembly in a WeChat, QQ, Alipay or Douyin mini program
 │       ├── apple                        Shared by macOS and iOS
+│       ├── privacy                      Shared permissions of macOS and iOS, which microphone shares too
 │       ├── webstyle, canvas2d           Shared CSS and 2D canvas player of the web and mini programs
 │       ├── field, hover, finger         Shared input
 │       ├── scrollbar, textselect        Shared scrolling and selection
