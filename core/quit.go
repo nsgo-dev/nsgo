@@ -80,8 +80,10 @@ func (rt *runtime) quitRequest(id uint32) {
 		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemQuitResponse, Count: id, On: quit})
 		t.changed = true
 	}
-	for i := len(rt.quitRequests) - 1; i >= 0; i-- {
-		h := rt.quitRequests[i]
+	// A handler may dispose the owners of others, as closing a window does, so they run from a copy.
+	hs := slices.Clone(rt.quitRequests)
+	for i := len(hs) - 1; i >= 0; i-- {
+		h := hs[i]
 		if h.owner.disposed {
 			continue
 		}
@@ -92,7 +94,7 @@ func (rt *runtime) quitRequest(id uint32) {
 				answer(quit)
 			}
 		}}
-		rt.guard(h.owner, func() { h.fn(q) })
+		rt.tree.within(h.owner, func() { h.fn(q) })
 		switch {
 		case q.canceled:
 			answer(false)

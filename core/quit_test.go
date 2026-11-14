@@ -117,6 +117,35 @@ func TestQuitRequestCanDeferAndAnswersOnce(t *testing.T) {
 	}
 }
 
+func TestQuitRequestSurvivesAHandlerDisposingOthers(t *testing.T) {
+	var ran []string
+	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {
+		cx.OnQuitRequest(func(*QuitRequest) { ran = append(ran, "root") })
+		child := cx.Child()
+		child.Run(func() {
+			child.OnQuitRequest(func(*QuitRequest) { ran = append(ran, "older") })
+			child.OnQuitRequest(func(*QuitRequest) {
+				ran = append(ran, "newest")
+				// As closing the window it lives in does.
+				child.Dispose()
+			})
+		})
+		return View{}
+	})
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventQuitRequest, Count: 10})
+	b := h.tree.Commit()
+	if len(h.errs) > 0 {
+		t.Fatalf("errors %v", h.errs)
+	}
+	if !slices.Equal(ran, []string{"newest", "root"}) {
+		t.Fatalf("handlers ran %v", ran)
+	}
+	if b == nil || len(b.Items) != 1 || b.Items[0].Kind != driver.ItemQuitResponse || b.Items[0].Count != 10 || !b.Items[0].On {
+		t.Fatalf("approval response %#v", b)
+	}
+}
+
 func TestQuitRequestApprovesWithoutHandlers(t *testing.T) {
 	h := newHost(t, Size{Width: 390, Height: 844}, func(*Scope) Node { return View{} })
 	h.commit()
