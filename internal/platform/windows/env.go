@@ -53,6 +53,7 @@ func (w *window) environment() driver.Environment {
 		Locale:         locale,
 		LocaleSettings: localeSettings(),
 		OS:             driver.OSWindows,
+		HasWebView:     true,
 		OSVersion:      osVersion(),
 		Idiom:          driver.IdiomDesktop,
 		TitleBar:       w.titleBarArea(),
