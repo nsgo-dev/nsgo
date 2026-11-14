@@ -59,16 +59,19 @@ func TestDoctorVerdicts(t *testing.T) {
 func TestDoctorOlderGoThatSwitches(t *testing.T) {
 	for _, c := range []struct {
 		version, toolchain string
+		pathGo             bool
 		ok, downloads      bool
 	}{
-		{"go1.27.3", "local", true, false},
-		{"go1.26.0", "auto", true, true},
-		{"go1.26.0", "go1.26.0+auto", true, true},
-		{"go1.26.0", "local", false, false},
-		{"go1.26.0", "path", false, false},
-		{"go1.20.14", "auto", false, false},
+		{"go1.27.3", "local", false, true, false},
+		{"go1.26.0", "auto", false, true, true},
+		{"go1.26.0", "go1.26.0+auto", false, true, true},
+		{"go1.26.0", "local", true, false, false},
+		{"go1.26.0", "path", false, false, false},
+		{"go1.26.0", "path", true, true, false},
+		{"go1.26.0", "go1.26.0+path", true, true, false},
+		{"go1.20.14", "auto", false, false, false},
 	} {
-		m := &machine{goVersion: c.version, goToolchain: c.toolchain}
+		m := &machine{goVersion: c.version, goToolchain: c.toolchain, pathGo: c.pathGo}
 		if m.goBuilds() != c.ok || m.goDownloads() != c.downloads {
 			t.Errorf("%s with GOTOOLCHAIN=%s: builds %v, downloads %v", c.version, c.toolchain, m.goBuilds(), m.goDownloads())
 		}

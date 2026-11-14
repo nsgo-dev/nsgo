@@ -31,6 +31,7 @@ type machine struct {
 	system       string // the system's name and version, "macOS 26.1"
 	goVersion    string // go env GOVERSION
 	goToolchain  string // go env GOTOOLCHAIN
+	pathGo       bool   // minGo's toolchain is on PATH, where GOTOOLCHAIN=path looks for it
 	xcode        string // Xcode's version
 	sdks         map[string]bool
 	simulators   map[string]int // available simulators by OS, "iOS"
@@ -120,15 +121,24 @@ func doctor(ctx context.Context) error {
 	return nil
 }
 
-// goBuilds is whether the Go found builds NSGo apps: minGo or later, or an older one that downloads minGo when a module asks for it.
+// goBuilds is whether the Go found builds NSGo apps: minGo or later, or an older one that switches to minGo when a module asks for it. A GOTOOLCHAIN naming one toolchain, as go1.27.3, is the Go found, as go env runs it.
 func (m *machine) goBuilds() bool {
-	return m.goVersion != "" && (version.Compare(m.goVersion, minGo) >= 0 || m.goDownloads())
+	return m.goVersion != "" && (version.Compare(m.goVersion, minGo) >= 0 || m.goDownloads() || m.goFromPath())
 }
 
-// goDownloads is whether the Go found is older than minGo but switches to a newer toolchain a module needs, downloading it: GOTOOLCHAIN is auto, the default, or ends in +auto.
+// goSwitches is whether the Go found is older than minGo but can switch to the toolchain a module needs.
+func (m *machine) goSwitches() bool {
+	return version.Compare(m.goVersion, minGo) < 0 && version.Compare(m.goVersion, switchGo) >= 0
+}
+
+// goDownloads is whether the Go found switches to minGo, downloading it: GOTOOLCHAIN is auto, the default, or ends in +auto.
 func (m *machine) goDownloads() bool {
-	return version.Compare(m.goVersion, minGo) < 0 && version.Compare(m.goVersion, switchGo) >= 0 &&
-		(m.goToolchain == "auto" || strings.HasSuffix(m.goToolchain, "+auto"))
+	return m.goSwitches() && (m.goToolchain == "auto" || strings.HasSuffix(m.goToolchain, "+auto"))
+}
+
+// goFromPath is whether the Go found switches to minGo's toolchain on PATH: GOTOOLCHAIN is path or ends in +path, which never download.
+func (m *machine) goFromPath() bool {
+	return m.goSwitches() && m.pathGo && (m.goToolchain == "path" || strings.HasSuffix(m.goToolchain, "+path"))
 }
 
 // tools are the lines saying what doctor found: ok for a tool found, else
@@ -140,6 +150,10 @@ func (m *machine) tools() []verdict {
 		out = append(out, no("no Go on PATH: every target needs Go "+strings.TrimPrefix(minGo, "go")+" or later"))
 	case m.goDownloads():
 		out = append(out, yes().with(fmt.Sprintf("Go %s: Go %s will be downloaded when an app builds", strings.TrimPrefix(m.goVersion, "go"), strings.TrimPrefix(minGo, "go"))))
+	case m.goFromPath():
+		out = append(out, yes().with(fmt.Sprintf("Go %s: apps build with %s on PATH", strings.TrimPrefix(m.goVersion, "go"), minGo)))
+	case m.goSwitches() && (m.goToolchain == "path" || strings.HasSuffix(m.goToolchain, "+path")):
+		out = append(out, no(fmt.Sprintf("Go %s is too old and GOTOOLCHAIN=%s downloads no other: put %s on PATH or install Go %s", strings.TrimPrefix(m.goVersion, "go"), m.goToolchain, minGo, strings.TrimPrefix(minGo, "go"))))
 	case version.Compare(m.goVersion, minGo) < 0:
 		out = append(out, no(fmt.Sprintf("Go %s is too old: NSGo needs %s or later", strings.TrimPrefix(m.goVersion, "go"), strings.TrimPrefix(minGo, "go"))))
 	default:
@@ -289,6 +303,9 @@ func probe(ctx context.Context) *machine {
 			m.goVersion, m.goToolchain, _ = strings.Cut(out, "\n")
 		}
 	})
+	if _, err := exec.LookPath(minGo); err == nil {
+		m.pathGo = true
+	}
 	if m.goos == "darwin" {
 		wg.Go(func() { m.probeXcode(ctx) })
 	}

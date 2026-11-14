@@ -42,7 +42,7 @@ The first step of `dev`, each rebuild's included, and of `build`, `check` and `t
 
 ## Doctor
 
-`nsgo doctor` (`doctor.go`) looks at the machine, starting nothing, and lists the tools it found, then each target with whether it builds and runs there: `✓`, `✗` with what to install or connect, or `–` for what no tool could change, such as another system's apps or Apple's on a Mac-less machine. It reuses the lookups the commands make, `findAdb`, `findNDK`, `findBrowser`, `simulators`, `iosDevices` and `canOpenMiniProgram`, so it and they agree, and reads Linux's libraries from the library directories, as the backend's `dlopen` would find them, with GTK's version from its file's name. It fails only when Go is missing or older than go.mod's.
+`nsgo doctor` (`doctor.go`) looks at the machine, starting nothing, and lists the tools it found, then each target with whether it builds and runs there: `✓`, `✗` with what to install or connect, or `–` for what no tool could change, such as another system's apps or Apple's on a Mac-less machine. It reuses the lookups the commands make, `findAdb`, `findNDK`, `findBrowser`, `simulators`, `iosDevices` and `canOpenMiniProgram`, so it and they agree, and reads Linux's libraries from the library directories, as the backend's `dlopen` would find them, with GTK's version from its file's name. It fails only when Go is missing, or older than go.mod's and unable to switch to it: GOTOOLCHAIN `auto` or `+auto` downloads it, `path` or `+path` needs its toolchain (`go1.27.3`) on PATH, and `local` or a Go before 1.21 never switches.
 
 ## Tests
 
