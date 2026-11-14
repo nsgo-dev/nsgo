@@ -96,6 +96,29 @@ func TestSVGMarkerPlacement(t *testing.T) {
 	}
 }
 
+func TestSVGMarkerReferences(t *testing.T) {
+	for _, tt := range []struct {
+		name, doc string
+		markers   int
+	}{
+		{"single quotes", `<path d="M0 0L10 0" marker-end="url('#m')"/>`, 1},
+		{"double quotes", `<path d="M0 0L10 0" style="marker-end: url(&quot;#m&quot;)"/>`, 1},
+		{"inherited from a group", `<g marker-end="url(#m)"><path d="M0 0L10 0"/></g>`, 1},
+		{"the marker shorthand", `<path d="M0 0L10 0L20 0" marker="url(#m)"/>`, 3},
+		{"a longhand over the shorthand", `<path d="M0 0L10 0L20 0" marker="url(#m)" marker-mid="none"/>`, 2},
+		{"none over an inherited marker", `<g marker-end="url(#m)"><path d="M0 0L10 0" marker-end="none"/></g>`, 0},
+		{"an element that is not a marker", `<g id="grp"><path d="M0 0L5 0" stroke="red"/></g><path d="M0 0L10 0" marker-end="url(#grp)"/>`, 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			lines := svgLines(svgOps(t, lineMarkerDoc("", tt.doc)))
+			// The group the last case names draws once, where it is.
+			if len(lines) != tt.markers {
+				t.Fatalf("lines = %v, want %d", lines, tt.markers)
+			}
+		})
+	}
+}
+
 func TestSVGMarkerViewBox(t *testing.T) {
 	ellipse := func(t *testing.T, doc string) DrawOp {
 		t.Helper()
@@ -141,6 +164,21 @@ func TestSVGMarkerClip(t *testing.T) {
 		if op.Kind == DrawClip {
 			t.Fatal("a marker with overflow visible clipped its content")
 		}
+	}
+}
+
+func TestSVGMarkerInheritance(t *testing.T) {
+	var fills []Color
+	for _, op := range svgOps(t, `<svg viewBox="0 0 100 100" fill="red">
+		<defs><marker id="m" overflow="visible"><path d="M0 0L5 0L5 5Z"/></marker></defs>
+		<g fill="blue"><path d="M10 10L50 10" stroke="black" marker-end="url(#m)"/></g>
+	</svg>`) {
+		if op.Kind == DrawFillColor {
+			fills = append(fills, op.Color)
+		}
+	}
+	if len(fills) != 2 || fills[1] != RGB(0xff0000) {
+		t.Fatalf("fills = %v, want the shape's blue, then red", fills)
 	}
 }
 

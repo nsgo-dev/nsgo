@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -16,15 +17,7 @@ import (
 // An Icon draws one in the color it inherits, and the image decoders draw
 // SVG files with it.
 //
-// ParseSVG reads static drawings, icons, logos and illustrations: path,
-// rect, circle, ellipse, line, polyline and polygon inside svg, g, a,
-// switch and use elements, with fills, strokes, stroke widths, caps and
-// joins, fill and clip rules, opacities, transforms, linear and radial
-// gradients and clip paths. A color may be none, currentColor, a hex
-// color, rgb(), rgba(), hsl(), hsla() or a CSS color name. Groups pass
-// these to their children, and presentation attributes, the style
-// attribute and simple style sheets (type, class and id selectors) set
-// them.
+// ParseSVG reads static drawings, icons, logos and illustrations: path, rect, circle, ellipse, line, polyline and polygon inside svg, g, a, switch and use elements, with fills, strokes, stroke widths, caps and joins, fill and clip rules, opacities, transforms, linear and radial gradients, clip paths and markers. A color may be none, currentColor, a hex color, rgb(), rgba(), hsl(), hsla() or a CSS color name. Groups pass these to their children, and presentation attributes, the style attribute and simple style sheets (type, class and id selectors) set them.
 //
 // Text, images, patterns, masks, filters, dashes and animations
 // are not read: an SVG is a drawing, not a page. ParseSVG reads only the
@@ -60,7 +53,7 @@ func ParseSVG(data []byte) (*SVG, error) {
 	}
 	s := &SVG{}
 	p := &svgParser{ids: map[string]*svgNode{}}
-	p.index(root)
+	p.index(root, nil)
 	if err := p.root(root, s); err != nil {
 		return nil, err
 	}
@@ -244,6 +237,8 @@ type svgStyle struct {
 	hidden                     bool
 	ctm                        svgMatrix
 	opacity                    float32
+	// markerStart, markerMid and markerEnd are the ids of the markers shapes draw at their vertices.
+	markerStart, markerMid, markerEnd string
 }
 
 func defaultSVGStyle() svgStyle {
@@ -270,16 +265,26 @@ type svgParser struct {
 	// using holds the elements use elements and markers are drawing, which a use or a marker inside them may not draw again.
 	using  map[*svgNode]bool
 	visits int
+	// ancestors holds each marker's ancestors, root first, which its content inherits from; markerStyles caches what that content starts from.
+	ancestors    map[*svgNode][]*svgNode
+	markerStyles map[*svgNode]svgStyle
 }
 
-func (p *svgParser) index(n *svgNode) {
+func (p *svgParser) index(n *svgNode, ancestors []*svgNode) {
 	if id := strings.TrimSpace(n.attrs["id"]); id != "" {
 		if _, ok := p.ids[id]; !ok {
 			p.ids[id] = n
 		}
 	}
+	if n.name == "marker" {
+		if p.ancestors == nil {
+			p.ancestors = map[*svgNode][]*svgNode{}
+		}
+		p.ancestors[n] = slices.Clone(ancestors)
+	}
+	ancestors = append(ancestors, n)
 	for _, c := range n.children {
-		p.index(c)
+		p.index(c, ancestors)
 	}
 }
 
@@ -793,6 +798,10 @@ func (p *svgParser) emitOps(ops []DrawOp, m svgMatrix) {
 
 // apply reads the presentation attributes on an element.
 func (s *svgStyle) apply(a map[string]string) error {
+	// The marker shorthand sets all three markers, and an element's own marker-start, marker-mid or marker-end overrides it.
+	if id, ok := svgMarkerRef(a["marker"]); ok {
+		s.markerStart, s.markerMid, s.markerEnd = id, id, id
+	}
 	for name, value := range a {
 		value = strings.TrimSpace(value)
 		if value == "inherit" {
@@ -859,6 +868,18 @@ func (s *svgStyle) apply(a map[string]string) error {
 			s.clipEvenOdd = value == "evenodd"
 		case "visibility":
 			s.hidden = value == "hidden" || value == "collapse"
+		case "marker-start":
+			if id, ok := svgMarkerRef(value); ok {
+				s.markerStart = id
+			}
+		case "marker-mid":
+			if id, ok := svgMarkerRef(value); ok {
+				s.markerMid = id
+			}
+		case "marker-end":
+			if id, ok := svgMarkerRef(value); ok {
+				s.markerEnd = id
+			}
 		}
 	}
 	return nil

@@ -22,15 +22,12 @@ func markable(name string) bool {
 	return false
 }
 
-// markers draws the markers el names on the shape in p.local: marker-start on the path's first vertex, marker-end on its last and marker-mid on every other one, inner subpaths' ends included.
+// markers draws the markers style names on the shape in p.local: marker-start on the path's first vertex, marker-end on its last and marker-mid on every other one, inner subpaths' ends included.
 func (p *svgParser) markers(el *svgNode, style svgStyle) error {
 	if !markable(el.name) {
 		return nil
 	}
-	a := el.attrs
-	start := p.ids[svgMarkerRef(a["marker-start"])]
-	mid := p.ids[svgMarkerRef(a["marker-mid"])]
-	end := p.ids[svgMarkerRef(a["marker-end"])]
+	start, mid, end := p.marker(style.markerStart), p.marker(style.markerMid), p.marker(style.markerEnd)
 	if start == nil && mid == nil && end == nil {
 		return nil
 	}
@@ -55,15 +52,22 @@ func (p *svgParser) markers(el *svgNode, style svgStyle) error {
 	return nil
 }
 
-func svgMarkerRef(v string) string {
+// marker returns the marker element id names, or nil.
+func (p *svgParser) marker(id string) *svgNode {
+	if m := p.ids[id]; m != nil && m.name == "marker" {
+		return m
+	}
+	return nil
+}
+
+// svgMarkerRef reads a marker property: the id url(#id) names, or none. It reports false for a value it does not read, so the inherited marker stays.
+func svgMarkerRef(v string) (string, bool) {
 	v = strings.TrimSpace(v)
-	if !strings.HasPrefix(v, "url(") {
-		return ""
+	if v == "none" {
+		return "", true
 	}
-	if i := strings.IndexByte(v, ')'); i >= 0 {
-		return svgHref(map[string]string{"href": strings.TrimSpace(v[4:i])})
-	}
-	return ""
+	id, _ := svgURL(v)
+	return id, strings.HasPrefix(v, "url(")
 }
 
 // svgVertices lists the vertices of a path's operations: every segment's ends, closing segments' included. joins are the indices of the curves that continue an arc, whose starts are not vertices.
@@ -219,10 +223,11 @@ func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent
 		p.op(DrawOp{Kind: DrawClip})
 		defer p.op(DrawOp{Kind: DrawRestore})
 	}
-	style := defaultSVGStyle()
-	if err := style.apply(marker.attrs); err != nil {
+	style, err := p.markerStyle(marker)
+	if err != nil {
 		return err
 	}
+	style.ctm = m.mul(svgMatrix{a: float64(sx), d: float64(sy)}).mul(svgTranslate(-refX, -refY))
 	for _, child := range marker.children {
 		if child.attrs["fill"] == "context-stroke" {
 			style.fill = parent.stroke
@@ -231,7 +236,6 @@ func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent
 			style.stroke = parent.fill
 		}
 	}
-	style.ctm = m.mul(svgMatrix{a: float64(sx), d: float64(sy)}).mul(svgTranslate(-refX, -refY))
 	if p.using == nil {
 		p.using = map[*svgNode]bool{}
 	}
@@ -243,6 +247,27 @@ func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent
 		}
 	}
 	return nil
+}
+
+// markerStyle returns the style a marker's content starts from: what the marker inherits from its ancestors, with its own properties.
+func (p *svgParser) markerStyle(marker *svgNode) (svgStyle, error) {
+	if s, ok := p.markerStyles[marker]; ok {
+		return s, nil
+	}
+	s := defaultSVGStyle()
+	for _, n := range p.ancestors[marker] {
+		if err := s.apply(n.attrs); err != nil {
+			return s, err
+		}
+	}
+	if err := s.apply(marker.attrs); err != nil {
+		return s, err
+	}
+	if p.markerStyles == nil {
+		p.markerStyles = map[*svgNode]svgStyle{}
+	}
+	p.markerStyles[marker] = s
+	return s, nil
 }
 
 // svgAngle reads an angle in degrees, or in grad, rad or turn units, as radians; one it cannot read is 0.
