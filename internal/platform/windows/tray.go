@@ -85,7 +85,7 @@ type trayIcon struct {
 	blurred time.Time
 }
 
-// blurClick is how long after a panel hid on blur the icon's next primary click is the one that hid it.
+// blurClick is how long after a panel hid on blur the icon's next click is the one that hid it.
 const blurClick = 2 * time.Second
 
 func (w *window) applyTray(cfg driver.TrayConfig) {
@@ -252,10 +252,11 @@ func (w *window) trayMessage(lParam uintptr) {
 	if tr == nil {
 		return
 	}
-	if index == 0 && !tr.blurred.IsZero() {
+	if !tr.blurred.IsZero() {
+		// The next click is the one the press that hid the panel ends, whatever its button: it spends the mark, and only a primary one is dropped, so a right-click that hid the panel does not swallow the primary click after it.
 		blurred := time.Since(tr.blurred) < blurClick
 		tr.blurred = time.Time{}
-		if blurred {
+		if blurred && index == 0 {
 			return
 		}
 	}
