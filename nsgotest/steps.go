@@ -395,7 +395,7 @@ func (a *App) inputStep(selector, step string) *View {
 	return v
 }
 
-// Focus focuses the selector's keyboard focus stop: the text field the match is or holds, focused as a tap would, else the pressable or Focusable view the match is or is in, else the first one inside it, reached as a Tab would, so a following Return or Space presses it. A disabled or read-only match fails the step, as a NoFocus view does.
+// Focus focuses the selector's keyboard focus stop: the text field the match is or holds, focused as a tap would, else the pressable or Focusable view the match is or is in, else the first one inside it, reached as a Tab would, so a following Return or Space presses it. Only macOS and the web give views other than fields the keyboard focus, so elsewhere, headless outside a macOS or web environment included, such a view fails the step, as a disabled or read-only match and a NoFocus view do.
 func (a *App) Focus(selector string) {
 	a.t.Helper()
 	a.step("focus(%s)", selector)
@@ -412,8 +412,15 @@ func (a *App) Focus(selector string) {
 		}
 		return t, t != nil && !t.disabled(nil) && (t.Kind != driver.KindInput || !t.Input.Readonly)
 	})
-	if v.Kind != driver.KindInput && v.Props.NoFocus {
-		a.t.Fatalf("nsgotest: %q is NoFocus: it never takes the keyboard focus\n%s", selector, a.Dump())
+	if v.Kind != driver.KindInput {
+		switch {
+		case v.Props.NoFocus:
+			a.t.Fatalf("nsgotest: %q is NoFocus: it never takes the keyboard focus\n%s", selector, a.Dump())
+		case a.target != nil && !slices.Contains([]string{"macos", "web"}, Target()):
+			a.t.Fatalf("nsgotest: %q is not a text field, and on %s only text fields take the keyboard focus; pressable views do on macOS and the web\n%s", selector, Target(), a.Dump())
+		case a.target == nil && !a.tabs():
+			a.t.Fatalf("nsgotest: %q is not a text field, and only text fields take the keyboard focus outside a macOS or web environment: give the test one with Environment\n%s", selector, a.Dump())
+		}
 	}
 	if !v.Focused {
 		switch {
