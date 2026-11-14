@@ -43,6 +43,8 @@ var (
 	iidAgileObject                    = parseGUID("94ea2b94-e9cc-49e0-c0ff-ee64ca8f5b90")
 	iidEnvironment                    = parseGUID("b96d755e-0319-4e92-a296-23436f46a1fc")
 	iidEnvironment3                   = parseGUID("80a22ae3-be7c-4ce2-afe1-5a50056cdeeb")
+	iidEnvironment10                  = parseGUID("ee0eb9df-6f12-46ce-b53f-3f47b9c928e0")
+	iidControllerOptions              = parseGUID("12aae616-8ccb-44ec-bcb3-eb1831881635")
 	iidController                     = parseGUID("4d00c0d1-9434-4eb6-8078-8697a560334f")
 	iidController2                    = parseGUID("c979903e-d4ca-4228-92eb-47ee3fa96eab")
 	iidController3                    = parseGUID("f9614724-5d2b-41dc-aef7-73d62b51543b")
@@ -54,6 +56,11 @@ var (
 	iidNavigationCompleted            = parseGUID("d33a35bf-1c49-4f98-93ab-006e0533fe1c")
 	iidWebMessageReceived             = parseGUID("57213f19-00e6-49fa-8e07-898ea01ecbd2")
 	iidWebResourceRequested           = parseGUID("ab00b74c-15f1-4646-80e8-e76341d25d71")
+	iidHttpRequestHeaders             = parseGUID("e86cac0e-5523-465c-b536-8fb9fc8c8c60")
+	iidWeb4                           = parseGUID("20d02d59-6df2-42dc-bd06-f98a694b1302")
+	iidDownloadStarting               = parseGUID("efedc989-c396-41ca-83f7-07f845a55724")
+	iidBytesReceivedChanged           = parseGUID("828e8ab6-d94c-4264-9cef-5217170d6251")
+	iidDownloadStateChanged           = parseGUID("81336594-7ede-4ba9-bf71-acf0a95b58dd")
 	iidCursorChanged                  = parseGUID("9da43ccc-26e1-4dad-b56c-d8961c94c571")
 	iidFocusChanged                   = parseGUID("05ea24bd-6452-4926-9014-4b82b498135d")
 	iidMoveFocusRequested             = parseGUID("69035451-6dc7-4cb8-9bce-b2bd70ad289f")
@@ -71,6 +78,8 @@ const (
 	envCreateWebResourceResponse   = 4
 	envCreateCompositionController = 9
 	envCreatePointerInfo           = 10
+	env10CreateCompositionWithOpts = 20
+	env10CreateControllerOptions   = 21
 
 	// ICoreWebView2CompositionController
 	compPutRootVisualTarget = 4
@@ -93,6 +102,9 @@ const (
 	controllerPutRasterizationScale              = 29
 	controllerPutShouldDetectMonitorScaleChanges = 31
 
+	// ICoreWebView2ControllerOptions.
+	controllerOptionsPutIsInPrivateModeEnabled = 4
+
 	// ICoreWebView2
 	webGetSettings                   = 3
 	webGetSource                     = 4
@@ -113,6 +125,24 @@ const (
 	webGetDocumentTitle              = 48
 	webAddWebResourceRequested       = 55
 	webAddWebResourceRequestedFilter = 57
+	// ICoreWebView2_4 (after ICoreWebView2_2 and ICoreWebView2_3).
+	webAddDownloadStarting = 75
+
+	// ICoreWebView2DownloadStartingEventArgs.
+	downloadArgsGetOperation  = 3
+	downloadArgsPutCancel     = 5
+	downloadArgsGetResultPath = 6
+	downloadArgsPutResultPath = 7
+	downloadArgsPutHandled    = 9
+
+	// ICoreWebView2DownloadOperation.
+	downloadAddBytesChanged = 3
+	downloadAddStateChanged = 7
+	downloadGetURI          = 9
+	downloadGetBytes        = 13
+	downloadGetState        = 16
+	downloadGetInterrupt    = 17
+	downloadCancel          = 18
 
 	// ICoreWebView2Settings, then ICoreWebView2Settings2 and 6
 	settingsPutIsScriptEnabled          = 4
@@ -140,6 +170,8 @@ const (
 	resourceArgsGetRequest  = 3
 	resourceArgsPutResponse = 5
 	requestGetUri           = 3
+	requestGetHeaders       = 5
+	httpHeadersSetHeader    = 8
 
 	// ICoreWebView2PointerInfo
 	pointerPutPointerKind         = 4
@@ -225,6 +257,7 @@ type pointerPenInfo struct {
 const (
 	sOK             = 0
 	eNoInterface    = 0x80004002
+	eFail           = 0x80004005
 	rpcEChangedMode = 0x80010106
 )
 

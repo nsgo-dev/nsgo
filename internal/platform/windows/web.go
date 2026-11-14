@@ -47,9 +47,15 @@ package windows
 // once the document scripts asked for are added.
 
 import (
+	"mime"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 
@@ -79,6 +85,8 @@ type webView struct {
 	configured, hasApplied bool
 	commands               []webCommand // waiting for the controller
 	userAgent              string       // WebView2's own
+	headerFilter           bool
+	schemeServing          bool
 
 	// The document scripts: the app's IDs and the one keeping the page
 	// from scrolling, the generation of each kind, and how many are still
@@ -100,7 +108,17 @@ type webView struct {
 	lastDown              uint32
 	lastDownAt            point
 	lastButton, downCount int
+
+	downloads []*webDownload
 }
+
+type webDownload struct {
+	view *webView
+	op   *comObject
+	item driver.WebDownload
+}
+
+var webDownloadSerial atomic.Uint64
 
 type webCommand struct {
 	command driver.WebCommand
@@ -189,7 +207,26 @@ func (wv *webView) environmentReady(env *comObject, err error) {
 		c.addRef()
 		wv.controllerReady(c)
 	})
-	if hr := env3.call(envCreateCompositionController, wv.w.hwnd, h.ptr()); failed(hr) {
+	create := func() uintptr {
+		if !wv.config.Incognito {
+			return env3.call(envCreateCompositionController, wv.w.hwnd, h.ptr())
+		}
+		env10 := env.query(&iidEnvironment10)
+		if env10 == nil {
+			return eNoInterface
+		}
+		defer env10.release()
+		var options *comObject
+		if failed(env10.call(env10CreateControllerOptions, uintptr(unsafe.Pointer(&options)))) || options == nil {
+			return eFail
+		}
+		defer options.release()
+		if failed(options.call(controllerOptionsPutIsInPrivateModeEnabled, boolArg(true))) {
+			return eFail
+		}
+		return env10.call(env10CreateCompositionWithOpts, wv.w.hwnd, uintptr(unsafe.Pointer(options)), h.ptr())
+	}
+	if hr := create(); failed(hr) {
 		h.release()
 		wv.unavailable()
 	}
@@ -226,6 +263,8 @@ func (wv *webView) controllerReady(comp *comObject) {
 	}
 	wv.addScript(webBridge, func(string) bool { return true })
 	wv.listen()
+	wv.listenDownloads()
+	wv.serveSchemes()
 	wv.listenInput()
 	wv.executed = newHandler(&iidExecuteScriptCompleted, nil)
 	wv.ready = true
@@ -243,6 +282,106 @@ func (wv *webView) controllerReady(comp *comObject) {
 	// The root visual target shows once the composition commits: the
 	// next frame does.
 	wv.w.redrawAll()
+}
+
+func (wv *webView) listenDownloads() {
+	web4 := wv.web.query(&iidWeb4)
+	if web4 == nil {
+		return
+	}
+	web4.subscribe(webAddDownloadStarting, newHandler(&iidDownloadStarting, func(_ uintptr, args unsafe.Pointer) {
+		wv.downloadStarted((*comObject)(args))
+	}))
+	web4.release()
+}
+
+func (wv *webView) downloadStarted(args *comObject) {
+	if args == nil {
+		return
+	}
+	if wv.config.DownloadDir == "" {
+		args.call(downloadArgsPutCancel, 1)
+		return
+	}
+	var op *comObject
+	if failed(args.call(downloadArgsGetOperation, uintptr(unsafe.Pointer(&op)))) || op == nil {
+		args.call(downloadArgsPutCancel, 1)
+		return
+	}
+	name := "download"
+	if defaultPath := args.getString(downloadArgsGetResultPath); defaultPath != "" {
+		name = webDownloadFilename(defaultPath)
+	}
+	id := strconv.FormatInt(time.Now().UnixMilli(), 36) + "-" +
+		strconv.FormatUint(webDownloadSerial.Add(1), 36)
+	dir := filepath.Join(wv.config.DownloadDir, id)
+	path := filepath.Join(dir, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		args.call(downloadArgsPutCancel, 1)
+		op.release()
+		return
+	}
+	if failed(args.call(downloadArgsPutResultPath, uintptr(unsafe.Pointer(wide(path))))) ||
+		failed(args.call(downloadArgsPutHandled, 1)) {
+		args.call(downloadArgsPutCancel, 1)
+		op.release()
+		return
+	}
+	dl := &webDownload{view: wv, op: op, item: driver.WebDownload{State: driver.WebDownloadStarted,
+		ID: id, URL: op.getString(downloadGetURI), Filename: name, Path: path}}
+	wv.downloads = append(wv.downloads, dl)
+	wv.report(driver.Event{Kind: driver.EventDownload, Data: &dl.item})
+	op.subscribe(downloadAddBytesChanged, newHandler(&iidBytesReceivedChanged, func(uintptr, unsafe.Pointer) {
+		// The public event model reports the byte count when the download
+		// reaches its terminal state, matching the Apple and Linux hosts.
+	}))
+	op.subscribe(downloadAddStateChanged, newHandler(&iidDownloadStateChanged, func(uintptr, unsafe.Pointer) {
+		wv.downloadStateChanged(dl)
+	}))
+}
+
+func (wv *webView) downloadStateChanged(dl *webDownload) {
+	if wv.closed || dl == nil || dl.op == nil {
+		return
+	}
+	var state int32
+	if failed(dl.op.call(downloadGetState, uintptr(unsafe.Pointer(&state)))) {
+		return
+	}
+	switch state {
+	case 2: // COREWEBVIEW2_DOWNLOAD_STATE_COMPLETED
+		dl.item.State = driver.WebDownloadFinished
+		var bytes int64
+		if !failed(dl.op.call(downloadGetBytes, uintptr(unsafe.Pointer(&bytes)))) {
+			dl.item.Bytes = bytes
+		}
+	case 1: // COREWEBVIEW2_DOWNLOAD_STATE_INTERRUPTED
+		dl.item.State = driver.WebDownloadFailed
+		dl.item.Message = "The download was interrupted."
+		var reason int32
+		if !failed(dl.op.call(downloadGetInterrupt, uintptr(unsafe.Pointer(&reason)))) {
+			dl.item.Message += " Reason " + strconv.FormatInt(int64(reason), 10) + "."
+		}
+	default:
+		return
+	}
+	wv.report(driver.Event{Kind: driver.EventDownload, Data: &dl.item})
+	dl.op.release()
+	dl.op = nil
+	for i, active := range wv.downloads {
+		if active == dl {
+			wv.downloads = append(wv.downloads[:i], wv.downloads[i+1:]...)
+			break
+		}
+	}
+}
+
+func webDownloadFilename(path string) string {
+	name := filepath.Base(path)
+	if name == "." || name == ".." || name == string(filepath.Separator) || name == "" {
+		return "download"
+	}
+	return name
 }
 
 // listen reports the page's navigations and messages.
@@ -395,6 +534,7 @@ func webError(status int32) string {
 func (wv *webView) configure(c *driver.WebConfig) {
 	wv.config, wv.configured = *c, true
 	if wv.ready {
+		wv.serveSchemes()
 		wv.paintBackground()
 		wv.apply()
 	}
@@ -420,6 +560,9 @@ func (wv *webView) apply() {
 			s6.call(settingsPutIsSwipeNavigationEnabled, boolArg(c.BackForwardGestures))
 			s6.release()
 		}
+	}
+	if len(c.Headers) > 0 {
+		wv.serveHeaders()
 	}
 	scripts := first || c.InjectedJavaScript != old.InjectedJavaScript ||
 		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent
@@ -593,20 +736,97 @@ func (wv *webView) serveHTML() {
 		if !sameDocument(uri, wv.base) {
 			return
 		}
-		body := []byte(wv.html)
-		stream, _, _ := shCreateMemStream.Call(uintptr(unsafe.Pointer(&body[0])), uintptr(len(body)))
-		if stream == 0 {
+		wv.respondResource(a, []byte(wv.html), "text/html; charset=utf-8")
+	}))
+}
+
+// serveSchemes answers requests for the app-owned schemes of this view.
+func (wv *webView) serveSchemes() {
+	if wv.schemeServing || len(wv.config.SchemeHandlers) == 0 || wv.web == nil {
+		return
+	}
+	wv.schemeServing = true
+	wv.web.call(webAddWebResourceRequestedFilter, uintptr(unsafe.Pointer(wide("*"))), webResourceContextAll)
+	wv.web.subscribe(webAddWebResourceRequested, newHandler(&iidWebResourceRequested, func(_ uintptr, args unsafe.Pointer) {
+		if wv.closed || wv.env == nil {
 			return
 		}
-		s := *(**comObject)(unsafe.Pointer(&stream))
-		defer s.release()
-		var response *comObject
-		if failed(wv.env.call(envCreateWebResourceResponse, s.ptr(), 200, uintptr(unsafe.Pointer(wide("OK"))),
-			uintptr(unsafe.Pointer(wide("Content-Type: text/html; charset=utf-8"))), uintptr(unsafe.Pointer(&response)))) {
+		a := (*comObject)(args)
+		var request *comObject
+		if failed(a.call(resourceArgsGetRequest, uintptr(unsafe.Pointer(&request)))) || request == nil {
 			return
 		}
-		a.call(resourceArgsPutResponse, response.ptr())
-		response.release()
+		uri := request.getString(requestGetUri)
+		request.release()
+		u, err := url.Parse(uri)
+		if err != nil {
+			return
+		}
+		handler := wv.config.SchemeHandlers[strings.ToLower(u.Scheme)]
+		if handler == nil {
+			return
+		}
+		body := handler(uri)
+		wv.respondResource(a, body, webMIME(u.Path, body))
+	}))
+}
+
+func (wv *webView) respondResource(args *comObject, body []byte, contentType string) {
+	var data unsafe.Pointer
+	if len(body) > 0 {
+		data = unsafe.Pointer(&body[0])
+	}
+	stream, _, _ := shCreateMemStream.Call(uintptr(data), uintptr(len(body)))
+	if stream == 0 {
+		return
+	}
+	s := *(**comObject)(unsafe.Pointer(&stream))
+	defer s.release()
+	var response *comObject
+	header := "Content-Type: " + contentType + "\r\nAccess-Control-Allow-Origin: *"
+	if failed(wv.env.call(envCreateWebResourceResponse, s.ptr(), 200, uintptr(unsafe.Pointer(wide("OK"))),
+		uintptr(unsafe.Pointer(wide(header))), uintptr(unsafe.Pointer(&response)))) {
+		return
+	}
+	args.call(resourceArgsPutResponse, response.ptr())
+	response.release()
+}
+
+func webMIME(path string, body []byte) string {
+	if typ := mime.TypeByExtension(filepath.Ext(path)); typ != "" {
+		return typ
+	}
+	if len(body) > 0 {
+		return http.DetectContentType(body)
+	}
+	return "application/octet-stream"
+}
+
+// serveHeaders adds the app's configured headers to WebView2 requests.
+func (wv *webView) serveHeaders() {
+	if wv.headerFilter || wv.web == nil {
+		return
+	}
+	wv.headerFilter = true
+	wv.web.call(webAddWebResourceRequestedFilter, uintptr(unsafe.Pointer(wide("*"))), webResourceContextAll)
+	wv.web.subscribe(webAddWebResourceRequested, newHandler(&iidWebResourceRequested, func(_ uintptr, args unsafe.Pointer) {
+		if wv.closed || len(wv.config.Headers) == 0 {
+			return
+		}
+		a := (*comObject)(args)
+		var request *comObject
+		if failed(a.call(resourceArgsGetRequest, uintptr(unsafe.Pointer(&request)))) || request == nil {
+			return
+		}
+		defer request.release()
+		var headers *comObject
+		if failed(request.call(requestGetHeaders, uintptr(unsafe.Pointer(&headers)))) || headers == nil {
+			return
+		}
+		defer headers.release()
+		for name, value := range wv.config.Headers {
+			headers.call(httpHeadersSetHeader, uintptr(unsafe.Pointer(wide(name))), uintptr(unsafe.Pointer(wide(value))))
+		}
 	}))
 }
 
@@ -773,6 +993,14 @@ func (wv *webView) close() {
 	}
 	wv.closed = true
 	wv.commands = nil
+	for _, dl := range wv.downloads {
+		if dl.op != nil {
+			dl.op.call(downloadCancel)
+			dl.op.release()
+			dl.op = nil
+		}
+	}
+	wv.downloads = nil
 	if wv.controller != nil {
 		wv.controller.call(controllerClose)
 	}
@@ -809,6 +1037,7 @@ const (
 	mouseHorizontalWheel       = 526
 	mouseLeave                 = 675
 	webResourceContextDocument = 1
+	webResourceContextAll      = 0
 )
 
 // buttonEvent returns the mouse event of button (0 left, 1 right, 2
