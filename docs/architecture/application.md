@@ -1,6 +1,6 @@
 # Application and windows
 
-An app opens what it shows itself, as an Avalonia application does: windows, panels, tray icons and global shortcuts, on one engine whose windows share its signals. Read this before changing `nsgo.Run`, `nsgo.SetMainView`, `desktop`'s windows, tray icons, shortcuts or shutdown, or how the engine attaches surfaces. macOS opens the full set; Linux also handles global shortcuts; the [roadmap](../roadmap.md#application-and-windows) orders the remaining Windows and Linux work.
+An app opens what it shows itself, as an Avalonia application does: windows, panels, tray icons and global shortcuts, on one engine whose windows share its signals. Read this before changing `nsgo.Run`, `nsgo.SetMainView`, `desktop`'s windows, tray icons, shortcuts or shutdown, or how the engine attaches surfaces. macOS opens the full set, Windows and Linux open them for `nsgo.Run(App)`, and Linux also handles global shortcuts; the [roadmap](../roadmap.md#application-and-windows) orders the remaining Windows and Linux work.
 
 ## Model
 
@@ -37,7 +37,7 @@ The engine runs one graph with a tree per surface (`core.Tree`). Where the platf
 - Opening sends `ItemOpenSurface` to the app's surface. The platform makes the window and attaches it: `engine.Engine.Attach(id, platform)` returns the surface's `Engine`, which reports its size, environment and events as the first surface's does.
 - The engine commits every attached tree after each wake-up, the first first, and asks a window's platform for display frames, since the app's surface has no display. A tree waits uncommitted until it is attached.
 - A closed window's tree ends: the engine sends its platform one batch, `WindowDestroy`, and forgets it, or sends it to a platform that attaches after the close.
-- Where the platform opens no windows (phones, the web, `nsgo.NewView`, test hosts, Windows for now, and Linux apps run with a root view), the first tree is the one surface: `OpenWindow`, `OpenPanel` and, except on Linux, `NewTray` return nil, whose methods do nothing, and `core.AppRoot` shows the main view in it. A platform that registers global shortcuts there, as Linux's own window does, says so with `core.RootOptions.HotKeys`, and the shortcuts go to that surface.
+- Where the platform opens no windows (phones, the web, `nsgo.NewView`, test hosts, and Windows and Linux apps run with a root view), the first tree is the one surface: `OpenWindow`, `OpenPanel` and, except on Windows and Linux, `NewTray` return nil, whose methods do nothing, and `core.AppRoot` shows the main view in it. A platform that registers global shortcuts there, as Linux's own window does, says so with `core.RootOptions.HotKeys`, and the shortcuts go to that surface.
 
 ## Lifecycle
 
@@ -75,7 +75,15 @@ An app run with a function (`nsgo.Run(App)`, or a root view with automatic updat
 - Both paths dispatch the same `EventHotKey`; when neither backend is available, the shortcut is ignored. A host's `NewView` takes none.
 
 ## Windows
-The Windows backend supports notification-area icons, click events and menus, and attaches opened window surfaces to the app's message loop. Tray-anchored panels, panel focus behavior and drawn tray views remain in the surfaces slice of the roadmap.
+
+For `nsgo.Run(App)`, `Run` keeps its root window hidden as the app's own surface and attaches the surfaces the app opens on its message loop; `nsgo.Run(Root)` shows the main view in the root window and only adds tray icons.
+
+- A window is a top-level window centered at its content size in its monitor's scale, with its material. Its close reports `EventWindowClose`, and `WindowDestroy` destroys it. Keys go to the key bindings and menu of the window they are sent to.
+- A panel is a borderless popup tool window, so it has no taskbar button. It shows above or under its tray icon from `Shell_NotifyIconGetRect`, else in the upper middle of the monitor with the pointer, sized at that monitor's scale, and takes the focus, which activates the app; with `HideOnBlur` it hides as it loses it. The press on the icon that hides a panel by taking its focus does not show it again.
+- A tray icon is `Shell_NotifyIcon`'s at `NOTIFYICON_VERSION_4`: `NIN_SELECT` and `NIN_KEYSELECT` are primary clicks and `WM_CONTEXTMENU` secondary, its tooltip is the standard one, and the icons are added again when Explorer broadcasts `TaskbarCreated`. Its menu is owned by a hidden window, so it raises none of the app's. A drawn icon's surface stays hidden.
+- An alert asked from the app's own surface shows the hidden root window as the alert's own window, without the app's menu bar, which closing cancels.
+- `LaunchAtLogin` answers false, and global shortcuts register nothing ([roadmap](../roadmap.md#application-and-windows)).
+
 ## Configuration
 
 `nsgo.yaml` keeps what the package needs before any code runs: the name, the ID, the version and the launch screen's appearance. Windows are sized and limited in Go, `nsgo.WindowSize` and `nsgo.WindowConstraints` for the main window and `WindowOptions` for others; `nsgo.HideDock` and the shutdown mode are Go's too. A `window` in `nsgo.yaml` fails the tool, naming `nsgo.WindowSize`.
