@@ -170,7 +170,6 @@ type surface struct {
 	id          string
 	native      objc.ID
 	engine      *engine.Engine
-	awake       awakeState
 	batches     queue.Batches
 	views       []*view // index is NodeID
 	fingers     fingers // the touches reported
@@ -897,12 +896,12 @@ func (s *surface) apply(b *driver.MountBatch) {
 			haptic(it.Count)
 			continue
 		case driver.ItemKeepAwake:
-			if it.Awake != nil {
-				s.awake.take(it.Count, *it.Awake)
+			if it.Awake != nil && !s.closed {
+				s.keepAwake(it.Count, *it.Awake)
 			}
 			continue
 		case driver.ItemReleaseAwake:
-			s.awake.release(it.Count)
+			s.releaseAwake(it.Count)
 			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge,
 			driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:

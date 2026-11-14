@@ -72,3 +72,10 @@ func (a *awakeState) release(id uint32) {
 		group.assertion = 0
 	}
 }
+
+// releaseAll releases the surface's holds as it closes: its tree's last releases never reach it.
+func (a *awakeState) releaseAll() {
+	for id := range a.ids {
+		a.release(id)
+	}
+}

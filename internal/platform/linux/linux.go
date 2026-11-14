@@ -119,7 +119,6 @@ type window struct {
 	env driver.Environment
 
 	engine  *engine.Engine
-	awake   awakeState
 	batches queue.Batches
 	chrome  chrome
 
@@ -681,6 +680,7 @@ func (w *window) close() {
 	}
 	w.closing = true
 	w.closeHotKeys()
+	w.releaseAllAwake()
 	w.visible = false
 	w.removeTrays()
 	if w.tickID != 0 {
@@ -795,11 +795,11 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemKeepAwake:
 			if it.Awake != nil {
-				w.awake.take(it.Count, *it.Awake, w.opts.ID)
+				w.keepAwake(it.Count, *it.Awake)
 			}
 			continue
 		case driver.ItemReleaseAwake:
-			w.awake.release(it.Count)
+			w.releaseAwake(it.Count)
 			continue
 		case driver.ItemCheckForUpdates:
 			w.checkForUpdates(it.Count)

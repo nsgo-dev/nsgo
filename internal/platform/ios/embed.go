@@ -305,6 +305,7 @@ func (s *surface) close() {
 		s.engine.Close()
 		engine.SyncStorage()
 	}
+	s.releaseAllAwake()
 	for _, v := range s.views {
 		if v != nil && v.component != nil {
 			v.component.Close()

@@ -2,50 +2,90 @@
 
 package windows
 
-import "github.com/nsgo-dev/nsgo/internal/driver"
+import (
+	"sync"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+)
 
 var setThreadExecutionState = kernel32.NewProc("SetThreadExecutionState")
 
-type awakeState struct {
-	ids             map[uint32]bool
-	display, system int
+// SetThreadExecutionState's flags, from winbase.h.
+const (
+	esSystemRequired  = 0x00000001
+	esDisplayRequired = 0x00000002
+	esContinuous      = 0x80000000
+)
+
+// awakeKey names a hold: the window that took it and the ID its tree gave it.
+type awakeKey struct {
+	w  *window
+	id uint32
 }
 
-func (a *awakeState) take(id uint32, req driver.KeepAwake) {
-	if a.ids == nil {
-		a.ids = map[uint32]bool{}
-	}
-	a.ids[id] = req.Display
-	if req.Display {
-		a.display++
-	} else {
-		a.system++
-	}
-	a.apply()
+// awakeHold is a hold and the thread whose execution state carries it.
+type awakeHold struct {
+	display bool
+	thread  uintptr
 }
 
-func (a *awakeState) release(id uint32) {
-	display, ok := a.ids[id]
+// awake is the process's keep-awake holds. The execution state SetThreadExecutionState sets is the calling thread's, and every window on a thread shares it: opened windows and panels share the app's UI thread, and a host's views share the thread that made them. So a window's holds are counted with those of every window on its thread, and each call sets that thread's state from all of them.
+var awake struct {
+	mu    sync.Mutex
+	holds map[awakeKey]awakeHold
+}
+
+func (w *window) keepAwake(id uint32, req driver.KeepAwake) {
+	thread, _, _ := getCurrentThreadID.Call()
+	awake.mu.Lock()
+	defer awake.mu.Unlock()
+	if awake.holds == nil {
+		awake.holds = map[awakeKey]awakeHold{}
+	}
+	awake.holds[awakeKey{w, id}] = awakeHold{display: req.Display, thread: thread}
+	applyAwake(thread)
+}
+
+func (w *window) releaseAwake(id uint32) {
+	awake.mu.Lock()
+	defer awake.mu.Unlock()
+	key := awakeKey{w, id}
+	hold, ok := awake.holds[key]
 	if !ok {
 		return
 	}
-	delete(a.ids, id)
-	if display {
-		a.display--
-	} else {
-		a.system--
-	}
-	a.apply()
+	delete(awake.holds, key)
+	applyAwake(hold.thread)
 }
 
-func (a *awakeState) apply() {
-	const continuous = 0x80000000
-	var flags uintptr
-	if a.display > 0 {
-		flags |= 0x00000002
+// releaseAllAwake releases the window's holds as it is destroyed, on its thread: its tree's last releases never reach it.
+func (w *window) releaseAllAwake() {
+	awake.mu.Lock()
+	defer awake.mu.Unlock()
+	released := false
+	for key := range awake.holds {
+		if key.w == w {
+			delete(awake.holds, key)
+			released = true
+		}
 	}
-	if a.system > 0 || a.display > 0 {
-		flags |= 0x00000001
+	if released {
+		thread, _, _ := getCurrentThreadID.Call()
+		applyAwake(thread)
 	}
-	setThreadExecutionState.Call(continuous | flags)
+}
+
+// applyAwake sets the execution state of thread, the calling one, from the holds it carries; with none left it clears the requirements. awake.mu is held.
+func applyAwake(thread uintptr) {
+	flags := uintptr(esContinuous)
+	for _, hold := range awake.holds {
+		if hold.thread != thread {
+			continue
+		}
+		flags |= esSystemRequired
+		if hold.display {
+			flags |= esDisplayRequired
+		}
+	}
+	setThreadExecutionState.Call(flags)
 }

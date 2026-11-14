@@ -370,7 +370,6 @@ type window struct {
 	opts     Options
 	skipChar bool
 	engine   *engine.Engine
-	awake    awakeState
 	batches  queue.Batches
 	scale    float64 // pixels per point
 	// placing is set while setWindowPosAt moves the window to pixels it chose (wmDPIChanged).
@@ -1127,11 +1126,11 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemKeepAwake:
 			if it.Awake != nil {
-				w.awake.take(it.Count, *it.Awake)
+				w.keepAwake(it.Count, *it.Awake)
 			}
 			continue
 		case driver.ItemReleaseAwake:
-			w.awake.release(it.Count)
+			w.releaseAwake(it.Count)
 			continue
 		case driver.ItemCheckForUpdates:
 			w.checkForUpdates(it.On, it.Count)
@@ -2380,6 +2379,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		w.removeTrays()
 		w.unregisterHotKeys()
 		endWindowGuide(w)
+		w.releaseAllAwake()
 		// Clients let the window's providers go.
 		if uiaReturnRawElementProvider.Find() == nil {
 			uiaReturnRawElementProvider.Call(hwnd, 0, 0, 0)

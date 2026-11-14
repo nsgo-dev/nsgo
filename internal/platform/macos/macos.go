@@ -847,6 +847,7 @@ func (s *surface) close() {
 	if s.engine != nil {
 		s.engine.Close()
 	}
+	s.awake.releaseAll()
 	for _, v := range s.views {
 		if v != nil && v.component != nil {
 			v.component.Close()
@@ -1464,7 +1465,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 			s.permission(it.Count, *it.Permission)
 			continue
 		case driver.ItemKeepAwake:
-			if it.Awake != nil {
+			if it.Awake != nil && !s.closed {
 				s.awake.take(it.Count, *it.Awake)
 			}
 			continue
