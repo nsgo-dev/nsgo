@@ -323,9 +323,6 @@ const (
 	ItemCloseNotification
 	// ItemBadge shows Count on the app's icon; 0 clears it.
 	ItemBadge
-	// ItemQuitResponse answers EventQuitRequest Count. On permits the
-	// platform's pending termination request; false cancels it.
-	ItemQuitResponse
 	// ItemBiometricAvailability asks whether an enrolled biometric can be
 	// used; the platform answers with EventBiometric and its kind in Index.
 	ItemBiometricAvailability
@@ -333,6 +330,8 @@ const (
 	// reason in Value; the platform answers with EventBiometric and its
 	// result in Index.
 	ItemBiometricAuthenticate
+	// ItemQuitResponse answers EventQuitRequest Count, last so that the kinds Android's Protocol.java mirrors keep their values. On permits the platform's pending termination request; false cancels it.
+	ItemQuitResponse
 )
 
 // Biometric kinds, as reported by an availability request.

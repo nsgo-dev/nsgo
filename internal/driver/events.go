@@ -247,14 +247,11 @@ const (
 	// notification whose ID is Text, the one that started the app
 	// included.
 	EventNotificationPress
-	// EventQuitRequest asks the app whether a platform quit request may
-	// proceed. Count identifies the request; the app answers with
-	// ItemQuitResponse. It is sent for user-initiated app termination,
-	// not Scope.Quit.
-	EventQuitRequest
 	// EventBiometric answers an ItemBiometricAvailability or
 	// ItemBiometricAuthenticate request: Index is a kind or result.
 	EventBiometric
+	// EventQuitRequest asks the app whether a quit the user asked for may proceed, last so that the kinds Android's Protocol.java mirrors keep their values. Count identifies the request; the app answers with ItemQuitResponse. It is sent for user-initiated app termination, not Scope.Quit.
+	EventQuitRequest
 )
 
 // What EventInputModality reports.
