@@ -19,9 +19,7 @@ import (
 // hoc and the package unsigned, which runs sandboxed here but uploads
 // nowhere.
 
-// sandboxEntitlements are what a store build's app claims: the sandbox,
-// with the network and the files the user picks, the microphone, the
-// camera, the calendars and Bluetooth when apple.info explains why, and macos.entitlements on top.
+// sandboxEntitlements are what a store build's app claims: the sandbox, with the network and the files the user picks, the microphone, the camera, the calendars and Bluetooth when apple.info explains why, and macos.entitlements on top.
 func (p *project) sandboxEntitlements() map[string]any {
 	ents := map[string]any{
 		"com.apple.security.app-sandbox":                    true,

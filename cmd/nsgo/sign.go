@@ -151,9 +151,7 @@ func (p *project) macSignArgs(path string) []string {
 	return append(args, path)
 }
 
-// hardenedEntitlements are what the hardened runtime denies unless the app
-// claims it, as the Info.plist entries apple.info gives ask for: the
-// microphone, the camera, and the calendars, whose entitlement reminders share.
+// hardenedEntitlements are what the hardened runtime denies unless the app claims it, as the Info.plist entries apple.info gives ask for: the microphone, the camera, and the calendars, whose entitlement reminders share.
 func (p *project) hardenedEntitlements() map[string]any {
 	ents := map[string]any{}
 	info := p.Apple.Info

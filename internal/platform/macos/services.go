@@ -112,8 +112,7 @@ func (s *surface) notify(it *driver.MountItem) {
 	}
 }
 
-// openURL opens u with the app the system picks and reports whether one
-// took it.
+// openURL opens u with the app the system picks and reports whether one took it.
 func (s *surface) openURL(u string, id uint32) {
 	s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: openSystemURL(u)})
 }

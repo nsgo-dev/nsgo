@@ -274,8 +274,7 @@ type msixFileType struct {
 	Extensions        []string
 }
 
-// msixManifest is the package's AppxManifest.xml: the app, which runs
-// with full trust as desktop apps do, its logos, languages and file types, and the devices it uses.
+// msixManifest is the package's AppxManifest.xml: the app, which runs with full trust as desktop apps do, its logos, languages and file types, and the devices it uses.
 func msixManifest(p *project, arch string) ([]byte, error) {
 	name, err := p.displayName()
 	if err != nil {

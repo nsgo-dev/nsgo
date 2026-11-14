@@ -212,16 +212,14 @@ type shellExecuteInfo struct {
 	Process    uintptr
 }
 
-// openURL has the shell open u with the app registered for it. A scheme
-// no app handles answers false without the shell asking for an app.
+// openURL has the shell open u with the app registered for it, answering whether one took it.
 func (w *window) openURL(u string, id uint32) {
 	w.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: w.shellOpenURL(u)})
 }
 
 // shellOpenURL has the shell open u with the app registered for it, reporting whether one took it; a scheme no app handles answers false without the shell asking for an app.
 func (w *window) shellOpenURL(u string) bool {
-	// The shell asks the user for an app when none handles the scheme,
-	// even without UI: ask the registry first.
+	// The shell asks the user for an app when none handles the scheme, even without UI: ask the registry first.
 	scheme, _, _ := strings.Cut(u, ":")
 	var key syscall.Handle
 	if syscall.RegOpenKeyEx(syscall.HKEY_CLASSES_ROOT, wide(scheme), 0, syscall.KEY_READ, &key) != nil {

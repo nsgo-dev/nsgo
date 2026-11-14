@@ -1,6 +1,4 @@
-// Package microphone records the system's default input. It reaches the
-// system directly, as base/terminal does, and builds on every target,
-// reporting where it cannot record.
+// Package microphone records the system's default input. It reaches the system directly, as base/terminal does, and builds on every target, reporting where it cannot record.
 //
 // Apps check and ask for the microphone with core.Scope.PermissionStatus and core.Scope.RequestPermission of core.PermissionMicrophone; Allowed and Authorize share their implementation for code that records without an engine.
 package microphone
