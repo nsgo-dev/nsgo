@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -104,10 +105,12 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 			return ctx.Err()
 		}
 		text, saved, saveErr := saveScreenshots(out.String(), shots, savedPaths)
-		if saveErr != nil {
-			return saveErr
-		}
 		t := parseTestOutput(name, text, code, err)
+		// A screenshot the tool cannot save, as one whose path an earlier one took, fails its test, and the run goes on.
+		if saveErr != nil {
+			t.Status = "fail"
+			t.Output += "\n" + saveErr.Error() + "\n"
+		}
 		if t.Elapsed == 0 {
 			t.Elapsed = time.Since(started)
 		}
@@ -303,9 +306,7 @@ func parseTestOutput(name, out string, code int, runErr error) *testResult {
 // name, then the PNG in base64, in chunks a device's log keeps whole.
 var screenshotLine = regexp.MustCompile(`nsgo-screenshot (\S+) (\d+)/(\d+) (\S*)`)
 
-// saveScreenshots saves the screenshots out carries in dir and returns
-// out without them, the files written and an error for invalid or duplicate
-// paths.
+// saveScreenshots saves the screenshots out carries in dir and returns out without them, the files written and an error for each invalid or duplicate path, whose shot it skips.
 func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, error) {
 	var kept strings.Builder
 	// Each Screenshot call is a shot of its own, so a name taken twice in one process is a duplicate rather than one image's chunks overwritten.
@@ -347,6 +348,7 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 		}
 	}
 	var saved []string
+	var errs []error
 	for _, s := range shots {
 		name := s.name
 		data, err := base64.StdEncoding.DecodeString(strings.Join(s.parts, ""))
@@ -355,7 +357,8 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 			continue
 		}
 		if name == "" || filepath.IsAbs(name) || screenshotPathHasParent(name) {
-			return kept.String(), saved, fmt.Errorf("screenshot %q: name must be a relative path without ..", name)
+			errs = append(errs, fmt.Errorf("screenshot %q: name must be a relative path without ..", name))
+			continue
 		}
 		path := filepath.Join(dir, name)
 		if filepath.Ext(path) != ".png" {
@@ -363,17 +366,19 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 		}
 		path = filepath.Clean(path)
 		if seen[path] {
-			return kept.String(), saved, fmt.Errorf("screenshot %q resolves to %s more than once", name, path)
+			errs = append(errs, fmt.Errorf("screenshot %q resolves to %s more than once", name, path))
+			continue
 		}
 		seen[path] = true
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return kept.String(), saved, fmt.Errorf("screenshot %q: create directory: %w", name, err)
+			errs = append(errs, fmt.Errorf("screenshot %q: create directory: %w", name, err))
+			continue
 		}
 		if err := os.WriteFile(path, data, 0o644); err == nil {
 			saved = append(saved, path)
 		}
 	}
-	return kept.String(), saved, nil
+	return kept.String(), saved, errors.Join(errs...)
 }
 
 func screenshotPathHasParent(name string) bool {

@@ -118,8 +118,10 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 			t.Errorf("screenshot %s: %v", name, err)
 		}
 	}
-	if _, _, err := saveScreenshots(line("en/my library")+"\n", dir, seen); err == nil {
+	if _, saved, err := saveScreenshots(line("en/my library")+"\n"+line("after")+"\n", dir, seen); err == nil {
 		t.Fatal("duplicate screenshot path succeeded")
+	} else if len(saved) != 1 || filepath.Base(saved[0]) != "after.png" {
+		t.Fatalf("saved %v beside a duplicate, want after.png", saved)
 	}
 	// Two shots of one name in one process, the second larger, fail without corrupting the first.
 	two := "nsgo-screenshot " + encode("twice") + " 1/2 AAAA\nnsgo-screenshot " + encode("twice") + " 2/2 BBBB\n"
