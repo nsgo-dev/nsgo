@@ -453,6 +453,7 @@ func (a *App) CapturePNG() []byte {
 // Capture captures the app as the platform shows it and decodes its PNG.
 // Headless runs skip the test because they have no native pixels.
 func (a *App) Capture() image.Image {
+	a.t.Helper()
 	pngData := a.CapturePNG()
 	img, err := png.Decode(bytes.NewReader(pngData))
 	if err != nil {
