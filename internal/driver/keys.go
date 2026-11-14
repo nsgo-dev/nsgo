@@ -20,9 +20,7 @@ type KeyBinding struct {
 	ID uint32
 }
 
-// NormalizeKey returns key lowercased with its modifiers in the order
-// mod, ctrl, alt, shift, meta; "cmd" and "command" are meta, "option" is
-// alt and "control" is ctrl.
+// NormalizeKey returns key lowercased with its modifiers in the order mod, ctrl, alt, shift, meta; "cmd" and "command" are meta, "option" is alt, "control" is ctrl and the key "return" is "enter".
 func NormalizeKey(key string) string {
 	parts := strings.Split(strings.ToLower(strings.ReplaceAll(key, " ", "")), "+")
 	name := parts[len(parts)-1]
