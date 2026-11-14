@@ -787,15 +787,15 @@ func (w *window) menuKeys(entries []driver.MenuEntry) {
 	}
 }
 
-// showMenuBar shows the application menu as the window's menu bar,
-// unless the title bar is hidden, the window is in full screen or the
-// bar hides until Alt shows it.
+// showMenuBar shows the application menu as the window's menu bar, unless the title bar is hidden, the window is in full screen, the bar hides until Alt shows it or the window is a hidden root.
 func (w *window) showMenuBar() {
 	c := &w.chrome
 	c.entries = nil
 	var bar uintptr
 	shown := c.menuBar == driver.MenuBarShown || c.revealed || c.menuOpen
-	if c.menu != nil && c.titleBar == driver.TitleBarDefault && !c.fullScreen && shown {
+	// A hidden root only ever shows as an app-modal alert's window (showAlertWindow), which must not offer the app's menus while the alert waits.
+	hiddenRoot := w.primary && w.opts.Hidden
+	if c.menu != nil && c.titleBar == driver.TitleBarDefault && !c.fullScreen && shown && !hiddenRoot {
 		bar, _, _ = createMenu.Call()
 		if bar != 0 {
 			w.appendMenu(bar, c.menu)
