@@ -40,6 +40,8 @@ https://github.com/egoist/mygo, Copyright (c) 2026 MyGo contributors, forked
 it under the MIT License. Its files keep their notices and say what MyGo
 changed; NSGo replaced MyGo's bridge. internal/shader/LICENSE holds both texts.
 
+base/formula/fonts/NewCMMath-Book.otf is New Computer Modern Math Book, Copyright (C) 2019-2026 Antonis Tsolomitis, copied unmodified from typst/typst-assets, https://github.com/typst/typst-assets, at commit 94dcb990. It is one file of the NewComputerModern package, whose complete and unmodified Work is on CTAN, https://ctan.org/pkg/newcomputermodern, version 8.1.1 of 2026-06-22. It is licensed under the GUST Font License 1.0, that is, under the LaTeX Project Public License 1.3c; base/formula/fonts/LICENSE holds both texts.
+
 The date and time tables in internal/cldr/tables.go are generated from the
 Unicode Common Locale Data Repository (CLDR), https://cldr.unicode.org,
 Copyright (c) 1991-2025 Unicode, Inc., licensed under the Unicode License v3.
