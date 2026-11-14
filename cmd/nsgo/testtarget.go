@@ -356,8 +356,9 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 			kept.WriteString("screenshot " + name + ": " + err.Error() + "\n")
 			continue
 		}
-		if name == "" || filepath.IsAbs(name) || screenshotPathHasParent(name) {
-			errs = append(errs, fmt.Errorf("screenshot %q: name must be a relative path without ..", name))
+		// A name that cleans to "." names dir itself, which .png would turn into a file beside it.
+		if name == "" || filepath.Clean(name) == "." || filepath.IsAbs(name) || screenshotPathHasParent(name) {
+			errs = append(errs, fmt.Errorf("screenshot %q: name must be a relative file path without ..", name))
 			continue
 		}
 		path := filepath.Join(dir, name)

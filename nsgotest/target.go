@@ -467,8 +467,8 @@ func (a *App) Capture() image.Image {
 // pixels and keep the historical log-only behavior.
 func (a *App) Screenshot(name string) {
 	a.t.Helper()
-	if name == "" || filepath.IsAbs(name) || pathHasParent(name) {
-		a.t.Fatalf("nsgotest: screenshot name must be a relative path without ..: %q", name)
+	if name == "" || filepath.Clean(name) == "." || filepath.IsAbs(name) || pathHasParent(name) {
+		a.t.Fatalf("nsgotest: screenshot name must be a relative file path without ..: %q", name)
 	}
 	if a.target == nil {
 		a.t.Logf("nsgotest: no screenshot %q headless; nsgo test -target takes it", name)

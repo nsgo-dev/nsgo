@@ -136,4 +136,12 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 	if _, _, err := saveScreenshots(line("../outside")+"\n", dir, map[string]bool{}); err == nil {
 		t.Fatal("parent screenshot path succeeded")
 	}
+	for _, name := range []string{".", "./"} {
+		if _, _, err := saveScreenshots(line(name)+"\n", dir, map[string]bool{}); err == nil {
+			t.Errorf("screenshot %q succeeded", name)
+		}
+	}
+	if _, err := os.Stat(dir + ".png"); err == nil {
+		t.Error("screenshot \".\" wrote a file beside the directory")
+	}
 }
