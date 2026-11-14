@@ -32,6 +32,22 @@ var unlinked = map[string][]string{
 // linkTargets are the targets the link tests build for.
 var linkTargets = [][2]string{{"darwin", "arm64"}, {"windows", "amd64"}, {"linux", "amd64"}, {"android", "arm64"}, {"js", "wasm"}}
 
+// A text view without RenderMath links no formulas: Untie and its font come with base/formula alone.
+func TestTextViewAppLinks(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("needs the go command")
+	}
+	linked := linkedPackagesOf(t, "./testdata/textview", "darwin", "arm64", "")
+	if !linked["github.com/nsgo-dev/nsgo/base/textview"] {
+		t.Fatal("the text view app links no text view")
+	}
+	for pkg := range linked {
+		if strings.HasPrefix(pkg, "github.com/caelyreth/untie") || pkg == "github.com/nsgo-dev/nsgo/base/formula" {
+			t.Errorf("an app showing a text view without formulas links %s", pkg)
+		}
+	}
+}
+
 func TestMinimalAppLinks(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("needs the go command")
@@ -67,7 +83,13 @@ func TestDevBuildsLink(t *testing.T) {
 // linkedPackages returns the packages the linker keeps in testdata/minimal for goos and goarch, built with tags, for what other packages reach: those its dependency dump has an edge into from another package's symbol. A package's own init and the tables it fills, and literals the linker shares by content, do not count.
 func linkedPackages(t *testing.T, goos, goarch, tags string) map[string]bool {
 	t.Helper()
-	cmd := exec.Command("go", "build", "-trimpath", "-tags="+tags, "-ldflags=-dumpdep", "-o", os.DevNull, "./testdata/minimal")
+	return linkedPackagesOf(t, "./testdata/minimal", goos, goarch, tags)
+}
+
+// linkedPackagesOf is linkedPackages for the app in dir.
+func linkedPackagesOf(t *testing.T, dir, goos, goarch, tags string) map[string]bool {
+	t.Helper()
+	cmd := exec.Command("go", "build", "-trimpath", "-tags="+tags, "-ldflags=-dumpdep", "-o", os.DevNull, dir)
 	cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0", "GOFLAGS=")
 	var dump bytes.Buffer
 	cmd.Stderr = &dump

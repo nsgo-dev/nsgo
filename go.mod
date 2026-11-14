@@ -2,12 +2,12 @@ module github.com/nsgo-dev/nsgo
 
 go 1.27.3
 
-require github.com/ebitengine/purego v0.11.3
-
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/andybalholm/brotli v1.3.0
+	github.com/caelyreth/untie v0.5.0
 	github.com/dop251/goja v0.0.0-20261027234916-5f913d1693d9
+	github.com/ebitengine/purego v0.11.3
 	github.com/evanw/esbuild v0.28.2
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/yuin/goldmark v1.8.7
@@ -20,6 +20,8 @@ require (
 
 require (
 	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
+	github.com/go-text/typesetting v0.3.5 // indirect
+	github.com/go-typeset/bidi v0.3.1 // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 )

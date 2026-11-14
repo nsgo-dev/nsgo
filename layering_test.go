@@ -103,6 +103,12 @@ var platformShared = []string{
 	"internal/platform/textselect", "internal/platform/updates", "internal/platform/webstyle", "internal/shaderir/",
 }
 
+// owned lists modules outside NSGo that only some packages may import, by module path: what is large enough that an app links it only by asking for what needs it (docs/architecture/layers.md, What an app links).
+var owned = map[string][]string{
+	// Untie and the font it lays out in, for the formulas apps ask for.
+	"github.com/caelyreth/untie": {"base/formula"},
+}
+
 // portable lists the packages that build unchanged for every target: no
 // purego, syscall or unsafe.
 var portable = []string{"core", "internal/driver", "internal/layout", "internal/shader", "internal/shader/wgsl", "internal/shaderir/", "internal/engine",
@@ -215,6 +221,11 @@ func checkLayer(t *testing.T, p listedPackage, tags string) {
 			}
 		} else if isPortable && platformImport(imp) {
 			t.Errorf("%s imports %s; it must build for every target unchanged", p.ImportPath, imp)
+		}
+		for module, owners := range owned {
+			if (imp == module || strings.HasPrefix(imp, module+"/")) && !matchesAny(pkg, owners) {
+				t.Errorf("%s imports %s, which only %v may", p.ImportPath, imp, owners)
+			}
 		}
 	}
 }

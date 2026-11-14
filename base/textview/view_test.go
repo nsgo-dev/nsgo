@@ -199,7 +199,17 @@ func TestTextViewRendersFormulasAndInlineNodes(t *testing.T) {
 	if got := strings.Join(shown, "|"); got != "E=mc^2 false|x^2 true" {
 		t.Errorf("rendered %q", got)
 	}
-	app.Find("text:Energy ￼ and ￼ and ￼.")
+	v := app.Find("text:Energy ￼ and ￼ and ￼.")
+	// A copy takes a formula as its TeX, and leaves the other attachments out.
+	var copies []string
+	for _, sp := range v.Spans {
+		if v.Text[sp.Start:sp.End] == "￼" {
+			copies = append(copies, sp.Copy)
+		}
+	}
+	if got := strings.Join(copies, "|"); got != "$E=mc^2$||" {
+		t.Errorf("the attachments copy as %q", got)
+	}
 }
 
 func TestTextViewReportsImagePressesAndOpensLinksThatLeave(t *testing.T) {

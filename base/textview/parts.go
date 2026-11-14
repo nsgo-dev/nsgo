@@ -102,7 +102,7 @@ const (
 	PartRule
 	// PartMath is a formula in text: its TeX.
 	PartMath
-	// PartMathBlock is a formula block: its TeX.
+	// PartMathBlock is a formula block: its TeX, or around what RenderMath shows.
 	PartMathBlock
 	// PartDetails is a disclosure: a column of its summary and, while
 	// open, its blocks.

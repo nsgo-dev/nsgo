@@ -70,9 +70,7 @@ type TextView struct {
 	RenderCustom func(cx *core.Scope, node Custom) core.Node
 	// CustomSpan shows a custom node in text as a span.
 	CustomSpan func(node Custom) core.Span
-	// RenderMath shows a formula: a block of its own when its Display is
-	// set ($$…$$ on lines of its own), else as an attachment in its text.
-	// Without it a formula shows its TeX in PartMath or PartMathBlock.
+	// RenderMath shows a formula: a block of its own in PartMathBlock when its Display is set ($$…$$ on lines of its own), else as an attachment in its text, which a copy takes as its TeX between dollars. Without it a formula shows its TeX in PartMath or PartMathBlock. formula.RenderMath (base/formula) typesets them, which links Untie and its font into the app.
 	RenderMath func(cx *core.Scope, math Math) core.Node
 	// RenderCodeBlock shows a code block in place of the default: the code
 	// in a horizontal scroll view.
@@ -371,7 +369,8 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 	case Math:
 		if r.tv.RenderMath != nil {
 			b.Display = true
-			return after(r.tv.RenderMath(cx, b))
+			return after(core.View{Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) },
+				Children: []core.Node{r.tv.RenderMath(cx, b)}})
 		}
 		if caret {
 			return r.selectable(core.Text{Spans: r.caretSpans([]core.Span{{Content: b.TeX}}, true), Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) }})
@@ -716,7 +715,7 @@ func (r *renderer) spans(out []core.Span, content []Inline, style func() core.St
 			out = append(out, core.Span{Content: in.Text, Class: inner(PartKeyboard), StyleFunc: under(PartKeyboard), OnPress: link})
 		case Math:
 			if render := r.tv.RenderMath; render != nil {
-				out = append(out, core.Span{Attachment: core.Func(func(cx *core.Scope) core.Node { return render(cx, in) })})
+				out = append(out, core.Span{Content: "$" + in.TeX + "$", Attachment: core.Func(func(cx *core.Scope) core.Node { return render(cx, in) })})
 			} else {
 				out = append(out, core.Span{Content: in.TeX, Class: inner(PartMath), StyleFunc: under(PartMath), OnPress: link})
 			}
