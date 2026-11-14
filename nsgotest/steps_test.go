@@ -377,6 +377,26 @@ func TestFocusTargetsAnyKeyboardStop(t *testing.T) {
 	}
 }
 
+func TestFocusTabsToAStopAsAUserDoes(t *testing.T) {
+	var log []string
+	button := func(name string) core.Node {
+		return core.View{TestID: name, Style: core.Style{Height: core.Pt(20)},
+			OnPress: func(core.PressEvent) {},
+			OnFocus: func() { log = append(log, "focus "+name) },
+			OnBlur:  func() { log = append(log, "blur "+name) }}
+	}
+	a := Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Children: []core.Node{button("a"), button("b"), button("c")}}
+	}, Environment(driver.Environment{OS: driver.OSMacOS}))
+	a.Focus("id:b")
+	a.Focus("id:a")
+	// The stops on the way take and lose the focus, as they do on a platform.
+	want := []string{"focus a", "blur a", "focus b", "blur b", "focus c", "blur c", "focus a"}
+	if !slices.Equal(log, want) {
+		t.Fatalf("log = %q\nwant  %q", log, want)
+	}
+}
+
 func TestFocusResolvesFieldsFirstThenStopsAroundTheMatch(t *testing.T) {
 	a := Start(t, func(cx *core.Scope) core.Node {
 		return core.View{Children: []core.Node{

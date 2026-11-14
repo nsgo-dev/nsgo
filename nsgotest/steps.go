@@ -395,7 +395,7 @@ func (a *App) inputStep(selector, step string) *View {
 	return v
 }
 
-// Focus focuses the selector's keyboard focus stop: the text field the match is or holds, focused as a tap would, else the pressable or Focusable view the match is or is in, else the first one inside it, reached as a Tab would, so a following Return or Space presses it. Only macOS and the web give views other than fields the keyboard focus, so elsewhere, headless outside a macOS or web environment included, such a view fails the step, as a disabled or read-only match and a NoFocus view do.
+// Focus puts the keyboard focus on the selector's focus stop: the text field the match is or holds, focused as a tap would, else the pressable or Focusable view the match is or is in, else the first one inside it, reached by pressing Tab from where the focus is, so a following Return or Space presses it. Only macOS and the web give views other than fields the keyboard focus, so elsewhere, headless outside a macOS or web environment included, such a view fails the step, as a disabled or read-only match and a NoFocus view do.
 func (a *App) Focus(selector string) {
 	a.t.Helper()
 	a.step("focus(%s)", selector)
@@ -424,30 +424,12 @@ func (a *App) Focus(selector string) {
 	}
 	if !v.Focused {
 		switch {
-		case a.target != nil && v.Kind == driver.KindInput:
-			a.target.press(a.target.reveal(v), 0)
+		case v.Kind != driver.KindInput:
+			a.tabTo(selector, v)
 		case a.target != nil:
-			// The platform surface has no imperative focus operation. Tab is
-			// the user-visible operation that focuses a pressable view, and
-			// checking the model after each key avoids assuming the current
-			// focus or a particular platform's first stop.
-			for range len(a.views) + 1 {
-				a.target.keys(nil, "tab")
-				a.target.settle()
-				if v.Focused {
-					break
-				}
-			}
-			if !v.Focused {
-				a.t.Fatalf("nsgotest: %q could not take keyboard focus\n%s", selector, a.Dump())
-			}
+			a.target.press(a.target.reveal(v), 0)
 		default:
-			modality := driver.ModalityKeyboard
-			if v.Kind == driver.KindInput {
-				// Preserve Focus's existing tap-like behavior for fields.
-				modality = driver.ModalityPointer
-			}
-			a.inputBy(modality)
+			a.inputBy(driver.ModalityPointer)
 			for _, o := range a.views {
 				if o != v {
 					a.setFocus(o, false)
@@ -458,6 +440,50 @@ func (a *App) Focus(selector string) {
 		}
 	}
 	a.done()
+}
+
+// tabTo presses Tab until v has the keyboard focus, as a user reaches a view no tap focuses, so the stops on the way take and lose the focus on a platform and headless alike. It fails the test once a Tab leaves the focus where it was, as when the app binds Tab, or brings it back around to where the first Tab put it without reaching v.
+func (a *App) tabTo(selector string, v *View) {
+	a.t.Helper()
+	// The views with the focus, in a fixed order to compare.
+	focused := func() []driver.NodeID {
+		var ids []driver.NodeID
+		for id, o := range a.views {
+			if o.Focused {
+				ids = append(ids, id)
+			}
+		}
+		slices.Sort(ids)
+		return ids
+	}
+	var first []driver.NodeID
+	// Going around comes back to the first stop within a Tab a view; the bound only keeps a platform whose focus never repeats from holding the test.
+	for range len(a.views) + 1 {
+		before := focused()
+		if a.target != nil {
+			a.target.keys(nil, "tab")
+			a.target.settle()
+		} else {
+			a.inputBy(driver.ModalityKeyboard)
+			a.moveFocus(false)
+			a.Settle()
+		}
+		if v.Focused {
+			return
+		}
+		now := focused()
+		switch {
+		case slices.Equal(now, before) && a.target != nil:
+			a.t.Fatalf("nsgotest: %q could not take the keyboard focus: Tab left the focus where it was, as it does when the app binds Tab\n%s", selector, a.Dump())
+		case slices.Equal(now, before):
+			a.t.Fatalf("nsgotest: %q could not take the keyboard focus: Tab left the focus where it was, as it does with no stop in sight\n%s", selector, a.Dump())
+		case first == nil && len(now) > 0:
+			first = now
+		case first != nil && slices.Equal(now, first):
+			a.t.Fatalf("nsgotest: %q could not take the keyboard focus: Tab went around every stop without reaching it\n%s", selector, a.Dump())
+		}
+	}
+	a.t.Fatalf("nsgotest: %q could not take the keyboard focus\n%s", selector, a.Dump())
 }
 
 // Type types text at the end of the field selector names (the match or
