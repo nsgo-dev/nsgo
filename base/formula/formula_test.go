@@ -236,16 +236,19 @@ func TestViewPaints(t *testing.T) {
 	}
 }
 
-// A formula whose renderer's fonts do not load shows its source in ErrorStyle.
+// A formula whose renderer's fonts do not load shows its source in ErrorClass and ErrorStyle.
 func TestViewFallsBackToItsSource(t *testing.T) {
 	r := newRenderer(Fonts{Math: []byte("no font")})
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
-		return View{TestID: "f", Source: `x^2`, Renderer: r, ErrorStyle: core.Style{Color: core.RGB(0xff0000)}}
+		return View{TestID: "f", Source: `x^2`, Renderer: r, ErrorClass: "italic", ErrorStyle: core.Style{Color: core.RGB(0xff0000)}}
 	})
 	app.WaitUntil(10*time.Second, r.loaded.Load)
 	v := app.WaitFor("text:x^2", 10*time.Second)
 	if v.TextStyle.Color != core.RGB(0xff0000) {
 		t.Errorf("the source shows in %v, want ErrorStyle's color", v.TextStyle.Color)
+	}
+	if !v.TextStyle.Font.Italic {
+		t.Error("the source shows upright, want ErrorClass's italic")
 	}
 }
 

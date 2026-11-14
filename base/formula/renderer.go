@@ -45,7 +45,7 @@ const cacheSize = 256
 // referenceSize is the font size formulas are laid out at, which drawing scales to the font size a formula inherits: layout is linear in the size.
 const referenceSize = 100
 
-// NewRenderer prepares a renderer for fonts, parsing and validating them, which takes a while for a large font: some tens of milliseconds for New Computer Modern Math on a Mac. It fails when Math has no usable MATH table.
+// NewRenderer prepares a renderer for fonts, parsing and validating them, which takes a while for a large font: about 120 ms for New Computer Modern Math on an M-series Mac, and about 0.7 s in WebAssembly. It fails when Math has no usable MATH table.
 func NewRenderer(fonts Fonts) (*Renderer, error) {
 	r := newRenderer(fonts)
 	if _, err := r.engine(); err != nil {
