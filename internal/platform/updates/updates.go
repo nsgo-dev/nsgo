@@ -103,7 +103,10 @@ func Find(ctx context.Context, c Config) driver.Update {
 		var item Item
 		if item, err = ParseAppcast(body); err == nil && Newer(item.Build, c.build()) {
 			u.Version, u.URL = item.Version, item.Link
-			u.Download, u.Signature, u.SHA256, u.Key, u.Size = item.Download, item.Signature, item.SHA256, c.Key, item.Size
+			// Only a package signed with the app's key is installed; an unsigned appcast, which a release built without NSGO_UPDATES_KEY writes, offers the release's page instead.
+			if item.Signature != "" && c.Key != "" {
+				u.Download, u.Signature, u.SHA256, u.Key, u.Size = item.Download, item.Signature, item.SHA256, c.Key, item.Size
+			}
 		}
 	}
 	if err != nil {

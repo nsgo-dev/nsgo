@@ -55,3 +55,26 @@ func TestDownloadRejectsBadSignature(t *testing.T) {
 		t.Fatal("bad signature accepted")
 	}
 }
+
+func TestDownloadRefusesUnsignedPackage(t *testing.T) {
+	body := []byte("unsigned update")
+	sum := sha256.Sum256(body)
+	was := imageload.HTTP
+	imageload.HTTP = func(context.Context, string, imageload.Header, imageload.Progress) (*imageload.Response, error) {
+		return &imageload.Response{Status: 200, Body: body}, nil
+	}
+	t.Cleanup(func() { imageload.HTTP = was })
+	public, _, _ := ed25519.GenerateKey(nil)
+	dir := t.TempDir()
+	for _, u := range []driver.Update{
+		{Version: "2.0", Download: "https://example.com/update.deb", SHA256: fmt.Sprintf("%x", sum)},
+		{Version: "2.0", Download: "https://example.com/update.deb", SHA256: fmt.Sprintf("%x", sum), Key: base64.StdEncoding.EncodeToString(public)},
+	} {
+		if _, err := Download(context.Background(), u, dir, nil); err == nil {
+			t.Errorf("unsigned %+v accepted", u)
+		}
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("an unsigned package left %v", entries)
+	}
+}

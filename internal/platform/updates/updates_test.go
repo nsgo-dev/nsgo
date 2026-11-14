@@ -87,10 +87,16 @@ func TestFind(t *testing.T) {
 	serve(t, 200, feed)
 	c := Config{App: "Hello", Version: "1.1", Build: "11", Feed: "https://example.com/appcast-linux_x64.xml"}
 	got := Find(context.Background(), c)
-	want := driver.Update{App: "Hello", Current: "1.1", Version: "1.2", URL: "https://example.com/hello-1.2.deb", Download: "https://example.com/hello-1.2.deb", Size: 10}
+	// An unsigned appcast offers the release's page alone, whether or not the app has a key.
+	want := driver.Update{App: "Hello", Current: "1.1", Version: "1.2", URL: "https://example.com/hello-1.2.deb"}
 	if got != want {
 		t.Errorf("Find = %+v, want %+v", got, want)
 	}
+	c.Key = "a2V5"
+	if got := Find(context.Background(), c); got != want {
+		t.Errorf("Find of an unsigned appcast with a key = %+v, want %+v", got, want)
+	}
+	c.Key = ""
 	c.Build = "12"
 	if got := Find(context.Background(), c); got.Version != "" || got.Err != "" {
 		t.Errorf("Find of the newest build = %+v, want none newer", got)
@@ -106,6 +112,23 @@ func TestFind(t *testing.T) {
 	serve(t, 404, "")
 	if got := Find(context.Background(), c); !strings.Contains(got.Err, "404") {
 		t.Errorf("Find of a missing appcast = %+v, want its status", got)
+	}
+}
+
+func TestFindOffersOnlySignedPackages(t *testing.T) {
+	signed := strings.Replace(feed, `sparkle:version="12"`, `sparkle:version="12" sparkle:edSignature="c2ln" sparkle:sha256="abc"`, 1)
+	serve(t, 200, signed)
+	c := Config{App: "Hello", Version: "1.1", Build: "11", Feed: "https://example.com/appcast-linux_x64.xml", Key: "a2V5"}
+	got := Find(context.Background(), c)
+	want := driver.Update{App: "Hello", Current: "1.1", Version: "1.2", URL: "https://example.com/hello-1.2.deb",
+		Download: "https://example.com/hello-1.2.deb", Signature: "c2ln", SHA256: "abc", Key: "a2V5", Size: 10}
+	if got != want {
+		t.Errorf("Find = %+v, want %+v", got, want)
+	}
+	// Without a key to check it against, a signature is worth nothing.
+	c.Key = ""
+	if got := Find(context.Background(), c); got.Download != "" || got.Version != "1.2" {
+		t.Errorf("Find without a key = %+v, want the page alone", got)
 	}
 }
 

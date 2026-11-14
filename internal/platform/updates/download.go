@@ -86,11 +86,8 @@ func verify(data []byte, update driver.Update) error {
 			return fmt.Errorf("updater: SHA-256 mismatch: got %s, want %s", got, update.SHA256)
 		}
 	}
-	if update.Signature == "" {
-		if update.Key != "" {
-			return errors.New("updater: signed update has no signature")
-		}
-		return nil
+	if update.Signature == "" || update.Key == "" {
+		return errors.New("updater: update package is not signed with the app's key")
 	}
 	key, err := base64.StdEncoding.DecodeString(update.Key)
 	if err != nil || len(key) != ed25519.PublicKeySize {

@@ -157,7 +157,7 @@ updates:
   # automatic: false                  # 只在要求时检查；默认为 true
 ```
 
-`nsgo keygen` 打印一对密钥，不写任何文件：把公钥填进 `updates.key` 并提交；私钥不要放进仓库，存进密码管理器，并在构建发布的地方设为 `NSGO_UPDATES_KEY`，例如 GitHub Actions 的 secret。每次 direct 构建都用私钥签名安装程序，并在旁边写出 `appcast-<目标>.xml`：一个 [Sparkle](https://sparkle-project.org) 格式的更新源，应用从 `feed` 下读取它，把 appcast 和安装程序一起上传即可。没有私钥时，`build` 不写 macOS 和 Windows 的 appcast，因为它们只安装签过名的安装程序。
+`nsgo keygen` 打印一对密钥，不写任何文件：把公钥填进 `updates.key` 并提交；私钥不要放进仓库，存进密码管理器，并在构建发布的地方设为 `NSGO_UPDATES_KEY`，例如 GitHub Actions 的 secret。每次 direct 构建都用私钥签名安装程序，并在旁边写出 `appcast-<目标>.xml`：一个 [Sparkle](https://sparkle-project.org) 格式的更新源，应用从 `feed` 下读取它，把 appcast 和安装程序一起上传即可。没有私钥时，`build` 不写 macOS 和 Windows 的 appcast，因为它们只安装签过名的安装程序；Linux 和 Android 应用读到未签名的 appcast 时，打开该 Release 的页面，不安装其中的软件包。
 
 | 目标 | direct 构建的更新方式 |
 | --- | --- |
