@@ -1820,6 +1820,14 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		w.mouseMoved()
 	}
 	switch message {
+	case wmClose:
+		// DefWindowProc destroys the HWND immediately. Let the core run
+		// Window.OnClosing first; an uncanceled request disposes the surface
+		// through the regular mount lifecycle.
+		if w.engine != nil {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventWindowClose})
+		}
+		return 0
 	case wmMouseMove, wmLButtonDown, wmLButtonUp, wmRButtonDown, wmRButtonUp, wmMButtonDown, wmMButtonUp,
 		wmXButtonDown, wmXButtonUp:
 		if w.hostedMouse(message, wParam, lParam) {

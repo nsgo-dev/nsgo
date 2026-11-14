@@ -564,9 +564,14 @@ func applyCallback(data uintptr) int32 {
 
 func closeRequestCallback(win uintptr, data uintptr) int32 {
 	if w := windowOf(data); w != nil {
-		w.close()
+		// Keep the native window alive while the core asks Window.OnClosing.
+		// A handler that does not cancel disposes the surface and the normal
+		// mount lifecycle then closes this window.
+		if w.engine != nil {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventWindowClose})
+		}
 	}
-	return 1 // the window closes; Run returns after the loop ends
+	return 1 // stop GTK's default close; the core decides whether it closes
 }
 
 // runTasks runs what other goroutines posted, in order.

@@ -54,7 +54,7 @@ The engine runs one graph with a tree per surface (`core.Tree`). Where the platf
 
 `Run` starts the engine on a surface in no window (`own`), which applies the app-level items: it opens surfaces, adds tray icons, registers shortcuts, sets the activation policy and the login item.
 
-- A window is an `NsgoWindow` centered at its content size. AppKit's close asks the delegate, which reports `EventWindowClose` and declines; `WindowDestroy` orders the window out and closes it once the batch returned.
+- A window is an `NsgoWindow` centered at its content size. AppKit's close asks the delegate, which reports `EventWindowClose` and declines; `WindowDestroy` orders the window out and closes it once the batch returned. Windows' `WM_CLOSE` and GTK's `close-request` use the same event, so `OnClosing` can cancel them before the native window is destroyed.
 - A panel is an `NsgoPanel`: an `NSPanel` that can become key without activating the app, titled for the system's rounded corners and shadow, with a transparent title bar and no controls, at the status level on every space. It shows under its tray icon's button, clamped to the screen's visible frame, else in the upper middle of the screen with the mouse, as Spotlight. With `HideOnBlur` it hides as it resigns key and reports `EventWindowHidden`.
 - A tray icon is an `NSStatusItem`: its button reports left and right clicks, a Control-click as secondary. The click that hides a panel by taking its focus does not show it again. Its menu is the status item's own, set for one `performClick:` and reported closed as a context menu.
 - A drawn icon is a surface in the button: an embedded surface whose hit test lets clicks through to the button, the item as wide as the view.
