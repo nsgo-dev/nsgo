@@ -115,6 +115,7 @@ type runtime struct {
 	storage        *storageWatch
 	dataDir        string
 	cacheDir       string
+	webSchemes     map[string]func(string) []byte
 	host           *hostApp
 	// restricted says an owner was given an Access (ProvideAccess), so
 	// requests look for one.

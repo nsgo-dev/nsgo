@@ -52,6 +52,7 @@ var (
 	cbWebDownloadReceived    uintptr
 	cbWebDownloadFinished    uintptr
 	cbWebDownloadFailed      uintptr
+	cbWebScheme              uintptr
 
 	cbShield           uintptr
 	cbViewClassInit    uintptr
@@ -126,6 +127,7 @@ func init() {
 	cbWebDownloadReceived = newCallback(webDownloadReceivedCallback)
 	cbWebDownloadFinished = newCallback(webDownloadFinishedCallback)
 	cbWebDownloadFailed = newCallback(webDownloadFailedCallback)
+	cbWebScheme = newCallback(webSchemeCallback)
 
 	cbShield = newCallback(shieldCallback)
 	cbViewClassInit = newCallback(viewClassInitCallback)
