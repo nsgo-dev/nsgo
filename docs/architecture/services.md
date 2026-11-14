@@ -180,18 +180,18 @@ It departs from MyGo where Go apps differ: answers come to callbacks on the engi
 
 ## Keeping the system awake
 
-`KeepAwake` takes a counted hold until the returned `release` function runs or its scope is disposed. `KeepAwakeOptions.Display` also prevents the display from blanking; a computer-only hold lets the display sleep. Holds with the same display option share one native assertion, and releasing twice is harmless. The hold ends when the app quits. `nsgotest.App.AwakeHolds` and `AwakeReleases` record requests without changing the test machine's power state.
+`KeepAwake` takes a hold until the returned `release` function runs or its scope is disposed, and releasing twice is harmless. `KeepAwakeOptions.Display` keeps the display on as well; a computer-only hold keeps the computer from idle sleep and lets the display sleep. Windows, Linux and iOS count every surface's holds together, as Windows' execution state is a thread's and iOS's idle timer the app's, and give holds of one kind one native setting or inhibitor; macOS gives each surface's holds of one kind one IOKit assertion. A backend ends a surface's holds as the surface closes, since its tree's last releases never reach the platform, and the system ends the rest as the app quits. `nsgotest.App.Awake` lists the holds the app keeps, each with its ID, `AwakeHolds` every one it took and `AwakeReleases` the IDs it released, without changing the test machine's power state.
 
 | Target | Display hold | Computer-only hold |
 | --- | --- | --- |
 | macOS | IOKit `IOPMAssertionCreateWithName(PreventUserIdleDisplaySleep)` | IOKit `PreventUserIdleSystemSleep` |
-| Windows | `SetThreadExecutionState(ES_DISPLAY_REQUIRED \| ES_SYSTEM_REQUIRED)` | `ES_SYSTEM_REQUIRED` |
-| Linux | `org.freedesktop.ScreenSaver.Inhibit`, through the session bus | The same session inhibitor where available |
-| iOS | `UIApplication.isIdleTimerDisabled` while any display hold exists | No-op; iOS controls background execution |
-| Android | No-op; the activity runtime does not keep a window awake for this service yet | No-op |
+| Windows | `SetThreadExecutionState(ES_DISPLAY_REQUIRED \| ES_SYSTEM_REQUIRED)`, set for each UI thread from the holds of its windows | `ES_SYSTEM_REQUIRED` |
+| Linux | `org.freedesktop.ScreenSaver.Inhibit` on the session bus | The desktop portal's `Inhibit` with its Suspend flag; without the portal, the ScreenSaver inhibitor, which keeps the display on too |
+| iOS | `UIApplication.idleTimerDisabled`, set as the first display hold comes and cleared as the last goes | No-op; iOS controls background execution |
+| Android | No-op | No-op |
 | Web and mini programs | No-op | No-op |
 
-The service is independent of `Video`: apps that play decoded frames or run a long task take a hold explicitly, and video playback does not silently change power policy.
+A playing `Video` keeps the display on only on iOS, where `AVPlayer`'s `preventsDisplaySleepDuringVideoPlayback` is on by default; on macOS that default is off, and the other targets' players ask for nothing, so an app that plays video, or draws its own frames, takes a display hold while it plays.
 
 ## Haptics
 
