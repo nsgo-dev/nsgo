@@ -1819,3 +1819,41 @@ func TestWebEvaluate(t *testing.T) {
 	}
 	app.WaitFor(`text:{"elements":true,"sum":42}`, 10*time.Second)
 }
+
+func TestSystemPermissions(t *testing.T) {
+	headless(t)
+	app := startDesktop(t)
+	open(app, "System")
+	read := func(p core.Permission) string { return app.Find("id:permission-" + string(p)).Text }
+	if s := read(core.PermissionCamera); s != "prompt" {
+		t.Errorf("the camera reads %q before asking", s)
+	}
+	app.Press("id:request-camera")
+	if s := read(core.PermissionCamera); s != "granted" {
+		t.Errorf("the camera reads %q once granted", s)
+	}
+	app.PermissionAnswers[core.PermissionMicrophone] = core.PermissionDenied
+	app.Press("id:request-microphone")
+	if s := read(core.PermissionMicrophone); s != "denied" {
+		t.Errorf("the microphone reads %q once refused", s)
+	}
+	app.Press("id:settings-microphone")
+	if !slices.Equal(app.PermissionSettings, []core.Permission{core.PermissionMicrophone}) {
+		t.Errorf("settings opened %v", app.PermissionSettings)
+	}
+	app.Press("id:guide-accessibility")
+	if app.Guide != core.PermissionAccessibility {
+		t.Fatalf("guide %q", app.Guide)
+	}
+	app.Find("id:stop-guide")
+	app.GrantPermission(core.PermissionAccessibility)
+	if s := read(core.PermissionAccessibility); s != "granted" {
+		t.Errorf("Accessibility reads %q once granted", s)
+	}
+	app.Find("id:guide-input-monitoring")
+	app.Press("id:guide-input-monitoring")
+	app.Press("id:stop-guide")
+	if app.Guide != "" {
+		t.Errorf("guide %q after its stop", app.Guide)
+	}
+}

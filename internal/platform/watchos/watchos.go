@@ -452,6 +452,10 @@ func (s *surface) apply(b *driver.MountBatch) {
 			// LocalAuthentication's biometric policy is not on watchOS.
 			s.engine.Dispatch(driver.NoBiometric(it))
 			continue
+		case driver.ItemPermission:
+			// The SwiftUI host asks nothing yet (docs/roadmap.md): what a watch keeps answers unknown.
+			driver.AnswerPermission(it.Count, *it.Permission, watchPermission, s.engine.Dispatch)
+			continue
 		case driver.ItemReadClipboard, driver.ItemPickImages, driver.ItemTakePhoto, driver.ItemPickFiles,
 			driver.ItemPickDirectories, driver.ItemOpenFile, driver.ItemShare, driver.ItemSaveFile:
 			s.unsupported(it)
@@ -899,6 +903,14 @@ func hostAlert(id uint32, index int32) {
 // app but through SwiftUI's openURL, which takes only the system's own.
 func (s *surface) openURL(_ string, request uint32) {
 	s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: request})
+}
+
+// watchPermission is whether watchOS keeps the permission name: a watch has no camera and no media library.
+func watchPermission(name string) int {
+	if name == driver.PermissionCamera || name == driver.PermissionMediaLibrary {
+		return driver.PermissionUnavailable
+	}
+	return driver.PhonePermission(name)
 }
 
 // errUnsupported is what a service watchOS has not answers with.

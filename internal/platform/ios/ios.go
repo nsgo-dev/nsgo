@@ -899,6 +899,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 			s.notify(it)
 			continue
+		case driver.ItemPermission:
+			s.permission(it.Count, *it.Permission)
+			continue
 		case driver.ItemCheckForUpdates:
 			s.checkForUpdates(it.Count)
 			continue

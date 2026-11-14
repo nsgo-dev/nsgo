@@ -788,6 +788,10 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemHotKeys:
 			w.applyHotKeys(it.Keys)
 			continue
+		case driver.ItemPermission:
+			// Nothing to ask, no settings page and nothing to guide.
+			driver.AnswerPermission(it.Count, *it.Permission, linuxPermission, w.engine.Dispatch)
+			continue
 		case driver.ItemCheckForUpdates:
 			w.checkForUpdates(it.Count)
 			continue

@@ -117,14 +117,17 @@ func (s *surface) notify(it *driver.MountItem) {
 // openURL opens u in the app that handles it and reports whether one
 // did.
 func (s *surface) openURL(u string, id uint32) {
+	openSystemURL(u, func(ok bool) { s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: ok}) })
+}
+
+// openSystemURL opens u in the app that handles it and calls answer with whether one did.
+func openSystemURL(u string, answer func(opened bool)) {
 	nsURL := objc.ID(apple.Class("NSURL")).Send(sel("URLWithString:"), apple.NSString(u))
 	if nsURL == 0 {
-		s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id})
+		answer(false)
 		return
 	}
-	done := objc.NewBlock(func(_ objc.Block, ok bool) {
-		s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: ok})
-	})
+	done := objc.NewBlock(func(_ objc.Block, ok bool) { answer(ok) })
 	app := objc.ID(apple.Class("UIApplication")).Send(sel("sharedApplication"))
 	opts := objc.ID(apple.Class("NSDictionary")).Send(sel("dictionary"))
 	app.Send(sel("openURL:options:completionHandler:"), nsURL, opts, done)

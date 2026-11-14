@@ -1322,6 +1322,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge:
 			s.notify(it)
 			continue
+		case driver.ItemPermission:
+			s.permission(it.Count, *it.Permission)
+			continue
 		case driver.ItemPickImages:
 			s.pickImages(*it.Pick, it.Count)
 			continue

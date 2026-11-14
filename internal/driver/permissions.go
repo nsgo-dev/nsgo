@@ -50,3 +50,23 @@ type PermissionRequest struct {
 	// App is the path of the app PermissionGuide holds out to drag, and AppName what it calls it; "" for the defaults.
 	App, AppName string
 }
+
+// AnswerPermission answers ItemPermission id where nothing asks, opens settings or guides: a check, a request and a guide hear status of the permission at once, opening the settings that none opened, and a stop nothing.
+func AnswerPermission(id uint32, r PermissionRequest, status func(name string) int, dispatch func(Event)) {
+	switch r.Command {
+	case PermissionStopGuide:
+	case PermissionOpenSettings:
+		dispatch(Event{Kind: EventPermission, Count: id})
+	default:
+		dispatch(Event{Kind: EventPermission, Count: id, Index: status(r.Name)})
+	}
+}
+
+// PhonePermission is whether a phone's or a watch's system keeps the permission name, PermissionUnknown for one it keeps, for the backends that cannot tell it yet: the six only Macs keep are PermissionUnavailable.
+func PhonePermission(name string) int {
+	switch name {
+	case PermissionMicrophone, PermissionCamera, PermissionCalendars, PermissionReminders, PermissionBluetooth, PermissionMediaLibrary:
+		return PermissionUnknown
+	}
+	return PermissionUnavailable
+}

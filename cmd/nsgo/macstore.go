@@ -20,8 +20,8 @@ import (
 // nowhere.
 
 // sandboxEntitlements are what a store build's app claims: the sandbox,
-// with the network and the files the user picks, the microphone and the
-// camera when apple.info explains why, and macos.entitlements on top.
+// with the network and the files the user picks, the microphone, the
+// camera, the calendars and Bluetooth when apple.info explains why, and macos.entitlements on top.
 func (p *project) sandboxEntitlements() map[string]any {
 	ents := map[string]any{
 		"com.apple.security.app-sandbox":                    true,
@@ -29,6 +29,9 @@ func (p *project) sandboxEntitlements() map[string]any {
 		"com.apple.security.files.user-selected.read-write": true,
 	}
 	maps.Copy(ents, p.hardenedEntitlements())
+	if p.Apple.Info["NSBluetoothAlwaysUsageDescription"] != "" {
+		ents["com.apple.security.device.bluetooth"] = true
+	}
 	maps.Copy(ents, p.MacOS.Entitlements)
 	return ents
 }

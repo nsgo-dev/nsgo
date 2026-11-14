@@ -29,6 +29,12 @@ apple:
     NSSpeechRecognitionUsageDescription: The System page turns what you say into text.
     NSCameraUsageDescription: The System page takes a photo with the camera.
     NSFaceIDUsageDescription: The System page asks for Face ID to show the prompt.
+    NSCalendarsFullAccessUsageDescription: The System page shows how the app asks for your calendars.
+    NSCalendarsUsageDescription: The System page shows how the app asks for your calendars.
+    NSRemindersFullAccessUsageDescription: The System page shows how the app asks for your reminders.
+    NSRemindersUsageDescription: The System page shows how the app asks for your reminders.
+    NSBluetoothAlwaysUsageDescription: The System page shows how the app asks for Bluetooth.
+    NSAppleMusicUsageDescription: The System page shows how the app asks for your media library.
 
 android:
   permissions: [POST_NOTIFICATIONS, USE_BIOMETRIC]

@@ -2483,3 +2483,28 @@ widgetsLiveActivityDetail: "The steps on the Lock Screen and in the Dynamic Isla
 widgetsStartActivity: "Start"
 widgetsEndActivity: "End"
 widgetsLiveActivityHow: "Its buttons add steps and end it without opening the Gallery on iOS 17 and later; the steps, goal and accent above update it while it runs."
+systemPermissions: "Permissions"
+systemPermissionsSummary: "PermissionStatus · RequestPermission · GuidePermission"
+systemPermissionSettings: "Settings"
+systemGuidePermission: "Guide"
+systemStopGuide: "Stop"
+systemPermissionsUnavailable:
+  message: "Not on this platform: {permissions}"
+  description: The note under the System page's permissions listing those the platform has not, joined by systemListSeparator.
+  placeholders:
+    permissions: { type: String }
+systemListSeparator:
+  message: ", "
+  description: What separates the names of a list, such as the permissions a platform has not.
+permissionAccessibility: "Accessibility"
+permissionScreenRecording: "Screen Recording"
+permissionInputMonitoring: "Input Monitoring"
+permissionFullDiskAccess: "Full Disk Access"
+permissionAppManagement: "App Management"
+permissionDeveloperTools: "Developer Tools"
+permissionMicrophone: "Microphone"
+permissionCamera: "Camera"
+permissionCalendars: "Calendars"
+permissionReminders: "Reminders"
+permissionBluetooth: "Bluetooth"
+permissionMediaLibrary: "Media & Apple Music"

@@ -51,6 +51,13 @@ func TestSandboxEntitlements(t *testing.T) {
 	if _, ok := ents["com.apple.security.device.camera"]; ok {
 		t.Error("the sandbox claims the camera unasked")
 	}
+	if _, ok := ents["com.apple.security.device.bluetooth"]; ok {
+		t.Error("the sandbox claims Bluetooth unasked")
+	}
+	p.Apple.Info["NSBluetoothAlwaysUsageDescription"] = "Pairs"
+	if p.sandboxEntitlements()["com.apple.security.device.bluetooth"] != true {
+		t.Error("the sandbox lacks Bluetooth, which apple.info explains")
+	}
 }
 
 func TestMSIXVersions(t *testing.T) {
@@ -157,6 +164,14 @@ func TestMSIXManifest(t *testing.T) {
 	data, _ = msixManifest(p, "amd64")
 	if !bytes.Contains(data, []byte(`Name="12345Me.MyApp" Publisher="CN=0F1E2D3C"`)) {
 		t.Error("the manifest does not carry Partner Center's identity")
+	}
+	if bytes.Contains(data, []byte("DeviceCapability")) {
+		t.Error("the manifest declares devices the app did not ask for")
+	}
+	p.Windows.DeviceCapabilities = []string{"microphone", "webcam"}
+	data, _ = msixManifest(p, "amd64")
+	if !bytes.Contains(data, []byte(`<DeviceCapability Name="microphone"/>`+"\n    "+`<DeviceCapability Name="webcam"/>`)) {
+		t.Errorf("the manifest does not declare the microphone and the webcam:\n%s", data)
 	}
 }
 

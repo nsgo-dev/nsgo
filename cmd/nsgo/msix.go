@@ -265,6 +265,7 @@ type msixData struct {
 	Name, Description, Exe                            string
 	Languages                                         []string
 	FileTypes                                         []msixFileType
+	DeviceCapabilities                                []string
 }
 
 // msixFileType is a kind of document the package opens.
@@ -274,7 +275,7 @@ type msixFileType struct {
 }
 
 // msixManifest is the package's AppxManifest.xml: the app, which runs
-// with full trust as desktop apps do, its logos, languages and file types.
+// with full trust as desktop apps do, its logos, languages and file types, and the devices it uses.
 func msixManifest(p *project, arch string) ([]byte, error) {
 	name, err := p.displayName()
 	if err != nil {
@@ -289,6 +290,8 @@ func msixManifest(p *project, arch string) ([]byte, error) {
 		Name:          name,
 		Description:   name,
 		Exe:           p.Name + ".exe",
+
+		DeviceCapabilities: p.Windows.DeviceCapabilities,
 	}
 	if d.Identity == "" {
 		d.Identity = strings.Trim(msixIdentityPattern.ReplaceAllString(p.ID, "-"), ".-")
@@ -375,6 +378,9 @@ var msixManifestTemplate = template.Must(template.New("msix").Funcs(template.Fun
   <Capabilities>
     <Capability Name="internetClient"/>
     <rescap:Capability Name="runFullTrust"/>
+{{- range .DeviceCapabilities}}
+    <DeviceCapability Name="{{x .}}"/>
+{{- end}}
   </Capabilities>
 </Package>
 `))

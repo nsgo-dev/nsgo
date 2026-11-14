@@ -1121,6 +1121,9 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemHotKeys:
 			w.hotKeysApply(it.Keys)
 			continue
+		case driver.ItemPermission:
+			w.permission(it.Count, *it.Permission)
+			continue
 		case driver.ItemCheckForUpdates:
 			w.checkForUpdates(it.On, it.Count)
 			continue
@@ -2361,6 +2364,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 	case wmDestroy:
 		w.removeTrays()
 		w.unregisterHotKeys()
+		endWindowGuide(w)
 		// Clients let the window's providers go.
 		if uiaReturnRawElementProvider.Find() == nil {
 			uiaReturnRawElementProvider.Call(hwnd, 0, 0, 0)

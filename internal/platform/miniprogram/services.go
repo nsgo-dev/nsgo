@@ -95,7 +95,19 @@ func (s *surface) service(it *driver.MountItem) {
 		s.statusBar(it.StatusBar)
 	case driver.ItemSpeech:
 		// The environment says it has no speech: the core sends none.
+	case driver.ItemPermission:
+		// The platforms' scopes are not read yet (docs/roadmap.md): those of the microphone, the camera and Bluetooth answer unknown.
+		driver.AnswerPermission(it.Count, *it.Permission, miniProgramPermission, s.engine.Dispatch)
 	}
+}
+
+// miniProgramPermission is whether a mini program's platform keeps the permission name, by a scope of its own.
+func miniProgramPermission(name string) int {
+	switch name {
+	case driver.PermissionMicrophone, driver.PermissionCamera, driver.PermissionBluetooth:
+		return driver.PermissionUnknown
+	}
+	return driver.PermissionUnavailable
 }
 
 // alert shows the platform's modal for one or two actions, its action sheet

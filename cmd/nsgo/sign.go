@@ -153,14 +153,20 @@ func (p *project) macSignArgs(path string) []string {
 
 // hardenedEntitlements are what the hardened runtime denies unless the app
 // claims it, as the Info.plist entries apple.info gives ask for: the
-// microphone and the camera.
+// microphone, the camera, and the calendars, whose entitlement reminders share.
 func (p *project) hardenedEntitlements() map[string]any {
 	ents := map[string]any{}
-	if p.Apple.Info["NSMicrophoneUsageDescription"] != "" {
+	info := p.Apple.Info
+	if info["NSMicrophoneUsageDescription"] != "" {
 		ents["com.apple.security.device.audio-input"] = true
 	}
-	if p.Apple.Info["NSCameraUsageDescription"] != "" {
+	if info["NSCameraUsageDescription"] != "" {
 		ents["com.apple.security.device.camera"] = true
+	}
+	for _, key := range []string{"NSCalendarsFullAccessUsageDescription", "NSCalendarsUsageDescription", "NSRemindersFullAccessUsageDescription", "NSRemindersUsageDescription"} {
+		if info[key] != "" {
+			ents["com.apple.security.personal-information.calendars"] = true
+		}
 	}
 	return ents
 }

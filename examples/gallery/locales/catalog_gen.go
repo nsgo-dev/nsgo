@@ -44,190 +44,191 @@ func For(cx *core.Scope) Messages {
 // its method, for the TSX declarations of the messages
 // (tsx.RegisterMessages).
 var Parameters = map[string][]string{
-	"SettingsAppInfoValue":      {"version", "build", "development"},
-	"MenusViewState":            {"sidebar", "statusBar", "zoom"},
-	"SystemFolderItems":         {"count"},
-	"SystemCounted":             {"n"},
-	"SystemTitleBarInsets":      {"top", "left", "right"},
-	"SystemClipboardImage":      {"width", "height", "bytes"},
-	"SystemClipboardHolds":      {"text", "image"},
-	"SystemPicked":              {"count"},
-	"ListsVisible":              {"count"},
-	"ListsItemsColumns":         {"items", "columns"},
-	"ListsMessagesPages":        {"messages", "pages"},
-	"ListsCard":                 {"n"},
-	"ListsItem":                 {"n"},
-	"ListsWeek":                 {"n"},
-	"ListsRows":                 {"count"},
-	"NavRow":                    {"n"},
-	"NavCharactersLost":         {"count"},
-	"NavLevel":                  {"n"},
-	"NavDeep":                   {"n"},
-	"NavOnlyCallOnCancel":       {"what", "count"},
-	"FormAccountCreated":        {"name", "email"},
-	"FormFieldsNeedAttention":   {"count"},
-	"CanvasAvg":                 {"mean"},
-	"CanvasVsAverage":           {"delta"},
-	"CanvasStrokesPoints":       {"strokes", "points"},
-	"CanvasBarValue":            {"n", "value"},
-	"CanvasBar":                 {"n"},
-	"TableIndicator":            {"n"},
-	"TableCellRow":              {"row", "column"},
-	"TableRow":                  {"row"},
-	"TableRowsOf":               {"first", "last", "total"},
-	"TableColumnsTick":          {"columns", "tick"},
-	"EditorLnCol":               {"line", "column"},
-	"EditorCarets":              {"count"},
-	"EditorMatches":             {"count"},
-	"EditorDefinitionAt":        {"name", "line", "column"},
-	"EditorReplaced":            {"count"},
-	"EditorLinePressed":         {"line"},
-	"EditorProblemsCount":       {"count"},
-	"CompCharacters":            {"count"},
-	"CompAnnouncement":          {"n"},
-	"AnimViews":                 {"count"},
-	"AnimReadyMadeMotions":      {"count"},
-	"GestDown":                  {"count"},
-	"GestTouchLine":             {"at", "page", "count"},
-	"GestTaps":                  {"count"},
-	"GestPointerAt":             {"at"},
-	"StocksDaysAgo":             {"days"},
-	"StocksFlatIssues":          {"flat", "issues"},
-	"StocksDownCount":           {"count"},
-	"StocksSimulatedFooter":     {"tick", "engine", "quotes"},
-	"StocksTicksCumulative":     {"ticks"},
-	"StocksBidShare":            {"share"},
-	"StocksAskShare":            {"share"},
-	"StocksAvgVol":              {"avg", "vol"},
-	"StocksDayRange":            {"low", "high"},
-	"StocksSimulatedStats":      {"engine", "quotes"},
-	"StocksShares":              {"count"},
-	"StocksOfBuyingPower":       {"percent", "power"},
-	"StocksPlacedDetail":        {"quantity", "code", "price"},
-	"ChatFilesWritten":          {"count"},
-	"ChatInstallCli":            {"provider", "why", "command"},
-	"ChatThoughtFor":            {"seconds"},
-	"ChatWorked":                {"minutes", "seconds"},
-	"ChatWorking":               {"status", "minutes", "seconds"},
-	"ChatRanTools":              {"count"},
-	"ChatQuotaLeft":             {"percent"},
-	"DockEdits":                 {"panel", "count"},
-	"ScrollPageOf":              {"title", "n", "total"},
-	"DockRegionNone":            {"name"},
-	"A11yItems":                 {"count"},
-	"A11yAKilo":                 {"price"},
-	"A11yInTheBasket":           {"count"},
-	"ScrollSettledOnPage":       {"n"},
-	"ScrollViewport":            {"height"},
-	"ScrollTile":                {"n"},
-	"ScrollPost":                {"n"},
-	"ScrollNew":                 {"n"},
-	"ScrollPosts":               {"count"},
-	"ChartsLiveLabel":           {"price", "change"},
-	"ChartsMidSpread":           {"spread", "share"},
-	"ChartsDepthLabel":          {"ticks", "bids", "asks"},
-	"ChartsBidsTo":              {"price", "size"},
-	"ChartsAsksTo":              {"price", "size"},
-	"ChartsTicks":               {"ticks"},
-	"ChartsFromTheHigh":         {"change"},
-	"ChartsDay":                 {"day"},
-	"ChartsEquityLabel":         {"change", "worst", "from", "to"},
-	"ChartsUnderwaterLabel":     {"worst", "day"},
-	"ChartsDays":                {"days"},
-	"ChartsCapacityLabel":       {"period", "loads"},
-	"ChartsRevenueLabel":        {"total", "region", "share"},
-	"ChartsTheLastMonth":        {"month"},
-	"ChartsSalesLabel":          {"month"},
-	"ChartsSalesValue":          {"month", "online", "store"},
-	"ChartsOfRevenue":           {"share"},
-	"ChartsNetMarginOf":         {"share"},
-	"ChartsBridgeLabel":         {"quarter", "revenue", "net", "margin"},
-	"ChartsTradersOfVisits":     {"traders", "visits"},
-	"ChartsKeptOf":              {"kept", "stage", "share"},
-	"ChartsFunnelLabel":         {"channel", "visits", "trades", "share"},
-	"ChartsFunnelValue":         {"stage", "reached", "kept"},
-	"ChartsCandlesLabel":        {"span", "open", "close_", "change"},
-	"ChartsCandleValue":         {"date", "open", "high", "low", "close_"},
-	"ChartsVolumeLabel":         {"span", "volume"},
-	"ChartsMillion":             {"volume"},
-	"ChartsWeekTo":              {"day"},
-	"ChartsVolumePriceLabel":    {"span", "change", "shares", "unit"},
-	"ChartsVolumePriceValue":    {"period", "close_", "shares"},
-	"ChartsAvgPer":              {"unit"},
-	"ChartsMarginsLabel":        {"segment", "revenue", "losses"},
-	"ChartsMarginsValue":        {"quarter", "revenue", "margin"},
-	"ChartsVolSharpe":           {"vol", "sharpe"},
-	"ChartsMeanReturn":          {"vol"},
-	"ChartsHoldingsWeight":      {"holdings", "rate"},
-	"ChartsSectorCap":           {"sector", "cap_"},
-	"ChartsRiskLabel":           {"holdings", "period", "best", "ahead"},
-	"ChartsRiskValue":           {"name", "ret", "vol", "sharpe"},
-	"ChartsAnalysts":            {"analysts"},
-	"ChartsStocks":              {"stocks"},
-	"ChartsFromPrice":           {"upside", "price"},
-	"ChartsTargetRange":         {"low", "high", "revised"},
-	"ChartsRaised":              {"raised", "stocks"},
-	"ChartsTargetsLabel":        {"list", "upside", "ticker", "most"},
-	"ChartsTargetsValue":        {"ticker", "target", "upside", "price"},
-	"ChartsHoldings":            {"holdings"},
-	"ChartsMeanOfPairs":         {"pairs"},
-	"ChartsCorrelationLabel":    {"holdings", "lookback", "a", "b_", "r", "hedgeA", "hedgeB", "hedge"},
-	"ChartsPairValue":           {"a", "b_", "r"},
-	"ChartsSeasonalityLabel":    {"symbol", "best", "bestReturn", "worst", "worstReturn"},
-	"ChartsTradesOfDay":         {"share", "day"},
-	"ChartsQuietest":            {"trades"},
-	"ChartsBusiest":             {"trades"},
-	"ChartsActivityLabel":       {"market", "day", "slot", "trades", "quietDay", "quietSlot"},
-	"ChartsActivityValue":       {"day", "slot", "trades"},
-	"ChartsFactorsLabel":        {"benchmark", "factor", "score"},
-	"ChartsOfQuarterRevenue":    {"share", "quarter"},
-	"ChartsFlowsLabel":          {"quarter", "revenue", "net", "margin"},
-	"ChartsTop":                 {"stocks"},
-	"ChartsAdvancing":           {"up", "down", "cap_"},
-	"ChartsCapWeighted":         {"cap_"},
-	"ChartsMarketMapLabel":      {"stocks", "sectors", "period", "up"},
-	"ChartsPositions":           {"positions"},
-	"ChartsOfThePortfolio":      {"value", "weight"},
-	"ChartsAllocationLabel":     {"total", "classes"},
-	"ShaderStartPressed":        {"count"},
-	"ShaderScaleIntensity":      {"scale", "intensity"},
-	"PhotosViews":               {"count"},
-	"PhotosPullToRefresh":       {"count"},
-	"PhotosLoadsMore":           {"count"},
-	"PhotosLoadingMore":         {"count"},
-	"DiffChange":                {"n"},
-	"DiffLinesSelected":         {"first", "last"},
-	"DiffLineOfOld":             {"line"},
-	"DiffLineOfNew":             {"line"},
-	"DiffCollapsed":             {"path", "state"},
-	"DiffLines":                 {"count"},
-	"DiffChanges":               {"count"},
-	"EditorErrors":              {"count"},
-	"EditorWarnings":            {"count"},
-	"EditorInfos":               {"count"},
-	"GestFiles":                 {"count"},
-	"StorageKeysChars":          {"keys", "chars"},
-	"StorageChars":              {"count"},
-	"ResizableSidebarPt":        {"size"},
-	"ResizableConsolePt":        {"size"},
-	"CollapsingEntry":           {"n"},
-	"CollapsingMinutes":         {"count"},
-	"TerminalSizeCells":         {"cols", "rows"},
-	"TerminalUnavailable":       {"reason"},
-	"RichHeading":               {"level"},
-	"RichCount":                 {"words", "characters"},
-	"SystemNotificationShown":   {"shown"},
-	"SystemNotificationPressed": {"id"},
-	"SystemSpeechEnded":         {"reason"},
-	"FlowLabel":                 {"nodes", "links"},
-	"FlowNewStep":               {"number"},
-	"FlowExperiment":            {"number"},
-	"WidgetsWrittenAt":          {"time_"},
-	"WidgetsSteps":              {"count"},
-	"WidgetsPercent":            {"count"},
-	"WidgetsMinutes":            {"count"},
-	"WidgetsHours":              {"count"},
-	"WidgetsOfGoal":             {"goal"},
+	"SettingsAppInfoValue":         {"version", "build", "development"},
+	"MenusViewState":               {"sidebar", "statusBar", "zoom"},
+	"SystemFolderItems":            {"count"},
+	"SystemCounted":                {"n"},
+	"SystemTitleBarInsets":         {"top", "left", "right"},
+	"SystemClipboardImage":         {"width", "height", "bytes"},
+	"SystemClipboardHolds":         {"text", "image"},
+	"SystemPicked":                 {"count"},
+	"ListsVisible":                 {"count"},
+	"ListsItemsColumns":            {"items", "columns"},
+	"ListsMessagesPages":           {"messages", "pages"},
+	"ListsCard":                    {"n"},
+	"ListsItem":                    {"n"},
+	"ListsWeek":                    {"n"},
+	"ListsRows":                    {"count"},
+	"NavRow":                       {"n"},
+	"NavCharactersLost":            {"count"},
+	"NavLevel":                     {"n"},
+	"NavDeep":                      {"n"},
+	"NavOnlyCallOnCancel":          {"what", "count"},
+	"FormAccountCreated":           {"name", "email"},
+	"FormFieldsNeedAttention":      {"count"},
+	"CanvasAvg":                    {"mean"},
+	"CanvasVsAverage":              {"delta"},
+	"CanvasStrokesPoints":          {"strokes", "points"},
+	"CanvasBarValue":               {"n", "value"},
+	"CanvasBar":                    {"n"},
+	"TableIndicator":               {"n"},
+	"TableCellRow":                 {"row", "column"},
+	"TableRow":                     {"row"},
+	"TableRowsOf":                  {"first", "last", "total"},
+	"TableColumnsTick":             {"columns", "tick"},
+	"EditorLnCol":                  {"line", "column"},
+	"EditorCarets":                 {"count"},
+	"EditorMatches":                {"count"},
+	"EditorDefinitionAt":           {"name", "line", "column"},
+	"EditorReplaced":               {"count"},
+	"EditorLinePressed":            {"line"},
+	"EditorProblemsCount":          {"count"},
+	"CompCharacters":               {"count"},
+	"CompAnnouncement":             {"n"},
+	"AnimViews":                    {"count"},
+	"AnimReadyMadeMotions":         {"count"},
+	"GestDown":                     {"count"},
+	"GestTouchLine":                {"at", "page", "count"},
+	"GestTaps":                     {"count"},
+	"GestPointerAt":                {"at"},
+	"StocksDaysAgo":                {"days"},
+	"StocksFlatIssues":             {"flat", "issues"},
+	"StocksDownCount":              {"count"},
+	"StocksSimulatedFooter":        {"tick", "engine", "quotes"},
+	"StocksTicksCumulative":        {"ticks"},
+	"StocksBidShare":               {"share"},
+	"StocksAskShare":               {"share"},
+	"StocksAvgVol":                 {"avg", "vol"},
+	"StocksDayRange":               {"low", "high"},
+	"StocksSimulatedStats":         {"engine", "quotes"},
+	"StocksShares":                 {"count"},
+	"StocksOfBuyingPower":          {"percent", "power"},
+	"StocksPlacedDetail":           {"quantity", "code", "price"},
+	"ChatFilesWritten":             {"count"},
+	"ChatInstallCli":               {"provider", "why", "command"},
+	"ChatThoughtFor":               {"seconds"},
+	"ChatWorked":                   {"minutes", "seconds"},
+	"ChatWorking":                  {"status", "minutes", "seconds"},
+	"ChatRanTools":                 {"count"},
+	"ChatQuotaLeft":                {"percent"},
+	"DockEdits":                    {"panel", "count"},
+	"ScrollPageOf":                 {"title", "n", "total"},
+	"DockRegionNone":               {"name"},
+	"A11yItems":                    {"count"},
+	"A11yAKilo":                    {"price"},
+	"A11yInTheBasket":              {"count"},
+	"ScrollSettledOnPage":          {"n"},
+	"ScrollViewport":               {"height"},
+	"ScrollTile":                   {"n"},
+	"ScrollPost":                   {"n"},
+	"ScrollNew":                    {"n"},
+	"ScrollPosts":                  {"count"},
+	"ChartsLiveLabel":              {"price", "change"},
+	"ChartsMidSpread":              {"spread", "share"},
+	"ChartsDepthLabel":             {"ticks", "bids", "asks"},
+	"ChartsBidsTo":                 {"price", "size"},
+	"ChartsAsksTo":                 {"price", "size"},
+	"ChartsTicks":                  {"ticks"},
+	"ChartsFromTheHigh":            {"change"},
+	"ChartsDay":                    {"day"},
+	"ChartsEquityLabel":            {"change", "worst", "from", "to"},
+	"ChartsUnderwaterLabel":        {"worst", "day"},
+	"ChartsDays":                   {"days"},
+	"ChartsCapacityLabel":          {"period", "loads"},
+	"ChartsRevenueLabel":           {"total", "region", "share"},
+	"ChartsTheLastMonth":           {"month"},
+	"ChartsSalesLabel":             {"month"},
+	"ChartsSalesValue":             {"month", "online", "store"},
+	"ChartsOfRevenue":              {"share"},
+	"ChartsNetMarginOf":            {"share"},
+	"ChartsBridgeLabel":            {"quarter", "revenue", "net", "margin"},
+	"ChartsTradersOfVisits":        {"traders", "visits"},
+	"ChartsKeptOf":                 {"kept", "stage", "share"},
+	"ChartsFunnelLabel":            {"channel", "visits", "trades", "share"},
+	"ChartsFunnelValue":            {"stage", "reached", "kept"},
+	"ChartsCandlesLabel":           {"span", "open", "close_", "change"},
+	"ChartsCandleValue":            {"date", "open", "high", "low", "close_"},
+	"ChartsVolumeLabel":            {"span", "volume"},
+	"ChartsMillion":                {"volume"},
+	"ChartsWeekTo":                 {"day"},
+	"ChartsVolumePriceLabel":       {"span", "change", "shares", "unit"},
+	"ChartsVolumePriceValue":       {"period", "close_", "shares"},
+	"ChartsAvgPer":                 {"unit"},
+	"ChartsMarginsLabel":           {"segment", "revenue", "losses"},
+	"ChartsMarginsValue":           {"quarter", "revenue", "margin"},
+	"ChartsVolSharpe":              {"vol", "sharpe"},
+	"ChartsMeanReturn":             {"vol"},
+	"ChartsHoldingsWeight":         {"holdings", "rate"},
+	"ChartsSectorCap":              {"sector", "cap_"},
+	"ChartsRiskLabel":              {"holdings", "period", "best", "ahead"},
+	"ChartsRiskValue":              {"name", "ret", "vol", "sharpe"},
+	"ChartsAnalysts":               {"analysts"},
+	"ChartsStocks":                 {"stocks"},
+	"ChartsFromPrice":              {"upside", "price"},
+	"ChartsTargetRange":            {"low", "high", "revised"},
+	"ChartsRaised":                 {"raised", "stocks"},
+	"ChartsTargetsLabel":           {"list", "upside", "ticker", "most"},
+	"ChartsTargetsValue":           {"ticker", "target", "upside", "price"},
+	"ChartsHoldings":               {"holdings"},
+	"ChartsMeanOfPairs":            {"pairs"},
+	"ChartsCorrelationLabel":       {"holdings", "lookback", "a", "b_", "r", "hedgeA", "hedgeB", "hedge"},
+	"ChartsPairValue":              {"a", "b_", "r"},
+	"ChartsSeasonalityLabel":       {"symbol", "best", "bestReturn", "worst", "worstReturn"},
+	"ChartsTradesOfDay":            {"share", "day"},
+	"ChartsQuietest":               {"trades"},
+	"ChartsBusiest":                {"trades"},
+	"ChartsActivityLabel":          {"market", "day", "slot", "trades", "quietDay", "quietSlot"},
+	"ChartsActivityValue":          {"day", "slot", "trades"},
+	"ChartsFactorsLabel":           {"benchmark", "factor", "score"},
+	"ChartsOfQuarterRevenue":       {"share", "quarter"},
+	"ChartsFlowsLabel":             {"quarter", "revenue", "net", "margin"},
+	"ChartsTop":                    {"stocks"},
+	"ChartsAdvancing":              {"up", "down", "cap_"},
+	"ChartsCapWeighted":            {"cap_"},
+	"ChartsMarketMapLabel":         {"stocks", "sectors", "period", "up"},
+	"ChartsPositions":              {"positions"},
+	"ChartsOfThePortfolio":         {"value", "weight"},
+	"ChartsAllocationLabel":        {"total", "classes"},
+	"ShaderStartPressed":           {"count"},
+	"ShaderScaleIntensity":         {"scale", "intensity"},
+	"PhotosViews":                  {"count"},
+	"PhotosPullToRefresh":          {"count"},
+	"PhotosLoadsMore":              {"count"},
+	"PhotosLoadingMore":            {"count"},
+	"DiffChange":                   {"n"},
+	"DiffLinesSelected":            {"first", "last"},
+	"DiffLineOfOld":                {"line"},
+	"DiffLineOfNew":                {"line"},
+	"DiffCollapsed":                {"path", "state"},
+	"DiffLines":                    {"count"},
+	"DiffChanges":                  {"count"},
+	"EditorErrors":                 {"count"},
+	"EditorWarnings":               {"count"},
+	"EditorInfos":                  {"count"},
+	"GestFiles":                    {"count"},
+	"StorageKeysChars":             {"keys", "chars"},
+	"StorageChars":                 {"count"},
+	"ResizableSidebarPt":           {"size"},
+	"ResizableConsolePt":           {"size"},
+	"CollapsingEntry":              {"n"},
+	"CollapsingMinutes":            {"count"},
+	"TerminalSizeCells":            {"cols", "rows"},
+	"TerminalUnavailable":          {"reason"},
+	"RichHeading":                  {"level"},
+	"RichCount":                    {"words", "characters"},
+	"SystemNotificationShown":      {"shown"},
+	"SystemNotificationPressed":    {"id"},
+	"SystemSpeechEnded":            {"reason"},
+	"FlowLabel":                    {"nodes", "links"},
+	"FlowNewStep":                  {"number"},
+	"FlowExperiment":               {"number"},
+	"WidgetsWrittenAt":             {"time_"},
+	"WidgetsSteps":                 {"count"},
+	"WidgetsPercent":               {"count"},
+	"WidgetsMinutes":               {"count"},
+	"WidgetsHours":                 {"count"},
+	"WidgetsOfGoal":                {"goal"},
+	"SystemPermissionsUnavailable": {"permissions"},
 }
 
 // Translation is a language's messages another package supplies:
@@ -235,191 +236,192 @@ var Parameters = map[string][]string{
 // of the others; a key or a field left out leaves the message to the
 // catalog.
 type Translation struct {
-	Texts                     map[string]string
-	SettingsAppInfoValue      func(version string, build string, development string) string
-	MenusViewState            func(sidebar string, statusBar string, zoom string) string
-	SystemFolderItems         func(count int) string
-	SystemCounted             func(n int) string
-	SystemTitleBarInsets      func(top float64, left float64, right float64) string
-	SystemClipboardImage      func(width float64, height float64, bytes int) string
-	SystemClipboardHolds      func(text string, image string) string
-	SystemPicked              func(count int) string
-	ListsVisible              func(count int) string
-	ListsItemsColumns         func(items int, columns int) string
-	ListsMessagesPages        func(messages int, pages int) string
-	ListsCard                 func(n int) string
-	ListsItem                 func(n int) string
-	ListsWeek                 func(n int) string
-	ListsRows                 func(count int) string
-	NavRow                    func(n int) string
-	NavCharactersLost         func(count int) string
-	NavLevel                  func(n int) string
-	NavDeep                   func(n int) string
-	NavOnlyCallOnCancel       func(what string, count int) string
-	FormAccountCreated        func(name string, email string) string
-	FormFieldsNeedAttention   func(count int) string
-	CanvasAvg                 func(mean float64) string
-	CanvasVsAverage           func(delta string) string
-	CanvasStrokesPoints       func(strokes int, points int) string
-	CanvasBarValue            func(n int, value float64) string
-	CanvasBar                 func(n int) string
-	TableIndicator            func(n int) string
-	TableCellRow              func(row string, column string) string
-	TableRow                  func(row string) string
-	TableRowsOf               func(first string, last string, total string) string
-	TableColumnsTick          func(columns int, tick int) string
-	EditorLnCol               func(line int, column int) string
-	EditorCarets              func(count int) string
-	EditorMatches             func(count int) string
-	EditorDefinitionAt        func(name string, line int, column int) string
-	EditorReplaced            func(count int) string
-	EditorLinePressed         func(line int) string
-	EditorProblemsCount       func(count int) string
-	CompCharacters            func(count int) string
-	CompAnnouncement          func(n int) string
-	AnimViews                 func(count int) string
-	AnimReadyMadeMotions      func(count int) string
-	GestDown                  func(count int) string
-	GestTouchLine             func(at string, page string, count int) string
-	GestTaps                  func(count int) string
-	GestPointerAt             func(at string) string
-	StocksDaysAgo             func(days int) string
-	StocksFlatIssues          func(flat int, issues int) string
-	StocksDownCount           func(count int) string
-	StocksSimulatedFooter     func(tick string, engine string, quotes string) string
-	StocksTicksCumulative     func(ticks int) string
-	StocksBidShare            func(share float64) string
-	StocksAskShare            func(share float64) string
-	StocksAvgVol              func(avg string, vol string) string
-	StocksDayRange            func(low string, high string) string
-	StocksSimulatedStats      func(engine string, quotes string) string
-	StocksShares              func(count int) string
-	StocksOfBuyingPower       func(percent string, power string) string
-	StocksPlacedDetail        func(quantity string, code string, price string) string
-	ChatFilesWritten          func(count int) string
-	ChatInstallCli            func(provider string, why string, command string) string
-	ChatThoughtFor            func(seconds int) string
-	ChatWorked                func(minutes int, seconds int) string
-	ChatWorking               func(status string, minutes int, seconds int) string
-	ChatRanTools              func(count int) string
-	ChatQuotaLeft             func(percent int) string
-	DockEdits                 func(panel string, count int) string
-	ScrollPageOf              func(title string, n int, total int) string
-	DockRegionNone            func(name string) string
-	A11yItems                 func(count int) string
-	A11yAKilo                 func(price string) string
-	A11yInTheBasket           func(count int) string
-	ScrollSettledOnPage       func(n int) string
-	ScrollViewport            func(height string) string
-	ScrollTile                func(n int) string
-	ScrollPost                func(n int) string
-	ScrollNew                 func(n int) string
-	ScrollPosts               func(count int) string
-	ChartsLiveLabel           func(price string, change string) string
-	ChartsMidSpread           func(spread string, share string) string
-	ChartsDepthLabel          func(ticks string, bids string, asks string) string
-	ChartsBidsTo              func(price string, size string) string
-	ChartsAsksTo              func(price string, size string) string
-	ChartsTicks               func(ticks string) string
-	ChartsFromTheHigh         func(change string) string
-	ChartsDay                 func(day string) string
-	ChartsEquityLabel         func(change string, worst string, from string, to string) string
-	ChartsUnderwaterLabel     func(worst string, day string) string
-	ChartsDays                func(days string) string
-	ChartsCapacityLabel       func(period string, loads string) string
-	ChartsRevenueLabel        func(total string, region string, share string) string
-	ChartsTheLastMonth        func(month string) string
-	ChartsSalesLabel          func(month string) string
-	ChartsSalesValue          func(month string, online string, store string) string
-	ChartsOfRevenue           func(share string) string
-	ChartsNetMarginOf         func(share string) string
-	ChartsBridgeLabel         func(quarter string, revenue string, net string, margin string) string
-	ChartsTradersOfVisits     func(traders string, visits string) string
-	ChartsKeptOf              func(kept string, stage string, share string) string
-	ChartsFunnelLabel         func(channel string, visits string, trades string, share string) string
-	ChartsFunnelValue         func(stage string, reached string, kept string) string
-	ChartsCandlesLabel        func(span string, open string, close_ string, change string) string
-	ChartsCandleValue         func(date string, open string, high string, low string, close_ string) string
-	ChartsVolumeLabel         func(span string, volume string) string
-	ChartsMillion             func(volume string) string
-	ChartsWeekTo              func(day string) string
-	ChartsVolumePriceLabel    func(span string, change string, shares string, unit string) string
-	ChartsVolumePriceValue    func(period string, close_ string, shares string) string
-	ChartsAvgPer              func(unit string) string
-	ChartsMarginsLabel        func(segment string, revenue string, losses string) string
-	ChartsMarginsValue        func(quarter string, revenue string, margin string) string
-	ChartsVolSharpe           func(vol string, sharpe string) string
-	ChartsMeanReturn          func(vol string) string
-	ChartsHoldingsWeight      func(holdings string, rate string) string
-	ChartsSectorCap           func(sector string, cap_ string) string
-	ChartsRiskLabel           func(holdings string, period string, best string, ahead string) string
-	ChartsRiskValue           func(name string, ret string, vol string, sharpe string) string
-	ChartsAnalysts            func(analysts string) string
-	ChartsStocks              func(stocks string) string
-	ChartsFromPrice           func(upside string, price string) string
-	ChartsTargetRange         func(low string, high string, revised string) string
-	ChartsRaised              func(raised string, stocks string) string
-	ChartsTargetsLabel        func(list string, upside string, ticker string, most string) string
-	ChartsTargetsValue        func(ticker string, target string, upside string, price string) string
-	ChartsHoldings            func(holdings string) string
-	ChartsMeanOfPairs         func(pairs string) string
-	ChartsCorrelationLabel    func(holdings string, lookback string, a string, b_ string, r string, hedgeA string, hedgeB string, hedge string) string
-	ChartsPairValue           func(a string, b_ string, r string) string
-	ChartsSeasonalityLabel    func(symbol string, best string, bestReturn string, worst string, worstReturn string) string
-	ChartsTradesOfDay         func(share string, day string) string
-	ChartsQuietest            func(trades string) string
-	ChartsBusiest             func(trades string) string
-	ChartsActivityLabel       func(market string, day string, slot string, trades string, quietDay string, quietSlot string) string
-	ChartsActivityValue       func(day string, slot string, trades string) string
-	ChartsFactorsLabel        func(benchmark string, factor string, score string) string
-	ChartsOfQuarterRevenue    func(share string, quarter string) string
-	ChartsFlowsLabel          func(quarter string, revenue string, net string, margin string) string
-	ChartsTop                 func(stocks string) string
-	ChartsAdvancing           func(up string, down string, cap_ string) string
-	ChartsCapWeighted         func(cap_ string) string
-	ChartsMarketMapLabel      func(stocks string, sectors string, period string, up string) string
-	ChartsPositions           func(positions string) string
-	ChartsOfThePortfolio      func(value string, weight string) string
-	ChartsAllocationLabel     func(total string, classes string) string
-	ShaderStartPressed        func(count int) string
-	ShaderScaleIntensity      func(scale string, intensity string) string
-	PhotosViews               func(count string) string
-	PhotosPullToRefresh       func(count int) string
-	PhotosLoadsMore           func(count int) string
-	PhotosLoadingMore         func(count int) string
-	DiffChange                func(n int) string
-	DiffLinesSelected         func(first int, last int) string
-	DiffLineOfOld             func(line int) string
-	DiffLineOfNew             func(line int) string
-	DiffCollapsed             func(path string, state string) string
-	DiffLines                 func(count int) string
-	DiffChanges               func(count int) string
-	EditorErrors              func(count int) string
-	EditorWarnings            func(count int) string
-	EditorInfos               func(count int) string
-	GestFiles                 func(count int) string
-	StorageKeysChars          func(keys int, chars int) string
-	StorageChars              func(count int) string
-	ResizableSidebarPt        func(size string) string
-	ResizableConsolePt        func(size string) string
-	CollapsingEntry           func(n string) string
-	CollapsingMinutes         func(count int) string
-	TerminalSizeCells         func(cols int, rows int) string
-	TerminalUnavailable       func(reason string) string
-	RichHeading               func(level int) string
-	RichCount                 func(words int, characters int) string
-	SystemNotificationShown   func(shown string) string
-	SystemNotificationPressed func(id string) string
-	SystemSpeechEnded         func(reason string) string
-	FlowLabel                 func(nodes int, links int) string
-	FlowNewStep               func(number int) string
-	FlowExperiment            func(number int) string
-	WidgetsWrittenAt          func(time_ string) string
-	WidgetsSteps              func(count int) string
-	WidgetsPercent            func(count int) string
-	WidgetsMinutes            func(count int) string
-	WidgetsHours              func(count int) string
-	WidgetsOfGoal             func(goal int) string
+	Texts                        map[string]string
+	SettingsAppInfoValue         func(version string, build string, development string) string
+	MenusViewState               func(sidebar string, statusBar string, zoom string) string
+	SystemFolderItems            func(count int) string
+	SystemCounted                func(n int) string
+	SystemTitleBarInsets         func(top float64, left float64, right float64) string
+	SystemClipboardImage         func(width float64, height float64, bytes int) string
+	SystemClipboardHolds         func(text string, image string) string
+	SystemPicked                 func(count int) string
+	ListsVisible                 func(count int) string
+	ListsItemsColumns            func(items int, columns int) string
+	ListsMessagesPages           func(messages int, pages int) string
+	ListsCard                    func(n int) string
+	ListsItem                    func(n int) string
+	ListsWeek                    func(n int) string
+	ListsRows                    func(count int) string
+	NavRow                       func(n int) string
+	NavCharactersLost            func(count int) string
+	NavLevel                     func(n int) string
+	NavDeep                      func(n int) string
+	NavOnlyCallOnCancel          func(what string, count int) string
+	FormAccountCreated           func(name string, email string) string
+	FormFieldsNeedAttention      func(count int) string
+	CanvasAvg                    func(mean float64) string
+	CanvasVsAverage              func(delta string) string
+	CanvasStrokesPoints          func(strokes int, points int) string
+	CanvasBarValue               func(n int, value float64) string
+	CanvasBar                    func(n int) string
+	TableIndicator               func(n int) string
+	TableCellRow                 func(row string, column string) string
+	TableRow                     func(row string) string
+	TableRowsOf                  func(first string, last string, total string) string
+	TableColumnsTick             func(columns int, tick int) string
+	EditorLnCol                  func(line int, column int) string
+	EditorCarets                 func(count int) string
+	EditorMatches                func(count int) string
+	EditorDefinitionAt           func(name string, line int, column int) string
+	EditorReplaced               func(count int) string
+	EditorLinePressed            func(line int) string
+	EditorProblemsCount          func(count int) string
+	CompCharacters               func(count int) string
+	CompAnnouncement             func(n int) string
+	AnimViews                    func(count int) string
+	AnimReadyMadeMotions         func(count int) string
+	GestDown                     func(count int) string
+	GestTouchLine                func(at string, page string, count int) string
+	GestTaps                     func(count int) string
+	GestPointerAt                func(at string) string
+	StocksDaysAgo                func(days int) string
+	StocksFlatIssues             func(flat int, issues int) string
+	StocksDownCount              func(count int) string
+	StocksSimulatedFooter        func(tick string, engine string, quotes string) string
+	StocksTicksCumulative        func(ticks int) string
+	StocksBidShare               func(share float64) string
+	StocksAskShare               func(share float64) string
+	StocksAvgVol                 func(avg string, vol string) string
+	StocksDayRange               func(low string, high string) string
+	StocksSimulatedStats         func(engine string, quotes string) string
+	StocksShares                 func(count int) string
+	StocksOfBuyingPower          func(percent string, power string) string
+	StocksPlacedDetail           func(quantity string, code string, price string) string
+	ChatFilesWritten             func(count int) string
+	ChatInstallCli               func(provider string, why string, command string) string
+	ChatThoughtFor               func(seconds int) string
+	ChatWorked                   func(minutes int, seconds int) string
+	ChatWorking                  func(status string, minutes int, seconds int) string
+	ChatRanTools                 func(count int) string
+	ChatQuotaLeft                func(percent int) string
+	DockEdits                    func(panel string, count int) string
+	ScrollPageOf                 func(title string, n int, total int) string
+	DockRegionNone               func(name string) string
+	A11yItems                    func(count int) string
+	A11yAKilo                    func(price string) string
+	A11yInTheBasket              func(count int) string
+	ScrollSettledOnPage          func(n int) string
+	ScrollViewport               func(height string) string
+	ScrollTile                   func(n int) string
+	ScrollPost                   func(n int) string
+	ScrollNew                    func(n int) string
+	ScrollPosts                  func(count int) string
+	ChartsLiveLabel              func(price string, change string) string
+	ChartsMidSpread              func(spread string, share string) string
+	ChartsDepthLabel             func(ticks string, bids string, asks string) string
+	ChartsBidsTo                 func(price string, size string) string
+	ChartsAsksTo                 func(price string, size string) string
+	ChartsTicks                  func(ticks string) string
+	ChartsFromTheHigh            func(change string) string
+	ChartsDay                    func(day string) string
+	ChartsEquityLabel            func(change string, worst string, from string, to string) string
+	ChartsUnderwaterLabel        func(worst string, day string) string
+	ChartsDays                   func(days string) string
+	ChartsCapacityLabel          func(period string, loads string) string
+	ChartsRevenueLabel           func(total string, region string, share string) string
+	ChartsTheLastMonth           func(month string) string
+	ChartsSalesLabel             func(month string) string
+	ChartsSalesValue             func(month string, online string, store string) string
+	ChartsOfRevenue              func(share string) string
+	ChartsNetMarginOf            func(share string) string
+	ChartsBridgeLabel            func(quarter string, revenue string, net string, margin string) string
+	ChartsTradersOfVisits        func(traders string, visits string) string
+	ChartsKeptOf                 func(kept string, stage string, share string) string
+	ChartsFunnelLabel            func(channel string, visits string, trades string, share string) string
+	ChartsFunnelValue            func(stage string, reached string, kept string) string
+	ChartsCandlesLabel           func(span string, open string, close_ string, change string) string
+	ChartsCandleValue            func(date string, open string, high string, low string, close_ string) string
+	ChartsVolumeLabel            func(span string, volume string) string
+	ChartsMillion                func(volume string) string
+	ChartsWeekTo                 func(day string) string
+	ChartsVolumePriceLabel       func(span string, change string, shares string, unit string) string
+	ChartsVolumePriceValue       func(period string, close_ string, shares string) string
+	ChartsAvgPer                 func(unit string) string
+	ChartsMarginsLabel           func(segment string, revenue string, losses string) string
+	ChartsMarginsValue           func(quarter string, revenue string, margin string) string
+	ChartsVolSharpe              func(vol string, sharpe string) string
+	ChartsMeanReturn             func(vol string) string
+	ChartsHoldingsWeight         func(holdings string, rate string) string
+	ChartsSectorCap              func(sector string, cap_ string) string
+	ChartsRiskLabel              func(holdings string, period string, best string, ahead string) string
+	ChartsRiskValue              func(name string, ret string, vol string, sharpe string) string
+	ChartsAnalysts               func(analysts string) string
+	ChartsStocks                 func(stocks string) string
+	ChartsFromPrice              func(upside string, price string) string
+	ChartsTargetRange            func(low string, high string, revised string) string
+	ChartsRaised                 func(raised string, stocks string) string
+	ChartsTargetsLabel           func(list string, upside string, ticker string, most string) string
+	ChartsTargetsValue           func(ticker string, target string, upside string, price string) string
+	ChartsHoldings               func(holdings string) string
+	ChartsMeanOfPairs            func(pairs string) string
+	ChartsCorrelationLabel       func(holdings string, lookback string, a string, b_ string, r string, hedgeA string, hedgeB string, hedge string) string
+	ChartsPairValue              func(a string, b_ string, r string) string
+	ChartsSeasonalityLabel       func(symbol string, best string, bestReturn string, worst string, worstReturn string) string
+	ChartsTradesOfDay            func(share string, day string) string
+	ChartsQuietest               func(trades string) string
+	ChartsBusiest                func(trades string) string
+	ChartsActivityLabel          func(market string, day string, slot string, trades string, quietDay string, quietSlot string) string
+	ChartsActivityValue          func(day string, slot string, trades string) string
+	ChartsFactorsLabel           func(benchmark string, factor string, score string) string
+	ChartsOfQuarterRevenue       func(share string, quarter string) string
+	ChartsFlowsLabel             func(quarter string, revenue string, net string, margin string) string
+	ChartsTop                    func(stocks string) string
+	ChartsAdvancing              func(up string, down string, cap_ string) string
+	ChartsCapWeighted            func(cap_ string) string
+	ChartsMarketMapLabel         func(stocks string, sectors string, period string, up string) string
+	ChartsPositions              func(positions string) string
+	ChartsOfThePortfolio         func(value string, weight string) string
+	ChartsAllocationLabel        func(total string, classes string) string
+	ShaderStartPressed           func(count int) string
+	ShaderScaleIntensity         func(scale string, intensity string) string
+	PhotosViews                  func(count string) string
+	PhotosPullToRefresh          func(count int) string
+	PhotosLoadsMore              func(count int) string
+	PhotosLoadingMore            func(count int) string
+	DiffChange                   func(n int) string
+	DiffLinesSelected            func(first int, last int) string
+	DiffLineOfOld                func(line int) string
+	DiffLineOfNew                func(line int) string
+	DiffCollapsed                func(path string, state string) string
+	DiffLines                    func(count int) string
+	DiffChanges                  func(count int) string
+	EditorErrors                 func(count int) string
+	EditorWarnings               func(count int) string
+	EditorInfos                  func(count int) string
+	GestFiles                    func(count int) string
+	StorageKeysChars             func(keys int, chars int) string
+	StorageChars                 func(count int) string
+	ResizableSidebarPt           func(size string) string
+	ResizableConsolePt           func(size string) string
+	CollapsingEntry              func(n string) string
+	CollapsingMinutes            func(count int) string
+	TerminalSizeCells            func(cols int, rows int) string
+	TerminalUnavailable          func(reason string) string
+	RichHeading                  func(level int) string
+	RichCount                    func(words int, characters int) string
+	SystemNotificationShown      func(shown string) string
+	SystemNotificationPressed    func(id string) string
+	SystemSpeechEnded            func(reason string) string
+	FlowLabel                    func(nodes int, links int) string
+	FlowNewStep                  func(number int) string
+	FlowExperiment               func(number int) string
+	WidgetsWrittenAt             func(time_ string) string
+	WidgetsSteps                 func(count int) string
+	WidgetsPercent               func(count int) string
+	WidgetsMinutes               func(count int) string
+	WidgetsHours                 func(count int) string
+	WidgetsOfGoal                func(goal int) string
+	SystemPermissionsUnavailable func(permissions string) string
 }
 
 var supplied = map[string]Translation{}
@@ -2640,6 +2642,24 @@ const (
 	textWidgetsStartActivity
 	textWidgetsEndActivity
 	textWidgetsLiveActivityHow
+	textSystemPermissions
+	textSystemPermissionsSummary
+	textSystemPermissionSettings
+	textSystemGuidePermission
+	textSystemStopGuide
+	textSystemListSeparator
+	textPermissionAccessibility
+	textPermissionScreenRecording
+	textPermissionInputMonitoring
+	textPermissionFullDiskAccess
+	textPermissionAppManagement
+	textPermissionDeveloperTools
+	textPermissionMicrophone
+	textPermissionCamera
+	textPermissionCalendars
+	textPermissionReminders
+	textPermissionBluetooth
+	textPermissionMediaLibrary
 	numTexts
 )
 
@@ -4860,6 +4880,24 @@ var keyOfText = [numTexts]string{
 	"widgetsStartActivity",
 	"widgetsEndActivity",
 	"widgetsLiveActivityHow",
+	"systemPermissions",
+	"systemPermissionsSummary",
+	"systemPermissionSettings",
+	"systemGuidePermission",
+	"systemStopGuide",
+	"systemListSeparator",
+	"permissionAccessibility",
+	"permissionScreenRecording",
+	"permissionInputMonitoring",
+	"permissionFullDiskAccess",
+	"permissionAppManagement",
+	"permissionDeveloperTools",
+	"permissionMicrophone",
+	"permissionCamera",
+	"permissionCalendars",
+	"permissionReminders",
+	"permissionBluetooth",
+	"permissionMediaLibrary",
 }
 
 // textsEn are the messages without arguments in en.
@@ -7077,7 +7115,25 @@ var textsEn = i18n.NewTexts(""+
 	"The steps on the Lock Screen and in the Dynamic Island, or as a Live Update on Android"+
 	"Start"+
 	"End"+
-	"Its buttons add steps and end it without opening the Gallery on iOS 17 and later; the steps, goal and accent above update it while it runs.",
+	"Its buttons add steps and end it without opening the Gallery on iOS 17 and later; the steps, goal and accent above update it while it runs."+
+	"Permissions"+
+	"PermissionStatus · RequestPermission · GuidePermission"+
+	"Settings"+
+	"Guide"+
+	"Stop"+
+	", "+
+	"Accessibility"+
+	"Screen Recording"+
+	"Input Monitoring"+
+	"Full Disk Access"+
+	"App Management"+
+	"Developer Tools"+
+	"Microphone"+
+	"Camera"+
+	"Calendars"+
+	"Reminders"+
+	"Bluetooth"+
+	"Media & Apple Music",
 	[]uint16{
 		7,
 		7,
@@ -9293,6 +9349,24 @@ var textsEn = i18n.NewTexts(""+
 		5,
 		3,
 		139,
+		11,
+		56,
+		8,
+		5,
+		4,
+		2,
+		13,
+		16,
+		16,
+		16,
+		14,
+		15,
+		10,
+		6,
+		9,
+		9,
+		9,
+		19,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -11510,7 +11584,25 @@ var textsZhHans = i18n.NewTexts(""+
 	"步数显示在锁屏和灵动岛里，在 Android 上则是 Live Update"+
 	"开始"+
 	"结束"+
-	"在 iOS 17 及以后，它的按钮无需打开 Gallery 就能增加步数或结束活动；活动进行时，上方的步数、目标和强调色会更新它。",
+	"在 iOS 17 及以后，它的按钮无需打开 Gallery 就能增加步数或结束活动；活动进行时，上方的步数、目标和强调色会更新它。"+
+	"系统权限"+
+	"PermissionStatus · RequestPermission · GuidePermission"+
+	"设置"+
+	"引导"+
+	"停止"+
+	"、"+
+	"辅助功能"+
+	"录屏"+
+	"输入监控"+
+	"完全磁盘访问权限"+
+	"App管理"+
+	"开发者工具"+
+	"麦克风"+
+	"相机"+
+	"日历"+
+	"提醒事项"+
+	"蓝牙"+
+	"媒体与Apple Music",
 	[]uint16{
 		6,
 		6,
@@ -13726,6 +13818,24 @@ var textsZhHans = i18n.NewTexts(""+
 		6,
 		6,
 		161,
+		12,
+		56,
+		6,
+		6,
+		6,
+		3,
+		12,
+		6,
+		12,
+		24,
+		9,
+		15,
+		9,
+		6,
+		6,
+		12,
+		6,
+		20,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -14333,6 +14443,9 @@ func Supply(lang string, t Translation) {
 	}
 	if t.WidgetsOfGoal != nil {
 		s.WidgetsOfGoal = t.WidgetsOfGoal
+	}
+	if t.SystemPermissionsUnavailable != nil {
+		s.SystemPermissionsUnavailable = t.SystemPermissionsUnavailable
 	}
 	supplied[lang] = s
 	Catalog.Add(lang)
@@ -35336,3 +35449,169 @@ func WidgetsLiveActivityHow(cx *core.Scope) string { return For(cx).WidgetsLiveA
 
 // WidgetsLiveActivityHow is the package's WidgetsLiveActivityHow in the language of msgs.
 func (msgs Messages) WidgetsLiveActivityHow() string { return msgs.text(textWidgetsLiveActivityHow) }
+
+// SystemPermissions says "Permissions"
+// in the language the app shows under cx.
+func SystemPermissions(cx *core.Scope) string { return For(cx).SystemPermissions() }
+
+// SystemPermissions is the package's SystemPermissions in the language of msgs.
+func (msgs Messages) SystemPermissions() string { return msgs.text(textSystemPermissions) }
+
+// SystemPermissionsSummary says "PermissionStatus · RequestPermission · GuidePermission"
+// in the language the app shows under cx.
+func SystemPermissionsSummary(cx *core.Scope) string { return For(cx).SystemPermissionsSummary() }
+
+// SystemPermissionsSummary is the package's SystemPermissionsSummary in the language of msgs.
+func (msgs Messages) SystemPermissionsSummary() string {
+	return msgs.text(textSystemPermissionsSummary)
+}
+
+// SystemPermissionSettings says "Settings"
+// in the language the app shows under cx.
+func SystemPermissionSettings(cx *core.Scope) string { return For(cx).SystemPermissionSettings() }
+
+// SystemPermissionSettings is the package's SystemPermissionSettings in the language of msgs.
+func (msgs Messages) SystemPermissionSettings() string {
+	return msgs.text(textSystemPermissionSettings)
+}
+
+// SystemGuidePermission says "Guide"
+// in the language the app shows under cx.
+func SystemGuidePermission(cx *core.Scope) string { return For(cx).SystemGuidePermission() }
+
+// SystemGuidePermission is the package's SystemGuidePermission in the language of msgs.
+func (msgs Messages) SystemGuidePermission() string { return msgs.text(textSystemGuidePermission) }
+
+// SystemStopGuide says "Stop"
+// in the language the app shows under cx.
+func SystemStopGuide(cx *core.Scope) string { return For(cx).SystemStopGuide() }
+
+// SystemStopGuide is the package's SystemStopGuide in the language of msgs.
+func (msgs Messages) SystemStopGuide() string { return msgs.text(textSystemStopGuide) }
+
+// SystemPermissionsUnavailable says "Not on this platform: {permissions}"
+// in the language the app shows under cx.
+//
+// The note under the System page's permissions listing those the platform has not, joined by systemListSeparator.
+func SystemPermissionsUnavailable(cx *core.Scope, permissions string) string {
+	return For(cx).SystemPermissionsUnavailable(permissions)
+}
+
+// SystemPermissionsUnavailable is the package's SystemPermissionsUnavailable in the language of msgs.
+func (msgs Messages) SystemPermissionsUnavailable(permissions string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemPermissionsUnavailable(permissions))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemPermissionsUnavailable; f != nil {
+			return f(permissions)
+		}
+		switch lang {
+		case "", "en":
+			return "Not on this platform: " + msgs.arg(permissions)
+		case "zh-Hans":
+			return "此平台没有：" + permissions
+		}
+	}
+}
+
+// SystemListSeparator says ", "
+// in the language the app shows under cx.
+//
+// What separates the names of a list, such as the permissions a platform has not.
+func SystemListSeparator(cx *core.Scope) string { return For(cx).SystemListSeparator() }
+
+// SystemListSeparator is the package's SystemListSeparator in the language of msgs.
+func (msgs Messages) SystemListSeparator() string { return msgs.text(textSystemListSeparator) }
+
+// PermissionAccessibility says "Accessibility"
+// in the language the app shows under cx.
+func PermissionAccessibility(cx *core.Scope) string { return For(cx).PermissionAccessibility() }
+
+// PermissionAccessibility is the package's PermissionAccessibility in the language of msgs.
+func (msgs Messages) PermissionAccessibility() string { return msgs.text(textPermissionAccessibility) }
+
+// PermissionScreenRecording says "Screen Recording"
+// in the language the app shows under cx.
+func PermissionScreenRecording(cx *core.Scope) string { return For(cx).PermissionScreenRecording() }
+
+// PermissionScreenRecording is the package's PermissionScreenRecording in the language of msgs.
+func (msgs Messages) PermissionScreenRecording() string {
+	return msgs.text(textPermissionScreenRecording)
+}
+
+// PermissionInputMonitoring says "Input Monitoring"
+// in the language the app shows under cx.
+func PermissionInputMonitoring(cx *core.Scope) string { return For(cx).PermissionInputMonitoring() }
+
+// PermissionInputMonitoring is the package's PermissionInputMonitoring in the language of msgs.
+func (msgs Messages) PermissionInputMonitoring() string {
+	return msgs.text(textPermissionInputMonitoring)
+}
+
+// PermissionFullDiskAccess says "Full Disk Access"
+// in the language the app shows under cx.
+func PermissionFullDiskAccess(cx *core.Scope) string { return For(cx).PermissionFullDiskAccess() }
+
+// PermissionFullDiskAccess is the package's PermissionFullDiskAccess in the language of msgs.
+func (msgs Messages) PermissionFullDiskAccess() string {
+	return msgs.text(textPermissionFullDiskAccess)
+}
+
+// PermissionAppManagement says "App Management"
+// in the language the app shows under cx.
+func PermissionAppManagement(cx *core.Scope) string { return For(cx).PermissionAppManagement() }
+
+// PermissionAppManagement is the package's PermissionAppManagement in the language of msgs.
+func (msgs Messages) PermissionAppManagement() string { return msgs.text(textPermissionAppManagement) }
+
+// PermissionDeveloperTools says "Developer Tools"
+// in the language the app shows under cx.
+func PermissionDeveloperTools(cx *core.Scope) string { return For(cx).PermissionDeveloperTools() }
+
+// PermissionDeveloperTools is the package's PermissionDeveloperTools in the language of msgs.
+func (msgs Messages) PermissionDeveloperTools() string {
+	return msgs.text(textPermissionDeveloperTools)
+}
+
+// PermissionMicrophone says "Microphone"
+// in the language the app shows under cx.
+func PermissionMicrophone(cx *core.Scope) string { return For(cx).PermissionMicrophone() }
+
+// PermissionMicrophone is the package's PermissionMicrophone in the language of msgs.
+func (msgs Messages) PermissionMicrophone() string { return msgs.text(textPermissionMicrophone) }
+
+// PermissionCamera says "Camera"
+// in the language the app shows under cx.
+func PermissionCamera(cx *core.Scope) string { return For(cx).PermissionCamera() }
+
+// PermissionCamera is the package's PermissionCamera in the language of msgs.
+func (msgs Messages) PermissionCamera() string { return msgs.text(textPermissionCamera) }
+
+// PermissionCalendars says "Calendars"
+// in the language the app shows under cx.
+func PermissionCalendars(cx *core.Scope) string { return For(cx).PermissionCalendars() }
+
+// PermissionCalendars is the package's PermissionCalendars in the language of msgs.
+func (msgs Messages) PermissionCalendars() string { return msgs.text(textPermissionCalendars) }
+
+// PermissionReminders says "Reminders"
+// in the language the app shows under cx.
+func PermissionReminders(cx *core.Scope) string { return For(cx).PermissionReminders() }
+
+// PermissionReminders is the package's PermissionReminders in the language of msgs.
+func (msgs Messages) PermissionReminders() string { return msgs.text(textPermissionReminders) }
+
+// PermissionBluetooth says "Bluetooth"
+// in the language the app shows under cx.
+func PermissionBluetooth(cx *core.Scope) string { return For(cx).PermissionBluetooth() }
+
+// PermissionBluetooth is the package's PermissionBluetooth in the language of msgs.
+func (msgs Messages) PermissionBluetooth() string { return msgs.text(textPermissionBluetooth) }
+
+// PermissionMediaLibrary says "Media & Apple Music"
+// in the language the app shows under cx.
+func PermissionMediaLibrary(cx *core.Scope) string { return For(cx).PermissionMediaLibrary() }
+
+// PermissionMediaLibrary is the package's PermissionMediaLibrary in the language of msgs.
+func (msgs Messages) PermissionMediaLibrary() string { return msgs.text(textPermissionMediaLibrary) }

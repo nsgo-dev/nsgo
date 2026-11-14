@@ -811,7 +811,7 @@ func (s *surface) RequestFrame() {
 // Mount implements engine.Platform: one message per commit, then the
 // loads of the image sources it changed.
 func (s *surface) Mount(b *driver.MountBatch) {
-	b = s.withoutUpdateChecks(withoutEffects(b))
+	b = s.withoutPermissions(s.withoutUpdateChecks(withoutEffects(b)))
 	requests, loads := s.trackImages(b)
 	s.stage(b)
 	for i := range b.Items {

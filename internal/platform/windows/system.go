@@ -215,20 +215,24 @@ type shellExecuteInfo struct {
 // openURL has the shell open u with the app registered for it. A scheme
 // no app handles answers false without the shell asking for an app.
 func (w *window) openURL(u string, id uint32) {
+	w.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: w.shellOpenURL(u)})
+}
+
+// shellOpenURL has the shell open u with the app registered for it, reporting whether one took it; a scheme no app handles answers false without the shell asking for an app.
+func (w *window) shellOpenURL(u string) bool {
 	// The shell asks the user for an app when none handles the scheme,
 	// even without UI: ask the registry first.
 	scheme, _, _ := strings.Cut(u, ":")
 	var key syscall.Handle
 	if syscall.RegOpenKeyEx(syscall.HKEY_CLASSES_ROOT, wide(scheme), 0, syscall.KEY_READ, &key) != nil {
-		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id})
-		return
+		return false
 	}
 	syscall.RegCloseKey(key)
 	const flagNoUI = 0x00000400 // SEE_MASK_FLAG_NO_UI
 	info := shellExecuteInfo{Mask: flagNoUI, Hwnd: w.hwnd, Verb: wide("open"), File: wide(u), Show: swShowNormal}
 	info.Size = uint32(unsafe.Sizeof(info))
 	r, _, _ := shellExecuteExW.Call(uintptr(unsafe.Pointer(&info)))
-	w.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: r != 0})
+	return r != 0
 }
 
 // openFile has the shell open f with the app associated with its type.

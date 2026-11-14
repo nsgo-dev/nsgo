@@ -913,12 +913,9 @@ func filesCard(cx *core.Scope) core.Node {
 	}}
 }
 
-// systemDemo is what the platform does for the app: the environment, the
-// status bar, alerts, frames and timers, shortcuts, the network, the
-// window, the clipboard, links, photos, the appearance, dictation, the
-// lifecycle, notifications, the badge, haptics and files.
+// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, haptics, biometrics, the system's permissions and files.
 func systemDemo(cx *core.Scope) core.Node {
-	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, filesCard)
+	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, permissionsCard, filesCard)
 }
 
 // yesNo says whether in tr's language.

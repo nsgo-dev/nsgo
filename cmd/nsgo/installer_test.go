@@ -540,6 +540,11 @@ func TestNotarization(t *testing.T) {
 	if ents := p.hardenedEntitlements(); ents["com.apple.security.device.audio-input"] != true || len(ents) != 1 {
 		t.Errorf("entitlements %v", ents)
 	}
+	// Reminders share the calendars' entitlement.
+	p.Apple.Info = map[string]string{"NSRemindersFullAccessUsageDescription": "Lists"}
+	if ents := p.hardenedEntitlements(); ents["com.apple.security.personal-information.calendars"] != true || len(ents) != 1 {
+		t.Errorf("reminders' entitlements %v", ents)
+	}
 }
 
 // A background's alias holds the volume's and the file's names, IDs and
