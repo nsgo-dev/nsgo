@@ -149,6 +149,7 @@ func TestViewSizesByFontAndReads(t *testing.T) {
 
 	size.Set(32)
 	app.Settle()
+	app.Screenshot("formula-baseline")
 	if got := app.Find("id:half").Frame.Size; math.Abs(float64(got.Width-2*small.Width)) > 1 || math.Abs(float64(got.Height-2*small.Height)) > 1 {
 		t.Errorf("at 32 points %v, at 16 %v: it doubles", got, small)
 	}
@@ -228,6 +229,7 @@ func TestRenderMath(t *testing.T) {
 			Markdown: "Energy $E=mc^2$.\n\n$$\nx^2\n$$\n\n$$\n" + strings.Repeat(`a+`, 60) + "b\n$$"}
 	}, nsgotest.Size(300, 400))
 	waitForFont(app, r)
+	app.Screenshot("formula-textview")
 	paragraph := app.Find("text:Energy ￼.")
 	if paragraph.Spans[1].Copy != "$E=mc^2$" {
 		t.Errorf("the inline formula copies as %q", paragraph.Spans[1].Copy)
