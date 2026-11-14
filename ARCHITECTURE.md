@@ -114,6 +114,7 @@ Record a design question here, and confirm the answer with the user before choos
 - **Sizes on a TV.** `ui`'s sizes are constants on every device, but a TV is read from across a room. Since `core` scales nothing by device, does `ui` take larger sizes on a TV, or leave them to the app ([roadmap](docs/roadmap.md#apple-tv))?
 - **Text-level search.** The design for #47 ([text-level search](docs/architecture/text-search.md#open-decisions)) proposes an answer to each of its open decisions: matches within one text, matched synchronously as a view builds its texts, every `TextView` below `ProvideSearch` joining, a view revealing its own match, folded chat turns unfolding while a search is open, and what the app renders itself and a closed disclosure's content left out. Confirm them before building it?
 - **Remote push.** [Remote push](docs/architecture/remote-push.md#open-decisions) is designed but not built, and five choices block it: the public API's shape, whether `nsgo build` packages an FCM adapter for standalone apps, whether a background push runs app code with no view, whether data delivery takes a capability of its own beside `AccessNotifications`, and which provider metadata the API exposes, a press's ID among it. Which answers?
+- **Contacts and calendar.** [The design](docs/architecture/contacts-calendar.md#open-decisions) for #57 waits on five answers: whether the first release writes contacts and events or only picks and reads, whether contacts and calendar are separate capabilities and permission APIs, which contact fields, recurrence forms and attendee data are stable across platforms, whether the calendar reports the provider's changes or apps query again, and whether provider IDs are strings or handles that expire with an engine. Which, before building it?
 
 ## Verification
 
@@ -132,7 +133,7 @@ Record a design question here, and confirm the answer with the user before choos
 | [Interaction](docs/architecture/interaction.md) | Accessibility, pointers, focus, touches, gestures or drops |
 | [Services](docs/architecture/services.md) | A service, a menu, the desktop window or the app's lifecycle |
 | [Remote push](docs/architecture/remote-push.md) | Remote notification tokens, payload delivery or provider adapters |
-| [Contacts and calendar](docs/architecture/contacts-calendar.md) | Personal contacts, calendars, events or their permissions |
+| [Contacts and calendar](docs/architecture/contacts-calendar.md) | Contacts, calendars, events or their permissions, which are designed and not built |
 | [Updates](docs/architecture/updates.md) | `updater`, an update check, the updaters `nsgo build` bundles or a release channel |
 | [Application and windows](docs/architecture/application.md) | `nsgo.Run`, the windows, panels and tray icons an app opens, global shortcuts or shutdown |
 | [Hosted views](docs/architecture/native-views.md) | `WebView`, `Video` or `Native` components |
