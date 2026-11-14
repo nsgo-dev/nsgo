@@ -107,11 +107,22 @@ func TestUpdateChannels(t *testing.T) {
 	if err := p.checkUpdateFeed("windows_x64"); err != nil {
 		t.Errorf("a store's build: %v", err)
 	}
+	// Stores review REQUEST_INSTALL_PACKAGES, which only the direct channel's installs need.
+	const install = "android.permission.REQUEST_INSTALL_PACKAGES"
+	if slices.Contains(p.androidPermissions(), install) {
+		t.Errorf("a store's Android app asks for %v", p.androidPermissions())
+	}
 	// None, as from -channel none, checks nothing, a key or not.
 	p, _ = updatingProject(t, "")
+	if perms := p.androidPermissions(); !slices.Equal(perms, []string{install}) {
+		t.Errorf("a direct Android app asks for %v, want the installer's permission", perms)
+	}
 	p.Updates.Channel = channelNone
 	if p.updatesOn() || p.updateLdflags([]string{"GOOS=ios", "GOARCH=arm64"}) != nil || p.sparklePlist("macos_arm64") != "" {
 		t.Error("channel none checks for updates")
+	}
+	if slices.Contains(p.androidPermissions(), install) {
+		t.Errorf("channel none's Android app asks for %v", p.androidPermissions())
 	}
 	// The direct channel signs its installers, so it needs the key.
 	p.Updates.Channel, p.Updates.public = channelDirect, nil

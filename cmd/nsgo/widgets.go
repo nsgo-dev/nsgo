@@ -72,16 +72,19 @@ type liveActivities struct {
 // its widgets or its Live Activities.
 func (p *project) iosExtension() bool { return len(p.Widgets) > 0 || p.LiveActivities.Enabled }
 
-// androidPermissions are the permissions the Android app asks for:
-// android.permissions, with those of Live Updates when it has Live
-// Activities.
+// androidPermissions are the permissions the Android app asks for: android.permissions, with those of Live Updates when it has Live Activities, and REQUEST_INSTALL_PACKAGES on the direct channel, whose updater hands the next APK to the package installer. A store's build never asks for it, as stores review it.
 func (p *project) androidPermissions() []string {
 	perms := p.Android.Permissions
+	var added []string
 	if p.LiveActivities.Enabled {
-		for _, perm := range []string{"android.permission.POST_NOTIFICATIONS", "android.permission.POST_PROMOTED_NOTIFICATIONS"} {
-			if !slices.Contains(perms, perm) {
-				perms = append(slices.Clip(perms), perm)
-			}
+		added = append(added, "android.permission.POST_NOTIFICATIONS", "android.permission.POST_PROMOTED_NOTIFICATIONS")
+	}
+	if p.updates() {
+		added = append(added, "android.permission.REQUEST_INSTALL_PACKAGES")
+	}
+	for _, perm := range added {
+		if !slices.Contains(perms, perm) {
+			perms = append(slices.Clip(perms), perm)
 		}
 	}
 	return perms

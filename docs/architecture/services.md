@@ -121,7 +121,7 @@ Android hands files on as content URIs from the runtime's `FileProvider`, which 
 
 `mobile.InstallPackage` hands an APK in the app's storage to Android's package installer, as `OpenFile` hands a file on: `ACTION_VIEW` of a `FileProvider` URI typed `application/vnd.android.package-archive`. The installer asks the user to confirm, and sends them to the setting first where they have not let the app install packages, so the answer says only that it started. `CanInstallPackages` is `canRequestPackageInstalls`, and `OpenInstallSettings` opens `ACTION_MANAGE_UNKNOWN_APP_SOURCES` for the app. Elsewhere `core` answers at once, without asking the platform.
 
-The installer refuses an app whose manifest does not ask for `REQUEST_INSTALL_PACKAGES`, which stores review, so the runtime asks for nothing: an app lists it in `nsgo.yaml`'s `android.permissions` ([tool](tool.md)), an embedding host in its own manifest, and `InstallPackage` fails with that advice without it.
+The installer refuses an app whose manifest does not ask for `REQUEST_INSTALL_PACKAGES`, which stores review, so the runtime asks for nothing: an app lists it in `nsgo.yaml`'s `android.permissions` ([tool](tool.md)), which the tool adds itself to a build on the direct updates channel ([updates](updates.md)), an embedding host in its own manifest, and `InstallPackage` fails with that advice without it.
 
 ## Speech
 
