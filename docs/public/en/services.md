@@ -157,7 +157,7 @@ if err == nil {
 }
 ```
 
-`cx.Env().Lifecycle()` says whether the app is active, inactive or in the background, and `cx.OnQuit` cleans up as it quits, however it does, with 200 ms for its work. `cx.SetAppearance` forces light or dark, `cx.SetLocale` chooses the language, `cx.OnKey` binds a keyboard shortcut, `cx.RegisterHotKey` binds one while any app is frontmost, and `cx.OnOpenFiles` hears the documents a macOS app opens.
+`cx.Env().Lifecycle()` says whether the app is active, inactive or in the background, and `cx.OnQuit` cleans up as it quits, however it does, with 200 ms for its work. `desktop.OnQuitRequest` hears a quit the user asks for on macOS, such as Cmd+Q, and may cancel it or defer it while it asks the user. `cx.SetAppearance` forces light or dark, `cx.SetLocale` chooses the language, `cx.OnKey` binds a keyboard shortcut, `cx.RegisterHotKey` binds one while any app is frontmost, and `cx.OnOpenFiles` hears the documents a macOS app opens.
 
 ```go
 cx.OnKey("mod+k", func() { palette.Set(true) })

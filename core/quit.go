@@ -20,8 +20,7 @@ type quitHandler struct {
 	fn    func(ctx context.Context)
 }
 
-// QuitRequest is a user-initiated request to end the app. A handler may
-// cancel it, or defer it while it asks the user what to do.
+// QuitRequest is the core's part of desktop.QuitRequest, which apps use: a quit the user asked for, which a handler may cancel, or defer while it asks the user what to do.
 type QuitRequest struct {
 	canceled bool
 	deferred bool
@@ -29,17 +28,14 @@ type QuitRequest struct {
 	answer   func(bool)
 }
 
-// Cancel keeps the app running. It has an effect only while the request
-// handler is running.
+// Cancel keeps the app running. It has an effect only while the request handler is running.
 func (q *QuitRequest) Cancel() {
 	if q != nil && !q.deferred {
 		q.canceled = true
 	}
 }
 
-// Defer keeps the platform's quit request pending and returns a one-shot
-// answer. quit true proceeds with quitting; false cancels it. The returned
-// function is safe to call from another goroutine.
+// Defer keeps the platform's quit request pending and returns a one-shot answer. quit true proceeds with quitting; false cancels it. The returned function is safe to call from another goroutine. Call it in every case: until it is called, a later quit request, such as a second Cmd+Q, waits for this one's answer.
 func (q *QuitRequest) Defer() func(quit bool) {
 	if q == nil || q.canceled || q.deferred || q.answer == nil {
 		return func(bool) {}
@@ -58,10 +54,7 @@ type quitRequestHandler struct {
 	fn    func(*QuitRequest)
 }
 
-// OnQuitRequest hears a user-initiated request to quit, such as Cmd+Q or
-// a tray menu's Quit. Handlers run newest first. A handler that does not
-// cancel or defer lets the request continue to the next handler; when all
-// handlers do so, the app quits. Scope.Quit and Restart remain immediate.
+// OnQuitRequest is the core's part of desktop.OnQuitRequest, which apps use: fn runs, while the current owner lives, when the user asks the app to quit, by Cmd+Q, the Dock, a tray menu's Quit or the system, on macOS. Handlers run newest first. A handler that does not cancel or defer lets the request continue to the next handler; when all handlers do so, the app quits. Scope.Quit and Restart remain immediate.
 func (cx *Scope) OnQuitRequest(fn func(*QuitRequest)) {
 	rt := cx.rt
 	h := &quitRequestHandler{owner: cx.current(), fn: fn}

@@ -23,6 +23,8 @@ type (
 	WindowClosing = core.WindowClosing
 	// ShutdownMode says when the app ends by itself.
 	ShutdownMode = core.ShutdownMode
+	// QuitRequest is a quit the user asked for, which OnQuitRequest's handlers may cancel, or defer while they ask the user.
+	QuitRequest = core.QuitRequest
 	// Tray is a tray icon: in the macOS menu bar.
 	Tray = core.Tray
 	// TrayOptions are a tray icon's image or view, and what its clicks
@@ -73,6 +75,17 @@ func MainWindow(cx *core.Scope) *Window { return cx.MainWindow() }
 // clicking it in the Dock or launching it a second time. Without a
 // handler the main window shows and takes the focus.
 func OnReopen(cx *core.Scope, fn func()) { cx.OnReopen(fn) }
+
+// OnQuitRequest runs fn when the user asks the app to quit, by Cmd+Q, the Dock, a tray menu's Quit or the system, on macOS, newest first: a handler may cancel the quit, or defer it with QuitRequest.Defer while it asks the user, and when none does the app quits. core.Scope.Quit and Restart quit without asking:
+//
+//	desktop.OnQuitRequest(cx, func(q *desktop.QuitRequest) {
+//		if !dirty.Get() {
+//			return
+//		}
+//		done := q.Defer()
+//		base.ShowAlertDialog(cx, discard, func(label string) { done(label == "Discard") })
+//	})
+func OnQuitRequest(cx *core.Scope, fn func(q *QuitRequest)) { cx.OnQuitRequest(fn) }
 
 // OnOpenFiles runs fn with the paths of files the system asks the app to
 // open: the file types nsgo.yaml's file_types declares, opened from the
