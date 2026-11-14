@@ -28,3 +28,21 @@ func TestTextView(t *testing.T) {
 		}
 	})
 }
+
+// A typeset display formula is as large as the text around it, while its TeX alone shows in the code type.
+func TestTextViewMathBlock(t *testing.T) {
+	app, _ := start(t, core.Environment{}, func(cx *core.Scope) core.Node {
+		return core.View{Style: core.Style{Gap: 12}, Children: []core.Node{
+			TextView{TestID: "typeset", Markdown: "$$\nx\n$$\n", RenderMath: func(cx *core.Scope, m textview.Math) core.Node {
+				return core.Canvas{TestID: "formula", Em: core.EmBox{Width: 1, Ascent: 1}, Style: core.Style{AlignSelf: core.AlignStart}}
+			}},
+			TextView{TestID: "source", Markdown: "$$\nx\n$$\n"},
+		}}
+	})
+	if got := app.Find("id:formula").Frame.Size.Height; got != TypeBody.FontSize {
+		t.Errorf("a display formula is %v high, want the body's %v", got, TypeBody.FontSize)
+	}
+	if got := app.Find("source >> x").TextStyle.Font.Size; got != TypeCode.FontSize {
+		t.Errorf("a formula's TeX is %v, want the code's %v", got, TypeCode.FontSize)
+	}
+}

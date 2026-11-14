@@ -5,11 +5,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// TextView is textview.TextView in ui's type and colors: its
-// headings, quotes and alerts, lists, code, tables and links. The app's
-// StyleOf merges over ui's styles, and its Styles over both, as
-// they do in base. Code is colored by the app's Highlighter, such as
-// highlight.New's.
+// TextView is textview.TextView in ui's type and colors: its headings, quotes and alerts, lists, code, tables and links. The app's StyleOf merges over ui's styles, and its Styles over both, as they do in base. Code is colored by the app's Highlighter, such as highlight.New's. With RenderMath, a display formula's block keeps its box but not the code type.
 type TextView textview.TextView
 
 // Render implements core.Node.
@@ -17,8 +13,13 @@ func (v TextView) Render(cx *core.Scope) core.Node {
 	styles := Themed(cx, func() textview.Styles { return TextViewStyles(cx) })
 	out := textview.TextView(v)
 	app := v.StyleOf
+	typeset := v.RenderMath != nil
 	out.StyleOf = func(p textview.Part) core.Style {
 		s := styles()[p]
+		if typeset && p == textview.PartMathBlock {
+			// A typeset display formula takes the type around it, as the inline ones do; the code type is for its TeX.
+			s.FontFamily, s.FontSize, s.LineHeight = "", 0, 0
+		}
 		if app != nil {
 			s = s.Merge(app(p))
 		}
