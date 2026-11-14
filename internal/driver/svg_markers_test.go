@@ -182,6 +182,63 @@ func TestSVGMarkerInheritance(t *testing.T) {
 	}
 }
 
+func TestSVGMarkerPaint(t *testing.T) {
+	colors := func(ops []DrawOp, kind DrawKind) []Color {
+		var out []Color
+		for _, op := range ops {
+			if op.Kind == kind {
+				out = append(out, op.Color)
+			}
+		}
+		return out
+	}
+	t.Run("context paints follow the marked shape", func(t *testing.T) {
+		ops := svgOps(t, `<svg viewBox="0 0 100 100">
+			<marker id="m" overflow="visible"><path d="M0 0L5 0L5 5Z" fill="context-fill" stroke="context-stroke"/></marker>
+			<path d="M10 10L50 10L50 50Z" fill="#00ff00" stroke="#0000ff" marker-start="url(#m)"/>
+		</svg>`)
+		if got := colors(ops, DrawFillColor); len(got) != 2 || got[1] != RGB(0x00ff00) {
+			t.Fatalf("fills = %v, want the shape's green twice", got)
+		}
+		if got := colors(ops, DrawStrokeColor); len(got) != 2 || got[1] != RGB(0x0000ff) {
+			t.Fatalf("strokes = %v, want the shape's blue twice", got)
+		}
+	})
+	t.Run("a context paint stays on its element", func(t *testing.T) {
+		ops := svgOps(t, `<svg viewBox="0 0 100 100">
+			<marker id="m" overflow="visible"><path d="M0 0L5 0L5 5Z" fill="context-stroke"/><path d="M0 0L5 5L0 5Z"/></marker>
+			<path d="M10 10L50 10" fill="none" stroke="#0000ff" marker-start="url(#m)"/>
+		</svg>`)
+		if got := colors(ops, DrawFillColor); len(got) != 2 || got[0] != RGB(0x0000ff) || got[1] != RGB(0x000000) {
+			t.Fatalf("fills = %v, want blue then black", got)
+		}
+	})
+	t.Run("a context paint on the marker", func(t *testing.T) {
+		ops := svgOps(t, `<svg viewBox="0 0 100 100">
+			<marker id="m" overflow="visible" fill="context-stroke"><g><path d="M0 0L5 0L5 5Z"/></g></marker>
+			<path d="M10 10L50 10" fill="none" stroke="#0000ff" marker-start="url(#m)"/>
+		</svg>`)
+		if got := colors(ops, DrawFillColor); len(got) != 1 || got[0] != RGB(0x0000ff) {
+			t.Fatalf("fills = %v, want blue", got)
+		}
+	})
+	t.Run("a context paint outside markers paints nothing", func(t *testing.T) {
+		ops := svgOps(t, `<svg viewBox="0 0 100 100"><path d="M10 10L50 10L50 50Z" fill="context-fill"/></svg>`)
+		if got := colors(ops, DrawFillColor); len(got) != 0 {
+			t.Fatalf("fills = %v, want none", got)
+		}
+	})
+	t.Run("markers take their shape's opacity", func(t *testing.T) {
+		ops := svgOps(t, `<svg viewBox="0 0 100 100">
+			<marker id="m" overflow="visible"><path d="M0 0L5 0L5 5Z" fill="red"/></marker>
+			<g opacity="0.5"><path d="M10 10L50 10" fill="none" stroke="blue" marker-end="url(#m)"/></g>
+		</svg>`)
+		if got := colors(ops, DrawFillColor); len(got) != 1 || got[0] != 0xff000080 {
+			t.Fatalf("fills = %v, want red at half alpha", got)
+		}
+	})
+}
+
 func TestSVGMarkerLimits(t *testing.T) {
 	for _, doc := range []string{
 		`<svg viewBox="0 0 10 10"><marker id="m"><path d="M0 0L1 1" fill="none" marker-end="url(#m)"/></marker><path d="M0 0L5 5" stroke="blue" marker-end="url(#m)"/></svg>`,

@@ -20,6 +20,10 @@ func parseSVGPaint(v string) (p svgPaint, ok bool, err error) {
 		return svgPaint{kind: paintNone}, true, nil
 	case strings.EqualFold(v, "currentColor"):
 		return svgPaint{kind: paintCurrent}, true, nil
+	case v == "context-fill":
+		return svgPaint{kind: paintContextFill}, true, nil
+	case v == "context-stroke":
+		return svgPaint{kind: paintContextStroke}, true, nil
 	case strings.HasPrefix(v, "url("):
 		end := strings.IndexByte(v, ')')
 		if end < 0 {
@@ -28,7 +32,7 @@ func parseSVGPaint(v string) (p svgPaint, ok bool, err error) {
 		id, _ := svgURL(v[:end+1])
 		p = svgPaint{kind: paintURL, ref: id}
 		if rest := strings.TrimSpace(v[end+1:]); rest != "" {
-			if fb, ok, _ := parseSVGPaint(rest); ok && fb.kind != paintURL {
+			if fb, ok, _ := parseSVGPaint(rest); ok && (fb.kind == paintNone || fb.kind == paintCurrent || fb.kind == paintFixed) {
 				p.fall, p.color = fb.kind, fb.color
 			}
 		}

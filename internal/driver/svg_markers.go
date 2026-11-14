@@ -228,14 +228,8 @@ func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent
 		return err
 	}
 	style.ctm = m.mul(svgMatrix{a: float64(sx), d: float64(sy)}).mul(svgTranslate(-refX, -refY))
-	for _, child := range marker.children {
-		if child.attrs["fill"] == "context-stroke" {
-			style.fill = parent.stroke
-		}
-		if child.attrs["stroke"] == "context-fill" {
-			style.stroke = parent.fill
-		}
-	}
+	style.opacity = parent.opacity
+	style.contextFill, style.contextStroke = parent.context(parent.fill), parent.context(parent.stroke)
 	if p.using == nil {
 		p.using = map[*svgNode]bool{}
 	}
@@ -247,6 +241,21 @@ func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent
 		}
 	}
 	return nil
+}
+
+// context resolves paint, a fill or stroke of a shape drawn with s, to what context-fill or context-stroke paints in the markers on that shape.
+func (s svgStyle) context(paint svgPaint) svgPaint {
+	switch paint.kind {
+	case paintContextFill:
+		return s.contextFill
+	case paintContextStroke:
+		return s.contextStroke
+	case paintCurrent:
+		if s.color.kind == paintFixed {
+			return s.color
+		}
+	}
+	return paint
 }
 
 // markerStyle returns the style a marker's content starts from: what the marker inherits from its ancestors, with its own properties.

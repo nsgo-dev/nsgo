@@ -216,6 +216,9 @@ const (
 	paintCurrent
 	paintFixed
 	paintURL
+	// paintContextFill and paintContextStroke paint as the fill and the stroke of the shape a marker is drawn on.
+	paintContextFill
+	paintContextStroke
 )
 
 func fixedPaint(c Color) svgPaint { return svgPaint{kind: paintFixed, color: c} }
@@ -237,6 +240,8 @@ type svgStyle struct {
 	hidden                     bool
 	ctm                        svgMatrix
 	opacity                    float32
+	// contextFill and contextStroke are the paints of the shape the marker being drawn is on, which context-fill and context-stroke name; outside markers they are none.
+	contextFill, contextStroke svgPaint
 	// markerStart, markerMid and markerEnd are the ids of the markers shapes draw at their vertices.
 	markerStart, markerMid, markerEnd string
 }
@@ -656,6 +661,12 @@ func (p *svgParser) setPaint(paint svgPaint, style svgStyle, alpha float32, fill
 	}
 	if alpha <= 0 {
 		return false, false
+	}
+	switch paint.kind {
+	case paintContextFill:
+		paint = style.contextFill
+	case paintContextStroke:
+		paint = style.contextStroke
 	}
 	if paint.kind == paintURL {
 		if el := p.ids[paint.ref]; el != nil && (el.name == "linearGradient" || el.name == "radialGradient") {
