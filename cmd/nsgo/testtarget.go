@@ -103,9 +103,9 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		text, saved, err := saveScreenshots(out.String(), shots, savedPaths)
-		if err != nil {
-			return err
+		text, saved, saveErr := saveScreenshots(out.String(), shots, savedPaths)
+		if saveErr != nil {
+			return saveErr
 		}
 		t := parseTestOutput(name, text, code, err)
 		if t.Elapsed == 0 {
