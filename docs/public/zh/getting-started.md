@@ -7,7 +7,7 @@ order: 10
 
 ## 环境要求
 
-- [Go](https://go.dev/dl/) 1.26 或更新版本。
+- [Go](https://go.dev/dl/) 1.27.3 或更新版本。
 - 为 iOS、tvOS 和 watchOS 构建需要装有 Xcode 的 Mac。其他目标只需 macOS 上的 Go；x86_64 Android 模拟器还需要 Android NDK。
 - 在 iPhone 上运行需要 Xcode 的 Accounts 中有 Apple ID，iPhone 已信任该电脑，并开启开发者模式。
 - 在 Android 上运行需要 Android SDK platform-tools 中的 `adb`。

@@ -32,7 +32,7 @@ NSGo is early, with no release or stable API yet. It runs on macOS, iOS and its 
 
 ## Getting started
 
-With Go 1.26 or later, and Xcode for iOS, tvOS and watchOS, create an app and run it with hot reload:
+With Go 1.27.3 or later, and Xcode for iOS, tvOS and watchOS, create an app and run it with hot reload:
 
 ```sh
 go mod init example.com/hello

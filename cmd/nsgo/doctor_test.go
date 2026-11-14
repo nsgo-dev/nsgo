@@ -2,19 +2,22 @@ package main
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
 func TestDoctorVerdicts(t *testing.T) {
-	mac := &machine{goos: "darwin", goarch: "arm64", goVersion: "go1.26.2", xcode: "Xcode 26.1",
+	mac := &machine{goos: "darwin", goarch: "arm64", goVersion: "go1.27.3", xcode: "Xcode 26.1",
 		sdks:         map[string]bool{"iphoneos": true, "iphonesimulator": true, "appletvos": true, "appletvsimulator": true},
 		simulators:   map[string]int{"iOS": 2},
 		appleDevices: map[string]int{},
 		adb:          "/sdk/platform-tools/adb", android: []androidDevice{{serial: "emulator-5554", abi: "arm64-v8a"}},
 		miniTools: map[string]bool{"wechat": true}}
-	linux := &machine{goos: "linux", goarch: "amd64", goVersion: "go1.27", linuxLibs: []string{"GTK 4"},
+	linux := &machine{goos: "linux", goarch: "amd64", goVersion: "go1.27.4", linuxLibs: []string{"GTK 4"},
 		sdks: map[string]bool{}, simulators: map[string]int{}, appleDevices: map[string]int{}, miniTools: map[string]bool{}}
-	oldGo := &machine{goos: "windows", goarch: "amd64", goVersion: "go1.25.4"}
+	oldGo := &machine{goos: "windows", goarch: "amd64", goVersion: "go1.25.4", goToolchain: "local"}
+	switching := &machine{goos: "windows", goarch: "amd64", goVersion: "go1.26.0", goToolchain: "auto"}
+	tooOldToSwitch := &machine{goos: "windows", goarch: "amd64", goVersion: "go1.20.14", goToolchain: "auto"}
 
 	for _, c := range []struct {
 		m            *machine
@@ -40,6 +43,8 @@ func TestDoctorVerdicts(t *testing.T) {
 		{linux, "android_arm64", true, false, false},
 		{linux, "miniprogram_wechat", true, false, true},
 		{oldGo, "windows_x64", false, true, false},
+		{switching, "windows_x64", true, true, false},
+		{tooOldToSwitch, "windows_x64", false, true, false},
 	} {
 		build, run := c.m.build(c.target), c.m.run(c.target)
 		if build.ok != c.build || run.ok != c.run || run.elsewhere != c.runElsewhere {
@@ -47,6 +52,29 @@ func TestDoctorVerdicts(t *testing.T) {
 		}
 		if !build.ok && build.why == "" || !run.ok && run.why == "" {
 			t.Errorf("%s on %s: a target it cannot build or run must say why", c.target, c.m.goos)
+		}
+	}
+}
+
+func TestDoctorOlderGoThatSwitches(t *testing.T) {
+	for _, c := range []struct {
+		version, toolchain string
+		ok, downloads      bool
+	}{
+		{"go1.27.3", "local", true, false},
+		{"go1.26.0", "auto", true, true},
+		{"go1.26.0", "go1.26.0+auto", true, true},
+		{"go1.26.0", "local", false, false},
+		{"go1.26.0", "path", false, false},
+		{"go1.20.14", "auto", false, false},
+	} {
+		m := &machine{goVersion: c.version, goToolchain: c.toolchain}
+		if m.goBuilds() != c.ok || m.goDownloads() != c.downloads {
+			t.Errorf("%s with GOTOOLCHAIN=%s: builds %v, downloads %v", c.version, c.toolchain, m.goBuilds(), m.goDownloads())
+		}
+		tool := m.tools()[0]
+		if tool.ok != c.ok || c.downloads && !strings.Contains(tool.why, "Go 1.27.3 will be downloaded") {
+			t.Errorf("%s with GOTOOLCHAIN=%s: doctor says %+v", c.version, c.toolchain, tool)
 		}
 	}
 }

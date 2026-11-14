@@ -32,7 +32,7 @@ NSGo 处于早期阶段，尚无发布版本或稳定的 API。它可在 macOS�
 
 ## 快速开始
 
-安装 Go 1.26 或更新版本（构建 iOS、tvOS 和 watchOS 还需 Xcode）后，创建应用并以热重载方式运行：
+安装 Go 1.27.3 或更新版本（构建 iOS、tvOS 和 watchOS 还需 Xcode）后，创建应用并以热重载方式运行：
 
 ```sh
 go mod init example.com/hello

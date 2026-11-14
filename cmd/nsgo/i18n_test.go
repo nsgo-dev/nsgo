@@ -184,7 +184,7 @@ func TestCatalogApp(t *testing.T) {
 	}
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
-		"go.mod": "module example.com/app\n\ngo 1.26.0\n\nrequire github.com/nsgo-dev/nsgo v0.0.0\n\nreplace github.com/nsgo-dev/nsgo => " + root + "\n",
+		"go.mod": "module example.com/app\n\ngo 1.27.3\n\nrequire github.com/nsgo-dev/nsgo v0.0.0\n\nreplace github.com/nsgo-dev/nsgo => " + root + "\n",
 		"go.sum": string(sum),
 		"app.go": "package app\n\nimport _ \"example.com/app/locales\"\n",
 		"locales/en.yaml": `

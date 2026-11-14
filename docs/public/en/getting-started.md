@@ -7,7 +7,7 @@ order: 10
 
 ## Requirements
 
-- [Go](https://go.dev/dl/) 1.26 or later.
+- [Go](https://go.dev/dl/) 1.27.3 or later.
 - To build for iOS, tvOS and watchOS, a Mac with Xcode. Every other target builds from macOS with Go alone; the x86_64 Android emulator's also needs an Android NDK.
 - To run on an iPhone, an Apple ID in Xcode's Accounts and the iPhone trusted, with Developer Mode on.
 - To run on Android, `adb` from the Android SDK's platform-tools.

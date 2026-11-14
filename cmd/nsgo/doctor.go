@@ -19,7 +19,10 @@ import (
 )
 
 // minGo is the oldest Go that builds NSGo apps, go.mod's go line.
-const minGo = "go1.26"
+const minGo = "go1.27.3"
+
+// switchGo is the oldest Go that downloads a newer toolchain a module needs.
+const switchGo = "go1.21"
 
 // machine is what doctor found on this machine. An empty string is a
 // tool it did not find.
@@ -27,6 +30,7 @@ type machine struct {
 	goos, goarch string
 	system       string // the system's name and version, "macOS 26.1"
 	goVersion    string // go env GOVERSION
+	goToolchain  string // go env GOTOOLCHAIN
 	xcode        string // Xcode's version
 	sdks         map[string]bool
 	simulators   map[string]int // available simulators by OS, "iOS"
@@ -110,10 +114,21 @@ func doctor(ctx context.Context) error {
 		line(fmt.Sprintf("%-*s  %s      %s", width, t, mark(build), mark(run)) + why)
 	}
 	emit("")
-	if m.goVersion == "" || version.Compare(m.goVersion, minGo) < 0 {
+	if !m.goBuilds() {
 		return fmt.Errorf("NSGo needs Go %s or later: https://go.dev/dl/", strings.TrimPrefix(minGo, "go"))
 	}
 	return nil
+}
+
+// goBuilds is whether the Go found builds NSGo apps: minGo or later, or an older one that downloads minGo when a module asks for it.
+func (m *machine) goBuilds() bool {
+	return m.goVersion != "" && (version.Compare(m.goVersion, minGo) >= 0 || m.goDownloads())
+}
+
+// goDownloads is whether the Go found is older than minGo but switches to a newer toolchain a module needs, downloading it: GOTOOLCHAIN is auto, the default, or ends in +auto.
+func (m *machine) goDownloads() bool {
+	return version.Compare(m.goVersion, minGo) < 0 && version.Compare(m.goVersion, switchGo) >= 0 &&
+		(m.goToolchain == "auto" || strings.HasSuffix(m.goToolchain, "+auto"))
 }
 
 // tools are the lines saying what doctor found: ok for a tool found, else
@@ -123,6 +138,8 @@ func (m *machine) tools() []verdict {
 	switch {
 	case m.goVersion == "":
 		out = append(out, no("no Go on PATH: every target needs Go "+strings.TrimPrefix(minGo, "go")+" or later"))
+	case m.goDownloads():
+		out = append(out, yes().with(fmt.Sprintf("Go %s: Go %s will be downloaded when an app builds", strings.TrimPrefix(m.goVersion, "go"), strings.TrimPrefix(minGo, "go"))))
 	case version.Compare(m.goVersion, minGo) < 0:
 		out = append(out, no(fmt.Sprintf("Go %s is too old: NSGo needs %s or later", strings.TrimPrefix(m.goVersion, "go"), strings.TrimPrefix(minGo, "go"))))
 	default:
@@ -193,7 +210,7 @@ func (m *machine) build(target string) verdict {
 	if _, _, ok := appleOSOf(target); ok && m.goos != "darwin" {
 		return elsewhere("needs a Mac with Xcode")
 	}
-	if m.goVersion == "" || version.Compare(m.goVersion, minGo) < 0 {
+	if !m.goBuilds() {
 		return no("needs Go " + strings.TrimPrefix(minGo, "go"))
 	}
 	if sys, sim, ok := appleOSOf(target); ok {
@@ -267,7 +284,11 @@ func probe(ctx context.Context) *machine {
 	m := &machine{goos: runtime.GOOS, goarch: runtime.GOARCH, system: systemName(ctx),
 		sdks: map[string]bool{}, simulators: map[string]int{}, appleDevices: map[string]int{}, miniTools: map[string]bool{}}
 	var wg sync.WaitGroup
-	wg.Go(func() { m.goVersion, _ = output(ctx, "go", "env", "GOVERSION") })
+	wg.Go(func() {
+		if out, err := output(ctx, "go", "env", "GOVERSION", "GOTOOLCHAIN"); err == nil {
+			m.goVersion, m.goToolchain, _ = strings.Cut(out, "\n")
+		}
+	})
 	if m.goos == "darwin" {
 		wg.Go(func() { m.probeXcode(ctx) })
 	}
