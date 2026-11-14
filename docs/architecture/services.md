@@ -4,6 +4,8 @@ Services are what the platform does for the app outside its views: alerts, the c
 
 Audio playback is planned as the `audio` package, whose engine part `core` will carry as a service through the batch; its design is [audio playback](audio.md). Until it lands, an app plays sound only through a `Video`.
 
+Remote push is designed separately in [Remote push](remote-push.md); it is not implemented by the local notification service described below.
+
 ## Requests and answers
 
 A service is a command item in the batch. One that answers, such as a clipboard read, an opened URL or a pick, carries a number in `Count` and comes back as an event with it.
