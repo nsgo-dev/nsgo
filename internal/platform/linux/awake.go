@@ -10,7 +10,7 @@ type awakeState struct {
 }
 
 func (a *awakeState) take(id uint32, req driver.KeepAwake, appID string) {
-	bindInputSources()
+	bindNotifications()
 	if a.ids == nil {
 		a.ids = map[uint32]bool{}
 	}
@@ -46,7 +46,7 @@ func (a *awakeState) release(id uint32) {
 		return
 	}
 	delete(a.ids, id)
-	bindInputSources()
+	bindNotifications()
 	if len(a.ids) == 0 && a.cookie != 0 {
 		if bus := sessionBus(); bus != 0 {
 			gVariantUnrefNonZero(dbusCall(bus, "org.freedesktop.ScreenSaver", "/ScreenSaver", "org.freedesktop.ScreenSaver", "UnInhibit", gVariantNewUint32(a.cookie)))
