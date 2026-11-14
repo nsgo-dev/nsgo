@@ -164,6 +164,8 @@ type runtime struct {
 	speech *SpeechSession
 	// quits are the OnQuit handlers, oldest first.
 	quits []*quitHandler
+	// quitRequests are the handlers for user-initiated quit requests.
+	quitRequests []*quitRequestHandler
 	// notificationPresses hear notifications pressed, and pressesPending
 	// keeps those pressed before any did.
 	notificationPresses []*notificationPressHandler
