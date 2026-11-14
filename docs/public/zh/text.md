@@ -82,6 +82,8 @@ textview.TextView{
 }
 ```
 
+公式（`$…$`、`$$…$$`）默认显示 TeX 源码；应用传入 `base/formula` 的 `RenderMath: formula.RenderMath` 后才会排版，字号和颜色与周围文本一致，读屏时使用应用的语言，复制时得到 TeX。它会让应用增大约 6.5 MB，其中包括字体。在其他地方显示公式用 `formula.View`，支持 TeX 和 Typst。
+
 `textview.Parse` 读取 Markdown，`textview.ParseHTML` 读取 HTML，得到应用也可以自己构建的块。`Options.Streaming` 修复仍在到达的文档：补全末尾未闭合的语法，并暂缓显示含义还要由后续字符决定的最后一行，例如单独的列表标记，让回复不会把标记闪成文本；`StreamingCaret` 在末尾绘制光标，适合逐字生成的回复。
 
 ## 下一步

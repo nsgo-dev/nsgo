@@ -184,6 +184,32 @@ Popups are placed against what their trigger holds (`Overlay.AnchorContent`), th
 | `Card`'s `Border` color | `CardVariant` | `ui` takes color from variants |
 | Content inside a node takes the pointer | Only the keyboard and assistive technology reach it | Hit tests ignore transforms ([roadmap](../roadmap.md#finish-the-existing-platforms)) |
 
+## Formulas
+
+`base/formula` typesets TeX and Typst math with [Untie](https://github.com/caelyreth/untie) and draws it as a `core.Canvas` of filled shapes; NSH has none, and MyGo's `contrib/mygo` adapter of Untie is the reference. Its font is New Computer Modern Math Book (GUST Font License, that is LPPL 1.3c: `fonts/LICENSE`, `NOTICE`), embedded unmodified, which a test pins by its digest; `NewRenderer` takes an app's fonts.
+
+- A formula is laid out once at 100 points and kept as em-unit paths in runs of one paint, 256 layouts a `Renderer` (`TestLayoutScalesLinearly` holds layout linear in the size). The canvas is sized by `Canvas.Em` in ems of the font it inherits, so it follows the text size, the user's setting and a text's own limits on it, and its baseline sits on its line's through the attachment's `Descent` ([text](text.md#text-and-drawing)).
+- Its box is Untie's `Bounds`, with the ink past the box: canvases clip on the web, a `<canvas>` element, and on Linux, an image surface of the view's size ([canvas](canvas.md)), so an inline formula has its overflow's gap on each side rather than lose ink.
+- Ink fills from the view's text color (`FillFromView`), which a theme or appearance change resends without drawing again; colors the formula names stay, and errors take `ErrorStyle`'s color. A formula past Untie's limits, or whose fonts did not load, shows its source in `ErrorStyle`.
+- The font loads on a `core.Resource`'s goroutine, as parsing it takes about 120 ms on an M-series Mac; until then a formula is an empty em square. In WebAssembly the load takes about 0.7 s and still holds the page's one thread.
+- Assistive technology reads the canvas as an image labelled by Untie's structured description, spoken through `base/formula/locales` in English and Chinese, which `LabelFunc` follows as the source and the language change; the description's literal letters, digits and `\text` stay as written, and digits read as numbers. A text with hidden spans reads the label in the formula's place, never its TeX.
+- `RenderMath` gives `TextView` an inline formula, whose span's `Content`, `$…$`, is what a copy takes, and a display one in a sideways `Scroll` around a centered text as wide as it at least, copying as `$$…$$`; `TextView` keeps `PartMathBlock` around it.
+
+What formulas cost an app, from a `ui.TextView` with and without `RenderMath` (2026-11-15):
+
+| Target | Added |
+| --- | --- |
+| macOS, Windows, Linux | 6.2, 6.6 and 6.5 MB of binary, the 1.4 MB font among it |
+| Android | 2.8 MB of APK |
+| Web | 10.8 MB of WebAssembly, 3.0 MB gzipped (2.2 MB with Brotli), the font 0.95 MB of it |
+
+| MyGo's adapter | NSGo | Why |
+| --- | --- | --- |
+| Fits or keeps a natural size in points | Em-sized by the inherited font | Formulas follow the text size as text does |
+| Its own layout cache of boxes | Em-unit paths at one reference size | One layout serves every size and engine |
+| English speech, `LocalizeLabel` for others | Untie's description spoken from catalogs | A component's words come from its catalogs |
+| Context menu copying MathML, hover hits | Copies as TeX; no hits | Left for later ([roadmap](../roadmap.md#formulas)) |
+
 ## Resizable panels
 
 `ResizablePanelGroup` ports `gpui-base`'s sizing (`resizeState`, tested as NSH tests it), filling its container unless the app sizes it: a drag grows the panel before its handle by taking from the panels after it, nearest first, as far as their minimums allow, and shrinking below a minimum takes from the panels before.

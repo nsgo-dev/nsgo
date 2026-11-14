@@ -14,6 +14,8 @@
 - Text: `FillText` and `StrokeText` in a `Font`.
 - Images: `DrawImage` at the natural size, `DrawImageIn` into a rectangle and `DrawImageFrom` from a part of the image.
 
+A canvas has no size of its own unless `Em` gives it one in ems of the font size it inherits, scaled by the user's text size as text is, as `base/formula`'s formulas size themselves: in a text's attachment its baseline, `Em.Descent` ems above its bottom, sits on the line's ([text](text.md)). `EmFunc` and `LabelFunc` follow what they read, laying it out again and naming it anew.
+
 The recorder resolves what needs the engine, so players stay plain: text alignment and baselines become an offset from the text's metrics, and an `ArcTo` becomes an arc from the current point. A `FillPath`, `StrokePath` or `ClipPath` (`FillRect` and `StrokeRect` among them) begins a path for its `Path` and another after it; the current path it leaves is recorded again, under the transforms it was built in and inside a `Save` and `Restore`, before the next op that builds on it or uses it (`DrawKind.UsesPath`). A run of `FillRect`s after a long line, as a chart's bars after its line, records each rectangle alone. Players keep only a transform, a clip and the paint state.
 
 ## Queries

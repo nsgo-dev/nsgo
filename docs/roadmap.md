@@ -120,6 +120,25 @@ What NSGo's issue [#49](https://github.com/nsgo-dev/nsgo/issues/49) asks for fol
 ## Android embedding and process lifetime
 An `NsgoEngine` a host keeps runs the app on while its one `NsgoView` is detached ([embedding](architecture/embedding.md)). Issue #12 also needs a fresh Activity's view to show a running engine and several surfaces to share one process before recording, floating windows or push delivery can depend on it; the design and staged protocol work are in [Android engine and view lifetime](architecture/android-lifecycle.md).
 | Android engine and view lifetime | #12, [Android engine and view lifetime](architecture/android-lifecycle.md) | A host retains one `NsgoEngine` in its Application or foreground service, Activities attach and detach `NsgoView` surfaces without killing the Go process, two surfaces share one process with independent trees, and explicit engine destruction closes the process once |
+
+## Formulas
+
+What `base/formula` still lacks ([formulas](architecture/components.md#formulas)), Untie's and MyGo's adapter the references.
+
+| Item | Reference | Done when |
+| --- | --- | --- |
+| Copying formulas on Android | `text.md` (Text selection) | Android's selection copies an attachment as its span's `Copy`, as the other backends do; `Selection.java` leaves attachments out now |
+| Formulas in TSX | `tsx.md` | TSX registers `formula.View`, its `TextView` takes `renderMath`, and the TSX gallery's TextView page typesets its formulas |
+| Formulas in mini programs | `miniprogram.md` | A mini program shows formulas within the platforms' 2 MB package: Untie's code alone, about 6 MB natively, is past it before its 1.4 MB font |
+| Formulas on watchOS | — | The gallery's formulas show in the watch simulator with the memory they take read, Untie's code, its font and the font's parsed copy, against what a watch has; unmeasured now |
+| Display formulas that break | Untie's `Style.MaxWidth` and `Box.Lines` | A display formula wider than its view breaks at its relations and operators rather than scroll |
+| Formulas as they stream | `untie/stream`, MyGo's `StreamingMath` | A formula growing as a reply streams moves to its new layout, and its unfinished end shows no error marks |
+| Scripts in `\text` | Untie's `FontSetConfig.Fallbacks` | CJK and other scripts in `\text{}` take the system's fonts, where they show as Untie's placeholders now |
+| Formulas in shrinking text | `text.md` | A formula in a text with `AdjustsFontSizeToFit` shrinks with it |
+| Formulas in editors | Untie's `Box.Hits`, `NearestCaret`; MyGo's `hit.go` | Presses, carets and diagnostics reach a formula's parts, for an editor of formulas |
+| MathML on the clipboard | MyGo's `clipboard.go` | A copy of a formula also gives MathML and its source as `text/x-tex` |
+| Thin rules on whole pixels | Untie's `PixelGrid` | Fraction bars and roots' rules land on whole device pixels at small sizes |
+
 ## Terminal
 
 What `base/terminal` still lacks of a terminal app's features, Ghostty's the reference ([terminal](architecture/terminal.md)), in the order to build them.

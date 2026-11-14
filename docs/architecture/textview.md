@@ -10,8 +10,9 @@ The shared find design for this document and `ui/chat` is in [Text-level search]
 | --- | --- |
 | `base/textview` | `Document` and its blocks and inlines, `Parse`, `ParseHTML`, `Extension`, and the unstyled `TextView`, styled by `Part` |
 | `base/textview/highlight` | A `Highlighter` from chroma's lexers in NSH's light and dark palette, following the system's appearance |
+| `base/formula` | `RenderMath`, typesetting formulas with Untie ([formulas](components.md#formulas)) |
 
-Highlighting is its own package because chroma's lexers add about 4.5 MB to a binary, against about 0.3 MB for goldmark. Apps opt in with `Highlighter: highlight.New(cx)`.
+Highlighting is its own package because chroma's lexers add about 4.5 MB to a binary, against about 0.3 MB for goldmark. Apps opt in with `Highlighter: highlight.New(cx)`. Formulas cost more, about 6.5 MB natively with their font, so apps opt in with `RenderMath: formula.RenderMath`; `ui.TextView` does not by itself.
 
 `highlight.New` keeps the last 64 blocks' tokens for the process and measures each language's lexing speed: a block is colored from the cache, lexed on the spot when its language should take under 2 ms, and otherwise shown plain, or with the colors of the block it grew from, and lexed on a goroutine whose result colors it again. This keeps lexing off the engine goroutine, as NSH's highlighter does with its blocking thread.
 
@@ -50,7 +51,7 @@ Highlighting is its own package because chroma's lexers add about 4.5 MB to a bi
 - A row is a `Dynamic`: the part styles and the highlighter it reads, such as the system's appearance, rebuild it.
 - Paragraphs, headings, cells and code are each one `Text` with spans; links are spans with a press handler that calls `OnLinkPress`, then with `OpenLinks` opens a URL with a scheme through `Scope.OpenURL`. An image in no link reports its press with `OnImagePress`.
 - Images show as blocks when a paragraph holds only images. In a line of text an image is an attachment: the size it asks for, else three quarters of a line tall.
-- `RenderMath` shows formulas: blocks in place, inline ones as attachments, whose own view's `VerticalAlign` places them. Without it `Math` shows its TeX in `PartMath` or `PartMathBlock`.
+- `RenderMath` shows formulas: blocks in place inside `PartMathBlock`, inline ones as attachments, whose own view's `VerticalAlign` places them and whose span's `Content`, `$TeX$`, is what a copy takes. Without it `Math` shows its TeX in `PartMath` or `PartMathBlock`.
 - An inline custom node shows through `CustomSpan` as a span, else through `RenderCustom` as an attachment, else as its content.
 - `Selectable` makes the root a selection area, so one selection runs across the blocks.
 - `StreamingCaret` is placed as an attachment after the last text of the last block, into quotes, lists and custom content, after a code block's code or in a table's last cell, else on a line after the last block. The last row is built again when another follows it.
