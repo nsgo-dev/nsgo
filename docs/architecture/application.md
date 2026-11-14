@@ -75,7 +75,7 @@ An app run with a function (`nsgo.Run(App)`, or a root view with automatic updat
 - Both paths dispatch the same `EventHotKey`; when neither backend is available, the shortcut is ignored. A host's `NewView` takes none.
 
 ## Windows
-The Windows backend supports notification-area icons, click events and menus. Panels, additional surfaces and drawn tray views remain in the surfaces slice of the roadmap.
+The Windows backend supports notification-area icons, click events and menus, and attaches opened window surfaces to the app's message loop. Tray-anchored panels, panel focus behavior and drawn tray views remain in the surfaces slice of the roadmap.
 ## Configuration
 
 `nsgo.yaml` keeps what the package needs before any code runs: the name, the ID, the version and the launch screen's appearance. Windows are sized and limited in Go, `nsgo.WindowSize` and `nsgo.WindowConstraints` for the main window and `WindowOptions` for others; `nsgo.HideDock` and the shutdown mode are Go's too. A `window` in `nsgo.yaml` fails the tool, naming `nsgo.WindowSize`.
