@@ -217,8 +217,9 @@ func textInputMethods() []objc.MethodDef {
 		}},
 		{Cmd: sel("copy:"), Fn: func(self objc.ID, _ objc.SEL, _ objc.ID) {
 			if v := textOf(self); v != nil && v.tsel.has && v.tsel.start < v.tsel.end {
-				u := v.units()
-				text := string(utf16.Decode(u[v.clampUnits(v.tsel.start):v.clampUnits(v.tsel.end)]))
+				// As every copy takes a text: hidden spans left out and attachments as their copy texts.
+				from, to := driver.UTF16Offset(v.plain, v.clampUnits(v.tsel.start)), driver.UTF16Offset(v.plain, v.clampUnits(v.tsel.end))
+				text := driver.CopiedText(v.plain, v.spans, from, to)
 				objc.ID(apple.Class("UIPasteboard")).Send(sel("generalPasteboard")).Send(sel("setString:"), apple.NSString(text))
 			}
 		}},
