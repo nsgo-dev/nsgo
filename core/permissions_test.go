@@ -39,6 +39,8 @@ func TestPermissionUnknownKeyAndAccessRefusal(t *testing.T) {
 	var got []core.PermissionStatus
 	answer := func(s core.PermissionStatus) { got = append(got, s) }
 	var opened []bool
+	var inline []core.PermissionStatus
+	var openedInline []bool
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		// Answered inline, sending nothing.
 		cx.RequestPermission("nope", answer)
@@ -46,18 +48,25 @@ func TestPermissionUnknownKeyAndAccessRefusal(t *testing.T) {
 		cx.ProvideAccess(refuseKey{core.PermissionCamera})
 		cx.RequestPermission(core.PermissionCamera, answer)
 		cx.OpenPermissionSettings(core.PermissionCamera, func(ok bool) { opened = append(opened, ok) })
-		cx.RequestPermission(core.PermissionMicrophone, answer)
 		cx.GuidePermission(core.PermissionCamera, core.PermissionGuideOptions{}, answer)
 		// Code under an Access names no other app for the user to give a permission to.
 		cx.GuidePermission(core.PermissionMicrophone, core.PermissionGuideOptions{App: "/Applications/Other.app"}, answer)
+		inline, openedInline = slices.Clone(got), slices.Clone(opened)
+		cx.RequestPermission(core.PermissionMicrophone, answer)
+		// It may guide the user to give this app one its Access allows.
+		cx.GuidePermission(core.PermissionScreenRecording, core.PermissionGuideOptions{}, answer)
 		return core.View{}
 	})
+	want := []core.PermissionStatus{core.PermissionUnavailable, core.PermissionUnavailable, core.PermissionUnavailable, core.PermissionUnavailable}
+	if !slices.Equal(inline, want) || !slices.Equal(openedInline, []bool{false, false}) {
+		t.Errorf("answered inline %v and opened %v, want %v and [false false]", inline, openedInline, want)
+	}
 	app.Settle()
-	want := []core.PermissionStatus{core.PermissionUnavailable, core.PermissionUnavailable, core.PermissionUnavailable, core.PermissionUnavailable, core.PermissionGranted}
+	want = append(want, core.PermissionGranted)
 	if !slices.Equal(got, want) {
 		t.Errorf("statuses %v, want %v", got, want)
 	}
-	if !slices.Equal(opened, []bool{false, false}) || len(app.PermissionSettings) != 0 || app.Guide != "" {
+	if !slices.Equal(opened, []bool{false, false}) || len(app.PermissionSettings) != 0 || app.Guide != core.PermissionScreenRecording {
 		t.Errorf("opened %v, settings %v, guide %q", opened, app.PermissionSettings, app.Guide)
 	}
 	if s := app.Permissions[core.PermissionCamera]; s != core.PermissionNotAsked {
@@ -130,7 +139,7 @@ func TestPermissionGuideEndsOnceForEachWay(t *testing.T) {
 	app.CloseGuide()
 	check("closed", core.PermissionNotAsked)
 
-	// Its owner goes, and done runs under the root.
+	// Its owner goes, which ends it as stop does.
 	shown.Set(true)
 	app.Settle()
 	if app.Guide != core.PermissionFullDiskAccess {

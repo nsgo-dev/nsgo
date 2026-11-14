@@ -11,19 +11,13 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
-// Taking a photo: UIImagePickerController's camera, after the user
-// allowed it through AVCaptureDevice, as the picker itself shows only a
-// notice when they have not.
+// Taking a photo: UIImagePickerController's camera, after the user allowed it through privacy, which asks AVCaptureDevice, as the picker itself shows only a notice when they have not.
 
-const (
-	avFoundationPath = "/System/Library/Frameworks/AVFoundation.framework/AVFoundation"
-	// UIImagePickerControllerSourceTypeCamera.
-	sourceCamera = 1
-	// AVAuthorizationStatus.
-	cameraNotAsked, cameraAllowed = 0, 3
-)
+// UIImagePickerControllerSourceTypeCamera.
+const sourceCamera = 1
 
 var (
 	cameraOnce     sync.Once
@@ -53,26 +47,22 @@ func (s *surface) takePhoto(r driver.PickRequest, id uint32) {
 		fail("the app declares no NSCameraUsageDescription")
 		return
 	}
-	if _, err := purego.Dlopen(avFoundationPath, purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
-		fail("AVFoundation is missing")
-		return
-	}
-	device, video := objc.ID(apple.Class("AVCaptureDevice")), apple.Global(avFoundationPath, "AVMediaTypeVideo")
-	switch objc.Send[int](device, sel("authorizationStatusForMediaType:"), video) {
-	case cameraAllowed:
+	// The camera's check and prompt are privacy's, which core's permission requests share.
+	switch privacy.Status(driver.PermissionCamera) {
+	case driver.PermissionGranted:
 		s.presentCamera(r, id)
-	case cameraNotAsked:
-		block := objc.NewBlock(func(_ objc.Block, granted bool) {
+	case driver.PermissionNotAsked:
+		privacy.Request(driver.PermissionCamera, func(status int) {
 			apple.OnMain(func() {
-				if granted {
+				if status == driver.PermissionGranted {
 					s.presentCamera(r, id)
 				} else {
 					fail("camera access denied")
 				}
 			})
 		})
-		device.Send(sel("requestAccessForMediaType:completionHandler:"), video, block)
-		block.Release()
+	case driver.PermissionUnavailable:
+		fail("AVFoundation is missing")
 	default:
 		fail("camera access denied")
 	}

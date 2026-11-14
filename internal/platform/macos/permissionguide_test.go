@@ -50,9 +50,17 @@ func TestGuideEndsOnceAndUnansweredAsItsSurfaceCloses(t *testing.T) {
 		t.Errorf("answers %+v", answers)
 	}
 
-	// Its surface closing ends it unanswered.
+	// The surface keeps one stop for all its guides and nothing of those that answered.
 	third := newGuide(s, 3)
 	s.adoptGuide(third)
+	if len(s.stops) != 1 {
+		t.Errorf("the surface keeps %d stops for its guides", len(s.stops))
+	}
+	if live := liveGuides[s]; len(live) != 1 {
+		t.Errorf("the surface keeps %d guides", len(live))
+	}
+
+	// Its surface closing ends it unanswered.
 	for _, stop := range s.stops {
 		stop()
 	}
@@ -65,5 +73,8 @@ func TestGuideEndsOnceAndUnansweredAsItsSurfaceCloses(t *testing.T) {
 	}
 	if currentGuide != nil {
 		t.Error("a guide is still running")
+	}
+	if _, ok := liveGuides[s]; ok {
+		t.Error("a closed surface's guides are kept")
 	}
 }

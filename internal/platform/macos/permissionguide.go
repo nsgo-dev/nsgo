@@ -37,7 +37,6 @@ const (
 	nsDraggingFormationNone             = 1
 	nsImageOnly                         = 1
 	nsImageResizingModeStretch          = 1
-	nsTextAlignmentCenter               = 2
 	kCGWindowListOptionOnScreenOnly     = 1 << 0
 	kCGWindowListExcludeDesktopElements = 1 << 4
 	kCGEventSourceStateCombined         = 0
@@ -91,9 +90,10 @@ type guideViews struct {
 }
 
 var (
-	// guideMu guards currentGuide, the guide running, which a new one ends.
+	// guideMu guards currentGuide, the guide running, which a new one ends, and liveGuides, each surface's guides yet to answer, which it silences as it closes.
 	guideMu      sync.Mutex
 	currentGuide *permissionGuide
+	liveGuides   = map[*surface]map[*permissionGuide]struct{}{}
 	// activeGuide is the guide whose panel shows, which the panel's classes reach: the main thread's.
 	activeGuide *permissionGuide
 	// guideDragging is set while the app is dragged from the panel, which lets the mouse through until the tracker sees the button up.
@@ -195,19 +195,40 @@ func (s *surface) guidePermission(id uint32, r driver.PermissionRequest) {
 	go g.track()
 }
 
-// adoptGuide makes g the guide running, ending the one before, and ends it unanswered as its surface closes.
+// adoptGuide makes g the guide running, ending the one before, and has its surface end it unanswered as it closes.
 func (s *surface) adoptGuide(g *permissionGuide) {
 	guideMu.Lock()
 	old := currentGuide
 	currentGuide = g
+	live := liveGuides[s]
+	first := live == nil
+	if first {
+		live = map[*permissionGuide]struct{}{}
+		liveGuides[s] = live
+	}
+	live[g] = struct{}{}
 	guideMu.Unlock()
 	if old != nil {
 		old.end()
 	}
-	s.stops = append(s.stops, func() {
+	// One stop for all of the surface's guides, which leaves nothing behind as each answers.
+	if first {
+		s.stops = append(s.stops, func() { endSurfaceGuides(s) })
+	}
+}
+
+// endSurfaceGuides ends surface s's guides unanswered, as s closes.
+func endSurfaceGuides(s *surface) {
+	guideMu.Lock()
+	live := liveGuides[s]
+	delete(liveGuides, s)
+	for g := range live {
 		g.quiet.Store(true)
+	}
+	guideMu.Unlock()
+	for g := range live {
 		g.end()
-	})
+	}
 }
 
 // stopGuide ends surface s's guide numbered id, which still answers.
@@ -284,6 +305,7 @@ func (g *permissionGuide) finish(status int) {
 	if currentGuide == g {
 		currentGuide = nil
 	}
+	delete(liveGuides[g.s], g)
 	guideMu.Unlock()
 	if !g.quiet.Load() {
 		g.dispatch(driver.Event{Kind: driver.EventPermission, Count: g.id, Index: status})
@@ -512,7 +534,7 @@ func (g *permissionGuide) build(w float64) {
 	v.hint = objc.ID(apple.Class("NSTextField")).Send(sel("labelWithString:"), apple.NSString(msgs.GuideDragHint()))
 	v.hint.Send(sel("setFont:"), objc.ID(apple.Class("NSFont")).Send(sel("systemFontOfSize:"), 9.0))
 	v.hint.Send(sel("setTextColor:"), systemColor("secondaryLabelColor"))
-	v.hint.Send(sel("setAlignment:"), nsTextAlignmentCenter)
+	v.hint.Send(sel("setAlignment:"), nsAlignCenter)
 	effect.Send(sel("addSubview:"), v.hint)
 
 	if img := guideSymbol("hand.draw", msgs.GuideDragHint()); img != 0 {

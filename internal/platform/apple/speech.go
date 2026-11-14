@@ -10,6 +10,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
 // Speech recognizes speech for macOS and iOS, as NSH's speech.rs: the
@@ -37,7 +38,7 @@ const (
 	speechPath    = "/System/Library/Frameworks/Speech.framework/Speech"
 	avPath        = "/System/Library/Frameworks/AVFoundation.framework/AVFoundation"
 	authNotAsked  = 0
-	authAllowed   = 3 // SFSpeechRecognizerAuthorizationStatusAuthorized, AVAuthorizationStatusAuthorized
+	authAllowed   = 3 // SFSpeechRecognizerAuthorizationStatusAuthorized
 	speechBufSize = 1024
 )
 
@@ -125,16 +126,16 @@ func (s *speechState) authorize(run *speechRun, next func()) {
 		s.finish(run, driver.SpeechNotAllowed)
 		return
 	}
-	device, media := objc.ID(Class("AVCaptureDevice")), Global(avPath, "AVMediaTypeAudio")
-	switch objc.Send[int](device, sel("authorizationStatusForMediaType:"), media) {
-	case authAllowed:
+	// The microphone's check and prompt are privacy's, which core's permission requests share.
+	switch privacy.Status(driver.PermissionMicrophone) {
+	case driver.PermissionGranted:
 		if !run.done {
 			next()
 		}
-	case authNotAsked:
-		block := objc.NewBlock(func(_ objc.Block, granted bool) {
+	case driver.PermissionNotAsked:
+		privacy.Request(driver.PermissionMicrophone, func(status int) {
 			OnMain(func() {
-				if !granted {
+				if status != driver.PermissionGranted {
 					s.finish(run, driver.SpeechNotAllowed)
 					return
 				}
@@ -143,8 +144,6 @@ func (s *speechState) authorize(run *speechRun, next func()) {
 				}
 			})
 		})
-		device.Send(sel("requestAccessForMediaType:completionHandler:"), media, block)
-		block.Release()
 	default:
 		s.finish(run, driver.SpeechNotAllowed)
 	}

@@ -82,9 +82,10 @@ func askMedia(name string, answer func(int)) {
 		}
 		answer(driver.PermissionGranted)
 	}, func(err js.Value) {
+		// Chrome rejects a dismissed prompt as it does a blocked one, while the Permissions API still reads "prompt" for it: only a browser whose API cannot tell takes the rejection for a refusal.
 		refused := err.Truthy() && err.Get("name").String() == "NotAllowedError"
 		mediaPermission(name, func(status int) {
-			if refused && (status == driver.PermissionUnknown || status == driver.PermissionNotAsked) {
+			if refused && status == driver.PermissionUnknown {
 				status = driver.PermissionDenied
 			}
 			answer(status)
