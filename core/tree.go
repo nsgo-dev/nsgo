@@ -485,8 +485,7 @@ type spanNode struct {
 	cls     *spanClasses // its classes, when it has any
 }
 
-// attachNode is the view of a text's attachment: a layout root of its own
-// at its content size, which the text places in its lines.
+// attachNode is the view of a text's attachment: a layout root of its own at its content size, which the text places in its lines.
 type attachNode struct {
 	// size, align and descent are what the text was prepared with.
 	size    Size

@@ -138,6 +138,7 @@ What `base/formula` still lacks ([formulas](architecture/components.md#formulas)
 | Formulas in editors | Untie's `Box.Hits`, `NearestCaret`; MyGo's `hit.go` | Presses, carets and diagnostics reach a formula's parts, for an editor of formulas |
 | MathML on the clipboard | MyGo's `clipboard.go` | A copy of a formula also gives MathML and its source as `text/x-tex` |
 | Thin rules on whole pixels | Untie's `PixelGrid` | Fraction bars and roots' rules land on whole device pixels at small sizes |
+| Loading the font on the web | `components.md` (Formulas) | The formula font loads without holding the page's one thread for its 0.7 s, in pieces between frames or as a smaller font |
 
 ## Terminal
 

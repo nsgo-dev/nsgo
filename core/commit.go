@@ -531,8 +531,7 @@ func (n *node) textRTL(inherited textFields, content string) bool {
 // their content size.
 const attachmentSpace = 1 << 20
 
-// sizeAttachments resolves and lays out the attachments of text n, each a
-// layout root at its content size, with scale the user's text size setting as far as the text takes it, and reports whether a size or where one sits in its line changed.
+// sizeAttachments resolves and lays out the attachments of text n, each a layout root at its content size, with scale the user's text size setting as far as the text takes it, and reports whether a size or where one sits in its line changed.
 func (t *Tree) sizeAttachments(n *node, inherited textFields, scale float32, force bool) bool {
 	changed := false
 	inherited.attachScale = scale

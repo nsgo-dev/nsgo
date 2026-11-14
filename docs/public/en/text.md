@@ -82,7 +82,7 @@ textview.TextView{
 }
 ```
 
-Formulas (`$…$`, `$$…$$`) show their TeX until the app passes `RenderMath: formula.RenderMath` from `base/formula`, which typesets them in the size and color of the text around them, read aloud in the app's language and copied as TeX; it adds about 6.5 MB to an app, its font included. `formula.View` shows a formula anywhere else, in TeX or Typst.
+Formulas (`$…$`, `$$…$$`) show their TeX until the app passes `RenderMath: formula.RenderMath` from `base/formula`, which typesets them in the size and color of the text around them, read aloud in the app's language and copied as TeX; it adds about 6.5 MB to a desktop app and 3 MB gzipped to a web one, its font included. `formula.View` shows a formula anywhere else, in TeX or Typst.
 
 `textview.Parse` reads Markdown and `textview.ParseHTML` reads HTML into blocks the app can also build. `Options.Streaming` repairs a document that arrives in pieces, closing what its end leaves open and holding back a last line whose meaning the next characters decide, such as a list marker alone, so a reply never flashes markers as text, and `StreamingCaret` draws a caret at its end, for a reply written as it streams.
 
