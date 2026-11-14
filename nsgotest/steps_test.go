@@ -377,6 +377,62 @@ func TestFocusTargetsAnyKeyboardStop(t *testing.T) {
 	}
 }
 
+func TestFocusResolvesFieldsFirstThenStopsAroundTheMatch(t *testing.T) {
+	a := Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Children: []core.Node{
+			core.View{TestID: "button", Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}, Children: []core.Node{
+				core.Text{Content: "Save"},
+			}},
+			core.View{TestID: "row", Children: []core.Node{
+				core.View{TestID: "inner", Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}},
+			}},
+			core.View{TestID: "card", OnPress: func(core.PressEvent) {}, Children: []core.Node{
+				core.View{TestID: "form", Children: []core.Node{
+					core.Input{TestID: "name", Style: core.Style{Height: core.Pt(20)}},
+				}},
+			}},
+		}}
+	}, Environment(driver.Environment{OS: driver.OSMacOS}))
+	for _, c := range []struct{ selector, want string }{
+		{"text:Save", "button"}, {"id:row", "inner"}, {"id:form", "name"}, {"id:card", "name"},
+	} {
+		a.Focus(c.selector)
+		if !a.Find("id:" + c.want).Focused {
+			t.Fatalf("Focus(%q) should focus %s\n%s", c.selector, c.want, a.Dump())
+		}
+	}
+}
+
+func TestFocusFailsOnStopsThatTakeNoFocus(t *testing.T) {
+	no := func() bool { return true }
+	root := func(cx *core.Scope) core.Node {
+		return core.View{Children: []core.Node{
+			core.View{TestID: "row", Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}, Children: []core.Node{
+				core.Input{TestID: "readonly", Readonly: true, Style: core.Style{Height: core.Pt(20)}},
+			}},
+			core.Input{TestID: "disabledfield", Disabled: no, Style: core.Style{Height: core.Pt(20)}},
+			core.View{TestID: "disabled", Disabled: no, Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}},
+			core.View{TestID: "nofocus", NoFocus: true, Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}},
+		}}
+	}
+	mac := Environment(driver.Environment{OS: driver.OSMacOS})
+	for _, c := range []struct {
+		selector string
+		opts     []Option
+		want     string
+	}{
+		{"id:readonly", []Option{mac}, "is disabled"},
+		{"id:disabledfield", []Option{mac}, "is disabled"},
+		{"id:disabled", []Option{mac}, "is disabled"},
+		{"id:nofocus", []Option{mac}, "NoFocus"},
+	} {
+		msg := fails(t, func(tb testing.TB) { Start(tb, root, c.opts...).Focus(c.selector) })
+		if !strings.Contains(msg, c.selector) || !strings.Contains(msg, c.want) {
+			t.Fatalf("Focus(%q) failed with %q, want %q", c.selector, msg, c.want)
+		}
+	}
+}
+
 func TestAnAppsRefreshIndicatorFollowsThePull(t *testing.T) {
 	var refreshing *core.Signal[bool]
 	var pull *core.AnimatedValue

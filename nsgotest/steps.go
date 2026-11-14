@@ -395,19 +395,26 @@ func (a *App) inputStep(selector, step string) *View {
 	return v
 }
 
-// Focus focuses the selector's keyboard focus stop. Text fields keep their
-// tap-like behavior; pressable and Focusable views are reached as a Tab
-// would be, so a following Return or Space can activate them.
+// Focus focuses the selector's keyboard focus stop: the text field the match is or holds, focused as a tap would, else the pressable or Focusable view the match is or is in, else the first one inside it, reached as a Tab would, so a following Return or Space presses it. A disabled or read-only match fails the step, as a NoFocus view does.
 func (a *App) Focus(selector string) {
 	a.t.Helper()
 	a.step("focus(%s)", selector)
+	isInput := func(v *View) bool { return v.Kind == driver.KindInput }
+	isStop := func(v *View) bool { return v.Kind != driver.KindInput && (pressable(v) || v.Props.Focusable) }
 	v := a.pick(selector, "focusable view", func(m *View) (*View, bool) {
-		if v := m.upTo(focusable); v != nil {
-			return v, true
+		// A field in the match comes first, as Focus took fields only before it took other stops.
+		t := m.downTo(isInput)
+		if t == nil {
+			t = m.upTo(isStop)
 		}
-		v := m.downTo(focusable)
-		return v, v != nil
+		if t == nil {
+			t = m.downTo(isStop)
+		}
+		return t, t != nil && !t.disabled(nil) && (t.Kind != driver.KindInput || !t.Input.Readonly)
 	})
+	if v.Kind != driver.KindInput && v.Props.NoFocus {
+		a.t.Fatalf("nsgotest: %q is NoFocus: it never takes the keyboard focus\n%s", selector, a.Dump())
+	}
 	if !v.Focused {
 		switch {
 		case a.target != nil && v.Kind == driver.KindInput:
