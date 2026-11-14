@@ -1889,10 +1889,11 @@ func TestSystemPermissionsOnTheWeb(t *testing.T) {
 	}
 }
 
-// The TextView demo typesets its formulas: the number of frames inline, on its text's baseline, and a block of its own, which copy as their TeX.
+// The TextView demo's document typesets its formulas: the number of frames inline, on its text's baseline, and a block of its own, which copy as their TeX.
 func TestTextViewFormulas(t *testing.T) {
-	app := startDesktop(t)
-	open(app, "TextView")
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.Scroll{TestID: "page", Children: []core.Node{markdownCard(cx)}}
+	}, nsgotest.Size(700, 800), nsgotest.Environment(desktopEnv))
 	sixty := app.WaitFor("label:60", 10*time.Second)
 	if sixty.Kind != driver.KindCanvas {
 		t.Errorf("$60$ shows as %v, not typeset", sixty.Kind)
@@ -1908,4 +1909,6 @@ func TestTextViewFormulas(t *testing.T) {
 		t.Errorf("the paragraph's formulas copy as %q", got)
 	}
 	app.Find(`label:t sub frame equals 1000 over 60 ms`)
+	app.Scroll("id:page", 600)
+	app.Screenshot("textview-formulas")
 }
