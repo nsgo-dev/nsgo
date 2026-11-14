@@ -15,7 +15,7 @@ type Path struct {
 // understands every command of SVG 1.1's path grammar; arcs become cubic
 // curves.
 func ParsePath(data string) (*Path, error) {
-	ops, err := appendPathData(nil, data)
+	ops, err := appendPathData(nil, data, nil)
 	if err != nil {
 		return nil, err
 	}

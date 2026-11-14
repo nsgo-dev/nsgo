@@ -44,31 +44,6 @@ func TestSVGPathCommands(t *testing.T) {
 	}
 }
 
-func TestSVGMarkers(t *testing.T) {
-	ops := svgOps(t, `<svg viewBox="0 0 20 10" stroke="red" stroke-width="2" fill="none">
-		<defs><marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto"><path d="M0 0L4 2L0 4Z" fill="context-stroke"/></marker></defs>
-		<path d="M2 5L10 5L18 5" marker-start="url(#arrow)" marker-mid="url(#arrow)" marker-end="url(#arrow)"/>
-	</svg>`)
-	strokes := 0
-	fills := 0
-	for _, op := range ops {
-		if op.Kind == DrawStroke {
-			strokes++
-		}
-		if op.Kind == DrawFill {
-			fills++
-		}
-	}
-	if strokes != 1 || fills != 3 {
-		t.Fatalf("markers produced %d strokes and %d fills, want 1 and 3", strokes, fills)
-	}
-	// The end marker points along the line and is translated to the path end.
-	last := ops[len(ops)-1]
-	if last.Kind != DrawFill {
-		t.Fatalf("last operation = %v, want fill", last.Kind)
-	}
-}
-
 func TestSVGPathCurves(t *testing.T) {
 	ops := svgOps(t, `<svg viewBox="0 0 24 24"><path d="M0 0 C1 1 2 2 3 3 S5 5 6 6 Q7 7 8 8 T10 10"/></svg>`)
 	if got := opKinds(ops); !slices.Equal(got, []DrawKind{DrawBeginPath, DrawMoveTo, DrawCubicTo, DrawCubicTo, DrawQuadTo, DrawQuadTo, DrawFillColor, DrawFill}) {

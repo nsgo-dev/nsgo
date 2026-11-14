@@ -174,17 +174,19 @@ func (p *svgParser) polygon(a map[string]string, closed bool) error {
 	return nil
 }
 
-// path reads path data and adds its shape.
+// path reads path data and adds its shape, with the arcs' inner joins in p.joins.
 func (p *svgParser) path(d string) error {
 	p.begin()
-	ops, err := appendPathData(p.local, d)
+	ops, err := appendPathData(p.local, d, &p.joins)
 	p.local = ops
 	return err
 }
 
 // appendPathData appends the ops of SVG path data to ops. It understands
 // every command of SVG 1.1's path grammar; arcs become cubic curves.
-func appendPathData(ops []DrawOp, d string) ([]DrawOp, error) {
+//
+// When joins is not nil, it receives the index in ops of every cubic curve that continues an arc after its first, whose start is not a vertex of the path.
+func appendPathData(ops []DrawOp, d string, joins *[]int) ([]DrawOp, error) {
 	sc := svgScanner{s: d}
 	var (
 		x, y   float32 // the current point
@@ -456,7 +458,13 @@ func appendPathData(ops []DrawOp, d string) ([]DrawOp, error) {
 					return ops, err
 				}
 				nx, ny = toX(nx), toY(ny)
+				first := len(ops)
 				ops = appendSVGArc(ops, x, y, rx, ry, rotation, large, sweep, nx, ny)
+				if joins != nil {
+					for i := first + 1; i < len(ops); i++ {
+						*joins = append(*joins, i)
+					}
+				}
 				x, y = nx, ny
 				prev = 'A'
 			}

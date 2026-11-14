@@ -265,6 +265,8 @@ type svgParser struct {
 	ops    []DrawOp
 	// local is the shape being read, in its own coordinates.
 	local []DrawOp
+	// joins are the indices in local of the curves that continue an arc, whose starts are not vertices for markers.
+	joins []int
 	// using holds the elements use elements and markers are drawing, which a use or a marker inside them may not draw again.
 	using  map[*svgNode]bool
 	visits int
@@ -414,7 +416,7 @@ func (p *svgParser) element(el *svgNode, style svgStyle, root bool) error {
 	case "use":
 		return p.use(el, style)
 	}
-	p.local = p.local[:0]
+	p.local, p.joins = p.local[:0], p.joins[:0]
 	if err := p.shape(el); err != nil {
 		return err
 	}
