@@ -4,12 +4,14 @@ package linux
 
 import "github.com/nsgo-dev/nsgo/internal/driver"
 
-// Keep-awake holds inhibit the session's idling with org.freedesktop.ScreenSaver.Inhibit, which GNOME and KDE serve. The calls go to the bus on portalQueue's thread, in order, off the GTK thread.
+// Keep-awake holds. A display hold inhibits the session's idling with org.freedesktop.ScreenSaver.Inhibit, which GNOME and KDE serve, so the screen does not blank and the computer does not idle-sleep. A computer-only hold inhibits only suspend, through the desktop portal's Inhibit with its Suspend flag, and the display still blanks; without the portal it falls back on the ScreenSaver inhibitor, which keeps the display on too. The calls go to the bus on portalQueue's thread, in order: the bus starts the portal as the first call reaches it, which can take seconds.
 
 const (
 	screenSaverName  = "org.freedesktop.ScreenSaver"
 	screenSaverPath  = "/ScreenSaver"
 	screenSaverIface = "org.freedesktop.ScreenSaver"
+	inhibitIface     = "org.freedesktop.portal.Inhibit"
+	inhibitSuspend   = 4 // Inhibit's Suspend flag
 )
 
 // awakeKey names a hold: the window that took it and the ID its tree gave it.
@@ -34,7 +36,7 @@ func (w *window) keepAwake(id uint32, req driver.KeepAwake) {
 	if w.closing {
 		return
 	}
-	bindNotifications()
+	bindGlobalHotKeys()
 	key, appID := awakeKey{w, id}, w.opts.ID
 	portalQueue() <- func() {
 		if _, ok := awake.holds[key]; ok {
@@ -91,6 +93,19 @@ func awakeGroupOf(display bool) *awakeGroup {
 
 // inhibitAwake starts the inhibition req asks for and returns what ends it, nil when none started.
 func inhibitAwake(appID string, req driver.KeepAwake) func() {
+	if !req.Display {
+		if bus := portalBus(appID); bus != 0 {
+			reply := portalCall(bus, globalShortcutPath, inhibitIface, "Inhibit", gVariantNewString(cstr("")), gVariantNewUint32(inhibitSuspend),
+				portalVariant("a{sv}", "{'reason': <"+portalQuote(req.Reason)+">}"))
+			if reply != 0 {
+				handle := portalTupleText(reply, 0)
+				gVariantUnref(reply)
+				if handle != "" {
+					return func() { gVariantUnrefNonZero(portalCall(bus, handle, globalRequestIface, "Close")) }
+				}
+			}
+		}
+	}
 	bus := sessionBus()
 	if bus == 0 {
 		return nil
