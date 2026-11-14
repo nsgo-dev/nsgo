@@ -431,7 +431,9 @@ func TestFocusFailsOnStopsThatTakeNoFocus(t *testing.T) {
 				core.Input{TestID: "readonly", Readonly: true, Style: core.Style{Height: core.Pt(20)}},
 			}},
 			core.Input{TestID: "disabledfield", Disabled: no, Style: core.Style{Height: core.Pt(20)}},
-			core.View{TestID: "disabled", Disabled: no, Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}},
+			core.View{TestID: "card", OnPress: func(core.PressEvent) {}, Children: []core.Node{
+				core.View{TestID: "disabled", Disabled: no, Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}},
+			}},
 			core.View{TestID: "nofocus", NoFocus: true, Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}},
 			core.View{TestID: "save", Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {}},
 		}}
