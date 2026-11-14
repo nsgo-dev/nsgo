@@ -315,8 +315,7 @@ type surface struct {
 var (
 	surfaces = map[*surface]bool{}
 	runner   *surface
-	// quitPending is AppKit's NSTerminateLater request waiting for the
-	// engine's ItemQuitResponse.
+	// quitPending is a quit request the engine has not answered with ItemQuitResponse yet.
 	quitPending   bool
 	quitRequestID uint32
 )
@@ -663,27 +662,22 @@ func startApp(opts Options) objc.ID {
 		Cmd: sel("applicationShouldTerminateAfterLastWindowClosed:"),
 		Fn:  func(self objc.ID, _ objc.SEL, app objc.ID) bool { return false },
 	}, {
-		// Quitting returns from Run instead of ending the process.
+		// Quitting returns from Run instead of ending the process, so AppKit's terminate is always canceled: a quit the user asks for, from the menu bar, the Dock, a tray menu or the system, is the app's to answer (core.Scope.OnQuitRequest), and its approval finishes the app as ItemQuit does. NSTerminateLater would not do: AppKit exit()s once it is answered YES, skipping OnQuit and the return from Run, a second terminate: while it waits exits without asking, and its wait, nested in whatever sent terminate:, starves the main queue when that is a block on it, as a tray menu's is.
 		Cmd: sel("applicationShouldTerminate:"),
 		Fn: func(self objc.ID, _ objc.SEL, app objc.ID) uint {
-			if finished {
-				const terminateCancel = 0
-				return terminateCancel
-			}
-			if own == nil || own.engine == nil {
+			switch {
+			case finished:
+			case own == nil || own.engine == nil:
 				finish()
-				const terminateCancel = 0
-				return terminateCancel
+			case quitPending:
+				// The app is still answering the last request, perhaps by asking the user: a second Cmd+Q waits for that answer.
+			default:
+				quitPending = true
+				quitRequestID++
+				own.engine.Dispatch(driver.Event{Kind: driver.EventQuitRequest, Count: quitRequestID})
 			}
-			if quitPending {
-				const terminateLater = 2
-				return terminateLater
-			}
-			quitPending = true
-			quitRequestID++
-			own.engine.Dispatch(driver.Event{Kind: driver.EventQuitRequest, Count: quitRequestID})
-			const terminateLater = 2
-			return terminateLater
+			const terminateCancel = 0
+			return terminateCancel
 		},
 	}, {
 		// Clicking the Dock icon, or launching the app again, is the
@@ -1517,10 +1511,8 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemQuitResponse:
 			if !s.embedded && it.Count == quitRequestID && quitPending {
 				quitPending = false
-				app := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
-				app.Send(sel("replyToApplicationShouldTerminate:"), it.On)
 				if it.On {
-					finish()
+					apple.OnMain(finish)
 				}
 			}
 			continue
