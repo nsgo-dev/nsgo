@@ -26,7 +26,7 @@ import (
 // attribute and simple style sheets (type, class and id selectors) set
 // them.
 //
-// Text, images, patterns, masks, filters, markers, dashes and animations
+// Text, images, patterns, masks, filters, dashes and animations
 // are not read: an SVG is a drawing, not a page. ParseSVG reads only the
 // document, never a file or URL it names.
 type SVG struct {
@@ -422,7 +422,10 @@ func (p *svgParser) element(el *svgNode, style svgStyle, root bool) error {
 	if err := p.shape(el); err != nil {
 		return err
 	}
-	return p.paint(style)
+	if err := p.paint(style); err != nil {
+		return err
+	}
+	return p.markers(el, style)
 }
 
 // shape reads a shape element's geometry into p.local.

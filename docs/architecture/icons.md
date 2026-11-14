@@ -10,7 +10,7 @@ An icon is a vector element, not an image: `core.SVG` turns a document into canv
 
 | Read | Not read |
 | --- | --- |
-| `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` inside `svg`, `g`, `a`, `switch` and `use` (of shapes, groups and symbols) | Text, images, patterns, masks, filters, markers, animations, nested viewports' `viewBox`es |
+| `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` inside `svg`, `g`, `a`, `switch` and `use` (of shapes, groups and symbols), with `marker-start`, `marker-mid` and `marker-end` | Text, images, patterns, masks, filters, animations, nested viewports' `viewBox`es |
 | `fill`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `stroke-dasharray`, `stroke-dashoffset`, `fill-rule`, `clip-rule`, `fill-opacity`, `stroke-opacity`, `color`, `visibility`, inherited through groups; `opacity`, `display="none"`, `transform` | `stroke-miterlimit`, `paint-order`, blend modes |
 | `none`, `currentColor`, hex, `rgb()`, `rgba()`, `hsl()`, `hsla()`, CSS names, `transparent`; `url(#id)` with a fallback | `var()`, `currentColor` in a gradient stop (black) |
 | Linear and radial gradients with `href` inheritance, both units, `gradientTransform` and spread methods; clip paths in user space units | Clip paths in `objectBoundingBox` units; a focal point outside its circle moves onto it, as in SVG 1.1 |
@@ -23,6 +23,7 @@ Parsing reads the document into a tree first, so references may point forward, t
 - A gradient paint records `DrawFillGradient` or `DrawStrokeGradient` with a `core.Gradient` already in the shape's coordinates, after its mean color as a plain fill or stroke color. Players that do not paint gradients use that color; Android's runtime paints them, as the image rasterizer does.
 - A clip path records `DrawClip` in a saved state, its shapes merged into one path; several shapes clip by the nonzero rule.
 - Path data supports every SVG 1.1 command; elliptical arcs become cubic curves of at most a quarter turn each.
+- Markers draw their path, curve and shape vertices at the start, middle and end of a path, with `auto` or numeric orientation, `markerUnits`, `viewBox`, `refX` and `refY`; `context-stroke` and `context-fill` follow the marked shape.
 - A rounded `rect` takes elliptical corner radii; only equal radii become one `DrawRoundRect`.
 - Unknown elements are skipped, an unread paint keeps the inherited one, and a reference to no gradient paints its fallback, or nothing.
 - Nesting deeper than 256 elements fails, and so does a document whose `use` elements draw over a million elements or that records over two million operations; a `use` never draws an element it is inside of.
