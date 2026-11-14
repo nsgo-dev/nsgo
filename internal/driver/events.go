@@ -250,8 +250,10 @@ const (
 	// EventBiometric answers an ItemBiometricAvailability or
 	// ItemBiometricAuthenticate request: Index is a kind or result.
 	EventBiometric
-	// EventQuitRequest asks the app whether a quit the user asked for may proceed, last so that the kinds Android's Protocol.java mirrors keep their values. Count identifies the request; the app answers with ItemQuitResponse. It is sent for user-initiated app termination, not Scope.Quit.
+	// EventQuitRequest asks the app whether a quit the user asked for may proceed, after the kinds Android's Protocol.java mirrors so that they keep their values. Count identifies the request; the app answers with ItemQuitResponse. It is sent for user-initiated app termination, not Scope.Quit.
 	EventQuitRequest
+	// EventPermission answers ItemPermission Count, after the kinds Android's Protocol.java mirrors: Index is the permission's status (PermissionNotAsked, ...), and Finished says whether PermissionOpenSettings opened the settings.
+	EventPermission
 )
 
 // What EventInputModality reports.

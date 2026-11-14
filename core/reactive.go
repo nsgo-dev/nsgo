@@ -177,6 +177,8 @@ type runtime struct {
 	causes causes
 	// dev is what DevTools read, while devtools.Enabled.
 	dev *devState
+	// guide is the permission guide showing, one per engine.
+	guide *permissionGuide
 	// quits are the OnQuit handlers, oldest first.
 	quits []*quitHandler
 	// quitRequests are the handlers for user-initiated quit requests.

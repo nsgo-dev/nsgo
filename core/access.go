@@ -59,6 +59,8 @@ const (
 	AccessNotifications = "notifications"
 	// AccessBiometrics is Face ID, Touch ID and device biometric unlock.
 	AccessBiometrics = "biometrics"
+	// AccessPermissions is checking, asking for and opening the settings of the system's permissions, by the permission's key (AccessRequest.Resource), and guiding the user to give them.
+	AccessPermissions = "permissions"
 	// AccessHost is the host's handlers, by name (CallHost, PostHost).
 	AccessHost = "host"
 )

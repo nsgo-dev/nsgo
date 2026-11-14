@@ -330,8 +330,10 @@ const (
 	// reason in Value; the platform answers with EventBiometric and its
 	// result in Index.
 	ItemBiometricAuthenticate
-	// ItemQuitResponse answers EventQuitRequest Count, last so that the kinds Android's Protocol.java mirrors keep their values. On permits the platform's pending termination request; false cancels it.
+	// ItemQuitResponse answers EventQuitRequest Count, after the kinds Android's Protocol.java mirrors so that they keep their values. On permits the platform's pending termination request; false cancels it.
 	ItemQuitResponse
+	// ItemPermission, after the kinds Android's Protocol.java mirrors, carries Permission, a request numbered Count about one of the system's permissions; the platform answers each one but PermissionStopGuide with EventPermission carrying Count, the status as Index.
+	ItemPermission
 )
 
 // Biometric kinds, as reported by an availability request.
@@ -454,6 +456,8 @@ type MountItem struct {
 	Speech *SpeechRequest
 	// Notification is what ItemShowNotification shows.
 	Notification *Notification
+	// Permission is an ItemPermission's request.
+	Permission *PermissionRequest
 	// Files is ItemPickFiles' request, Save ItemSaveFile's,
 	// Directories ItemPickDirectories', Open ItemOpenFile's and
 	// ItemInstallPackage's and Share ItemShare's.

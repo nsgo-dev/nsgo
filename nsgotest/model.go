@@ -446,6 +446,8 @@ func (a *App) apply(b *driver.MountBatch) {
 				result = core.BiometricUnavailable
 			}
 			a.post(driver.Event{Kind: driver.EventBiometric, Count: it.Count, Index: int(result)})
+		case driver.ItemPermission:
+			a.permission(&it)
 		case driver.ItemPickImages:
 			a.Picks = append(a.Picks, *it.Pick)
 			var files []driver.PickedFile
@@ -603,6 +605,65 @@ func (a *App) speech(id uint32, r driver.SpeechRequest) {
 			a.Speech = nil
 		}
 	}
+}
+
+// permission answers an ItemPermission from Permissions, as a platform whose system keeps every permission does.
+func (a *App) permission(it *driver.MountItem) {
+	r := it.Permission
+	p := core.Permission(r.Name)
+	switch r.Command {
+	case driver.PermissionCheck:
+	case driver.PermissionAsk:
+		if a.Permissions[p] == core.PermissionNotAsked {
+			a.Permissions[p] = cmp.Or(a.PermissionAnswers[p], core.PermissionGranted)
+		}
+	case driver.PermissionOpenSettings:
+		a.PermissionSettings = append(a.PermissionSettings, p)
+		a.post(driver.Event{Kind: driver.EventPermission, Count: it.Count, Finished: true})
+		return
+	case driver.PermissionGuide:
+		// One guide shows at a time, and none for what the app has.
+		a.endGuide()
+		if !a.Permissions[p].Allowed() {
+			a.Guide, a.guideID = p, it.Count
+			return
+		}
+	case driver.PermissionStopGuide:
+		if it.Count == a.guideID {
+			a.endGuide()
+		}
+		return
+	}
+	a.post(driver.Event{Kind: driver.EventPermission, Count: it.Count, Index: int(a.Permissions[p])})
+}
+
+// endGuide ends the guide showing, answering its request with its permission's status.
+func (a *App) endGuide() {
+	if a.Guide == "" {
+		return
+	}
+	a.post(driver.Event{Kind: driver.EventPermission, Count: a.guideID, Index: int(a.Permissions[a.Guide])})
+	a.Guide, a.guideID = "", 0
+}
+
+// GrantPermission has the user turn p on in the system's settings, which ends a guide of p, and settles.
+func (a *App) GrantPermission(p core.Permission) {
+	a.t.Helper()
+	a.Permissions[p] = core.PermissionGranted
+	if a.Guide == p {
+		a.endGuide()
+	}
+	a.Settle()
+}
+
+// CloseGuide has the user close the guide's panel or the system's settings, which ends the guide, and settles.
+func (a *App) CloseGuide() {
+	a.t.Helper()
+	if a.Guide == "" {
+		a.t.Fatal("nsgotest: no permission guide shows")
+	}
+	a.endGuide()
+	a.Settle()
 }
 
 // PressNotification has the user press the notification called id,

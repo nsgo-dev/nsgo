@@ -237,6 +237,12 @@ type App struct {
 	BiometricAvailability core.BiometricKind
 	BiometricAnswer       core.BiometricResult
 	AuthenticationReasons []string
+	// Permissions is each permission's status as the platform answers it, PermissionNotAsked for one it does not hold; a request while not asked makes it PermissionAnswers' for it, the user granting it when that has none. Start makes both maps. PermissionSettings are the permissions whose settings the app opened, oldest first, and Guide the permission a guide shows, "" for none: GrantPermission and CloseGuide end it.
+	Permissions        map[core.Permission]core.PermissionStatus
+	PermissionAnswers  map[core.Permission]core.PermissionStatus
+	PermissionSettings []core.Permission
+	Guide              core.Permission
+	guideID            uint32
 	// OnAlert answers each alert the app shows with the index of the
 	// button the user presses, or -1 to dismiss it, once the step that
 	// showed it ends. Without it Alerts lists them and Answer answers
@@ -343,6 +349,9 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 		Clock: core.NewManualClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
 		views: map[driver.NodeID]*View{},
 		edits: map[driver.NodeID]uint32{},
+
+		Permissions:       map[core.Permission]core.PermissionStatus{},
+		PermissionAnswers: map[core.Permission]core.PermissionStatus{},
 	}
 	for _, o := range opts {
 		o(a)
