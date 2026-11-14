@@ -1858,6 +1858,18 @@ func TestSystemPermissions(t *testing.T) {
 	}
 }
 
+// TestSystemPermissionsInTheBackground reads the statuses as the page opens while the app is not in front, as when it starts behind the terminal.
+func TestSystemPermissionsInTheBackground(t *testing.T) {
+	headless(t)
+	env := desktopEnv
+	env.Lifecycle = core.LifecycleBackground
+	app := startDesktop(t, nsgotest.Environment(env))
+	open(app, "System")
+	if s := app.Find("id:permission-camera").Text; s != "prompt" {
+		t.Errorf("the camera reads %q in the background", s)
+	}
+}
+
 // TestSystemPermissionsOnTheWeb reads the page's permissions: the microphone and the camera through the Permissions API, the rest collapsed into one note.
 func TestSystemPermissionsOnTheWeb(t *testing.T) {
 	if nsgotest.Target() != "web" {

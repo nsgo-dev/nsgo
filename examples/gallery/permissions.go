@@ -52,9 +52,11 @@ func permissionsCard(cx *core.Scope) core.Node {
 			cx.PermissionStatus(p, statuses[p].Set)
 		}
 	}
-	// What the user changed in the settings shows as the app comes back.
+	// The statuses are read as the card opens, whether or not the app is in front, and again as the app comes back, showing what the user changed in the settings.
+	read := false
 	cx.Effect(func() {
-		if env.Lifecycle() == core.LifecycleActive {
+		if env.Lifecycle() == core.LifecycleActive || !read {
+			read = true
 			cx.Untrack(refresh)
 		}
 	})
