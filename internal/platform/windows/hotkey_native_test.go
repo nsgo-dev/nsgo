@@ -4,6 +4,7 @@ package windows
 
 import (
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
@@ -32,6 +33,28 @@ func waitForHeld(t *testing.T, key string, held bool) {
 	for heldBySomeone(t, key) != held {
 		if time.Now().After(deadline) {
 			t.Fatalf("%s held = %v, want %v", key, !held, held)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// waitForRegistered waits until the backend holds exactly the shortcuts ids, as the window's thread sees them. Probe a combination only after this: a probe's RegisterHotKey while the backend is still registering the combination would take it from the backend.
+func waitForRegistered(t *testing.T, hwnd uintptr, ids ...uint32) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		var got []uint32
+		onMain(t, hwnd, func(w *window) {
+			for id := range w.hotKeys {
+				got = append(got, id)
+			}
+		})
+		slices.Sort(got)
+		if slices.Equal(got, ids) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("registered shortcuts %v, want %v", got, ids)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -79,6 +102,7 @@ func TestGlobalHotKeysReachTheApp(t *testing.T) {
 			t.Error("the window did not close")
 		}
 	})
+	waitForRegistered(t, hwnd, 1, 2)
 	waitForHeld(t, kept, true)
 	waitForHeld(t, dropped, true)
 
@@ -101,6 +125,7 @@ func TestGlobalHotKeysReachTheApp(t *testing.T) {
 	if got := next(); got != kept {
 		t.Fatalf("WM_HOTKEY 1 ran %q, want %q", got, kept)
 	}
+	waitForRegistered(t, hwnd, 1)
 	waitForHeld(t, dropped, false)
 	waitForHeld(t, kept, true)
 	// An ID no longer registered runs nothing; messages arrive in order, so the next shortcut to run is the kept one.
