@@ -140,6 +140,7 @@ Record a design question here, and confirm the answer with the user before choos
 | [Location and motion](docs/architecture/location-motion.md) | Location fixes, motion samples or sensor permissions |
 | [Picture in Picture](docs/architecture/picture-in-picture.md) | iOS video or custom-content Picture in Picture |
 | [Android floating windows](docs/architecture/android-floating-windows.md) | Android system overlays, service ownership or overlay permissions |
+| [Foldable displays](docs/architecture/foldable.md) | Hinge geometry, reserved regions or posture in the environment |
 | [Updates](docs/architecture/updates.md) | `updater`, an update check, the updaters `nsgo build` bundles or a release channel |
 | [Application and windows](docs/architecture/application.md) | `nsgo.Run`, the windows, panels and tray icons an app opens, global shortcuts or shutdown |
 | [Hosted views](docs/architecture/native-views.md) | `WebView`, `Video` or `Native` components |
