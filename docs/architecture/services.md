@@ -1,6 +1,6 @@
 # Services
 
-Services are what the platform does for the app outside its views: alerts, the clipboard, opening links, the photo picker, taking a photo, file and folder picks and saves, opening and sharing the app's files, installing packages on Android, speech recognition, biometrics, notifications and the badge, the system's permissions, haptics, the app's lifecycle, the appearance, keyboard shortcuts, the status bar, the desktop window and quitting. Read this before changing one, in `core` or in a backend; [application and windows](application.md) covers the windows, tray icons and global shortcuts an app opens. A service goes to the platform of the window the code asking is in.
+Services are what the platform does for the app outside its views: alerts, the clipboard, opening links, the photo picker, taking a photo, file and folder picks and saves, opening and sharing the app's files, installing packages on Android, speech recognition, biometrics, notifications and the badge, the system's permissions, keeping the computer awake, haptics, the app's lifecycle, the appearance, keyboard shortcuts, the status bar, the desktop window and quitting. Read this before changing one, in `core` or in a backend; [application and windows](application.md) covers the windows, tray icons and global shortcuts an app opens. A service goes to the platform of the window the code asking is in.
 
 Audio playback is planned as the `audio` package, whose engine part `core` will carry as a service through the batch; its design is [audio playback](audio.md). Until it lands, an app plays sound only through a `Video`.
 
@@ -177,6 +177,21 @@ macOS's guide is a borderless panel that never takes the focus (`macos/permissio
 It departs from MyGo where Go apps differ: answers come to callbacks on the engine instead of blocking calls, the guide waits so no `Wait` is needed, `not-gated` stands for MyGo's `ErrUnsupported` beside `Allowed`, and the statuses take the web's names.
 
 `nsgotest` keeps each status (`Permissions`) and what a request makes of one not asked (`PermissionAnswers`), both made by `Start`, the settings opened (`PermissionSettings`) and the guide showing (`Guide`), which `GrantPermission` and `CloseGuide` end.
+
+## Keeping the system awake
+
+`KeepAwake` takes a counted hold until the returned `release` function runs or its scope is disposed. `KeepAwakeOptions.Display` also prevents the display from blanking; a computer-only hold lets the display sleep. Holds with the same display option share one native assertion, and releasing twice is harmless. The hold ends when the app quits. `nsgotest.App.AwakeHolds` and `AwakeReleases` record requests without changing the test machine's power state.
+
+| Target | Display hold | Computer-only hold |
+| --- | --- | --- |
+| macOS | IOKit `IOPMAssertionCreateWithName(PreventUserIdleDisplaySleep)` | IOKit `PreventUserIdleSystemSleep` |
+| Windows | `SetThreadExecutionState(ES_DISPLAY_REQUIRED \| ES_SYSTEM_REQUIRED)` | `ES_SYSTEM_REQUIRED` |
+| Linux | `org.freedesktop.ScreenSaver.Inhibit`, through the session bus | The same session inhibitor where available |
+| iOS | `UIApplication.isIdleTimerDisabled` while any display hold exists | No-op; iOS controls background execution |
+| Android | No-op; the activity runtime does not keep a window awake for this service yet | No-op |
+| Web and mini programs | No-op | No-op |
+
+The service is independent of `Video`: apps that play decoded frames or run a long task take a hold explicitly, and video playback does not silently change power policy.
 
 ## Haptics
 

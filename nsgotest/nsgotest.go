@@ -250,6 +250,9 @@ type App struct {
 	PermissionSettings []core.Permission
 	Guide              core.Permission
 	guideID            uint32
+	// AwakeHolds records power assertions and AwakeReleases their IDs.
+	AwakeHolds    []driver.KeepAwake
+	AwakeReleases []uint32
 	// OnAlert answers each alert the app shows with the index of the
 	// button the user presses, or -1 to dismiss it, once the step that
 	// showed it ends. Without it Alerts lists them and Answer answers

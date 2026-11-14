@@ -119,6 +119,7 @@ type window struct {
 	env driver.Environment
 
 	engine  *engine.Engine
+	awake   awakeState
 	batches queue.Batches
 	chrome  chrome
 
@@ -791,6 +792,14 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemPermission:
 			// Nothing to ask, no settings page and nothing to guide.
 			driver.AnswerPermission(it.Count, *it.Permission, linuxPermission, w.engine.Dispatch)
+			continue
+		case driver.ItemKeepAwake:
+			if it.Awake != nil {
+				w.awake.take(it.Count, *it.Awake, w.opts.ID)
+			}
+			continue
+		case driver.ItemReleaseAwake:
+			w.awake.release(it.Count)
 			continue
 		case driver.ItemCheckForUpdates:
 			w.checkForUpdates(it.Count)

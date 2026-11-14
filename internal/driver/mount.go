@@ -338,6 +338,10 @@ const (
 	ItemRevealFile
 	// ItemTrashFile moves Open to the system Trash or Recycle Bin.
 	ItemTrashFile
+	// ItemKeepAwake takes a power assertion described by Awake and identified
+	// by Count; ItemReleaseAwake releases the assertion identified by Count.
+	ItemKeepAwake
+	ItemReleaseAwake
 )
 
 // Biometric kinds, as reported by an availability request.
@@ -462,6 +466,8 @@ type MountItem struct {
 	Notification *Notification
 	// Permission is an ItemPermission's request.
 	Permission *PermissionRequest
+	// Awake is ItemKeepAwake's power assertion.
+	Awake *KeepAwake
 	// Files is ItemPickFiles' request, Save ItemSaveFile's,
 	// Directories ItemPickDirectories', Open ItemOpenFile's and
 	// ItemInstallPackage's and Share ItemShare's.

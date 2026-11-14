@@ -216,6 +216,7 @@ type surface struct {
 	// host sets, which an embedded surface shows in.
 	appearance, host driver.Appearance
 	engine           *engine.Engine
+	awake            awakeState
 	batches          queue.Batches
 	views            []*view            // index is NodeID
 	movers           map[*view]struct{} // views following mouse moves
@@ -1461,6 +1462,14 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemPermission:
 			s.permission(it.Count, *it.Permission)
+			continue
+		case driver.ItemKeepAwake:
+			if it.Awake != nil {
+				s.awake.take(it.Count, *it.Awake)
+			}
+			continue
+		case driver.ItemReleaseAwake:
+			s.awake.release(it.Count)
 			continue
 		case driver.ItemPickImages:
 			s.pickImages(*it.Pick, it.Count)

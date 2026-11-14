@@ -560,6 +560,12 @@ type MenuEntry struct {
 	NotInText bool
 }
 
+// KeepAwake is a platform power assertion requested by ItemKeepAwake.
+type KeepAwake struct {
+	Reason  string
+	Display bool
+}
+
 // StorageOp says what a StorageChange does.
 type StorageOp uint8
 

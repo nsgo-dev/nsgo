@@ -370,6 +370,7 @@ type window struct {
 	opts     Options
 	skipChar bool
 	engine   *engine.Engine
+	awake    awakeState
 	batches  queue.Batches
 	scale    float64 // pixels per point
 	// placing is set while setWindowPosAt moves the window to pixels it chose (wmDPIChanged).
@@ -1123,6 +1124,14 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemPermission:
 			w.permission(it.Count, *it.Permission)
+			continue
+		case driver.ItemKeepAwake:
+			if it.Awake != nil {
+				w.awake.take(it.Count, *it.Awake)
+			}
+			continue
+		case driver.ItemReleaseAwake:
+			w.awake.release(it.Count)
 			continue
 		case driver.ItemCheckForUpdates:
 			w.checkForUpdates(it.On, it.Count)

@@ -378,6 +378,8 @@ type (
 	// Appearance is the light or dark appearance an app asks for, or the
 	// system's.
 	Appearance = driver.Appearance
+	// KeepAwake is a power assertion request.
+	KeepAwake = driver.KeepAwake
 	// ClipboardImage is an image read from the clipboard: a PNG and its
 	// size in pixels.
 	ClipboardImage = driver.ClipboardImage
