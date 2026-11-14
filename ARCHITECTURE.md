@@ -134,6 +134,7 @@ Record a design question here, and confirm the answer with the user before choos
 | [Services](docs/architecture/services.md) | A service, a menu, the desktop window or the app's lifecycle |
 | [Remote push](docs/architecture/remote-push.md) | Remote notification tokens, payload delivery or provider adapters |
 | [Contacts and calendar](docs/architecture/contacts-calendar.md) | Contacts, calendars, events or their permissions, which are designed and not built |
+| [Location and motion](docs/architecture/location-motion.md) | Location fixes, motion samples or sensor permissions |
 | [Updates](docs/architecture/updates.md) | `updater`, an update check, the updaters `nsgo build` bundles or a release channel |
 | [Application and windows](docs/architecture/application.md) | `nsgo.Run`, the windows, panels and tray icons an app opens, global shortcuts or shutdown |
 | [Hosted views](docs/architecture/native-views.md) | `WebView`, `Video` or `Native` components |
