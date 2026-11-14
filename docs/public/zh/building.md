@@ -111,6 +111,7 @@ windows:
     identity: 12345Example.Hello
     publisher: CN=00000000-0000-0000-0000-000000000000
     publisher_name: Example
+  # device_capabilities: [microphone, webcam]  # 应用使用的设备，由 Windows 向用户询问
 linux:
   summary: Says hello                  # 软件中心显示的一句话简介
   license: MIT                         # SPDX 表达式；默认为 LicenseRef-proprietary

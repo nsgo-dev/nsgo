@@ -46,6 +46,7 @@ cx.SetBadge(len(unread.Get()))
 
 ## 下一步
 
+- [系统权限](permissions.md)：系统的其他权限，例如麦克风和辅助功能。
 - [触感反馈](haptics.md)：设备在用户手指下播放的反馈。
 - [平台服务](services.md)：警告框、剪贴板、文件、存储和网络。
 - [实时活动](live-activities.md)：应用跟随的事，显示在锁屏和灵动岛里。

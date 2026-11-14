@@ -1857,3 +1857,22 @@ func TestSystemPermissions(t *testing.T) {
 		t.Errorf("guide %q after its stop", app.Guide)
 	}
 }
+
+// TestSystemPermissionsOnTheWeb reads the page's permissions: the microphone and the camera through the Permissions API, the rest collapsed into one note.
+func TestSystemPermissionsOnTheWeb(t *testing.T) {
+	if nsgotest.Target() != "web" {
+		t.Skip("checks the web's Permissions API")
+	}
+	app := startDesktop(t)
+	open(app, "System")
+	app.WaitFor("text:Not on this platform: Accessibility, Screen Recording, Input Monitoring, Full Disk Access, App Management, Developer Tools, Calendars, Reminders, Bluetooth, Media & Apple Music", 10*time.Second)
+	for _, p := range []core.Permission{core.PermissionMicrophone, core.PermissionCamera} {
+		app.WaitUntil(10*time.Second, func() bool {
+			s := app.Find("id:permission-" + string(p)).Text
+			return s == "prompt" || s == "granted" || s == "denied"
+		})
+	}
+	if len(app.Query("id:permission-accessibility")) != 0 {
+		t.Error("the page lists Accessibility")
+	}
+}

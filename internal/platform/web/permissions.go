@@ -43,7 +43,7 @@ func mediaPermission(name string, answer func(int)) {
 		answer(driver.PermissionUnknown)
 		return
 	}
-	query, ok := call(permissions, "query", map[string]any{"name": name})
+	query, ok := tryCall(permissions, "query", map[string]any{"name": name})
 	if !ok {
 		answer(driver.PermissionUnknown)
 		return
@@ -70,7 +70,7 @@ func askMedia(name string, answer func(int)) {
 	if name == driver.PermissionCamera {
 		constraints = map[string]any{"video": true}
 	}
-	stream, ok := call(js.Global().Get("navigator").Get("mediaDevices"), "getUserMedia", constraints)
+	stream, ok := tryCall(js.Global().Get("navigator").Get("mediaDevices"), "getUserMedia", constraints)
 	if !ok {
 		answer(driver.PermissionUnknown)
 		return
@@ -92,8 +92,8 @@ func askMedia(name string, answer func(int)) {
 	})
 }
 
-// call calls method of v with args, reporting false where it throws, as an insecure context's getUserMedia may.
-func call(v js.Value, method string, args ...any) (result js.Value, ok bool) {
+// tryCall calls method of v with args, reporting false where it throws, as an insecure context's getUserMedia may.
+func tryCall(v js.Value, method string, args ...any) (result js.Value, ok bool) {
 	defer func() {
 		if recover() != nil {
 			ok = false

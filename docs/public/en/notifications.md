@@ -46,6 +46,7 @@ cx.SetBadge(len(unread.Get()))
 
 ## Next
 
+- [Permissions](permissions.md): the system's other permissions, such as the microphone and Accessibility.
 - [Haptics](haptics.md): the feedback the device plays under the user's finger.
 - [Platform services](services.md): alerts, the clipboard, files, storage and networking.
 - [Live Activities](live-activities.md): what the app follows, on the Lock Screen and in the Dynamic Island.

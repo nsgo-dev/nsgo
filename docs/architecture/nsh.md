@@ -79,6 +79,7 @@ NSGo departs from NSH and from MyGo in the same direction.
 - File pickers and save dialogs for files of any type, streamed rather than passed through the platform's bridge ([services](services.md#files)).
 - A terminal running programs with Ghostty's emulator ([terminal](terminal.md)).
 - Widgets on macOS and iOS, timelines of views the app writes and a SwiftUI extension the tool compiles draws ([tool](tool.md#widgets)).
+- The system's permissions, checked, asked for and opened in its settings, and a guide that holds the app for the user to drag into System Settings, after MyGo's PermissionFlow ([services](services.md#permissions)).
 - Message catalogs each package owns, in YAML, compiled to Go by the tool, which an app supplies in more languages, where NSH leaves translations to apps ([languages](languages.md)).
 
 ## What NSGo leaves out

@@ -1,6 +1,6 @@
 # Services
 
-Services are what the platform does for the app outside its views: alerts, the clipboard, opening links, the photo picker, taking a photo, file and folder picks and saves, opening and sharing the app's files, installing packages on Android, speech recognition, biometrics, notifications and the badge, haptics, the app's lifecycle, the appearance, keyboard shortcuts, the status bar, the desktop window and quitting. Read this before changing one, in `core` or in a backend; [application and windows](application.md) covers the windows, tray icons and global shortcuts an app opens. A service goes to the platform of the window the code asking is in.
+Services are what the platform does for the app outside its views: alerts, the clipboard, opening links, the photo picker, taking a photo, file and folder picks and saves, opening and sharing the app's files, installing packages on Android, speech recognition, biometrics, notifications and the badge, the system's permissions, haptics, the app's lifecycle, the appearance, keyboard shortcuts, the status bar, the desktop window and quitting. Read this before changing one, in `core` or in a backend; [application and windows](application.md) covers the windows, tray icons and global shortcuts an app opens. A service goes to the platform of the window the code asking is in.
 
 Audio playback is planned as the `audio` package, whose engine part `core` will carry as a service through the batch; its design is [audio playback](audio.md). Until it lands, an app plays sound only through a `Video`.
 
@@ -155,6 +155,28 @@ The installer refuses an app whose manifest does not ask for `REQUEST_INSTALL_PA
 | Web | The page's `Notification` | The page's | Its `onclick`, focusing the window | `navigator.setAppBadge` for an installed web app |
 
 `nsgotest` keeps the notifications shown, the badge and the permission (`NotificationPermission`, `NotificationAnswer`), and `PressNotification` presses one.
+
+## Permissions
+
+`PermissionStatus` answers whether the app has one of the system's permissions without asking, `RequestPermission` asks with the system's prompt where it has one and has not asked yet, `OpenPermissionSettings` opens the page of the system's settings that gives it, and `desktop.GuidePermission` opens that page and waits for the user to give it, after MyGo's PermissionFlow, itself after [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow) (`NOTICE`). A `Permission` is a key, from `accessibility` to `media-library` in the order of macOS's Privacy & Security (`core.Permissions`). Its status is `prompt` (not asked), `granted`, `denied`, `unknown` (kept but not told), `not-gated` (nothing keeps it from the app, which `Allowed` counts with granted) or `unavailable`: the platform has no such thing, the key names none, or the owner's `Access` does not grant `AccessPermissions` for it. One item, `ItemPermission`, carries the five commands, checking, asking, opening the settings, guiding and ending a guide; `EventPermission` answers each but the last.
+
+- Asking on Apple platforms needs the permission's usage description in the Info.plist the system reads (`nsgo.yaml`'s `apple.info`), on macOS the responsible process's: without it the request answers unavailable and logs the key, since the system would end the app as it asks. `internal/platform/privacy` holds the checks and the prompts, which the `microphone` package's `Allowed` and `Authorize` share.
+- macOS charges what a program started from another app does to that app, so under `nsgo dev` the terminal is asked and listed, and a grant to an ad hoc signed build lapses with the next build's signature. Screen Recording tells a grant only once the app starts again.
+
+| Target | Check and ask | Settings | Guide |
+| --- | --- | --- | --- |
+| macOS | `AXIsProcessTrusted`, CoreGraphics' screen and input checks, a read of TCC's database for Full Disk Access, `AVCaptureDevice`, EventKit's full access from macOS 14, CoreBluetooth; App Management, Developer Tools and Media unknown | Privacy & Security at the pane | The panel below |
+| iOS, tvOS | `AVCaptureDevice`, EventKit, CoreBluetooth and `MPMediaLibrary`; what only Macs keep and what tvOS lacks unavailable | The app's page in Settings | Answers at once |
+| Windows | The microphone and the camera from the consent store: the device's switch, the user's and the app's, under its package family name in an MSIX (`windows.device_capabilities` declares them) and `NonPackaged` otherwise; nothing to ask, the rest not gated | `ms-settings:privacy-microphone` or `privacy-webcam` | Opens the page and ends once granted or `SystemSettings.exe` exits; a permission without a page, or one the device's switch denies, answers at once |
+| Linux | Not gated; the microphone and the camera unknown in Flatpak or Snap | None | Answers at once |
+| Web | The microphone and the camera by the Permissions API, unknown in Firefox, asked by `getUserMedia`, whose tracks stop at once; unavailable outside a secure context, as the rest is | None | Answers at once |
+| Android, watchOS, mini programs | Unknown for what the system keeps, unavailable for the rest, asking nothing yet ([roadmap](../roadmap.md#finish-the-existing-platforms)) | None | Answers at once |
+
+macOS's guide is a borderless panel that never takes the focus (`macos/permissionguide.go`). A goroutine follows System Settings 30 times a second through `CGWindowListCopyWindowInfo`, which needs no permission: the panel sits under its window, lined up with the pane, and hides while another app is in front. For the panes whose list takes an app dragged into it, all but the microphone's, the camera's, the calendars' and the reminders', it says "Drag MyApp to the list above to allow Accessibility." in `desktop/locales`' words, naming the pane as System Settings does (Device Control and Data Access from macOS 27), and holds the app's icon and name for the user to drag; the pointer stays the arrow. The app is its bundle, else its executable, never the terminal that started it; `GuideOptions.App` names another, which code under an `Access` cannot. The guide ends, answering once, as the app has the permission (checked every 250 ms), the user closes the panel or System Settings, System Settings does not open within 10 seconds, `stop` is called, its owner goes or another guide starts; one whose window closes ends unanswered.
+
+It departs from MyGo where Go apps differ: answers come to callbacks on the engine instead of blocking calls, the guide waits so no `Wait` is needed, `not-gated` stands for MyGo's `ErrUnsupported` beside `Allowed`, and the statuses take the web's names.
+
+`nsgotest` keeps each status (`Permissions`) and what a request makes of one not asked (`PermissionAnswers`), both made by `Start`, the settings opened (`PermissionSettings`) and the guide showing (`Guide`), which `GrantPermission` and `CloseGuide` end.
 
 ## Haptics
 

@@ -111,6 +111,7 @@ windows:
     identity: 12345Example.Hello
     publisher: CN=00000000-0000-0000-0000-000000000000
     publisher_name: Example
+  # device_capabilities: [microphone, webcam]  # the devices the app uses, which Windows asks the user for
 linux:
   summary: Says hello                  # one line for software centers
   license: MIT                         # an SPDX expression; LicenseRef-proprietary by default
