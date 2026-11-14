@@ -81,7 +81,8 @@ func TestGlobalHotKeysReachTheApp(t *testing.T) {
 			fired <- kept
 			temp.Dispose()
 		})
-		temp.RegisterHotKey(dropped, func() { fired <- dropped })
+		// Registered while the app function runs, the shortcut would belong to the running owner; Run makes temp own it, so disposing temp drops it.
+		temp.Run(func() { temp.RegisterHotKey(dropped, func() { fired <- dropped }) })
 	})
 	done := make(chan struct{})
 	go func() {
