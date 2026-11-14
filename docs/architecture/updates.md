@@ -2,7 +2,7 @@
 
 An app updates the way its platform and the channel it reached the user through do: package `updater` asks, the platform's own updater answers, and `nsgo build` decides from `nsgo.yaml`'s `updates` what each package carries. Read this before changing `updater`, `internal/platform/updates`, a backend's `updates.go` or the tool's ([tool](tool.md#updates)).
 
-NSH's `nsh/updater` downloads, verifies and swaps in the next version itself. NSGo leaves that to Sparkle, WinSparkle and the stores, with their windows (decided by the user, 2026-11-10): they handle installs and restarts better than an app's own code would, and stores forbid self-updating apps anyway.
+NSH's `nsh/updater` downloads, verifies and swaps in the next version itself. NSGo leaves that to Sparkle, WinSparkle and the stores, with their windows (decided by the user, 2026-11-10): they handle installs and restarts better than an app's own code would, and stores forbid self-updating apps anyway. Linux and Android have no such updater, so on the direct channel `updater` downloads the appcast's signed package itself, verifies it as Sparkle does, and hands it to the package manager that installed the app or to Android's package installer, which ask the user themselves (2026-11-14); it never swaps files in on its own.
 
 ## Requests and answers
 
@@ -10,6 +10,7 @@ NSH's `nsh/updater` downloads, verifies and swaps in the next version itself. NS
 
 - Where the platform's updater shows what it found in windows of its own, Sparkle's or WinSparkle's, the answer is `Finished` and `updater` shows nothing.
 - Elsewhere it carries a `driver.Update`: a newer version and its page, none, or why the check failed. `updater` says it in an alert in its catalog's words and opens the page with `OpenURL`.
+- On Linux and Android the answer also names the newer version's package when it is signed with the app's key and, on Linux, dpkg owns the running executable. Choosing Update then runs `core.InstallUpdateInBackground` under the app's root scope, so it outlives the scope that asked: it downloads the package within ten minutes, checks its length, SHA-256 and Ed25519 signature, stages it in the cache's `nsgo.updater`, and installs it with `pkexec dpkg`, then restarts, or with `mobile.InstallPackage`. A failure says so in an alert that offers the page. The staged package is removed once installed on Linux, and on Android by the next download or a check that finds the app up to date, as the installer reads it after it starts.
 - Web, mini programs and watchOS never answer: a page loads its newest version, and a watch app follows its iPhone app.
 
 | Target | Updater |
@@ -39,8 +40,8 @@ A store bans an app that carries a self-updater or sends its users to other down
 | --- | --- | --- |
 | macOS | GitHub or a website, Homebrew casks: Sparkle | The Mac App Store, from its sandboxed package |
 | Windows | GitHub or a website, winget: WinSparkle | The Microsoft Store, from the MSIX; a Store listing of the setup may keep WinSparkle |
-| Linux | GitHub or a website: the release's page | Distribution repositories and the AUR (`none`), Flathub from the Flatpak manifest, and Snap |
-| Android | GitHub or a website: the release's page | Google Play from the App Bundle, and other stores |
+| Linux | GitHub or a website: the release's Debian package through dpkg where dpkg installed the app, else the release's page | Distribution repositories and the AUR (`none`), Flathub from the Flatpak manifest, and Snap |
+| Android | GitHub or a website: the release's APK through the package installer | Google Play from the App Bundle, and other stores |
 | iOS, tvOS | — | The App Store; TestFlight checks nothing |
 
 ## Who installed the app
@@ -70,5 +71,5 @@ Linux cannot tell a distribution's package from a downloaded one, so its package
 - WinSparkle on Windows 11 x64 offered 0.2.0, verified the download, ran the setup with `/S /RELAUNCH` and started 0.2.0 (2026-11-11).
 - Linux under Wayland offered 0.2.0 in `updater`'s alert as the app started, and with `SNAP` set asked nothing. iOS's check reaches the App Store from the simulator, and a development build on an iPhone, whose receipt is `sandboxReceipt`, checked nothing.
 - Android's emulators, API 29 and 34, checked an APK installed by adb or the package installer and left one installed as Google Play's alone; Android refuses cleartext, so an appcast has not been read there.
-- Direct Linux and Android packages now download only after the user chooses Update, verify the appcast's length, SHA-256 and Ed25519 signature, and stage the file atomically before installation; Linux restarts after its package manager succeeds.
-- Not run yet: a Developer ID or notarized macOS update, Windows on arm64, a Flatpak, a TestFlight build, Android reading an `https` appcast, and a native test that installs an update.
+- Headless tests cover installing on Linux and Android: only signed packages are offered, a download is verified before it is staged, Linux asks `dpkg-query` and `pacman` who owns the app and runs `pkexec` (in a Debian container), Android hands the APK to its installer, a failure offers the page, the install finishes after the scope that offered it is disposed, and staged packages are removed. No device has installed an update this way yet.
+- Not run yet: a Developer ID or notarized macOS update, Windows on arm64, a Flatpak, a TestFlight build, Android reading an `https` appcast and installing the APK it names, a Linux install through `pkexec dpkg` and its restart, and a native test that installs an update.

@@ -163,7 +163,7 @@ updates:
 | --- | --- |
 | macOS | Sparkle, which `build` puts into the app, checks daily, offers the new version, downloads the disk image, checks its signature, installs it and restarts the app |
 | Windows | WinSparkle, beside the executable, does the same and runs the installer silently, which starts the new version |
-| Linux, Android | The app reads its appcast, verifies and stages the signed package, then asks the Linux package manager or Android package installer to install it |
+| Linux, Android | The app reads its appcast, and once the user chooses Update downloads and verifies the signed package and installs it through `pkexec dpkg`, restarting, or Android's package installer; an app from the Arch package or the AppImage, or an unsigned appcast, offers the release's page instead |
 | iOS | The app asks the App Store, which updates it, and offers its page there |
 
 ### Channels
