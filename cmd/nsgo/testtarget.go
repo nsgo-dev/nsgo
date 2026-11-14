@@ -308,8 +308,13 @@ var screenshotLine = regexp.MustCompile(`nsgo-screenshot (\S+) (\d+)/(\d+) (\S*)
 // paths.
 func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, error) {
 	var kept strings.Builder
-	parts := map[string][]string{}
-	var order []string
+	// Each Screenshot call is a shot of its own, so a name taken twice in one process is a duplicate rather than one image's chunks overwritten.
+	type shot struct {
+		name  string
+		parts []string
+	}
+	var shots []*shot
+	current := map[string]*shot{}
 	sc := bufio.NewScanner(strings.NewReader(out))
 	sc.Buffer(make([]byte, 1<<20), 256<<20)
 	for sc.Scan() {
@@ -330,17 +335,21 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 		}
 		i, _ := strconv.Atoi(m[2])
 		n, _ := strconv.Atoi(m[3])
-		if parts[name] == nil {
-			parts[name] = make([]string, n)
-			order = append(order, name)
+		// A first chunk starts a new shot of the name.
+		s := current[name]
+		if s == nil || i == 1 {
+			s = &shot{name: name, parts: make([]string, n)}
+			current[name] = s
+			shots = append(shots, s)
 		}
-		if i >= 1 && i <= len(parts[name]) {
-			parts[name][i-1] = m[4]
+		if i >= 1 && i <= len(s.parts) {
+			s.parts[i-1] = m[4]
 		}
 	}
 	var saved []string
-	for _, name := range order {
-		data, err := base64.StdEncoding.DecodeString(strings.Join(parts[name], ""))
+	for _, s := range shots {
+		name := s.name
+		data, err := base64.StdEncoding.DecodeString(strings.Join(s.parts, ""))
 		if err != nil {
 			kept.WriteString("screenshot " + name + ": " + err.Error() + "\n")
 			continue
