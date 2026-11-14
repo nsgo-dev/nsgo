@@ -42,6 +42,8 @@ type Environment struct {
 	Speech bool
 	// Camera says ItemTakePhoto shows a camera here.
 	Camera bool
+	// CanSendInput says Ref.SendInput can deliver trusted input to web views.
+	CanSendInput bool
 	// RTL lays the app out right to left.
 	RTL bool
 	// PixelRatio is device pixels per point; 0 means 1.
@@ -51,7 +53,7 @@ type Environment struct {
 	// LocaleSettings are how the user reads weeks, times and measures,
 	// apart from the language, where the platform says.
 	LocaleSettings LocaleSettings
-	OS     OS
+	OS             OS
 	// OSVersion is the system's version: major and minor on Apple
 	// platforms, Windows and Linux (the kernel's), Android's API level
 	// as Major, and zero on the web.
