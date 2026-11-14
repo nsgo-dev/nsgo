@@ -117,6 +117,57 @@ func TestQuitRequestCanDeferAndAnswersOnce(t *testing.T) {
 	}
 }
 
+func TestQuitRequestCancelsForAHandlerThatPanicsAfterDefer(t *testing.T) {
+	var answer func(bool)
+	ran := false
+	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {
+		cx.OnQuitRequest(func(*QuitRequest) { ran = true })
+		return Func(func(cx *Scope) Node {
+			cx.OnQuitRequest(func(q *QuitRequest) {
+				answer = q.Defer()
+				panic("broken dialog")
+			})
+			return View{}
+		})
+	})
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventQuitRequest, Count: 12})
+	b := h.tree.Commit()
+	if len(h.errs) != 1 {
+		t.Fatalf("the panic was reported as %v", h.errs)
+	}
+	h.errs = nil
+	if ran {
+		t.Error("a handler past the deferring one ran")
+	}
+	if b == nil || len(b.Items) != 1 || b.Items[0].Kind != driver.ItemQuitResponse || b.Items[0].Count != 12 || b.Items[0].On {
+		t.Fatalf("response for the panicking handler %#v", b)
+	}
+	answer(true)
+	h.drain()
+	if b := h.tree.Commit(); b != nil && len(b.Items) > 0 {
+		t.Fatalf("the lost answer answered again %#v", b)
+	}
+}
+
+func TestQuitRequestKeepsAnAnswerGivenBeforeAPanic(t *testing.T) {
+	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {
+		cx.OnQuitRequest(func(q *QuitRequest) {
+			q.Defer()(true)
+			panic("after answering")
+		})
+		return View{}
+	})
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventQuitRequest, Count: 13})
+	h.drain()
+	b := h.tree.Commit()
+	h.errs = nil
+	if b == nil || len(b.Items) != 1 || b.Items[0].Kind != driver.ItemQuitResponse || b.Items[0].Count != 13 || !b.Items[0].On {
+		t.Fatalf("response %#v", b)
+	}
+}
+
 func TestQuitRequestSurvivesAHandlerDisposingOthers(t *testing.T) {
 	var ran []string
 	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {

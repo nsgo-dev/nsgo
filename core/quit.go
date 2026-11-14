@@ -35,7 +35,7 @@ func (q *QuitRequest) Cancel() {
 	}
 }
 
-// Defer keeps the platform's quit request pending and returns a one-shot answer. quit true proceeds with quitting; false cancels it. The returned function is safe to call from another goroutine. Call it in every case: until it is called, a later quit request, such as a second Cmd+Q, waits for this one's answer.
+// Defer keeps the platform's quit request pending and returns a one-shot answer. quit true proceeds with quitting; false cancels it. The returned function is safe to call from another goroutine. Call it in every case: until it is called, a later quit request, such as a second Cmd+Q, waits for this one's answer. A handler that panics after Defer, without having answered, cancels the request, and the function it got then does nothing.
 func (q *QuitRequest) Defer() func(quit bool) {
 	if q == nil || q.canceled || q.deferred || q.answer == nil {
 		return func(bool) {}
@@ -87,12 +87,20 @@ func (rt *runtime) quitRequest(id uint32) {
 				answer(quit)
 			}
 		}}
-		rt.tree.within(h.owner, func() { h.fn(q) })
+		returned := false
+		rt.tree.within(h.owner, func() {
+			h.fn(q)
+			returned = true
+		})
 		switch {
 		case q.canceled:
 			answer(false)
 			return
 		case q.deferred:
+			// A handler that panics after Defer loses the function that would answer, and the platform would wait for it forever, so the request is canceled for it; the lost function then does nothing.
+			if !returned && !q.answered.Swap(true) {
+				answer(false)
+			}
 			return
 		}
 	}
