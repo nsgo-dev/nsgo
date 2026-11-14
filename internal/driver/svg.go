@@ -42,10 +42,7 @@ type SVG struct {
 // svgBox is a viewBox in user space.
 type svgBox struct{ x, y, w, h float32 }
 
-// Bounds on what one document may take to parse, since SVG files come from
-// the network: nesting deeper than maxSVGDepth fails, and so does a
-// document whose use elements draw more than maxSVGVisits elements or that
-// records more than maxSVGOps operations.
+// Bounds on what one document may take to parse, since SVG files come from the network: nesting deeper than maxSVGDepth fails, and so does a document whose use elements and markers draw more than maxSVGVisits elements or that records more than maxSVGOps operations.
 const (
 	maxSVGDepth  = 256
 	maxSVGUses   = 16
@@ -268,8 +265,7 @@ type svgParser struct {
 	ops    []DrawOp
 	// local is the shape being read, in its own coordinates.
 	local []DrawOp
-	// using holds the elements use elements are drawing, which a use
-	// inside them may not draw again.
+	// using holds the elements use elements and markers are drawing, which a use or a marker inside them may not draw again.
 	using  map[*svgNode]bool
 	visits int
 }

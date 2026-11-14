@@ -26,7 +26,7 @@ Parsing reads the document into a tree first, so references may point forward, t
 - Markers draw their path, curve and shape vertices at the start, middle and end of a path, with `auto` or numeric orientation, `markerUnits`, `viewBox`, `refX` and `refY`; `context-stroke` and `context-fill` follow the marked shape.
 - A rounded `rect` takes elliptical corner radii; only equal radii become one `DrawRoundRect`.
 - Unknown elements are skipped, an unread paint keeps the inherited one, and a reference to no gradient paints its fallback, or nothing.
-- Nesting deeper than 256 elements fails, and so does a document whose `use` elements draw over a million elements or that records over two million operations; a `use` never draws an element it is inside of.
+- Nesting deeper than 256 elements fails, and so does a document whose `use` elements and markers draw over a million elements or that records over two million operations; neither a `use` nor a marker draws an element it is inside of.
 
 ## Icon element
 

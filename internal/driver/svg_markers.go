@@ -31,7 +31,9 @@ func (p *svgParser) markers(el *svgNode, style svgStyle) error {
 			continue
 		}
 		if start != nil {
-			p.paintMarker(start, path[0], path[0].outX, path[0].outY, style, false)
+			if err := p.paintMarker(start, path[0], path[0].outX, path[0].outY, style, false); err != nil {
+				return err
+			}
 		}
 		if mid != nil {
 			for i := 1; i+1 < len(path); i++ {
@@ -43,12 +45,16 @@ func (p *svgParser) markers(el *svgNode, style svgStyle) error {
 				if inX == 0 && inY == 0 {
 					inX, inY = outX, outY
 				}
-				p.paintMarker(mid, v, inX+outX, inY+outY, style, false)
+				if err := p.paintMarker(mid, v, inX+outX, inY+outY, style, false); err != nil {
+					return err
+				}
 			}
 		}
 		if end != nil {
 			v := path[len(path)-1]
-			p.paintMarker(end, v, v.inX, v.inY, style, true)
+			if err := p.paintMarker(end, v, v.inX, v.inY, style, true); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -122,9 +128,12 @@ func svgMarkerPaths(ops []DrawOp) [][]svgMarkerPoint {
 	return out
 }
 
-func (p *svgParser) paintMarker(marker *svgNode, point svgMarkerPoint, dx, dy float32, parent svgStyle, end bool) {
-	if marker == nil || len(marker.children) == 0 || (dx == 0 && dy == 0) {
-		return
+func (p *svgParser) paintMarker(marker *svgNode, point svgMarkerPoint, dx, dy float32, parent svgStyle, end bool) error {
+	if marker == nil || len(marker.children) == 0 || (dx == 0 && dy == 0) || p.using[marker] || len(p.using) >= maxSVGUses {
+		return nil
+	}
+	if p.visits++; p.visits > maxSVGVisits || len(p.ops) > maxSVGOps {
+		return errSVGTooComplex
 	}
 	width, height := float32(3), float32(3)
 	if n, err := svgLength(marker.attrs["markerWidth"]); err == nil && n > 0 {
@@ -165,7 +174,7 @@ func (p *svgParser) paintMarker(marker *svgNode, point svgMarkerPoint, dx, dy fl
 	}
 	style := defaultSVGStyle()
 	if err := style.apply(marker.attrs); err != nil {
-		return
+		return err
 	}
 	for _, child := range marker.children {
 		if child.attrs["fill"] == "context-stroke" {
@@ -176,7 +185,15 @@ func (p *svgParser) paintMarker(marker *svgNode, point svgMarkerPoint, dx, dy fl
 		}
 	}
 	style.ctm = m
-	for _, child := range marker.children {
-		_ = p.element(child, style, false)
+	if p.using == nil {
+		p.using = map[*svgNode]bool{}
 	}
+	p.using[marker] = true
+	defer delete(p.using, marker)
+	for _, child := range marker.children {
+		if err := p.element(child, style, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }
