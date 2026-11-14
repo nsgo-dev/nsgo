@@ -110,6 +110,8 @@ func check(cx *core.Scope, background bool, answered func(core.UpdateCheck)) {
 					Actions: ok, Cancelable: true}, func(int) {})
 			}
 		case c.Version == "":
+			// The running version is the newest, so a package staged for an earlier update has been installed or is out of date.
+			discardStaged(cx)
 			if !background {
 				cx.ShowAlert(core.AlertConfig{Title: msgs.UpToDate(), Message: msgs.UpToDateMessage(c.App, c.Current),
 					Actions: ok, Cancelable: true}, func(int) {})
@@ -134,7 +136,7 @@ func check(cx *core.Scope, background bool, answered func(core.UpdateCheck)) {
 	})
 }
 
-// stagingDir is the directory under the app's cache that holds the packages downloadAndInstall stages.
+// stagingDir is the directory under the app's cache that holds the package downloadAndInstall stages, which only it writes.
 const stagingDir = "nsgo.updater"
 
 // staging is where downloadAndInstall stages packages: under the app's cache, else the system's temporary directory.
@@ -146,9 +148,21 @@ func staging(cx *core.Scope) string {
 	return filepath.Join(dir, stagingDir)
 }
 
+// discardStaged removes the packages downloadAndInstall staged on Linux and Android. Android's installer reads one through a content URI after it starts, so a package stays until the next download or a check that finds the app up to date.
+func discardStaged(cx *core.Scope) {
+	if sys := cx.Env().OS(); sys != core.OSLinux && sys != core.OSAndroid {
+		return
+	}
+	if err := os.RemoveAll(staging(cx)); err != nil {
+		log.Printf("updater: %v", err)
+	}
+}
+
 // downloadAndInstall downloads, verifies and installs c's package off the app's graph and main threads, after the user chose Update, which is their approval; package managers still ask for their own elevation or install permission. The work outlives the scope that offered the update. Linux restarts into the new version once its package manager installed it; a failure is logged and offers the release's page, where the user can get the package themselves.
 func downloadAndInstall(cx *core.Scope, c core.UpdateCheck) {
-	core.InstallUpdateInBackground(cx, c, staging(cx), func(app *core.Scope, path string, err error) {
+	dir := staging(cx)
+	discardStaged(cx)
+	core.InstallUpdateInBackground(cx, c, dir, func(app *core.Scope, path string, err error) {
 		if err != nil {
 			log.Printf("updater: %v", err)
 			msgs := locales.For(app)
@@ -166,6 +180,10 @@ func downloadAndInstall(cx *core.Scope, c core.UpdateCheck) {
 			return
 		}
 		if app.Env().OS() == core.OSLinux {
+			// The package manager copied it into place.
+			if err := os.Remove(path); err != nil {
+				log.Printf("updater: %v", err)
+			}
 			app.Restart()
 		}
 	})

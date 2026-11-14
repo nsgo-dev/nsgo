@@ -74,6 +74,9 @@ func TestUpdateInstallsAndRestartsOnLinux(t *testing.T) {
 	if len(in.downloaded) != 1 || !slices.Equal(in.installed, in.downloaded) {
 		t.Fatalf("downloaded %v, installed %v", in.downloaded, in.installed)
 	}
+	if _, err := os.Stat(in.installed[0]); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the installed package stayed: %v", err)
+	}
 	if len(app.OpenedURLs) != 0 || len(app.Alerts()) != 0 {
 		t.Errorf("an install opened %v and showed %+v", app.OpenedURLs, app.Alerts())
 	}
@@ -93,6 +96,12 @@ func TestUpdateHandsTheAPKToAndroidsInstaller(t *testing.T) {
 	// The installer reads the package after it starts, and Android restarts the app itself.
 	if _, err := os.Stat(in.downloaded[0]); err != nil || app.Restarts != 0 {
 		t.Errorf("package %v, restarts %d", err, app.Restarts)
+	}
+	// A check finding the app up to date discards it.
+	app.Update = func(bool) core.UpdateCheck { return core.UpdateCheck{App: "Hello", Current: "1.1"} }
+	app.Press("text:Check")
+	if _, err := os.Stat(in.downloaded[0]); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the staged package stayed once the app was up to date: %v", err)
 	}
 }
 
