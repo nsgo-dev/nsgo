@@ -440,10 +440,13 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.Badge = int(it.Count)
 		case driver.ItemKeepAwake:
 			if it.Awake != nil {
-				a.AwakeHolds = append(a.AwakeHolds, *it.Awake)
+				hold := AwakeHold{ID: it.Count, KeepAwake: *it.Awake}
+				a.AwakeHolds = append(a.AwakeHolds, hold)
+				a.Awake = append(a.Awake, hold)
 			}
 		case driver.ItemReleaseAwake:
 			a.AwakeReleases = append(a.AwakeReleases, it.Count)
+			a.Awake = slices.DeleteFunc(a.Awake, func(h AwakeHold) bool { return h.ID == it.Count })
 		case driver.ItemBiometricAvailability:
 			a.post(driver.Event{Kind: driver.EventBiometric, Count: it.Count, Index: int(a.BiometricAvailability)})
 		case driver.ItemBiometricAuthenticate:

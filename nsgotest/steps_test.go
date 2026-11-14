@@ -493,3 +493,30 @@ func TestAnAppsRefreshIndicatorFollowsThePull(t *testing.T) {
 		t.Fatalf("the pull is %v once refreshed, want 0", at())
 	}
 }
+
+func TestAwakeHoldsNameWhatEachReleaseEnds(t *testing.T) {
+	app := Start(t, func(cx *core.Scope) core.Node {
+		cx.KeepAwake("downloading", core.KeepAwakeOptions{})
+		var release func()
+		return core.View{Children: []core.Node{
+			core.View{TestID: "play", Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {
+				release = cx.KeepAwake("playing", core.KeepAwakeOptions{Display: true})
+			}},
+			core.View{TestID: "pause", Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) {
+				release()
+			}},
+		}}
+	})
+	app.Press("id:play")
+	if len(app.Awake) != 2 || !app.Awake[1].Display || app.Awake[1].Reason != "playing" {
+		t.Fatalf("holds %+v, want the download's and the player's", app.Awake)
+	}
+	playing := app.Awake[1].ID
+	app.Press("id:pause")
+	if len(app.Awake) != 1 || app.Awake[0].Reason != "downloading" || app.Awake[0].Display {
+		t.Fatalf("holds %+v, want only the download's", app.Awake)
+	}
+	if !slices.Equal(app.AwakeReleases, []uint32{playing}) || len(app.AwakeHolds) != 2 {
+		t.Fatalf("releases %v of holds %+v, want the player's", app.AwakeReleases, app.AwakeHolds)
+	}
+}

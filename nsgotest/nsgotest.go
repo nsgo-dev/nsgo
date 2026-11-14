@@ -140,6 +140,12 @@ type seed map[string]string
 func (s seed) Load() (map[string]string, error) { return s, nil }
 func (seed) Write(driver.StorageChange)         {}
 
+// AwakeHold is a keep-awake hold the app took: the ID its release names in AwakeReleases, and what it asked for.
+type AwakeHold struct {
+	ID uint32
+	core.KeepAwake
+}
+
 // App is an app running in a test. Its methods run on the test's
 // goroutine; the app's goroutines reach it through Scope.Post, which App
 // runs when it settles.
@@ -250,8 +256,9 @@ type App struct {
 	PermissionSettings []core.Permission
 	Guide              core.Permission
 	guideID            uint32
-	// AwakeHolds records power assertions and AwakeReleases their IDs.
-	AwakeHolds    []driver.KeepAwake
+	// Awake is the keep-awake holds the app keeps, oldest first, each gone once released. AwakeHolds records every hold the app took and AwakeReleases the IDs of the holds it released, oldest first. None changes the test machine's power state.
+	Awake         []AwakeHold
+	AwakeHolds    []AwakeHold
 	AwakeReleases []uint32
 	// OnAlert answers each alert the app shows with the index of the
 	// button the user presses, or -1 to dismiss it, once the step that
