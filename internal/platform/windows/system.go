@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -862,11 +863,6 @@ func (w *window) placePanel(anchor uint32) {
 	if anchor != 0 && w.placeAtTray(anchor) {
 		return
 	}
-	var panel rect
-	if r, _, _ := getWindowRect.Call(w.hwnd, uintptr(unsafe.Pointer(&panel))); r == 0 {
-		return
-	}
-	width, height := panel.Right-panel.Left, panel.Bottom-panel.Top
 	var at point
 	getCursorPos.Call(uintptr(unsafe.Pointer(&at)))
 	pointer := rect{at.X, at.Y, at.X + 1, at.Y + 1}
@@ -876,12 +872,46 @@ func (w *window) placePanel(anchor uint32) {
 	if r, _, _ := getMonitorInfoW.Call(monitor, uintptr(unsafe.Pointer(&mi))); r == 0 {
 		return
 	}
+	width, height, ok := w.panelPixels(monitor)
+	if !ok {
+		return
+	}
 	screen, work := mi.Monitor, mi.Work
 	x := screen.Left + (screen.Right-screen.Left-width)/2
 	y := screen.Top + (screen.Bottom-screen.Top)/3 - height/2
 	x = max(work.Left, min(x, work.Right-width))
 	y = max(work.Top, min(y, work.Bottom-height))
-	setWindowPos.Call(w.hwnd, 0, uintptr(x), uintptr(y), 0, 0, swpNoSize|swpNoZOrder|swpNoActivate)
+	w.movePanel(x, y, width, height)
+}
+
+// panelPixels returns the panel's size in pixels on monitor: its size in points now, at that monitor's scale, which may not be the one it was laid out at (a panel is made on the primary monitor).
+func (w *window) panelPixels(monitor uintptr) (width, height int32, ok bool) {
+	var client rect
+	if r, _, _ := getClientRect.Call(w.hwnd, uintptr(unsafe.Pointer(&client))); r == 0 || client.Right <= 0 || client.Bottom <= 0 {
+		return 0, 0, false
+	}
+	size := w.point(client.Right, client.Bottom)
+	scale := w.scale
+	var dpi, dpiY uint32
+	if r, _, _ := getDpiForMonitor.Call(monitor, 0, uintptr(unsafe.Pointer(&dpi)), uintptr(unsafe.Pointer(&dpiY))); r == 0 && dpi > 0 {
+		scale = float64(dpi) / 96 // MDT_EFFECTIVE_DPI
+	}
+	return int32(math.Round(float64(size.X) * scale)), int32(math.Round(float64(size.Y) * scale)), true
+}
+
+// movePanel moves and sizes the panel to the pixels it chose on its monitor, which a DPI change the move causes keeps (setWindowPosAt), then lays it out at the scale it has there: a hidden window may move to a monitor of another scale without a WM_DPICHANGED.
+func (w *window) movePanel(x, y, width, height int32) {
+	w.setWindowPosAt(x, y, width, height)
+	dpi, _, _ := getDpiForWindow.Call(w.hwnd)
+	if dpi == 0 || float64(dpi)/96 == w.scale {
+		return
+	}
+	w.scale = float64(dpi) / 96
+	if w.engine != nil {
+		size := w.point(width, height)
+		w.engine.Resize(driver.Size{Width: size.X, Height: size.Y})
+		w.updateEnvironment()
+	}
 }
 
 // placeAtTray moves a panel beside its notification-area icon, reporting whether it could. Shell owns the icon's screen rectangle; use the work area of that monitor to keep the panel visible and prefer the space above the taskbar.
@@ -890,18 +920,14 @@ func (w *window) placeAtTray(id uint32) bool {
 	if !ok {
 		return false
 	}
-	var panel rect
-	if r, _, _ := getWindowRect.Call(w.hwnd, uintptr(unsafe.Pointer(&panel))); r == 0 {
-		return false
-	}
-	width, height := panel.Right-panel.Left, panel.Bottom-panel.Top
-	if width <= 0 || height <= 0 {
-		return false
-	}
 	var mi monitorInfo
 	mi.Size = uint32(unsafe.Sizeof(mi))
 	monitor, _, _ := monitorFromRect.Call(uintptr(unsafe.Pointer(&anchor)), monitorDefaultNear)
 	if r, _, _ := getMonitorInfoW.Call(monitor, uintptr(unsafe.Pointer(&mi))); r == 0 {
+		return false
+	}
+	width, height, ok := w.panelPixels(monitor)
+	if !ok {
 		return false
 	}
 	work := mi.Work
@@ -912,7 +938,7 @@ func (w *window) placeAtTray(id uint32) bool {
 	}
 	x = max(work.Left, min(x, work.Right-width))
 	y = max(work.Top, min(y, work.Bottom-height))
-	setWindowPos.Call(w.hwnd, 0, uintptr(x), uintptr(y), 0, 0, swpNoSize|swpNoZOrder|swpNoActivate)
+	w.movePanel(x, y, width, height)
 	return true
 }
 
