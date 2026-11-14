@@ -60,7 +60,7 @@ Linux cannot tell a distribution's package from a downloaded one, so its package
 - The direct channel reads `releases/latest/download/` by default, so every release must carry the appcast of each target it updates: a target a release leaves out answers 404 until one carries it again.
 - WinSparkle saves `updates.automatic` as the user's choice on the first start, so a later change in `nsgo.yaml` reaches only new installs.
 - An app that closes its main window into the tray keeps running through WinSparkle's shutdown request; the installer then stops it.
-- Linux installs the appcast's Debian or Arch package through `pkexec`; Android hands its APK to `mobile.InstallPackage`, which asks the user and keeps store installs out of the direct channel.
+- The Linux appcast offers the release's Debian package, which the app installs through `pkexec dpkg` only where dpkg owns its executable; an install from the Arch package or the AppImage, or one outside any package, gets the release's page, as the backend asks `dpkg-query` and `pacman` before offering the package. Android hands its APK to `mobile.InstallPackage`, which asks the user and keeps store installs out of the direct channel.
 
 ## Verification
 
