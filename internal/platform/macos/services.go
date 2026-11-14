@@ -115,13 +115,17 @@ func (s *surface) notify(it *driver.MountItem) {
 // openURL opens u with the app the system picks and reports whether one
 // took it.
 func (s *surface) openURL(u string, id uint32) {
+	s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: openSystemURL(u)})
+}
+
+// openSystemURL opens u with the app the system picks, reporting whether one took it.
+func openSystemURL(u string) bool {
 	nsURL := objc.ID(apple.Class("NSURL")).Send(sel("URLWithString:"), apple.NSString(u))
-	opened := false
-	if nsURL != 0 {
-		ws := objc.ID(apple.Class("NSWorkspace")).Send(sel("sharedWorkspace"))
-		opened = objc.Send[bool](ws, sel("openURL:"), nsURL)
+	if nsURL == 0 {
+		return false
 	}
-	s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: opened})
+	ws := objc.ID(apple.Class("NSWorkspace")).Send(sel("sharedWorkspace"))
+	return objc.Send[bool](ws, sel("openURL:"), nsURL)
 }
 
 // openFile opens f in the app Launch Services associates with it, and

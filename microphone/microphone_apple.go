@@ -10,7 +10,9 @@ import (
 	"unsafe"
 
 	"github.com/ebitengine/purego"
-	"github.com/ebitengine/purego/objc"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
 const (
@@ -20,8 +22,6 @@ const (
 	kAudioFormatLinearPCM      = 0x6C70636D // 'lpcm'
 	kLinearPCMFormatSignedInt  = 1 << 2
 	kLinearPCMFormatPacked     = 1 << 3
-	authorizationNotDetermined = 0
-	authorizationAuthorized    = 3
 )
 
 // streamDescription is AudioStreamBasicDescription.
@@ -56,8 +56,6 @@ var system struct {
 	stop          func(queue uintptr, immediate bool) int32
 	dispose       func(queue uintptr, immediate bool) int32
 	callback      uintptr
-	mediaType     objc.ID
-	captureDevice objc.ID
 	nextID        atomic.Uintptr
 	recordings    sync.Map // of *recording, by id
 }
@@ -85,13 +83,10 @@ func load() error {
 		purego.RegisterLibFunc(&system.start, toolbox, "AudioQueueStart")
 		purego.RegisterLibFunc(&system.stop, toolbox, "AudioQueueStop")
 		purego.RegisterLibFunc(&system.dispose, toolbox, "AudioQueueDispose")
-		media, err := purego.Dlsym(foundation, "AVMediaTypeAudio")
-		if err != nil {
+		if _, err := purego.Dlsym(foundation, "AVMediaTypeAudio"); err != nil {
 			system.err = err
 			return
 		}
-		system.mediaType = **(**objc.ID)(unsafe.Pointer(&media))
-		system.captureDevice = objc.ID(objc.GetClass("AVCaptureDevice"))
 		// One callback serves every recording, as callbacks are never freed.
 		system.callback = purego.NewCallback(func(user, queue uintptr, buffer *queueBuffer, _ uintptr, _ uint32, _ uintptr) {
 			v, ok := system.recordings.Load(user)
@@ -114,37 +109,29 @@ func load() error {
 // Supported says this target can record.
 func Supported() bool { return load() == nil }
 
-// Allowed says the system lets this process record, without asking.
+// Allowed says the system lets this process record, without asking. It reads the same status as core.Scope.PermissionStatus of core.PermissionMicrophone, which apps with an engine use; this serves recording without one.
 func Allowed() bool {
-	return load() == nil && authorization() == authorizationAuthorized
+	return load() == nil && privacy.Status(driver.PermissionMicrophone) == driver.PermissionGranted
 }
 
-func authorization() int {
-	return objc.Send[int](system.captureDevice, objc.RegisterName("authorizationStatusForMediaType:"), system.mediaType)
-}
-
-// Authorize asks the user the first time, waiting for the answer, so call
-// it off the UI. It answers nil once this process may record, and
-// ErrDenied when it may not.
+// Authorize asks the user the first time, waiting for the answer, so call it off the UI. It answers nil once this process may record, and ErrDenied when it may not. It asks as core.Scope.RequestPermission of core.PermissionMicrophone does, which apps with an engine use; this serves recording without one.
 func Authorize() error {
 	if err := load(); err != nil {
 		return fmt.Errorf("microphone: %w", err)
 	}
-	switch authorization() {
-	case authorizationAuthorized:
+	switch privacy.Status(driver.PermissionMicrophone) {
+	case driver.PermissionGranted:
 		return nil
-	case authorizationNotDetermined:
+	case driver.PermissionNotAsked:
 	default:
 		return ErrDenied
 	}
 	if err := checkUsageDescription(); err != nil {
 		return err
 	}
-	answer := make(chan bool, 1)
-	block := objc.NewBlock(func(_ objc.Block, granted bool) { answer <- granted })
-	defer block.Release()
-	objc.Send[objc.ID](system.captureDevice, objc.RegisterName("requestAccessForMediaType:completionHandler:"), system.mediaType, block)
-	if !<-answer {
+	answer := make(chan int, 1)
+	privacy.Request(driver.PermissionMicrophone, func(status int) { answer <- status })
+	if <-answer != driver.PermissionGranted {
 		return ErrDenied
 	}
 	return nil

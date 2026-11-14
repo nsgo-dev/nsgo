@@ -21,7 +21,8 @@ var layers = []struct {
 	imports []string
 }{
 	{"internal/layout", nil},
-	{"microphone", nil},
+	// The microphone asks for its permission as the backends do.
+	{"microphone", []string{"internal/driver", "internal/platform/privacy"}},
 	// Widgets take core's colors, edges and fonts, and reach WidgetKit
 	// through the files and the library the tool's extension shares, and
 	// Android's runtime through the driver's Live Updates.
@@ -50,6 +51,7 @@ var layers = []struct {
 	{"internal/platform/menutext", []string{"internal/driver", "desktop/locales"}},
 	{"internal/platform/perfhud", []string{"internal/driver", "internal/engine", "internal/platform/apple"}},
 	{"internal/platform/picked", []string{"internal/driver"}},
+	{"internal/platform/privacy", []string{"internal/driver"}},
 	{"internal/platform/queue", []string{"internal/driver"}},
 	{"internal/platform/scrollbar", []string{"internal/driver"}},
 	{"internal/platform/textselect", []string{"internal/driver"}},
@@ -97,7 +99,7 @@ var layers = []struct {
 // writers but not the compiler, which only the core links.
 var platformShared = []string{
 	"internal/platform/apple", "internal/platform/canvas2d", "internal/platform/canvastest", "internal/platform/field", "internal/platform/finger",
-	"internal/platform/fontfile", "internal/platform/hover", "internal/platform/imagedecode", "internal/platform/imageload", "internal/platform/menutext", "internal/platform/perfhud", "internal/platform/picked", "internal/platform/queue", "internal/platform/scrollbar",
+	"internal/platform/fontfile", "internal/platform/hover", "internal/platform/imagedecode", "internal/platform/imageload", "internal/platform/menutext", "internal/platform/perfhud", "internal/platform/picked", "internal/platform/privacy", "internal/platform/queue", "internal/platform/scrollbar",
 	"internal/platform/textselect", "internal/platform/updates", "internal/platform/webstyle", "internal/shaderir/",
 }
 

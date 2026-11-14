@@ -38,9 +38,10 @@ func For(cx *core.Scope) Messages {
 // its method, for the TSX declarations of the messages
 // (tsx.RegisterMessages).
 var Parameters = map[string][]string{
-	"AboutApp": {"app"},
-	"HideApp":  {"app"},
-	"QuitApp":  {"app"},
+	"AboutApp":  {"app"},
+	"HideApp":   {"app"},
+	"QuitApp":   {"app"},
+	"GuideDrag": {"app", "permission"},
 }
 
 // Translation is a language's messages another package supplies:
@@ -48,10 +49,11 @@ var Parameters = map[string][]string{
 // of the others; a key or a field left out leaves the message to the
 // catalog.
 type Translation struct {
-	Texts    map[string]string
-	AboutApp func(app string) string
-	HideApp  func(app string) string
-	QuitApp  func(app string) string
+	Texts     map[string]string
+	AboutApp  func(app string) string
+	HideApp   func(app string) string
+	QuitApp   func(app string) string
+	GuideDrag func(app string, permission string) string
 }
 
 var supplied = map[string]Translation{}
@@ -78,6 +80,17 @@ const (
 	textEnterFullScreen
 	textExitFullScreen
 	textClose
+	textGuideDragHint
+	textPermissionAccessibility
+	textPermissionDeviceControl
+	textPermissionScreenRecording
+	textPermissionScreenAudioRecording
+	textPermissionInputMonitoring
+	textPermissionFullDiskAccess
+	textPermissionAppManagement
+	textPermissionDeveloperTools
+	textPermissionBluetooth
+	textPermissionMediaLibrary
 	numTexts
 )
 
@@ -104,6 +117,17 @@ var keyOfText = [numTexts]string{
 	"enterFullScreen",
 	"exitFullScreen",
 	"close",
+	"guideDragHint",
+	"permissionAccessibility",
+	"permissionDeviceControl",
+	"permissionScreenRecording",
+	"permissionScreenAudioRecording",
+	"permissionInputMonitoring",
+	"permissionFullDiskAccess",
+	"permissionAppManagement",
+	"permissionDeveloperTools",
+	"permissionBluetooth",
+	"permissionMediaLibrary",
 }
 
 // textsEn are the messages without arguments in en.
@@ -127,7 +151,18 @@ var textsEn = i18n.NewTexts(""+
 	"Toggle Full Screen"+
 	"Enter Full Screen"+
 	"Exit Full Screen"+
-	"Close",
+	"Close"+
+	"Drag"+
+	"Accessibility"+
+	"Device Control and Data Access"+
+	"Screen Recording"+
+	"Screen & System Audio Recording"+
+	"Input Monitoring"+
+	"Full Disk Access"+
+	"App Management"+
+	"Developer Tools"+
+	"Bluetooth"+
+	"Media & Apple Music",
 	[]uint16{
 		4,
 		6,
@@ -149,6 +184,17 @@ var textsEn = i18n.NewTexts(""+
 		17,
 		16,
 		5,
+		4,
+		13,
+		30,
+		16,
+		31,
+		16,
+		16,
+		14,
+		15,
+		9,
+		19,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -172,7 +218,18 @@ var textsZhHans = i18n.NewTexts(""+
 	"切换全屏幕"+
 	"进入全屏幕"+
 	"退出全屏幕"+
-	"关闭",
+	"关闭"+
+	"拖移"+
+	"辅助功能"+
+	"设备控制和数据访问"+
+	"录屏"+
+	"录屏与系统录音"+
+	"输入监控"+
+	"完全磁盘访问权限"+
+	"App管理"+
+	"开发者工具"+
+	"蓝牙"+
+	"媒体与Apple Music",
 	[]uint16{
 		6,
 		6,
@@ -194,6 +251,17 @@ var textsZhHans = i18n.NewTexts(""+
 		15,
 		15,
 		6,
+		6,
+		12,
+		27,
+		6,
+		21,
+		12,
+		24,
+		9,
+		15,
+		6,
+		20,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -258,6 +326,9 @@ func Supply(lang string, t Translation) {
 	}
 	if t.QuitApp != nil {
 		s.QuitApp = t.QuitApp
+	}
+	if t.GuideDrag != nil {
+		s.GuideDrag = t.GuideDrag
 	}
 	supplied[lang] = s
 	Catalog.Add(lang)
@@ -489,3 +560,140 @@ func Close(cx *core.Scope) string { return For(cx).Close() }
 
 // Close is the package's Close in the language of msgs.
 func (msgs Messages) Close() string { return msgs.text(textClose) }
+
+// GuideDrag says "Drag {app} to the list above to allow {permission}."
+// in the language the app shows under cx.
+//
+// The macOS guide's panel under System Settings, which holds the app for the user to drag into the list of a privacy pane; app is the app's name and permission the pane's title, both shown in bold.
+func GuideDrag(cx *core.Scope, app string, permission string) string {
+	return For(cx).GuideDrag(app, permission)
+}
+
+// GuideDrag is the package's GuideDrag in the language of msgs.
+func (msgs Messages) GuideDrag(app string, permission string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.GuideDrag(app, permission))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].GuideDrag; f != nil {
+			return f(app, permission)
+		}
+		switch lang {
+		case "", "en":
+			return "Drag " + msgs.arg(app) + " to the list above to allow " + msgs.arg(permission) + "."
+		case "zh-Hans":
+			return "将 " + app + " 拖到上方列表以允许“" + permission + "”。"
+		}
+	}
+}
+
+// GuideDragHint says "Drag"
+// in the language the app shows under cx.
+//
+// The hint on the card the user drags from the macOS guide's panel into System Settings.
+func GuideDragHint(cx *core.Scope) string { return For(cx).GuideDragHint() }
+
+// GuideDragHint is the package's GuideDragHint in the language of msgs.
+func (msgs Messages) GuideDragHint() string { return msgs.text(textGuideDragHint) }
+
+// PermissionAccessibility says "Accessibility"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane before macOS 27, as System Settings shows it.
+func PermissionAccessibility(cx *core.Scope) string { return For(cx).PermissionAccessibility() }
+
+// PermissionAccessibility is the package's PermissionAccessibility in the language of msgs.
+func (msgs Messages) PermissionAccessibility() string { return msgs.text(textPermissionAccessibility) }
+
+// PermissionDeviceControl says "Device Control and Data Access"
+// in the language the app shows under cx.
+//
+// The title of macOS's Accessibility pane from macOS 27, as System Settings shows it.
+func PermissionDeviceControl(cx *core.Scope) string { return For(cx).PermissionDeviceControl() }
+
+// PermissionDeviceControl is the package's PermissionDeviceControl in the language of msgs.
+func (msgs Messages) PermissionDeviceControl() string { return msgs.text(textPermissionDeviceControl) }
+
+// PermissionScreenRecording says "Screen Recording"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane before macOS 15, as System Settings shows it.
+func PermissionScreenRecording(cx *core.Scope) string { return For(cx).PermissionScreenRecording() }
+
+// PermissionScreenRecording is the package's PermissionScreenRecording in the language of msgs.
+func (msgs Messages) PermissionScreenRecording() string {
+	return msgs.text(textPermissionScreenRecording)
+}
+
+// PermissionScreenAudioRecording says "Screen & System Audio Recording"
+// in the language the app shows under cx.
+//
+// The title of macOS's Screen Recording pane from macOS 15, as System Settings shows it.
+func PermissionScreenAudioRecording(cx *core.Scope) string {
+	return For(cx).PermissionScreenAudioRecording()
+}
+
+// PermissionScreenAudioRecording is the package's PermissionScreenAudioRecording in the language of msgs.
+func (msgs Messages) PermissionScreenAudioRecording() string {
+	return msgs.text(textPermissionScreenAudioRecording)
+}
+
+// PermissionInputMonitoring says "Input Monitoring"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane, as System Settings shows it.
+func PermissionInputMonitoring(cx *core.Scope) string { return For(cx).PermissionInputMonitoring() }
+
+// PermissionInputMonitoring is the package's PermissionInputMonitoring in the language of msgs.
+func (msgs Messages) PermissionInputMonitoring() string {
+	return msgs.text(textPermissionInputMonitoring)
+}
+
+// PermissionFullDiskAccess says "Full Disk Access"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane, as System Settings shows it.
+func PermissionFullDiskAccess(cx *core.Scope) string { return For(cx).PermissionFullDiskAccess() }
+
+// PermissionFullDiskAccess is the package's PermissionFullDiskAccess in the language of msgs.
+func (msgs Messages) PermissionFullDiskAccess() string {
+	return msgs.text(textPermissionFullDiskAccess)
+}
+
+// PermissionAppManagement says "App Management"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane, as System Settings shows it.
+func PermissionAppManagement(cx *core.Scope) string { return For(cx).PermissionAppManagement() }
+
+// PermissionAppManagement is the package's PermissionAppManagement in the language of msgs.
+func (msgs Messages) PermissionAppManagement() string { return msgs.text(textPermissionAppManagement) }
+
+// PermissionDeveloperTools says "Developer Tools"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane, as System Settings shows it.
+func PermissionDeveloperTools(cx *core.Scope) string { return For(cx).PermissionDeveloperTools() }
+
+// PermissionDeveloperTools is the package's PermissionDeveloperTools in the language of msgs.
+func (msgs Messages) PermissionDeveloperTools() string {
+	return msgs.text(textPermissionDeveloperTools)
+}
+
+// PermissionBluetooth says "Bluetooth"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane, as System Settings shows it.
+func PermissionBluetooth(cx *core.Scope) string { return For(cx).PermissionBluetooth() }
+
+// PermissionBluetooth is the package's PermissionBluetooth in the language of msgs.
+func (msgs Messages) PermissionBluetooth() string { return msgs.text(textPermissionBluetooth) }
+
+// PermissionMediaLibrary says "Media & Apple Music"
+// in the language the app shows under cx.
+//
+// The title of macOS's privacy pane, as System Settings shows it.
+func PermissionMediaLibrary(cx *core.Scope) string { return For(cx).PermissionMediaLibrary() }
+
+// PermissionMediaLibrary is the package's PermissionMediaLibrary in the language of msgs.
+func (msgs Messages) PermissionMediaLibrary() string { return msgs.text(textPermissionMediaLibrary) }

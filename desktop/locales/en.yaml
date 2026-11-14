@@ -33,3 +33,42 @@ toggleFullScreen: "Toggle Full Screen"
 enterFullScreen: "Enter Full Screen"
 exitFullScreen: "Exit Full Screen"
 close: "Close"
+guideDrag:
+  message: "Drag {app} to the list above to allow {permission}."
+  description: The macOS guide's panel under System Settings, which holds the app for the user to drag into the list of a privacy pane; app is the app's name and permission the pane's title, both shown in bold.
+  placeholders:
+    app: { type: String }
+    permission: { type: String }
+guideDragHint:
+  message: "Drag"
+  description: The hint on the card the user drags from the macOS guide's panel into System Settings.
+permissionAccessibility:
+  message: "Accessibility"
+  description: The title of macOS's privacy pane before macOS 27, as System Settings shows it.
+permissionDeviceControl:
+  message: "Device Control and Data Access"
+  description: The title of macOS's Accessibility pane from macOS 27, as System Settings shows it.
+permissionScreenRecording:
+  message: "Screen Recording"
+  description: The title of macOS's privacy pane before macOS 15, as System Settings shows it.
+permissionScreenAudioRecording:
+  message: "Screen & System Audio Recording"
+  description: The title of macOS's Screen Recording pane from macOS 15, as System Settings shows it.
+permissionInputMonitoring:
+  message: "Input Monitoring"
+  description: The title of macOS's privacy pane, as System Settings shows it.
+permissionFullDiskAccess:
+  message: "Full Disk Access"
+  description: The title of macOS's privacy pane, as System Settings shows it.
+permissionAppManagement:
+  message: "App Management"
+  description: The title of macOS's privacy pane, as System Settings shows it.
+permissionDeveloperTools:
+  message: "Developer Tools"
+  description: The title of macOS's privacy pane, as System Settings shows it.
+permissionBluetooth:
+  message: "Bluetooth"
+  description: The title of macOS's privacy pane, as System Settings shows it.
+permissionMediaLibrary:
+  message: "Media & Apple Music"
+  description: The title of macOS's privacy pane, as System Settings shows it.

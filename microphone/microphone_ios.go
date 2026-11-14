@@ -9,6 +9,8 @@ import (
 
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
+
+	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
 const (
@@ -123,12 +125,9 @@ func enterSession(ended func()) (leave func(), err error) {
 	}, nil
 }
 
-// checkUsageDescription stands in front of the permission prompt, as iOS
-// aborts an app that declares no usage description.
+// checkUsageDescription stands in front of the permission prompt, as iOS aborts an app that declares no usage description.
 func checkUsageDescription() error {
-	bundle := objc.ID(objc.GetClass("NSBundle")).Send(sel("mainBundle"))
-	key := objc.ID(objc.GetClass("NSString")).Send(sel("stringWithUTF8String:"), unsafe.StringData("NSMicrophoneUsageDescription\x00"))
-	if bundle.Send(sel("objectForInfoDictionaryKey:"), key) == 0 {
+	if !privacy.DeclaresUsage("NSMicrophoneUsageDescription") {
 		return ErrNoUsageDescription
 	}
 	return nil

@@ -1,0 +1,61 @@
+//go:build ios
+
+package privacy
+
+import (
+	"github.com/ebitengine/purego/objc"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+)
+
+const mediaPlayerPath = "/System/Library/Frameworks/MediaPlayer.framework/MediaPlayer"
+
+// mediaLibrary is MPMediaLibrary, 0 where the system has none, as tvOS has not.
+func mediaLibrary() objc.ID {
+	if !loaded(mediaPlayerPath) {
+		return 0
+	}
+	if lib := class("MPMediaLibrary"); responds(lib, "authorizationStatus") {
+		return lib
+	}
+	return 0
+}
+
+// platformStatus answers the media library, and what only Macs keep, which iOS has not.
+func platformStatus(name string) int {
+	if name == driver.PermissionMediaLibrary {
+		lib := mediaLibrary()
+		if lib == 0 {
+			return driver.PermissionUnavailable
+		}
+		return fromTCC(objc.Send[int](lib, sel("authorizationStatus")))
+	}
+	return driver.PermissionUnavailable
+}
+
+// platformAsks says Request answers name with platformRequest: what only Macs keep.
+func platformAsks(name string) bool {
+	switch name {
+	case driver.PermissionMicrophone, driver.PermissionCamera, driver.PermissionCalendars, driver.PermissionReminders,
+		driver.PermissionBluetooth, driver.PermissionMediaLibrary:
+		return false
+	}
+	return true
+}
+
+func platformRequest(string) int { return driver.PermissionUnavailable }
+
+// platformAskOnce asks for the media library.
+func platformAskOnce(name string, answer func(int)) {
+	block := objc.NewBlock(func(objc.Block, int) { answer(Status(name)) })
+	mediaLibrary().Send(sel("requestAuthorization:"), block)
+	block.Release()
+}
+
+// DeclaresUsage reports whether the app's Info.plist declares key, as iOS ends an app that asks for what it declares no reason for.
+func DeclaresUsage(key string) bool {
+	bundle := class("NSBundle").Send(sel("mainBundle"))
+	declared := false
+	withString(key, func(k objc.ID) { declared = bundle.Send(sel("objectForInfoDictionaryKey:"), k) != 0 })
+	return declared
+}

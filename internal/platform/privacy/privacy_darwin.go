@@ -1,0 +1,264 @@
+//go:build darwin
+
+package privacy
+
+import (
+	"log"
+	"sync"
+	"time"
+	"unsafe"
+
+	"github.com/ebitengine/purego"
+	"github.com/ebitengine/purego/objc"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+)
+
+// The frameworks that keep the permissions phones and Macs share, loaded as one is first asked about.
+const (
+	avFoundationPath  = "/System/Library/Frameworks/AVFoundation.framework/AVFoundation"
+	eventKitPath      = "/System/Library/Frameworks/EventKit.framework/EventKit"
+	coreBluetoothPath = "/System/Library/Frameworks/CoreBluetooth.framework/CoreBluetooth"
+)
+
+// The statuses of TCC as AVFoundation, EventKit and CoreBluetooth number them; MediaPlayer swaps denied and restricted, which tell the same.
+const (
+	tccNotDetermined = 0
+	tccAuthorized    = 3
+
+	ekEntityTypeEvent    = 0
+	ekEntityTypeReminder = 1
+)
+
+// pollInterval is how often a request the system answers with no callback looks at the status again, and pollLimit how long it waits for the user.
+const (
+	pollInterval = 250 * time.Millisecond
+	pollLimit    = 10 * time.Minute
+)
+
+var (
+	frameworks sync.Map // path → whether it loaded
+	// eventStore and centralManager are kept: a request dies with its store, and CoreBluetooth asks while its manager lives.
+	requestMu      sync.Mutex
+	eventStore     objc.ID
+	centralManager objc.ID
+)
+
+func sel(name string) objc.SEL { return objc.RegisterName(name) }
+
+func class(name string) objc.ID { return objc.ID(objc.GetClass(name)) }
+
+// loaded loads the framework at path once, reporting whether it has one.
+func loaded(path string) bool {
+	if v, ok := frameworks.Load(path); ok {
+		return v.(bool)
+	}
+	_, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	frameworks.Store(path, err == nil)
+	return err == nil
+}
+
+// global reads the object the framework at path exports as name, 0 when it has none.
+func global(path, name string) objc.ID {
+	lib, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		return 0
+	}
+	addr, err := purego.Dlsym(lib, name)
+	if err != nil || addr == 0 {
+		return 0
+	}
+	return **(**objc.ID)(unsafe.Pointer(&addr))
+}
+
+// withString passes fn an NSString of s, released once fn returns, so callers on goroutines without an autorelease pool leak nothing.
+func withString(s string, fn func(objc.ID)) {
+	b := append([]byte(s), 0)
+	ns := class("NSString").Send(sel("alloc")).Send(sel("initWithUTF8String:"), &b[0])
+	defer ns.Send(sel("release"))
+	fn(ns)
+}
+
+func responds(o objc.ID, name string) bool {
+	return o != 0 && objc.Send[bool](o, sel("respondsToSelector:"), sel(name))
+}
+
+// fromTCC is the status of TCC's raw value v: EventKit's 4, write only, is not the access asked for, and MediaPlayer's 1 and 2 are both refusals.
+func fromTCC(v int) int {
+	switch v {
+	case tccNotDetermined:
+		return driver.PermissionNotAsked
+	case tccAuthorized:
+		return driver.PermissionGranted
+	case 1, 2, 4:
+		return driver.PermissionDenied
+	}
+	return driver.PermissionUnknown
+}
+
+func granted(ok bool) int {
+	if ok {
+		return driver.PermissionGranted
+	}
+	return driver.PermissionDenied
+}
+
+// Status is whether the app has the permission name (a driver.Permission* key), as a driver.Permission* status, without asking the user.
+func Status(name string) int {
+	switch name {
+	case driver.PermissionMicrophone, driver.PermissionCamera:
+		device, media := captureDevice(name)
+		if device == 0 || media == 0 {
+			return driver.PermissionUnavailable
+		}
+		return fromTCC(objc.Send[int](device, sel("authorizationStatusForMediaType:"), media))
+	case driver.PermissionCalendars, driver.PermissionReminders:
+		store := eventStoreClass()
+		if store == 0 {
+			return driver.PermissionUnavailable
+		}
+		return fromTCC(objc.Send[int](store, sel("authorizationStatusForEntityType:"), entityType(name)))
+	case driver.PermissionBluetooth:
+		if !loaded(coreBluetoothPath) {
+			return driver.PermissionUnavailable
+		}
+		cb := class("CBManager")
+		if !responds(cb, "authorization") {
+			return driver.PermissionUnknown
+		}
+		return fromTCC(objc.Send[int](cb, sel("authorization")))
+	}
+	return platformStatus(name)
+}
+
+// Request asks the user for the permission name with the system's prompt, where it has one and has not asked yet, and calls answer with its status then, on any goroutine. When the Info.plist the system reads lacks the permission's usage description, it logs the key and answers driver.PermissionUnavailable without asking, as the system would end the app as it asks.
+func Request(name string, answer func(status int)) {
+	if platformAsks(name) {
+		answer(platformRequest(name))
+		return
+	}
+	st := Status(name)
+	if st != driver.PermissionNotAsked {
+		answer(st)
+		return
+	}
+	if key := usageKey(name); !DeclaresUsage(key) {
+		log.Printf("nsgo: requesting %s needs %s in the app's Info.plist (nsgo.yaml's apple.info)", name, key)
+		answer(driver.PermissionUnavailable)
+		return
+	}
+	switch name {
+	case driver.PermissionMicrophone, driver.PermissionCamera:
+		device, media := captureDevice(name)
+		block := objc.NewBlock(func(objc.Block, bool) { answer(Status(name)) })
+		device.Send(sel("requestAccessForMediaType:completionHandler:"), media, block)
+		block.Release()
+	case driver.PermissionCalendars, driver.PermissionReminders:
+		requestMu.Lock()
+		if eventStore == 0 {
+			eventStore = eventStoreClass().Send(sel("alloc")).Send(sel("init"))
+		}
+		store := eventStore
+		requestMu.Unlock()
+		block := objc.NewBlock(func(objc.Block, bool, objc.ID) { answer(Status(name)) })
+		switch {
+		case fullAccess() && name == driver.PermissionCalendars:
+			store.Send(sel("requestFullAccessToEventsWithCompletion:"), block)
+		case fullAccess():
+			store.Send(sel("requestFullAccessToRemindersWithCompletion:"), block)
+		default:
+			store.Send(sel("requestAccessToEntityType:completion:"), entityType(name), block)
+		}
+		block.Release()
+	case driver.PermissionBluetooth:
+		requestMu.Lock()
+		if centralManager == 0 {
+			// Its delegate would hear of the radio's state: the prompt shows without one.
+			centralManager = class("CBCentralManager").Send(sel("alloc")).Send(sel("initWithDelegate:queue:"), objc.ID(0), objc.ID(0))
+		}
+		requestMu.Unlock()
+		// CoreBluetooth calls nothing back: wait for the status to change.
+		go func() {
+			for start := time.Now(); time.Since(start) < pollLimit; {
+				time.Sleep(pollInterval)
+				if st := Status(name); st != driver.PermissionNotAsked {
+					answer(st)
+					return
+				}
+			}
+			answer(Status(name))
+		}()
+	default:
+		platformAskOnce(name, answer)
+	}
+}
+
+// usageKey is the Info.plist key that says why the app asks for the permission name.
+func usageKey(name string) string {
+	switch name {
+	case driver.PermissionMicrophone:
+		return "NSMicrophoneUsageDescription"
+	case driver.PermissionCamera:
+		return "NSCameraUsageDescription"
+	case driver.PermissionCalendars:
+		if fullAccess() {
+			return "NSCalendarsFullAccessUsageDescription"
+		}
+		return "NSCalendarsUsageDescription"
+	case driver.PermissionReminders:
+		if fullAccess() {
+			return "NSRemindersFullAccessUsageDescription"
+		}
+		return "NSRemindersUsageDescription"
+	case driver.PermissionBluetooth:
+		return "NSBluetoothAlwaysUsageDescription"
+	case driver.PermissionMediaLibrary:
+		return "NSAppleMusicUsageDescription"
+	}
+	return ""
+}
+
+// capture is AVFoundation's media types, read once.
+var capture struct {
+	once         sync.Once
+	audio, video objc.ID
+}
+
+// captureDevice is AVCaptureDevice and the media type of the microphone or the camera, 0 where the system has none.
+func captureDevice(name string) (device, media objc.ID) {
+	capture.once.Do(func() {
+		if loaded(avFoundationPath) {
+			capture.audio, capture.video = global(avFoundationPath, "AVMediaTypeAudio"), global(avFoundationPath, "AVMediaTypeVideo")
+		}
+	})
+	media = capture.audio
+	if name == driver.PermissionCamera {
+		media = capture.video
+	}
+	device = class("AVCaptureDevice")
+	if media == 0 || !responds(device, "authorizationStatusForMediaType:") {
+		return 0, 0
+	}
+	return device, media
+}
+
+// eventStoreClass is EKEventStore, 0 where the system has no EventKit, as tvOS has not.
+func eventStoreClass() objc.ID {
+	if !loaded(eventKitPath) {
+		return 0
+	}
+	return class("EKEventStore")
+}
+
+// fullAccess says EventKit asks for full access, as from macOS 14 and iOS 17, with keys of its own.
+func fullAccess() bool {
+	store := eventStoreClass()
+	return store != 0 && objc.Send[bool](store, sel("instancesRespondToSelector:"), sel("requestFullAccessToEventsWithCompletion:"))
+}
+
+func entityType(name string) int {
+	if name == driver.PermissionReminders {
+		return ekEntityTypeReminder
+	}
+	return ekEntityTypeEvent
+}
