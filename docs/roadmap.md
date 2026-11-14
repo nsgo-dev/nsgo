@@ -23,7 +23,6 @@ What NSH added between 0.4.0 and 0.5.0 that NSGo has not, in the order to build 
 | --- | --- | --- |
 | Notifications on screens | #931, #1373 | With the permission granted, a notification shows, its press reaches the app and the badge shows on a Mac, an iPhone, Windows in a signed-in session and an Android 13 device, and a toast pressed after the app ended starts it through a COM activator; so far Linux and the Android emulator (API 29) showed and closed one, macOS, iOS's simulator and the web answered the permission without asking, and Windows, over SSH, reached its notifier, which reports the platform unavailable there (2026-11-12) |
 | Sounds and audio | `audio-design.md` (The API, The platforms) | `audio.Sound` plays a short sound from a file or bytes and `audio.Player`, NSH's `AudioPlayer`, plays, pauses, seeks and loops audio on every target, decoding off the main thread, as [audio playback](architecture/audio.md) designs it, and the gallery gives each kind of moment a sound |
-| Location and motion sensors | #56, [location and motion design](architecture/location-motion.md) | Provider-neutral location and sensor streams define accuracy, rates, timestamps, permission and lifecycle behavior on Apple and Android targets |
 | Haptics felt | #1328 | `mobile.PlayHaptic` is felt on an iPhone and an Android phone; so far it ran in the iOS simulator and the Android emulator, which have none (2026-11-12) |
 | Biometric authentication | #55 | `core` asks for enrolled Face ID, Touch ID or Android biometrics and reports authentication results through LocalAuthentication and BiometricPrompt, with nsgotest fakes and sandbox capability checks |
 | More of a web view's loads | #1038, #1028, #1233, #1496, #1439 | A load carries the app's request headers, `Incognito` keeps the website data in memory, the app serves URL schemes of its own to its pages, a page from the app's own files loads on macOS, and `Env` says where the platform shows no web view |
@@ -55,6 +54,11 @@ NSGo's own, beyond NSH's notifications: a server reaching the app ([remote push]
 | --- | --- | --- |
 | Remote push notifications | APNs, Firebase Cloud Messaging | An iOS app, a macOS app and an Android app register, report their token and receive a data push and a pressed notification's payload from APNs' sandbox or a test FCM project, through one provider-neutral `core` API |
 
+## Location and motion
+NSGo's own design for [#56](https://github.com/nsgo-dev/nsgo/issues/56) ([location and motion](architecture/location-motion.md)), which waits on its [open questions](../ARCHITECTURE.md#open-questions).
+| Location and motion on phones | `CLLocationManager`, `CMMotionManager`, `LocationManager`, `SensorManager` | The gallery's System page, the permission granted, gets a one-shot fix and a stream and accelerometer, gyroscope and device-motion samples at the rate it asks on an iPhone, an Android 9 device and one on API 31 or later, a phone lying face up reading +9.81 m/s² on z on both; a denied permission reaches the app as denied, and `nsgotest` grants, denies and feeds fixes and samples headless |
+| Location on Macs and TVs | `CLLocationManager` | A notarized macOS build and a Mac App Store build get fixes, with the location entitlement `nsgo build` claims, and a tvOS app a one-shot fix, its streams reporting unavailable |
+| Location and motion elsewhere | Geolocation API, `DeviceMotionEvent`, `Windows.Devices.Geolocation`, GeoClue | The web, Windows and Linux give location fixes, and the web motion samples, where they report both unavailable in the first release |
 ## Keyboard, popups and screen readers
 
 What 0.5.0 changed in how the keyboard's focus, popups and assistive technology behave, which NSGo's `core` and `base` follow from 0.4.0 still ([interaction](architecture/interaction.md), [components](architecture/components.md)).
