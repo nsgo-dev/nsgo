@@ -34,6 +34,7 @@ var layers = []struct {
 	{"internal/cldr/", nil},
 	{"internal/cldr", nil},
 	{"internal/driver", []string{"internal/shaderir"}},
+	{"internal/dev/locales", []string{"core", "i18n"}},
 	// DevTools hand the automation's agent each surface's batches and events.
 	{"internal/devtools", []string{"internal/driver"}},
 	{"internal/shaderir/", []string{"internal/shaderir"}},
@@ -126,7 +127,7 @@ var owned = map[string][]string{
 
 // portable lists the packages that build unchanged for every target: no
 // purego, syscall or unsafe.
-var portable = []string{"core", "internal/automation", "internal/driver", "internal/layout", "internal/shader", "internal/shader/wgsl", "internal/shaderir/", "internal/engine",
+var portable = []string{"core", "internal/automation", "internal/dev/locales", "internal/driver", "internal/layout", "internal/shader", "internal/shader/wgsl", "internal/shaderir/", "internal/engine",
 	"internal/testhost", "internal/cldr", "base/", "ui/", "i18n", "mobile", "audio", "desktop", "desktop/locales", "icons/", "nsgotest", "tsx", "tsx/websrc", "updater", "updater/locales"}
 
 // unportable are the packages among portable's that reach the system: the
@@ -147,8 +148,8 @@ var layerTargets = [][2]string{
 
 const modulePath = "github.com/nsgo-dev/nsgo"
 
-// devImports are what a package's nsgo dev builds (the nsgodev tag) import besides its layer's: the dev client reads what DevTools show from internal/devtools, and the commit traces and their causes from the driver.
-var devImports = map[string][]string{"internal/dev": {"internal/devtools", "internal/driver"}}
+// devImports are what a package's nsgo dev builds (the nsgodev tag) import besides its layer's: the dev client reads what DevTools show from internal/devtools, the commit traces and their causes from the driver, and its failure overlay's words from its catalog.
+var devImports = map[string][]string{"internal/dev": {"internal/dev/locales", "internal/devtools", "internal/driver"}}
 
 // automationImports are what a package's nsgo dev -automation builds (the nsgoautomation tag, with nsgodev) import besides its dev builds': the dev client links nsgotest's agent, which it serves over DevTools' channel.
 var automationImports = map[string][]string{"internal/dev": {"nsgotest"}}

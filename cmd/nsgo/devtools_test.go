@@ -443,4 +443,9 @@ func TestDevPagesTakeTheTokenOutOfTheirAddress(t *testing.T) {
 	reload(web)
 	wait(web, failed)
 	wait(web, tokenGone)
+
+	// The overlay says what the app's Go gives it in the language the app shows.
+	eval(web, `globalThis.nsgoDevMessages = {buildFailed: "构建失败", copy: "复制", reload: "重新加载"}`)
+	s.send("error", "the build failed again")
+	wait(web, `["构建失败", "复制", "重新加载", "the build failed again"].every((s) => document.body.innerText.includes(s)) && !document.body.innerText.includes("Build failed")`)
 }

@@ -19,6 +19,7 @@ nsgo
 │   ├── nsgo (root)                      Run, NewView and their options
 │   │   ├── internal/backend             Picks a backend and starts the app
 │   │   ├── internal/dev                 The dev client of nsgo dev's builds
+│   │   │   └── locales                  Its failure overlay's words
 │   │   └── internal/restart             Starts a desktop app again once it exits
 │   ├── tsx                              Runs TSX apps on goja, or the page's engine
 │   │   ├── internal/js                  The engines' one API
@@ -134,7 +135,7 @@ A line means "imports". `internal/moduletest/layering_test.go` checks the graph 
 - `core` imports only `internal/driver`, `internal/devtools`, `internal/layout` and the shader compilers (`internal/shader`, `internal/shader/wgsl`, `internal/shaderir`). `internal/devtools` imports only `internal/driver`, for the batches and events it hands `nsgo dev -automation`'s agent, so DevTools' overlay, the layout audit's included, lives in `core` (`UpdateHighlights`).
 - Backends import `internal/driver`, `internal/engine`, `desktop/locales`, their shared packages and the shader writers, never the compilers, which only `core` links.
 - Only a backend's test host, built with the `nsgotest` tag, imports `core`; its surface (`testsurface.go`) also builds with `nsgoautomation`, for `nsgo dev -automation`'s live windows. The release, embed, watch and mini-program backend builds are checked separately so a test-only import cannot leak into an app.
-- The root starts the dev client (`internal/dev`), which imports `internal/devtools` and `internal/driver` only in dev builds, to write `-trace`'s batches and DevTools' commits, and `nsgotest` only in `nsgo dev -automation`'s (`internal/dev/automation.go`, the `nsgodev` and `nsgoautomation` tags), whose agent `nsgotest` and the tool reach through `internal/automation`, which imports nothing of NSGo's; `TestLayering` lists that build too, and `TestMinimalAppLinks` fails a release app that links `testing`, `nsgotest` or the protocol.
+- The root starts the dev client (`internal/dev`), which imports `internal/devtools` and `internal/driver` only in dev builds, to write `-trace`'s batches and DevTools' commits, its catalog `internal/dev/locales`, of `core` and `i18n` alone, for its failure overlay's words, and `nsgotest` only in `nsgo dev -automation`'s (`internal/dev/automation.go`, the `nsgodev` and `nsgoautomation` tags), whose agent `nsgotest` and the tool reach through `internal/automation`, which imports nothing of NSGo's; `TestLayering` lists that build too, and `TestMinimalAppLinks` fails a release app that links `testing`, `nsgotest` or the protocol.
 - `audio` imports only `core`, as `mobile` does: `core` does the engine's part, so its sounds and players reach the platform through the batch.
 - `i18n` imports only `core` and `internal/cldr`; `base`'s packages import it for their catalogs, as `ui/chat/locales` does for its own.
 - `updater` imports only `core` and its catalogs; `internal/backend` imports it, to check as the app starts where the platform's updater keeps no schedule.

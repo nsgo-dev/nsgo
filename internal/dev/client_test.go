@@ -4,6 +4,7 @@ package dev
 
 import (
 	"bufio"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,9 +13,11 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/i18n"
 	"github.com/nsgo-dev/nsgo/internal/devtools"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/engine"
+	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
 // nsgo.Run starts DevTools before any graph, so an app's function that shows its view with nsgo.SetMainView has its trees registered and its commits sent with the run's token, and SetMainView, however often it is called, starts nothing again.
@@ -77,4 +80,62 @@ func TestDevClientStartsDevToolsOnceBeforeTheGraph(t *testing.T) {
 	if n := count(); n != 1 {
 		t.Fatalf("one commit reached the page %d times", n)
 	}
+}
+
+// The overlay's title and buttons are the dev client's catalog's, in the language the app shows: nsgo dev -lang zh-Hans's, as a device's set to Chinese.
+func TestDevOverlayUsesCatalogLanguage(t *testing.T) {
+	appSpeaks(t, "en", "zh-Hans")
+	for _, tc := range []struct {
+		locale string
+		kind   devFailureKind
+		want   []string
+	}{
+		{"en-US", devAppFailed, []string{"The app failed", "Copy", "Reload"}},
+		{"en-US", devBuildFailed, []string{"Build failed", "Copy", "Reload"}},
+		{"zh-CN", devAppFailed, []string{"应用运行失败", "复制", "重新加载"}},
+		{"zh-Hans", devBuildFailed, []string{"构建失败", "复制", "重新加载"}},
+	} {
+		t.Run(fmt.Sprintf("%s/%d", tc.locale, tc.kind), func(t *testing.T) {
+			app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+				return devOverlay(cx, devFailure{kind: tc.kind, Text: "details"}, func() {}, func() {})
+			}, nsgotest.Environment(core.Environment{Locale: tc.locale}))
+			for _, text := range append(tc.want, "details") {
+				if !app.Exists("text:" + text) {
+					t.Fatalf("the overlay does not show %q\n%s", text, app.Dump())
+				}
+			}
+		})
+	}
+}
+
+// The overlay follows the app's language as it changes, as the app's own words do.
+func TestDevOverlayFollowsTheLanguage(t *testing.T) {
+	appSpeaks(t, "en", "zh-Hans")
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return devOverlay(cx, devFailure{kind: devBuildFailed, Text: "details"}, func() {}, func() {})
+	}, nsgotest.Environment(core.Environment{Locale: "en-US"}))
+	if !app.Exists("text:Build failed") {
+		t.Fatalf("the overlay is not in English\n%s", app.Dump())
+	}
+	app.SetEnvironment(core.Environment{Locale: "zh-CN"})
+	if !app.Exists("text:构建失败") || !app.Exists("text:重新加载") {
+		t.Fatalf("the overlay did not follow the language to Chinese\n%s", app.Dump())
+	}
+}
+
+// An app whose catalog lacks Chinese shows the overlay in English on a device set to Chinese, as it shows NSGo's other words.
+func TestDevOverlayKeepsTheLanguageTheAppShows(t *testing.T) {
+	appSpeaks(t, "en")
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return devOverlay(cx, devFailure{kind: devAppFailed, Text: "details"}, func() {}, func() {})
+	}, nsgotest.Environment(core.Environment{Locale: "zh-CN"}))
+	if !app.Exists("text:The app failed") || !app.Exists("text:Copy") {
+		t.Fatalf("the overlay is not in English\n%s", app.Dump())
+	}
+}
+
+// appSpeaks gives the test's app a catalog of langs, as the code nsgo writes for an app's catalogs does.
+func appSpeaks(t *testing.T, langs ...string) {
+	i18n.SetApp(i18n.NewCatalog(langs[0], langs[1:]...))
+	t.Cleanup(func() { i18n.SetApp(nil) })
 }

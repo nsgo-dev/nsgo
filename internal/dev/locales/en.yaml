@@ -1,0 +1,12 @@
+appFailed:
+  message: "The app failed"
+  description: The title of the development overlay when the app's render fails.
+buildFailed:
+  message: "Build failed"
+  description: The title of the development overlay when the app's build fails.
+copy:
+  message: "Copy"
+  description: The development overlay button that copies the failure text.
+reload:
+  message: "Reload"
+  description: The development overlay button that asks the development server to rebuild the app.

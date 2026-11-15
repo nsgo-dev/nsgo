@@ -1032,8 +1032,9 @@ events.onmessage = (e) => {
   overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:rgba(17,17,17,.6);padding:48px 24px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;font:13px system-ui;color:#f2f2f2";
   const panel = document.createElement("div");
   panel.style.cssText = "width:100%;max-width:720px;max-height:100%;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;padding:20px;border-radius:12px;background:#1c1c1c;border:1px solid rgba(255,255,255,.1)";
+  const say = (key, source) => globalThis.nsgoDevMessages?.[key] ?? source;
   const title = document.createElement("div");
-  title.textContent = "Build failed";
+  title.textContent = say("buildFailed", "Build failed");
   title.style.cssText = "color:#ff5c5c;font:bold 18px system-ui";
   const text = document.createElement("pre");
   text.textContent = JSON.parse(rest.join(" "));
@@ -1048,8 +1049,8 @@ events.onmessage = (e) => {
   const buttons = document.createElement("div");
   buttons.style.cssText = "display:flex;gap:8px;justify-content:flex-end";
   buttons.append(
-    button("Copy", () => navigator.clipboard.writeText(text.textContent)),
-    button("Reload", () => fetch("/_nsgo/reload", { method: "POST", headers: { "X-NSGo-Token": token } })),
+    button(say("copy", "Copy"), () => navigator.clipboard.writeText(text.textContent)),
+    button(say("reload", "Reload"), () => fetch("/_nsgo/reload", { method: "POST", headers: { "X-NSGo-Token": token } })),
   );
   panel.append(title, text, buttons);
   overlay.append(panel);

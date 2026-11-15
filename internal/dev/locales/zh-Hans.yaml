@@ -1,0 +1,4 @@
+appFailed: "应用运行失败"
+buildFailed: "构建失败"
+copy: "复制"
+reload: "重新加载"
