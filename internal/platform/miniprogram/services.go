@@ -105,6 +105,10 @@ func (s *surface) service(it *driver.MountItem) {
 	case driver.ItemPermission:
 		// The platforms' scopes are not read yet (docs/roadmap.md): those of the microphone, the camera and Bluetooth answer unknown.
 		driver.AnswerPermission(it.Count, *it.Permission, miniProgramPermission, s.engine.Dispatch)
+	case driver.ItemNotificationPermission, driver.ItemShowNotification:
+		s.engine.Dispatch(driver.NoNotification(it))
+	case driver.ItemCloseNotification, driver.ItemBadge:
+		// Mini programs have no notification center or app badge API.
 	}
 }
 

@@ -406,6 +406,15 @@ const (
 	NotificationsUnavailable
 )
 
+// NoNotification answers a notification request on a target without a
+// notification API: permission is unavailable, and showing it fails.
+func NoNotification(it *MountItem) Event {
+	if it.Kind == ItemNotificationPermission {
+		return Event{Kind: EventNotification, Count: it.Count, Index: NotificationsUnavailable}
+	}
+	return Event{Kind: EventNotification, Count: it.Count}
+}
+
 // Haptic is what ItemHaptic plays, as core.Haptic.
 type Haptic = uint32
 

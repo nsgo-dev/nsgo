@@ -462,6 +462,12 @@ func (s *surface) apply(b *driver.MountBatch) {
 			// The SwiftUI host asks nothing yet (docs/roadmap.md): what a watch keeps answers unknown.
 			driver.AnswerPermission(it.Count, *it.Permission, watchPermission, s.engine.Dispatch)
 			continue
+		case driver.ItemNotificationPermission, driver.ItemShowNotification:
+			s.engine.Dispatch(driver.NoNotification(it))
+			continue
+		case driver.ItemCloseNotification, driver.ItemBadge:
+			// watchOS has no notification center or app badge API.
+			continue
 		case driver.ItemReadClipboard, driver.ItemPickImages, driver.ItemTakePhoto, driver.ItemPickFiles,
 			driver.ItemPickDirectories, driver.ItemOpenFile, driver.ItemRevealFile, driver.ItemTrashFile, driver.ItemShare, driver.ItemSaveFile:
 			s.unsupported(it)
