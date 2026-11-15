@@ -154,3 +154,80 @@ func TestSpansFuncAttachmentsFollowTheSpans(t *testing.T) {
 		t.Fatalf("text %q with %d children", got, len(text.children))
 	}
 }
+
+// countedBox is an attachment that counts how often it is made.
+type countedBox struct {
+	id      string
+	renders int
+}
+
+func (b *countedBox) Render(*Scope) Node {
+	b.renders++
+	return View{TestID: b.id, Style: Style{Width: Pt(10), Height: Pt(6)}}
+}
+
+// sizedBox is an attachment of a comparable type, the same when its fields are.
+type sizedBox struct {
+	id    string
+	width Points
+}
+
+var sizedRenders int
+
+func (b sizedBox) Render(*Scope) Node {
+	sizedRenders++
+	return View{TestID: b.id, Style: Style{Width: Pt(b.width), Height: Pt(6)}}
+}
+
+// A SpansFunc that runs again with the same attachments in the same order, the text around them split or restyled, keeps their views; another attachment, or one that cannot be compared, is made again.
+func TestSpansFuncKeepsTheSameAttachments(t *testing.T) {
+	var step *Signal[int]
+	box := &countedBox{id: "box"}
+	sizedRenders = 0
+	h := newHost(t, Size{Width: 300, Height: 200}, func(cx *Scope) Node {
+		step = NewSignal(cx, 0)
+		return Text{TestID: "text", SpansFunc: func() []Span {
+			sized := Span{Content: "$x$", Attachment: sizedBox{id: "sized", width: 8}}
+			switch step.Get() {
+			case 0:
+				return []Span{{Content: "abc "}, {Attachment: box}, {Content: " d"}, sized}
+			case 1:
+				red := Style{Color: RGB(0xff0000)}
+				return []Span{{Content: "a"}, {Content: "bc", Style: red}, {Content: " "}, {Attachment: box}, {Content: " "}, {Content: "d", Style: red}, sized}
+			case 2:
+				return []Span{{Content: "abc "}, {Attachment: &countedBox{id: "other"}}, {Content: " d"}, sized}
+			}
+			return []Span{{Content: "abc "}, {Attachment: Func(func(*Scope) Node { return View{TestID: "func"} })}, {Content: " d"}, sized}
+		}}
+	})
+	h.commit()
+	text := h.find("text")
+	first, sized := h.find("box"), h.find("sized")
+	step.Set(1)
+	h.commit()
+	if box.renders != 1 || sizedRenders != 1 || first.deleted || sized.deleted || h.find("box") != first {
+		t.Fatalf("restyling made the attachments again: box %d, sized %d, deleted %v %v", box.renders, sizedRenders, first.deleted, sized.deleted)
+	}
+	red := 0
+	for _, sp := range text.text.text.Spans {
+		if sp.Style.Color == RGB(0xff0000) {
+			red++
+		}
+	}
+	if red != 2 {
+		t.Fatalf("restyled spans %+v", text.text.text.Spans)
+	}
+	if got := text.text.text.Text; got != "abc ￼ d￼" || len(text.children) != 2 {
+		t.Fatalf("text %q with %d children", got, len(text.children))
+	}
+	step.Set(2)
+	h.commit()
+	if !first.deleted || h.find("other") == nil || len(text.children) != 2 {
+		t.Fatalf("another attachment kept the old view: deleted %v, %d children", first.deleted, len(text.children))
+	}
+	step.Set(3)
+	h.commit()
+	if h.find("func") == nil || len(text.children) != 2 {
+		t.Fatalf("%d children", len(text.children))
+	}
+}

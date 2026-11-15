@@ -485,6 +485,8 @@ type spanNode struct {
 	long    func(PressEvent)
 	attach  *node        // the view of an attachment
 	cls     *spanClasses // its classes, when it has any
+	// made is, for an attachment a SpansFunc mounted, the span its view was made of, which the spans that follow keep the view for when they hold the same.
+	made *Span
 }
 
 // attachNode is the view of a text's attachment: a layout root of its own at its content size, which the text places in its lines.
@@ -1680,8 +1682,7 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 	}
 	t.followSpanClasses(n)
 	if v.SpansFunc != nil {
-		// attached owns the attachments' views, made again whenever the
-		// spans change, since a Node cannot be compared.
+		// attached owns the attachments' views, kept while the spans hold the same attachments in the same order and made again when they do not.
 		var attached *Scope
 		cx.renderEffect(func() {
 			spans := v.SpansFunc()
@@ -1697,19 +1698,30 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 				if old.cls != nil {
 					own = old.cls.base
 				}
-				same = spans[i].Attachment == nil && old.attach == nil && spans[i].Content == old.content && (old.cls == nil) == (spans[i].Class == "") &&
+				if old.attach != nil || spans[i].Attachment != nil {
+					same = spans[i].Content == old.content && sameAttachment(old, spans[i])
+					continue
+				}
+				same = spans[i].Content == old.content && (old.cls == nil) == (spans[i].Class == "") &&
 					(old.cls == nil || old.cls.list.class == spans[i].Class) && reflect.DeepEqual(spans[i].Style, own) &&
 					(spans[i].OnPress == nil) == (old.press == nil)
 			}
 			if same {
 				// The presses cannot be compared: the latest take them.
 				for i, sp := range spans {
-					n.text.spans[i].press, n.text.spans[i].long = sp.OnPress, sp.OnLongPress
-					t.listenForSpan(n, sp)
+					if sp.Attachment == nil {
+						n.text.spans[i].press, n.text.spans[i].long = sp.OnPress, sp.OnLongPress
+						t.listenForSpan(n, sp)
+					}
 				}
 				return
 			}
+			// The text around the same attachments changed: they keep their views, and the text restyles.
+			var kept []spanNode
 			if attached != nil {
+				kept = keptAttachments(n.text.spans, spans)
+			}
+			if attached != nil && kept == nil {
 				attached.Dispose()
 				attached = nil
 				for _, old := range n.text.spans {
@@ -1723,6 +1735,13 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 			}
 			n.text.spans = n.text.spans[:0]
 			for _, sp := range spans {
+				if sp.Attachment != nil && kept != nil {
+					old := kept[0]
+					kept = kept[1:]
+					old.content = sp.Content
+					n.text.spans = append(n.text.spans, old)
+					continue
+				}
 				if sp.Attachment != nil {
 					if attached == nil {
 						attached = &Scope{}
@@ -1733,7 +1752,8 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 					t.setClasses(w, sp.Class)
 					t.bindStyle(attached, w, sp.Style, nil)
 					t.within(attached, func() { t.mount(attached, w, sp.Attachment) })
-					n.text.spans = append(n.text.spans, spanNode{content: sp.Content, attach: w})
+					made := sp
+					n.text.spans = append(n.text.spans, spanNode{content: sp.Content, attach: w, made: &made})
 					n.text.attachments++
 					continue
 				}
@@ -1755,6 +1775,45 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 			}
 		})
 	}
+}
+
+// keptAttachments is the spans of old's attachments when spans hold the same ones in the same order, each with the same classes and style, else nil.
+func keptAttachments(old []spanNode, spans []Span) []spanNode {
+	var kept []spanNode
+	k := 0
+	for _, sp := range spans {
+		if sp.Attachment == nil {
+			continue
+		}
+		for k < len(old) && old[k].attach == nil {
+			k++
+		}
+		if k == len(old) || !sameAttachment(&old[k], sp) {
+			return nil
+		}
+		kept = append(kept, old[k])
+		k++
+	}
+	for ; k < len(old); k++ {
+		if old[k].attach != nil {
+			return nil // one went
+		}
+	}
+	return kept
+}
+
+// sameAttachment reports whether span sp is an attachment the view of attachment old was made of, with the same classes and style.
+func sameAttachment(old *spanNode, sp Span) bool {
+	return old.made != nil && sp.Attachment != nil && sameNode(old.made.Attachment, sp.Attachment) &&
+		old.made.Class == sp.Class && reflect.DeepEqual(old.made.Style, sp.Style)
+}
+
+// sameNode reports whether a and b are the same node: the same pointer, or equal values of a type that compares. Other nodes, a Func among them, cannot be told apart and are never the same.
+func sameNode(a, b Node) bool {
+	if a == nil || b == nil || reflect.TypeOf(a) != reflect.TypeOf(b) || !reflect.ValueOf(a).Comparable() {
+		return false
+	}
+	return a == b
 }
 
 // bindInputTheme keeps input n's theme colors, as cx's palette has them.
