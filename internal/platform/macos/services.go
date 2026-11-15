@@ -89,7 +89,8 @@ func (s *surface) readClipboard(it *driver.MountItem) {
 }
 
 // notify carries out a notification's item through the notification
-// center; the badge is the Dock tile's, which needs no permission.
+// center; the badge is the Dock tile's and does not initialize the
+// notification center or need notification permission.
 func (s *surface) notify(it *driver.MountItem) {
 	e, id := s.engine, it.Count
 	switch it.Kind {

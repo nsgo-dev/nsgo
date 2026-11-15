@@ -102,6 +102,7 @@ func notificationPressed(id string) {
 // first when ask is set and the user was not asked yet. answer runs on
 // any goroutine.
 func NotificationPermission(ask bool, answer func(int)) {
+	WatchNotifications()
 	center := notificationCenter()
 	if center == 0 {
 		answer(driver.NotificationsUnavailable)
@@ -138,6 +139,7 @@ func NotificationPermission(ask bool, answer func(int)) {
 // answers with whether the center took it: not without the permission.
 // answer runs on any goroutine.
 func ShowNotification(n driver.Notification, answer func(bool)) {
+	WatchNotifications()
 	center := notificationCenter()
 	if center == 0 {
 		answer(false)

@@ -721,9 +721,6 @@ func startApp(opts Options) objc.ID {
 		Fn:  func(self objc.ID, _ objc.SEL, note objc.ID) { engine.SyncStorage() },
 	}})).Send(selNew)
 	nsApp.Send(sel("setDelegate:"), delegate)
-	// Before the app finishes launching, so a press that launched it is
-	// heard.
-	apple.WatchNotifications()
 	setAppearance(opts.Appearance)
 	return nsApp
 }
