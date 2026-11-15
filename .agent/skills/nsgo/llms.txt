@@ -1,0 +1,89 @@
+# NSGo
+
+> A cross-platform native UI engine with a Go backend: app logic, the reactive graph and layout run in Go, and each platform draws with its own native views, on iOS, Android, macOS, Windows, Linux, the web, tvOS, watchOS and mini programs.
+
+NSGo is early, with no stable API: use the latest version (`go get github.com/nsgo-dev/nsgo@latest`) and read its source, `go list -m -f '{{.Dir}}' github.com/nsgo-dev/nsgo`, before relying on a signature. Each page below is Markdown; https://nsgo.dev/llms-full.txt holds them all.
+
+Coding agents can install NSGo's skill, which keeps an app on NSGo's conventions: `bunx skills add nsgo-dev/nsgo`.
+
+## Overview
+
+- [Introduction](https://nsgo.dev/docs/index.md): What NSGo is, what it runs on and how it works.
+- [Compared with other frameworks](https://nsgo.dev/docs/comparison.md): Where NSGo fits beside NSH, MyGo and other UI frameworks, and what it gives up.
+
+## Get started
+
+- [Setup](https://nsgo.dev/docs/getting-started.md): Install what NSGo needs, create an app and run it on every target.
+- [Example: A todo app](https://nsgo.dev/docs/tutorials/todo.md): Build a small todo app step by step, with signals, a list and a test.
+- [Example: A notes app](https://nsgo.dev/docs/tutorials/notes.md): Build a notes app with a navigation stack, a multiline editor and notes kept on the device.
+- [Example: Popular GitHub repositories](https://nsgo.dev/docs/tutorials/repos.md): List the most-starred Go repositories from GitHub's API, loading on a goroutine with a spinner, errors and a retry.
+
+## Toolchain
+
+- [Running and debugging](https://nsgo.dev/docs/debugging.md): Run an app on any target with hot reload, and see its errors, updates, layout, speed and other languages.
+- [Testing](https://nsgo.dev/docs/testing.md): Test an app the way a user uses it, headless or in a native window.
+- [Building and shipping](https://nsgo.dev/docs/building.md): Package an app for every platform, make installers, sign and notarize it, publish it on GitHub and embed it in other apps.
+- [Embedding](https://nsgo.dev/docs/embedding.md): Put an NSGo app inside an iOS, Android, desktop or web app of your own.
+
+## Components
+
+- [Component reference](https://nsgo.dev/docs/ui.md): The most-used components, their variants, states and accessibility.
+- [Button](https://nsgo.dev/docs/ui/button.md): A push button, its variants and sizes, and the icon button.
+- [Text](https://nsgo.dev/docs/ui/text.md): Paragraphs, spans, links, fonts and documents.
+- [Input](https://nsgo.dev/docs/ui/input.md): The platform's text field, controlled or not, with focus and the software keyboard.
+- [Checkbox](https://nsgo.dev/docs/ui/checkbox.md): A check box, checked, unchecked or indeterminate.
+- [Switch](https://nsgo.dev/docs/ui/switch.md): A setting that is on or off, in three sizes.
+- [Select](https://nsgo.dev/docs/ui/select.md): One value from a list, as a popup or a sheet.
+- [Slider](https://nsgo.dev/docs/ui/slider.md): One value, or a range, along a track with the keyboard and the pointer.
+- [List](https://nsgo.dev/docs/ui/list.md): Rows of any number, built only in view, with selection and activation.
+- [Scroll](https://nsgo.dev/docs/ui/scroll.md): The platform's scroll view, with paging, snapping, zoom and refresh.
+- [Tabs](https://nsgo.dev/docs/ui/tabs.md): A tab list, a segmented control and the system tab bar.
+- [Dialog](https://nsgo.dev/docs/ui/dialog.md): A modal surface, a sheet and an alert.
+- [Menu](https://nsgo.dev/docs/ui/menu.md): A menu from a trigger, a context menu and their items.
+
+## Platform features
+
+- [Platform services](https://nsgo.dev/docs/services.md): Alerts, the clipboard, files, photos, sharing, storage, speech, networking and the app's lifecycle.
+- [Notifications](https://nsgo.dev/docs/notifications.md): Ask to show notifications, show and close them, count them and show a task's progress on the app's icon and hear presses.
+- [Haptics](https://nsgo.dev/docs/haptics.md): Play feedback under the user's finger as a value changes, elements collide or a task ends.
+- [Widgets](https://nsgo.dev/docs/widgets.md): Show the app's views on the Home Screen and the Lock Screen of iPhones and iPads, and on the Mac's desktop.
+- [Live Activities](https://nsgo.dev/docs/live-activities.md): Follow something as it happens on the Lock Screen and in the Dynamic Island, and as Live Updates on Android.
+- [Permissions](https://nsgo.dev/docs/permissions.md): Check and ask for the system's permissions, open their settings, and guide the user to System Settings on macOS.
+
+## Core concepts
+
+- [Components and state](https://nsgo.dev/docs/components.md): Elements, components, signals and styles.
+- [Layout](https://nsgo.dev/docs/layout.md): Flexbox, grid, sizes and positioning, with the safe area and the keyboard in the layout.
+- [Styles and themes](https://nsgo.dev/docs/styles.md): Typed styles, Tailwind classes, state styles, and light and dark themes.
+- [Text](https://nsgo.dev/docs/text.md): Show text with spans, fonts, decorations, selection and documents.
+- [Images and icons](https://nsgo.dev/docs/images.md): Show a picture from a URL, the app's resources or bytes, and draw Lucide icons and SVGs.
+- [Lists and scrolling](https://nsgo.dev/docs/lists.md): Scroll views with native gestures, and lists that recycle rows for any number of items.
+- [Navigation](https://nsgo.dev/docs/navigation.md): Native navigation stacks, system headers, modals, menus and tab bars.
+- [Forms](https://nsgo.dev/docs/forms.md): Text fields, focus, the software keyboard, switches, pickers and validation.
+- [Animation](https://nsgo.dev/docs/animation.md): Transitions, animated values, layout animation and motion presets that run on the platform's frame clock.
+- [Canvas and shaders](https://nsgo.dev/docs/canvas.md): Draw 2D graphics on the engine, and fill a view with a GPU fragment shader.
+- [Accessibility](https://nsgo.dev/docs/accessibility.md): Labels, roles, values, actions and focus for screen readers and keyboards.
+- [Localization](https://nsgo.dev/docs/localization.md): Translate an app's messages and follow the language it shows.
+- [TSX apps](https://nsgo.dev/docs/tsx.md): Write an app in TSX with Tailwind classes, compiled ahead with no Node.
+
+## Writing components
+
+- [Writing components](https://nsgo.dev/docs/authoring.md): Make components other people put in their apps, as NSGo's own base and ui are made.
+- [Parts and states](https://nsgo.dev/docs/authoring/parts.md): Hold no state the app owns, style every part, and tell assistive technology what the component is.
+- [Looks and themes](https://nsgo.dev/docs/authoring/looks.md): Take colors from the theme in effect, and give a component variants and sizes.
+- [Unstyled components](https://nsgo.dev/docs/authoring/base.md): NSGo's own controls without a look, to style part by part or to build a styled library on.
+- [Words, tests and publishing](https://nsgo.dev/docs/authoring/shipping.md): Translate what a component says, test it as a user would, and offer it to Go and TSX apps.
+
+## Contributing
+
+- [Development setup](https://nsgo.dev/docs/contributing.md): Build NSGo from source, run the gallery and test a change.
+- [The codebase](https://nsgo.dev/docs/contributing/codebase.md): Where each part of NSGo lives, and the documents that explain why.
+- [Making a change](https://nsgo.dev/docs/contributing/changes.md): What a pull request to NSGo needs, from the same change on every backend to tests, docs and a changelog line.
+- [Docs and the website](https://nsgo.dev/docs/contributing/docs.md): Write a page of these docs, translate it, run the website and keep the agents' skill current.
+
+## Optional
+
+- [Live demo](https://nsgo.dev/gallery/): every component, running in the browser
+- [Roadmap](https://github.com/nsgo-dev/nsgo/blob/main/docs/roadmap.md): what is not implemented yet, by target
+- [Changelog](https://github.com/nsgo-dev/nsgo/blob/main/CHANGELOG.md)
+- [Architecture](https://github.com/nsgo-dev/nsgo/blob/main/ARCHITECTURE.md): how the engine works, for contributors
