@@ -5,6 +5,7 @@ package macos
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -152,6 +153,8 @@ var (
 	cgEventCreateScrollWheelEvent2 func(source uintptr, units uint32, count uint32, w1, w2, w3 int32) uintptr
 	cgEventSetIntegerValueField    func(event uintptr, field uint32, value int64)
 	cgEventSetLocation             func(event uintptr, p apple.CGPoint)
+	cgWindowListCreateImage        func(bounds apple.CGRect, option uint32, window uint32, imageOption uint32) uintptr
+	screenshotFallbackOnce         sync.Once
 )
 
 func loadCG() {
@@ -165,6 +168,7 @@ func loadCG() {
 	purego.RegisterLibFunc(&cgEventCreateScrollWheelEvent2, cg, "CGEventCreateScrollWheelEvent2")
 	purego.RegisterLibFunc(&cgEventSetIntegerValueField, cg, "CGEventSetIntegerValueField")
 	purego.RegisterLibFunc(&cgEventSetLocation, cg, "CGEventSetLocation")
+	purego.RegisterLibFunc(&cgWindowListCreateImage, cg, "CGWindowListCreateImage")
 }
 
 // Scroll is a trackpad gesture: it begins, moves 20 points at most every
@@ -475,8 +479,33 @@ func (t *testSurface) Answer(id uint32, index int) error {
 func (t *testSurface) Screenshot() ([]byte, error) {
 	var png []byte
 	onMainSync(func() {
+		loadCG()
+		// CGWindowListCreateImage asks WindowServer for the already composited
+		// frame. This preserves Core Animation shadows, masks, presentation
+		// layers, visual effects and insertion-point drawing that an AppKit
+		// cacheDisplayInRect: redraw omits. screenPoint uses the same global
+		// top-left coordinate space as CGWindowListCreateImage.
 		v := t.s.native
 		bounds := objc.Send[apple.CGRect](v, selBounds)
+		origin := t.screenPoint(driver.Point{})
+		window := uint32(objc.Send[int](t.s.window, sel("windowNumber")))
+		const (
+			windowListIncludingWindow    = 1 << 3
+			windowImageBoundsIgnoreFrame = 1 << 0
+			windowImageBestResolution    = 1 << 3
+		)
+		image := cgWindowListCreateImage(apple.Rect(origin.X, origin.Y, bounds.Size.Width, bounds.Size.Height),
+			windowListIncludingWindow, window, windowImageBoundsIgnoreFrame|windowImageBestResolution)
+		if image != 0 {
+			defer apple.Release(image)
+			png, _ = apple.PNGImage(image)
+		}
+		if png != nil {
+			return
+		}
+		screenshotFallbackOnce.Do(func() {
+			log.Printf("nsgo: macOS composited screenshot unavailable; falling back to cacheDisplayInRect: (shadows, animations and visual effects may be missing)")
+		})
 		rep := v.Send(sel("bitmapImageRepForCachingDisplayInRect:"), bounds)
 		if rep == 0 {
 			return

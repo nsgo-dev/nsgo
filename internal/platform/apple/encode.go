@@ -139,6 +139,36 @@ func PNG(data []byte) ([]byte, driver.Size, error) {
 	return Encode(data, 0, false, 0)
 }
 
+// PNGImage encodes an already composited CGImage as a PNG. The caller keeps
+// ownership of image; this function does not retain or release it.
+func PNGImage(image uintptr) ([]byte, error) {
+	encodeOnce.Do(loadEncode)
+	if image == 0 {
+		return nil, errors.New("apple: empty image")
+	}
+	out := cfDataCreateMutable(0, 0)
+	if out == 0 {
+		return nil, errors.New("apple: cannot create image data")
+	}
+	defer Release(out)
+	dest := cgImageDestinationCreate(out, utiPNG, 1, 0)
+	if dest == 0 {
+		return nil, errors.New("apple: cannot encode the image")
+	}
+	defer Release(dest)
+	cgImageDestinationAddImage(dest, image, 0)
+	if !cgImageDestinationFinalize(dest) {
+		return nil, errors.New("apple: cannot encode the image")
+	}
+	n := cfDataGetLength(out)
+	if n == 0 {
+		return nil, errors.New("apple: cannot encode the image")
+	}
+	b := make([]byte, n)
+	copy(b, unsafe.Slice(cfDataGetBytePtr(out), n))
+	return b, nil
+}
+
 // PreparePicked returns f as r asks for it: its type and size as it
 // shows filled in, encoded again as PNG or JPEG when r needs it.
 func PreparePicked(r driver.PickRequest, f driver.PickedFile) driver.PickedFile {

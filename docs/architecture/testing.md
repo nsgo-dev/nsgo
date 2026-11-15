@@ -63,7 +63,7 @@ On a target, `App.CapturePNG` and `App.Capture` settle and return the platform's
 
 | Target | Input | Screenshots | Quiet |
 | --- | --- | --- | --- |
-| macOS | Mouse and key `NSEvent`s posted to NSApp's queue, so monitors see them; wheels as trackpad phases to the view hit; hover through tracking-area handlers; Command edit keys as the Edit menu's actions | `cacheDisplayInRect:` | Animator, layout motions, ghosts |
+| macOS | Mouse and key `NSEvent`s posted to NSApp's queue, so monitors see them; wheels as trackpad phases to the view hit; hover through tracking-area handlers; Command edit keys as the Edit menu's actions | `CGWindowListCreateImage` captures the window-server composite at the surface's screen rectangle; when WindowServer capture is unavailable, `cacheDisplayInRect:` is used once with a logged limitation | Animator, layout motions, ghosts |
 | iOS simulator | IOHID digitizer events to `_enqueueHIDEvent:`; typing through `UIKeyboardImpl`; keys as HID keyboard events | `drawViewHierarchyInRect:` | Finite Core Animation, gliding scroll views |
 | Web | Trusted CDP input from the tool, asked over the `nsgoTest` binding; macOS editing commands | `Page.captureScreenshot` | Animator, finite DOM animations |
 | Windows | Posted mouse and wheel messages; keys at `editKey` and `shortcut` with the thread's keyboard state | `PrintWindow` | Transitions, moves, fades |
