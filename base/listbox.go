@@ -11,8 +11,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// The list Select and Combobox open, its state machine and how it presents
-// itself, with no look, as NSH's listbox.rs:
+// The list Select and Combobox open and SuggestList shows at a caret, its state machine and how it presents itself, with no look, as NSH's listbox.rs:
 //
 //   - listShown is the rows the items show for a query: a case-insensitive
 //     substring of the titles, in their order, adjacent items of one Group
@@ -634,6 +633,9 @@ type listParts struct {
 	renderItem  func(SelectEntry) core.Node
 	renderGroup func(SelectGroup) core.Node
 	empty       core.Node
+	// listLabel names the rows' list for screen readers, and keyboardTaps is what a tap on them does to the software keyboard.
+	listLabel    string
+	keyboardTaps core.KeyboardTaps
 }
 
 // listHooks are what the list asks of its component.
@@ -681,7 +683,8 @@ func (lb *listbox) content(onSheet bool, p listParts, h listHooks) []core.Node {
 		ViewabilityConfig:     core.ViewabilityConfig{ItemVisiblePercentThreshold: listInView},
 		OnViewableItemsChange: lb.viewable}
 	listStyle := core.Style{FlexShrink: 1, MinHeight: core.Pt(0)}.Merge(p.list.Style)
-	nodes = append(nodes, core.Scroll{Role: core.RoleListbox, Class: p.list.Class, Style: listStyle, StyleFunc: p.list.Fn, Children: []core.Node{rows}})
+	nodes = append(nodes, core.Scroll{Role: core.RoleListbox, Label: p.listLabel, Behavior: core.ScrollBehavior{KeyboardShouldPersistTaps: p.keyboardTaps},
+		Class: p.list.Class, Style: listStyle, StyleFunc: p.list.Fn, Children: []core.Node{rows}})
 	if p.empty != nil {
 		nodes = append(nodes, core.Show{When: func() bool { return len(lb.shown.Get().rows) == 0 },
 			Then: func(*core.Scope) core.Node { return p.empty }})
