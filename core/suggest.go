@@ -13,7 +13,7 @@ type SuggestOptions struct {
 	Trigger string
 	// AllowSpaces lets a query contain spaces.
 	AllowSpaces bool
-	// AllowedPrefixes are what may precede Trigger. When nil, a line start or a space is accepted.
+	// AllowedPrefixes are what may precede Trigger besides a line's start, a space when nil.
 	AllowedPrefixes []string
 	// OnOpen and OnClose hear a query start and end.
 	OnOpen, OnClose func()
@@ -235,15 +235,15 @@ func suggestionRange(value string, caret int, o SuggestOptions) (from, to int, q
 		return
 	}
 	prefix := before[:at]
-	allowed := false
+	// A line's start always is, as base/richeditor's Suggestion takes a text block's.
+	allowed := prefix == "" || strings.HasSuffix(prefix, "\n")
 	if o.AllowedPrefixes == nil {
-		allowed = prefix == "" || strings.HasSuffix(prefix, " ") || strings.HasSuffix(prefix, "\n")
-	} else {
-		for _, p := range o.AllowedPrefixes {
-			if strings.HasSuffix(prefix, p) {
-				allowed = true
-				break
-			}
+		allowed = allowed || strings.HasSuffix(prefix, " ")
+	}
+	for _, p := range o.AllowedPrefixes {
+		if strings.HasSuffix(prefix, p) {
+			allowed = true
+			break
 		}
 	}
 	if !allowed {

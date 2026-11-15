@@ -58,4 +58,9 @@ func TestSuggestionRangeAllowedPrefixes(t *testing.T) {
 	if _, _, _, ok := suggestionRange("hi @re", 6, o); ok {
 		t.Fatal("a space opened a query its prefixes leave out")
 	}
+	for _, value := range []string{"@re", "hi\n@re"} {
+		if _, _, query, ok := suggestionRange(value, UTF16Len(value), o); !ok || query != "re" {
+			t.Fatalf("at a line's start of %q: %q, %v", value, query, ok)
+		}
+	}
 }
