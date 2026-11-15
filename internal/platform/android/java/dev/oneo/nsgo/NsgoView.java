@@ -975,7 +975,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             return;
         }
         if (request == RecordingService.PERMISSION_REQUEST) {
-            recordingPermission(results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED);
+            // The prompt asked for POST_NOTIFICATIONS too where the recording's notification needed it, which is asked once, as Notifications asks it.
+            if (java.util.Arrays.asList(permissions).contains(Notifications.PERMISSION)) Notifications.markAsked(getContext());
+            recordingPermission(RecordingService.granted(getContext()));
             return;
         }
         if (request == Notifications.PERMISSION_REQUEST) {
@@ -3296,14 +3298,14 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /**
-     * Starts a recording, on the UI thread: only for an app that declares the service, while an activity of the app is visible, as Android lets only a foreground app start using the microphone, and once RECORD_AUDIO is granted, which it asks for first.
+     * Starts a recording, on the UI thread: only for an app that declares the service, while an activity of the app is visible, as Android lets only a foreground app start using the microphone, and once RECORD_AUDIO is granted, which it asks for first. From Android 13 it asks for POST_NOTIFICATIONS with it, or alone the first time, as without it the service's notification does not show; a refusal still records.
      */
     private void recordingStart(JSONObject m) {
         long id = m.optLong("id");
         String refusal = recordingRefusal();
         if (refusal != null) {
             write(Protocol.RECORDING_REPORT, RecordingService.refusal("ended", id, "unavailable", refusal));
-        } else if (RecordingService.granted(getContext())) {
+        } else if (RecordingService.granted(getContext()) && !Notifications.needsPrompt(getContext())) {
             RecordingService.start(getContext().getApplicationContext(), engine, m);
         } else {
             recordingStarts.add(m);
@@ -3335,13 +3337,21 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         return null;
     }
 
+    /** Asks for RECORD_AUDIO unless it is granted, with POST_NOTIFICATIONS where the recording's notification needs it and it was never asked. */
     private void askRecording() {
         if (recordingAsking) return;
+        ArrayList<String> asked = new ArrayList<>();
+        if (!RecordingService.granted(getContext())) asked.add(RecordingService.PERMISSION);
+        if (Notifications.needsPrompt(getContext())) asked.add(Notifications.PERMISSION);
+        if (asked.isEmpty()) {
+            recordingPermission(RecordingService.granted(getContext()));
+            return;
+        }
         recordingAsking = true;
-        activity().requestPermissions(new String[] {"android.permission.RECORD_AUDIO"}, RecordingService.PERMISSION_REQUEST);
+        activity().requestPermissions(asked.toArray(new String[0]), RecordingService.PERMISSION_REQUEST);
     }
 
-    /** Hears RECORD_AUDIO's prompt answered: the authorizes and the starts waiting for it go on. */
+    /** Hears RECORD_AUDIO's prompt answered, or POST_NOTIFICATIONS' alone: the authorizes and the starts waiting for it go on, whatever the user said of notifications. */
     private void recordingPermission(boolean granted) {
         recordingAsking = false;
         recordingState();

@@ -41,8 +41,8 @@ public final class RecordingService extends Service {
     private static final String TAG = "nsgo";
     private static final String CHANNEL = "nsgo.recording";
     private static final int NOTIFICATION = 0x6e7372;
-    private static final String PERMISSION = "android.permission.RECORD_AUDIO";
-    /** The request code of RECORD_AUDIO's prompt. */
+    static final String PERMISSION = "android.permission.RECORD_AUDIO";
+    /** The request code of RECORD_AUDIO's prompt, which asks for POST_NOTIFICATIONS too where the service's notification needs it. */
     static final int PERMISSION_REQUEST = 0x6e7b;
     /** The most PCM a WAV holds: RIFF's sizes are 32 bits and count 36 bytes of header too. */
     private static final long MAX_DATA = 0xffffffffL - 36;

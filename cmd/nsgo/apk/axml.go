@@ -42,11 +42,12 @@ type Manifest struct {
 	Recording bool
 }
 
-// recordingPermissions are what the runtime's recording service needs: the microphone, a foreground service and, from Android 14, one of the microphone type.
+// recordingPermissions are what the runtime's recording service needs: the microphone, a foreground service, from Android 14 one of the microphone type, and from Android 13 the notifications the service's notification shows with, which RecordWAV asks for with the microphone.
 var recordingPermissions = []string{
 	"android.permission.RECORD_AUDIO",
 	"android.permission.FOREGROUND_SERVICE",
 	"android.permission.FOREGROUND_SERVICE_MICROPHONE",
+	"android.permission.POST_NOTIFICATIONS",
 }
 
 // The binary XML chunk and value types, from Android's ResourceTypes.h.
