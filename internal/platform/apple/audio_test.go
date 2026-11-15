@@ -5,6 +5,7 @@ package apple
 import (
 	"encoding/binary"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -373,6 +374,124 @@ func TestAPlayerFailsAsTheDesignSays(t *testing.T) {
 		// Played again, it loads again and fails again.
 		ta.send(id, driver.AudioRequest{Command: driver.AudioResume})
 		ta.wait(id, driver.AudioFailure, 10*time.Second, nil)
+	}
+}
+
+func TestAPreloadLoadsAFailedPlayerAgain(t *testing.T) {
+	ta := newTestAudio(t)
+	path := filepath.Join(t.TempDir(), "later.wav")
+	openPlayer(ta, 1, driver.ImageSource{URI: path}, false)
+	ta.send(1, driver.AudioRequest{Command: driver.AudioPreload})
+	if e := ta.wait(1, driver.AudioFailure, 5*time.Second, nil); e.Error != driver.AudioNotSupported {
+		t.Fatalf("a missing file failed with %q (%s)", e.Error, e.Message)
+	}
+	if err := os.WriteFile(path, wav(300*time.Millisecond), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The core waits in loading for the preload's answer: the failed player loads again.
+	ta.send(1, driver.AudioRequest{Command: driver.AudioPreload})
+	if e := ta.wait(1, driver.AudioOpened, 5*time.Second, nil); !near(e.Duration, 300*time.Millisecond) {
+		t.Errorf("loaded again %+v", e)
+	}
+}
+
+func TestAPlayerPlaysOnFromWhereItFailed(t *testing.T) {
+	ta := newTestAudio(t)
+	openPlayer(ta, 1, driver.ImageSource{Data: wav(3 * time.Second)}, false)
+	ta.send(1, driver.AudioRequest{Command: driver.AudioResume})
+	ta.wait(1, driver.AudioPlaying, 5*time.Second, nil)
+	var last time.Duration
+	for last < 400*time.Millisecond {
+		last = ta.wait(1, driver.AudioProgress, 2*time.Second, nil).Position
+	}
+	// The output lost while it plays, as AVPlayerItemFailedToPlayToEndTimeNotification reports it.
+	onMain(func() { ta.audio.players[1].fail(driver.AudioFailed, "the output went") })
+	ta.wait(1, driver.AudioFailure, time.Second, nil)
+	// The core keeps the position it had and takes none lower without a seek, so the player plays on from there.
+	ta.send(1, driver.AudioRequest{Command: driver.AudioResume})
+	ta.wait(1, driver.AudioOpened, 5*time.Second, nil)
+	ta.wait(1, driver.AudioPlaying, time.Second, nil)
+	if e := ta.wait(1, driver.AudioProgress, 2*time.Second, nil); e.Position < last || e.Seeks != 0 {
+		t.Errorf("played again from %v (%d seeks), want %v on", e.Position, e.Seeks, last)
+	}
+}
+
+// encoded is a file of name holding length of silence that afconvert encoded with args, skipping the test where the Mac has no afconvert.
+func encoded(t *testing.T, length time.Duration, name string, args ...string) string {
+	t.Helper()
+	afconvert, err := exec.LookPath("afconvert")
+	if err != nil {
+		t.Skip("no afconvert to encode the audio with")
+	}
+	dir := t.TempDir()
+	source, out := filepath.Join(dir, "source.wav"), filepath.Join(dir, name)
+	if err := os.WriteFile(source, wavOf(length, 44100, 1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := exec.Command(afconvert, append(args, source, out)...).CombinedOutput(); err != nil {
+		t.Fatalf("afconvert %v: %v: %s", args, err, b)
+	}
+	return out
+}
+
+// TestCompressedAudioDecodesAndPlays plays the formats besides WAV that the design names: AAC in an M4A and FLAC, which AVFoundation decodes. MP3 stays a check by hand, as no tool on a Mac encodes it.
+func TestCompressedAudioDecodesAndPlays(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		args []string
+	}{
+		{"silence.m4a", []string{"-f", "m4af", "-d", "aac"}},
+		{"silence.flac", []string{"-f", "flac", "-d", "flac"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			path := encoded(t, 400*time.Millisecond, c.name, c.args...)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ta := newTestAudio(t)
+			limits := func(src driver.ImageSource) driver.AudioRequest {
+				return driver.AudioRequest{Command: driver.AudioLoad, Source: src, MaxBytes: driver.MaxSoundBytes, MaxDuration: driver.MaxSoundDuration}
+			}
+			// From its file and from its bytes, which the temporary file is named for.
+			for id, src := range []driver.ImageSource{{URI: path}, {Data: data}} {
+				ta.send(uint32(id+1), limits(src))
+				if e := ta.wait(uint32(id+1), driver.AudioLoaded, 5*time.Second, nil); !near(e.Duration, 400*time.Millisecond) || e.Bytes == 0 || e.Cut {
+					t.Errorf("sound %d loaded %+v", id+1, e)
+				}
+			}
+			ta.send(1, driver.AudioRequest{Command: driver.AudioPlay, Volume: 0.01, Rate: 1})
+			openPlayer(ta, 3, driver.ImageSource{URI: path}, false)
+			ta.send(3, driver.AudioRequest{Command: driver.AudioResume})
+			if e := ta.wait(3, driver.AudioOpened, 5*time.Second, nil); !near(e.Duration, 400*time.Millisecond) {
+				t.Errorf("player opened %+v", e)
+			}
+			ta.wait(3, driver.AudioPlaying, time.Second, nil)
+			ta.wait(3, driver.AudioEnded, 5*time.Second, nil)
+		})
+	}
+}
+
+func TestAudioThatCannotBeDecodedFailsWithDecode(t *testing.T) {
+	ta := newTestAudio(t)
+	dir := t.TempDir()
+	id := uint32(0)
+	for _, name := range []string{"broken.m4a", "broken.flac", "broken.mp3"} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(strings.Repeat("not audio ", 100)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		id++
+		ta.send(id, driver.AudioRequest{Command: driver.AudioLoad, Source: driver.ImageSource{URI: path}, MaxBytes: driver.MaxSoundBytes, MaxDuration: driver.MaxSoundDuration})
+		if e := ta.wait(id, driver.AudioFailure, 5*time.Second, nil); e.Error != driver.AudioDecode {
+			t.Errorf("sound of %s failed with %q (%s), want %q", name, e.Error, e.Message, driver.AudioDecode)
+		}
+		id++
+		openPlayer(ta, id, driver.ImageSource{URI: path}, false)
+		ta.send(id, driver.AudioRequest{Command: driver.AudioResume})
+		if e := ta.wait(id, driver.AudioFailure, 10*time.Second, nil); e.Error != driver.AudioDecode {
+			t.Errorf("player of %s failed with %q (%s), want %q", name, e.Error, e.Message, driver.AudioDecode)
+		}
 	}
 }
 

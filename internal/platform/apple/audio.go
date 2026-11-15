@@ -591,7 +591,7 @@ type audioPlayer struct {
 	stops        []func()
 	// file is the temporary file holding bytes the player plays, removed with it.
 	file string
-	// position is where a seek asked it to be before it could seek, applied at its load.
+	// position is where its next load starts it: where AudioOpen or a seek asked it to be before it could seek, then where it last reported it was, so a load after a failure plays on from where the core has it.
 	position time.Duration
 	// opening says the player is being made, its source read on a goroutine; generation counts the makings, so one that finishes after a close finds the player went.
 	opening                                       bool
@@ -606,9 +606,14 @@ type audioPlayer struct {
 	release func()
 }
 
-func (p *audioPlayer) report(e driver.AudioEvent) { p.audio.report(p.id, e) }
+func (p *audioPlayer) report(e driver.AudioEvent) {
+	if e.Phase == driver.AudioProgress || e.Phase == driver.AudioPaused {
+		p.position = e.Position
+	}
+	p.audio.report(p.id, e)
+}
 
-// fail reports the player failed, once, and stops it until a play loads it again.
+// fail reports the player failed, once, and stops it until a play or a preload loads it again.
 func (p *audioPlayer) fail(code, message string) {
 	if p.failed {
 		return
@@ -624,13 +629,10 @@ func (p *audioPlayer) fail(code, message string) {
 func (p *audioPlayer) apply(r *driver.AudioRequest) {
 	switch r.Command {
 	case driver.AudioPreload:
+		p.retry()
 		p.open()
 	case driver.AudioResume:
-		if p.failed {
-			// Asked again: try again from the start.
-			p.close()
-			p.failed, p.loaded, p.ended = false, false, false
-		}
+		p.retry()
 		p.open()
 		if p.loaded {
 			p.start()
@@ -656,6 +658,15 @@ func (p *audioPlayer) apply(r *driver.AudioRequest) {
 			}
 		}
 	}
+}
+
+// retry lets a failed player go, so that the open after it, a preload's or a play's, loads it again at where it last reported it was, or from the start if it had ended.
+func (p *audioPlayer) retry() {
+	if !p.failed {
+		return
+	}
+	p.close()
+	p.failed, p.loaded = false, false
 }
 
 // progress is an AudioProgress at position.
@@ -882,10 +893,11 @@ func (p *audioPlayer) check() {
 	}
 }
 
-// seek moves the player to position exactly.
+// seek moves the player to position exactly, in nanoseconds rather than cmTimeOf's 600ths of a second, which could land a load after a failure before the position the core has.
 func (p *audioPlayer) seek(position time.Duration) {
 	zero := cmTimeOf(0)
-	p.player.Send(sel("seekToTime:toleranceBefore:toleranceAfter:"), cmTimeOf(position), zero, zero)
+	at := cmTime{Value: position.Nanoseconds(), Timescale: int32(time.Second), Flags: 1}
+	p.player.Send(sel("seekToTime:toleranceBefore:toleranceAfter:"), at, zero, zero)
 }
 
 // start plays the loaded player from where it is, from the start after it ended, holding the session while it plays.
