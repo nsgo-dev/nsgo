@@ -8,7 +8,7 @@ The first design covers:
 
 - choosing contacts through the platform's picker, which needs no permission;
 - adding an event through the platform's editor, which needs no permission where the platform allows it;
-- reading each permission without asking, and asking for it;
+- reading each permission without asking, and asking for it, through `core.Permission` ([permissions](services.md#permissions)), never an API of the service's own;
 - reading a contact's selected fields and, where permission allows, querying contacts;
 - listing calendars and the occurrences of events in a time range;
 - creating, updating and deleting an event with an explicit user action; and
@@ -44,7 +44,7 @@ The picker returns the provider ID and the fields the user chose. A query takes 
 
 Writing a contact is a separate operation from reading. It must say whether it creates a new record or applies a revision to an existing provider ID, and it must report conflicts instead of overwriting a newer edit silently. The first implementation may leave writes out if both platforms cannot provide the same conflict semantics; a picker and read-only API must not imply write support.
 
-The permission reads as not asked, granted, limited, denied or restricted. Apple reads it with `CNContactStore`'s `authorizationStatusForEntityType:` and asks with `requestAccessForEntityType:completionHandler:`; Android asks for `READ_CONTACTS` for reads and `WRITE_CONTACTS` only for writes. Limited is iOS 18's `CNAuthorizationStatusLimited`: queries and reads see only the contacts the user shared, and one outside them is not found, not an error. Denied and restricted return no contact bytes. A package declares the usage description and permissions in YAML; code does not add them to a manifest implicitly.
+The permission joins `core.Permission` as a contacts key and reads as not asked, granted, limited, denied or restricted; restricted is `PermissionDenied`, which counts an administrator's refusal, and limited is a level `PermissionStatus` lacks (open decision 2). Apple reads it with `CNContactStore`'s `authorizationStatusForEntityType:` and asks with `requestAccessForEntityType:completionHandler:`; Android asks for `READ_CONTACTS` for reads and `WRITE_CONTACTS` only for writes. Limited is iOS 18's `CNAuthorizationStatusLimited`: queries and reads see only the contacts the user shared, and one outside them is not found, not an error. Denied and restricted return no contact bytes. A package declares the usage description and permissions in YAML; code does not add them to a manifest implicitly.
 
 ## Calendar
 
@@ -56,7 +56,7 @@ Creating an event takes an explicit calendar ID; updating and deleting take the 
 
 An event ID does not survive every change: EventKit's `eventIdentifier` will likely change when the event moves to another calendar, on this device or through a sync from another. An update or delete whose ID no longer resolves fails with not-found, never reports success, so the app can query again rather than believe the event is gone.
 
-The permission reads as not asked, write-only, full, denied or restricted. From iOS 17 and macOS 14, Apple asks with `requestWriteOnlyAccessToEventsWithCompletion:` or `requestFullAccessToEventsWithCompletion:` and needs `NSCalendarsWriteOnlyAccessUsageDescription` or `NSCalendarsFullAccessUsageDescription`; on iOS 17 an app with only `NSCalendarsUsageDescription` is denied without a prompt. Below them, `requestAccessToEntityType:` asks for the one level there is, with `NSCalendarsUsageDescription`, so an app that supports both declares both keys.
+The permission is `core.PermissionCalendars`, which reads as not asked, write-only, full, denied or restricted. It asks for full access, and reads write-only access, a level `PermissionStatus` lacks, as `PermissionDenied` (open decision 2). From iOS 17 and macOS 14, Apple asks with `requestWriteOnlyAccessToEventsWithCompletion:` or `requestFullAccessToEventsWithCompletion:` and needs `NSCalendarsWriteOnlyAccessUsageDescription` or `NSCalendarsFullAccessUsageDescription`; on iOS 17 an app with only `NSCalendarsUsageDescription` is denied without a prompt. Below them, `requestAccessToEntityType:` asks for the one level there is, with `NSCalendarsUsageDescription`, so an app that supports both declares both keys.
 
 Write-only access lets an app create events and nothing else: listing calendars returns one virtual calendar that is no real one, a query returns nothing, not even the events the app created, and the user chooses the calendar a new event goes to. Under it the calendar list holds that one entry, marked as the system's choice, creating into it saves where the user chooses, and queries, updates and deletes fail with a permission error rather than answering empty or not-found. Android has no write-only level: choosing a calendar reads `CalendarContract.Calendars`, which needs `READ_CALENDAR`, so creating, updating or deleting needs `READ_CALENDAR` and `WRITE_CALENDAR` together. An app that only adds events uses the editor instead, on iOS and Android.
 
@@ -66,7 +66,7 @@ A calendar picker is optional and must be an app choice; the system permission p
 
 Contacts and calendar data use a dedicated capability, checked in `core/access.go` and distinct from `AccessNotifications`, `AccessNetwork` and the photo picker, so a TSX package is refused or granted on purpose. The final access model must decide whether contacts and calendar are separate grants. A restricted scope receives no IDs or metadata from a denied request. The backend does not log names, notes, addresses, event titles or raw provider errors containing them.
 
-The tool adds the declarations an app asks for in `nsgo.yaml`: Apple usage descriptions from `apple.info` and Android permissions from `android.permissions`. On macOS it also claims `com.apple.security.personal-information.addressbook` when `apple.info` has `NSContactsUsageDescription`, and `com.apple.security.personal-information.calendars` when it has a calendar usage description, as `hardenedEntitlements` in `cmd/nsgo/sign.go` does for the microphone and the camera: the hardened runtime of a notarized build and the App Sandbox of a store build deny Contacts and EventKit without them. Usage-description text is app-owned and localized. The service does not silently sync, cache or upload data, and it does not run in the background merely because a permission was granted.
+The tool adds the declarations an app asks for in `nsgo.yaml`: Apple usage descriptions from `apple.info` and Android permissions from `android.permissions`. On macOS `hardenedEntitlements` in `cmd/nsgo/sign.go` claims `com.apple.security.personal-information.calendars` when `apple.info` has a calendar or reminder usage description, as it does for the microphone and the camera, and is to claim `com.apple.security.personal-information.addressbook` when it has `NSContactsUsageDescription`: the hardened runtime of a notarized build and the App Sandbox of a store build deny Contacts and EventKit without them. Usage-description text is app-owned and localized. The service does not silently sync, cache or upload data, and it does not run in the background merely because a permission was granted.
 
 ## Verification
 
@@ -76,7 +76,7 @@ The implementation is complete only when these checks exist:
 - `internal/driver` tests cover request IDs, empty versus absent fields, bounded results and large notes or payloads;
 - Apple tests use fake contact and event stores for limited and write-only access, picker results, authorization changes, stale records and changed identifiers;
 - Android tests use fake `ContentResolver` providers for permission separation, cursors, `Instances` versus `Events` IDs, lookup keys, account changes and revision conflicts;
-- `nsgotest` fakes the permissions, the picker's and the editor's answers and the stores, as it does `PickImages` and `NotificationPermission`, and the gallery's System page checks each service with it;
+- `nsgotest` fakes the permissions in `Permissions` and `PermissionAnswers`, as it does every permission, and the picker's and the editor's answers and the stores, as it does `PickImages`, and the gallery's System page checks each service with it;
 - `cmd/nsgo` tests check the macOS entitlements each usage description brings;
 - target tests use fixture stores containing no real personal data and verify that a denied request produces no observable record metadata; and
 - `docs/architecture/services.md`, `docs/public/en/services.md` and the roadmap describe what was built.
@@ -86,7 +86,7 @@ The implementation is complete only when these checks exist:
 These decisions need confirmation before an implementation chooses them, and the [open questions](../../ARCHITECTURE.md#open-questions) list them:
 
 1. Is the first release picker plus read-only, or does it include contact and event writes?
-2. Are contacts and calendar separate capabilities and permission APIs?
+2. Are contacts and calendar separate capabilities, and do contacts' limited and calendars' write-only access read through `core.Permission` as levels `PermissionStatus` gains or as keys of their own?
 3. Which contact fields, recurrence forms and attendee data are in the stable cross-platform model?
 4. Does the calendar API expose provider change notifications, or require apps to requery after each operation?
 5. Are provider IDs exposed as opaque strings, or wrapped in handles that expire with an engine?
