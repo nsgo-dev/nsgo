@@ -334,3 +334,57 @@ func TestEncodeManifestOverlay(t *testing.T) {
 		t.Errorf("property %s = %s", p.string(t, "name"), p.string(t, "value"))
 	}
 }
+
+// TestFrameworkAttributeIDs holds androidAttrs to the IDs of the SDK's public-final.xml, as the system reads a binary manifest's attributes by ID and ignores one under another's.
+func TestFrameworkAttributeIDs(t *testing.T) {
+	want := map[string]uint32{
+		"versionCode":                 0x0101021b,
+		"versionName":                 0x0101021c,
+		"minSdkVersion":               0x0101020c,
+		"targetSdkVersion":            0x01010270,
+		"name":                        0x01010003,
+		"label":                       0x01010001,
+		"exported":                    0x01010010,
+		"authorities":                 0x01010018,
+		"grantUriPermissions":         0x0101001b,
+		"theme":                       0x01010000,
+		"icon":                        0x01010002,
+		"debuggable":                  0x0101000f,
+		"extractNativeLibs":           0x010104ea,
+		"enableOnBackInvokedCallback": 0x0101066c,
+		"foregroundServiceType":       0x01010599,
+		"configChanges":               0x0101001f,
+		"windowSoftInputMode":         0x0101022b,
+		"value":                       0x01010024,
+	}
+	for name, spec := range androidAttrs {
+		id, ok := want[name]
+		if !ok {
+			t.Errorf("android:%s has no ID to check it against", name)
+			continue
+		}
+		if spec.id != id {
+			t.Errorf("android:%s = %#x, want %#x", name, spec.id, id)
+		}
+	}
+}
+
+// TestForegroundServiceTypes holds the flags to attrs_manifest.xml's.
+func TestForegroundServiceTypes(t *testing.T) {
+	for s, want := range map[string]uint32{
+		"microphone":              0x80,
+		"camera|microphone":       0xc0,
+		"fileManagement":          0x1000,
+		"mediaProcessing":         0x2000,
+		"specialUse":              0x40000000,
+		"dataSync | shortService": 0x801,
+	} {
+		got, err := parseForegroundServiceType(s)
+		if err != nil || got != want {
+			t.Errorf("parseForegroundServiceType(%q) = %#x, %v, want %#x", s, got, err, want)
+		}
+	}
+	if _, err := parseForegroundServiceType("speaker"); err == nil {
+		t.Error("an unknown type was accepted")
+	}
+}

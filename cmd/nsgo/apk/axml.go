@@ -89,12 +89,28 @@ var androidAttrs = map[string]attrSpec{
 	"enableOnBackInvokedCallback": {0x0101066c, typeBool, parseBool},
 	"configChanges":               {0x0101001f, typeHex, parseConfigChanges},
 	"windowSoftInputMode":         {0x0101022b, typeHex, parseSoftInputMode},
-	"foregroundServiceType":       {0x01010599, typeHex, parseFlags(foregroundServiceTypes)},
+	"foregroundServiceType":       {0x01010599, typeHex, parseForegroundServiceType},
 	"value":                       {0x01010024, typeString, nil},
 }
 
-// foregroundServiceTypes are the foreground service types a service may declare, as ServiceInfo's FOREGROUND_SERVICE_TYPE_*: the overlay's only so far.
-var foregroundServiceTypes = map[string]uint32{"specialUse": 0x40000000}
+// foregroundServiceTypes are the ServiceInfo.FOREGROUND_SERVICE_TYPE_* names a service lists, as attrs_manifest.xml has them.
+var foregroundServiceTypes = map[string]uint32{
+	"dataSync":        0x1,
+	"mediaPlayback":   0x2,
+	"phoneCall":       0x4,
+	"location":        0x8,
+	"connectedDevice": 0x10,
+	"mediaProjection": 0x20,
+	"camera":          0x40,
+	"microphone":      0x80,
+	"health":          0x100,
+	"remoteMessaging": 0x200,
+	"systemExempted":  0x400,
+	"shortService":    0x800,
+	"fileManagement":  0x1000,
+	"mediaProcessing": 0x2000,
+	"specialUse":      0x40000000,
+}
 
 // OverlayService is the service overlays over other apps take (Manifest.Overlay), and OverlaySubtype the subtype of its specialUse type, which stores read.
 const (
@@ -355,8 +371,9 @@ func parseFlags(table map[string]uint32) func(string) (uint32, error) {
 }
 
 var (
-	parseConfigChanges = parseFlags(configChanges)
-	parseSoftInputMode = parseFlags(softInputModes)
+	parseConfigChanges         = parseFlags(configChanges)
+	parseSoftInputMode         = parseFlags(softInputModes)
+	parseForegroundServiceType = parseFlags(foregroundServiceTypes)
 )
 
 // encoder builds the element chunks and the string pool they index.
