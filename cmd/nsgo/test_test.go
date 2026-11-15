@@ -212,6 +212,31 @@ func TestIsTestName(t *testing.T) {
 	}
 }
 
+func TestTargetHostError(t *testing.T) {
+	for _, tc := range []struct {
+		target, want string
+		hosted       bool
+	}{
+		{target: "android", want: "requires the package's tests to import github.com/nsgo-dev/nsgo"},
+		{target: "android", hosted: true},
+		{target: "ios_simulator"},
+		{target: "macos"},
+	} {
+		t.Run(tc.target+map[bool]string{true: "/hosted", false: "/unhosted"}[tc.hosted], func(t *testing.T) {
+			err := targetHostError(tc.target, tc.hosted)
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("targetHostError(%q, %v) = %v, want no error", tc.target, tc.hosted, err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("targetHostError(%q, %v) = %v, want an error containing %q", tc.target, tc.hosted, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 	dir := t.TempDir()
 	encode := func(name string) string { return "~" + base64.RawURLEncoding.EncodeToString([]byte(name)) }

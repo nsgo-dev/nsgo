@@ -60,6 +60,13 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 		plain("no tests match")
 		return nil
 	}
+	hosted, err := linksPlatform(ctx, p, seen)
+	if err != nil {
+		return err
+	}
+	if err := targetHostError(opts.target, hosted); err != nil {
+		return err
+	}
 	p.testBinary = true
 	progress := begin("building the tests for %s", opts.target)
 	runner, err := targetFor(ctx, p, opts)
@@ -80,12 +87,12 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	}
 	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, trace: opts.trace, out: os.Stderr}
 	savedPaths := map[string]bool{}
-	// A package that links no platform, as a library's, runs headless in
-	// the target's runtime: the web's engine, say.
+	// A package that links no platform, as a library's, runs headless in the
+	// target's runtime where the target can host that process (the web's
+	// engine, say). Android is rejected above because its stdout is the
+	// protocol and needs the linked test host.
 	env := slices.Clone(opts.env)
-	if hosted, err := linksPlatform(ctx, p, seen); err != nil {
-		return err
-	} else if hosted {
+	if hosted {
 		env = append(env, "NSGO_TEST_TARGET="+opts.target)
 	}
 	if opts.trace {
@@ -122,6 +129,18 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 		}
 	}
 	return r.finish(opts, nil)
+}
+
+// targetHostError refuses the Android target when the package's test binary
+// does not link NSGo's root package. Android runs that binary as a child
+// process whose stdout is the mount protocol; without the root package,
+// nsgotest.Main falls back to os.Exit and go test writes its own output to
+// that protocol, which the Java reader would interpret as a huge length.
+func targetHostError(target string, hosted bool) error {
+	if target == "android" && !hosted {
+		return errors.New("test: -target android requires the package's tests to import github.com/nsgo-dev/nsgo (a blank import is enough); run it headless or add that import before using an Android target")
+	}
+	return nil
 }
 
 // traceWriter passes a test's trace lines on as they come: the batches
