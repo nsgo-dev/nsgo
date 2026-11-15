@@ -9,7 +9,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// videoSessions are the videos that play with an audio session of their own, and how each lets it go, which internal/audiosession weighs against the other holders of the shared AVAudioSession. Only the main thread touches it.
+// videoSessions are the videos playing and the audio session each holds, which internal/audiosession weighs against the other holders of the shared AVAudioSession. Only the main thread touches it.
 var videoSessions = map[*Video]videoSession{}
 
 type videoSession struct {
@@ -17,21 +17,24 @@ type videoSession struct {
 	release func()
 }
 
-// audioPlaying says video key plays with session, or plays no more when session is AudioSessionDefault, which holds nothing.
-func audioPlaying(key *Video, session driver.AudioSession) {
+// audioPlaying says video key plays with session, or, playing false, plays no more. AudioSessionDefault holds the session at the app's own category, so that it stays active under the playing video: deactivating it, as a holder of another level letting go would, stops the video.
+func audioPlaying(key *Video, session driver.AudioSession, playing bool) {
 	held, ok := videoSessions[key]
-	if ok && held.session == session {
-		return
-	}
-	if session == driver.AudioSessionDefault {
+	if !playing {
 		if ok {
 			delete(videoSessions, key)
 			held.release()
 		}
 		return
 	}
-	level := audiosession.Playback
-	if session == driver.AudioSessionMixWithOthers {
+	if ok && held.session == session {
+		return
+	}
+	level := audiosession.Kept
+	switch session {
+	case driver.AudioSessionPlayback:
+		level = audiosession.Playback
+	case driver.AudioSessionMixWithOthers:
 		level = audiosession.Mixing
 	}
 	// The new level is held before the old one goes, so a playing video that changes its session moves the session across without deactivating it; when it cannot, the video keeps the old one.

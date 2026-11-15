@@ -320,7 +320,7 @@ func (v *Video) open() {
 // close stops the player and stops observing it. A macOS view keeps the
 // last frame; an iOS one lets the player's layer or controller go.
 func (v *Video) close() {
-	audioPlaying(v, driver.AudioSessionDefault)
+	audioPlaying(v, v.config.AudioSession, false)
 	if v.player != 0 && v.timeToken != 0 {
 		v.player.Send(sel("removeTimeObserver:"), v.timeToken)
 	}
@@ -611,11 +611,7 @@ func (v *Video) position() time.Duration {
 
 // followAudio holds the video's audio session while it plays, and lets it go when it does not: the session follows what plays, not what is mounted.
 func (v *Video) followAudio() {
-	if v.player != 0 && v.status != nil && v.status.play.playing {
-		audioPlaying(v, v.config.AudioSession)
-	} else {
-		audioPlaying(v, driver.AudioSessionDefault)
-	}
+	audioPlaying(v, v.config.AudioSession, v.player != 0 && v.status != nil && v.status.play.playing)
 }
 
 // poll reports the player's state every 100ms until it loaded or failed,
