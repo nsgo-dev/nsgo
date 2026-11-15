@@ -1,6 +1,6 @@
 # Text-level search
 
-This is the shared design for issue [#47](https://github.com/nsgo-dev/nsgo/issues/47). It is a goal, not an implemented API. Chat transcript search will consume this capability; the matching rules and highlights belong to `base/textview`, so another document viewer can use them without importing `ui/chat`. Where the design picks an answer to one of its [open decisions](#open-decisions), the answer is a proposal, marked with the decision's number, until the user confirms it.
+This is the shared design for issue [#47](https://github.com/nsgo-dev/nsgo/issues/47). It is a goal, not an implemented API. Chat transcript search will consume this capability; the matching rules and highlights belong to `base/textview`, so another document viewer can use them without importing `ui/chat`. Where it follows one of its [decisions](#decisions), confirmed by the user on 2026-11-15, the decision's number marks it.
 
 ## What a view searches
 
@@ -75,15 +75,15 @@ The implementation is complete only when these checks exist:
 - shared-search tests cover tree order with a view mounted late, replacement, removal, opening and closing, next/previous wrapping, selected bounds across three views and revealing a match in a code block's horizontal scroll; and
 - `ui/chat` tests type a query over three turns, one match in a folded turn's step and one in folded reasoning, show the count, navigate and reveal the selected match clear of the bar, then close with Escape, the focus back where it was and the transcript selection unchanged.
 
-## Open decisions
+## Decisions
 
-These need the user's confirmation before an implementation chooses them, as [Open questions](../../ARCHITECTURE.md#open-questions) records; the body proposes the first answer of each:
+The user confirmed these on 2026-11-15, each the first answer of the question it settled:
 
-1. Should matches stay within one text initially, or should a document-level plain-text view join blocks?
-2. Should `ProvideSearch` automatically include every descendant `TextView`, or must each view opt in through its `Search` field?
-3. Is matching each text synchronously as the view builds it acceptable for large transcripts, or should the API expose an asynchronous index from the start?
-4. Should regular expressions and accent/Unicode-insensitive matching be later options, or belong to a separate search package?
-5. Should an open search unfold a transcript's turns and reasoning, or leave folded content out of it?
-6. Should `TextView` reveal its own match through core's box reveal, or should the owning transcript scroll to `SelectedBounds`?
-7. Should what the app renders itself (`RenderMath`, `RenderCustom`, `RenderCodeBlock`, plugins) stay out of the search, or should such renderers take its matches and report their boxes back?
-8. Should a closed details' children be searched only once it opens, or searched closed and opened to show the selected match, as browsers open a `<details>`?
+1. Matches stay within one text; no document-level plain-text view joins blocks.
+2. `ProvideSearch` includes every descendant `TextView`, and a view's `Search` field joins it to another search instead.
+3. A view matches each text synchronously as it builds it, with no asynchronous index.
+4. Regular expressions and accent- or Unicode-insensitive matching come later as options, not as a separate package.
+5. An open search unfolds a transcript's turns and reasoning rather than leaving folded content out.
+6. `TextView` reveals its own match through core's box reveal; the transcript does not scroll to `SelectedBounds` itself.
+7. What the app renders itself (`RenderMath`, `RenderCustom`, `RenderCodeBlock`, plugins) stays out of the search.
+8. A closed details' children are searched once it opens, not while it is closed.
