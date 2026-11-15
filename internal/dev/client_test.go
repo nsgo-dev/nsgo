@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -138,4 +139,51 @@ func TestDevOverlayKeepsTheLanguageTheAppShows(t *testing.T) {
 func appSpeaks(t *testing.T, langs ...string) {
 	i18n.SetApp(i18n.NewCatalog(langs[0], langs[1:]...))
 	t.Cleanup(func() { i18n.SetApp(nil) })
+}
+
+// Command or Control+R (mod+r) posts the reload the overlay's Reload button does, over the overlay too, and an app that binds the key itself keeps it.
+func TestDevReloadKey(t *testing.T) {
+	var reloads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/_nsgo/reload" && r.Method == http.MethodPost {
+			reloads.Add(1)
+		}
+	}))
+	defer server.Close()
+	devServer = server.URL
+	t.Setenv("NSGO_DEV_SERVER", "")
+	t.Cleanup(func() { devServer = "" })
+
+	// waitFor waits for want reloads, then a while longer for any more, as each is posted off the engine's goroutine.
+	waitFor := func(what string, want int32) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); reloads.Load() < want && time.Now().Before(deadline); {
+			time.Sleep(5 * time.Millisecond)
+		}
+		time.Sleep(200 * time.Millisecond)
+		if got := reloads.Load(); got != want {
+			t.Fatalf("%s: %d reloads posted, want %d", what, got, want)
+		}
+	}
+
+	app := nsgotest.Start(t, Wrap(func(*core.Scope) core.Node { return core.View{} }))
+	app.Key("mod+r")
+	waitFor("mod+r", 1)
+
+	// An app that failed to render shows the overlay, a modal over it: the key still builds again.
+	app = nsgotest.Start(t, Wrap(func(*core.Scope) core.Node { panic("render failed") }))
+	app.Find("nsgo-dev-overlay")
+	app.Key("mod+r")
+	waitFor("mod+r over the overlay", 2)
+
+	var own atomic.Int32
+	app = nsgotest.Start(t, Wrap(func(cx *core.Scope) core.Node {
+		cx.OnKey("mod+r", func() { own.Add(1) })
+		return core.View{}
+	}))
+	app.Key("mod+r")
+	waitFor("mod+r an app binds", 2)
+	if own.Load() != 1 {
+		t.Fatalf("the app's own mod+r ran %d times, want once", own.Load())
+	}
 }

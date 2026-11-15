@@ -28,7 +28,7 @@ go tool nsgo dev -target android            # on a connected device or emulator,
 
 ## Errors
 
-A failed build shows over the running app, with buttons to copy the error and to build again; fix the file and the next save replaces it. A component that panics while it renders shows the same way. The app's own output, such as `log.Print`, appears in the terminal under the tool's lines.
+A failed build shows over the running app, with buttons to copy the error and to build again; fix the file and the next save replaces it. Command+R in the app, Control+R off Apple platforms, builds and starts it again at any time, over the error too, unless the app binds the key itself; in the browser the key reloads the page as usual. A component that panics while it renders shows the same way. The app's own output, such as `log.Print`, appears in the terminal under the tool's lines.
 
 Before running, `go tool nsgo check` vets the app and type-checks its TSX; `-target all` vets it for every target, so code behind another platform's build tags is checked from a Mac too.
 
