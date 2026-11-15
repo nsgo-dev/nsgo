@@ -14,8 +14,7 @@ import (
 
 // Host is a backend's test host.
 type Host interface {
-	// Main runs the platform's loop on the calling goroutine, the main
-	// thread, and run on another; it ends the process with run's code.
+	// Main runs the platform's loop on the calling goroutine, the main thread, and run on another; it ends the process with run's code once run has returned, never before, as run holds a TestMain's teardown (nsgotest.MainFunc).
 	Main(run func() int)
 	// Open shows app on a new surface as the backend's Run does, with
 	// o's size and what it observes.

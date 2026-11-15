@@ -22,24 +22,36 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
-// mainRan is set once Main hands the main thread to the platform, and
-// opened once a test opened its app there: a process shows one.
+// mainRan is set once Main or MainFunc hands the main thread to the platform, and opened once a test opened its app there: a process shows one.
 var mainRan, opened bool
 
 // Main runs the package's tests, from TestMain:
 //
 //	func TestMain(m *testing.M) { nsgotest.Main(m) }
 //
-// Headless it is m.Run. Under `nsgo test -target` it gives the main
-// thread to the platform, as macOS, iOS and Windows need their windows'
-// loop there, and runs the tests beside it.
+// It is MainFunc(m.Run), and like it never returns.
 func Main(m *testing.M) {
+	MainFunc(m.Run)
+}
+
+// MainFunc runs the package's tests through run, from TestMain, and ends the process with the code run returns. run calls m.Run, with whatever setup and teardown the package needs around it, deferred calls included:
+//
+//	func TestMain(m *testing.M) {
+//		nsgotest.MainFunc(func() int {
+//			setup()
+//			defer teardown()
+//			return m.Run()
+//		})
+//	}
+//
+// Headless it is os.Exit(run()). Under `nsgo test -target` it gives the main thread to the platform, as macOS, iOS and Windows need their windows' loop there, and runs run beside it; the process ends only once run has returned, so its teardown completes first. A target runs each test in a process of its own, so there run, and its setup and teardown, run once per test.
+func MainFunc(run func() int) {
 	if h := testhost.Current(); onTarget() && h != nil {
 		mainRan = true
-		h.Main(m.Run)
+		h.Main(run)
 		return
 	}
-	os.Exit(m.Run())
+	os.Exit(run())
 }
 
 // onTarget reports whether `nsgo test -target` runs the tests.

@@ -21,6 +21,20 @@ func TestPress(t *testing.T) {
 
 `TestMain` gives the platform the main thread when the tests run on a target.
 
+When a package needs process-wide setup and teardown, put them around `m.Run` in `MainFunc`; deferred cleanup runs before the test process exits:
+
+```go
+func TestMain(m *testing.M) {
+	nsgotest.MainFunc(func() int {
+		setup()
+		defer teardown()
+		return m.Run()
+	})
+}
+```
+
+`Main(m)` is the one-line form of `MainFunc(m.Run)`. A target runs each test in its own process, so this setup and teardown run once per test process.
+
 An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, is tested with `nsgotest.StartApp(t, fn)`, which runs the function once in the app's own scope, as `Run` does, so its application menu and quit handlers stay. With a desktop `nsgotest.Environment` the app's main view shows in its main window where `nsgo.Run` opens one: on macOS, and on Windows and Linux for an app's function. There `desktop.CurrentWindow` and `OnClosing` work; `app.CloseWindow()` sends the window's close button's request and reports whether it closed, and a handler alone is tested by calling it and reading `WindowClosing.Canceled()`, or `QuitRequest.Canceled()` for `OnQuitRequest`. Steps act on the main window only. `app.DropFiles` may name anything inside a drop zone: the nearest view around it with `OnFileDrop` takes the files. A view's `Bounds()` is its frame in the window's points, as `Ref.Bounds` reports it. Headless, `app.Press` flips the system switch (`ui.SwitchSystem`) as on a target, and `app.Emit("id:switch", "change", true)` reports a value directly. `app.Navigate` and `app.PostMessage` reach a web view that is mounted but hidden, as it goes on loading.
 
 ## Run the tests
