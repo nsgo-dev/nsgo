@@ -174,6 +174,8 @@ type App struct {
 	Speech     *driver.SpeechRequest
 	speechID   uint32
 	speechText string
+	// microphone is MicrophoneInput's fake recorder.
+	microphone *Microphone
 	// OpenedURLs are the URLs the app opened, oldest first. OpenURL
 	// answers whether each opens; every one does when it is nil.
 	OpenedURLs []string
@@ -385,6 +387,9 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 	}
 	for _, o := range opts {
 		o(a)
+	}
+	if a.microphone != nil && !onTarget() {
+		a.microphone.connect(t)
 	}
 	if os.Getenv("NSGO_TEST_TRACE") != "" {
 		a.trace = os.Stdout
