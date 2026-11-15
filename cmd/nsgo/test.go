@@ -112,6 +112,11 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 			opts.run = "^$"
 		}
 	}
+	tags, err := goTags(ctx, p, opts.env)
+	if err != nil {
+		return err
+	}
+	args = append(args, tagsArgs(tags)...)
 	if opts.run != "" {
 		args = append(args, "-run", opts.run)
 	}

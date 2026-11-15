@@ -208,6 +208,8 @@ type project struct {
 	Build struct {
 		Output  string   `yaml:"output"`
 		Targets []string `yaml:"targets"`
+		// Tags are the app's Go build tags, which every go command the tool runs for the app takes, the tool's own added to them (goTags).
+		Tags []string `yaml:"tags"`
 		// Open shows the output directory once the build finishes; it
 		// defaults to false.
 		Open *bool `yaml:"open"`
@@ -332,6 +334,11 @@ func load(dir string) (*project, error) {
 	}
 	if owner, name, ok := strings.Cut(p.Releases.GitHub, "/"); p.Releases.GitHub != "" && (!ok || owner == "" || name == "" || strings.Contains(name, "/")) {
 		return nil, fmt.Errorf("nsgo.yaml: release.github %q is not owner/name", p.Releases.GitHub)
+	}
+	for _, tag := range p.Build.Tags {
+		if !validTag(tag) {
+			return nil, fmt.Errorf("nsgo.yaml: build.tags has %q; a build tag is letters, digits, underscores and dots, one to an item", tag)
+		}
 	}
 	if p.Dev.Target == "" {
 		p.Dev.Target = "native"

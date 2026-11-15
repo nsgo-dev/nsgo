@@ -32,7 +32,7 @@ func check(ctx context.Context, p *project, target string) error {
 		return checkTSX(ctx, p)
 	}
 	s = begin("vetting")
-	if err := goTool(ctx, p.Dir, nil, "vet", "./..."); err != nil {
+	if err := goToolWithTags(ctx, p, nil, nil, "vet", "./..."); err != nil {
 		s.fail()
 		return err
 	}
@@ -40,11 +40,11 @@ func check(ctx context.Context, p *project, target string) error {
 	// The dev client builds only into nsgo dev's builds, which take the nsgodev tag, and on macOS -automation's agent with nsgoautomation too, so NSGo's own repository vets them as they build them.
 	if path, err := importPathOf(p.Dir); err == nil && path == nsgoModule {
 		s = begin("vetting the dev client")
-		if err := goTool(ctx, p.Dir, []string{"GOFLAGS=-tags=nsgodev"}, "vet", ".", "./internal/dev"); err != nil {
+		if err := goToolWithTags(ctx, p, nil, []string{"nsgodev"}, "vet", ".", "./internal/dev"); err != nil {
 			s.fail()
 			return err
 		}
-		if err := goTool(ctx, p.Dir, []string{"GOOS=darwin", "GOARCH=arm64", "CGO_ENABLED=0", "GOFLAGS=-tags=nsgodev,nsgoautomation"}, "vet", ".", "./internal/dev", "./nsgotest", "./internal/platform/macos"); err != nil {
+		if err := goToolWithTags(ctx, p, []string{"GOOS=darwin", "GOARCH=arm64", "CGO_ENABLED=0"}, []string{"nsgodev", "nsgoautomation"}, "vet", ".", "./internal/dev", "./nsgotest", "./internal/platform/macos"); err != nil {
 			s.fail()
 			return err
 		}
@@ -59,7 +59,7 @@ func check(ctx context.Context, p *project, target string) error {
 			s = begin("vetting for %s", name)
 			env, err := vetEnv(ctx, name)
 			if err == nil {
-				err = goTool(ctx, p.Dir, env, "vet", "./...")
+				err = goToolWithTags(ctx, p, env, targetTags(name), "vet", "./...")
 			}
 			if err != nil {
 				s.fail()
@@ -94,8 +94,7 @@ func checkTSX(ctx context.Context, p *project) error {
 	return nil
 }
 
-// vetEnv is the environment go vets a target's build in, as the target's
-// build sets it.
+// vetEnv is the environment go vets a target's build in, as the target's build sets it; the tags its build adds are targetTags'.
 func vetEnv(ctx context.Context, target string) ([]string, error) {
 	os, arch, _ := strings.Cut(target, "_")
 	switch os {
@@ -103,16 +102,13 @@ func vetEnv(ctx context.Context, target string) ([]string, error) {
 		return []string{"GOOS=darwin", "GOARCH=" + goArch(arch), "CGO_ENABLED=0"}, nil
 	case "windows", "linux":
 		return []string{"GOOS=" + os, "GOARCH=" + goArch(arch), "CGO_ENABLED=0"}, nil
-	case "web":
+	case "web", "miniprogram":
 		return []string{"GOOS=js", "GOARCH=wasm"}, nil
-	case "miniprogram":
-		return []string{"GOOS=js", "GOARCH=wasm", "GOFLAGS=-tags=" + strings.Join(miniprogramTags, ",")}, nil
 	case "ios", "tvos":
 		sys, _, _ := appleOSOf(os)
 		return iosEnv(ctx, sys, arch == "simulator")
 	case "watchos":
-		env, err := iosEnv(ctx, watchOS, arch == "simulator")
-		return append(env, "GOFLAGS=-tags=nsgowatch"), err
+		return iosEnv(ctx, watchOS, arch == "simulator")
 	case "android":
 		if arch == "arm64" {
 			return []string{"GOOS=android", "GOARCH=arm64", "CGO_ENABLED=0"}, nil
@@ -223,7 +219,12 @@ func generateTypes(ctx context.Context, p *project) error {
 		return err
 	}
 	listTypes := func() ([]byte, error) {
-		list := exec.CommandContext(ctx, "go", "list", "-overlay", ov, "-f", "{{.Name}} {{.GoFiles}}", ".")
+		tags, err := goTags(ctx, p, nil)
+		if err != nil {
+			return nil, err
+		}
+		args := append([]string{"list", "-overlay", ov}, tagsArgs(tags)...)
+		list := exec.CommandContext(ctx, "go", append(args, "-f", "{{.Name}} {{.GoFiles}}", ".")...)
 		list.Dir = p.Dir
 		return list.CombinedOutput()
 	}
@@ -272,7 +273,7 @@ func runTypes(ctx context.Context, p *project, buildArgs ...string) error {
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
-	if err := goTool(ctx, p.Dir, nil, append([]string{"build", "-o", bin}, buildArgs...)...); err != nil {
+	if err := goToolWithTags(ctx, p, nil, nil, append([]string{"build", "-o", bin}, buildArgs...)...); err != nil {
 		return err
 	}
 	// typesInit ends the program before main; the timeout guards the
@@ -302,4 +303,14 @@ func goTool(ctx context.Context, dir string, env []string, args ...string) error
 		return fmt.Errorf("go %s failed\n%s", args[0], strings.TrimSpace(out.String()))
 	}
 	return nil
+}
+
+// goToolWithTags is goTool in p's directory with goTags' tags, extra the tool's, after args[0], the go command's subcommand; GOFLAGS's other flags still apply.
+func goToolWithTags(ctx context.Context, p *project, env, extra []string, args ...string) error {
+	tags, err := goTags(ctx, p, env, extra...)
+	if err != nil {
+		return err
+	}
+	args = append(append([]string{args[0]}, tagsArgs(tags)...), args[1:]...)
+	return goTool(ctx, p.Dir, env, args...)
 }

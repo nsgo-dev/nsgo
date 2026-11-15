@@ -498,7 +498,10 @@ func goBuildCommand(ctx context.Context, p *project, out string, env []string, e
 	done = func() {}
 	args := append([]string{"build"}, extra.flags...)
 	args = append(args, "-ldflags", p.ldflags(append(append([]string(nil), ldflags...), p.updateLdflags(env)...)...), "-o", out)
-	tags := extra.tags
+	tags, err := goTags(ctx, p, env, extra.tags...)
+	if err != nil {
+		return nil, nil, err
+	}
 	files := map[string]string{}
 	for k, v := range extra.files {
 		files[k] = v
@@ -547,9 +550,8 @@ func goBuildCommand(ctx context.Context, p *project, out string, env []string, e
 			tags = append(tags, "nsgoautomation")
 		}
 	}
-	if len(tags) > 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
-	}
+	tags = uniqueTags(tags)
+	args = append(args, tagsArgs(tags)...)
 	env, err = smallJSON(ctx, p, env, tags)
 	if err != nil {
 		return nil, nil, err
@@ -610,9 +612,7 @@ func smallJSON(ctx context.Context, p *project, env, tags []string) ([]string, e
 	if p.testBinary {
 		args = append(args, "-test")
 	}
-	if len(tags) > 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
-	}
+	args = append(args, tagsArgs(tags)...)
 	cmd := exec.CommandContext(ctx, "go", append(args, ".")...)
 	cmd.Dir = p.Dir
 	cmd.Env = append(os.Environ(), env...)

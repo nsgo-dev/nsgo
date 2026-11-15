@@ -49,6 +49,7 @@ dev:
   # icon: { png: assets/Icon-dev.png }  # 在 dev 构建中替换 icon 的文件；默认取 assets/*-dev.*
 build:
   output: dist
+  tags: []              # 应用每次构建、测试和检查都使用的 Go 构建标签，例如 timetzdata
   open: false           # true 时构建后打开输出目录
   installers: true      # false 时不生成磁盘映像、Windows 安装程序和 Linux 软件包
   jobs: 0               # 同时构建的目标数；0 为 CPU 数的一半，1 为逐个构建
@@ -65,6 +66,8 @@ build:
 ```
 
 命令行参数会替换同名的值，例如 `-target`、`-version` 或 `-output`；`-h` 列出全部参数。
+
+工具为应用运行的每个 go 命令都使用 `build.tags`：`dev` 及其每次重新加载、`build`（包括 `-embed`）、`test`（包括 `-target`）和 `check`，覆盖所有目标。NSGo 自己的标签（例如 `dev` 中的 `nsgodev`、目标测试中的 `nsgotest`）会加在它们之后，`GOFLAGS` 中 `-tags` 的标签也会合并进来，而不是被替换；`GOFLAGS` 的其余选项照常生效。
 
 Apple TV 的图标不是方形，而是一张分层卡片：`tvos` 取 Xcode 的 `.brandassets`（其中的 `App Icon` 堆栈和顶部横幅），或一张如 1280×768 的宽图，工具用它的边缘色铺底、让图铺满卡片，并居中生成顶部横幅；两者都没有时，`png` 按卡片高度的四分之三居中。Apple Watch 会把图标裁成圆形，所以 `watchos` 取按 watchOS 圆形绘制的 `.icon` 或一张方图；没有它时依次用 `apple` 和 `png`。两者与 `apple`、`png` 一样默认取 `assets/AppIconTV.*` 和 `assets/AppIconWatch.*`。
 

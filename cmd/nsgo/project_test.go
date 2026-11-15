@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -104,6 +105,20 @@ func TestBuildOpen(t *testing.T) {
 		if got := p.openOutput(); got != tt.want {
 			t.Errorf("build.open %q: got %v, want %v", tt.yaml, got, tt.want)
 		}
+	}
+}
+
+func TestBuildTags(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: Test\nbuild:\n  tags: [demo_lite, timetzdata]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(p.Build.Tags, []string{"demo_lite", "timetzdata"}) {
+		t.Fatalf("build.tags = %v", p.Build.Tags)
 	}
 }
 

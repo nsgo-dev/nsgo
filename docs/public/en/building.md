@@ -49,6 +49,7 @@ dev:
   # icon: { png: assets/Icon-dev.png }  # replaces icon's files in dev's builds; defaults to assets/*-dev.*
 build:
   output: dist
+  tags: []              # Go build tags every build, test and check of the app takes, such as timetzdata
   open: false           # true opens the output directory after building
   installers: true      # false leaves out the disk image, the Windows installer and the Linux packages
   jobs: 0               # how many targets build at once; 0 is half the CPUs, 1 one after another
@@ -65,6 +66,8 @@ build:
 ```
 
 Flags replace the values they name, such as `-target`, `-version` or `-output`; `-h` lists them all.
+
+Every go command the tool runs for the app takes `build.tags`, in `dev` and its reloads, `build` with `-embed` too, `test` with `-target` too and `check`, on every target. NSGo's own tags, such as `nsgodev` in `dev` or `nsgotest` in target tests, are added to them, as are the tags of `-tags` in `GOFLAGS`, which would otherwise be replaced; the rest of `GOFLAGS` applies as it is.
 
 An Apple TV's icon is a layered card, not a square: `tvos` takes Xcode's `.brandassets`, its `App Icon` stacks and top shelf images, or a wide image such as 1280×768, which the tool draws to fit the card over its edge color and centers on the top shelf images. Without either, the PNG sits at three quarters of the card's height. An Apple Watch masks its icon to a circle, so `watchos` takes an `.icon` drawn for watchOS's circles or a square PNG; without it the app uses `apple`, then `png`. Both fall back to `assets/AppIconTV.*` and `assets/AppIconWatch.*`, as `apple` and `png` do.
 

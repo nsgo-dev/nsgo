@@ -21,13 +21,18 @@ const ghosttyPackage = "github.com/nsgo-dev/nsgo/base/terminal/internal/library"
 // terminal looks for it.
 const ghosttyFramework = "GhosttyVT.framework"
 
-// linkedDir returns the directory of package pkg when the app's build for
-// env links it, else "".
-func linkedDir(ctx context.Context, p *project, env []string, pkg string) (string, error) {
+// linkedDir returns the directory of package pkg when the app's build for env, with the tool's tags extra, links it, else "".
+func linkedDir(ctx context.Context, p *project, env []string, pkg string, extra ...string) (string, error) {
 	args := []string{"list", "-deps", "-f", fmt.Sprintf(`{{if eq .ImportPath %q}}{{.Dir}}{{end}}`, pkg)}
 	if p.testBinary {
-		args = append(args, "-test", "-tags", "nsgotest")
+		args = append(args, "-test")
+		extra = append(extra[:len(extra):len(extra)], "nsgotest")
 	}
+	tags, err := goTags(ctx, p, env, extra...)
+	if err != nil {
+		return "", err
+	}
+	args = append(args, tagsArgs(tags)...)
 	cmd := exec.CommandContext(ctx, "go", append(args, ".")...)
 	cmd.Dir = p.Dir
 	cmd.Env = append(os.Environ(), env...)

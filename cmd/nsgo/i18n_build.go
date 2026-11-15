@@ -51,10 +51,11 @@ type goPackage struct {
 	embeds          []string // the files it embeds, relative to dir
 }
 
-// goPackages lists pkgs, from dir, with -deps their dependencies too.
-func goPackages(ctx context.Context, dir string, deps bool, pkgs ...string) ([]goPackage, error) {
-	args := []string{"list", "-e", "-f",
-		"{{.ImportPath}}\t{{.Dir}}\t{{if .Module}}{{.Module.Main}}{{end}}\t{{.Standard}}\t{{if .Error}}{{printf \"%q\" .Error.Err}}{{end}}{{range .EmbedFiles}}\t{{.}}{{end}}"}
+// goPackages lists pkgs, from dir, with -deps their dependencies too, as a build with tags sees them.
+func goPackages(ctx context.Context, dir string, deps bool, tags []string, pkgs ...string) ([]goPackage, error) {
+	args := append([]string{"list", "-e"}, tagsArgs(tags)...)
+	args = append(args, "-f",
+		"{{.ImportPath}}\t{{.Dir}}\t{{if .Module}}{{.Module.Main}}{{end}}\t{{.Standard}}\t{{if .Error}}{{printf \"%q\" .Error.Err}}{{end}}{{range .EmbedFiles}}\t{{.}}{{end}}")
 	if deps {
 		args = append(args, "-deps")
 	}
@@ -83,19 +84,20 @@ func goPackages(ctx context.Context, dir string, deps bool, pkgs ...string) ([]g
 	return list, nil
 }
 
-// appPackages is goPackages of pattern in the app's directory, with its
-// dependencies. When one comes from a module the app's go.mod or go.sum
-// lacks, as after pasting an app that imports ui into a new module, it runs
-// go mod tidy and lists them again, so the build that follows finds them.
+// appPackages is goPackages of pattern in the app's directory, with its dependencies, under the app's tags. When one comes from a module the app's go.mod or go.sum lacks, as after pasting an app that imports ui into a new module, it runs go mod tidy and lists them again, so the build that follows finds them.
 func (p *project) appPackages(ctx context.Context, pattern string) ([]goPackage, error) {
-	pkgs, err := goPackages(ctx, p.Dir, true, pattern)
+	tags, err := goTags(ctx, p, nil)
+	if err != nil {
+		return nil, err
+	}
+	pkgs, err := goPackages(ctx, p.Dir, true, tags, pattern)
 	if err != nil || !slices.ContainsFunc(pkgs, func(g goPackage) bool { return lacksModule(g.err) }) {
 		return pkgs, err
 	}
 	if err := p.tidy(ctx); err != nil {
 		return nil, err
 	}
-	return goPackages(ctx, p.Dir, true, pattern)
+	return goPackages(ctx, p.Dir, true, tags, pattern)
 }
 
 // nsgoModule is NSGo's module path.
@@ -152,7 +154,7 @@ func (cs *catalogSet) resolve() {
 				}
 				s.target = cs.byPath[s.importPath]
 				if s.target == nil {
-					pkgs, err := goPackages(cs.ctx, c.dir, false, s.importPath)
+					pkgs, err := goPackages(cs.ctx, c.dir, false, nil, s.importPath)
 					if err != nil || len(pkgs) == 0 || pkgs[0].dir == "" {
 						cs.ds.errorf(f.path, s.line, "%s: no such package", s.importPath)
 						continue

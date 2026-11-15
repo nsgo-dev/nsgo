@@ -166,15 +166,11 @@ func goListFor(ctx context.Context, p *project, target string, args ...string) (
 			return nil, err
 		}
 	}
-	tags := "nsgotest"
-	for i, kv := range env {
-		if t, ok := strings.CutPrefix(kv, "GOFLAGS=-tags="); ok {
-			tags += "," + t
-			env = slices.Delete(env, i, i+1)
-			break
-		}
+	tags, err := goTags(ctx, p, env, append([]string{"nsgotest"}, targetTags(target)...)...)
+	if err != nil {
+		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, "go", append(append([]string{"list", "-tags=" + tags}, args...), ".")...)
+	cmd := exec.CommandContext(ctx, "go", append(append(append([]string{"list"}, tagsArgs(tags)...), args...), ".")...)
 	cmd.Dir = p.Dir
 	cmd.Env = append(os.Environ(), env...)
 	var stderr bytes.Buffer
@@ -196,7 +192,11 @@ func listTests(ctx context.Context, p *project, target, run string) ([]string, e
 		top, _ := splitTestRun(run)
 		return listTestSources(ctx, p, target, top)
 	}
-	args := []string{"test", "-list", run}
+	tags, err := goTags(ctx, p, nil)
+	if err != nil {
+		return nil, err
+	}
+	args := append([]string{"test", "-list", run}, tagsArgs(tags)...)
 	// The TSX tests are in a file the tool adds.
 	if tsxTest, err := p.tsxTestFile(); err != nil {
 		return nil, err
@@ -288,7 +288,11 @@ func testContextError(ctx context.Context, timeout time.Duration) error {
 
 // buildsHere reports whether the package has Go files for this machine.
 func buildsHere(ctx context.Context, p *project) (bool, error) {
-	cmd := exec.CommandContext(ctx, "go", "list", "-e", "-tags=nsgotest", "-f", "{{if or .GoFiles .TestGoFiles .XTestGoFiles}}yes{{end}}", ".")
+	tags, err := goTags(ctx, p, nil, "nsgotest")
+	if err != nil {
+		return false, err
+	}
+	cmd := exec.CommandContext(ctx, "go", append(append([]string{"list", "-e"}, tagsArgs(tags)...), "-f", "{{if or .GoFiles .TestGoFiles .XTestGoFiles}}yes{{end}}", ".")...)
 	cmd.Dir = p.Dir
 	out, err := cmd.Output()
 	if err != nil {

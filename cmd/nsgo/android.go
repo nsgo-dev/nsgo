@@ -178,10 +178,17 @@ func androidLibraries(ctx context.Context, p *project, goarch string, app []byte
 func selectsGeometry(ctx context.Context, p *project, env []string) (bool, error) {
 	files := "{{range .GoFiles}}\t{{.}}{{end}}{{range .CgoFiles}}\t{{.}}{{end}}{{range .IgnoredGoFiles}}\t{{.}}{{end}}"
 	args := []string{"list", "-deps"}
+	var extra []string
 	if p.testBinary {
 		files += "{{range .TestGoFiles}}\t{{.}}{{end}}{{range .XTestGoFiles}}\t{{.}}{{end}}"
-		args = append(args, "-test", "-tags", "nsgotest")
+		args = append(args, "-test")
+		extra = append(extra, "nsgotest")
 	}
+	tags, err := goTags(ctx, p, env, extra...)
+	if err != nil {
+		return false, err
+	}
+	args = append(args, tagsArgs(tags)...)
 	args = append(args, "-f", "{{if not .Standard}}{{.ImportPath}}\t{{.Name}}\t{{.Dir}}"+files+"{{end}}", ".")
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = p.Dir
