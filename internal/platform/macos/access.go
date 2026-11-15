@@ -28,6 +28,7 @@ import (
 //   and AXCancel, custom ones NSAccessibilityCustomActions.
 // - Live regions are announced from here: a changed label, or a changed
 //   text inside one.
+// - An input's editor is its element and answers for the input (editorAccessMethods); one with RoleCombobox is an editable combobox, AXComboBox, where a view with RoleCombobox is a select's pop-up button.
 
 const appKitPath = "/System/Library/Frameworks/AppKit.framework/AppKit"
 
@@ -130,6 +131,10 @@ func (v *view) axRole() [2]string {
 	if p.Role == driver.RoleButton && p.Pressed {
 		// A button that stays on, as browsers make ARIA's aria-pressed.
 		return [2]string{"AXCheckBox", "AXToggle"}
+	}
+	if v.input != nil && p.Role == driver.RoleCombobox {
+		// An editable combobox: its editor is the element (editorAccessMethods).
+		return [2]string{}
 	}
 	if r, ok := roles[p.Role]; ok {
 		return r
@@ -256,6 +261,89 @@ func accessibilityChildren(self objc.ID, cmd objc.SEL) objc.ID {
 		return kids.Send(sel("arrayByAddingObject:"), v.axScrollBar())
 	}
 	return apple.SendSuper[objc.ID](self, cmd)
+}
+
+// axRoleDescription is NSAccessibilityRoleDescription.
+var axRoleDescription = sync.OnceValue(func() func(role, subrole objc.ID) objc.ID {
+	lib, err := purego.Dlopen(appKitPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		return func(_, _ objc.ID) objc.ID { return 0 }
+	}
+	var describe func(role, subrole objc.ID) objc.ID
+	purego.RegisterLibFunc(&describe, lib, "NSAccessibilityRoleDescription")
+	return describe
+})
+
+// editorAccessMethods are what an input's editor, a field's cell (cell) or a text view, answers VoiceOver with. AppKit's text classes answer through accessibilityAttributeValue:, which reads none of the attributes set on them, and a field's element is its cell rather than the field, so the editor answers here for its input's view, which is no element: the input's label, help and test ID, and for RoleCombobox the role of an editable combobox and the popup's state. Its text, value and selection stay its class's.
+func editorAccessMethods(cell bool) []objc.MethodDef {
+	owner := func(self objc.ID) *view {
+		if cell {
+			self = self.Send(sel("controlView"))
+		}
+		if v := views[self]; v != nil && v.input != nil && v.input.field == self && !v.axElement {
+			return v
+		}
+		return nil
+	}
+	return []objc.MethodDef{
+		{Cmd: sel("accessibilityAttributeValue:"), Fn: func(self objc.ID, cmd objc.SEL, name objc.ID) objc.ID {
+			if v := owner(self); v != nil {
+				if value, ok := v.editorAttribute(apple.GoString(name)); ok {
+					return value
+				}
+			}
+			return apple.SendSuper[objc.ID](self, cmd, name)
+		}},
+		{Cmd: sel("accessibilityAttributeNames"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
+			names := apple.SendSuper[objc.ID](self, cmd)
+			v := owner(self)
+			if v == nil || names == 0 {
+				return names
+			}
+			for _, name := range []string{"AXDescription", "AXIdentifier", "AXExpanded"} {
+				if _, ok := v.editorAttribute(name); !ok {
+					continue
+				}
+				if ns := apple.NSString(name); !objc.Send[bool](names, sel("containsObject:"), ns) {
+					names = names.Send(sel("arrayByAddingObject:"), ns)
+				}
+			}
+			return names
+		}},
+	}
+}
+
+// editorAttribute is what the editor of v, an input whose view is no element, answers for an attribute, or false for what its class answers.
+func (v *view) editorAttribute(name string) (objc.ID, bool) {
+	p := &v.props
+	combobox := p.Role == driver.RoleCombobox
+	switch name {
+	case "AXRole":
+		if combobox {
+			return apple.NSString("AXComboBox"), true
+		}
+	case "AXRoleDescription":
+		if combobox {
+			return axRoleDescription()(apple.NSString("AXComboBox"), 0), true
+		}
+	case "AXDescription":
+		if p.Label != "" {
+			return apple.NSString(p.Label), true
+		}
+	case "AXHelp":
+		if help := p.HelpText(); help != "" {
+			return apple.NSString(help), true
+		}
+	case "AXIdentifier":
+		if p.TestID != "" {
+			return apple.NSString(p.TestID), true
+		}
+	case "AXExpanded":
+		if combobox && p.Expandable {
+			return objc.ID(apple.Class("NSNumber")).Send(sel("numberWithBool:"), p.Expanded), true
+		}
+	}
+	return 0, false
 }
 
 // textChanged follows ItemText: a text inside a live region is announced.

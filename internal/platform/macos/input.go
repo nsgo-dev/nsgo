@@ -4,6 +4,7 @@ package macos
 
 import (
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/ebitengine/purego/objc"
@@ -69,7 +70,7 @@ var (
 	selInsertTabIgnore = sel("insertTabIgnoringFieldEditor:")
 	selDeleteBackward  = sel("deleteBackward:")
 
-	classField, classSecureField, classTextView, classSecureEditor objc.Class
+	classField, classSecureField, classTextView, classSecureEditor, classSecureFieldCell objc.Class
 
 	selResetCursorRects = sel("resetCursorRects")
 )
@@ -114,8 +115,9 @@ func registerInput() {
 	classField = register("NsgoField", apple.Class("NSTextField"), delegate, fieldMethods)
 	classSecureField = register("NsgoSecureField", apple.Class("NSSecureTextField"), delegate, fieldMethods)
 	classSecureEditor = register("NsgoSecureEditor", apple.Class("NSSecureTextView"), nil, editorCursor())
+	classSecureFieldCell = register("NsgoSecureFieldCell", apple.Class("NSSecureTextFieldCell"), nil, editorAccessMethods(true))
 	classTextView = register("NsgoTextView", apple.Class("NSTextView"),
-		[]*objc.Protocol{objc.GetProtocol("NSTextViewDelegate")}, append(editorCursor(), []objc.MethodDef{
+		[]*objc.Protocol{objc.GetProtocol("NSTextViewDelegate")}, slices.Concat(editorCursor(), editorAccessMethods(false), []objc.MethodDef{
 			{Cmd: sel("textDidChange:"), Fn: func(self objc.ID, _ objc.SEL, _ objc.ID) { inputOf(self).changed() }},
 			{Cmd: selShouldChange, Fn: func(self objc.ID, _ objc.SEL, tv objc.ID, r apple.NSRange, repl objc.ID) bool {
 				return inputOf(self).shouldChange(tv, r, repl)
@@ -169,7 +171,7 @@ func registerInput() {
 				}
 			}},
 			{Cmd: sel("validateUserInterfaceItem:"), Fn: validatePaste},
-		}...))
+		}))
 }
 
 // editorCursor keeps a text view from setting the cursor, which is the
@@ -260,10 +262,13 @@ func (v *view) setEditor(multiline, masked bool) {
 			class = classSecureField
 		}
 		f := objc.ID(class).Send(selNew)
-		if !masked {
-			loadSetClass()
-			objectSetClass(f.Send(sel("cell")), classFieldCell)
+		// A secure field keeps AppKit's secure field editor: its cell only takes the input's accessibility (editorAccessMethods).
+		cellClass := classFieldCell
+		if masked {
+			cellClass = classSecureFieldCell
 		}
+		loadSetClass()
+		objectSetClass(f.Send(sel("cell")), cellClass)
 		f.Send(sel("setBezeled:"), false)
 		f.Send(sel("setBordered:"), false)
 		f.Send(sel("setDrawsBackground:"), false)

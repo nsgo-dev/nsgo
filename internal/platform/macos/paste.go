@@ -30,7 +30,7 @@ func registerPaste() {
 		{Cmd: sel("pasteAsPlainText:"), Fn: paste},
 		{Cmd: sel("validateUserInterfaceItem:"), Fn: validatePaste},
 	}...))
-	classFieldCell = register("NsgoFieldCell", apple.Class("NSTextFieldCell"), nil, []objc.MethodDef{{
+	classFieldCell = register("NsgoFieldCell", apple.Class("NSTextFieldCell"), nil, append(editorAccessMethods(true), objc.MethodDef{
 		Cmd: sel("fieldEditorForView:"),
 		Fn: func(self objc.ID, _ objc.SEL, control objc.ID) objc.ID {
 			v := views[control]
@@ -44,7 +44,7 @@ func registerPaste() {
 			}
 			return s.fieldEditor
 		},
-	}})
+	}))
 	classWindowDelegate = register("NsgoWindowDelegate", apple.Class("NSObject"),
 		[]*objc.Protocol{objc.GetProtocol("NSWindowDelegate")}, []objc.MethodDef{{
 			// An opened window's close is the app's to decide
