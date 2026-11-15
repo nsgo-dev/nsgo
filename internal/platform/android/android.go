@@ -394,8 +394,12 @@ func init() {
 // host opens it with.
 func (s *surface) startEngine(app engine.App, size driver.Size, appearance driver.Appearance, test *testOpen) {
 	eopts := engine.Options{Size: size, Environment: s.env, Appearance: appearance, Host: s.hostOptions()}
-	// The runtime passes the app's own files and cache directories.
-	eopts.SetDirs(os.Getenv("NSGO_DATA_DIR"), os.Getenv("NSGO_CACHE_DIR"))
+	// The runtime passes the app's own files, cache and log directories.
+	data, cache, logs := os.Getenv("NSGO_DATA_DIR"), os.Getenv("NSGO_CACHE_DIR"), os.Getenv("NSGO_LOGS_DIR")
+	if logs == "" && data != "" {
+		logs = filepath.Join(data, "logs")
+	}
+	eopts.SetDirs(data, cache, logs)
 	if test != nil {
 		eopts.UseTest(test.options, &test.pin)
 		// A phone's screen is what it is.

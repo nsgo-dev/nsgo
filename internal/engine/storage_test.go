@@ -12,21 +12,25 @@ import (
 func TestAppDirs(t *testing.T) {
 	env := map[string]string{"HOME": "/h", "APPDATA": `C:\r`, "LOCALAPPDATA": `C:\l`}
 	get := func(k string) string { return env[k] }
-	for _, c := range []struct{ goos, id, data, cache string }{
-		{"darwin", "dev.app", "/h/Library/Application Support/dev.app", "/h/Library/Caches/dev.app"},
-		{"ios", "", "/h/Library/Application Support/default", "/h/Library/Caches/default"},
-		{"linux", "../x", "/h/.local/share/default", "/h/.cache/default"},
-		{"windows", "dev.app", filepath.Join(`C:\r`, "dev.app"), filepath.Join(`C:\l`, "dev.app")},
-		{"android", "dev.app", "", ""},
-		{"js", "dev.app", "", ""},
+	for _, c := range []struct{ goos, id, data, cache, logs string }{
+		{"darwin", "dev.app", "/h/Library/Application Support/dev.app", "/h/Library/Caches/dev.app", "/h/Library/Logs/dev.app"},
+		{"ios", "", "/h/Library/Application Support/default", "/h/Library/Caches/default", "/h/Library/Application Support/default/logs"},
+		{"linux", "../x", "/h/.local/share/default", "/h/.cache/default", "/h/.local/state/default"},
+		{"windows", "dev.app", filepath.Join(`C:\r`, "dev.app"), filepath.Join(`C:\l`, "dev.app"), filepath.Join(`C:\l`, "dev.app", "Logs")},
+		{"android", "dev.app", "", "", ""},
+		{"js", "dev.app", "", "", ""},
 	} {
-		data, cache := appDirs(c.goos, c.id, get)
-		if data != filepath.FromSlash(c.data) && data != c.data || cache != filepath.FromSlash(c.cache) && cache != c.cache {
-			t.Errorf("%s %q: %q, %q; want %q, %q", c.goos, c.id, data, cache, c.data, c.cache)
+		data, cache, logs := appDirs(c.goos, c.id, get)
+		if data != filepath.FromSlash(c.data) && data != c.data || cache != filepath.FromSlash(c.cache) && cache != c.cache || logs != filepath.FromSlash(c.logs) && logs != c.logs {
+			t.Errorf("%s %q: %q, %q, %q; want %q, %q, %q", c.goos, c.id, data, cache, logs, c.data, c.cache, c.logs)
 		}
 	}
-	if data, _ := appDirs("linux", "a", func(string) string { return "" }); data != "" {
-		t.Errorf("without a home: %q", data)
+	if data, _, logs := appDirs("linux", "a", func(string) string { return "" }); data != "" || logs != "" {
+		t.Errorf("without a home: %q, %q", data, logs)
+	}
+	env["XDG_STATE_HOME"] = "/state"
+	if _, _, logs := appDirs("linux", "dev.app", get); logs != filepath.Join("/state", "dev.app") {
+		t.Errorf("XDG_STATE_HOME logs = %q", logs)
 	}
 }
 
@@ -72,19 +76,41 @@ func TestFileStorage(t *testing.T) {
 func TestEngineMakesAppDirs(t *testing.T) {
 	root := t.TempDir()
 	opts := Options{Size: driver.Size{Width: 100, Height: 100}}
-	opts.SetDirs(filepath.Join(root, "data"), filepath.Join(root, "cache"))
-	var data string
+	opts.SetDirs(filepath.Join(root, "data"), filepath.Join(root, "cache"), filepath.Join(root, "logs"))
+	var data, logs string
 	r := &recorder{mounted: make(chan struct{}, 8)}
 	e := Start(r, func(cx *core.Scope) core.Node {
-		data = cx.DataDir()
+		data, logs = cx.DataDir(), cx.LogsDir()
 		return core.View{}
 	}, opts)
 	<-r.mounted
 	e.Close()
-	if data != opts.DataDir {
-		t.Fatalf("DataDir = %q", data)
+	if data != opts.DataDir || logs != opts.LogsDir {
+		t.Fatalf("directories = %q, %q", data, logs)
 	}
-	for _, d := range []string{opts.DataDir, opts.CacheDir} {
+	for _, d := range []string{opts.DataDir, opts.CacheDir, opts.LogsDir} {
+		if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
+			t.Fatalf("%s: %v", d, err)
+		}
+	}
+}
+
+func TestHostDataDirMovesLogs(t *testing.T) {
+	root := t.TempDir()
+	host := filepath.Join(root, "host")
+	opts := Options{Size: driver.Size{Width: 100, Height: 100}, Host: HostOptions{DataDir: host}}
+	r := &recorder{mounted: make(chan struct{}, 8)}
+	var data, logs string
+	e := Start(r, func(cx *core.Scope) core.Node {
+		data, logs = cx.DataDir(), cx.LogsDir()
+		return core.View{}
+	}, opts)
+	<-r.mounted
+	e.Close()
+	if data != host || logs != filepath.Join(host, "logs") {
+		t.Fatalf("host directories = %q, %q", data, logs)
+	}
+	for _, d := range []string{data, logs} {
 		if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
 			t.Fatalf("%s: %v", d, err)
 		}

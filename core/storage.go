@@ -357,3 +357,7 @@ func (cx *Scope) DataDir() string { return cx.rt.dataDir }
 // CacheDir returns the directory for files the app can make again, which
 // the system may delete when space runs low; "" on the web.
 func (cx *Scope) CacheDir() string { return cx.rt.cacheDir }
+
+// LogsDir returns the directory for the app's log files; "" on the web.
+// The directory is made when the engine starts.
+func (cx *Scope) LogsDir() string { return cx.rt.logsDir }

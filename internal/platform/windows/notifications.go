@@ -200,7 +200,7 @@ func registerAUMID(id, name string) {
 // appIconPNG writes the executable's icon as a PNG in the app's cache
 // directory, which toasts read, and returns its path, "" without one.
 func appIconPNG(id string) string {
-	_, dir := engine.AppDirs(id)
+	_, dir, _ := engine.AppDirs(id)
 	if dir == "" {
 		return ""
 	}

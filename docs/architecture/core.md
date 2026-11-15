@@ -121,7 +121,7 @@ Style `Transition`s, animated values and layout animations run on the platform, 
 - A file that does not parse is set aside as `storage.json.corrupt`, and one that cannot be read leaves changes in memory. Platforms call `engine.SyncStorage` as the process ends.
 - The web keeps entries in `localStorage` under `nsgo:<app id>:`.
 - `Scope.ProvideStorage(name, quota)` gives a subtree a partition: its keys are stored under a prefix starting with a zero byte, which the app's own `Storage` neither lists nor clears, and hold at most `quota` bytes besides the app's quota. A partition's `Clear`, and the app's while partitions hold entries, remove key by key.
-- `Scope.DataDir` and `Scope.CacheDir` are named by the app's ID, which the tool passes from `nsgo.yaml`: `engine.AppDirs` on Apple platforms, Windows and Linux, the files and cache directories the runtime passes on Android, and none on the web. The engine makes them as it starts.
+- `Scope.DataDir`, `Scope.CacheDir` and `Scope.LogsDir` are named by the app's ID, which the tool passes from `nsgo.yaml`: `engine.AppDirs` resolves them on macOS, iOS, watchOS, Windows and Linux, the runtime passes the files, cache and logs directories on Android, and the web returns none. macOS logs use `~/Library/Logs/<id>`, Windows uses `%LOCALAPPDATA%/<id>/Logs`, Linux uses `$XDG_STATE_HOME/<id>` (default `~/.local/state/<id>`), and iOS, watchOS and Android use `logs` under the data directory. The engine makes all three as it starts.
 
 ## Access
 

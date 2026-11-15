@@ -18,16 +18,18 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// AppDirs returns app id's data and cache directories on this system:
-// Application Support and Caches on Apple platforms, %APPDATA% and
-// %LOCALAPPDATA% on Windows, the XDG directories elsewhere, each with a
-// directory named by id, or "default" when id names no directory. Both are
-// "" where only the platform knows them, on Android and the web.
-func AppDirs(id string) (data, cache string) {
+// AppDirs returns app id's data, cache and log directories on this system.
+// Data and cache use Application Support and Caches on macOS and iOS,
+// %APPDATA% and %LOCALAPPDATA% on Windows, and the XDG directories elsewhere.
+// Logs use ~/Library/Logs on macOS, the app's data directory on iOS and
+// Android, %LOCALAPPDATA%\<id>\Logs on Windows, and XDG_STATE_HOME on
+// Linux. Android and the web return empty roots because their runtime supplies
+// the directories (or has none).
+func AppDirs(id string) (data, cache, logs string) {
 	return appDirs(runtime.GOOS, id, os.Getenv)
 }
 
-func appDirs(goos, id string, env func(string) string) (data, cache string) {
+func appDirs(goos, id string, env func(string) string) (data, cache, logs string) {
 	home := env("HOME")
 	under := func(dir, rest string) string {
 		if dir == "" {
@@ -35,13 +37,30 @@ func appDirs(goos, id string, env func(string) string) (data, cache string) {
 		}
 		return filepath.Join(dir, rest)
 	}
+	var logRoot string
 	switch goos {
 	case "android", "js":
-		return "", ""
-	case "darwin", "ios":
+		return "", "", ""
+	case "darwin":
+		data, cache = under(home, "Library/Application Support"), under(home, "Library/Caches")
+		logRoot = under(home, "Library/Logs")
+	case "ios":
 		data, cache = under(home, "Library/Application Support"), under(home, "Library/Caches")
 	case "windows":
 		data, cache = env("APPDATA"), env("LOCALAPPDATA")
+		logRoot = env("LOCALAPPDATA")
+	case "linux":
+		data, cache = env("XDG_DATA_HOME"), env("XDG_CACHE_HOME")
+		if data == "" {
+			data = under(home, ".local/share")
+		}
+		if cache == "" {
+			cache = under(home, ".cache")
+		}
+		logRoot = env("XDG_STATE_HOME")
+		if logRoot == "" {
+			logRoot = under(home, ".local/state")
+		}
 	default:
 		data, cache = env("XDG_DATA_HOME"), env("XDG_CACHE_HOME")
 		if data == "" {
@@ -52,7 +71,20 @@ func appDirs(goos, id string, env func(string) string) (data, cache string) {
 		}
 	}
 	name := appDirName(id)
-	return under(data, name), under(cache, name)
+	data, cache = under(data, name), under(cache, name)
+	switch goos {
+	case "ios":
+		if data != "" {
+			logs = filepath.Join(data, "logs")
+		}
+	case "windows":
+		if logRoot != "" {
+			logs = filepath.Join(logRoot, name, "Logs")
+		}
+	default:
+		logs = under(logRoot, name)
+	}
+	return data, cache, logs
 }
 
 // appDirName is the directory of app id: the id, or "default" for an id
@@ -228,8 +260,11 @@ func writeFile(path string, data []byte) error {
 
 // SetDirs sets the app's directories and keeps its storage in a file in
 // data, unless data is "".
-func (o *Options) SetDirs(data, cache string) {
-	o.DataDir, o.CacheDir = data, cache
+func (o *Options) SetDirs(data, cache string, logs ...string) {
+	o.DataDir, o.CacheDir, o.LogsDir = data, cache, ""
+	if len(logs) > 0 {
+		o.LogsDir = logs[0]
+	}
 	if data != "" {
 		o.Storage = OpenFileStorage(data)
 	}

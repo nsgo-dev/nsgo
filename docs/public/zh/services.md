@@ -80,7 +80,7 @@ if token, ok := store.GetItem("token"); ok {
 store.SetItem("token", token)
 ```
 
-`store.Keys()` 列出键，`RemoveItem` 删除一个，`Clear` 清空存储。`cx.DataDir()` 和 `cx.CacheDir()` 给出应用存放键值存储放不下的文件的目录；`Scope.ProvideStorage` 给子树一个独立分区。
+`store.Keys()` 列出键，`RemoveItem` 删除一个，`Clear` 清空存储。`cx.DataDir()` 和 `cx.CacheDir()` 给出应用存放键值存储放不下的文件的目录；`cx.LogsDir()` 是平台的持久日志目录，Web 上为空。`Scope.ProvideStorage` 给子树一个独立分区。
 
 ## 网络
 

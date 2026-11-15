@@ -86,9 +86,9 @@ type Options struct {
 	// Storage keeps the app's entries; in memory for the engine's life
 	// when nil. Platforms pass OpenFileStorage in the data directory.
 	Storage *core.Store
-	// DataDir and CacheDir are the app's directories, made when the
+	// DataDir, CacheDir and LogsDir are the app's directories, made when the
 	// engine starts; "" where the target has none.
-	DataDir, CacheDir string
+	DataDir, CacheDir, LogsDir string
 	// Appearance is the appearance the app starts in, forced as
 	// Scope.SetAppearance forces it; the system's by default.
 	Appearance driver.Appearance
@@ -279,6 +279,7 @@ func Start(p Platform, app App, opts Options) *Engine {
 	}
 	if dir := opts.Host.DataDir; dir != "" && opts.Observe == nil {
 		opts.DataDir = dir
+		opts.LogsDir = filepath.Join(dir, "logs")
 		opts.Storage = OpenFileStorage(dir)
 	}
 	e.raw = opts.Environment
@@ -337,7 +338,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 	if opts.Thread != nil {
 		opts.Thread()
 	}
-	for _, dir := range []string{opts.DataDir, opts.CacheDir} {
+	for _, dir := range []string{opts.DataDir, opts.CacheDir, opts.LogsDir} {
 		if dir == "" {
 			continue
 		}
@@ -374,6 +375,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		Storage:      opts.Storage,
 		DataDir:      opts.DataDir,
 		CacheDir:     opts.CacheDir,
+		LogsDir:      opts.LogsDir,
 		Host:         opts.Host.Channel,
 		Windows:      opts.Windows,
 		HotKeys:      opts.HotKeys,
