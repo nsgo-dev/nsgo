@@ -4,44 +4,23 @@ package microphone
 
 import (
 	"errors"
-	"sync"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 
+	"github.com/nsgo-dev/nsgo/internal/audiosession"
 	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
 const (
-	uikitPath       = "/System/Library/Frameworks/UIKit.framework/UIKit"
-	foundationPath  = "/System/Library/Frameworks/AVFoundation.framework/AVFoundation"
-	sessionPlayRec  = "AVAudioSessionCategoryPlayAndRecord"
-	sessionMode     = "AVAudioSessionModeDefault"
-	optionBluetooth = 1 << 2 // AVAudioSessionCategoryOptionAllowBluetooth
-	optionSpeaker   = 1 << 3 // AVAudioSessionCategoryOptionDefaultToSpeaker
-	// notifyOthers is AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation.
-	notifyOthers = 1
+	uikitPath      = "/System/Library/Frameworks/UIKit.framework/UIKit"
+	foundationPath = "/System/Library/Frameworks/AVFoundation.framework/AVFoundation"
 )
 
 var errSession = errors.New("microphone: cannot activate the audio session")
 
-// session is the shared AVAudioSession while recordings hold it: the
-// category that also plays, so the app's sounds still do, and on leaving
-// what it was before. Video sets the session too, on the main thread,
-// and one that starts playing during a recording takes it away.
-var session struct {
-	sync.Mutex
-	users          int
-	category, mode objc.ID
-	options        uint
-}
-
 func sel(name string) objc.SEL { return objc.RegisterName(name) }
-
-func audioSession() objc.ID {
-	return objc.ID(objc.GetClass("AVAudioSession")).Send(sel("sharedInstance"))
-}
 
 // global reads the object a framework exports under name, 0 if it has none.
 func global(path, name string) objc.ID {
@@ -56,56 +35,11 @@ func global(path, name string) objc.ID {
 	return **(**objc.ID)(unsafe.Pointer(&symbol))
 }
 
-// holdSession makes the session one that records, for the first user.
-func holdSession() error {
-	session.Lock()
-	defer session.Unlock()
-	if session.users > 0 {
-		session.users++
-		return nil
-	}
-	shared := audioSession()
-	category, mode := global(foundationPath, sessionPlayRec), global(foundationPath, sessionMode)
-	if shared == 0 || category == 0 || mode == 0 {
-		return errSession
-	}
-	session.category = shared.Send(sel("category")).Send(sel("retain"))
-	session.mode = shared.Send(sel("mode")).Send(sel("retain"))
-	session.options = objc.Send[uint](shared, sel("categoryOptions"))
-	if !objc.Send[bool](shared, sel("setCategory:mode:options:error:"), category, mode, uint(optionBluetooth|optionSpeaker), objc.ID(0)) ||
-		!objc.Send[bool](shared, sel("setActive:error:"), true, objc.ID(0)) {
-		restoreSession(shared)
-		return errSession
-	}
-	session.users = 1
-	return nil
-}
-
-// releaseSession gives the session back once its last user left, letting
-// the apps recording interrupted play again.
-func releaseSession() {
-	session.Lock()
-	defer session.Unlock()
-	if session.users--; session.users > 0 {
-		return
-	}
-	shared := audioSession()
-	objc.Send[bool](shared, sel("setActive:withOptions:error:"), false, uint(notifyOthers), objc.ID(0))
-	restoreSession(shared)
-}
-
-func restoreSession(shared objc.ID) {
-	objc.Send[bool](shared, sel("setCategory:mode:options:error:"), session.category, session.mode, session.options, objc.ID(0))
-	session.category.Send(sel("release"))
-	session.mode.Send(sel("release"))
-}
-
-// enterSession holds the session, calling ended if an interruption or the
-// app leaving the screen stops the recording. Its leave deactivates off
-// the caller's thread, as that waits for the system.
+// enterSession holds the shared AVAudioSession at the level that records, which internal/audiosession weighs against its other holders, such as a video playing, calling ended if an interruption or the app leaving the screen stops the recording. Its leave lets the session go off the caller's thread, as deactivating waits for the system.
 func enterSession(ended func()) (leave func(), err error) {
-	if err := holdSession(); err != nil {
-		return nil, err
+	release, err := audiosession.Hold(audiosession.Recording)
+	if err != nil {
+		return nil, errSession
 	}
 	center := objc.ID(objc.GetClass("NSNotificationCenter")).Send(sel("defaultCenter"))
 	block := objc.NewBlock(func(objc.Block, objc.ID) { ended() })
@@ -121,7 +55,7 @@ func enterSession(ended func()) (leave func(), err error) {
 			center.Send(sel("removeObserver:"), token)
 			token.Send(sel("release"))
 		}
-		go releaseSession()
+		go release()
 	}, nil
 }
 

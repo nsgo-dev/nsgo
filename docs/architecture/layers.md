@@ -47,24 +47,25 @@ nsgo
 │       └── internal/cldr                Dates and pseudo locales by CLDR's data
 │
 ├── Backends
-│   └── internal/platform
-│       ├── macos, ios                   AppKit and UIKit
-│       ├── windows                      Win32 and Direct2D
-│       ├── linux                        GTK 4
-│       ├── android                      Java runtime over pipes
-│       ├── web                          WebAssembly and the DOM
-│       ├── miniprogram                  WebAssembly in a WeChat, QQ, Alipay or Douyin mini program
-│       ├── apple                        Shared by macOS and iOS
-│       ├── privacy                      Shared permissions of macOS and iOS, which microphone shares too
-│       ├── webstyle, canvas2d           Shared CSS and 2D canvas player of the web and mini programs
-│       ├── field, hover, finger         Shared input
-│       ├── scrollbar, textselect        Shared scrolling and selection
-│       ├── imagedecode, imageload       Shared images
-│       ├── menutext                     Shared menu labels
-│       ├── updates                      Shared update checks of Linux, Android and iOS
-│       ├── picked, fontfile             Shared picked photos and font files
-│       ├── queue, perfhud               Shared batches and readings
-│       └── canvastest, imageloadtest    Shared test drawings and HTTP client checks
+│   ├── internal/platform
+│   │   ├── macos, ios                   AppKit and UIKit
+│   │   ├── windows                      Win32 and Direct2D
+│   │   ├── linux                        GTK 4
+│   │   ├── android                      Java runtime over pipes
+│   │   ├── web                          WebAssembly and the DOM
+│   │   ├── miniprogram                  WebAssembly in a WeChat, QQ, Alipay or Douyin mini program
+│   │   ├── apple                        Shared by macOS and iOS
+│   │   ├── privacy                      Shared permissions of macOS and iOS, which microphone shares too
+│   │   ├── webstyle, canvas2d           Shared CSS and 2D canvas player of the web and mini programs
+│   │   ├── field, hover, finger         Shared input
+│   │   ├── scrollbar, textselect        Shared scrolling and selection
+│   │   ├── imagedecode, imageload       Shared images
+│   │   ├── menutext                     Shared menu labels
+│   │   ├── updates                      Shared update checks of Linux, Android and iOS
+│   │   ├── picked, fontfile             Shared picked photos and font files
+│   │   ├── queue, perfhud               Shared batches and readings
+│   │   └── canvastest, imageloadtest    Shared test drawings and HTTP client checks
+│   └── internal/audiosession            iOS's one audio session, shared with microphone
 │
 ├── Engine
 │   ├── internal/engine                  One app on its goroutine, a batch per commit
@@ -147,7 +148,7 @@ Backends reach `core` only through the engine and `core` imports no backend, so 
 
 `nsgotest` is a backend of its own: headless, without the engine, applying each batch to a model of the native views. On a platform, it drives a backend's test host through `internal/testhost`.
 
-`microphone` stands apart from the layers, as recording has nothing to do with views: it loads the system's audio libraries through purego, holds iOS's audio session of its own while it records, and elsewhere builds to report that it cannot. It asks for the microphone through `internal/platform/privacy`, which the Apple backends answer `core`'s permission requests, speech and iOS's camera with, so the permission has one implementation; `privacy` imports only `internal/driver`. `widget` stands apart too, as widgets are drawn by an extension the tool compiles rather than by the engine: it imports `core`, for its colors, edges and fonts, writes timelines for the extension and loads the tool's library of Swift through purego ([tool](tool.md#widgets)). On Android its Live Activities reach the runtime through `internal/driver`'s Live Updates, a channel outside any surface, which the backend connects, as an activity outlives the app's views.
+`microphone` stands apart from the layers, as recording has nothing to do with views: it loads the system's audio libraries through purego, holds iOS's audio session while it records through `internal/audiosession`, which imports nothing of the module and which the backends' videos and speech hold too, and elsewhere builds to report that it cannot. It asks for the microphone through `internal/platform/privacy`, which the Apple backends answer `core`'s permission requests, speech and iOS's camera with, so the permission has one implementation; `privacy` imports only `internal/driver`. `widget` stands apart too, as widgets are drawn by an extension the tool compiles rather than by the engine: it imports `core`, for its colors, edges and fonts, writes timelines for the extension and loads the tool's library of Swift through purego ([tool](tool.md#widgets)). On Android its Live Activities reach the runtime through `internal/driver`'s Live Updates, a channel outside any surface, which the backend connects, as an activity outlives the app's views.
 
 Portable packages build unchanged for every target, with no purego, `syscall` or `unsafe`: `core`, `base` but for `base/terminal`, `ui`, `i18n`, `mobile`, `audio`, `desktop`, `icons`, `tsx`, `nsgotest`, `internal/automation`, `internal/driver`, `internal/layout`, `internal/testhost`, the shader compilers and `internal/engine`. No package has cgo files or hand-written C.
 

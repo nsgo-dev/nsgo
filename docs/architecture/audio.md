@@ -64,7 +64,7 @@ Go code is trusted ([ARCHITECTURE.md](../../ARCHITECTURE.md#boundaries)), so the
 
 ## Sessions
 
-The engines' audio objects are per engine, but iOS has one `AVAudioSession` per process, which videos, speech, `microphone` and now audio all set. A new shared package, `internal/audiosession`, holds it for all of them: it imports nothing of the module, so `microphone` and the Apple backend both import it (a rule of its own in `layering_test.go`, with `microphone`'s widened to it and the package added to `platformShared`), it guards its holders with a mutex, so the main thread, the audio workers and `microphone`'s caller may all call it, and it does nothing outside iOS. It replaces `apple/audiosession_ios.go`'s list, `speech_ios.go`'s and `microphone_ios.go`'s own copies, which is the roadmap's *Recording beside video on iOS* row.
+The engines' audio objects are per engine, but iOS has one `AVAudioSession` per process, which videos, speech, `microphone` and now audio all set. A shared package, `internal/audiosession`, holds it for all of them: it imports nothing of the module, so `microphone` and the Apple backend both import it (a rule of its own in `layering_test.go`, with `microphone`'s widened to it and the package added to `platformShared`), it guards its holders with a mutex, so the main thread, the audio workers and `microphone`'s caller may all call it, and it does nothing outside iOS. It replaced `apple/audiosession_ios.go`'s list and `speech_ios.go`'s and `microphone_ios.go`'s own copies, so a video that starts playing with a session of its own no longer takes it from a recording, which the roadmap's *Recording beside video on iOS* row checks on a device.
 
 Each holder asks for a level, and the highest held sets the session:
 
@@ -108,7 +108,7 @@ A sound is read by the backend's image reader (`imageload`, with its cache and l
 Each stage is one reviewable change, in NSH's order:
 
 1. The `audio` package with its rule in `layering_test.go`, `core`'s part, the protocol's requests and events, `Env.CanPlayAudio`, `AccessAudio` and the `audio` capability, and `nsgotest`'s fake: it records the sounds loaded and played and each player's commands, answers a load with a duration the test sets, advances progress only on the test's clock, and can fail a load with `Decode` and a play with `NotAllowed`, so tests assert on what an action played without sleeping. Built (2026-11-15).
-2. `internal/audiosession`, with videos, speech and `microphone` moved onto it.
+2. `internal/audiosession`, with videos, speech and `microphone` moved onto it. Built, not yet run on a device (2026-11-15).
 3. macOS and iOS, then the web, Windows, Android and Linux, each with its format and error tests.
 4. The gallery: a sound for each kind of moment and a player demo of both levels.
 

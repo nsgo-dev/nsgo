@@ -21,8 +21,9 @@ var layers = []struct {
 	imports []string
 }{
 	{"internal/layout", nil},
-	// The microphone asks for its permission as the backends do.
-	{"microphone", []string{"internal/driver", "internal/platform/privacy"}},
+	// The microphone asks for its permission as the backends do, and holds iOS's audio session with the backends' videos and speech.
+	{"microphone", []string{"internal/audiosession", "internal/driver", "internal/platform/privacy"}},
+	{"internal/audiosession", nil},
 	// The automation's protocol, which the nsgo tool and the agent in a running app speak, is the standard library's JSON alone.
 	{"internal/automation", nil},
 	// Widgets take core's colors, edges and fonts, and reach WidgetKit
@@ -102,7 +103,7 @@ var layers = []struct {
 // platformShared is the code several backends share, with the shader
 // writers but not the compiler, which only the core links.
 var platformShared = []string{
-	"internal/platform/apple", "internal/platform/canvas2d", "internal/platform/canvastest", "internal/platform/field", "internal/platform/finger",
+	"internal/audiosession", "internal/platform/apple", "internal/platform/canvas2d", "internal/platform/canvastest", "internal/platform/field", "internal/platform/finger",
 	"internal/platform/fontfile", "internal/platform/hover", "internal/platform/imagedecode", "internal/platform/imageload", "internal/platform/menutext", "internal/platform/perfhud", "internal/platform/picked", "internal/platform/privacy", "internal/platform/queue", "internal/platform/scrollbar",
 	"internal/platform/textselect", "internal/platform/updates", "internal/platform/webstyle", "internal/shaderir/",
 }

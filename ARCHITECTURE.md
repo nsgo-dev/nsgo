@@ -38,6 +38,7 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `icons/lucide`, `tools/lucidegen` | — (NSH loads SVG as images) | The bundled Lucide pack, an accessor per icon, and its generator ([icons](docs/architecture/icons.md)) |
 | `audio` | `nsh`'s `Sound` and `AudioPlayer` | Sounds decoded once and played overlapping, and players of long audio, on core's part; no platform plays them yet ([audio playback](docs/architecture/audio.md)) |
 | `microphone` | — | Recording the default input on macOS and iOS, reporting `ErrUnsupported` elsewhere |
+| `internal/audiosession` | — | iOS's one `AVAudioSession`, set by the highest level its holders ask for: videos, speech, `microphone` and audio's players and sounds ([sessions](docs/architecture/audio.md#sessions)) |
 | `updater`, `updater/locales` | `nsh/updater` | Updating the app the way its platform and channel do: Sparkle, WinSparkle, the appcast `nsgo build` signs, or the App Store ([updates](docs/architecture/updates.md)) |
 | `widget` | — | Timelines of views that macOS and iOS widgets show, drawn by a SwiftUI extension the tool compiles, and Live Activities, which the extension draws on iOS and Android's runtime posts as Live Updates ([widgets](docs/architecture/tool.md#widgets)) |
 | `nsgotest` | `nsh-testing` | App tests, headless or on a platform, and the agent `nsgo dev -automation` drives a running app through ([testing](docs/architecture/testing.md)) |
