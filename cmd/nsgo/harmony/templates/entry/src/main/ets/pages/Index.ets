@@ -2,7 +2,7 @@ import { webview } from '@kit.ArkWeb';
 import { image } from '@kit.ImageKit';
 import { util } from '@kit.ArkTS';
 import { i18n, resourceManager } from '@kit.LocalizationKit';
-import { deviceInfo, pasteboard } from '@kit.BasicServicesKit';
+import { deviceInfo, pasteboard, settings } from '@kit.BasicServicesKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { camera, cameraPicker } from '@kit.CameraKit';
 import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
@@ -10,7 +10,9 @@ import { accessibility } from '@kit.AccessibilityKit';
 import { formProvider, formBindingData } from '@kit.FormKit';
 import { display, window, typeNode, BuilderNode, NodeController, FrameNode, UIContext, componentSnapshot } from '@kit.ArkUI';
 import { displaySync } from '@kit.ArkGraphics2D';
-import { common, ConfigurationConstant } from '@kit.AbilityKit';
+import { common, ConfigurationConstant, abilityAccessCtrl, bundleManager } from '@kit.AbilityKit';
+import type { Permissions, PermissionRequestResult } from '@kit.AbilityKit';
+import { userAuth } from '@kit.UserAuthenticationKit';
 import MeasureText, { MeasureOptions } from '@ohos.measure';
 
 // The host the harmonyos target builds: the app's engine runs in WebAssembly
@@ -892,9 +894,46 @@ class Bridge {
     }
   }
 
+  keepawake(id: number, display: boolean): void {
+    if (this.host !== undefined) {
+      this.host.keepawake(id, display);
+    }
+  }
+
+  releaseawake(id: number): void {
+    if (this.host !== undefined) {
+      this.host.releaseawake(id);
+    }
+  }
+
+  bioavail(id: number): void {
+    if (this.host !== undefined) {
+      this.host.bioavail(id);
+    }
+  }
+
+  bioauth(id: number, reason: string): void {
+    if (this.host !== undefined) {
+      this.host.bioauth(id, reason);
+    }
+  }
+
+  permission(id: number, command: number, name: string): void {
+    if (this.host !== undefined) {
+      this.host.permission(id, command, name);
+    }
+  }
+
   savefile(id: number, name: string, mime: string, data: string): void {
     if (this.host !== undefined) {
       this.host.savefile(id, name, mime, data);
+    }
+  }
+
+  // saved answers a save that never reached the dialog, with the reason.
+  saved(id: number, ok: boolean, why: string): void {
+    if (this.host !== undefined) {
+      this.host.send('saved', id, ok ? 1 : 0, 0, why);
     }
   }
 
@@ -953,6 +992,8 @@ struct Index {
   private res: resourceManager.ResourceManager | undefined = undefined;
   private hostCtx: common.UIAbilityContext | undefined = undefined;
   private win: window.Window | undefined = undefined;
+  // awake holds the power assertions keeping the screen on.
+  private awake: Set<number> = new Set();
   private safeTop: number = 0;
   private safeBottom: number = 0;
   private keyboard: number = 0;
@@ -1328,6 +1369,155 @@ struct Index {
       this.send('imageinfo', id, 0, 0, e.message);
       s.release();
     });
+  }
+
+  // keepawake holds the screen on for a power assertion, as iOS's
+  // idleTimerDisabled: one open hold keeps it on, and the last to go lets
+  // it sleep again.
+  keepawake(id: number, display: boolean): void {
+    this.awake.add(id);
+    this.applyAwake();
+  }
+
+  releaseawake(id: number): void {
+    this.awake.delete(id);
+    this.applyAwake();
+  }
+
+  private applyAwake(): void {
+    const w = this.win;
+    if (w === undefined) {
+      return;
+    }
+    w.setWindowKeepScreenOn(this.awake.size > 0).catch((e: Error) => {
+      console.error('NSGO harmony: keep awake: ' + e);
+    });
+  }
+
+  // bioavail answers ItemBiometricAvailability with the enrolled
+  // credential's kind, driver.Biometric's.
+  bioavail(id: number): void {
+    const at = abilityAccessCtrl.createAtManager();
+    const token = this.tokenID();
+    // Face and fingerprint, as driver's kinds; the system tells which is
+    // enrolled by whether the credential is there at all.
+    const kinds: number[] = [userAuth.UserAuthType.FACE, userAuth.UserAuthType.FINGERPRINT];
+    const mapped: number[] = [2, 3];
+    let found = 0;
+    for (let i = 0; i < kinds.length; i++) {
+      try {
+        at.checkAccessTokenSync(token, 'ohos.permission.ACCESS_BIOMETRIC');
+      } catch (e) {
+        console.error('NSGO harmony: biometric: ' + e);
+      }
+      try {
+        userAuth.getAvailableStatus(kinds[i], userAuth.AuthTrustLevel.ATL1);
+        found = mapped[i];
+        break;
+      } catch (e) {
+        // Not enrolled: the next kind may be.
+      }
+    }
+    this.send('bio', id, found, 0, '');
+  }
+
+  // bioauth asks for the user's biometric and answers
+  // ItemBiometricAuthenticate with driver.BiometricResult's kind.
+  bioauth(id: number, reason: string): void {
+    const ctx = this.hostCtx;
+    if (ctx === undefined || reason === '') {
+      this.send('bio', id, 4, 0, '');
+      return;
+    }
+    let auth: userAuth.UserAuthInstance;
+    try {
+      auth = userAuth.getUserAuthInstance({
+        challenge: new Uint8Array([]),
+        authType: [userAuth.UserAuthType.FACE, userAuth.UserAuthType.FINGERPRINT],
+        authTrustLevel: userAuth.AuthTrustLevel.ATL1
+      }, { title: reason, uiContext: ctx });
+    } catch (e) {
+      console.error('NSGO harmony: biometric auth: ' + e);
+      this.send('bio', id, 4, 0, '');
+      return;
+    }
+    auth.on('result', {
+      onResult: (result: userAuth.UserAuthResult) => {
+        // Success, failure, cancel or unavailable, as driver's kinds.
+        let mapped = 2;
+        if (result.result === userAuth.UserAuthResultCode.SUCCESS) {
+          mapped = 1;
+        } else if (result.result === userAuth.UserAuthResultCode.CANCELED) {
+          mapped = 3;
+        } else if (result.result === userAuth.UserAuthResultCode.NOT_ENROLLED ||
+          result.result === userAuth.UserAuthResultCode.TYPE_NOT_SUPPORT) {
+          mapped = 4;
+        }
+        this.send('bio', id, mapped, 0, '');
+      }
+    });
+    auth.start();
+  }
+
+  // tokenID is this app's access token, which the permission checks ask
+  // about.
+  private tokenID(): number {
+    try {
+      // The token is in the application info, which the default flags
+      // leave out.
+      const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION);
+      return info.appInfo.accessTokenId;
+    } catch (e) {
+      console.error('NSGO harmony: token: ' + e);
+      return 0;
+    }
+  }
+
+  // permission answers ItemPermission numbered id for a key this system
+  // keeps: the microphone or the camera.
+  permission(id: number, command: number, name: string): void {
+    const perm: string = name === 'microphone' ? 'ohos.permission.MICROPHONE' : 'ohos.permission.CAMERA';
+    const ctx = this.hostCtx;
+    if (ctx === undefined) {
+      this.send('perm', id, 5, 0, '');
+      return;
+    }
+    const at = abilityAccessCtrl.createAtManager();
+    const token = this.tokenID();
+    const status = (): number => {
+      try {
+        const s = at.checkAccessTokenSync(token, perm as Permissions);
+        return s === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED ? 1 : 2;
+      } catch (e) {
+        console.error('NSGO harmony: permission: ' + e);
+        return 5;
+      }
+    };
+    // driver.PermissionCommand: check, ask, open settings, guide, stop.
+    if (command === 1) {
+      at.requestPermissionsFromUser(ctx, [perm as Permissions]).then((r: PermissionRequestResult) => {
+        const granted = r.authResults.length > 0 && r.authResults[0] === 0;
+        this.send('perm', id, granted ? 1 : 2, 0, '');
+      }).catch((e: Error) => {
+        console.error('NSGO harmony: permission ask: ' + e);
+        this.send('perm', id, status(), 0, '');
+      });
+      return;
+    }
+    if (command === 2 || command === 3) {
+      // The app's own page in the system's settings, where the user
+      // changes a permission it refused.
+      try {
+        settings.openAppDetailSettingsPage(ctx, ctx.applicationInfo.name);
+      } catch (e) {
+        console.error('NSGO harmony: permission settings: ' + e);
+        this.send('perm', id, status(), 0, '');
+        return;
+      }
+      this.send('perm', id, status(), command === 2 ? 1 : 0, '');
+      return;
+    }
+    this.send('perm', id, status(), 0, '');
   }
 
   // title names the app in the task switcher, which has no window title.
@@ -1780,7 +1970,7 @@ struct Index {
         .javaScriptProxy({
           object: this.bridge,
           name: 'nsgoHarmony',
-          methodList: ['ready', 'submit', 'tick', 'idle', 'device', 'measure', 'perf', 'snapshot', 'scrollBy', 'launch', 'alert', 'backunhandled', 'clipread', 'clipset', 'clipimage', 'dismisskeyboard', 'announce', 'title', 'updatewidget', 'listdir', 'readfile', 'pickdirectories', 'imageinfo', 'openurl', 'pickimages', 'pickfiles', 'savefile', 'openfile', 'takephoto'],
+          methodList: ['ready', 'submit', 'tick', 'idle', 'device', 'measure', 'perf', 'snapshot', 'scrollBy', 'launch', 'alert', 'backunhandled', 'clipread', 'clipset', 'clipimage', 'dismisskeyboard', 'announce', 'title', 'updatewidget', 'listdir', 'readfile', 'pickdirectories', 'imageinfo', 'openurl', 'pickimages', 'pickfiles', 'savefile', 'saved', 'openfile', 'takephoto', 'keepawake', 'releaseawake', 'bioavail', 'bioauth', 'permission'],
           controller: this.controller
         })
         .onInterceptRequest((event) => {

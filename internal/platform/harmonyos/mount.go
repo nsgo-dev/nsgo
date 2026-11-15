@@ -443,6 +443,39 @@ func (m *mounter) item(b *driver.MountBatch, it *driver.MountItem) {
 		// The SDK has no updater either: Android's is Play Core's.
 		m.s.dispatch(driver.Event{Kind: driver.EventUpdate, Count: it.Count,
 			Data: &driver.Update{Err: "the OpenHarmony SDK has no updater"}})
+	case driver.ItemKeepAwake:
+		// ArkUI's own power assertion: the page holds the screen on for
+		// as long as one hold is open.
+		if it.Awake != nil {
+			m.s.bridge.Call("keepawake", int(it.Count), it.Awake.Display)
+		}
+	case driver.ItemReleaseAwake:
+		m.s.bridge.Call("releaseawake", int(it.Count))
+	case driver.ItemBiometricAvailability:
+		m.s.bridge.Call("bioavail", int(it.Count))
+	case driver.ItemBiometricAuthenticate:
+		m.s.bridge.Call("bioauth", int(it.Count), it.Value)
+	case driver.ItemPermission:
+		if it.Permission != nil {
+			name := it.Permission.Name
+			if name == driver.PermissionMicrophone || name == driver.PermissionCamera {
+				// The two the phone's system keeps, and the two the SDK
+				// asks the user for: the page tells their status and asks.
+				m.s.bridge.Call("permission", int(it.Count), int(it.Permission.Command), name)
+			} else {
+				// Nothing here keeps a Mac's permissions: a check, a
+				// request and a guide hear so at once, and a stop nothing.
+				driver.AnswerPermission(it.Count, *it.Permission,
+					func(string) int { return driver.PermissionUnavailable }, m.s.dispatch)
+			}
+		}
+	case driver.ItemOverlayPermission:
+		// Showing windows over other apps needs SYSTEM_FLOAT_WINDOW, which
+		// only a system app holds.
+		m.s.dispatch(driver.Event{Kind: driver.EventOverlayPermission, Count: it.Count, Index: driver.OverlayUnavailable})
+	case driver.ItemTaskProgress:
+		// The task switcher shows no progress of a phone's app: the call
+		// needs no answer, as on iOS.
 	case driver.ItemEvents:
 		bits := it.Events
 		if v := m.views[it.ID]; v != nil {

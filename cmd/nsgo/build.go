@@ -864,10 +864,10 @@ func buildHarmonyHAP(ctx context.Context, p *project, dir, site string, code int
 		if err != nil {
 			return "", err
 		}
-		return harmony.PackageWithHost(dir, site, hostDir, p.Name, p.ID, p.Version, code)
+		return harmony.PackageWithHost(dir, site, hostDir, p.Name, p.ID, p.Version, code, p.Harmonyos.Permissions)
 	}
 	padded := func() (string, error) {
-		return harmony.Package(dir, site, p.Name, p.ID, p.Version, code)
+		return harmony.Package(dir, site, p.Name, p.ID, p.Version, code, p.Harmonyos.Permissions)
 	}
 	report := func(name string) {
 		if name != "" {

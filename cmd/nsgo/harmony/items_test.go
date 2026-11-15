@@ -33,11 +33,16 @@ var unsupportedItems = map[string]string{
 		ItemInputSource ItemNative
 		ItemNativeCommand ItemBlockNative ItemShader ItemShaderInput
 		ItemShaderTransition`,
-	"accessibility": `ItemAccessibilityFocus`,
+	"accessibility":            `ItemAccessibilityFocus`,
 	"notifications and badges": `ItemBadge ItemCloseNotification ItemHaptic`,
 	"desktop only": `ItemDock ItemMenu ItemPopupMenu ItemLaunchAtLogin
 		ItemSetLaunchAtLogin ItemOpenSurface ItemQuit ItemTray ItemTrayMenu
-		ItemWindow ItemHotKeys`,
+		ItemWindow ItemHotKeys ItemQuitResponse`,
+	// The core answers these before the platform sees them: it resolves a
+	// path with os.Stat, which js/wasm does not implement, answers the
+	// install family itself off Android, and sends no audio where the
+	// environment says none.
+	"answered by the core": `ItemAudio ItemRevealFile ItemTrashFile`,
 }
 
 // unsupportedEvents are the events no HarmonyOS code reads or dispatches.
@@ -54,8 +59,14 @@ var unsupportedEvents = map[string]string{
 		EventNavigationStateChange EventMenu EventMenuClosed EventMessage
 		EventBackStarted EventBackCancelled EventWindowClose
 		EventWindowHidden EventReopen EventOpenFiles`,
-	"notifications and input modality": `EventNotificationPress EventInputModality`,
-	"system and desktop": `EventTray EventHotKey EventLaunchAtLogin EventSpeech`,
+	"notifications and input modality": `EventNotificationPress EventInputModality
+		EventWindowEnded`,
+	"system and desktop": `EventTray EventHotKey EventLaunchAtLogin EventSpeech
+		EventQuitRequest`,
+	// The app hears neither: the core sends no audio where the environment
+	// says none, and asks about a quit only where the platform ends apps
+	// itself.
+	"answered by the core": `EventAudio`,
 }
 
 // unsupportedKinds are the view kinds Index.ets has no constant for.

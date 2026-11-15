@@ -233,6 +233,9 @@ func (s *surface) environment() driver.Environment {
 	env.ScreenReader = d.ScreenReader
 	// The camera picker is the platform's, on every device that has one.
 	env.Camera = true
+	// Sounds and players have no host here yet, and the microphone's
+	// permission is the page's to answer.
+	env.Audio = false
 	// A screen's system header is 44 points tall, which the core pads its
 	// content below and the render layer draws over it.
 	env.HeaderHeight = 44
@@ -258,14 +261,14 @@ func (s *surface) environment() driver.Environment {
 // the system bars or the keyboard moved, or the window resized.
 func (s *surface) changed() {
 	env := s.environment()
-	if env != s.env {
+	if !env.Equal(s.env) {
 		s.env = env
 		s.engine.SetEnvironment(env)
 	}
 	size := s.size()
 	if size != s.size0 {
 		s.size0 = size
-		s.engine.Resize(size)
+		s.engine.Resize(size, driver.Geometry{})
 	}
 }
 
@@ -445,6 +448,14 @@ func (s *surface) event(args []js.Value) {
 		}
 	case "openurl":
 		s.dispatch(driver.Event{Kind: driver.EventOpenURL, Count: uint32(id), Finished: num(2) == 1})
+	case "bio":
+		// A biometric answer: the availability or the authentication's
+		// result, as driver's kinds.
+		s.dispatch(driver.Event{Kind: driver.EventBiometric, Count: uint32(id), Index: int(num(2))})
+	case "perm":
+		// A permission answered: its status, and whether opening the
+		// settings opened one.
+		s.dispatch(driver.Event{Kind: driver.EventPermission, Count: uint32(id), Index: int(num(2)), Finished: num(3) == 1})
 	case "picked":
 		s.picked(uint32(id), str(4))
 	case "pickedfiles":

@@ -46,7 +46,7 @@ func harmonyTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 			if code == 0 {
 				code = 1
 			}
-			hap, err := harmony.Package(dir, site, p.Name, p.ID, p.Version, code)
+			hap, err := harmony.Package(dir, site, p.Name, p.ID, p.Version, code, p.Harmonyos.Permissions)
 			if err != nil {
 				return -1, err
 			}

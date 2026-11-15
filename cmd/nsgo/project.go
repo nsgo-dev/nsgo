@@ -164,6 +164,13 @@ type project struct {
 		TargetSDK   int      `yaml:"target_sdk"`
 		Recording   bool     `yaml:"recording"`
 	} `yaml:"android"`
+	// Harmonyos is the harmonyos target's: Permissions are the ones its
+	// module.json asks for beyond the runtime's INTERNET, by their
+	// ohos.permission names, such as MICROPHONE and CAMERA, which a prompt
+	// only asks for once declared.
+	Harmonyos struct {
+		Permissions []string `yaml:"permissions"`
+	} `yaml:"harmonyos"`
 	// MacOS is the macOS target's disk image: DMGBackground, a PNG with
 	// an optional @2x twin, is the picture behind its window, which takes
 	// its size, else a built-in arrow; DMGIcon, an .icns or a square PNG,
@@ -367,6 +374,11 @@ func load(dir string) (*project, error) {
 	for i, perm := range p.Android.Permissions {
 		if !strings.Contains(perm, ".") {
 			p.Android.Permissions[i] = "android.permission." + perm
+		}
+	}
+	for i, perm := range p.Harmonyos.Permissions {
+		if !strings.Contains(perm, ".") {
+			p.Harmonyos.Permissions[i] = "ohos.permission." + perm
 		}
 	}
 	if p.I18n.Dir == "" {

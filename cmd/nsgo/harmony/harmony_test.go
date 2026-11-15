@@ -33,7 +33,7 @@ func TestPackage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hap, err := harmony.Package(dir, site, "Hello", "dev.oneo.nsgo.hello", "2.3.4", 7)
+	hap, err := harmony.Package(dir, site, "Hello", "dev.oneo.nsgo.hello", "2.3.4", 7, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestPackageServesAnotherBundle(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(site, "index.html"), []byte("<html>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	hap, err := harmony.Package(dir, site, "Other", "com.example.other", "1.0.0", 1)
+	hap, err := harmony.Package(dir, site, "Other", "com.example.other", "1.0.0", 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestPackageRefusesLongBundle(t *testing.T) {
 		t.Fatal(err)
 	}
 	long := strings.Repeat("a", 200)
-	if _, err := harmony.Package(dir, site, "Long", long, "1.0.0", 1); err == nil {
+	if _, err := harmony.Package(dir, site, "Long", long, "1.0.0", 1, nil); err == nil {
 		t.Fatal("Package accepted a bundle name too long for the host")
 	}
 }
@@ -179,7 +179,7 @@ func TestPackageWithHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hap, err := harmony.PackageWithHost(dir, site, hostDir, "Exact", "com.example.exact", "2.0.0", 5)
+	hap, err := harmony.PackageWithHost(dir, site, hostDir, "Exact", "com.example.exact", "2.0.0", 5, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +229,7 @@ func TestBundleOf(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(site, "index.html"), []byte("<html>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	hap, err := harmony.Package(dir, site, "Hello", "dev.example.hello", "1.0.0", 1)
+	hap, err := harmony.Package(dir, site, "Hello", "dev.example.hello", "1.0.0", 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,4 +244,50 @@ func TestBundleOf(t *testing.T) {
 	if got != want {
 		t.Errorf("BundleOf = %q, want %q", got, want)
 	}
+}
+
+// TestPackageDeclaresPermissions checks that an app's harmonyos permissions
+// reach module.json beside the runtime's INTERNET: a prompt asks only for a
+// permission the module declares, so one missing here answers denied forever.
+func TestPackageDeclaresPermissions(t *testing.T) {
+	dir := t.TempDir()
+	site := filepath.Join(dir, "web")
+	if err := os.MkdirAll(site, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(site, "index.html"), []byte("<html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	hap, err := harmony.Package(dir, site, "Perms", "dev.example.perms", "1.0.0", 1,
+		[]string{"ohos.permission.CAMERA", "ohos.permission.MICROPHONE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	zr, err := zip.OpenReader(hap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+	for _, f := range zr.File {
+		if f.Name != "module.json" {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{`"ohos.permission.INTERNET"`, `"ohos.permission.CAMERA"`, `"ohos.permission.MICROPHONE"`,
+			`"usedScene"`, `"reason":"$string:app_name"`} {
+			if !strings.Contains(string(data), want) {
+				t.Errorf("module.json has no %s: %s", want, data)
+			}
+		}
+		return
+	}
+	t.Fatal("the HAP has no module.json")
 }

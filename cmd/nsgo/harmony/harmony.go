@@ -79,6 +79,7 @@ var (
 	reCode      = regexp.MustCompile("\"versionCode\":[0-9]+")
 	reLabel     = regexp.MustCompile("\"label\":\"[^\"]*\"")
 	rePackVer   = regexp.MustCompile("\"version\":\\{\"code\":[0-9]+,\"name\":\"[^\"]*\"\\}")
+	reHookPerm  = regexp.MustCompile(`\{"name":"ohos\.permission\.INTERNET"\}`)
 )
 
 // hostBundle is the fixed placeholder the committed ArkTS bytecode was
@@ -103,27 +104,27 @@ func BundleName(id string) (string, error) {
 // bytecode names each module with the placeholder bundle; Package swaps it
 // for an equally long name derived from the app's id, so one host serves
 // every app without the SDK.
-func Package(dir, site, name, bundle, version string, code int) (string, error) {
+func Package(dir, site, name, bundle, version string, code int, perms []string) (string, error) {
 	padded, err := BundleName(bundle)
 	if err != nil {
 		return "", err
 	}
-	return packageFrom(dir, site, name, padded, version, code, host, "host", true)
+	return packageFrom(dir, site, name, padded, version, code, host, "host", true, perms)
 }
 
 // PackageWithHost writes the HAP for an app into dir from a host built for
 // the app's own bundle, as CompileHost builds one with the SDK: its
 // bytecode already names the modules with the app's bundle, so only the
 // app's version and label change and the installed bundle keeps the id.
-func PackageWithHost(dir, site, hostDir, name, bundle, version string, code int) (string, error) {
-	return packageFrom(dir, site, name, bundle, version, code, os.DirFS(hostDir), ".", false)
+func PackageWithHost(dir, site, hostDir, name, bundle, version string, code int, perms []string) (string, error) {
+	return packageFrom(dir, site, name, bundle, version, code, os.DirFS(hostDir), ".", false, perms)
 }
 
 // packageFrom writes the HAP from a host tree and the web build in site.
 // When swap is set, the placeholder bundle is replaced by bundle in every
 // host file, the bytecode included; otherwise the host already carries the
 // app's bundle and only the app's values are patched.
-func packageFrom(dir, site, name, bundle, version string, code int, hfs fs.FS, root string, swap bool) (string, error) {
+func packageFrom(dir, site, name, bundle, version string, code int, hfs fs.FS, root string, swap bool, perms []string) (string, error) {
 	hostNames, err := walk(hfs, root)
 	if err != nil {
 		return "", err
@@ -168,6 +169,9 @@ func packageFrom(dir, site, name, bundle, version string, code int, hfs fs.FS, r
 			s = reName.ReplaceAllString(s, "\"versionName\":\""+version+"\"")
 			s = reCode.ReplaceAllString(s, "\"versionCode\":"+strconv.Itoa(code))
 			s = reLabel.ReplaceAllString(s, "\"label\":\""+name+"\"")
+			if len(perms) > 0 {
+				s = addPermissions(s, perms)
+			}
 			data = []byte(s)
 		case "pack.info":
 			s := string(data)
@@ -195,6 +199,22 @@ func packageFrom(dir, site, name, bundle, version string, code int, hfs fs.FS, r
 		return "", err
 	}
 	return out, nil
+}
+
+// addPermissions adds the app's permissions to a module.json beside the
+// runtime's INTERNET, which every app keeps. A permission the system asks
+// the user for needs a reason and a used scene, or the prompt does not show
+// and the request answers denied at once.
+func addPermissions(module string, perms []string) string {
+	entries := make([]string, 0, len(perms)+1)
+	entries = append(entries, `{"name":"ohos.permission.INTERNET"}`)
+	for _, p := range perms {
+		entries = append(entries, `{"name":`+strconv.Quote(p)+
+			`,"reason":"$string:app_name","usedScene":{"abilities":["EntryAbility"],"when":"inuse"}}`)
+	}
+	// Literal: the reason names a string resource as $string:app_name, and
+	// a $ in ReplaceAllString's replacement would be a capture group.
+	return reHookPerm.ReplaceAllLiteralString(module, strings.Join(entries, ","))
 }
 
 // walk lists the files under root, with paths relative to it.

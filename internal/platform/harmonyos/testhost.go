@@ -260,7 +260,7 @@ func (t *testSurface) Animating() bool { return t.s.anim.Running() }
 
 func (t *testSurface) Resize(size driver.Size) error {
 	t.s.size0 = size
-	t.s.engine.Resize(size)
+	t.s.engine.Resize(size, driver.Geometry{})
 	return nil
 }
 
