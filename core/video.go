@@ -53,12 +53,50 @@ type Video struct {
 	OnEnd func()
 	// OnBuffer receives whether playback waits for data.
 	OnBuffer func(buffering bool)
+	// OnPause is called once when a video the app asked to play is paused by
+	// the system or by the platform's built-in controls. Paused remains the
+	// app's requested state; the handler should follow the event in its own
+	// state when it wants the app's controls to stay in sync.
+	OnPause func(VideoPauseReason)
+	// OnPlay is called when a video previously paused by the system or its
+	// built-in controls starts again through those controls or the system.
+	OnPlay   func()
 	OnError  func(err error)
 	OnPress  func(PressEvent)
 	OnLayout func(Bounds)
 	Ref      *Ref
 	Label    string
 	TestID   string
+}
+
+// VideoPauseReason says why the platform paused a video that the app asked
+// to play.
+type VideoPauseReason uint8
+
+const (
+	// VideoPauseInterruption is an incoming call, another app taking audio
+	// focus, Siri or another system interruption.
+	VideoPauseInterruption VideoPauseReason = iota
+	// VideoPauseRouteLost is an audio output disappearing, such as unplugged
+	// headphones.
+	VideoPauseRouteLost
+	// VideoPauseControls is a pause from the platform's built-in controls or
+	// Control Center.
+	VideoPauseControls
+)
+
+// String names a video pause reason for logs and diagnostics.
+func (r VideoPauseReason) String() string {
+	switch r {
+	case VideoPauseInterruption:
+		return "interruption"
+	case VideoPauseRouteLost:
+		return "route-lost"
+	case VideoPauseControls:
+		return "controls"
+	default:
+		return "unknown"
+	}
 }
 
 // Render implements Node.
@@ -81,6 +119,8 @@ type videoNode struct {
 	progress     func(position, duration time.Duration)
 	end          func()
 	buffer       func(bool)
+	pause        func(VideoPauseReason)
+	play         func()
 	loadError    func(error)
 	// refused is the source Access refused last.
 	refused string
@@ -98,7 +138,7 @@ func (t *Tree) mountVideo(cx *Scope, parent *node, v Video) {
 			Rate: videoRate(v.Rate), Repeat: v.Repeat, ResizeMode: v.ResizeMode, Controls: v.Controls,
 			ProgressInterval: videoInterval(v.ProgressInterval), AudioSession: v.AudioSession},
 		loadStart: v.OnLoadStart, load: v.OnLoad, progress: v.OnProgress, end: v.OnEnd,
-		buffer: v.OnBuffer, loadError: v.OnError,
+		buffer: v.OnBuffer, pause: v.OnPause, play: v.OnPlay, loadError: v.OnError,
 	}
 	n.video = vn
 	bind := func(set func(*driver.VideoConfig)) {
@@ -182,6 +222,14 @@ func (t *Tree) dispatchVideo(n *node, ev driver.Event) bool {
 		if vn.buffer != nil {
 			call(func() { vn.buffer(ev.Buffering) })
 		}
+	case driver.EventVideoPause:
+		if vn.pause != nil {
+			call(func() { vn.pause(VideoPauseReason(ev.Index)) })
+		}
+	case driver.EventVideoPlay:
+		if vn.play != nil {
+			call(vn.play)
+		}
 	case driver.EventError:
 		if vn.loadError != nil {
 			call(func() { vn.loadError(&MediaError{Message: ev.Text}) })
@@ -205,6 +253,8 @@ func (vn *videoNode) events() driver.EventMask {
 	bit(driver.EventProgress, vn.progress != nil)
 	bit(driver.EventEnd, vn.end != nil)
 	bit(driver.EventBuffer, vn.buffer != nil)
+	bit(driver.EventVideoPause, vn.pause != nil)
+	bit(driver.EventVideoPlay, vn.play != nil)
 	bit(driver.EventError, vn.loadError != nil)
 	return m
 }

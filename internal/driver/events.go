@@ -279,6 +279,24 @@ const (
 	EventWebCookies
 )
 
+// EventVideoPause reports that a video the app asked to play stopped by
+// itself. Index is one of the VideoPause reasons. It uses the protocol slot
+// of EventImageInfo, which is an answer event and is never included in a
+// generic view's event mask, so the new event still fits the uint64 mask.
+const EventVideoPause EventKind = 42
+
+// EventVideoPlay reports that a video the app had followed as paused started
+// again through its native controls or the system. It uses EventMenuClosed's
+// protocol slot, which likewise is not a view-mask event.
+const EventVideoPlay EventKind = 57
+
+// Video pause reasons carried in EventVideoPause.Index.
+const (
+	VideoPauseInterruption = iota
+	VideoPauseRouteLost
+	VideoPauseControls
+)
+
 // What EventInputModality reports.
 const (
 	// ModalityKeyboard is a key pressed, not a modifier alone: Tab, an

@@ -28,21 +28,28 @@ type Video struct {
 	// the view is not in one yet.
 	Parent objc.ID
 
-	holder     objc.ID
-	player     objc.ID
-	shown      objc.ID // macOS: the layer view or the AVPlayerView
-	layer      objc.ID // the AVPlayerLayer, without controls
-	controller objc.ID // iOS: the AVPlayerViewController, with them
-	timeToken  objc.ID
-	endToken   objc.ID
-	status     *videoStatus
-	config     driver.VideoConfig
-	made       bool
+	holder            objc.ID
+	player            objc.ID
+	shown             objc.ID // macOS: the layer view or the AVPlayerView
+	layer             objc.ID // the AVPlayerLayer, without controls
+	controller        objc.ID // iOS: the AVPlayerViewController, with them
+	timeToken         objc.ID
+	endToken          objc.ID
+	rateToken         objc.ID
+	stopInterruptions func()
+	stopRoutes        func()
+	status            *videoStatus
+	config            driver.VideoConfig
+	made              bool
 }
 
 // videoStatus is what a player reported so far.
 type videoStatus struct {
 	loaded, failed, buffering bool
+	playing, systemPaused     bool
+	pauseReported             bool
+	pauseReason               int
+	hasPauseReason            bool
 }
 
 // cmTime is CoreMedia's CMTime.
@@ -134,16 +141,25 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 		v.observe()
 	}
 	if v.player != 0 {
+		st := v.status
+		// Paused is the app's requested state. Setting it, or answering a
+		// system pause by changing it, takes ownership back from the player.
+		if c.Paused || c.Paused != old.Paused {
+			st.systemPaused = false
+			st.pauseReported = false
+			st.hasPauseReason = false
+		}
 		v.player.Send(sel("setMuted:"), c.Muted)
 		v.player.Send(sel("setVolume:"), c.Volume)
 		if c.Paused {
 			v.player.Send(sel("pause"))
-		} else {
+		} else if !st.systemPaused {
 			v.player.Send(sel("setRate:"), c.Rate)
 		}
+		v.rateChanged()
 	}
 	// The audio session follows what plays, not what is mounted.
-	if v.player != 0 && !c.Paused {
+	if v.player != 0 && !c.Paused && (v.status == nil || !v.status.systemPaused) {
 		audioPlaying(v, c.AudioSession)
 	} else {
 		audioPlaying(v, driver.AudioSessionDefault)
@@ -237,6 +253,10 @@ func (v *Video) open() {
 		if v.status != st || v.player == 0 {
 			return
 		}
+		st.playing = false
+		st.systemPaused = false
+		st.pauseReported = false
+		st.hasPauseReason = false
 		v.Dispatch(driver.Event{Kind: driver.EventEnd})
 		if !v.config.Repeat {
 			// It stopped: the other apps' audio may play again.
@@ -245,6 +265,8 @@ func (v *Video) open() {
 		if v.config.Repeat {
 			v.player.Send(sel("seekToTime:"), cmTimeOf(0))
 			v.player.Send(sel("play"))
+			st.playing = true
+			st.systemPaused = false
 		}
 	})
 	center := objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter"))
@@ -252,6 +274,18 @@ func (v *Video) open() {
 	v.endToken = center.Send(selAddObserver, NSString("AVPlayerItemDidPlayToEndTimeNotification"),
 		v.player.Send(sel("currentItem")), queue, ended).Send(sel("retain"))
 	ended.Release()
+	// AVPlayerRateDidChangeNotification is available on the minimum Apple
+	// targets (macOS 12 and iOS 15). It is the only reliable signal when a
+	// native control or an interruption stops the player before the periodic
+	// time observer runs.
+	rated := objc.NewBlock(func(objc.Block, objc.ID) {
+		if v.status == st && v.player != 0 {
+			v.rateChanged()
+		}
+	})
+	v.rateToken = center.Send(selAddObserver, NSString("AVPlayerRateDidChangeNotification"), v.player, queue, rated).Send(sel("retain"))
+	rated.Release()
+	v.watchSystemPauses(st)
 	v.poll(st, 0)
 }
 
@@ -262,15 +296,28 @@ func (v *Video) close() {
 	if v.player != 0 && v.timeToken != 0 {
 		v.player.Send(sel("removeTimeObserver:"), v.timeToken)
 	}
-	if v.endToken != 0 {
-		objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter")).Send(sel("removeObserver:"), v.endToken)
+	if v.stopInterruptions != nil {
+		v.stopInterruptions()
+		v.stopInterruptions = nil
 	}
-	for _, id := range []objc.ID{v.timeToken, v.endToken} {
+	if v.stopRoutes != nil {
+		v.stopRoutes()
+		v.stopRoutes = nil
+	}
+	if v.endToken != 0 || v.rateToken != 0 {
+		center := objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter"))
+		for _, id := range []objc.ID{v.endToken, v.rateToken} {
+			if id != 0 {
+				center.Send(sel("removeObserver:"), id)
+			}
+		}
+	}
+	for _, id := range []objc.ID{v.timeToken, v.endToken, v.rateToken} {
 		if id != 0 {
 			id.Send(sel("release"))
 		}
 	}
-	v.timeToken, v.endToken = 0, 0
+	v.timeToken, v.endToken, v.rateToken = 0, 0, 0
 	if v.player != 0 {
 		v.player.Send(sel("pause"))
 		v.player.Send(sel("release"))
@@ -410,6 +457,7 @@ func (v *Video) observe() {
 		if v.status != st || v.player == 0 {
 			return
 		}
+		v.rateChanged()
 		v.report()
 		at := max(objc.Send[cmTime](v.player, sel("currentTime")).duration(), 0)
 		v.Dispatch(driver.Event{Kind: driver.EventProgress, Time: at, Duration: v.itemDuration()})
@@ -418,6 +466,115 @@ func (v *Video) observe() {
 	v.timeToken = v.player.Send(sel("addPeriodicTimeObserverForInterval:queue:usingBlock:"),
 		cmTimeOf(v.config.ProgressInterval), objc.ID(0), tick).Send(sel("retain"))
 	tick.Release()
+}
+
+// avName returns an Apple framework's exported NSString constant, falling
+// back to the constant's documented value on systems that do not export it.
+func avName(name string) objc.ID {
+	for _, path := range []string{
+		"/System/Library/Frameworks/AVFoundation.framework/AVFoundation",
+		"/System/Library/Frameworks/AVFAudio.framework/AVFAudio",
+	} {
+		if id := Global(path, name); id != 0 {
+			return id
+		}
+	}
+	return NSString(name)
+}
+
+// watchSystemPauses observes the iOS notifications that identify a pause
+// before AVPlayer's rate notification. macOS has no AVAudioSession route or
+// interruption notifications, so its native controls use rateChanged alone.
+func (v *Video) watchSystemPauses(st *videoStatus) {
+	if runtime.GOOS != "ios" {
+		return
+	}
+	center := objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter"))
+	v.stopInterruptions = Observe(center, avName("AVAudioSessionInterruptionNotification"), func(note objc.ID) {
+		if v.status == st && interruptionBegan(note) {
+			v.systemPause(driver.VideoPauseInterruption)
+		}
+	})
+	v.stopRoutes = Observe(center, avName("AVAudioSessionRouteChangeNotification"), func(note objc.ID) {
+		const oldDeviceUnavailable = 2 // AVAudioSessionRouteChangeReasonOldDeviceUnavailable
+		if v.status == st && notificationInt(note, "AVAudioSessionRouteChangeReasonKey") == oldDeviceUnavailable {
+			v.systemPause(driver.VideoPauseRouteLost)
+		}
+	})
+}
+
+func notificationInt(note objc.ID, key string) int {
+	info := note.Send(sel("userInfo"))
+	if info == 0 {
+		return 0
+	}
+	number := info.Send(selObjectForKey, avName(key))
+	if number == 0 {
+		return 0
+	}
+	return objc.Send[int](number, sel("intValue"))
+}
+
+func interruptionBegan(note objc.ID) bool {
+	const began = 1 // AVAudioSessionInterruptionTypeBegan
+	return notificationInt(note, "AVAudioSessionInterruptionTypeKey") == began
+}
+
+// systemPause reports a pause caused by the system before the player posts
+// its rate change. The state flag makes the later rate notification harmless,
+// so every transition reaches the app once.
+func (v *Video) systemPause(reason int) {
+	st := v.status
+	if st == nil || v.player == 0 || v.config.Paused || st.pauseReported {
+		return
+	}
+	if !st.playing && objc.Send[float32](v.player, sel("rate")) == 0 {
+		return
+	}
+	st.pauseReason, st.hasPauseReason = reason, true
+	v.player.Send(sel("pause"))
+	st.playing = false
+	st.systemPaused = true
+	st.pauseReported = true
+	audioPlaying(v, driver.AudioSessionDefault)
+	v.Dispatch(driver.Event{Kind: driver.EventVideoPause, Index: reason})
+}
+
+// rateChanged follows player-owned play/pause transitions. An app's Paused
+// config suppresses the pause event; a system or controls pause is reported
+// with its pending reason, or as a controls pause when there is none.
+func (v *Video) rateChanged() {
+	st := v.status
+	if st == nil || v.player == 0 {
+		return
+	}
+	playing := objc.Send[float32](v.player, sel("rate")) != 0
+	if playing {
+		audioPlaying(v, v.config.AudioSession)
+		if st.pauseReported {
+			st.pauseReported = false
+			st.systemPaused = false
+			st.hasPauseReason = false
+			v.Dispatch(driver.Event{Kind: driver.EventVideoPlay})
+		}
+		st.playing = true
+		return
+	}
+	if !st.playing {
+		return
+	}
+	st.playing = false
+	audioPlaying(v, driver.AudioSessionDefault)
+	if v.config.Paused || st.pauseReported {
+		return
+	}
+	reason := driver.VideoPauseControls
+	if st.hasPauseReason {
+		reason = st.pauseReason
+		st.hasPauseReason = false
+	}
+	st.pauseReported = true
+	v.Dispatch(driver.Event{Kind: driver.EventVideoPause, Index: reason})
 }
 
 // poll reports the player's state every 100ms until it loaded or failed,

@@ -230,6 +230,8 @@ final class Protocol {
     static final int EVENT_CHANGE_TEXT = 9;
     static final int EVENT_SUBMIT_EDITING = 10;
     static final int EVENT_SCROLL = 11;
+    /** A video paused by the system or its native controls; index is the reason. */
+    static final int EVENT_VIDEO_PAUSE = 42;
     static final int EVENT_LOAD_START = 12;
     static final int EVENT_PROGRESS = 13;
     static final int EVENT_LOAD = 14;
@@ -272,6 +274,8 @@ final class Protocol {
     static final int EVENT_SCREEN_HEADER = 54;
     static final int EVENT_OPEN_URL = 55;
     static final int EVENT_PICK = 56;
+    /** A video previously paused by the system or its native controls started again. */
+    static final int EVENT_VIDEO_PLAY = 57;
     static final int EVENT_BACK_STARTED = 58;
     static final int EVENT_BACK_CANCELLED = 59;
     static final int EVENT_SCROLL_END = 60;
@@ -283,6 +287,11 @@ final class Protocol {
     static final int EVENT_BIOMETRIC = 78;
     static final int EVENT_OVERLAY_PERMISSION = 80;
     static final int EVENT_SPEAK = 90;
+
+    // Reasons carried in EVENT_VIDEO_PAUSE's index, as core.VideoPauseReason.
+    static final int VIDEO_PAUSE_INTERRUPTION = 0;
+    static final int VIDEO_PAUSE_ROUTE_LOST = 1;
+    static final int VIDEO_PAUSE_CONTROLS = 2;
 
     static final int BIOMETRIC_NONE = 0;
     static final int BIOMETRIC_FACE = 1;

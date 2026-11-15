@@ -3972,9 +3972,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                     }
 
                     @Override
-                    public void report(int k, String text, long time, long duration, int width, int height,
+                    public void report(int k, String text, long time, long duration, int width, int height, int index,
                             boolean buffering) {
-                        event(k, n.id, 0, 0, 0, text, width / density, height / density, 0, 0, 0, 0, 0, null,
+                        event(k, n.id, 0, 0, 0, text, width / density, height / density, index, 0, 0, 0, 0, null,
                                 time, duration, buffering, "", false);
                     }
                 });

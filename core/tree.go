@@ -2105,6 +2105,14 @@ func (t *Tree) Dispatch(ev driver.Event) {
 	if ev.Kind >= driver.EventWindowClose && t.surfaceEvent(ev) {
 		return
 	}
+	// Video pause/play reports occupy protocol slots that are otherwise used
+	// only for answers (EventImageInfo and EventMenuClosed), so route them to
+	// a video before the tree-wide answer handlers below.
+	if n := t.node(ev.ID); n != nil && n.video != nil &&
+		(ev.Kind == driver.EventVideoPause || ev.Kind == driver.EventVideoPlay) {
+		t.dispatchVideo(n, ev)
+		return
+	}
 	switch ev.Kind {
 	case driver.EventTouch:
 		t.touched(ev)

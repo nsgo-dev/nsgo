@@ -15,6 +15,8 @@ func TestVideoConfiguresSeeksAndReports(t *testing.T) {
 	var info []VideoInfo
 	var positions []time.Duration
 	var ended, buffering int
+	var pauses []VideoPauseReason
+	var plays int
 	var failed error
 	h := newHost(t, Size{Width: 300, Height: 400}, func(cx *Scope) Node {
 		paused = NewSignal(cx, true)
@@ -30,6 +32,8 @@ func TestVideoConfiguresSeeksAndReports(t *testing.T) {
 			OnProgress: func(p, _ time.Duration) { positions = append(positions, p) },
 			OnEnd:      func() { ended++ },
 			OnBuffer:   func(bool) { buffering++ },
+			OnPause:    func(r VideoPauseReason) { pauses = append(pauses, r) },
+			OnPlay:     func() { plays++ },
 			OnError:    func(err error) { failed = err },
 		}
 	})
@@ -54,7 +58,8 @@ func TestVideoConfiguresSeeksAndReports(t *testing.T) {
 	if cfg == nil || *cfg != want {
 		t.Fatalf("config %+v, want %+v", cfg, want)
 	}
-	if !mask.Has(driver.EventLoad) || !mask.Has(driver.EventProgress) || !mask.Has(driver.EventEnd) || mask.Has(driver.EventLoadStart) {
+	if !mask.Has(driver.EventLoad) || !mask.Has(driver.EventProgress) || !mask.Has(driver.EventEnd) ||
+		!mask.Has(driver.EventVideoPause) || !mask.Has(driver.EventVideoPlay) || mask.Has(driver.EventLoadStart) {
 		t.Fatalf("mask %b", mask)
 	}
 	if k := kinds(h.commit()); k[driver.ItemVideo] != 0 {
@@ -85,10 +90,13 @@ func TestVideoConfiguresSeeksAndReports(t *testing.T) {
 	h.tree.Dispatch(driver.Event{Kind: driver.EventProgress, ID: id, Time: time.Second, Duration: 90 * time.Second})
 	h.tree.Dispatch(driver.Event{Kind: driver.EventBuffer, ID: id, Buffering: true})
 	h.tree.Dispatch(driver.Event{Kind: driver.EventEnd, ID: id})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventVideoPause, ID: id, Index: int(VideoPauseRouteLost)})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventVideoPlay, ID: id})
 	h.tree.Dispatch(driver.Event{Kind: driver.EventError, ID: id, Text: "no decoder"})
 	if len(info) != 1 || info[0].Duration != 90*time.Second || info[0].Size.Width != 640 ||
-		len(positions) != 1 || positions[0] != time.Second || ended != 1 || buffering != 1 {
-		t.Fatalf("info %v, positions %v, ended %d, buffering %d", info, positions, ended, buffering)
+		len(positions) != 1 || positions[0] != time.Second || ended != 1 || buffering != 1 ||
+		len(pauses) != 1 || pauses[0] != VideoPauseRouteLost || plays != 1 {
+		t.Fatalf("info %v, positions %v, ended %d, buffering %d, pauses %v, plays %d", info, positions, ended, buffering, pauses, plays)
 	}
 	if me, ok := failed.(*MediaError); !ok || me.Message != "no decoder" {
 		t.Fatalf("error %#v", failed)
@@ -145,6 +153,18 @@ func TestVideoSeeksAroundItsConfig(t *testing.T) {
 	paused.Set(true)
 	ref.Seek(4 * time.Second)
 	check("paused", h.commit(), "seek 4s", "video")
+}
+
+func TestVideoPauseReasons(t *testing.T) {
+	for r, want := range map[VideoPauseReason]string{
+		VideoPauseInterruption: "interruption",
+		VideoPauseRouteLost:    "route-lost",
+		VideoPauseControls:     "controls",
+	} {
+		if got := r.String(); got != want {
+			t.Errorf("%d.String() = %q, want %q", r, got, want)
+		}
+	}
 }
 
 func TestVideoDefaults(t *testing.T) {
