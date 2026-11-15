@@ -192,6 +192,7 @@ func TestStyleKeysSetTheirFields(t *testing.T) {
 			return s.TextShadowColor == core.RGB(1) && s.TextShadowOffset == core.Point{X: 1, Y: 2} && s.TextShadowRadius == 3
 		},
 		`{writingDirection: "rtl"}`: func(s core.Style) bool { return s.WritingDirection == core.WritingRTL },
+		`{language: "ja"}`:          func(s core.Style) bool { return s.Language == "ja" },
 		`{placeholderColor: "#000001", selectionColor: "#000002", caretColor: "#000003"}`: func(s core.Style) bool {
 			return s.PlaceholderColor == core.RGB(1) && s.SelectionColor == core.RGB(2) && s.CaretColor == core.RGB(3)
 		},

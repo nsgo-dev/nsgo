@@ -177,6 +177,8 @@ export interface TextStyle extends ViewStyle {
   fontSize?: number;
   fontWeight?: "normal" | "bold" | number | `${number}`;
   fontFamily?: string;
+  /** BCP 47 language tag used for glyph forms and line breaking. */
+  language?: string;
   fontStyle?: "normal" | "italic";
   fontVariant?: ("small-caps" | "oldstyle-nums" | "lining-nums" | "tabular-nums" | "proportional-nums")[];
   lineHeight?: number;

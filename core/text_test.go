@@ -24,6 +24,51 @@ func TestTextFontScaling(t *testing.T) {
 	}
 }
 
+func TestTextLanguageInheritsAndOverrides(t *testing.T) {
+	var scope *Scope
+	h := newHost(t, Size{Width: 300, Height: 100}, func(cx *Scope) Node {
+		scope = cx
+		return View{Children: []Node{
+			Text{TestID: "default", Content: "直"},
+			View{Style: Style{Language: "ja"}, Children: []Node{
+				Text{TestID: "inherited", Content: "直"},
+				Text{TestID: "span", Spans: []Span{{Content: "直", Style: Style{Language: "zh-Hant"}}, {Content: "直"}}},
+			}},
+		}}
+	})
+	h.tree.SetEnvironment(Environment{Locale: "en-US"})
+	h.commit()
+	language := func(id string) string { return h.find(id).text.text.Style.Font.Language }
+	if got := language("default"); got != "en-US" {
+		t.Fatalf("default language = %q, want en-US", got)
+	}
+	if got := language("inherited"); got != "ja" {
+		t.Fatalf("inherited language = %q, want ja", got)
+	}
+	spans := h.find("span").text.text.Spans
+	if got := spans[0].Style.Font.Language; got != "zh-Hant" {
+		t.Fatalf("span language = %q, want zh-Hant", got)
+	}
+	if got := spans[1].Style.Font.Language; got != "ja" {
+		t.Fatalf("span without a language = %q, want its text's ja", got)
+	}
+	// Text that sets none follows the app's language as it changes; a set one stays.
+	h.tree.SetEnvironment(Environment{Locale: "ko-KR"})
+	h.commit()
+	if got := language("default"); got != "ko-KR" {
+		t.Fatalf("default language after the locale changed = %q, want ko-KR", got)
+	}
+	if got := language("inherited"); got != "ja" {
+		t.Fatalf("inherited language after the locale changed = %q, want ja", got)
+	}
+	// So does it as the app switches its own at runtime, which marks no node.
+	scope.SetLocale("ja-JP")
+	h.commit()
+	if got := language("default"); got != "ja-JP" {
+		t.Fatalf("default language after SetLocale = %q, want ja-JP", got)
+	}
+}
+
 func TestTextTransformShadowAndDecoration(t *testing.T) {
 	h := newHost(t, Size{Width: 400, Height: 100}, func(cx *Scope) Node {
 		return View{Style: Style{TextTransform: TextTransformUppercase, TextShadowOffset: Point{X: 1, Y: 2}}, Children: []Node{

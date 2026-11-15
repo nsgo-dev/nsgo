@@ -308,6 +308,9 @@ func addStyle(list uintptr, textLen, start, end int, s driver.TextStyle, holes [
 		pangoAttrListInsert(list, attr)
 	}
 	f := s.Font
+	if f.Language != "" {
+		add(pangoAttrLanguageNew(pangoLanguageFromString(cstr(f.Language))))
+	}
 	if f.Family != "" {
 		add(pangoAttrFamilyNew(cstr(pangoFamilies(f.Family))))
 	}

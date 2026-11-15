@@ -214,6 +214,9 @@ func (t *Tree) commitRound() {
 		if rtl != t.rtl {
 			t.setRTL(rtl)
 		}
+		if lang != t.language {
+			t.fullRound = true
+		}
 		t.language, t.forced, t.directionSent = lang, forced, true
 		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemDirection, RTL: rtl, Language: lang, Forced: forced})
 	}
@@ -227,14 +230,14 @@ func (t *Tree) commitRound() {
 		}
 	}
 	t.stacks = live
-	t.resolve(t.view, textFields{}, false)
+	t.resolve(t.view, textFields{Language: lang}, false)
 	t.timeLayout()
 	// Lists fill their windows from the layout, which may need another.
 	for range 4 {
 		if !t.updateLists() {
 			break
 		}
-		t.resolve(t.view, textFields{}, false)
+		t.resolve(t.view, textFields{Language: lang}, false)
 		t.timeLayout()
 	}
 	// System headers cover what the stacks' places decide.

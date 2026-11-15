@@ -20,6 +20,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Text the engine prepares, measures and lays out on the reader thread, all
@@ -98,6 +99,8 @@ final class Text {
     /** A resolved text style, as android.go's writeStyle writes it. */
     static final class Style {
         final String family;
+        /** The text's language, which picks Han glyph forms, fallback fonts and line breaks, or null for the system's. */
+        final Locale locale;
         final float size;
         final int weight;
         final int color;
@@ -116,6 +119,8 @@ final class Text {
 
         Style(DataInputStream in, float density) throws IOException {
             family = Protocol.readString(in);
+            String language = Protocol.readString(in);
+            locale = language.isEmpty() ? null : Locale.forLanguageTag(language);
             size = in.readFloat() * density;
             weight = in.readUnsignedShort();
             color = argb(in.readInt());
@@ -174,6 +179,7 @@ final class Text {
             paint.setLetterSpacing(letterSpacingEm());
             paint.setFontFeatureSettings(features);
             paint.setFlags(paintFlags(paint.getFlags()));
+            if (locale != null) paint.setTextLocale(locale);
             return paint;
         }
 
@@ -409,6 +415,7 @@ final class Text {
             paint.setTypeface(typeface);
             paint.setLetterSpacing(style.letterSpacingEm());
             paint.setFontFeatureSettings(style.features);
+            if (style.locale != null) paint.setTextLocale(style.locale);
         }
 
         @Override

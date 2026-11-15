@@ -58,6 +58,8 @@ The code is committed beside the catalogs, so `go build` and `go test` need no t
 
 `SetLocale` changes all of it at once, and `""` follows the host's or the user's again; the app keeps the choice in its storage, as the gallery's language setting does (`examples/gallery/language.go`).
 
+Text is in the language the app shows unless `core.Style.Language` says otherwise: a BCP 47 tag such as `ja` or `zh-Hant`, inherited like the other text fields, on a view for its subtree or on a `Span` for one run. The platforms draw Han characters in that language's forms by it ([text](text.md)), and a switch of the shown language prepares the text that inherits it again.
+
 The app lays out in the direction its language is written in (`core.Env.RTL`): right to left in Arabic or Hebrew whatever the system's, by the tag's script, else its language. Without catalogs it follows the locale it forces, else the system. The core sends the direction to the platform as `ItemDirection` on the first commit and when it changes, and each backend lays its native controls out in it:
 
 | Backend | What mirrors |

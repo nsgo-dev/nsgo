@@ -1864,6 +1864,7 @@ func writeDecor(w *writer, v *driver.ViewStyle) {
 // writeStyle writes a text style in the format Text.Style reads.
 func writeStyle(w *writer, t *driver.TextStyle) {
 	w.str(firstFamily(t.Font.Family))
+	w.str(t.Font.Language)
 	w.points(t.Font.Size)
 	w.u16(uint16(t.Font.Weight))
 	w.u32(uint32(t.Color))

@@ -473,9 +473,11 @@ type Font struct {
 	// Family is a font family name; empty is the system font, and
 	// FontMonospace the platform's fixed-pitch font.
 	Family string
-	Size   Points
-	Weight FontWeight
-	Italic bool
+	// Language is the text's BCP 47 tag, which picks the glyph forms of characters several languages share, such as Han, and the fallback fonts and line breaking where the platform's text stack takes it; empty is the platform's own choice.
+	Language string
+	Size     Points
+	Weight   FontWeight
+	Italic   bool
 	// Variant turns on OpenType features: small capitals and the forms
 	// and widths of figures.
 	Variant FontVariant

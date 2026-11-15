@@ -127,6 +127,7 @@ type surface struct {
 	dom          dom           // frames and texts applied in bulk (dom.go)
 	parked       js.Value      // a hidden, inert element removed views wait in
 	measuring    *preparedText // the text measure holds
+	measureLang  string        // measure's lang attribute
 	metrics      js.Value      // a canvas's 2D context, for fonts' metrics
 	engine       *engine.Engine
 	views        []*view // index is NodeID
@@ -210,6 +211,8 @@ type view struct {
 	para   *paragraphStyle
 	filled string
 	plain  bool
+	// lang is the lang attribute inner holds.
+	lang string
 	// textBox is the text's box last set on inner, while textBoxOK, and
 	// oneLine whether it was kept on one line.
 	textBox   driver.Bounds
@@ -630,6 +633,7 @@ var numericVariants = [...]struct {
 // whole and one per span, and its attachments' placeholders.
 type richText struct {
 	text        string
+	language    string
 	style       map[string]string
 	spans       []span
 	attachments []driver.TextAttachment
@@ -648,6 +652,7 @@ type richText struct {
 type span struct {
 	start, end int
 	style      map[string]string
+	language   string
 	link       bool
 	cursor     driver.Cursor
 	// hidden marks a hidden span's element with data-hidden, which copySelection leaves out as the browser's copy does.
@@ -834,7 +839,7 @@ func (s *surface) Prepare(t *driver.AttributedText) driver.PreparedText {
 			// and screen readers too.
 			css["visibility"] = "hidden"
 		}
-		spans = append(spans, span{start: start, end: end, style: css, link: sp.Link, cursor: sp.Cursor, hidden: sp.Hidden})
+		spans = append(spans, span{start: start, end: end, style: css, language: sp.Style.Font.Language, link: sp.Link, cursor: sp.Cursor, hidden: sp.Hidden})
 		at = end
 	}
 	var copies []string
@@ -848,7 +853,7 @@ func (s *surface) Prepare(t *driver.AttributedText) driver.PreparedText {
 			}
 		}
 	}
-	p := &preparedText{s: s, richText: richText{text: t.Text, style: style, spans: spans,
+	p := &preparedText{s: s, richText: richText{text: t.Text, language: t.Style.Font.Language, style: style, spans: spans,
 		attachments: t.Attachments, copies: copies, drawn: drawn, maxLines: t.MaxLines, para: ps}}
 	if len(spans) == 0 && len(t.Attachments) == 0 && oneLine(t.Text) {
 		p.line = ps.line
@@ -1014,9 +1019,7 @@ func (r *richText) appendText(doc, el js.Value, start, end int) {
 	}
 }
 
-// fill puts the text in el: as it is, or as a <span> per span carrying
-// its byte offset, so a press can tell the character it hit. Links take
-// keyboard focus when interactive.
+// fill puts the text in el: as it is, or as a <span> per span carrying its byte offset, so a press can tell the character it hit. Links take keyboard focus when interactive. The caller sets el's lang; a span in another language carries its own.
 func (r *richText) fill(s *surface, el js.Value, interactive bool) {
 	doc := s.doc
 	if len(r.spans) == 0 && len(r.attachments) == 0 {
@@ -1036,6 +1039,9 @@ func (r *richText) fill(s *surface, el js.Value, interactive bool) {
 		}
 		if sp.cursor != driver.CursorAuto {
 			setStyle(e, map[string]string{"cursor": sp.cursor.Name()})
+		}
+		if sp.language != r.language && sp.language != "" {
+			e.Call("setAttribute", "lang", sp.language)
 		}
 		r.appendText(doc, e, sp.start, sp.end)
 		e.Call("setAttribute", "data-start", sp.start)
@@ -1179,6 +1185,10 @@ func (p *preparedText) hold() js.Value {
 	if p.s.measuring != p {
 		p.s.measuring = p
 		p.s.measureCSS.set(p.style)
+		if p.s.measureLang != p.language {
+			p.s.measureLang = p.language
+			setAttr(m, "lang", p.language)
+		}
 		if p.text == "" {
 			m.Set("textContent", "​") // an empty text keeps a line's height
 		} else {
@@ -1931,6 +1941,11 @@ func (s *surface) setText(v *view, t *driver.TextContent) {
 		v.inner.Set("textContent", "")
 		v.plain, v.filled = true, ""
 		return
+	}
+	if v.lang != l.language {
+		// Set apart from the batch, and only as it changes, which is rarely.
+		v.lang = l.language
+		setAttr(v.inner, "lang", l.language)
 	}
 	// A text of the style it had sends its content and box alone, queued
 	// for the page to apply with the batch's other texts and frames.

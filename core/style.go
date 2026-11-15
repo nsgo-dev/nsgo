@@ -198,6 +198,8 @@ type Style struct {
 	// the characters those before it lack; empty is the system font, and
 	// FontMonospace the system's fixed-pitch font.
 	FontFamily string
+	// Language is the text's BCP 47 tag ("ja", "zh-Hant"), which picks the glyph forms of characters languages share, such as Han, and the fallback fonts and line breaking where the platform takes it. Empty inherits it, and the root's is the language the app shows (Env.Language), else its locale.
+	Language   string
 	FontSize   Points
 	FontWeight FontWeight
 	FontStyle  FontStyle
@@ -866,6 +868,7 @@ func (s Style) withStates(own, group shownStates) Style {
 func (s *Style) mergeText(o Style) {
 	set(&s.Color, o.Color)
 	set(&s.FontFamily, o.FontFamily)
+	set(&s.Language, o.Language)
 	set(&s.FontSize, o.FontSize)
 	set(&s.FontWeight, o.FontWeight)
 	set(&s.FontStyle, o.FontStyle)
@@ -920,6 +923,7 @@ func setSlice[T any](dst *[]T, v []T) {
 type textFields struct {
 	Color                            Color
 	FontFamily                       string
+	Language                         string
 	FontSize                         Points
 	FontWeight                       FontWeight
 	FontStyle                        FontStyle
@@ -959,6 +963,7 @@ func (s *Style) inherit(parent textFields) textFields {
 	t := parent
 	set(&t.Color, currentIn(s.Color, parent.Color))
 	set(&t.FontFamily, s.FontFamily)
+	set(&t.Language, s.Language)
 	set(&t.FontSize, s.FontSize)
 	set(&t.FontWeight, s.FontWeight)
 	set(&t.FontStyle, s.FontStyle)
@@ -1048,10 +1053,11 @@ func (s *textFields) textStyle() driver.TextStyle {
 	t := driver.TextStyle{
 		Transform: uint8(s.TextTransform),
 		Font: Font{
-			Family: s.FontFamily,
-			Size:   s.FontSize,
-			Weight: s.FontWeight,
-			Italic: s.FontStyle == FontStyleItalic,
+			Family:   s.FontFamily,
+			Language: s.Language,
+			Size:     s.FontSize,
+			Weight:   s.FontWeight,
+			Italic:   s.FontStyle == FontStyleItalic,
 			// The normal bit only marks a variant as set.
 			Variant: s.FontVariant &^ FontVariantNormal,
 		},

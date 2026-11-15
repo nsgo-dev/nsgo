@@ -66,9 +66,10 @@ var defaultFaceMetrics = faceMetrics{ascent: 1.07, descent: 0.26, xHeight: 0.5, 
 	underline: -0.1, underlineThickness: 0.05, strike: 0.3, strikeThickness: 0.05}
 
 type faceKey struct {
-	family string
-	weight driver.FontWeight
-	italic bool
+	family   string
+	language string
+	weight   driver.FontWeight
+	italic   bool
 }
 
 var (
@@ -216,7 +217,7 @@ func systemFonts() *comObject {
 // metricsOf returns the metrics of the face font is set in, the default
 // family's when the system has no such family.
 func metricsOf(font driver.Font) faceMetrics {
-	key := faceKey{fontName(font.Family), font.Weight, font.Italic}
+	key := faceKey{fontName(font.Family), font.Language, font.Weight, font.Italic}
 	facesMu.Lock()
 	defer facesMu.Unlock()
 	if m, ok := faces[key]; ok {
@@ -274,7 +275,7 @@ func textFormat(font driver.Font) *comObject {
 	}
 	if failed(f.callF(dwCreateTextFormat, 1<<5, uintptr(unsafe.Pointer(wide(fontName(font.Family)))), fonts.ptr(),
 		fontWeight(font.Weight), fontStyle(font.Italic), dwStretchNormal, f32(max(float32(font.Size), 0.1)),
-		uintptr(unsafe.Pointer(wide(""))), uintptr(unsafe.Pointer(&format)))) {
+		uintptr(unsafe.Pointer(wide(font.Language))), uintptr(unsafe.Pointer(&format)))) {
 		return nil
 	}
 	return format
@@ -544,6 +545,11 @@ func (pt *preparedText) build() *comObject {
 		layout.callRange(layoutSetFontWeight, 0, r.start, n, fontWeight(f.Weight))
 		layout.callRange(layoutSetFontStyle, 0, r.start, n, fontStyle(f.Italic))
 		layout.callRange(layoutSetFontSize, 1, r.start, n, f32(max(float32(f.Size), 0.1)))
+		if f.Language != pt.style.Font.Language {
+			// The format has the text's own; a span in another language picks its glyphs and fallback by its own.
+			locale := wide(f.Language)
+			layout.callRange(layoutSetLocaleName, 0, r.start, n, uintptr(unsafe.Pointer(locale)))
+		}
 		if ls := float32(r.style.LetterSpacing); ls != 0 && spacing != nil {
 			spacing.callRange(layoutSetCharacterSpacing, 0b111, r.start, n, f32(0), f32(ls), f32(0))
 		}

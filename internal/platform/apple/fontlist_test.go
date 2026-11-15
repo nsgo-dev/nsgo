@@ -84,7 +84,7 @@ func TestListsFallBackInTheStyledFace(t *testing.T) {
 		{"system-ui, Hiragino Sans", "Hiragino Sans", "a中", 700, false},
 		{"Didot, Times New Roman", "Times New Roman", "aЖ", driver.FontWeightNormal, true},
 	} {
-		if f := familyFont(driver.Family{Name: c.fallback}, 12); f == 0 {
+		if f := familyFont(driver.Family{Name: c.fallback}, 12, ""); f == 0 {
 			t.Logf("%s is not installed", c.fallback)
 			continue
 		} else {
@@ -99,6 +99,25 @@ func TestListsFallBackInTheStyledFace(t *testing.T) {
 		faces := runFaces(st, c.text)
 		if len(faces) != 2 || faces[1] != want {
 			t.Errorf("%q at %d, italic %v: runs set in %v, want the second in %s", c.list, c.weight, c.italic, faces, want)
+		}
+	}
+}
+
+// TestLanguagePicksHanForms sets the same Han character in Japanese and in Chinese and checks CoreText falls back to each language's face, whatever the system prefers, and that the font cache keeps the two apart.
+func TestLanguagePicksHanForms(t *testing.T) {
+	face := func(lang string) string {
+		faces := runFaces(driver.TextStyle{Font: driver.Font{Size: 12, Weight: driver.FontWeightNormal, Language: lang}, Color: driver.RGB(0)}, "直")
+		if len(faces) != 1 {
+			t.Fatalf("%s: runs set in %v, want one", lang, faces)
+		}
+		return faces[0]
+	}
+	for range 2 { // the second round reads the cache
+		if got := face("ja"); !strings.Contains(got, "Hira") {
+			t.Errorf("Japanese sets in %s, want a Hiragino face", got)
+		}
+		if got := face("zh-Hans"); !strings.Contains(got, "PingFang") || !strings.Contains(got, "SC") {
+			t.Errorf("Simplified Chinese sets in %s, want a PingFang SC face", got)
 		}
 	}
 }

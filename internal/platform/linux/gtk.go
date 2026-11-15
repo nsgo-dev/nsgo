@@ -274,6 +274,8 @@ var (
 	pangoAttrListInsert            func(uintptr, uintptr)
 	pangoAttrListUnref             func(uintptr)
 	pangoAttrFamilyNew             func(*byte) uintptr
+	pangoLanguageFromString        func(*byte) uintptr
+	pangoAttrLanguageNew           func(uintptr) uintptr
 	pangoAttrSizeNew               func(int32) uintptr
 	pangoAttrWeightNew             func(int32) uintptr
 	pangoAttrStyleNew              func(int32) uintptr
@@ -633,6 +635,8 @@ func bind() {
 	purego.RegisterLibFunc(&pangoAttrListInsert, pangoLib, "pango_attr_list_insert")
 	purego.RegisterLibFunc(&pangoAttrListUnref, pangoLib, "pango_attr_list_unref")
 	purego.RegisterLibFunc(&pangoAttrFamilyNew, pangoLib, "pango_attr_family_new")
+	purego.RegisterLibFunc(&pangoLanguageFromString, pangoLib, "pango_language_from_string")
+	purego.RegisterLibFunc(&pangoAttrLanguageNew, pangoLib, "pango_attr_language_new")
 	purego.RegisterLibFunc(&pangoAttrSizeNew, pangoLib, "pango_attr_size_new")
 	purego.RegisterLibFunc(&pangoAttrWeightNew, pangoLib, "pango_attr_weight_new")
 	purego.RegisterLibFunc(&pangoAttrStyleNew, pangoLib, "pango_attr_style_new")

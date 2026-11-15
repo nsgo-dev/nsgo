@@ -147,6 +147,7 @@ const (
 	layoutSetDrawingEffect    = 38
 	layoutSetInlineObject     = 39
 	layoutSetTypography       = 40
+	layoutSetLocaleName       = 41
 	layoutGetLineMetrics      = 59
 	layoutGetMetrics          = 60
 	layoutHitTestPoint        = 64

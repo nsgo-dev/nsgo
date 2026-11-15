@@ -473,6 +473,8 @@ func (r *runtime) styleKey(s *core.Style, key string, v js.Value) {
 		s.FontWeight = r.fontWeight(v)
 	case "fontFamily":
 		s.FontFamily = v.String()
+	case "language":
+		s.Language = v.String()
 	case "fontStyle":
 		s.FontStyle = pick(r, key, v, map[string]core.FontStyle{"normal": core.FontStyleNormal,
 			"italic": core.FontStyleItalic})

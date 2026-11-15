@@ -74,7 +74,7 @@ var (
 	attrFont, attrColor, attrKern, attrUnderline, attrParagraph uintptr
 	attrTraits, attrWeight, attrSymbolic, attrUnderlineColor    uintptr
 	attrFeatureSettings, attrFeatureTag, attrFeatureValue       uintptr
-	attrCascadeList, attrFamilyName, attrWidth                  uintptr
+	attrCascadeList, attrFamilyName, attrWidth, attrLanguage    uintptr
 
 	ctFontDescriptorCreateWithAttrs func(attrs uintptr) uintptr
 	ctFontDescriptorCopyAttr        func(desc, attr uintptr) uintptr
@@ -154,6 +154,7 @@ func loadText(cf, cg uintptr) {
 	attrCascadeList = constant(ct, "kCTFontCascadeListAttribute")
 	attrFamilyName = constant(ct, "kCTFontFamilyNameAttribute")
 	attrWidth = constant(ct, "kCTFontWidthTrait")
+	attrLanguage = constant(ct, "kCTLanguageAttributeName")
 	attrFeatureTag = constant(ct, "kCTFontOpenTypeFeatureTag")
 	attrFeatureValue = constant(ct, "kCTFontOpenTypeFeatureValue")
 	reg(&ctFontDescriptorCreateWithAttrs, ct, "CTFontDescriptorCreateWithAttributes")
@@ -169,11 +170,12 @@ var weights = [...]float64{-0.8, -0.6, -0.4, 0, 0.23, 0.3, 0.4, 0.56, 0.62}
 // of numbers has two or three of these for the whole screen, and asks for
 // them once per changed cell per frame.
 type fontKey struct {
-	family  string
-	size    float64
-	weight  driver.FontWeight
-	italic  bool
-	variant driver.FontVariant
+	family   string
+	language string
+	size     float64
+	weight   driver.FontWeight
+	italic   bool
+	variant  driver.FontVariant
 }
 
 // fontCacheLimit bounds the cache. A screen uses a handful of fonts; an
@@ -189,7 +191,7 @@ var fontCache = newRefCache[fontKey](fontCacheLimit)
 // again by reference. Building one is seven CoreText calls through purego;
 // a frame of a table asks for the same font forty times.
 func Font(f driver.Font) uintptr {
-	k := fontKey{family: f.Family, size: float64(f.Size), weight: f.Weight, italic: f.Italic, variant: f.Variant}
+	k := fontKey{family: f.Family, language: f.Language, size: float64(f.Size), weight: f.Weight, italic: f.Italic, variant: f.Variant}
 	if ref := fontCache.get(k); ref != 0 {
 		return ref
 	}
@@ -236,13 +238,13 @@ func withFeatures(font uintptr, tags []string) uintptr {
 func listedFont(f driver.Font) uintptr {
 	var fonts []uintptr
 	for _, family := range driver.FontFamilies(f.Family) {
-		if font := familyFont(family, f.Size); font != 0 {
+		if font := familyFont(family, f.Size, f.Language); font != 0 {
 			fonts = append(fonts, font)
 		}
 	}
 	if len(fonts) == 0 {
 		const uiFontSystem = 2
-		return ctFontCreateUIFont(uiFontSystem, float64(f.Size), 0)
+		return uiFont(uiFontSystem, f.Size, f.Language)
 	}
 	if len(fonts) == 1 {
 		return fonts[0]
@@ -290,13 +292,13 @@ func styledCascade(cascade, traits uintptr) uintptr {
 
 // familyFont returns a new CTFont of a family, 0 for a named one the
 // system does not have: CTFontCreateWithName answers those with another.
-func familyFont(family driver.Family, size driver.Points) uintptr {
+func familyFont(family driver.Family, size driver.Points, language string) uintptr {
 	const uiFontSystem, uiFontUserFixedPitch = 2, 1
 	switch family.Kind {
 	case driver.FamilySystem, driver.FamilyRounded:
-		return ctFontCreateUIFont(uiFontSystem, float64(size), 0)
+		return uiFont(uiFontSystem, size, language)
 	case driver.FamilyMonospace:
-		return ctFontCreateUIFont(uiFontUserFixedPitch, float64(size), 0)
+		return uiFont(uiFontUserFixedPitch, size, language)
 	case driver.FamilySerif:
 		family.Name = "Times New Roman"
 	}
@@ -317,17 +319,26 @@ func familyFont(family driver.Family, size driver.Points) uintptr {
 	return font
 }
 
+func uiFont(kind uint32, size driver.Points, language string) uintptr {
+	var lang uintptr
+	if language != "" {
+		lang = CFString(language)
+		defer Release(lang)
+	}
+	return ctFontCreateUIFont(kind, float64(size), lang)
+}
+
 // buildFace returns a new CTFont of f's family, size, weight and slant.
 func buildFace(f driver.Font) uintptr {
 	var base uintptr
 	if f.Family == driver.FontMonospace {
 		const uiFontUserFixedPitch = 1
-		base = ctFontCreateUIFont(uiFontUserFixedPitch, float64(f.Size), 0)
+		base = uiFont(uiFontUserFixedPitch, f.Size, f.Language)
 	} else if f.Family != "" {
 		base = listedFont(f)
 	} else {
 		const uiFontSystem = 2
-		base = ctFontCreateUIFont(uiFontSystem, float64(f.Size), 0)
+		base = uiFont(uiFontSystem, f.Size, f.Language)
 	}
 	if f.Weight == driver.FontWeightNormal && !f.Italic {
 		return base
@@ -427,6 +438,10 @@ func runAttributes(st driver.TextStyle, keys, values []uintptr) uintptr {
 	owned := []uintptr{font, color, underline}
 	keys = append(keys, attrFont, attrColor, attrUnderline)
 	values = append(values, font, color, underline)
+	if st.Font.Language != "" {
+		lang := CFString(st.Font.Language)
+		keys, values, owned = append(keys, attrLanguage), append(values, lang), append(owned, lang)
+	}
 	if line != 0 && st.DecorationColor != 0 {
 		c := CGColor(st.DecorationColor)
 		keys, values, owned = append(keys, attrUnderlineColor), append(values, c), append(owned, c)
