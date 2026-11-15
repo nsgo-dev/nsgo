@@ -377,6 +377,50 @@ func TestAfterFuncRunsOnClock(t *testing.T) {
 	}
 }
 
+func TestAfterFuncRemovesFinishedTimers(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node { return View{} })
+	owner := h.root
+	called := 0
+	owner.AfterFunc(time.Second, func() { called++ })
+	if got := len(owner.timers); got != 1 {
+		t.Fatalf("pending timers after arm = %d, want 1", got)
+	}
+	h.clock.Advance(time.Second)
+	h.drain()
+	if called != 1 {
+		t.Fatalf("called %d times, want 1", called)
+	}
+	if got := len(owner.timers); got != 0 {
+		t.Fatalf("pending timers after fire = %d, want 0", got)
+	}
+
+	stop := owner.AfterFunc(time.Hour, func() { called++ })
+	if !stop() || stop() {
+		t.Fatal("stop return values changed")
+	}
+	if got := len(owner.timers); got != 0 {
+		t.Fatalf("pending timers after stop = %d, want 0", got)
+	}
+
+	child := owner.Child()
+	child.AfterFunc(time.Hour, func() { called++ })
+	child.Dispose()
+	if got := len(child.timers); got != 0 {
+		t.Fatalf("pending timers after dispose = %d, want 0", got)
+	}
+}
+
+func TestManualClockClearsStoppedTimerTail(t *testing.T) {
+	c := NewManualClock(time.Unix(0, 0))
+	stop := c.AfterFunc(time.Hour, func() {})
+	stop()
+	c.Advance(0)
+	backing := c.timers[:cap(c.timers)]
+	if len(c.timers) != 0 || (len(backing) > 0 && backing[0] != nil) {
+		t.Fatalf("stopped timer remains in clock backing array: len=%d cap=%d", len(c.timers), cap(c.timers))
+	}
+}
+
 func TestTransitionEndFollowsTheNewTransition(t *testing.T) {
 	var ending *Signal[bool]
 	ended := 0

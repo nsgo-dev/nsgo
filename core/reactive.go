@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -35,6 +36,8 @@ type Scope struct {
 	prev     *Scope
 	next     *Scope
 	cleanups []func()
+	timerMu  sync.Mutex
+	timers   map[*afterTimer]struct{}
 	values   map[any]any
 	catch    func(error)
 	ctx      context.Context
@@ -314,6 +317,7 @@ func (cx *Scope) Dispose() {
 func (cx *Scope) Disposed() bool { return cx.disposed }
 
 func (cx *Scope) disposeOwned() {
+	cx.stopTimers()
 	for c := cx.last; c != nil; {
 		prev := c.prev
 		c.prev, c.next = nil, nil
@@ -388,27 +392,100 @@ func (cx *Scope) Post(fn func()) {
 	})
 }
 
+// afterTimer is kept in its owner's pending timer set only while its callback
+// may still be posted. The mutex protects the clock stop function because the
+// clock callback and an app calling stop may run on different goroutines.
+type afterTimer struct {
+	owner     *Scope
+	fn        func()
+	mu        sync.Mutex
+	clockStop func() bool
+	stopped   atomic.Bool
+	ran       atomic.Bool
+	done      atomic.Bool
+}
+
+func (t *afterTimer) cancelClock() {
+	t.mu.Lock()
+	stop := t.clockStop
+	t.clockStop = nil
+	t.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+}
+
+func (t *afterTimer) fire() {
+	t.done.Store(true)
+	t.owner.removeTimer(t)
+	t.cancelClock()
+	t.owner.Post(func() {
+		if !t.stopped.Load() {
+			t.ran.Store(true)
+			t.fn()
+		}
+		t.fn = nil
+	})
+}
+
+func (o *Scope) addTimer(t *afterTimer) {
+	o.timerMu.Lock()
+	defer o.timerMu.Unlock()
+	if t.done.Load() || t.stopped.Load() || o.disposed {
+		return
+	}
+	if o.timers == nil {
+		o.timers = make(map[*afterTimer]struct{})
+	}
+	o.timers[t] = struct{}{}
+}
+
+func (o *Scope) removeTimer(t *afterTimer) {
+	o.timerMu.Lock()
+	if o.timers != nil {
+		delete(o.timers, t)
+	}
+	o.timerMu.Unlock()
+}
+
+func (o *Scope) stopTimers() {
+	o.timerMu.Lock()
+	timers := make([]*afterTimer, 0, len(o.timers))
+	for t := range o.timers {
+		timers = append(timers, t)
+	}
+	clear(o.timers)
+	o.timerMu.Unlock()
+	for _, t := range timers {
+		t.stopped.Store(true)
+		t.cancelClock()
+	}
+}
+
 // AfterFunc runs fn on the graph's goroutine after d, unless the current
-// owner is disposed first or stop is called.
+// owner is disposed first or stop is called. A fired or stopped timer keeps
+// nothing on its owner, so re-arming one under a long-lived scope is safe.
 func (cx *Scope) AfterFunc(d time.Duration, fn func()) (stop func() bool) {
 	o := cx.current()
-	// The call is posted when the time comes: stopping it before it runs
-	// cancels it there too, as a timer an earlier one clears.
-	var stopped, ran atomic.Bool
-	clockStop := cx.rt.clock.AfterFunc(d, func() {
-		o.Post(func() {
-			if !stopped.Load() {
-				ran.Store(true)
-				fn()
-			}
-		})
-	})
-	stop = func() bool {
+	t := &afterTimer{owner: o, fn: fn}
+	clockStop := cx.rt.clock.AfterFunc(d, t.fire)
+	t.mu.Lock()
+	if t.done.Load() {
+		t.mu.Unlock()
 		clockStop()
-		return !stopped.Swap(true) && !ran.Load()
+	} else {
+		t.clockStop = clockStop
+		t.mu.Unlock()
+		o.addTimer(t)
 	}
-	o.addCleanup(func() { stop() })
-	return stop
+	return func() bool {
+		if t.stopped.Swap(true) || t.ran.Load() {
+			return false
+		}
+		o.removeTimer(t)
+		t.cancelClock()
+		return true
+	}
 }
 
 // Untrack runs fn without subscribing the running computation to what

@@ -137,6 +137,7 @@ func slicesDeleteStopped(ts []*manualTimer) []*manualTimer {
 			out = append(out, t)
 		}
 	}
+	clear(ts[len(out):])
 	return out
 }
 
