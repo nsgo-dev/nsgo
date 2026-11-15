@@ -1595,8 +1595,8 @@ func pressesBegan(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 				name = strings.ToLower(apple.GoString(key.Send(sel("charactersIgnoringModifiers"))))
 			}
 			if name != "" {
-				binding, consumed = driver.FindKey(app.keys, apple.KeyNames(name, objc.Send[uint](key, sel("modifierFlags"))),
-					app.editing(), false)
+				binding, consumed = driver.FindKeyWithFocus(app.keys, apple.KeyNames(name, objc.Send[uint](key, sel("modifierFlags"))),
+					app.focusedKeyUse(), false)
 			}
 		})
 	}

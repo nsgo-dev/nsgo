@@ -1253,7 +1253,7 @@ func (s *surface) binding(event objc.ID) (string, bool) {
 			return "", false
 		}
 	}
-	return driver.FindKey(s.keys, apple.KeyNames(name, objc.Send[uint](event, sel("modifierFlags"))), s.editing(),
+	return driver.FindKeyWithFocus(s.keys, apple.KeyNames(name, objc.Send[uint](event, sel("modifierFlags"))), s.focusedKeyUse(),
 		objc.Send[bool](event, sel("isARepeat")))
 }
 

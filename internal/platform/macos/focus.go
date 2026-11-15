@@ -114,6 +114,39 @@ func (s *surface) focusedPressable() bool {
 	return v != nil && v.surface == s && v.focusable()
 }
 
+// focusedKeyUse describes the keys the focused drawn control keeps before
+// the app's automatic key bindings. Text fields and pages keep their own
+// editing keys; controls keep the standard activation and navigation keys.
+func (s *surface) focusedKeyUse() driver.KeyUse {
+	v := views[s.window.Send(sel("firstResponder"))]
+	if v == nil || v.surface != s {
+		return 0
+	}
+	return keyUse(v)
+}
+
+func keyUse(v *view) driver.KeyUse {
+	if v == nil {
+		return 0
+	}
+	if v.kind == driver.KindInput || v.kind == driver.KindWeb {
+		return driver.KeyUseText
+	}
+	var use driver.KeyUse
+	if v.pressable() {
+		use |= driver.KeyUsePress
+	}
+	switch v.props.Role {
+	case driver.RoleAdjustable, driver.RoleSpinButton:
+		use |= driver.KeyUseAdjust
+	case driver.RoleTab, driver.RoleTabList, driver.RoleRadio, driver.RoleRadioGroup,
+		driver.RoleOption, driver.RoleListbox, driver.RoleMenuItem, driver.RoleMenuItemRadio,
+		driver.RoleMenuItemCheckbox:
+		use |= driver.KeyUseSelect
+	}
+	return use
+}
+
 // modalCame remembers what had the focus as modal v came: a field's
 // NSTextField rather than the shared field editor it edits in.
 func (s *surface) modalCame(v *view) {

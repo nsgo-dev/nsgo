@@ -249,7 +249,8 @@ func (k *listKeys) typed(prefix string) {
 
 // bind binds the keys while the list holds them.
 func (k *listKeys) bind(cx *core.Scope) {
-	repeat := core.KeyOptions{Repeat: true}
+	repeat := core.KeyOptions{When: core.KeyNotEditing, Repeat: true}
+	noEdit := core.KeyOptions{When: core.KeyNotEditing}
 	s := k.list.Selection
 	cx.OnKeyWith("up", repeat, func() { k.step(-k.columns, false) })
 	cx.OnKeyWith("down", repeat, func() { k.step(k.columns, false) })
@@ -257,11 +258,11 @@ func (k *listKeys) bind(cx *core.Scope) {
 		cx.OnKeyWith("left", repeat, func() { k.step(-1, false) })
 		cx.OnKeyWith("right", repeat, func() { k.step(1, false) })
 	}
-	cx.OnKey("home", func() { k.moveTo(0, false) })
-	cx.OnKey("end", func() { k.moveTo(k.list.Count()-1, false) })
+	cx.OnKeyWith("home", noEdit, func() { k.moveTo(0, false) })
+	cx.OnKeyWith("end", noEdit, func() { k.moveTo(k.list.Count()-1, false) })
 	cx.OnKeyWith("pageup", repeat, func() { k.step(-k.page(), false) })
 	cx.OnKeyWith("pagedown", repeat, func() { k.step(k.page(), false) })
-	cx.OnKey("enter", func() { k.activate(k.cursor()) })
+	cx.OnKeyWith("enter", noEdit, func() { k.activate(k.cursor()) })
 	if s.Multiple() {
 		cx.OnKeyWith("shift+up", repeat, func() { k.step(-k.columns, true) })
 		cx.OnKeyWith("shift+down", repeat, func() { k.step(k.columns, true) })
@@ -269,9 +270,9 @@ func (k *listKeys) bind(cx *core.Scope) {
 			cx.OnKeyWith("shift+left", repeat, func() { k.step(-1, true) })
 			cx.OnKeyWith("shift+right", repeat, func() { k.step(1, true) })
 		}
-		cx.OnKey("shift+home", func() { k.moveTo(0, true) })
-		cx.OnKey("shift+end", func() { k.moveTo(k.list.Count()-1, true) })
-		cx.OnKey("mod+a", func() {
+		cx.OnKeyWith("shift+home", noEdit, func() { k.moveTo(0, true) })
+		cx.OnKeyWith("shift+end", noEdit, func() { k.moveTo(k.list.Count()-1, true) })
+		cx.OnKeyWith("mod+a", noEdit, func() {
 			keys := make([]any, k.list.Count())
 			for i := range keys {
 				keys[i] = k.key(i)
@@ -284,13 +285,13 @@ func (k *listKeys) bind(cx *core.Scope) {
 				}
 			})
 		})
-		cx.OnKey("space", func() {
+		cx.OnKeyWith("space", noEdit, func() {
 			if c := k.cursor(); c >= 0 {
 				k.changeSelection(func() { s.Toggle(k.key(c)) })
 			}
 		})
 	} else {
-		cx.OnKey("space", func() {
+		cx.OnKeyWith("space", noEdit, func() {
 			if c := k.cursor(); c >= 0 {
 				k.changeSelection(func() { s.Set(k.key(c)) })
 			}

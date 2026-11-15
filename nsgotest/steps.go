@@ -749,12 +749,12 @@ func (a *App) Key(key string) {
 	k := driver.NormalizeKey(key)
 	a.inputBy(driver.ModalityKeyboard)
 	names := a.keyNames(k)
-	for _, b := range a.Keymap {
-		if slices.Contains(names, b) {
-			a.dispatch(driver.Event{Kind: driver.EventKey, Text: b})
-			a.done()
-			return
+	if binding, consumed := driver.FindKeyWithFocus(a.keyBindings, names, a.focusedKeyUse(), false); consumed {
+		if binding != "" {
+			a.dispatch(driver.Event{Kind: driver.EventKey, Text: binding})
 		}
+		a.done()
+		return
 	}
 	if a.tabs() {
 		switch k {
@@ -806,6 +806,30 @@ func (a *App) Key(key string) {
 		a.dispatch(driver.Event{Kind: driver.EventBack, ID: a.rootID})
 	}
 	a.done()
+}
+
+func (a *App) focusedKeyUse() driver.KeyUse {
+	var use driver.KeyUse
+	for _, v := range a.views {
+		if !v.Focused {
+			continue
+		}
+		if v.Kind == driver.KindInput || v.Kind == driver.KindWeb {
+			use |= driver.KeyUseText
+		}
+		if pressable(v) {
+			use |= driver.KeyUsePress
+		}
+		switch v.Props.Role {
+		case driver.RoleAdjustable, driver.RoleSpinButton:
+			use |= driver.KeyUseAdjust
+		case driver.RoleTab, driver.RoleTabList, driver.RoleRadio, driver.RoleRadioGroup,
+			driver.RoleOption, driver.RoleListbox, driver.RoleMenuItem, driver.RoleMenuItemRadio,
+			driver.RoleMenuItemCheckbox:
+			use |= driver.KeyUseSelect
+		}
+	}
+	return use
 }
 
 // shifted is what the key typing c types with Shift on the US layout.

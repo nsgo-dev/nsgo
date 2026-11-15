@@ -323,8 +323,9 @@ type App struct {
 	// reader's focus to.
 	AccessibilityFocus *View
 	// Keymap is the keyboard shortcuts the app binds; Title its title.
-	Keymap []string
-	Title  string
+	Keymap      []string
+	keyBindings []driver.KeyBinding
+	Title       string
 	// Language is the language the platform labels its menus in, and
 	// LanguageForced whether the app forces it (core.Scope.SetLocale),
 	// which Apple platforms keep for the system's words in later launches.

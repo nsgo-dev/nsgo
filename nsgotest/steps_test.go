@@ -214,6 +214,27 @@ func TestTypingIsKeyByKey(t *testing.T) {
 	}
 }
 
+func TestKeyAutoYieldsToFocusedControls(t *testing.T) {
+	var app *App
+	var binding, control int
+	app = Start(t, func(cx *core.Scope) core.Node {
+		cx.OnKey("space", func() { binding++ })
+		return core.Func(func(cx *core.Scope) core.Node {
+			cx.OnKeyWith("right", core.KeyOptions{When: core.KeyNotEditing}, func() { control++ })
+			return core.View{TestID: "slider", Role: core.RoleAdjustable, OnPress: func(core.PressEvent) {}, Style: core.Style{Width: core.Pt(80), Height: core.Pt(20)}}
+		})
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	app.Focus("id:slider")
+	app.Key("space")
+	if binding != 0 {
+		t.Fatalf("Space binding fired on a focused control: %d", binding)
+	}
+	app.Key("right")
+	if control != 1 || binding != 0 {
+		t.Fatalf("control key handling = control %d, binding %d", control, binding)
+	}
+}
+
 func TestDragsGoToWhatAFingerMoves(t *testing.T) {
 	var log []string
 	app := Start(t, func(cx *core.Scope) core.Node {

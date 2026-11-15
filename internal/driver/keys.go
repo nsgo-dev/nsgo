@@ -45,9 +45,26 @@ type KeyBinding struct {
 	// Repeat fires it again on the auto-repeats of a held key; else they
 	// are consumed and fire nothing.
 	Repeat bool
+	// BlockedBy says which focused controls keep the key from an automatic
+	// binding. It is zero for bindings that always remain eligible.
+	BlockedBy KeyUse
 	// ID is a global shortcut's (ItemHotKeys), which EventHotKey reports.
 	ID uint32
 }
+
+// KeyUse says which keys a focused control keeps for itself.
+type KeyUse uint8
+
+const (
+	// KeyUsePress is Enter or Space on a focused pressable control.
+	KeyUsePress KeyUse = 1 << iota
+	// KeyUseAdjust is an arrow, paging, Home or End key on an adjustable control.
+	KeyUseAdjust
+	// KeyUseSelect is an arrow, Home or End key on a tab or radio control.
+	KeyUseSelect
+	// KeyUseText is a focused text editor or web view.
+	KeyUseText
+)
 
 // NormalizeKey returns key lowercased with its modifiers in the order mod, ctrl, alt, shift, meta; "cmd" and "command" are meta, "option" is alt, "control" is ctrl and the key "return" is "enter".
 func NormalizeKey(key string) string {
@@ -80,9 +97,20 @@ func NormalizeKey(key string) string {
 // fires, or "" and whether the press is consumed anyway: the repeat of a
 // binding that fires once.
 func FindKey(keymap []KeyBinding, names []string, editing, repeat bool) (key string, consumed bool) {
+	var use KeyUse
+	if editing {
+		use = KeyUseText
+	}
+	return FindKeyWithFocus(keymap, names, use, repeat)
+}
+
+// FindKeyWithFocus is FindKey with the focused control's key uses. Automatic
+// bindings whose key a focused control owns are skipped; KeyAlways and
+// KeyNotEditing bindings have no BlockedBy bits and remain eligible.
+func FindKeyWithFocus(keymap []KeyBinding, names []string, use KeyUse, repeat bool) (key string, consumed bool) {
 	for i := len(keymap) - 1; i >= 0; i-- {
 		b := keymap[i]
-		if !slices.Contains(names, b.Key) || editing && !b.InText {
+		if !slices.Contains(names, b.Key) || use&KeyUseText != 0 && !b.InText || use&b.BlockedBy != 0 {
 			continue
 		}
 		if repeat && !b.Repeat {

@@ -1377,7 +1377,15 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.u32(uint32(len(it.Keys)))
 			for _, k := range it.Keys {
 				w.str(k.Key)
-				w.flags(k.InText, k.Repeat)
+				flags := uint8(0)
+				if k.InText {
+					flags |= 1
+				}
+				if k.Repeat {
+					flags |= 2
+				}
+				flags |= uint8(k.BlockedBy) << 2
+				w.byte(flags)
 			}
 		case driver.ItemStatusBar:
 			c := it.StatusBar

@@ -585,6 +585,7 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 			a.post(ev)
 		case driver.ItemKeymap:
+			a.keyBindings = slices.Clone(it.Keys)
 			a.Keymap = a.Keymap[:0]
 			for _, b := range it.Keys {
 				if !slices.Contains(a.Keymap, b.Key) {

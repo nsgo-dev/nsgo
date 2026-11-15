@@ -32,6 +32,28 @@ var apple = func() bool {
 
 func (s *surface) setKeymap(keys []driver.KeyBinding) { s.keys = keys }
 
+func focusedKeyUse(v *view) driver.KeyUse {
+	if v == nil {
+		return 0
+	}
+	if v.kind == driver.KindInput || v.kind == driver.KindWeb {
+		return driver.KeyUseText
+	}
+	var use driver.KeyUse
+	if v.pressable() {
+		use |= driver.KeyUsePress
+	}
+	switch v.props.Role {
+	case driver.RoleAdjustable, driver.RoleSpinButton:
+		use |= driver.KeyUseAdjust
+	case driver.RoleTab, driver.RoleTabList, driver.RoleRadio, driver.RoleRadioGroup,
+		driver.RoleOption, driver.RoleListbox, driver.RoleMenuItem, driver.RoleMenuItemRadio,
+		driver.RoleMenuItemCheckbox:
+		use |= driver.KeyUseSelect
+	}
+	return use
+}
+
 // keyName returns the normalized name of e's key without modifiers, or
 // "" for a modifier. Letters and digits follow the layout, unless it
 // types none, such as Option on a Mac or a Cyrillic layout; then the
@@ -97,7 +119,7 @@ func (s *surface) shortcut(e js.Value) {
 	case !apple && ctrl:
 		names = append([]string{join(true, false, alt, shift, meta)}, names...)
 	}
-	k, consumed := driver.FindKey(s.keys, names, editing(s.doc.Get("activeElement")), e.Get("repeat").Bool())
+	k, consumed := driver.FindKeyWithFocus(s.keys, names, focusedKeyUse(s.viewOf(s.doc.Get("activeElement"))), e.Get("repeat").Bool())
 	if !consumed {
 		return
 	}

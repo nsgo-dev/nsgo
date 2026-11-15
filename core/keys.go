@@ -26,8 +26,11 @@ type keyBinding struct {
 type KeyWhen uint8
 
 const (
-	// KeyAuto fires it unless a text input or a web view has the
-	// keyboard focus and uses the key itself (EditsText).
+	// KeyAuto fires it unless a focused text editor or control uses the key
+	// itself. Text editors use the keys EditsText reports; buttons, menu rows
+	// and other pressables keep Enter and Space; sliders keep their arrow,
+	// paging, Home and End keys; tabs and radio groups keep their navigation
+	// keys.
 	KeyAuto KeyWhen = iota
 	// KeyAlways fires it wherever the keyboard focus is.
 	KeyAlways
@@ -45,7 +48,7 @@ type KeyOptions struct {
 	OverModals bool
 }
 
-// OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". The newest binding of a key wins. It fires once while the key is held, and not while a text input that uses the key has the keyboard focus; OnKeyWith says else.
+// OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". The newest binding of a key wins. It fires once while the key is held, and not while a text input that uses the key has the keyboard focus; focused controls keep the keys they use as described by KeyAuto. OnKeyWith says else.
 //
 // What the owner shows are the views of the nearest owner at or above it that has any. The binding rests while none of them shows: in a Holder's content no place shows, under a DisplayNone view such as a navigation stack's screen below the top, in a dismissed modal. While a modal is shown it rests too if any of them is outside the topmost modal, as the page under a dialog is, unless KeyOptions.OverModals. It fires again once they show, without binding it again.
 func (cx *Scope) OnKey(key string, fn func()) { cx.OnKeyWith(key, KeyOptions{}, fn) }
@@ -58,8 +61,12 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 	}
 	k := driver.NormalizeKey(key)
 	inText := opts.When == KeyAlways || opts.When == KeyAuto && !EditsText(k)
+	blocked := driver.KeyUse(0)
+	if opts.When == KeyAuto {
+		blocked = keyControlUses(k)
+	}
 	owner := cx.current()
-	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat}, owner: owner, within: confinement(owner), overModals: opts.OverModals, fn: fn}
+	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, BlockedBy: blocked}, owner: owner, within: confinement(owner), overModals: opts.OverModals, fn: fn}
 	t.keys = append(t.keys, b)
 	t.keysChanged = true
 	t.changed = true
@@ -68,6 +75,21 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 		t.keysChanged = true
 		t.changed = true
 	})
+}
+
+func keyControlUses(key string) driver.KeyUse {
+	parts := strings.Split(key, "+")
+	if len(parts) != 1 {
+		return 0
+	}
+	switch parts[0] {
+	case "enter", "space":
+		return driver.KeyUsePress
+	case "up", "down", "left", "right", "home", "end", "pageup", "pagedown":
+		return driver.KeyUseAdjust | driver.KeyUseSelect
+	default:
+		return 0
+	}
 }
 
 type backHandler struct {

@@ -118,13 +118,13 @@ func (r Rating) Render(cx *core.Scope) core.Node {
 				}
 			}
 		}
-		arrow := core.KeyOptions{When: core.KeyAuto, Repeat: true}
+		arrow := core.KeyOptions{When: core.KeyNotEditing, Repeat: true}
 		cx.OnKeyWith("right", arrow, sideways(1))
 		cx.OnKeyWith("left", arrow, sideways(-1))
 		cx.OnKeyWith("up", arrow, by(1))
 		cx.OnKeyWith("down", arrow, by(-1))
-		cx.OnKeyWith("home", core.KeyOptions{When: core.KeyAuto}, func() { set(0) })
-		cx.OnKeyWith("end", core.KeyOptions{When: core.KeyAuto}, func() { set(limit) })
+		cx.OnKeyWith("home", core.KeyOptions{When: core.KeyNotEditing}, func() { set(0) })
+		cx.OnKeyWith("end", core.KeyOptions{When: core.KeyNotEditing}, func() { set(limit) })
 		return nil
 	}})
 	view := core.View{TestID: r.TestID, Accessible: true, Role: core.RoleAdjustable, Label: r.Label, Disabled: r.Disabled,

@@ -34,6 +34,30 @@ func TestKeyBindingsFireAsTheirOptionsSay(t *testing.T) {
 	}
 }
 
+func TestAutomaticBindingsYieldToFocusedControls(t *testing.T) {
+	var keymap []driver.KeyBinding
+	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+		cx.OnKeyWith("space", KeyOptions{}, func() {})
+		cx.OnKeyWith("right", KeyOptions{}, func() {})
+		cx.OnKeyWith("mod+enter", KeyOptions{}, func() {})
+		keymap = cx.tree().keymap()
+		return View{}
+	})
+	h.commit()
+	if keymap[0].BlockedBy != driver.KeyUsePress || keymap[1].BlockedBy != driver.KeyUseAdjust|driver.KeyUseSelect || keymap[2].BlockedBy != 0 {
+		t.Fatalf("automatic key uses = %#v", keymap)
+	}
+	if got, consumed := driver.FindKeyWithFocus(keymap, []string{"space"}, driver.KeyUsePress, false); got != "" || consumed {
+		t.Fatalf("space on a pressable control = %q, %v", got, consumed)
+	}
+	if got, consumed := driver.FindKeyWithFocus(keymap, []string{"right"}, driver.KeyUseAdjust, false); got != "" || consumed {
+		t.Fatalf("right on an adjustable control = %q, %v", got, consumed)
+	}
+	if got, consumed := driver.FindKeyWithFocus(keymap, []string{"mod+enter"}, driver.KeyUsePress, false); got != "mod+enter" || !consumed {
+		t.Fatalf("modified enter on a pressable control = %q, %v", got, consumed)
+	}
+}
+
 func TestKeyLabelsFollowThePlatform(t *testing.T) {
 	for _, c := range []struct {
 		key   string
