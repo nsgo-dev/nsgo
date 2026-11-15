@@ -45,6 +45,44 @@ func TestAndroidPermissions(t *testing.T) {
 	}
 }
 
+func TestLinuxPackageDependencies(t *testing.T) {
+	dir := t.TempDir()
+	write := func(linux string) {
+		if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: Test\nlinux:\n"+linux), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("  depends:\n    deb: [gstreamer1.0-plugins-good, 'libsoup-3.0-0 | libsoup3']\n    arch: [gst-plugins-good]\n  recommends:\n    deb: [gstreamer1.0-libav]\n    arch: ['gst-libav: H.264 and AAC video']\n")
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := p.Linux.Depends.Deb; len(got) != 2 || got[0] != "gstreamer1.0-plugins-good" || got[1] != "libsoup-3.0-0 | libsoup3" {
+		t.Errorf("linux.depends.deb = %q", got)
+	}
+	if got := p.Linux.Depends.Arch; len(got) != 1 || got[0] != "gst-plugins-good" {
+		t.Errorf("linux.depends.arch = %q", got)
+	}
+	if got := p.Linux.Recommends.Deb; len(got) != 1 || got[0] != "gstreamer1.0-libav" {
+		t.Errorf("linux.recommends.deb = %q", got)
+	}
+	if got := p.Linux.Recommends.Arch; len(got) != 1 || got[0] != "gst-libav: H.264 and AAC video" {
+		t.Errorf("linux.recommends.arch = %q", got)
+	}
+	for _, tc := range []struct{ linux, want string }{
+		{"  depends: { deb: [a, ''] }\n", "nsgo.yaml: linux.depends.deb entry 2 is empty"},
+		{"  depends: { arch: ['  '] }\n", "nsgo.yaml: linux.depends.arch entry 1 is empty"},
+		{"  recommends: { deb: [\"\"] }\n", "nsgo.yaml: linux.recommends.deb entry 1 is empty"},
+		{"  recommends: { arch: [\"a\\nDescription: b\"] }\n", "nsgo.yaml: linux.recommends.arch entry 1 contains a line break"},
+		{"  depends: { deb: [\"a\\r\"] }\n", "nsgo.yaml: linux.depends.deb entry 1 contains a line break"},
+	} {
+		write(tc.linux)
+		if _, err := load(dir); err == nil || err.Error() != tc.want {
+			t.Errorf("%q: load error = %v, want %q", tc.linux, err, tc.want)
+		}
+	}
+}
+
 func TestBuildOpen(t *testing.T) {
 	for _, tt := range []struct {
 		yaml string

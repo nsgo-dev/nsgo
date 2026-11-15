@@ -33,6 +33,43 @@ type linuxPackageEntry struct {
 	dir  bool
 }
 
+// linuxDeps lists packages for each Linux package format, each entry as that format writes it: Debian's alternatives and version constraints ("a | b", "foo (>= 1.2)") or Arch's "name: reason" optional dependencies.
+type linuxDeps struct {
+	Deb  []string `yaml:"deb"`
+	Arch []string `yaml:"arch"`
+}
+
+// validateLinuxDeps rejects a blank entry, which would leave an empty item in a Debian list or an empty Arch line, and one holding a line break, which would add fields to the packages' metadata.
+func (p *project) validateLinuxDeps() error {
+	for _, key := range []struct {
+		name   string
+		values []string
+	}{
+		{"depends.deb", p.Linux.Depends.Deb},
+		{"depends.arch", p.Linux.Depends.Arch},
+		{"recommends.deb", p.Linux.Recommends.Deb},
+		{"recommends.arch", p.Linux.Recommends.Arch},
+	} {
+		for i, value := range key.values {
+			if strings.TrimSpace(value) == "" {
+				return fmt.Errorf("linux.%s entry %d is empty", key.name, i+1)
+			}
+			if strings.ContainsAny(value, "\r\n") {
+				return fmt.Errorf("linux.%s entry %d contains a line break", key.name, i+1)
+			}
+		}
+	}
+	return nil
+}
+
+// linuxDependency is a Debian dependency field: base, then extra.
+func linuxDependency(base string, extra []string) string {
+	if len(extra) == 0 {
+		return base
+	}
+	return strings.Join(append([]string{base}, extra...), ", ")
+}
+
 // buildLinuxPackages writes the Debian and Arch packages of the Linux
 // package in dir, built for arch, beside it, and returns their paths.
 func buildLinuxPackages(ctx context.Context, p *project, dir, arch string) (string, string, error) {
@@ -215,8 +252,9 @@ func debPackage(p *project, files []linuxPackageEntry, arch string) ([]byte, err
 		return nil, err
 	}
 	control := fmt.Sprintf("Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: %s\nInstalled-Size: %d\n"+
-		"Depends: libgtk-4-1\nRecommends: libwebkitgtk-6.0-4\nSection: misc\nPriority: optional\nDescription: %s\n",
-		p.packageSlug(), debVersion(p.Version), debArch[arch], p.maintainer(), (linuxPackageSize(files)+1023)/1024, name)
+		"Depends: %s\nRecommends: %s\nSection: misc\nPriority: optional\nDescription: %s\n",
+		p.packageSlug(), debVersion(p.Version), debArch[arch], p.maintainer(), (linuxPackageSize(files)+1023)/1024,
+		linuxDependency("libgtk-4-1", p.Linux.Depends.Deb), linuxDependency("libwebkitgtk-6.0-4", p.Linux.Recommends.Deb), name)
 	controlTar, err := tarGz([]linuxPackageEntry{
 		{name: "control", data: []byte(control), mode: 0o644},
 		{name: "md5sums", data: md5sums.Bytes(), mode: 0o644},
@@ -253,10 +291,18 @@ func archPackage(p *project, files []linuxPackageEntry, arch string) ([]byte, er
 		return nil, err
 	}
 	slug := p.packageSlug()
-	info := fmt.Sprintf("pkgname = %s\npkgbase = %s\npkgver = %s-1\npkgdesc = %s\nbuilddate = %d\npackager = %s\nsize = %d\narch = %s\n"+
-		"depend = gtk4\noptdepend = webkitgtk-6.0: web views\n",
+	var info strings.Builder
+	fmt.Fprintf(&info, "pkgname = %s\npkgbase = %s\npkgver = %s-1\npkgdesc = %s\nbuilddate = %d\npackager = %s\nsize = %d\narch = %s\n",
 		slug, slug, archVersion(p.Version), name, time.Now().Unix(), p.maintainer(), linuxPackageSize(files), archLinuxArch[arch])
-	entries := append([]linuxPackageEntry{{name: ".PKGINFO", data: []byte(info), mode: 0o644}}, files...)
+	info.WriteString("depend = gtk4\n")
+	for _, dep := range p.Linux.Depends.Arch {
+		fmt.Fprintf(&info, "depend = %s\n", dep)
+	}
+	info.WriteString("optdepend = webkitgtk-6.0: web views\n")
+	for _, dep := range p.Linux.Recommends.Arch {
+		fmt.Fprintf(&info, "optdepend = %s\n", dep)
+	}
+	entries := append([]linuxPackageEntry{{name: ".PKGINFO", data: []byte(info.String()), mode: 0o644}}, files...)
 	return tarGz(entries, "")
 }
 

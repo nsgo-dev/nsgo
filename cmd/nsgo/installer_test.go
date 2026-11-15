@@ -292,7 +292,7 @@ func TestLinuxPackages(t *testing.T) {
 		t.Errorf("debian-binary is %q", members["debian-binary"])
 	}
 	control := tarFiles(t, members["control.tar.gz"])["./control"]
-	for _, want := range []string{"Package: app\n", "Version: 1.0.0~rc.1\n", "Architecture: amd64\n", "Maintainer: App\n", "Depends: libgtk-4-1\n"} {
+	for _, want := range []string{"Package: app\n", "Version: 1.0.0~rc.1\n", "Architecture: amd64\n", "Maintainer: App\n", "\nDepends: libgtk-4-1\nRecommends: libwebkitgtk-6.0-4\n"} {
 		if !strings.Contains(control, want) {
 			t.Errorf("control lacks %q:\n%s", want, control)
 		}
@@ -315,10 +315,32 @@ func TestLinuxPackages(t *testing.T) {
 		t.Fatalf("the package starts with %v, %v", first, err)
 	}
 	info := tarFiles(t, pkg)[".PKGINFO"]
-	for _, want := range []string{"pkgname = app\n", "pkgver = 1.0.0_rc.1-1\n", "arch = aarch64\n", "packager = Jane <jane@example.com>\n", "depend = gtk4\n"} {
+	for _, want := range []string{"pkgname = app\n", "pkgver = 1.0.0_rc.1-1\n", "arch = aarch64\n", "packager = Jane <jane@example.com>\n", "\ndepend = gtk4\noptdepend = webkitgtk-6.0: web views\n"} {
 		if !strings.Contains(info, want) {
 			t.Errorf(".PKGINFO lacks %q:\n%s", want, info)
 		}
+	}
+	if n := strings.Count(info, "depend = "); n != 2 {
+		t.Errorf(".PKGINFO has %d dependency lines:\n%s", n, info)
+	}
+
+	p.Linux.Depends = linuxDeps{Deb: []string{"gstreamer1.0-plugins-good", "libsoup-3.0-0 | libsoup3"}, Arch: []string{"gst-plugins-good"}}
+	p.Linux.Recommends = linuxDeps{Deb: []string{"gstreamer1.0-libav", "ffmpeg (>= 7)"}, Arch: []string{"gst-libav: H.264 and AAC video", "ffmpeg: thumbnails"}}
+	deb, err = debPackage(p, files, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	control = tarFiles(t, arMembers(t, deb)["control.tar.gz"])["./control"]
+	if want := "\nDepends: libgtk-4-1, gstreamer1.0-plugins-good, libsoup-3.0-0 | libsoup3\nRecommends: libwebkitgtk-6.0-4, gstreamer1.0-libav, ffmpeg (>= 7)\n"; !strings.Contains(control, want) {
+		t.Errorf("control lacks %q:\n%s", want, control)
+	}
+	pkg, err = archPackage(p, files, "arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	info = tarFiles(t, pkg)[".PKGINFO"]
+	if want := "\ndepend = gtk4\ndepend = gst-plugins-good\noptdepend = webkitgtk-6.0: web views\noptdepend = gst-libav: H.264 and AAC video\noptdepend = ffmpeg: thumbnails\n"; !strings.Contains(info, want) {
+		t.Errorf(".PKGINFO lacks %q:\n%s", want, info)
 	}
 }
 
