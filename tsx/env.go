@@ -40,6 +40,9 @@ var envExports = []export{
 	{"reduceMotion", func(r *runtime) js.Value {
 		return r.envAccessor(func(e *core.Env) any { return e.ReduceMotion() })
 	}},
+	{"increaseContrast", func(r *runtime) js.Value {
+		return r.envAccessor(func(e *core.Env) any { return e.IncreaseContrast() })
+	}},
 	{"lifecycle", func(r *runtime) js.Value {
 		return r.envAccessor(func(e *core.Env) any { return e.Lifecycle().String() })
 	}},

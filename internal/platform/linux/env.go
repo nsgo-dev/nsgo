@@ -24,7 +24,7 @@ const (
 // environment reads what GTK and the session say about where the app
 // runs. There is no software keyboard, so its inset stays 0.
 func (w *window) environment() driver.Environment {
-	dark, reduce, dpi := false, false, int32(96*xftDPIUnit)
+	dark, reduce, contrast, dpi := false, false, false, int32(96*xftDPIUnit)
 	theme := ""
 	if settings := gtkSettingsGetDefault(); settings != 0 {
 		if colorScheme() {
@@ -38,6 +38,16 @@ func (w *window) environment() driver.Environment {
 	}
 	if strings.Contains(strings.ToLower(theme), "dark") || strings.Contains(strings.ToLower(os.Getenv("GTK_THEME")), "dark") {
 		dark = true
+	}
+	// GTK does not expose a common contrast property. GNOME's setting is
+	// preferred where its schema is installed; high-contrast theme names are
+	// the fallback used by other GTK desktops.
+	contrast = gnomeHighContrast()
+	for _, name := range []string{theme, os.Getenv("GTK_THEME")} {
+		name = strings.ToLower(name)
+		if strings.Contains(name, "highcontrast") || strings.Contains(name, "high-contrast") {
+			contrast = true
+		}
 	}
 	scale := 1.0
 	if surface := gtkNativeGetSurface(gtkWidgetGetNative(w.surface)); surface != 0 {
@@ -66,24 +76,25 @@ func (w *window) environment() driver.Environment {
 		}
 	}
 	return driver.Environment{
-		Dark:           dark,
-		FontScale:      fontScale,
-		ReduceMotion:   reduce,
-		RTL:            systemDirection() == gtkTextDirRTL || rightToLeft(locale),
-		PixelRatio:     float32(scale),
-		Locale:         locale,
-		LocaleSettings: localeSettings(),
-		Displays:       displays(),
-		OS:             driver.OSLinux,
-		HasWebView:     true,
-		OSVersion:      osVersion(),
-		Idiom:          driver.IdiomDesktop,
-		TitleBar:       w.titleBarArea(),
-		Maximized:      w.win != 0 && gtkWindowIsMaximized(w.win) != 0,
-		FullScreen:     w.chrome.fullScreen,
-		Minimized:      minimized,
-		WindowFrame:    frame,
-		Lifecycle:      w.lifecycle(),
+		Dark:             dark,
+		FontScale:        fontScale,
+		ReduceMotion:     reduce,
+		IncreaseContrast: contrast,
+		RTL:              systemDirection() == gtkTextDirRTL || rightToLeft(locale),
+		PixelRatio:       float32(scale),
+		Locale:           locale,
+		LocaleSettings:   localeSettings(),
+		Displays:         displays(),
+		OS:               driver.OSLinux,
+		HasWebView:       true,
+		OSVersion:        osVersion(),
+		Idiom:            driver.IdiomDesktop,
+		TitleBar:         w.titleBarArea(),
+		Maximized:        w.win != 0 && gtkWindowIsMaximized(w.win) != 0,
+		FullScreen:       w.chrome.fullScreen,
+		Minimized:        minimized,
+		WindowFrame:      frame,
+		Lifecycle:        w.lifecycle(),
 	}
 }
 
@@ -444,6 +455,49 @@ var (
 	gnomeSettingsOnce             sync.Once
 	gnomeSettings, gnomeGetString uintptr
 )
+
+var (
+	gnomeA11yOnce                      sync.Once
+	gnomeA11ySettings, gnomeGetBoolean uintptr
+)
+
+// gnomeHighContrast reads GNOME's optional accessibility setting without
+// linking to GSettings at build time. Other GTK desktops use their theme
+// name, handled by environment.
+func gnomeHighContrast() bool {
+	gnomeA11yOnce.Do(func() {
+		var lookup, source, settingsNew uintptr
+		var err error
+		if source, err = purego.Dlsym(gioLib, "g_settings_schema_source_get_default"); err != nil {
+			return
+		}
+		if lookup, err = purego.Dlsym(gioLib, "g_settings_schema_source_lookup"); err != nil {
+			return
+		}
+		if settingsNew, err = purego.Dlsym(gioLib, "g_settings_new"); err != nil {
+			return
+		}
+		src, _, _ := purego.SyscallN(source)
+		if src == 0 {
+			return
+		}
+		if found, _, _ := purego.SyscallN(lookup, src, uintptr(unsafe.Pointer(cstr("org.gnome.desktop.a11y.interface"))), 1); found == 0 {
+			return
+		}
+		gnomeA11ySettings, _, _ = purego.SyscallN(settingsNew, uintptr(unsafe.Pointer(cstr("org.gnome.desktop.a11y.interface"))))
+		gnomeGetBoolean, _ = purego.Dlsym(gioLib, "g_settings_get_boolean")
+	})
+	if gnomeA11ySettings == 0 || gnomeGetBoolean == 0 {
+		return false
+	}
+	v, _, _ := purego.SyscallN(gnomeGetBoolean, gnomeA11ySettings, uintptr(unsafe.Pointer(cstr("high-contrast"))))
+	return v != 0
+}
+
+func gnomeA11ySettingsForWatch() uintptr {
+	gnomeHighContrast()
+	return gnomeA11ySettings
+}
 
 // rightToLeft reports whether locale's language reads right to left.
 func rightToLeft(locale string) bool {

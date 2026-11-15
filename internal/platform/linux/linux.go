@@ -580,6 +580,9 @@ func (w *window) setupSettings() {
 			w.settingsHandlers = append(w.settingsHandlers, gSignalConnect(settings, "notify::"+name, cbSettingsChanged, w.handle))
 		}
 	}
+	if settings := gnomeA11ySettingsForWatch(); settings != 0 {
+		w.settingsHandlers = append(w.settingsHandlers, gSignalConnect(settings, "changed::high-contrast", cbSettingsChanged, w.handle))
+	}
 }
 
 // Mount implements engine.Platform: it queues the batch and wakes the

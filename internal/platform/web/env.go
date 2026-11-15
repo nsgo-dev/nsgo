@@ -14,9 +14,9 @@ import (
 // watch is what the page's environment is read from. The page cannot
 // tell whether a screen reader runs, so ScreenReader stays false.
 type watch struct {
-	dark, reduce, desktop js.Value // media query lists
-	resolution            js.Value // matches ratio only
-	ratio                 float64
+	dark, reduce, contrast, desktop js.Value // media query lists
+	resolution                      js.Value // matches ratio only
+	ratio                           float64
 	// probe is padded by the safe area and as wide as the root font size.
 	probe   js.Value
 	changed js.Func
@@ -45,6 +45,7 @@ func (s *surface) watchStart(page bool) {
 	w := &s.watch
 	w.dark = g.Call("matchMedia", "(prefers-color-scheme: dark)")
 	w.reduce = g.Call("matchMedia", "(prefers-reduced-motion: reduce)")
+	w.contrast = g.Call("matchMedia", "(prefers-contrast: more), (forced-colors: active)")
 	w.desktop = g.Call("matchMedia", "(hover: hover) and (pointer: fine) and (min-width: 600px)")
 	w.probe = s.doc.Call("createElement", "div")
 	setStyle(w.probe, map[string]string{
@@ -64,7 +65,7 @@ func (s *surface) watchChanges() {
 		s.updateEnv()
 		return nil
 	})
-	for _, q := range []js.Value{w.dark, w.reduce, w.desktop} {
+	for _, q := range []js.Value{w.dark, w.reduce, w.contrast, w.desktop} {
 		q.Call("addEventListener", "change", w.changed)
 	}
 	s.watchRatio(g.Get("devicePixelRatio").Float())
@@ -145,14 +146,15 @@ func (s *surface) environment() driver.Environment {
 			Top: length("paddingTop"), Right: length("paddingRight"),
 			Bottom: length("paddingBottom"), Left: length("paddingLeft"),
 		},
-		Dark:          w.dark.Get("matches").Bool(),
-		ReduceMotion:  w.reduce.Get("matches").Bool(),
-		FontScale:     float32(length("width") / 16),
-		PixelRatio:    float32(g.Get("devicePixelRatio").Float()),
-		OS:            driver.OSWeb,
-		HasWebView:    true,
-		AppleKeyboard: apple,
-		Idiom:         driver.IdiomPhone,
+		Dark:             w.dark.Get("matches").Bool(),
+		ReduceMotion:     w.reduce.Get("matches").Bool(),
+		IncreaseContrast: w.contrast.Get("matches").Bool(),
+		FontScale:        float32(length("width") / 16),
+		PixelRatio:       float32(g.Get("devicePixelRatio").Float()),
+		OS:               driver.OSWeb,
+		HasWebView:       true,
+		AppleKeyboard:    apple,
+		Idiom:            driver.IdiomPhone,
 	}
 	if w.desktop.Get("matches").Bool() {
 		env.Idiom = driver.IdiomDesktop

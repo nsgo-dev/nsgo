@@ -40,6 +40,7 @@ var (
 
 const (
 	spiGetScreenReader        = 0x0046
+	spiGetHighContrast        = 0x0042
 	spiGetClientAreaAnimation = 0x1042
 	localeIReadingLayout      = 0x0070
 	localeIFirstDayOfWeek     = 0x100C // 0 Monday to 6 Sunday
@@ -47,6 +48,7 @@ const (
 	localeIMeasure            = 0x000D // 0 metric, 1 U.S.
 	localeReturnNumber        = 0x20000000
 	localeNameMaxLength       = 85
+	hcfHighContrastOn         = 0x00000001
 
 	dwmwaUseImmersiveDarkMode    = 20
 	dwmwaUseImmersiveDarkModeOld = 19 // before Windows 10 20H1
@@ -60,33 +62,46 @@ type monitorInfoEx struct {
 	Device  [32]uint16
 }
 
+type highContrast struct {
+	Size          uint32
+	Flags         uint32
+	DefaultScheme *uint16
+}
+
 // environment reads what Windows says about where the app runs, with
 // what the hidden title bar's window controls cover. There is no
 // software keyboard, so its inset stays 0.
 func (w *window) environment() driver.Environment {
 	locale := userLocale()
 	return driver.Environment{
-		Dark:           regDWORD(`Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, "AppsUseLightTheme", 1) == 0,
-		FontScale:      float32(regDWORD(`Software\Microsoft\Accessibility`, "TextScaleFactor", 100)) / 100,
-		ReduceMotion:   !systemFlag(spiGetClientAreaAnimation, true),
-		ScreenReader:   systemFlag(spiGetScreenReader, false),
-		RTL:            rightToLeft(locale),
-		PixelRatio:     float32(w.scale),
-		Locale:         locale,
-		LocaleSettings: localeSettings(),
-		Displays:       w.displays(),
-		OS:             driver.OSWindows,
-		HasWebView:     true,
-		OSVersion:      osVersion(),
-		Idiom:          driver.IdiomDesktop,
-		TitleBar:       w.titleBarArea(),
-		WindowMaterial: w.material,
-		Maximized:      w.zoomed(),
-		FullScreen:     w.chrome.fullScreen,
-		Minimized:      isIconicWindow(w.owner()),
-		WindowFrame:    w.windowFrame(),
-		Lifecycle:      w.lifecycle(),
+		Dark:             regDWORD(`Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, "AppsUseLightTheme", 1) == 0,
+		FontScale:        float32(regDWORD(`Software\Microsoft\Accessibility`, "TextScaleFactor", 100)) / 100,
+		ReduceMotion:     !systemFlag(spiGetClientAreaAnimation, true),
+		IncreaseContrast: highContrastEnabled(),
+		ScreenReader:     systemFlag(spiGetScreenReader, false),
+		RTL:              rightToLeft(locale),
+		PixelRatio:       float32(w.scale),
+		Locale:           locale,
+		LocaleSettings:   localeSettings(),
+		Displays:         w.displays(),
+		OS:               driver.OSWindows,
+		HasWebView:       true,
+		OSVersion:        osVersion(),
+		Idiom:            driver.IdiomDesktop,
+		TitleBar:         w.titleBarArea(),
+		WindowMaterial:   w.material,
+		Maximized:        w.zoomed(),
+		FullScreen:       w.chrome.fullScreen,
+		Minimized:        isIconicWindow(w.owner()),
+		WindowFrame:      w.windowFrame(),
+		Lifecycle:        w.lifecycle(),
 	}
+}
+
+func highContrastEnabled() bool {
+	hc := highContrast{Size: uint32(unsafe.Sizeof(highContrast{}))}
+	r, _, _ := systemParametersInfoW.Call(spiGetHighContrast, uintptr(hc.Size), uintptr(unsafe.Pointer(&hc)), 0)
+	return r != 0 && hc.Flags&hcfHighContrastOn != 0
 }
 
 // displays reads the monitors in the virtual desktop, in the points monitorLayout lays them out in, as WindowFrame uses.

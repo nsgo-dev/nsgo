@@ -145,7 +145,7 @@ func (t *Tree) classEnv(n *node) classEnv {
 	o := n.owner
 	e := o.Env()
 	pal := o.Palette()
-	return classEnv{dark: o.Dark(), window: e.Window(), rtl: e.RTL(), reduce: e.ReduceMotion(), os: e.OS(),
+	return classEnv{dark: o.Dark(), window: e.Window(), rtl: e.RTL(), reduce: e.ReduceMotion(), contrast: e.IncreaseContrast(), os: e.OS(),
 		palette: &pal, tw: o.Theme().tailwind(), theme: o.Theme()}
 }
 

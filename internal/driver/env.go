@@ -41,7 +41,9 @@ type Environment struct {
 	// asks; 0 means 1.
 	FontScale    float32
 	ReduceMotion bool
-	ScreenReader bool
+	// IncreaseContrast says the user asked the system for stronger contrast.
+	IncreaseContrast bool
+	ScreenReader     bool
 	// ScreenColor says ItemPickScreenColor works here.
 	ScreenColor bool
 	// Speech says ItemSpeech recognizes speech here, Audio that ItemAudio plays sounds and players.

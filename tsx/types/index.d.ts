@@ -197,6 +197,8 @@ export interface AppInfo {
 }
 export declare function appInfo(): AppInfo;
 export declare const reduceMotion: Accessor<boolean>;
+/** Whether the system asks the app to use stronger contrast. */
+export declare const increaseContrast: Accessor<boolean>;
 export declare const screenReaderEnabled: Accessor<boolean>;
 /** Whether the app is in use: "inactive" shows it without the focus, "background" shows none of it. */
 export type Lifecycle = "active" | "inactive" | "background";

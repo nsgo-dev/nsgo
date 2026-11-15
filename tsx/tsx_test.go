@@ -172,25 +172,29 @@ mount(App);`)
 }
 
 func TestTheEnvironment(t *testing.T) {
-	app := run(t, `import { colorScheme, lifecycle, mount, platform, setColorScheme, Text, View, windowSize } from "nsgo";
+	app := run(t, `import { colorScheme, increaseContrast, lifecycle, mount, platform, setColorScheme, Text, View, windowSize } from "nsgo";
 function App() {
 	return <View testID="toggle" onPress={() => setColorScheme("dark")}>
-		<Text>{colorScheme() + " " + windowSize().width + " " + platform.select({ ios: "ios", default: "other" }) + " " + lifecycle()}</Text>
+		<Text>{colorScheme() + " " + windowSize().width + " " + platform.select({ ios: "ios", default: "other" }) + " " + lifecycle() + " " + increaseContrast()}</Text>
 	</View>;
 }
 mount(App);`, nsgotest.Environment(core.Environment{OS: core.OSIOS}))
-	if texts := app.Texts(); !slices.Contains(texts, "light 390 ios active") {
+	if texts := app.Texts(); !slices.Contains(texts, "light 390 ios active false") {
 		t.Fatalf("texts %q", texts)
 	}
 	app.Press("id:toggle")
-	if texts := app.Texts(); !slices.Contains(texts, "dark 390 ios active") {
+	if texts := app.Texts(); !slices.Contains(texts, "dark 390 ios active false") {
 		t.Errorf("after setColorScheme: %q", texts)
 	}
 	for _, state := range []core.Lifecycle{core.LifecycleInactive, core.LifecycleBackground} {
 		app.SetEnvironment(core.Environment{OS: core.OSIOS, Lifecycle: state})
-		if want := "dark 390 ios " + state.String(); !slices.Contains(app.Texts(), want) {
+		if want := "dark 390 ios " + state.String() + " false"; !slices.Contains(app.Texts(), want) {
 			t.Errorf("texts %q, want %q", app.Texts(), want)
 		}
+	}
+	app.SetEnvironment(core.Environment{OS: core.OSIOS, IncreaseContrast: true})
+	if !slices.Contains(app.Texts(), "dark 390 ios active true") {
+		t.Errorf("contrast environment update did not rerender: %q", app.Texts())
 	}
 }
 

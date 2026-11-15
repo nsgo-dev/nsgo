@@ -950,6 +950,7 @@ func TestActiveStyleInsideAButton(t *testing.T) {
 func TestEnvironment(t *testing.T) {
 	var widths []Points
 	var darks []bool
+	var contrasts []bool
 	var materials []WindowMaterial
 	var states []Lifecycle
 	var minimized []bool
@@ -957,21 +958,27 @@ func TestEnvironment(t *testing.T) {
 		cx.Effect(func() { states = append(states, cx.Env().Lifecycle()) })
 		cx.Effect(func() { widths = append(widths, cx.Env().Window().Width) })
 		cx.Effect(func() { darks = append(darks, cx.Env().Dark()) })
+		cx.Effect(func() { contrasts = append(contrasts, cx.Env().IncreaseContrast()) })
 		cx.Effect(func() { materials = append(materials, cx.Env().WindowMaterial()) })
 		cx.Effect(func() { minimized = append(minimized, cx.Env().Minimized()) })
 		return Text{Content: "Aa", Style: Style{FontSize: 10}, TestID: "text"}
 	})
 	h.commit()
 	h.tree.Resize(Size{Width: 200, Height: 100}, Geometry{})
-	h.tree.SetEnvironment(Environment{Dark: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar})
-	h.tree.SetEnvironment(Environment{Dark: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar}) // unchanged: no runs
+	h.tree.SetEnvironment(Environment{Dark: true, IncreaseContrast: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar})
+	h.tree.SetEnvironment(Environment{Dark: true, IncreaseContrast: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar}) // unchanged: no runs
 	h.commit()
-	if !slices.Equal(widths, []Points{100, 200}) || !slices.Equal(darks, []bool{false, true}) ||
+	if !slices.Equal(widths, []Points{100, 200}) || !slices.Equal(darks, []bool{false, true}) || !slices.Equal(contrasts, []bool{false, true}) ||
 		!slices.Equal(materials, []WindowMaterial{WindowMaterialNone, WindowMaterialSidebar}) {
-		t.Fatalf("widths %v, darks %v, materials %v", widths, darks, materials)
+		t.Fatalf("widths %v, darks %v, contrasts %v, materials %v", widths, darks, contrasts, materials)
 	}
 	if got := h.find("text").text.style.Font.Size; got != 20 {
 		t.Fatalf("font size = %v, want scaled to 20", got)
+	}
+	h.tree.SetEnvironment(Environment{Dark: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar})
+	h.commit()
+	if !slices.Equal(contrasts, []bool{false, true, false}) {
+		t.Fatalf("contrasts after reset %v", contrasts)
 	}
 	h.tree.SetEnvironment(Environment{Dark: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar, Lifecycle: LifecycleBackground, Minimized: true})
 	h.commit()

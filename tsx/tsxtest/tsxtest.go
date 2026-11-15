@@ -310,6 +310,9 @@ func (r *runner) open(call goja.FunctionCall) goja.Value {
 	if v := opt("reducedMotion"); v != nil {
 		env.ReduceMotion, envSet = v.ToBoolean(), true
 	}
+	if v := opt("increaseContrast"); v != nil {
+		env.IncreaseContrast, envSet = v.ToBoolean(), true
+	}
 	if v := opt("speech"); v != nil {
 		env.Speech, envSet = v.ToBoolean(), true
 	}

@@ -81,14 +81,14 @@ func (t tri) holds(v bool) bool { return t == either || (t == yes) == v }
 
 // classCond is when a rule applies: all of it must hold.
 type classCond struct {
-	dark, landscape, rtl, reduceMotion tri
-	minWidth, maxWidth                 Points // 0: none
-	platform                           OS     // "": any
-	states, notStates                  uint16
-	data                               string // data-*:'s name
-	group                              *classGroup
-	position                           uint8
-	placeholder, selection             bool
+	dark, landscape, rtl, reduceMotion, increaseContrast tri
+	minWidth, maxWidth                                   Points // 0: none
+	platform                                             OS     // "": any
+	states, notStates                                    uint16
+	data                                                 string // data-*:'s name
+	group                                                *classGroup
+	position                                             uint8
+	placeholder, selection                               bool
 }
 
 // classGroup is a group-* variant: the states of the nearest group named
@@ -165,6 +165,7 @@ const (
 	rankData          = 46
 	rankMotionSafe    = 47
 	rankMotionReduce  = 48
+	rankContrastMore  = 49
 	rankMax           = 50
 	rankMin           = 51
 	rankPortrait      = 60
@@ -510,14 +511,14 @@ type classList struct {
 
 // classEnv is what a node's classes are resolved for.
 type classEnv struct {
-	dark     bool
-	window   Size
-	rtl      bool
-	reduce   bool
-	os       OS
-	position uint8
-	palette  *Palette
-	tw       *tailwindTheme
+	dark, contrast bool
+	window         Size
+	rtl            bool
+	reduce         bool
+	os             OS
+	position       uint8
+	palette        *Palette
+	tw             *tailwindTheme
 	// theme gives the tokens classes name as variables: rounded-(--radius).
 	theme *Theme
 	// fontSize is what em-based utilities (tracking-*) measure against.
@@ -632,7 +633,7 @@ func (t *tailwindTheme) parseToken(l *classList, token string) bool {
 	}
 	l.rules = append(l.rules, classRule{cond: cond, decls: decls, rank: rank, important: important})
 	l.env = l.env || env || cond.dark != either || cond.landscape != either || cond.rtl != either ||
-		cond.reduceMotion != either || cond.minWidth != 0 || cond.maxWidth != 0 || cond.platform != ""
+		cond.reduceMotion != either || cond.increaseContrast != either || cond.minWidth != 0 || cond.maxWidth != 0 || cond.platform != ""
 	l.positional = l.positional || cond.position != 0
 	l.spacing = l.spacing || strings.HasPrefix(strings.TrimPrefix(utility, "-"), "space-")
 	return true
@@ -693,7 +694,9 @@ func (t *tailwindTheme) variant(v string, c *classCond) (classKey, bool) {
 		return key(rankMotionSafe)
 	case "motion-reduce":
 		c.reduceMotion = yes
-		return key(rankMotionReduce)
+	case "contrast-more":
+		c.increaseContrast = yes
+		return key(rankContrastMore)
 	case "portrait":
 		c.landscape = no
 		return key(rankPortrait)
@@ -842,7 +845,7 @@ func (t *tailwindTheme) length(s string) (Points, bool) {
 // matches reports whether cond's environment holds in env.
 func (c *classCond) matches(env *classEnv) bool {
 	w := env.window
-	return c.dark.holds(env.dark) && c.rtl.holds(env.rtl) && c.reduceMotion.holds(env.reduce) &&
+	return c.dark.holds(env.dark) && c.rtl.holds(env.rtl) && c.reduceMotion.holds(env.reduce) && c.increaseContrast.holds(env.contrast) &&
 		c.landscape.holds(w.Width > w.Height) && (c.minWidth == 0 || w.Width >= c.minWidth) &&
 		(c.maxWidth == 0 || w.Width < c.maxWidth) && (c.platform == "" || c.platform == env.os) &&
 		(c.position == 0 || env.position&c.position != 0)

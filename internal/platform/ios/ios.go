@@ -303,11 +303,11 @@ var (
 	// surfaceMethods are the surface's, NsgoSurface's and NSGoView's.
 	surfaceMethods []objc.MethodDef
 
-	uiApplicationMain           func(argc int, argv unsafe.Pointer, principal, delegate uintptr) int
-	uiReduceMotion, uiVoiceOver func() bool
-	uiAccessibilityPost         func(notification uint32, argument objc.ID)
-	announcement                uint32 // UIAccessibilityAnnouncementNotification
-	traits                      = map[string]uint64{}
+	uiApplicationMain                           func(argc int, argv unsafe.Pointer, principal, delegate uintptr) int
+	uiReduceMotion, uiVoiceOver, uiDarkerColors func() bool
+	uiAccessibilityPost                         func(notification uint32, argument objc.ID)
+	announcement                                uint32 // UIAccessibilityAnnouncementNotification
+	traits                                      = map[string]uint64{}
 )
 
 const uikitPath = "/System/Library/Frameworks/UIKit.framework/UIKit"
@@ -320,6 +320,7 @@ func loadUIKit() {
 	purego.RegisterLibFunc(&uiApplicationMain, uikit, "UIApplicationMain")
 	purego.RegisterLibFunc(&uiReduceMotion, uikit, "UIAccessibilityIsReduceMotionEnabled")
 	purego.RegisterLibFunc(&uiVoiceOver, uikit, "UIAccessibilityIsVoiceOverRunning")
+	purego.RegisterLibFunc(&uiDarkerColors, uikit, "UIAccessibilityDarkerSystemColorsEnabled")
 	purego.RegisterLibFunc(&uiAccessibilityPost, uikit, "UIAccessibilityPostNotification")
 	loadAccessibility(uikit)
 
@@ -588,6 +589,7 @@ func (s *surface) environment() driver.Environment {
 		Dark:             objc.Send[int](traits, sel("userInterfaceStyle")) == dark,
 		FontScale:        float32(objc.Send[float64](body, sel("pointSize")) / 17),
 		ReduceMotion:     uiReduceMotion(),
+		IncreaseContrast: uiDarkerColors(),
 		ScreenReader:     uiVoiceOver(),
 		RTL:              rtl,
 		PixelRatio:       float32(scale),
@@ -657,7 +659,8 @@ func (s *surface) observe() {
 	refresh := func(objc.ID) { s.refresh() }
 	on := func(name objc.ID, fn func(objc.ID)) { s.stops = append(s.stops, apple.Observe(center, name, fn)) }
 	for _, name := range []string{"UIContentSizeCategoryDidChangeNotification",
-		"UIAccessibilityReduceMotionStatusDidChangeNotification", "UIAccessibilityVoiceOverStatusDidChangeNotification"} {
+		"UIAccessibilityReduceMotionStatusDidChangeNotification", "UIAccessibilityDarkerSystemColorsStatusDidChangeNotification",
+		"UIAccessibilityVoiceOverStatusDidChangeNotification"} {
 		on(apple.Global(uikitPath, name), refresh)
 	}
 	for name, state := range lifecycleNote {

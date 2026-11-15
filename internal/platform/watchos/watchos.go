@@ -265,19 +265,20 @@ func (s *surface) environment(scale float64, safe driver.Edges, flags uint32) dr
 	locale, rtl := apple.Locale()
 	steps := int(flags>>8) - 128
 	env := driver.Environment{
-		SafeArea:       safe,
-		Dark:           flags&1 != 0,
-		ReduceMotion:   flags&2 != 0,
-		ScreenReader:   flags&4 != 0,
-		FontScale:      fontScale(steps),
-		RTL:            rtl,
-		PixelRatio:     float32(scale),
-		Locale:         locale,
-		LocaleSettings: apple.LocaleSettings(),
-		OS:             driver.OSIOS,
-		OSVersion:      osVersion(),
-		Idiom:          driver.IdiomWatch,
-		Lifecycle:      s.env.Lifecycle,
+		SafeArea:         safe,
+		Dark:             flags&1 != 0,
+		ReduceMotion:     flags&2 != 0,
+		IncreaseContrast: flags&(1<<16) != 0,
+		ScreenReader:     flags&4 != 0,
+		FontScale:        fontScale(steps),
+		RTL:              rtl,
+		PixelRatio:       float32(scale),
+		Locale:           locale,
+		LocaleSettings:   apple.LocaleSettings(),
+		OS:               driver.OSIOS,
+		OSVersion:        osVersion(),
+		Idiom:            driver.IdiomWatch,
+		Lifecycle:        s.env.Lifecycle,
 	}
 	return env
 }

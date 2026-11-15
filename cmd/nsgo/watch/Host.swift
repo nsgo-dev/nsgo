@@ -510,6 +510,7 @@ struct Root: View {
 	@Environment(\.displayScale) private var scale
 	@Environment(\.colorScheme) private var scheme
 	@Environment(\.accessibilityReduceMotion) private var reduceMotion
+	@Environment(\.colorSchemeContrast) private var contrast
 	@Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 	@Environment(\.scenePhase) private var phase
 	@Environment(\.dynamicTypeSize) private var typeSize
@@ -537,6 +538,7 @@ struct Root: View {
 			.onChange(of: geo.size) { report(geo) }
 			.onChange(of: scheme) { report(geo) }
 			.onChange(of: reduceMotion) { report(geo) }
+			.onChange(of: contrast) { report(geo) }
 			.onChange(of: voiceOver) { report(geo) }
 			.onChange(of: typeSize) { report(geo) }
 		}
@@ -567,6 +569,7 @@ struct Root: View {
 		var flags: UInt32 = 0
 		if scheme == .dark { flags |= 1 }
 		if reduceMotion { flags |= 2 }
+		if contrast == .increased { flags |= 1 << 16 }
 		if voiceOver { flags |= 4 }
 		let steps: [DynamicTypeSize] = [.xSmall, .small, .medium, .large, .xLarge, .xxLarge, .xxxLarge,
 			.accessibility1, .accessibility2, .accessibility3, .accessibility4, .accessibility5]

@@ -3,6 +3,7 @@ package dev.oneo.nsgo;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.UiModeManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -172,7 +173,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     // The environment, on the UI thread: the insets in pixels and what was last sent.
     private final AccessibilityManager accessibility;
+    private final UiModeManager uiMode;
     private final AccessibilityManager.TouchExplorationStateChangeListener screenReader = on -> environment();
+    private final UiModeManager.ContrastChangeListener contrast = value -> environment();
     private final ContentObserver motion = new ContentObserver(ui) {
         @Override
         public void onChange(boolean self) {
@@ -307,6 +310,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         density = context.getResources().getDisplayMetrics().density;
         ime = context.getSystemService(InputMethodManager.class);
         accessibility = context.getSystemService(AccessibilityManager.class);
+        uiMode = context.getSystemService(UiModeManager.class);
         gestures = new Gestures(context);
         setOnApplyWindowInsetsListener((v, insets) -> {
             insets(insets);
@@ -397,6 +401,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         accessibility.addTouchExplorationStateChangeListener(screenReader);
+        if (Build.VERSION.SDK_INT >= 34 && uiMode != null) uiMode.addContrastChangeListener(ui::post, contrast);
         getContext().getContentResolver().registerContentObserver(
                 Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, motion);
         if (primary != null) return;
@@ -434,6 +439,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         // An app waiting for the folds starts as the view leaves its window, as it would have without them.
         releaseStart();
         accessibility.removeTouchExplorationStateChangeListener(screenReader);
+        if (Build.VERSION.SDK_INT >= 34 && uiMode != null) uiMode.removeContrastChangeListener(contrast);
         getContext().getContentResolver().unregisterContentObserver(motion);
         unregisterBack();
         // A view out of its window keeps the geometry it last reported.
@@ -841,6 +847,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         // Android's reduce-motion setting turns animations off.
         boolean reduceMotion = Settings.Global.getFloat(getContext().getContentResolver(),
                 Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f;
+        boolean increaseContrast = Build.VERSION.SDK_INT >= 34 && uiMode != null && uiMode.getContrast() > 0f;
         boolean reader = accessibility.isTouchExplorationEnabled();
         boolean rtl = config.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL;
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -859,6 +866,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             boolean background = getWindowVisibility() != View.VISIBLE;
             boolean inactive = !background && !hasWindowFocus();
             d.writeByte((dark ? 1 : 0) | (reduceMotion ? 2 : 0) | (reader ? 4 : 0) | (rtl ? 8 : 0)
+                    | (increaseContrast ? 128 : 0)
                     | (inactive ? 16 : 0) | (background ? 32 : 0) | (Services.hasCamera(getContext()) ? 64 : 0));
             int idiom = config.smallestScreenWidthDp >= 600 ? Protocol.IDIOM_TABLET : Protocol.IDIOM_PHONE;
             if ((config.uiMode & Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION) {

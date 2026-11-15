@@ -580,6 +580,7 @@ func readEnvironment(r *reader) driver.Environment {
 	flags := r.byte()
 	env.Dark = flags&1 != 0
 	env.ReduceMotion = flags&2 != 0
+	env.IncreaseContrast = flags&128 != 0
 	env.ScreenReader = flags&4 != 0
 	env.RTL = flags&8 != 0
 	env.Camera = flags&64 != 0
