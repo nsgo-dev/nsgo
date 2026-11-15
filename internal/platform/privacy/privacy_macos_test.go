@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ebitengine/purego/objc"
+
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
@@ -39,6 +41,19 @@ func TestFromTCC(t *testing.T) {
 		if got := fromTCC(raw); got != want {
 			t.Errorf("fromTCC(%d) = %d, want %d", raw, got, want)
 		}
+	}
+}
+
+func TestCentralManagerOptionsTurnThePowerAlertOff(t *testing.T) {
+	key := global(coreBluetoothPath, "CBCentralManagerOptionShowPowerAlertKey")
+	if key == 0 {
+		t.Fatal("CoreBluetooth exports no CBCentralManagerOptionShowPowerAlertKey")
+	}
+	options := centralManagerOptions()
+	defer options.Send(sel("release"))
+	value := options.Send(sel("objectForKey:"), key)
+	if value == 0 || objc.Send[bool](value, sel("boolValue")) {
+		t.Errorf("the power alert option is %#x, want NO", value)
 	}
 }
 

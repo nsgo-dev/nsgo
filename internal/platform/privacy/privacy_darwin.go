@@ -173,8 +173,7 @@ func Request(name string, answer func(status int)) {
 	case driver.PermissionBluetooth:
 		requestMu.Lock()
 		if centralManager == 0 {
-			// Its delegate would hear of the radio's state: the prompt shows without one.
-			centralManager = class("CBCentralManager").Send(sel("alloc")).Send(sel("initWithDelegate:queue:"), objc.ID(0), objc.ID(0))
+			centralManager = newCentralManager()
 		}
 		requestMu.Unlock()
 		// CoreBluetooth calls nothing back: wait for the status to change.
@@ -191,6 +190,24 @@ func Request(name string, answer func(status int)) {
 	default:
 		platformAskOnce(name, answer)
 	}
+}
+
+// newCentralManager makes the CBCentralManager whose creation shows Bluetooth's prompt, with no delegate, as the prompt shows without one.
+func newCentralManager() objc.ID {
+	options := centralManagerOptions()
+	defer options.Send(sel("release"))
+	return class("CBCentralManager").Send(sel("alloc")).Send(sel("initWithDelegate:queue:options:"), objc.ID(0), objc.ID(0), options)
+}
+
+// centralManagerOptions are a new manager's options, for the caller to release: the power alert off, so asking for the permission while the radio is off does not also ask the user to turn it on.
+func centralManagerOptions() objc.ID {
+	options := class("NSMutableDictionary").Send(sel("alloc")).Send(sel("init"))
+	if key := global(coreBluetoothPath, "CBCentralManagerOptionShowPowerAlertKey"); key != 0 {
+		no := class("NSNumber").Send(sel("alloc")).Send(sel("initWithBool:"), false)
+		options.Send(sel("setObject:forKey:"), no, key)
+		no.Send(sel("release"))
+	}
+	return options
 }
 
 // usageKey is the Info.plist key that says why the app asks for the permission name.
