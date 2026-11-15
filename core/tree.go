@@ -1698,9 +1698,15 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 					own = old.cls.base
 				}
 				same = spans[i].Attachment == nil && old.attach == nil && spans[i].Content == old.content && (old.cls == nil) == (spans[i].Class == "") &&
-					(old.cls == nil || old.cls.list.class == spans[i].Class) && reflect.DeepEqual(spans[i].Style, own)
+					(old.cls == nil || old.cls.list.class == spans[i].Class) && reflect.DeepEqual(spans[i].Style, own) &&
+					(spans[i].OnPress == nil) == (old.press == nil)
 			}
 			if same {
+				// The presses cannot be compared: the latest take them.
+				for i, sp := range spans {
+					n.text.spans[i].press, n.text.spans[i].long = sp.OnPress, sp.OnLongPress
+					t.listenForSpan(n, sp)
+				}
 				return
 			}
 			if attached != nil {
@@ -1732,7 +1738,8 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 					continue
 				}
 				style, cls := t.spanStyle(n, sp.Class, sp.Style)
-				n.text.spans = append(n.text.spans, spanNode{content: sp.Content, style: style, cls: cls})
+				n.text.spans = append(n.text.spans, spanNode{content: sp.Content, style: style, press: sp.OnPress, long: sp.OnLongPress, cls: cls})
+				t.listenForSpan(n, sp)
 			}
 			t.followSpanClasses(n)
 			n.text.stale = true

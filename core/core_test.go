@@ -994,6 +994,38 @@ func TestSpansStyleRangesAndLink(t *testing.T) {
 	}
 }
 
+// SpansFunc's spans take their presses as Spans' do, the latest ones as the spans change.
+func TestSpansFuncLinks(t *testing.T) {
+	var split *Signal[bool]
+	var pressed []string
+	h := newHost(t, Size{Width: 300, Height: 100}, func(cx *Scope) Node {
+		split = NewSignal(cx, false)
+		return Text{TestID: "text", SpansFunc: func() []Span {
+			link := func(name string) func(PressEvent) { return func(PressEvent) { pressed = append(pressed, name) } }
+			if split.Get() {
+				return []Span{{Content: "see "}, {Content: "do", OnPress: link("do")}, {Content: "cs", Style: Style{Color: RGB(0xff0000)}, OnPress: link("cs")}}
+			}
+			return []Span{{Content: "see "}, {Content: "docs", OnPress: link("docs")}}
+		}}
+	})
+	h.commit()
+	n := h.find("text")
+	if !n.text.text.Spans[1].Link || !n.events().Has(driver.EventPress) {
+		t.Fatal("the link span is not reported pressable")
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPress, ID: n.id, Index: 1})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPress, ID: n.id, Index: 5})
+	split.Set(true)
+	h.commit()
+	if sp := n.text.text.Spans; len(sp) != 3 || !sp[2].Link {
+		t.Fatalf("split spans %+v", sp)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPress, ID: n.id, Index: 7})
+	if strings.Join(pressed, " ") != "docs cs" {
+		t.Errorf("pressed %q, want docs then cs", pressed)
+	}
+}
+
 func TestTextPressOutsideItsLinks(t *testing.T) {
 	var link, text int
 	h := newHost(t, Size{Width: 300, Height: 100}, func(cx *Scope) Node {
