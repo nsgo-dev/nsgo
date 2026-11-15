@@ -592,6 +592,16 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.Menu = it.Menu
 		case driver.ItemWindow:
 			a.Window = append(a.Window, *it.Window)
+		case driver.ItemOpenSurface:
+			if it.Surface.Kind == driver.SurfaceOverlay {
+				a.openOverlay(it.Surface)
+			}
+		case driver.ItemOverlayPermission:
+			if it.On && a.OverlayPermission != core.OverlayGranted && a.OverlayPermission != core.OverlayUnavailable {
+				a.OverlaySettings++
+				a.OverlayPermission = a.OverlayAnswer
+			}
+			a.post(driver.Event{Kind: driver.EventOverlayPermission, Count: it.Count, Index: int(a.OverlayPermission)})
 		case driver.ItemAnnounce:
 			a.Announced = append(a.Announced, it.Value)
 		case driver.ItemInputSource:

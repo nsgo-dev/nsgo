@@ -12,7 +12,7 @@ A service is a command item in the batch. One that answers, such as a clipboard 
 
 - `Tree.request` keeps the callback under the owner that asked, and the root runs it when that owner is gone, so a closed menu still hears its answer.
 - Platforms answer on any goroutine through `Engine.Dispatch`; slow work, such as encoding a photo, runs off the main thread first.
-- `nsgotest` answers from its model: `App.Clipboard`, `ClipboardImage` and `ClipboardFiles`, `OpenURL`, `PickImages`, `TakePhoto` (recording `Photos`), `PickFiles`, `PickDirectories`, `SaveFile`, `OpenFile`, `RevealFile`, `TrashFile` and `CanInstallPackages`, and it records the shares, the packages installed, the install settings opened, the appearance, quits and the context menu shown. A speech session it runs hears what `HearSpeech` says and ends with `EndSpeech`.
+- `nsgotest` answers from its model: `App.Clipboard`, `ClipboardImage` and `ClipboardFiles`, `OpenURL`, `PickImages`, `TakePhoto` (recording `Photos`), `PickFiles`, `PickDirectories`, `SaveFile`, `OpenFile`, `RevealFile`, `TrashFile`, `CanInstallPackages` and `OverlayPermission`, and it records the shares, the packages installed, the install and overlay settings opened, the overlay over other apps (`App.Overlay`, [Android floating windows](android-floating-windows.md)), the appearance, quits and the context menu shown. A speech session it runs hears what `HearSpeech` says and ends with `EndSpeech`.
 
 ## Clipboard
 

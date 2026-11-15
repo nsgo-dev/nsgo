@@ -252,6 +252,10 @@ const (
 	EventBiometric
 	// EventQuitRequest asks the app whether a quit the user asked for may proceed, after the kinds Android's Protocol.java mirrors so that they keep their values. Count identifies the request; the app answers with ItemQuitResponse. It is sent for user-initiated app termination, not Scope.Quit.
 	EventQuitRequest
+	// EventOverlayPermission answers ItemOverlayPermission Count with the permission as Index.
+	EventOverlayPermission
+	// EventWindowEnded reports that the platform ended the surface's window itself, for the reason Index (OverlayEndDenied, ...), as Android ends an overlay it refuses or removes: the core closes it, and OnClosing has no say.
+	EventWindowEnded
 	// EventPermission answers ItemPermission Count, after the kinds Android's Protocol.java mirrors: Index is the permission's status (PermissionNotAsked, ...), and Finished says whether PermissionOpenSettings opened the settings.
 	EventPermission
 )

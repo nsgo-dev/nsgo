@@ -28,3 +28,18 @@ func TestWindowFrameOnScreen(t *testing.T) {
 		}
 	}
 }
+
+func TestWindowFrameWithin(t *testing.T) {
+	area := Bounds{Origin: Point{X: 0, Y: 24}, Size: Size{Width: 400, Height: 800}}
+	for _, c := range []struct{ frame, want WindowFrame }{
+		{WindowFrame{X: 10, Y: 40, Move: true, Width: 100, Height: 50}, WindowFrame{X: 10, Y: 40, Move: true, Width: 100, Height: 50}},
+		{WindowFrame{X: -30, Y: 0, Move: true, Width: 100, Height: 50}, WindowFrame{X: 0, Y: 24, Move: true, Width: 100, Height: 50}},
+		{WindowFrame{X: 350, Y: 790, Move: true, Width: 100, Height: 50}, WindowFrame{X: 300, Y: 774, Move: true, Width: 100, Height: 50}},
+		{WindowFrame{X: 5, Y: 5, Move: true, Width: 900, Height: 2000}, WindowFrame{X: 0, Y: 24, Move: true, Width: 400, Height: 800}},
+		{WindowFrame{Width: 100, Height: 50}, WindowFrame{X: 150, Y: 399, Width: 100, Height: 50}},
+	} {
+		if got := c.frame.Within(area); got != c.want {
+			t.Errorf("%+v within %+v = %+v, want %+v", c.frame, area, got, c.want)
+		}
+	}
+}

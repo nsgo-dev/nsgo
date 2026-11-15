@@ -332,6 +332,8 @@ const (
 	ItemBiometricAuthenticate
 	// ItemQuitResponse answers EventQuitRequest Count, after the kinds Android's Protocol.java mirrors so that they keep their values. On permits the platform's pending termination request; false cancels it.
 	ItemQuitResponse
+	// ItemOverlayPermission asks whether the app may show windows over other apps, Android's SYSTEM_ALERT_WINDOW, opening the system's setting for the app when On; the platform answers with EventOverlayPermission carrying Count and the permission as Index (an OverlayPermission), after the setting once the app is back in front.
+	ItemOverlayPermission
 	// ItemPermission, after the kinds Android's Protocol.java mirrors, carries Permission, a request numbered Count about one of the system's permissions; the platform answers each one but PermissionStopGuide with EventPermission carrying Count, the status as Index.
 	ItemPermission
 	// ItemRevealFile shows Open in the system file manager, selected.
@@ -344,6 +346,22 @@ const (
 	ItemReleaseAwake
 	// ItemTaskProgress, after the kinds Android's Protocol.java mirrors, sets the app's task progress bar to Progress.
 	ItemTaskProgress
+)
+
+// OverlayPermission is what EventOverlayPermission answers an ItemOverlayPermission with, as core's.
+const (
+	OverlayDenied = iota
+	OverlayGranted
+	OverlayUnavailable
+)
+
+// Why EventWindowEnded says the platform ended an overlay, as core's OverlayEnd.
+const (
+	OverlayEndDenied = iota + 1
+	OverlayEndUnavailable
+	OverlayEndRevoked
+	OverlayEndRemoved
+	OverlayEndFailed
 )
 
 // Biometric kinds, as reported by an availability request.

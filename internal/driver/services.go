@@ -180,6 +180,12 @@ const (
 	// SurfaceTrayIcon is the view a tray icon draws itself with
 	// (TrayConfig.View), in the menu bar on macOS.
 	SurfaceTrayIcon
+	// SurfaceOverlay is a window over other apps on Android
+	// (mobile.OpenOverlay): it takes touches but not the focus unless
+	// Focusable, none when Passive, and hides from screen readers unless
+	// Accessible. The platform reports the frame it applied in its
+	// environment's WindowFrame, and ends it with EventWindowEnded.
+	SurfaceOverlay
 )
 
 // SurfaceConfig is a window, a panel or a tray icon's view the app opens
@@ -198,6 +204,8 @@ type SurfaceConfig struct {
 	Frame WindowFrame
 	// Hidden opens it without showing it, as panels open.
 	Hidden bool
+	// Focusable, Passive and Accessible are a SurfaceOverlay's input modes: it takes the focus as well as touches, lets touches through to the apps below instead, or shows its content to screen readers.
+	Focusable, Passive, Accessible bool
 	// Material is the material behind the content (WindowSetMaterial).
 	Material WindowMaterial
 	// Constraints limit a window (WindowSetConstraints).
@@ -302,6 +310,19 @@ func (f WindowFrame) OnScreen(screens []Bounds) WindowFrame {
 	f.Width, f.Height = min(f.Width, s.Size.Width), min(f.Height, s.Size.Height)
 	f.X = s.Origin.X + (s.Size.Width-f.Width)/2
 	f.Y = s.Origin.Y + (s.Size.Height-f.Height)/2
+	return f
+}
+
+// Within returns f kept wholly in area, as an overlay keeps to the screen's usable area: no larger than it, and moved in where it pokes out; one that does not move centers on it.
+func (f WindowFrame) Within(area Bounds) WindowFrame {
+	f.Width, f.Height = min(max(f.Width, 0), area.Size.Width), min(max(f.Height, 0), area.Size.Height)
+	if !f.Move {
+		f.X = area.Origin.X + (area.Size.Width-f.Width)/2
+		f.Y = area.Origin.Y + (area.Size.Height-f.Height)/2
+		return f
+	}
+	f.X = min(max(f.X, area.Origin.X), area.Origin.X+area.Size.Width-f.Width)
+	f.Y = min(max(f.Y, area.Origin.Y), area.Origin.Y+area.Size.Height-f.Height)
 	return f
 }
 

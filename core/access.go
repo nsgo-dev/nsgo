@@ -63,6 +63,8 @@ const (
 	AccessBiometrics = "biometrics"
 	// AccessPermissions is checking, asking for and opening the settings of the system's permissions, by the permission's key (AccessRequest.Resource), and guiding the user to give them.
 	AccessPermissions = "permissions"
+	// AccessOverlay is windows over other apps on Android (OpenOverlay), which TSX packages cannot declare.
+	AccessOverlay = "overlay"
 	// AccessHost is the host's handlers, by name (CallHost, PostHost).
 	AccessHost = "host"
 )

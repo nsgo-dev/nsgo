@@ -77,6 +77,9 @@ type Window struct {
 	visible *Signal[bool]
 	closed  bool
 	closing []*closingHandler
+	// onEnd hears that the platform ended an overlay (OverlayOptions.OnEnd), under endOwner.
+	onEnd    func(OverlayEnd)
+	endOwner *Scope
 }
 
 type closingHandler struct {
@@ -681,6 +684,10 @@ func (t *Tree) surfaceEvent(ev driver.Event) bool {
 		if w := t.window; w != nil && !w.closed {
 			t.within(w.scope, func() { w.visible.Set(false) })
 		}
+	case driver.EventWindowEnded:
+		if w := t.window; w != nil && !w.closed {
+			w.end(OverlayEnd(ev.Index))
+		}
 	case driver.EventReopen:
 		t.within(t.root, rt.reopen)
 	case driver.EventOpenFiles:
@@ -692,7 +699,7 @@ func (t *Tree) surfaceEvent(ev driver.Event) bool {
 		}
 	case driver.EventHotKey:
 		rt.hotKey(ev.Count)
-	case driver.EventLaunchAtLogin, driver.EventNotification, driver.EventBiometric, driver.EventPermission:
+	case driver.EventLaunchAtLogin, driver.EventNotification, driver.EventBiometric, driver.EventPermission, driver.EventOverlayPermission:
 		t.answer(ev)
 	case driver.EventNotificationPress:
 		t.within(t.root, func() { rt.notificationPressed(ev.Text) })

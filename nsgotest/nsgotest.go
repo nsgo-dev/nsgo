@@ -263,6 +263,11 @@ type App struct {
 	Awake         []AwakeHold
 	AwakeHolds    []AwakeHold
 	AwakeReleases []uint32
+	// OverlayPermission is what the platform answers whether the app may show overlays over other apps with (mobile.OverlayPermission), denied at first, as Android's special access is. A request while denied opens the setting, which OverlaySettings counts, and makes it OverlayAnswer, which the test sets to OverlayGranted for a user who grants it. Overlay is the overlay the app opened last, kept once it closed; RevokeOverlayPermission takes the grant away.
+	OverlayPermission core.OverlayPermission
+	OverlayAnswer     core.OverlayPermission
+	OverlaySettings   int
+	Overlay           *Overlay
 	// OnAlert answers each alert the app shows with the index of the
 	// button the user presses, or -1 to dismiss it, once the step that
 	// showed it ends. Without it Alerts lists them and Answer answers
@@ -465,11 +470,12 @@ func (a *App) Settle() {
 			a.traceBatch(b, time.Since(began))
 			a.apply(b)
 		}
+		overlaid := a.commitOverlay()
 		a.animate()
 		a.mu.Lock()
 		more := len(a.posts) > 0
 		a.mu.Unlock()
-		if b == nil && len(posts) == 0 && !more {
+		if b == nil && !overlaid && len(posts) == 0 && !more {
 			if runtime.GOOS != "js" || !a.yieldToPage() {
 				return
 			}

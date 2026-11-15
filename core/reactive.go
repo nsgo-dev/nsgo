@@ -199,6 +199,8 @@ type runtime struct {
 	surfaces  []*Tree
 	surfaceID uint32
 	keyed     map[string]*Window
+	// overlay is the overlay over other apps opened last (OpenOverlay).
+	overlay *Window
 	// shutdown says when the app ends; main is its main window, ownMain
 	// the one SetMainView opened to show mainView.
 	shutdown      ShutdownMode
