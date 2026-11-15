@@ -131,6 +131,7 @@ func init() {
 	loadBorders(cg)
 	qc := load("/System/Library/Frameworks/QuartzCore.framework/QuartzCore")
 	purego.RegisterLibFunc(&caCurrentMediaTime, qc, "CACurrentMediaTime")
+	loadTimeZone()
 }
 
 // Release calls CFRelease on a CoreFoundation object.
