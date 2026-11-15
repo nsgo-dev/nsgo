@@ -117,3 +117,23 @@ func TestSuggestOutlivesItsField(t *testing.T) {
 		t.Fatalf("open %v, query %q", s.Open(), s.Query())
 	}
 }
+
+// TestSuggestClosesAsItsFieldUnmounts ends the query of a focused field that unmounts, which hears no blur, so a list beside it does not stay with its keys.
+func TestSuggestClosesAsItsFieldUnmounts(t *testing.T) {
+	var s *core.Suggest
+	var shown *core.Signal[bool]
+	closes := 0
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		s = core.NewSuggest(cx, core.SuggestOptions{OnClose: func() { closes++ }})
+		shown = core.NewSignal(cx, true)
+		return core.View{Children: []core.Node{
+			core.Show{When: shown.Get, Then: func(*core.Scope) core.Node { return core.Input{TestID: "f", Label: "To", Suggest: s} }},
+			core.View{TestID: "toggle", Role: core.RoleButton, Label: "Toggle", NoFocus: true, Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) { shown.Set(!shown.GetUntracked()) }},
+		}}
+	})
+	app.Type("id:f", "@al")
+	app.Press("id:toggle")
+	if s.Open() || closes != 1 {
+		t.Fatalf("open %v after the field unmounted, %d closes", s.Open(), closes)
+	}
+}

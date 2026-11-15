@@ -363,6 +363,9 @@ func (t *Tree) setInput(n *node, v Input) {
 		in.value, in.autoFocus = v.DefaultValue, v.AutoFocus
 	}
 	in.accessory = v.InputAccessoryViewID
+	if was := in.suggest; was != nil && was != v.Suggest {
+		was.unbind(n)
+	}
 	in.suggest = v.Suggest
 	if in.suggest != nil {
 		in.suggest.bind(t, n)

@@ -114,6 +114,15 @@ func (s *Suggest) close() {
 // bind attaches the Suggest to field n.
 func (s *Suggest) bind(t *Tree, n *node) { s.t, s.n = t, n }
 
+// unbind follows field n leaving the tree, which hears no blur: the query it had ends, as on a blur, unless the Suggest is another field's by now.
+func (s *Suggest) unbind(n *node) {
+	if s.n != n {
+		return
+	}
+	s.n = nil
+	s.focus(false)
+}
+
 // changed follows the user's edit.
 func (s *Suggest) changed(value string) {
 	s.dismissed = mapOffset(s.dismissed, s.value, value)

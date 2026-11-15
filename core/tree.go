@@ -927,6 +927,9 @@ func (t *Tree) discard(n *node) {
 	if n.input != nil {
 		n.input.measured.release()
 		n.input.sized.release()
+		if s := n.input.suggest; s != nil {
+			s.unbind(n)
+		}
 	}
 	for _, c := range n.children {
 		t.discard(c)
