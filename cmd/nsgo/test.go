@@ -52,7 +52,21 @@ type testResult struct {
 	Status        string // pass, fail or skip
 	Elapsed       time.Duration
 	Output        string
-	reported      int // how much of a benchmark's Output it reported
+	// Message is why the tool failed a test that passed or skipped, as one whose screenshot it cannot save, and the failure's message in place of the output's first line.
+	Message  string
+	reported int // how much of a benchmark's Output it reported
+}
+
+// failFor fails t for why, a reason the tool found after the test ran, and adds why to its output.
+func (t *testResult) failFor(why string) {
+	if t.Status == "pass" || t.Status == "skip" {
+		t.Message = why
+	}
+	t.Status = "fail"
+	if t.Output != "" && !strings.HasSuffix(t.Output, "\n") {
+		t.Output += "\n"
+	}
+	t.Output += why + "\n"
 }
 
 // testRun gathers what go test -json reports.
@@ -284,7 +298,7 @@ func (r *testRun) print(t *testResult) {
 	fmt.Fprintf(r.out, "%s%s %s (%s)\n", margin, mark, t.Name, t.Elapsed.Round(time.Millisecond))
 	if t.Status == "fail" {
 		for _, line := range strings.Split(strings.TrimRight(t.Output, "\n"), "\n") {
-			if strings.HasPrefix(line, "=== ") || strings.HasPrefix(line, "--- ") {
+			if goTestLine(line) {
 				continue
 			}
 			fmt.Fprintf(r.out, "%s    %s\n", margin, strings.TrimPrefix(line, "    "))
@@ -415,7 +429,11 @@ func writeJUnit(path string, results []*testResult, packages map[string]*testRes
 		c := junitCase{Class: t.Package, Name: t.Name, Time: seconds(t.Elapsed)}
 		switch t.Status {
 		case "fail":
-			c.Failure = &junitFailure{Message: firstLine(t.Output), Body: t.Output}
+			msg := t.Message
+			if msg == "" {
+				msg = firstLine(t.Output)
+			}
+			c.Failure = &junitFailure{Message: msg, Body: t.Output}
 			s.Failures++
 			failures++
 		case "skip":
@@ -460,14 +478,17 @@ func writeJUnit(path string, results []*testResult, packages map[string]*testRes
 
 func seconds(d time.Duration) string { return fmt.Sprintf("%.3f", d.Seconds()) }
 
-// firstLine is a failure's message: the first line it printed that is
-// not go test's own.
+// firstLine is a failure's message: the first line it printed that is not go test's own.
 func firstLine(output string) string {
 	for _, line := range strings.Split(output, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "=== ") && !strings.HasPrefix(line, "--- ") {
+		if line = strings.TrimSpace(line); line != "" && !goTestLine(line) {
 			return line
 		}
 	}
 	return ""
+}
+
+// goTestLine reports whether line is go test -v's own rather than the test's: a test's start or result, or the process's closing PASS or FAIL.
+func goTestLine(line string) bool {
+	return strings.HasPrefix(line, "=== ") || strings.HasPrefix(line, "--- ") || line == "PASS" || line == "FAIL"
 }

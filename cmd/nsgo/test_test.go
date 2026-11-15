@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/xml"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,5 +162,52 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 		t.Error("en/home overwrote en/Home on a case-insensitive volume")
 	} else if folds != nil && err != nil {
 		t.Errorf("en/home beside en/Home on a case-sensitive volume: %v", err)
+	}
+}
+
+// A passing test the tool fails, for a screenshot it cannot save or a process that exits badly, reports the tool's reason as its JUnit message and prints none of go test's closing lines.
+func TestToolFailureIsTheMessage(t *testing.T) {
+	dir := t.TempDir()
+	shot := "nsgo-screenshot ~" + base64.RawURLEncoding.EncodeToString([]byte("home")) + " 1/1 iVBORw0KGgo=\n"
+	passed := "=== RUN   TestShot\n    shot_test.go:9: took it\n" + shot + shot + "--- PASS: TestShot (0.01s)\nPASS\n"
+	dup, _ := targetResult("TestShot", passed, 0, nil, dir, map[string]bool{})
+	exited, _ := targetResult("TestExit", "=== RUN   TestExit\n--- PASS: TestExit (0.01s)\nPASS\n", 1, nil, dir, map[string]bool{})
+	for _, c := range []struct {
+		res  *testResult
+		want string
+	}{
+		{dup, `screenshot "home" resolves to`},
+		{exited, "the test process exited with 1"},
+	} {
+		if c.res.Status != "fail" {
+			t.Fatalf("%s: status %q, want fail", c.res.Name, c.res.Status)
+		}
+		c.res.Package = "example.com/app"
+		report := filepath.Join(dir, c.res.Name+".xml")
+		if err := writeJUnit(report, []*testResult{c.res}, nil); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(report)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var suites junitSuites
+		if err := xml.Unmarshal(data, &suites); err != nil {
+			t.Fatal(err)
+		}
+		if got := suites.Suites[0].Cases[0].Failure.Message; !strings.HasPrefix(got, c.want) {
+			t.Errorf("%s: JUnit message %q, want %q…", c.res.Name, got, c.want)
+		}
+		var console bytes.Buffer
+		r := &testRun{out: &console}
+		r.print(c.res)
+		for _, line := range strings.Split(console.String(), "\n") {
+			if strings.TrimSpace(line) == "PASS" {
+				t.Errorf("%s: console prints go test's PASS line:\n%s", c.res.Name, console.String())
+			}
+		}
+		if !strings.Contains(console.String(), c.want) {
+			t.Errorf("%s: console lacks %q:\n%s", c.res.Name, c.want, console.String())
+		}
 	}
 }

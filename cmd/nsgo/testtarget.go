@@ -104,13 +104,7 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		text, saved, saveErr := saveScreenshots(out.String(), shots, savedPaths)
-		t := parseTestOutput(name, text, code, err)
-		// A screenshot the tool cannot save, as one whose path an earlier one took, fails its test, and the run goes on.
-		if saveErr != nil {
-			t.Status = "fail"
-			t.Output += "\n" + saveErr.Error() + "\n"
-		}
+		t, saved := targetResult(name, out.String(), code, err, shots, savedPaths)
 		if t.Elapsed == 0 {
 			t.Elapsed = time.Since(started)
 		}
@@ -277,6 +271,17 @@ func isTestName(name string) bool {
 	return rest == "" || !unicode.IsLower(r)
 }
 
+// targetResult turns one test process's output into its result and saves the screenshots it carries in dir, returning the files written.
+func targetResult(name, out string, code int, runErr error, dir string, seen map[string]bool) (*testResult, []string) {
+	text, saved, saveErr := saveScreenshots(out, dir, seen)
+	t := parseTestOutput(name, text, code, runErr)
+	// A screenshot the tool cannot save, as one whose path an earlier one took, fails its test, and the run goes on.
+	if saveErr != nil {
+		t.failFor(saveErr.Error())
+	}
+	return t, saved
+}
+
 // testLine matches go test -v's result line of a top-level test.
 var testLine = regexp.MustCompile(`^--- (PASS|FAIL|SKIP): (\S+) \(([0-9.]+)s\)`)
 
@@ -292,12 +297,12 @@ func parseTestOutput(name, out string, code int, runErr error) *testResult {
 		}
 	}
 	if t.Status == "" || t.Status == "pass" && code != 0 {
-		t.Status = "fail"
 		why := fmt.Sprintf("the test process exited with %d", code)
 		if runErr != nil {
 			why = runErr.Error()
 		}
-		t.Output += "\n" + why + "\n"
+		// A process that crashed before its result keeps the crash's first line as the message.
+		t.failFor(why)
 	}
 	return t
 }
