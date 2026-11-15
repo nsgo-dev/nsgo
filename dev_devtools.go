@@ -146,6 +146,10 @@ func runDevCommand(c devCommand, out *devOut) {
 			s.Inspect(c.ID)
 		case "highlight":
 			s.Highlight(c.On)
+		case "layout":
+			s.Layout(c.On)
+		case "watch-layout":
+			s.WatchLayout(func(on bool) { reply(devMessage{Type: "layout", Data: on}) })
 		case "pick":
 			s.Pick(c.On, func(id uint32) { reply(devMessage{Type: "hover", ID: id}) }, func(id uint32) { reply(devMessage{Type: "picked", ID: id}) })
 		case "record":
@@ -202,14 +206,9 @@ func (o *devOut) run() {
 	}
 }
 
-// withDevOverlay mounts DevTools' overlay over app, outlining commits from the start under -highlight.
-func withDevOverlay(app App, highlight bool) App {
+// withDevOverlay mounts DevTools' overlay over app, outlining commits from the start under -highlight and showing the layout audit as -layout says.
+func withDevOverlay(app App, highlight bool, layout core.LayoutAudit) App {
 	return func(cx *core.Scope) core.Node {
-		cx.Post(func() {
-			for _, s := range devtools.Surfaces() {
-				s.Highlight(highlight)
-			}
-		})
-		return core.Group{core.Func(app), core.UpdateHighlights{}}
+		return core.Group{core.Func(app), core.UpdateHighlights{NoUpdates: !highlight, Layout: layout}}
 	}
 }

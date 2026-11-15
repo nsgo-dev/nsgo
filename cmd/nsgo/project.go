@@ -79,6 +79,8 @@ type project struct {
 		Highlight bool `yaml:"-"`
 		// Devtools has the client serve DevTools: nsgo dev -devtools sets it.
 		Devtools bool `yaml:"-"`
+		// Layout is what DevTools' layout audit starts showing, as bounds,grid=8: nsgo dev -layout sets it.
+		Layout string `yaml:"-"`
 		// Limits runs a TSX app sandboxed, as tsx.View would, within
 		// these limits (tsx.ParseLimits) and its capabilities: nsgo dev
 		// -limits sets it.
@@ -439,6 +441,9 @@ func (p *project) ldflags(extra ...string) string {
 	}
 	if p.Dev.Client && p.Dev.Devtools {
 		flags += fmt.Sprintf(" -X %s.devDevtools=1", pkg)
+	}
+	if p.Dev.Client && p.Dev.Layout != "" {
+		flags += fmt.Sprintf(" -X %s.devLayout=%s", pkg, p.Dev.Layout)
 	}
 	if p.Dev.Client && p.Dev.Limits != "" {
 		flags += fmt.Sprintf(" -X '%s.devLimits=%s'", compilerPath, p.Dev.Limits)

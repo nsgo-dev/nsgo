@@ -107,6 +107,41 @@ type devFlags struct {
 	lang      string
 	clip      string
 	limits    limitsFlag
+	layout    layoutFlag
+}
+
+// layoutFlag is -layout: alone bounds, or what DevTools' layout audit starts showing, joined by commas: bounds, grid and grid=N, N from 4 to 1000000 points (-layout=bounds,grid=4). It holds the parts without spaces, as the dev client reads them (the root package's parseDevLayout).
+type layoutFlag string
+
+func (l *layoutFlag) String() string   { return string(*l) }
+func (l *layoutFlag) IsBoolFlag() bool { return true }
+
+func (l *layoutFlag) Set(v string) error {
+	switch v {
+	case "true", "":
+		v = "bounds"
+	case "false":
+		*l = ""
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		name, n, hasN := strings.Cut(part, "=")
+		switch {
+		case (name == "bounds" || name == "grid") && !hasN:
+		case name == "grid":
+			// The audit's smallest step (core's minAuditGrid), written so that NaN fails it too.
+			if step, err := strconv.ParseFloat(n, 32); err != nil || !(step >= 4 && step <= 1e6) {
+				return fmt.Errorf("grid=%s: needs a step of 4 to 1000000 points", n)
+			}
+		default:
+			return fmt.Errorf("%q: needs bounds, grid or grid=N", part)
+		}
+		parts[i] = part
+	}
+	*l = layoutFlag(strings.Join(parts, ","))
+	return nil
 }
 
 // limitsFlag is -limits: alone the sandbox's default limits, or limits
@@ -145,6 +180,7 @@ func bindDevFlags(fs *flag.FlagSet) *devFlags {
 	fs.BoolVar(&f.trace, "trace", false, "print each commit's time, mount items and the writes that caused it from the running app")
 	fs.BoolVar(&f.highlight, "highlight", false, "outline for a moment each view a commit of the running app changed")
 	fs.BoolVar(&f.devtools, "devtools", false, "open DevTools in the browser: the running app's views, state, profiler and a test recorder")
+	fs.Var(&f.layout, "layout", "show DevTools' layout audit over the running app: alone every view's boxes, or what follows = joined by commas, bounds, grid (8 points) and grid=N, as -layout=bounds,grid=4")
 	fs.StringVar(&f.lang, "lang", "", "start the app with --nsgo-lang, in this `locale`, as de or zh-Hant, or a pseudo locale: en-XA accents and lengthens its messages, ar-XB mirrors them")
 	fs.StringVar(&f.team, "team", "", "the Apple developer `team` the iOS target signs with (default: the team Xcode last used)")
 	fs.StringVar(&f.clip, "clip", "", "with -target ios or ios_simulator, run nsgo.yaml's App Clip alone, opened from this `url`, in place of the app")

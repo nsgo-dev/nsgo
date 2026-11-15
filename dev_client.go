@@ -24,6 +24,9 @@ var devServer = ""
 // devHighlight is "1" in nsgo dev -highlight's builds, set with -ldflags -X.
 var devHighlight = ""
 
+// devLayout is what nsgo dev -layout's builds start the layout audit showing, as bounds,grid=8, set with -ldflags -X (parseDevLayout).
+var devLayout = ""
+
 // devServerURL is nsgo dev's server, "" when none runs the app, and whether the app runs in a web page the server served.
 func devServerURL() (server string, page bool) {
 	server = devServer
@@ -60,8 +63,8 @@ func devApp(app App) App {
 		return app
 	}
 	startDevClient()
-	if devHighlight == "1" || devDevtools == "1" {
-		app = withDevOverlay(app, devHighlight == "1")
+	if devHighlight == "1" || devDevtools == "1" || devLayout != "" {
+		app = withDevOverlay(app, devHighlight == "1", parseDevLayout(devLayout))
 	}
 	if page {
 		return app

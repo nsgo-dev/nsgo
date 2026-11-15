@@ -251,6 +251,31 @@ func TestAppFlags(t *testing.T) {
 	}
 }
 
+func TestLayoutFlag(t *testing.T) {
+	for args, want := range map[string]string{"-layout": "bounds", "-layout=bounds,grid=4": "bounds,grid=4", "-layout=grid": "grid", "-layout=bounds, grid": "bounds,grid"} {
+		fs := flag.NewFlagSet("dev", flag.ContinueOnError)
+		f := bindDevFlags(fs)
+		if err := fs.Parse([]string{args, "app"}); err != nil || string(f.layout) != want || fs.Arg(0) != "app" {
+			t.Errorf("%s: layout %q, args %q, %v", args, f.layout, fs.Args(), err)
+		}
+	}
+	for _, bad := range []string{"rulers", "grid=2", "grid=x", "grid=NaN", "grid=nan", "grid=1e30", "bounds,", "bounds=1"} {
+		var l layoutFlag
+		if l.Set(bad) == nil {
+			t.Errorf("-layout=%s was taken", bad)
+		}
+	}
+	p := &project{Name: "App", ID: "com.example.app"}
+	p.prepareDev(devOptions{layout: "bounds,grid=4"})
+	if flags := p.ldflags(); !strings.Contains(flags, " -X github.com/nsgo-dev/nsgo.devLayout=bounds,grid=4") {
+		t.Errorf("ldflags = %q, want -layout's value for the dev client", flags)
+	}
+	p.prepareDev(devOptions{})
+	if flags := p.ldflags(); strings.Contains(flags, "devLayout") {
+		t.Errorf("ldflags without -layout = %q", flags)
+	}
+}
+
 func TestIdentityLdflags(t *testing.T) {
 	p := &project{Name: "App", ID: "com.example.app", Version: "1.2.0", BuildNumber: 12}
 	flags := p.ldflags()

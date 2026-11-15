@@ -48,6 +48,7 @@ type devOptions struct {
 	trace     bool   // print the running app's commits
 	highlight bool   // outline what the running app's commits changed
 	devtools  bool   // open DevTools for the running app
+	layout    string // what DevTools' layout audit starts showing (layoutFlag)
 	fps       bool   // show the performance monitor: --nsgo-fps
 	lang      string // the locale to run the app in: --nsgo-lang
 	clip      string // the URL the App Clip opens from, run in the app's place
@@ -181,10 +182,10 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 	}
 }
 
-// prepareDev sets what dev's builds carry: the dev client, -trace's
-// commits, -highlight's outlines and the dev icons; -release strips them as nsgo build does.
+// prepareDev sets what dev's builds carry: the dev client, -trace's commits, -highlight's outlines, -layout's audit and the dev icons; -release strips them as nsgo build does.
 func (p *project) prepareDev(opts devOptions) {
 	p.Release, p.Dev.Client, p.Dev.Trace, p.Dev.Highlight, p.Dev.Devtools = opts.release, true, opts.trace, opts.highlight, opts.devtools
+	p.Dev.Layout = opts.layout
 	p.useDevIcons()
 }
 
