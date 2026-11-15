@@ -210,6 +210,23 @@ What formulas cost an app, from a `ui.TextView` with and without `RenderMath` (2
 | English speech, `LocalizeLabel` for others | Untie's description spoken from catalogs | A component's words come from its catalogs |
 | Context menu copying MathML, hover hits | Copies as TeX; no hits | Left for later ([roadmap](../roadmap.md#formulas)) |
 
+## Diagrams
+
+`base/diagram` draws Mermaid diagrams with [limu](https://github.com/firede/limu), which reads every diagram type Pele, the Obsidian team's Mermaid renderer, draws (flowcharts, sequence, class, state and entity relationship diagrams, Gantt charts, pies, mind maps, timelines, sankeys and more) and lays each out as a scene: items in the order they draw, each with its outline's parts, its edges' markers, its label and its style. NSH has none, and limu's MyGo adapter, `limumygo`, is the reference its painter follows (MIT, `NOTICE`).
+
+- One painter draws every type: an item's parts, each a path or a box with its corners rounded by the style's radius, filled and stroked as its `Paint` says; the markers at its ends; and its label, line by line about its `At`, turned by `Rotate` degrees. NSGo's canvas strokes, caps, joins and dashes as SVG does and strokes text, so a box is a rounded rectangle path, a line is stroked whole and a label's halo, which keeps it clear of the lines under it, is its text stroked first, where `limumygo` works around MyGo's painter.
+- Labels are measured for limu's layout with the platform's text engine (`Scope.MeasureText`), in the fonts they are drawn in: the system font, bold and italic as the label's spans say, and the monospaced one for its monospaced spans. A layout is kept by its source and size, 256 of them for the process, so a list or a chat showing a diagram again lays it out once.
+- The canvas is the scene's size in points, at `FontSize` (16) times the user's text size setting. Colors are limu's look resolved for each item from the theme: limu's default theme in light and Kohu's dark one in dark, following the appearance, or the app's `Theme`.
+- Assistive technology reads the canvas as an image named by the diagram's `accTitle` and `accDescr`, or else as a diagram, through `base/diagram/locales`.
+- `RenderDiagram` gives `TextView` a `View` for each code block whose language is `mermaid`. `TextView` places it as an attachment centered in `PartDiagramBlock` around a sideways `PartDiagramBlockScroll`, its span's `Content` the block's fenced source, which a copy takes; a block still streaming behind the caret shows as code until it is complete, so a reply's diagram does not flash its parse errors.
+- A diagram that does not parse, or that limu cannot lay out in finite numbers, shows its source as text in `ErrorClass` and `ErrorStyle`, the monospaced font in a `TextView`.
+
+| limumygo | NSGo | Why |
+| --- | --- | --- |
+| A box stroked grown by half its width, lines stroked in pieces, halos drawn as glyphs in sixteen directions | Paths stroked as SVG strokes them, text stroked for halos | NSGo's canvas strokes as SVG does |
+| `Options.Scale`, `Fonts` of its own | The scene's size in points, the platform's fonts measured through the text engine | Diagrams follow the text size and the platform's text as text does |
+| Hovered and clicked items, links, tooltips, icons and images | None yet | Left for later ([roadmap](../roadmap.md#diagrams)) |
+
 ## Resizable panels
 
 `ResizablePanelGroup` ports `gpui-base`'s sizing (`resizeState`, tested as NSH tests it), filling its container unless the app sizes it: a drag grows the panel before its handle by taking from the panels after it, nearest first, as far as their minimums allow, and shrinking below a minimum takes from the panels before.

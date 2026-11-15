@@ -121,6 +121,18 @@ What NSGo's issue [#49](https://github.com/nsgo-dev/nsgo/issues/49) asks for fol
 An `NsgoEngine` a host keeps runs the app on while its one `NsgoView` is detached ([embedding](architecture/embedding.md)). Issue #12 also needs a fresh Activity's view to show a running engine and several surfaces to share one process before recording, floating windows or push delivery can depend on it; the design and staged protocol work are in [Android engine and view lifetime](architecture/android-lifecycle.md).
 | Android engine and view lifetime | #12, [Android engine and view lifetime](architecture/android-lifecycle.md) | A host retains one `NsgoEngine` in its Application or foreground service, Activities attach and detach `NsgoView` surfaces without killing the Go process, two surfaces share one process with independent trees, and explicit engine destruction closes the process once |
 
+## Diagrams
+
+What `base/diagram` still lacks ([diagrams](architecture/components.md#diagrams)), limu's `limumygo` the reference.
+
+| Item | Reference | Done when |
+| --- | --- | --- |
+| Links and tooltips | `limumygo`'s `hit.go`, `scene.Item.Link` and `Tooltip` | A press on an item with a link opens it as `TextView`'s links do, and the item under the pointer shows its tooltip |
+| Icons and images in diagrams | `layout.Options.Icons`, `scene.Picture` | A node's `fa:` icon draws from an icon set the app gives, and its image loads as an `Image`'s does |
+| Diagrams that fit their view | `layout.Options.MaxWidth`, `KeepDirection` | A diagram is laid out to the width its view has, turning a wide flowchart to run down, rather than scroll |
+| Diagrams in TSX | `tsx.md` | TSX registers `diagram.View`, its `TextView` takes `renderDiagram`, and the TSX gallery's TextView page draws its diagram |
+| Diagrams in the app's palette | `ui` | `ui.TextView`'s diagrams take `ui`'s colors, through a `diagram.Theme` an app builds from them |
+
 ## Formulas
 
 What `base/formula` still lacks ([formulas](architecture/components.md#formulas)), Untie's and MyGo's adapter the references.

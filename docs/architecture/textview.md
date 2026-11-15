@@ -11,8 +11,9 @@ The shared find design for this document and `ui/chat` is in [Text-level search]
 | `base/textview` | `Document` and its blocks and inlines, `Parse`, `ParseHTML`, `Extension`, and the unstyled `TextView`, styled by `Part` |
 | `base/textview/highlight` | A `Highlighter` from chroma's lexers in NSH's light and dark palette, following the system's appearance |
 | `base/formula` | `RenderMath`, typesetting formulas with Untie ([formulas](components.md#formulas)) |
+| `base/diagram` | `RenderDiagram`, drawing mermaid code blocks with limu ([diagrams](components.md#diagrams)) |
 
-Highlighting is its own package because chroma's lexers add about 4.5 MB to a binary, against about 0.3 MB for goldmark. Apps opt in with `Highlighter: highlight.New(cx)`. Formulas cost more, about 6.5 MB natively with their font, so apps opt in with `RenderMath: formula.RenderMath`; `ui.TextView` does not by itself.
+Highlighting is its own package because chroma's lexers add about 4.5 MB to a binary, against about 0.3 MB for goldmark. Apps opt in with `Highlighter: highlight.New(cx)`. Formulas cost more, about 6.5 MB natively with their font, so apps opt in with `RenderMath: formula.RenderMath`; `ui.TextView` does not by itself. Diagrams come with `RenderDiagram: diagram.RenderDiagram` the same way.
 
 `highlight.New` keeps the last 64 blocks' tokens for the process and measures each language's lexing speed: a block is colored from the cache, lexed on the spot when its language should take under 2 ms, and otherwise shown plain, or with the colors of the block it grew from, and lexed on a goroutine whose result colors it again. This keeps lexing off the engine goroutine, as NSH's highlighter does with its blocking thread.
 
