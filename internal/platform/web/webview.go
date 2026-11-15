@@ -245,7 +245,7 @@ func (w *webFrame) awaitBridge() {
 	w.bridging, w.queued = w.token != "", nil
 }
 
-func (s *surface) webCommand(v *view, c driver.WebCommand, value string) {
+func (s *surface) webCommand(v *view, c driver.WebCommand, value string, data any) {
 	w := v.web
 	// viaPort hands msg to the source's page, once it handed its port, and reports false when no such page shows: the source is a URL, or its page went to another.
 	viaPort := func(msg map[string]any) bool {
@@ -306,6 +306,14 @@ func (s *surface) webCommand(v *view, c driver.WebCommand, value string) {
 	case driver.WebGoForward:
 		if !viaPort(map[string]any{"go": 1}) {
 			warn("GoForward")
+		}
+	case driver.WebLoad:
+		if src, ok := data.(*driver.WebSource); ok && src != nil {
+			// setWeb compares configuration to avoid duplicate loads; this
+			// command is deliberately unconditional.
+			w.config.Source = *src
+			w.loaded = false
+			s.setWeb(v, &w.config)
 		}
 	}
 	// StopLoading does nothing, as in NSH: the frame is another origin.

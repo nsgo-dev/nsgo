@@ -1463,6 +1463,16 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.byte(byte(it.WebCommand))
 			if it.WebCommand == driver.WebPostMessage {
 				w.str(driver.WebMessageScript(it.Value))
+			} else if it.WebCommand == driver.WebLoad {
+				if src, ok := it.Data.(*driver.WebSource); ok && src != nil {
+					w.str(src.Src)
+					w.str(src.HTML)
+					w.str(src.BaseURL)
+				} else {
+					w.str("")
+					w.str("")
+					w.str("")
+				}
 			} else {
 				w.str(it.Value)
 			}

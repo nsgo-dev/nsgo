@@ -115,6 +115,14 @@ const (
 	WebDownloadFailed
 )
 
+// WebFailure identifies the platform error behind an EventError. Domain is
+// empty for an error the engine produced itself, such as a refused
+// navigation.
+type WebFailure struct {
+	Domain string
+	Code   int
+}
+
 // WebConfig is everything a web view loads and allows (ItemWeb).
 // Platforms load the source again when it or the scripts change.
 type WebConfig struct {
@@ -130,9 +138,12 @@ type WebConfig struct {
 	Incognito bool
 	// SchemeHandlers are app-owned URL schemes and their response bodies.
 	// Platforms read them when the native view is first made.
-	SchemeHandlers      map[string]func(string) []byte
-	NoScroll            bool
-	NoJavaScript        bool
+	SchemeHandlers map[string]func(string) []byte
+	NoScroll       bool
+	NoJavaScript   bool
+	// PinchZoom enables the platform web view's pinch magnification where it
+	// has a setting for it. Platforms without one keep their native behavior.
+	PinchZoom           bool
 	BackForwardGestures bool
 	// DownloadDir is where the view saves what its pages download, a
 	// directory of its own for each (<id>/<file name>); "" saves nothing.
@@ -249,6 +260,9 @@ const (
 	// WebSendInput gives the page Data, a *WebInput, as the user's own
 	// input.
 	WebSendInput
+	// WebLoad loads the WebSource in Data, even when it equals the current
+	// source. The current WebConfig's request headers still apply.
+	WebLoad
 )
 
 // WebInput is input a web view's page takes as the user's hands give it:

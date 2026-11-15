@@ -207,6 +207,7 @@ func site(cx *core.Scope) core.Node {
 		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10}, Children: []core.Node{
 			navButton(cx, true, func() bool { return state.Get().CanGoBack }, tr.MediaBack(), ref.GoBack),
 			navButton(cx, false, func() bool { return state.Get().CanGoForward }, tr.MediaForward(), ref.GoForward),
+			ui.Button{Text: tr.MediaHome(), Variant: ui.ButtonSecondary, OnPress: func() { ref.Load(core.WebSrc("https://go.dev")) }},
 			ui.Spacer{},
 			ui.Button{Text: tr.MediaReload(), Variant: ui.ButtonSecondary, OnPress: ref.Reload},
 		}},

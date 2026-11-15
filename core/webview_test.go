@@ -19,6 +19,7 @@ func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 			InjectedJavaScript: "1",
 			Headers:            map[string]string{"X-Test": "one"},
 			Incognito:          true,
+			PinchZoom:          true,
 			Ref:                &ref,
 			TestID:             "web",
 			Style:              Style{Width: Pt(300), Height: Pt(200)},
@@ -42,7 +43,7 @@ func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	if n := h.find("web"); n.kind != driver.KindWeb {
 		t.Fatalf("kind %v, want KindWeb", n.kind)
 	}
-	if cfg == nil || cfg.Source.Src != "https://example.com" || cfg.InjectedJavaScript != "1" || cfg.Headers["X-Test"] != "one" || !cfg.Incognito {
+	if cfg == nil || cfg.Source.Src != "https://example.com" || cfg.InjectedJavaScript != "1" || cfg.Headers["X-Test"] != "one" || !cfg.Incognito || !cfg.PinchZoom {
 		t.Fatalf("config %+v", cfg)
 	}
 	if !mask.Has(driver.EventLoad) || !mask.Has(driver.EventMessage) || mask.Has(driver.EventLoadStart) {
@@ -72,6 +73,16 @@ func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	}
 	if len(cmds) != 2 || cmds[0] != driver.WebPostMessage || cmds[1] != driver.WebGoBack {
 		t.Fatalf("commands %v", cmds)
+	}
+
+	ref.Load(WebSrc("https://example.com"))
+	b = h.commit()
+	if len(b.Items) != 1 || b.Items[0].WebCommand != driver.WebLoad {
+		t.Fatalf("load command %v", b.Items)
+	}
+	loadedSource, ok := b.Items[0].Data.(*driver.WebSource)
+	if !ok || loadedSource.Src != "https://example.com" {
+		t.Fatalf("load source %#v", b.Items[0].Data)
 	}
 
 	id := h.find("web").id
@@ -137,6 +148,45 @@ func TestWebMessagesComeFromTheSourcesOrigin(t *testing.T) {
 				t.Errorf("OnMessageFrom heard %q and OnMessage %q, want %q", got, strs, c.want)
 			}
 		})
+	}
+}
+
+func TestWebLoadUsesAccessRefusal(t *testing.T) {
+	var ref Ref
+	var errors []error
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		cx.ProvideAccess(hostsAccess{hosts: []string{"ok.com"}})
+		return WebView{Ref: &ref, Source: WebSrc("https://ok.com/"), OnError: func(err error) { errors = append(errors, err) }}
+	})
+	h.commit()
+	ref.Load(WebSrc("https://evil.io/"))
+	b := h.commit()
+	if len(b.Items) != 1 || b.Items[0].WebCommand != driver.WebLoad {
+		t.Fatalf("load refusal command %v", b.Items)
+	}
+	src := b.Items[0].Data.(*driver.WebSource)
+	if src.Src != "" {
+		t.Fatalf("refused source reached backend: %#v", src)
+	}
+	h.drain()
+	if len(errors) != 1 {
+		t.Fatalf("refusal errors %v", errors)
+	}
+	if webErr, ok := errors[0].(*WebError); !ok || webErr.Domain != "" || webErr.Code != 0 || webErr.URL != "https://evil.io/" {
+		t.Fatalf("refusal error %#v", errors[0])
+	}
+}
+
+func TestWebErrorCarriesFailure(t *testing.T) {
+	var got *WebError
+	h := newHost(t, Size{Width: 100, Height: 100}, func(*Scope) Node {
+		return WebView{Ref: &Ref{}, OnError: func(err error) { got = err.(*WebError)}, TestID: "web"}
+	})
+	h.commit()
+	id := h.find("web").id
+	h.tree.Dispatch(driver.Event{Kind: driver.EventError, ID: id, Text: "failed", Navigation: &WebNavigation{URL: "https://example.com"}, Data: &driver.WebFailure{Domain: "test", Code: 7}})
+	if got == nil || got.Domain != "test" || got.Code != 7 || got.URL != "https://example.com" {
+		t.Fatalf("error %#v", got)
 	}
 }
 

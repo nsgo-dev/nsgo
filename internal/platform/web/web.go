@@ -1574,7 +1574,7 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemWeb:
 			s.setWeb(v, it.Web)
 		case driver.ItemWebCommand:
-			s.webCommand(v, it.WebCommand, it.Value)
+			s.webCommand(v, it.WebCommand, it.Value, it.Data)
 		case driver.ItemVideo:
 			if v.video != nil {
 				s.setVideo(v, it.Video)

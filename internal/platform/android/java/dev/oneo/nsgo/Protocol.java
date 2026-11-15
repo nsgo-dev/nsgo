@@ -301,6 +301,7 @@ final class Protocol {
     static final int WEB_STOP_LOADING = 4;
     static final int WEB_POST_MESSAGE = 5;
     static final int WEB_INJECT_JAVASCRIPT = 6;
+    static final int WEB_LOAD = 7;
 
     // Gesture phases, as in core/gesture.go.
     static final int GESTURE_BEGAN = 1;

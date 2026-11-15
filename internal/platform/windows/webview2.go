@@ -52,6 +52,7 @@ var (
 	iidController2                    = parseGUID("c979903e-d4ca-4228-92eb-47ee3fa96eab")
 	iidController3                    = parseGUID("f9614724-5d2b-41dc-aef7-73d62b51543b")
 	iidSettings2                      = parseGUID("ee9a0f68-f46c-4e32-ac23-ef8cac224d2a")
+	iidSettings5                      = parseGUID("183e7052-1d03-43a0-ab99-98e043b66b39")
 	iidSettings6                      = parseGUID("11cb3acd-9bc8-43b8-83bf-f40753714f87")
 	iidEnvironmentCompleted           = parseGUID("4e8a3389-c9d8-4bd2-b6b5-124fee6cc14d")
 	iidCompositionControllerCompleted = parseGUID("02fab84b-1428-4fb7-ad45-1b2e64736184")
@@ -157,6 +158,7 @@ const (
 	settingsPutIsStatusBarEnabled       = 10
 	settingsGetUserAgent                = 21
 	settingsPutUserAgent                = 22
+	settingsPutIsPinchZoomEnabled       = 30
 	settingsPutIsSwipeNavigationEnabled = 32
 
 	// ICoreWebView2NavigationStartingEventArgs

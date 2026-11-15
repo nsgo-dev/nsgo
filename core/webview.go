@@ -33,6 +33,10 @@ type WebView struct {
 	// pages from running scripts.
 	NoScroll     bool
 	NoJavaScript bool
+	// PinchZoom lets the user magnify the page with a pinch where the
+	// platform exposes that setting. It has no effect on iOS, whose page
+	// viewport controls zoom behavior.
+	PinchZoom bool
 	// BackForwardGestures lets swipes go back and forward where the
 	// platform has them (iOS, macOS trackpads).
 	BackForwardGestures bool
@@ -96,6 +100,8 @@ type WebMessage struct {
 type WebError struct {
 	URL     string
 	Message string
+	Domain  string
+	Code    int
 }
 
 func (e *WebError) Error() string { return e.Message }
@@ -137,7 +143,7 @@ func (t *Tree) mountWebView(cx *Scope, parent *node, w WebView) {
 			InjectedJavaScriptBeforeContent: w.InjectedJavaScriptBeforeContent, UserAgent: w.UserAgent,
 			Headers: cloneWebHeaders(w.Headers), Incognito: w.Incognito,
 			SchemeHandlers: webSchemesOf(cx),
-			NoScroll:       w.NoScroll, NoJavaScript: w.NoJavaScript, BackForwardGestures: w.BackForwardGestures,
+			NoScroll:       w.NoScroll, NoJavaScript: w.NoJavaScript, PinchZoom: w.PinchZoom, BackForwardGestures: w.BackForwardGestures,
 			Media: w.Media},
 		loadStart: w.OnLoadStart, load: w.OnLoad, navigation: w.OnNavigationStateChange,
 		loadError: w.OnError, message: w.OnMessage, messageFrom: w.OnMessageFrom, download: w.OnDownload,
@@ -269,7 +275,18 @@ func (t *Tree) dispatchWeb(n *node, ev driver.Event) {
 		call(wn.navigation)
 	case driver.EventError:
 		if wn.loadError != nil {
-			t.within(n.owner, func() { wn.loadError(&WebError{URL: nav.URL, Message: ev.Text}) })
+			failure := driver.WebFailure{}
+			switch f := ev.Data.(type) {
+			case *driver.WebFailure:
+				if f != nil {
+					failure = *f
+				}
+			case driver.WebFailure:
+				failure = f
+			}
+			t.within(n.owner, func() {
+				wn.loadError(&WebError{URL: nav.URL, Message: ev.Text, Domain: failure.Domain, Code: failure.Code})
+			})
 		}
 	case driver.EventDownload:
 		if d, ok := ev.Data.(*WebDownload); ok && wn.download != nil {
@@ -322,6 +339,32 @@ func (r *Ref) webCommand(c driver.WebCommand, value string) {
 		return
 	}
 	r.t.commands = append(r.t.commands, driver.MountItem{Kind: driver.ItemWebCommand, ID: r.n.id, WebCommand: c, Value: value})
+	r.t.changed = true
+}
+
+// Load loads src in the web view, even when it is equal to the source it
+// already shows. Access restrictions are applied in the same way as the
+// WebView.Source field.
+func (r *Ref) Load(src WebSource) {
+	if r.n == nil || r.n.deleted || r.n.web == nil {
+		return
+	}
+	wn := r.n.web
+	originalURL := src.Src
+	report := func(err error) {
+		if wn.loadError != nil {
+			r.t.within(r.n.owner, func() { wn.loadError(&WebError{URL: originalURL, Message: err.Error()}) })
+		}
+	}
+	if r.t.rt.restricted {
+		var refused string
+		r.t.refuseSource(r.n, AccessWebView, &src.Src, &refused, report)
+		if src.BaseURL != "" && sourceRefusal(r.n.owner, AccessWebView, src.BaseURL) != nil {
+			src.BaseURL = ""
+		}
+	}
+	r.t.commands = append(r.t.commands, driver.MountItem{Kind: driver.ItemWebCommand, ID: r.n.id,
+		WebCommand: driver.WebLoad, Data: &src})
 	r.t.changed = true
 }
 

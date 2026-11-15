@@ -80,3 +80,21 @@ func TestWebKitHandlesItsOwnSchemes(t *testing.T) {
 		t.Error("WKWebView handles an app's scheme")
 	}
 }
+
+func TestAppleWebCancellation(t *testing.T) {
+	for _, c := range []struct {
+		domain string
+		code   int
+		want   bool
+	}{
+		{"NSURLErrorDomain", -999, true},
+		{"WebKitErrorDomain", 102, true},
+		{"NSURLErrorDomain", -1009, false},
+		{"WebKitErrorDomain", 101, false},
+		{"", 102, false},
+	} {
+		if got := appleWebCancellation(c.domain, c.code); got != c.want {
+			t.Errorf("appleWebCancellation(%q, %d) = %v, want %v", c.domain, c.code, got, c.want)
+		}
+	}
+}

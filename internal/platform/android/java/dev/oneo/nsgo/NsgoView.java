@@ -2620,7 +2620,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 break;
             case Protocol.ITEM_WEB_COMMAND: {
                 int command = in.readUnsignedByte();
-                n.web.command(command, Protocol.readString(in));
+                String value = Protocol.readString(in);
+                if (command == Protocol.WEB_LOAD) {
+                    n.web.command(command, value, Protocol.readString(in), Protocol.readString(in));
+                } else {
+                    n.web.command(command, value, null, null);
+                }
                 break;
             }
             case Protocol.ITEM_VIDEO:

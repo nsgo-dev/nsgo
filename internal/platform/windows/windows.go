@@ -1385,7 +1385,7 @@ func (w *window) apply(b *driver.MountBatch) {
 			}
 		case driver.ItemWebCommand:
 			if v.web != nil {
-				v.web.command(it.WebCommand, it.Value)
+				v.web.command(it.WebCommand, it.Value, it.Data)
 			}
 		case driver.ItemVideo:
 			if v.kind == driver.KindVideo && it.Video != nil {

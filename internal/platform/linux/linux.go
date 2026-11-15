@@ -1064,7 +1064,7 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemWeb:
 			w.configureWeb(v, it.Web)
 		case driver.ItemWebCommand:
-			w.webCommand(v, it.WebCommand, it.Value)
+			w.webCommand(v, it.WebCommand, it.Value, it.Data)
 		case driver.ItemVideo:
 			w.configureVideo(v, it.Video)
 		case driver.ItemVideoSeek:

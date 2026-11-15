@@ -37,6 +37,7 @@ var (
 	webkitURISchemeRequestFinish         func(uintptr, uintptr, int64, *byte)
 	webkitURISchemeRequestFinishError    func(uintptr, uintptr)
 	gErrorNewLiteral                     func(uint32, int32, *byte) uintptr
+	gQuarkToString                       func(uint32) uintptr
 	gObjectRef                           func(uintptr) uintptr
 	gMemoryInputStreamNewFromBytes       func(uintptr) uintptr
 	webkitWebViewGetBackgroundColor      func(uintptr, *[4]float32)
@@ -137,6 +138,7 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitURISchemeRequestFinish, "webkit_uri_scheme_request_finish")
 	reg(&webkitURISchemeRequestFinishError, "webkit_uri_scheme_request_finish_error")
 	purego.RegisterLibFunc(&gErrorNewLiteral, glibLib, "g_error_new_literal")
+	purego.RegisterLibFunc(&gQuarkToString, glibLib, "g_quark_to_string")
 	purego.RegisterLibFunc(&gObjectRef, gobjectLib, "g_object_ref")
 	purego.RegisterLibFunc(&gMemoryInputStreamNewFromBytes, gioLib, "g_memory_input_stream_new_from_bytes")
 	reg(&webkitWebViewGetBackgroundColor, "webkit_web_view_get_background_color")
@@ -336,6 +338,8 @@ func (w *window) configureWeb(v *view, c *driver.WebConfig) {
 		webkitSettingsSetUserAgent(settings, cstr(c.UserAgent))
 	}
 	webkitSettingsSetBackForwardGestures(settings, boolInt(c.BackForwardGestures))
+	// WebKitGTK exposes page zoom, but no setting that enables or disables
+	// pinch gestures. PinchZoom therefore keeps WebKitGTK's native behavior.
 	// Pages see no media devices unless they may capture one.
 	webkitSettingsSetEnableMediaStream(settings, boolInt(c.Media != 0))
 	w.webBackground(v)
@@ -674,7 +678,7 @@ func (w *window) loadWeb(v *view) {
 }
 
 // webCommand has v's page do c, with value for messages and scripts.
-func (w *window) webCommand(v *view, c driver.WebCommand, value string) {
+func (w *window) webCommand(v *view, c driver.WebCommand, value string, data any) {
 	if v.web == nil || v.web.widget == 0 {
 		return // the placeholder has no page
 	}
@@ -692,6 +696,11 @@ func (w *window) webCommand(v *view, c driver.WebCommand, value string) {
 		evaluate(page, driver.WebMessageScript(value))
 	case driver.WebInjectJavaScript:
 		evaluate(page, value)
+	case driver.WebLoad:
+		if src, ok := data.(*driver.WebSource); ok && src != nil {
+			v.web.config.Source = *src
+			w.loadWeb(v)
+		}
 	}
 }
 
@@ -809,8 +818,12 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 		cancelled := e.domain == webkitNetworkErrorQuark() && e.code == webkitNetworkCancelled ||
 			e.domain == webkitPolicyErrorQuark() && e.code == webkitPolicyInterrupt
 		if !cancelled {
+			domain := ""
+			if name := gQuarkToString(e.domain); name != 0 {
+				domain = goString(name)
+			}
 			w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: goString(e.message),
-				Navigation: &driver.WebNavigation{URL: goString(uri)}})
+				Data: &driver.WebFailure{Domain: domain, Code: int(e.code)}, Navigation: &driver.WebNavigation{URL: goString(uri)}})
 		}
 	}
 	return 1 // the app shows failures itself, without WebKit's error page

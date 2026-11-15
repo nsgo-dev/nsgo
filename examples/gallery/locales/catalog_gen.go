@@ -1968,6 +1968,7 @@ const (
 	textMediaLoaded
 	textMediaBack
 	textMediaForward
+	textMediaHome
 	textMediaReload
 	textMediaVideo
 	textMediaThePlatformSPlayer
@@ -4232,6 +4233,7 @@ var keyOfText = [numTexts]string{
 	"mediaLoaded",
 	"mediaBack",
 	"mediaForward",
+	"mediaHome",
 	"mediaReload",
 	"mediaVideo",
 	"mediaThePlatformSPlayer",
@@ -6494,6 +6496,7 @@ var textsEn = i18n.NewTexts(""+
 	"Loaded"+
 	"Back"+
 	"Forward"+
+	"Home"+
 	"Reload"+
 	"Video"+
 	"The platform's player"+
@@ -8753,6 +8756,7 @@ var textsEn = i18n.NewTexts(""+
 		6,
 		4,
 		7,
+		4,
 		6,
 		5,
 		21,
@@ -11015,6 +11019,7 @@ var textsZhHans = i18n.NewTexts(""+
 	"已加载"+
 	"后退"+
 	"前进"+
+	"主页"+
 	"重新加载"+
 	"视频"+
 	"平台的播放器"+
@@ -13272,6 +13277,7 @@ var textsZhHans = i18n.NewTexts(""+
 		30,
 		9,
 		9,
+		6,
 		6,
 		6,
 		12,
@@ -27842,6 +27848,13 @@ func MediaForward(cx *core.Scope) string { return For(cx).MediaForward() }
 
 // MediaForward is the package's MediaForward in the language of msgs.
 func (msgs Messages) MediaForward() string { return msgs.text(textMediaForward) }
+
+// MediaHome says "Home"
+// in the language the app shows under cx.
+func MediaHome(cx *core.Scope) string { return For(cx).MediaHome() }
+
+// MediaHome is the package's MediaHome in the language of msgs.
+func (msgs Messages) MediaHome() string { return msgs.text(textMediaHome) }
 
 // MediaReload says "Reload"
 // in the language the app shows under cx.

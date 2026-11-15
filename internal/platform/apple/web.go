@@ -69,6 +69,13 @@ func loadWebKit() {
 	}
 	failed := func(self objc.ID, _ objc.SEL, _, _, err objc.ID) {
 		if w := webHandlers[self]; w != nil {
+			domain := GoString(err.Send(sel("domain")))
+			code := objc.Send[int](err, sel("code"))
+			// WebKit reports an intentional stop or policy interruption as a
+			// failed navigation. They are control flow, not page errors.
+			if appleWebCancellation(domain, code) {
+				return
+			}
 			info := err.Send(sel("userInfo"))
 			// NSURLErrorFailingURLStringErrorKey, else NSURLErrorFailingURLErrorKey.
 			url := GoString(info.Send(sel("objectForKey:"), NSString("NSErrorFailingURLStringKey")))
@@ -76,7 +83,7 @@ func loadWebKit() {
 				url = GoString(info.Send(sel("objectForKey:"), NSString("NSErrorFailingURLKey")).Send(sel("absoluteString")))
 			}
 			w.Dispatch(driver.Event{Kind: driver.EventError, Text: GoString(err.Send(sel("localizedDescription"))),
-				Navigation: &driver.WebNavigation{URL: url}})
+				Data: &driver.WebFailure{Domain: domain, Code: code}, Navigation: &driver.WebNavigation{URL: url}})
 		}
 	}
 	var protocols []*objc.Protocol
@@ -226,6 +233,10 @@ func loadWebKit() {
 		})
 }
 
+func appleWebCancellation(domain string, code int) bool {
+	return domain == "NSURLErrorDomain" && code == -999 || domain == "WebKitErrorDomain" && code == 102
+}
+
 // captureMedia is the devices a WKMediaCaptureType names.
 func captureMedia(kind int) driver.WebMedia {
 	switch kind {
@@ -331,6 +342,9 @@ func (w *Web) Configure(c *driver.WebConfig) {
 		w.web.Send(sel("setCustomUserAgent:"), NSString(c.UserAgent))
 	}
 	w.web.Send(sel("setAllowsBackForwardNavigationGestures:"), c.BackForwardGestures)
+	if runtime.GOOS != "ios" {
+		w.web.Send(sel("setAllowsMagnification:"), c.PinchZoom)
+	}
 	w.web.Send(sel("configuration")).Send(sel("defaultWebpagePreferences")).
 		Send(sel("setAllowsContentJavaScript:"), !c.NoJavaScript)
 	if runtime.GOOS == "ios" {
@@ -511,7 +525,7 @@ func (w *Web) navigated(loading bool, kinds ...driver.EventKind) {
 }
 
 // Command does c, with value for messages and scripts.
-func (w *Web) Command(c driver.WebCommand, value string) {
+func (w *Web) Command(c driver.WebCommand, value string, data any) {
 	if w.web == 0 {
 		return
 	}
@@ -532,6 +546,11 @@ func (w *Web) Command(c driver.WebCommand, value string) {
 		w.evaluate(driver.WebMessageScript(value))
 	case driver.WebInjectJavaScript:
 		w.evaluate(value)
+	case driver.WebLoad:
+		if src, ok := data.(*driver.WebSource); ok && src != nil {
+			w.config.Source = *src
+			w.load()
+		}
 	}
 }
 

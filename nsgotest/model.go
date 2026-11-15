@@ -161,10 +161,12 @@ type NativeCommand struct {
 	Args any
 }
 
-// WebCommand is a command a web view received, with its message or script.
+// WebCommand is a command a web view received, with its message or script in
+// Value and any structured argument in Data (such as WebLoad's WebSource).
 type WebCommand struct {
 	Command driver.WebCommand
 	Value   string
+	Data    any
 }
 
 // animate steps the animator to the clock and records the values it
@@ -324,7 +326,7 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemWeb:
 			v.Web = *it.Web
 		case driver.ItemWebCommand:
-			v.WebCommands = append(v.WebCommands, WebCommand{it.WebCommand, it.Value})
+			v.WebCommands = append(v.WebCommands, WebCommand{Command: it.WebCommand, Value: it.Value, Data: it.Data})
 		case driver.ItemVideo:
 			v.Video = *it.Video
 		case driver.ItemVideoSeek:

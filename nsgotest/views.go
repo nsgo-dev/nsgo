@@ -75,6 +75,8 @@ type (
 	WebCommandKind = driver.WebCommand
 	// WebConfig is everything a web view loads and allows (ItemWeb).
 	WebConfig = driver.WebConfig
+	// WebSource is what a web view shows: a URL or HTML.
+	WebSource = driver.WebSource
 )
 
 const (

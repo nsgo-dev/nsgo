@@ -682,7 +682,7 @@ final class WebNode {
     }
 
     /** Does a core.WebCommand, with value for messages and scripts. */
-    void command(int command, String value) {
+    void command(int command, String value, String loadHTML, String loadBaseURL) {
         switch (command) {
             case Protocol.WEB_RELOAD: view.reload(); break;
             case Protocol.WEB_GO_BACK: view.goBack(); break;
@@ -692,6 +692,12 @@ final class WebNode {
             case Protocol.WEB_POST_MESSAGE:
             case Protocol.WEB_INJECT_JAVASCRIPT:
                 view.evaluateJavascript(value, null);
+                break;
+            case Protocol.WEB_LOAD:
+                src = value != null ? value : "";
+                html = loadHTML != null ? loadHTML : "";
+                baseURL = loadBaseURL != null ? loadBaseURL : "";
+                load();
                 break;
             default:
         }

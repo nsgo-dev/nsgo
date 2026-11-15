@@ -122,6 +122,7 @@ var webDownloadSerial atomic.Uint64
 type webCommand struct {
 	command driver.WebCommand
 	value   string
+	data    any
 }
 
 // newWeb makes v's portal and starts making its controller for config c, which the controller's creation reads (Incognito): an environment already made calls back before configure.
@@ -276,7 +277,7 @@ func (wv *webView) controllerReady(comp *comObject) {
 	commands := wv.commands
 	wv.commands = nil
 	for _, c := range commands {
-		wv.command(c.command, c.value)
+		wv.command(c.command, c.value, c.data)
 	}
 	// The root visual target shows once the composition commits: the
 	// next frame does.
@@ -419,7 +420,8 @@ func (wv *webView) listen() {
 			wv.navigated(wv.navigation(false), driver.EventLoad, driver.EventNavigationStateChange)
 		} else if why := webError(status); why != "" {
 			nav := wv.navigation(false)
-			wv.report(driver.Event{Kind: driver.EventError, Text: why, Navigation: &nav})
+			wv.report(driver.Event{Kind: driver.EventError, Text: why,
+				Data: &driver.WebFailure{Domain: "COREWEBVIEW2_WEB_ERROR_STATUS", Code: int(status)}, Navigation: &nav})
 		}
 	}))
 	// getUserMedia: what the config's Media grants, without WebView2's
@@ -600,6 +602,10 @@ func (wv *webView) apply() {
 			s6.call(settingsPutIsSwipeNavigationEnabled, boolArg(c.BackForwardGestures))
 			s6.release()
 		}
+		if s5 := s.query(&iidSettings5); s5 != nil {
+			s5.call(settingsPutIsPinchZoomEnabled, boolArg(c.PinchZoom))
+			s5.release()
+		}
 	}
 	scripts := first || c.InjectedJavaScript != old.InjectedJavaScript ||
 		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent
@@ -738,6 +744,7 @@ func (wv *webView) navigate() {
 			url = src.Src
 		}
 		wv.report(driver.Event{Kind: driver.EventError, Text: hresultError("the page could not be loaded", hr).Error(),
+			Data:       &driver.WebFailure{Domain: "HRESULT", Code: int(hr)},
 			Navigation: &driver.WebNavigation{URL: url}})
 	}
 }
@@ -894,12 +901,12 @@ func sameDocument(a, b string) bool {
 }
 
 // command does c, or keeps it until the controller exists.
-func (wv *webView) command(c driver.WebCommand, value string) {
+func (wv *webView) command(c driver.WebCommand, value string, data any) {
 	if wv.failed || wv.closed {
 		return
 	}
 	if !wv.ready {
-		wv.commands = append(wv.commands, webCommand{c, value})
+		wv.commands = append(wv.commands, webCommand{c, value, data})
 		return
 	}
 	switch c {
@@ -915,6 +922,12 @@ func (wv *webView) command(c driver.WebCommand, value string) {
 		wv.execute(driver.WebMessageScript(value))
 	case driver.WebInjectJavaScript:
 		wv.execute(value)
+	case driver.WebLoad:
+		if src, ok := data.(*driver.WebSource); ok && src != nil {
+			wv.config.Source = *src
+			wv.navigatePending = true
+			wv.navigateIfReady()
+		}
 	}
 }
 
