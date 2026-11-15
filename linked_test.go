@@ -20,6 +20,8 @@ var unlinked = map[string][]string{
 		// Shaders compile when an app makes one: no package variable,
 		// init or element case of its own reaches the compilers.
 		"github.com/nsgo-dev/nsgo/internal/shader", "github.com/nsgo-dev/nsgo/internal/shader/wgsl", "go/parser",
+		// Only nsgo dev -automation's builds link the agent and what tests run on.
+		"testing", "github.com/nsgo-dev/nsgo/nsgotest", "github.com/nsgo-dev/nsgo/internal/automation",
 	},
 	// The page decodes and encodes images with the browser's codecs.
 	"js": {"image/png", "image/jpeg", "image/gif", "golang.org/x/image/webp", "golang.org/x/image/draw"},

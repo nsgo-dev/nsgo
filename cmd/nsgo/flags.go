@@ -104,6 +104,7 @@ type devFlags struct {
 	trace     bool
 	highlight bool
 	devtools  bool
+	auto      bool
 	lang      string
 	clip      string
 	limits    limitsFlag
@@ -181,11 +182,18 @@ func bindDevFlags(fs *flag.FlagSet) *devFlags {
 	fs.BoolVar(&f.highlight, "highlight", false, "outline for a moment each view a commit of the running app changed")
 	fs.BoolVar(&f.devtools, "devtools", false, "open DevTools in the browser: the running app's views, state, profiler and a test recorder")
 	fs.Var(&f.layout, "layout", "show DevTools' layout audit over the running app: alone every view's boxes, or what follows = joined by commas, bounds, grid (8 points) and grid=N, as -layout=bounds,grid=4")
+	fs.BoolVar(&f.auto, "automation", false, "let agents drive the running app over nsgo mcp, on macOS: windows, snapshots, presses, typing, menus, alerts and screenshots")
 	fs.StringVar(&f.lang, "lang", "", "start the app with --nsgo-lang, in this `locale`, as de or zh-Hant, or a pseudo locale: en-XA accents and lengthens its messages, ar-XB mirrors them")
 	fs.StringVar(&f.team, "team", "", "the Apple developer `team` the iOS target signs with (default: the team Xcode last used)")
 	fs.StringVar(&f.clip, "clip", "", "with -target ios or ios_simulator, run nsgo.yaml's App Clip alone, opened from this `url`, in place of the app")
 	fs.Var(&f.limits, "limits", "run a TSX app sandboxed, as tsx.View runs a package: within the default limits, or those given (`load=10s,call=2s,stack=1000,nodes=200000,timers=10000,requests=32,body=67108864,storage=1048576`), and nsgo.yaml's capabilities")
 	return f
+}
+
+// options are dev's options of the flags that name no nsgo.yaml value.
+func (f *devFlags) options() devOptions {
+	return devOptions{apply: f.apply, port: f.port, open: f.open, device: f.device, team: f.team, release: f.release, trace: f.trace,
+		highlight: f.highlight, devtools: f.devtools, layout: string(f.layout), automation: f.auto, fps: f.fps, lang: f.lang, clip: f.clip}
 }
 
 func (f *devFlags) apply(p *project) {

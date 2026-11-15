@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -18,7 +19,16 @@ import (
 //go:embed devtools
 var devtoolsPage embed.FS
 
-// serveDevTools adds DevTools to the dev server: the page at /_nsgo/devtools/, the app's messages, which it posts to /_nsgo/devtools/out and pages follow at /_nsgo/devtools/stream, and the pages' commands, which /_nsgo/devtools/command passes to the app as devtools events.
+// The longest line the app may post to /_nsgo/devtools/out, and with its token, as an answer to the automation may hold a screenshot; tests lower them.
+var (
+	maxMessage = 64 << 20
+	maxAnswer  = 256 << 20
+)
+
+// automationMessage starts each automation message the app posts.
+var automationMessage = []byte(`{"type":"automation"`)
+
+// serveDevTools adds DevTools to the dev server: the page at /_nsgo/devtools/, the app's messages, which it posts to /_nsgo/devtools/out and pages follow at /_nsgo/devtools/stream, and the pages' commands, which /_nsgo/devtools/command passes to the app as devtools events. The app's automation messages, its answers to nsgo dev -automation's requests, go to the automation alone, and only from a post with the app's token.
 func (s *devServer) serveDevTools() {
 	page, _ := fs.Sub(devtoolsPage, "devtools")
 	s.mux.Handle("/_nsgo/devtools/", http.StripPrefix("/_nsgo/devtools/", http.FileServer(http.FS(page))))
@@ -30,12 +40,44 @@ func (s *devServer) serveDevTools() {
 		if !fromDevServer(w, r, "application/x-ndjson") {
 			return
 		}
+		s.mu.Lock()
+		hub := s.hub
+		s.mu.Unlock()
+		fromApp := hub != nil && tokenIs(r.Header.Get(appTokenHeader), hub.appToken)
+		// An answer may carry a screenshot, as base64: a post with the app's token takes longer lines.
+		limit := maxMessage
+		if fromApp {
+			limit = maxAnswer
+		}
 		sc := bufio.NewScanner(r.Body)
-		sc.Buffer(make([]byte, 1<<16), 64<<20)
+		sc.Buffer(make([]byte, min(1<<16, limit)), limit)
 		for sc.Scan() {
-			if line := bytes.TrimSpace(sc.Bytes()); len(line) > 0 {
-				s.toPages(string(line))
+			line := bytes.TrimSpace(sc.Bytes())
+			if len(line) == 0 {
+				continue
 			}
+			// Only the automation's messages are read here, by the type the app writes first (devMessage); the rest go to the pages as they came.
+			if bytes.HasPrefix(line, automationMessage) {
+				var a struct {
+					Data json.RawMessage `json:"data"`
+				}
+				if fromApp && json.Unmarshal(line, &a) == nil {
+					hub.answered(a.Data)
+				}
+				continue
+			}
+			s.toPages(string(line))
+		}
+		if err := sc.Err(); err != nil {
+			status := http.StatusBadRequest
+			if errors.Is(err, bufio.ErrTooLong) {
+				status = http.StatusRequestEntityTooLarge
+			}
+			// The rest of the post is lost, an answer in it too: the request waiting fails now rather than when it times out.
+			if fromApp {
+				hub.lost(fmt.Sprintf("the app's answer was lost: %v", err))
+			}
+			http.Error(w, err.Error(), status)
 		}
 	})
 	s.mux.HandleFunc("/_nsgo/devtools/stream", s.pageStream)

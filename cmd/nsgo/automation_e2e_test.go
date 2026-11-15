@@ -1,0 +1,162 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/automation"
+)
+
+// lockedBuffer is a buffer two goroutines write.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+// TestAutomationEndToEnd builds testdata/automation as nsgo dev -automation does, runs it against a hub and drives it with posted events, the real menu bar and alerts. It opens a window and makes it key, so it runs only when asked, on a Mac with a GUI session:
+//
+//	NSGO_AUTOMATION_E2E=1 go tool nsgo test -run TestAutomationEndToEnd ./cmd/nsgo
+func TestAutomationEndToEnd(t *testing.T) {
+	if runtime.GOOS != "darwin" || os.Getenv("NSGO_AUTOMATION_E2E") == "" {
+		t.Skip("set NSGO_AUTOMATION_E2E=1 on a Mac with a GUI session: the test opens a window and makes it key")
+	}
+	ctx := context.Background()
+	p, err := load(filepath.Join("..", "..", "testdata", "automation"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.prepareDev(devOptions{automation: true})
+	bundle, err := buildMacApp(ctx, p, t.TempDir(), runtime.GOARCH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := startHub(t)
+	var out lockedBuffer
+	cmd := exec.Command(filepath.Join(bundle, "Contents", "MacOS", p.Name))
+	cmd.Env = append(os.Environ(), "NSGO_DEV_SERVER="+h.srv.url(), "NSGO_DEV_TOKEN="+h.appToken)
+	cmd.Stdout, cmd.Stderr = &out, &out
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cmd.Process.Kill()
+		cmd.Wait()
+		if t.Failed() {
+			t.Logf("the app's output:\n%s", out.String())
+		}
+	})
+	do := func(method string, params, result any) *automation.Error {
+		t.Helper()
+		data, _ := json.Marshal(params)
+		a := h.answer(automation.Request{Method: method, Params: data})
+		if a.Error == nil && result != nil {
+			if err := json.Unmarshal(a.Result, result); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return a.Error
+	}
+	must := func(method string, params, result any) {
+		t.Helper()
+		if err := do(method, params, result); err != nil {
+			t.Fatalf("%s %+v: %v", method, params, err)
+		}
+	}
+	shows := func(selector string) {
+		t.Helper()
+		must(automation.Wait, automation.WaitParams{Selector: selector}, nil)
+	}
+	var ws automation.WindowsResult
+	for deadline := time.Now().Add(20 * time.Second); len(ws.Windows) == 0; time.Sleep(100 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the app showed no window")
+		}
+		must(automation.Windows, automation.WindowsParams{}, &ws)
+	}
+	if len(ws.Windows) != 1 || !ws.Windows[0].Default || ws.Windows[0].Kind != "window" {
+		t.Fatalf("windows %+v", ws)
+	}
+	var snap automation.SnapshotResult
+	must(automation.Snapshot, automation.SnapshotParams{}, &snap)
+	if !strings.Contains(snap.Text, `- button "Add"`) {
+		t.Fatalf("snapshot:\n%s", snap.Text)
+	}
+	must(automation.Press, automation.PressParams{Selector: "id:add"}, nil)
+	shows(`text:"Count: 1"`)
+	must(automation.Type, automation.TypeParams{Selector: "id:name", Text: "Ada"}, nil)
+	shows(`text:"Hello, Ada"`)
+	must(automation.Key, automation.KeyParams{Selector: "id:name", Key: "mod+a"}, nil)
+	must(automation.Key, automation.KeyParams{Selector: "id:name", Key: "Backspace"}, nil)
+	shows(`text:"Hello, "`)
+	// The menu and its alert are the app function's, which the app's own surface holds.
+	must(automation.Menu, automation.MenuParams{Path: []string{"Actions", "Reset"}}, nil)
+	shows(`text:"Count: 0"`)
+	must(automation.Menu, automation.MenuParams{Path: []string{"Actions", "Ask"}}, nil)
+	var alerts automation.AlertResult
+	must(automation.Alert, automation.AlertParams{}, &alerts)
+	if len(alerts.Alerts) != 1 || alerts.Alerts[0].Window != 0 || alerts.Alerts[0].Title != "Keep going?" {
+		t.Fatalf("the app's alert: %+v", alerts)
+	}
+	yes, no, dismiss := 0, 1, -1
+	must(automation.Alert, automation.AlertParams{Answer: &yes}, &alerts)
+	shows(`text:"Answer: Yes"`)
+	// The window's alert is a sheet, which a dismissal ends.
+	must(automation.Press, automation.PressParams{Selector: "id:ask"}, nil)
+	must(automation.Alert, automation.AlertParams{}, &alerts)
+	if len(alerts.Alerts) != 1 || alerts.Alerts[0].Window != ws.Windows[0].ID {
+		t.Fatalf("the window's alert: %+v", alerts)
+	}
+	must(automation.Alert, automation.AlertParams{Answer: &dismiss}, &alerts)
+	shows(`text:"Answer: "`)
+	must(automation.Press, automation.PressParams{Selector: "id:ask"}, nil)
+	must(automation.Alert, automation.AlertParams{Window: &ws.Windows[0].ID, Answer: &no}, &alerts)
+	shows(`text:"Answer: No"`)
+	// The app's own alert runs modal, which a dismissal aborts.
+	must(automation.Menu, automation.MenuParams{Path: []string{"Actions", "Ask"}}, nil)
+	own := uint32(0)
+	must(automation.Alert, automation.AlertParams{Window: &own, Answer: &dismiss}, &alerts)
+	shows(`text:"Answer: "`)
+	if len(alerts.Alerts) != 0 {
+		t.Fatalf("a dismissed alert still shows: %+v", alerts)
+	}
+	// The app took its token for the server out of its environment, as it started.
+	shows(`text:"Token in the environment: false"`)
+	// A scroll view shows all its content to selectors, so the scroll shows in where a row far down is placed.
+	rowY := func() float64 {
+		t.Helper()
+		var found automation.FindResult
+		must(automation.Find, automation.FindParams{Selector: "id:row-60"}, &found)
+		return found.Elements[0].Bounds[1]
+	}
+	before := rowY()
+	must(automation.Scroll, automation.ScrollParams{Selector: "id:list", By: 1500}, nil)
+	if moved := before - rowY(); moved < 1000 {
+		t.Fatalf("the list scrolled %g points of 1500", moved)
+	}
+	var shot automation.ScreenshotResult
+	must(automation.Screenshot, automation.ScreenshotParams{}, &shot)
+	if shot.Width < int(ws.Windows[0].Width) || shot.Height < int(ws.Windows[0].Height) || len(shot.PNG) == 0 {
+		t.Fatalf("a %dx%d screenshot of a %gx%g window", shot.Width, shot.Height, ws.Windows[0].Width, ws.Windows[0].Height)
+	}
+}

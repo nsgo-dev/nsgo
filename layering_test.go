@@ -94,7 +94,7 @@ var layers = []struct {
 	{"examples/", []string{"", "core", "base/", "ui/", "mobile", "desktop", "desktop/locales", "i18n", "icons/", "nsgotest", "tsx/", "updater", "widget", "examples/"}},
 	// The nsgo tool links no component or runtime, so changing them does
 	// not build it again; it writes TSX declarations by running the app.
-	{"cmd/", []string{"core", "cmd/", "internal/platform/android/runtime", "tsx/bundler", "tsx/pkg", "tsx/websrc"}},
+	{"cmd/", []string{"core", "cmd/", "internal/automation", "internal/platform/android/runtime", "tsx/bundler", "tsx/pkg", "tsx/websrc"}},
 	{"tools/", []string{"core"}},
 }
 
@@ -138,6 +138,9 @@ const modulePath = "github.com/nsgo-dev/nsgo"
 // devImports are what a package's nsgo dev builds (the nsgodev tag) import besides its layer's: the root's dev client reads the commit traces and their causes from the driver.
 var devImports = map[string][]string{"": {"internal/driver"}}
 
+// automationImports are what a package's nsgo dev -automation builds (the nsgoautomation tag, with nsgodev) import besides its dev builds': the root's dev client links nsgotest's agent, which it serves over DevTools' channel.
+var automationImports = map[string][]string{"": {"nsgotest"}}
+
 // devLayerTargets are the targets whose nsgo dev builds (the nsgodev tag) are checked too: the dev client's files differ only between the web and the rest.
 var devLayerTargets = [][2]string{{"darwin", "arm64"}, {"js", "wasm"}}
 
@@ -148,7 +151,7 @@ func TestLayering(t *testing.T) {
 	check := func(goos, goarch, tags string) {
 		name := goos + "_" + goarch
 		if tags != "" {
-			name += "_" + tags
+			name += "_" + strings.ReplaceAll(tags, ",", "_")
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -163,6 +166,8 @@ func TestLayering(t *testing.T) {
 	for _, target := range devLayerTargets {
 		check(target[0], target[1], "nsgodev")
 	}
+	// nsgo dev -automation runs on macOS alone.
+	check("darwin", "arm64", "nsgodev,nsgoautomation")
 }
 
 type listedPackage struct {
@@ -213,8 +218,13 @@ func checkLayer(t *testing.T, p listedPackage, tags string) {
 		t.Errorf("%s: cgo files %v; reach system APIs through purego or syscall", p.ImportPath, p.CgoFiles)
 	}
 	allowed, ruled := layerImports(pkg)
-	if tags == "nsgodev" {
-		allowed = append(slices.Clip(allowed), devImports[pkg]...)
+	for _, tag := range strings.Split(tags, ",") {
+		switch tag {
+		case "nsgodev":
+			allowed = append(slices.Clip(allowed), devImports[pkg]...)
+		case "nsgoautomation":
+			allowed = append(slices.Clip(allowed), automationImports[pkg]...)
+		}
 	}
 	isPortable := matchesAny(pkg, portable) && !matchesAny(pkg, unportable)
 	for _, imp := range p.Imports {

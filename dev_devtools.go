@@ -32,7 +32,7 @@ type devCommand struct {
 	N       int    `json:"n"`
 }
 
-// devMessage is what the app tells the DevTools page.
+// devMessage is what the app tells the DevTools page. Type comes first: the server tells the automation's answers by it (cmd/nsgo's automationMessage).
 type devMessage struct {
 	Type    string                 `json:"type"`
 	Surface int                    `json:"surface"`
@@ -57,10 +57,8 @@ type devCommit struct {
 
 // startDevTools has core record what DevTools show, sends the page each commit, and follows the page's commands from the server's events. It runs once, before any graph starts (startDevClient).
 func startDevTools(server string) {
-	devtools.Enabled = true
+	out := openDevChannel(server)
 	driver.TraceCauses = true
-	out := &devOut{server: server, wake: make(chan struct{}, 1)}
-	go out.run()
 	commits := 0
 	var mu sync.Mutex
 	// sent are the batches the platform has not applied yet, by commit number, so its time joins the commit's row.
@@ -88,21 +86,47 @@ func startDevTools(server string) {
 			out.send(devMessage{Type: "applied", ID: uint32(n), Data: float64(took.Microseconds()) / 1000})
 		}
 	}
-	go listenDevTools(server, out)
 }
 
-// listenDevTools follows the server's events for DevTools' commands, reconnecting while it runs.
+// devChannel is the app's end of the channel DevTools and nsgo dev -automation share, nil until either starts it.
+var devChannel *devOut
+
+// openDevChannel has core record what DevTools show and register its trees, follows the server's events for DevTools' commands and the automation's requests, and returns where the app posts its messages; it starts them once, for whichever of DevTools and the automation starts first, before any graph starts (startDevClient).
+func openDevChannel(server string) *devOut {
+	if devChannel == nil {
+		devtools.Enabled = true
+		devChannel = &devOut{server: server, token: devToken, wake: make(chan struct{}, 1), hurry: make(chan struct{}, 1)}
+		go devChannel.run()
+		go listenDevTools(server, devChannel)
+	}
+	return devChannel
+}
+
+// listenDevTools follows the server's events for DevTools' commands under -devtools and, holding the automation's token, the automation's requests, reconnecting while it runs: -automation alone takes no page's commands. A stream the server refuses, as a second app's while one answers the automation, is tried again a second later.
 func listenDevTools(server string, out *devOut) {
 	for {
-		resp, err := http.Get(server + "/_nsgo/events")
-		if err == nil {
+		req, _ := http.NewRequest(http.MethodGet, server+"/_nsgo/events", nil)
+		if out.token != "" {
+			req.Header.Set("X-NSGo-Token", out.token)
+		}
+		if resp, err := http.DefaultClient.Do(req); err == nil {
 			sc := bufio.NewScanner(resp.Body)
 			sc.Buffer(make([]byte, 1<<16), 16<<20)
-			for sc.Scan() {
-				if raw, ok := strings.CutPrefix(sc.Text(), "data: devtools "); ok {
+			for resp.StatusCode == http.StatusOK && sc.Scan() {
+				data, ok := strings.CutPrefix(sc.Text(), "data: ")
+				if !ok {
+					continue
+				}
+				switch kind, raw, _ := strings.Cut(data, " "); kind {
+				case "devtools":
 					var c devCommand
-					if json.Unmarshal([]byte(raw), &c) == nil {
+					if devDevtools == "1" && json.Unmarshal([]byte(raw), &c) == nil {
 						runDevCommand(c, out)
+					}
+				case "automation":
+					// The agent may wait for the app to settle: DevTools' commands go on meanwhile.
+					if a := devtools.Automation; a != nil {
+						go func() { out.sendNow(devMessage{Type: "automation", Data: json.RawMessage(a.Do([]byte(raw)))}) }()
 					}
 				}
 			}
@@ -166,15 +190,20 @@ func runDevCommand(c devCommand, out *devOut) {
 	})
 }
 
-// devOut sends the page messages: one goroutine posts what gathered while the last post was on its way, so the graph never waits for the network.
+// devOut sends the page and the automation messages: one goroutine posts what gathered while the last post was on its way, so the graph never waits for the network. Its posts carry the automation's token, where the tool gave one, which the server takes the automation's answers with.
 type devOut struct {
-	server  string
-	mu      sync.Mutex
-	pending bytes.Buffer
-	wake    chan struct{}
+	server, token string
+	mu            sync.Mutex
+	pending       bytes.Buffer
+	wake, hurry   chan struct{}
 }
 
-func (o *devOut) send(m devMessage) {
+func (o *devOut) send(m devMessage) { o.queue(m, false) }
+
+// sendNow sends m without waiting for a quarter of a second's commits: the automation waits for its answer.
+func (o *devOut) sendNow(m devMessage) { o.queue(m, true) }
+
+func (o *devOut) queue(m devMessage, now bool) {
 	data, err := json.Marshal(m)
 	if err != nil {
 		return
@@ -187,12 +216,23 @@ func (o *devOut) send(m devMessage) {
 	case o.wake <- struct{}{}:
 	default:
 	}
+	if now {
+		select {
+		case o.hurry <- struct{}{}:
+		default:
+		}
+	}
 }
 
 func (o *devOut) run() {
 	for range o.wake {
-		// Commits come every frame: a quarter of a second's go in one post.
-		time.Sleep(250 * time.Millisecond)
+		// Commits come every frame: a quarter of a second's go in one post, unless an answer hurries it.
+		wait := time.NewTimer(250 * time.Millisecond)
+		select {
+		case <-wait.C:
+		case <-o.hurry:
+			wait.Stop()
+		}
 		o.mu.Lock()
 		body := bytes.Clone(o.pending.Bytes())
 		o.pending.Reset()
@@ -200,7 +240,12 @@ func (o *devOut) run() {
 		if len(body) == 0 {
 			continue
 		}
-		if resp, err := http.Post(o.server+"/_nsgo/devtools/out", "application/x-ndjson", bytes.NewReader(body)); err == nil {
+		req, _ := http.NewRequest(http.MethodPost, o.server+"/_nsgo/devtools/out", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/x-ndjson")
+		if o.token != "" {
+			req.Header.Set("X-NSGo-Token", o.token)
+		}
+		if resp, err := http.DefaultClient.Do(req); err == nil {
 			resp.Body.Close()
 		}
 	}

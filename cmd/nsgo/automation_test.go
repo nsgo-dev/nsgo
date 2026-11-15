@@ -1,0 +1,336 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/automation"
+)
+
+// startHub starts a dev server on any port with an automation hub.
+func startHub(t *testing.T) *automationHub {
+	t.Helper()
+	srv, err := startDevServer(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(srv.close)
+	h, err := newAutomationHub(srv, "native")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+// ask posts a tool's request to h's bridge with token and headers, returning the response.
+func ask(t *testing.T, h *automationHub, token string, header map[string]string, method string) *http.Response {
+	t.Helper()
+	body, _ := json.Marshal(automation.Request{ID: 5, Method: method})
+	req, _ := http.NewRequest(http.MethodPost, h.srv.url()+"/_nsgo/automation", bytes.NewReader(body))
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
+// answerOf decodes a bridge response.
+func answerOf(t *testing.T, resp *http.Response) automation.Answer {
+	t.Helper()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the bridge answered %s", resp.Status)
+	}
+	var a automation.Answer
+	if err := json.NewDecoder(resp.Body).Decode(&a); err != nil {
+		t.Fatal(err)
+	}
+	return a
+}
+
+// postOut posts lines to the dev server's /_nsgo/devtools/out as the app does, with token when given.
+func postOut(t *testing.T, h *automationHub, token string, lines ...string) {
+	t.Helper()
+	post, _ := http.NewRequest(http.MethodPost, h.srv.url()+"/_nsgo/devtools/out", strings.NewReader(strings.Join(lines, "\n")+"\n"))
+	post.Header.Set("Content-Type", "application/x-ndjson")
+	if token != "" {
+		post.Header.Set(appTokenHeader, token)
+	}
+	resp, err := http.DefaultClient.Do(post)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	resp.Body.Close()
+}
+
+// fakeApp follows h's server's events with the app's token as an app's DevTools stream does, and answers each automation request with answer over /_nsgo/devtools/out, until ctx ends; it reports once it is connected.
+func fakeApp(ctx context.Context, t *testing.T, h *automationHub, answer func(automation.Request) automation.Answer) (connected chan int) {
+	connected = make(chan int, 1)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, h.srv.url()+"/_nsgo/events", nil)
+	req.Header.Set(appTokenHeader, h.appToken)
+	go func() {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			connected <- 0
+			return
+		}
+		defer resp.Body.Close()
+		connected <- resp.StatusCode
+		sc := bufio.NewScanner(resp.Body)
+		for sc.Scan() {
+			data, ok := strings.CutPrefix(sc.Text(), "data: automation ")
+			if !ok || answer == nil {
+				continue
+			}
+			var r automation.Request
+			json.Unmarshal([]byte(data), &r)
+			body, _ := json.Marshal(answer(r))
+			postOut(t, h, h.appToken, `{"type":"automation","surface":0,"data":`+string(body)+`}`)
+		}
+	}()
+	return connected
+}
+
+func TestAutomationBridgeRefusesStrangers(t *testing.T) {
+	h := startHub(t)
+	if resp := ask(t, h, "", nil, automation.Status); resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("no token: %s", resp.Status)
+	}
+	if resp := ask(t, h, h.appToken, nil, automation.Status); resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("the app's token on the bridge: %s", resp.Status)
+	}
+	if resp := ask(t, h, h.bridgeToken, map[string]string{"Origin": "http://localhost"}, automation.Status); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("a web page's request: %s", resp.Status)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/_nsgo/automation", strings.NewReader("{}"))
+	req.RemoteAddr = "192.168.1.5:5000"
+	req.Header.Set("Authorization", "Bearer "+h.bridgeToken)
+	h.bridge(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("a request from the network: %d", rec.Code)
+	}
+	app, _ := http.NewRequest(http.MethodGet, h.srv.url()+"/_nsgo/events", nil)
+	app.Header.Set(appTokenHeader, h.bridgeToken)
+	if resp, err := http.DefaultClient.Do(app); err != nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("an app with the tools' token: %v %v", resp, err)
+	} else {
+		resp.Body.Close()
+	}
+	if a := answerOf(t, ask(t, h, h.bridgeToken, nil, automation.Status)); a.Error != nil || a.ID != 5 {
+		t.Errorf("status: %+v", a)
+	}
+}
+
+func TestAutomationRelaysToTheApp(t *testing.T) {
+	h := startHub(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	app := fakeApp(ctx, t, h, func(r automation.Request) automation.Answer {
+		return automation.Reply(r.ID, automation.WindowsResult{Windows: []automation.Window{{ID: 1, Title: r.Method}}}, nil)
+	})
+	if code := <-app; code != http.StatusOK {
+		t.Fatalf("the app connected with %d", code)
+	}
+	a := answerOf(t, ask(t, h, h.bridgeToken, nil, automation.Windows))
+	var r automation.WindowsResult
+	if a.Error != nil || a.ID != 5 || json.Unmarshal(a.Result, &r) != nil || r.Windows[0].Title != "windows" {
+		t.Fatalf("relayed %+v", a)
+	}
+	if second := fakeApp(ctx, t, h, nil); <-second != http.StatusConflict {
+		t.Error("a second app was let in while one is connected")
+	}
+	// Events without a token, as a page or the app's other listeners follow them, carry no request.
+	plain, _ := http.NewRequestWithContext(ctx, http.MethodGet, h.srv.url()+"/_nsgo/events", nil)
+	if resp, err := http.DefaultClient.Do(plain); err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("events without a token: %v %v", resp, err)
+	} else {
+		resp.Body.Close()
+	}
+	var s automation.StatusResult
+	json.Unmarshal(answerOf(t, ask(t, h, h.bridgeToken, nil, automation.Status)).Result, &s)
+	if !s.App || s.Run != 1 || s.Target != "native" {
+		t.Errorf("status %+v", s)
+	}
+}
+
+// TestAutomationAnswersReachTheAutomationAlone posts answers beside DevTools' messages: DevTools pages get theirs and never an answer, and an answer counts only from a post with the app's token.
+func TestAutomationAnswersReachTheAutomationAlone(t *testing.T) {
+	h := startHub(t)
+	page := make(chan string, 16)
+	h.srv.mu.Lock()
+	h.srv.pages[page] = true
+	h.srv.mu.Unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	requests := make(chan automation.Request, 1)
+	app := fakeApp(ctx, t, h, func(r automation.Request) automation.Answer {
+		requests <- r
+		return automation.Answer{}
+	})
+	<-app
+	done := make(chan automation.Answer, 1)
+	go func() { done <- h.call(automation.Request{ID: 7, Method: automation.Windows}, time.Second) }()
+	asked := <-requests
+	forged, _ := json.Marshal(automation.Reply(asked.ID, automation.WindowsResult{Windows: []automation.Window{{Title: "forged"}}}, nil))
+	postOut(t, h, "", `{"type":"automation","data":`+string(forged)+`}`, `{"type":"elements","surface":0}`)
+	real, _ := json.Marshal(automation.Reply(asked.ID, automation.WindowsResult{Windows: []automation.Window{{Title: "real"}}}, nil))
+	postOut(t, h, h.appToken, `{"type":"automation","data":`+string(real)+`}`)
+	a := <-done
+	var r automation.WindowsResult
+	if a.ID != 7 || json.Unmarshal(a.Result, &r) != nil || len(r.Windows) != 1 || r.Windows[0].Title != "real" {
+		t.Fatalf("answered %+v %s", a, a.Result)
+	}
+	h.srv.mu.Lock()
+	delete(h.srv.pages, page)
+	h.srv.mu.Unlock()
+	close(page)
+	var got []string
+	for m := range page {
+		got = append(got, m)
+	}
+	if len(got) != 1 || !strings.Contains(got[0], `"elements"`) {
+		t.Errorf("a DevTools page got %q", got)
+	}
+}
+
+// TestAutomationAnswerOverTheLimitFails has the app answer with a line longer than the server takes: the request fails at once rather than when it times out.
+func TestAutomationAnswerOverTheLimitFails(t *testing.T) {
+	limit := maxAnswer
+	maxAnswer = 1 << 10
+	t.Cleanup(func() { maxAnswer = limit })
+	h := startHub(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	app := fakeApp(ctx, t, h, func(r automation.Request) automation.Answer {
+		return automation.Reply(r.ID, automation.SnapshotResult{Text: strings.Repeat("x", 2<<10)}, nil)
+	})
+	<-app
+	start := time.Now()
+	a := h.call(automation.Request{ID: 3, Method: automation.Snapshot}, time.Second)
+	if a.ID != 3 || a.Error == nil || a.Error.Code != automation.Failed || !strings.Contains(a.Error.Message, "lost") {
+		t.Fatalf("answered %d bytes, error %v", len(a.Result), a.Error)
+	}
+	if took := time.Since(start); took > answerFor/2 {
+		t.Errorf("the request failed after %v", took)
+	}
+}
+
+func TestAutomationWithoutAnApp(t *testing.T) {
+	h := startHub(t)
+	if a := h.call(automation.Request{ID: 2, Method: automation.Windows}, 50*time.Millisecond); a.Error == nil || a.Error.Code != automation.NoApp || a.ID != 2 {
+		t.Errorf("no app: %+v", a)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	app := fakeApp(ctx, t, h, nil)
+	<-app
+	done := make(chan automation.Answer, 1)
+	go func() { done <- h.call(automation.Request{ID: 3, Method: automation.Windows}, time.Second) }()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	select {
+	case a := <-done:
+		if a.Error == nil || a.Error.Code != automation.NoApp {
+			t.Errorf("an app gone while asked: %+v", a)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("a request waited on an app gone")
+	}
+}
+
+func TestAutomationStatusAndLogs(t *testing.T) {
+	h := startHub(t)
+	h.srv.send("error", "main.go:3: undefined: x")
+	h.setBuilding(true)
+	var s automation.StatusResult
+	json.Unmarshal(answerOf(t, ask(t, h, h.bridgeToken, nil, automation.Status)).Result, &s)
+	if !s.Building || s.BuildError != "main.go:3: undefined: x" || s.App {
+		t.Errorf("status %+v", s)
+	}
+	for i := range 2500 {
+		h.log("line " + strconv.Itoa(i))
+	}
+	logs := func(n int) []string {
+		params, _ := json.Marshal(automation.LogsParams{Lines: n})
+		var r automation.LogsResult
+		json.Unmarshal(h.answer(automation.Request{Method: automation.Logs, Params: params}).Result, &r)
+		return r.Lines
+	}
+	if got := logs(0); len(got) != 200 || got[199] != "line 2499" {
+		t.Errorf("the default tail: %d lines, last %q", len(got), got[len(got)-1])
+	}
+	if got := logs(5000); len(got) != logLimit || got[0] != "line 500" {
+		t.Errorf("the whole ring: %d lines from %q", len(got), got[0])
+	}
+}
+
+func TestAutomationSessionFile(t *testing.T) {
+	h := startHub(t)
+	dir := t.TempDir()
+	if err := h.writeSession(dir); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(sessionPath(dir))
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("the session file: %v %v", info, err)
+	}
+	s, err := readSession(dir)
+	if err != nil || s.Token != h.bridgeToken || s.URL != h.srv.url() || s.PID != os.Getpid() {
+		t.Fatalf("read %+v %v", s, err)
+	}
+	// Another live nsgo dev -automation keeps its session.
+	other := startHub(t)
+	data, _ := os.ReadFile(sessionPath(dir))
+	theirs := bytes.Replace(data, []byte("pid: "+strconv.Itoa(os.Getpid())), []byte("pid: "+strconv.Itoa(os.Getppid())), 1)
+	os.WriteFile(sessionPath(dir), theirs, 0o600)
+	if err := other.writeSession(dir); err == nil || !strings.Contains(err.Error(), errSessionTaken.Error()) {
+		t.Errorf("a second session over a live one: %v", err)
+	}
+	other.removeSession()
+	if _, err := os.Stat(sessionPath(dir)); err != nil {
+		t.Error("a hub removed a session it did not write")
+	}
+	// A session whose process ID another process took, after its nsgo dev ended unannounced, is stale: its server answers no more.
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	os.WriteFile(sessionPath(dir), bytes.Replace(theirs, []byte(h.srv.url()), []byte(gone.URL), 1), 0o600)
+	if s, _ := readSession(dir); s == nil || s.URL != gone.URL || sessionLive(s) {
+		t.Fatalf("a session no server answers is live: %+v", s)
+	}
+	if err := other.writeSession(dir); err != nil {
+		t.Errorf("a session over a stale one: %v", err)
+	}
+	os.WriteFile(sessionPath(dir), data, 0o600)
+	h.removeSession()
+	if _, err := os.Stat(sessionPath(dir)); !os.IsNotExist(err) {
+		t.Errorf("the session file outlived its hub: %v", err)
+	}
+}
+
+func TestDevAutomationRefusesWhatItCannotDrive(t *testing.T) {
+	p := &project{}
+	p.Dev.Target = "native"
+	if err := dev(context.Background(), p, devOptions{automation: true, release: true}); err == nil || !strings.Contains(err.Error(), "-release") {
+		t.Errorf("-automation -release: %v", err)
+	}
+	p.Dev.Target = "web"
+	if err := dev(context.Background(), p, devOptions{automation: true}); err == nil || !strings.Contains(err.Error(), "macOS apps so far") {
+		t.Errorf("-automation -target web: %v", err)
+	}
+}

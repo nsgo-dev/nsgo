@@ -81,6 +81,8 @@ type project struct {
 		Devtools bool `yaml:"-"`
 		// Layout is what DevTools' layout audit starts showing, as bounds,grid=8: nsgo dev -layout sets it.
 		Layout string `yaml:"-"`
+		// Automation links the agent nsgo dev -automation drives the app through (package nsgotest), with the nsgoautomation tag.
+		Automation bool `yaml:"-"`
 		// Limits runs a TSX app sandboxed, as tsx.View would, within
 		// these limits (tsx.ParseLimits) and its capabilities: nsgo dev
 		// -limits sets it.

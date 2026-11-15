@@ -37,10 +37,14 @@ func check(ctx context.Context, p *project, target string) error {
 		return err
 	}
 	s.done("vetted", "")
-	// The dev client builds only into nsgo dev's builds, which take the nsgodev tag, so NSGo's own repository vets it as they build it.
+	// The dev client builds only into nsgo dev's builds, which take the nsgodev tag, and on macOS -automation's agent with nsgoautomation too, so NSGo's own repository vets them as they build them.
 	if path, err := importPathOf(p.Dir); err == nil && path == nsgoModule {
 		s = begin("vetting the dev client")
 		if err := goTool(ctx, p.Dir, []string{"GOFLAGS=-tags=nsgodev"}, "vet", "."); err != nil {
+			s.fail()
+			return err
+		}
+		if err := goTool(ctx, p.Dir, []string{"GOOS=darwin", "GOARCH=arm64", "CGO_ENABLED=0", "GOFLAGS=-tags=nsgodev,nsgoautomation"}, "vet", ".", "./nsgotest", "./internal/platform/macos"); err != nil {
 			s.fail()
 			return err
 		}

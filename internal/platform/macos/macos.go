@@ -302,8 +302,7 @@ type surface struct {
 	// The performance monitor and the panel that shows it.
 	perf *engine.PerfMonitor
 	hud  *hud
-	// alerts are the alerts shown, by ID, kept for a test host to answer
-	// them.
+	// alerts are the alerts shown, by ID, kept for a test host or nsgo dev's automation to answer them.
 	alerts map[uint32]shownAlert
 
 	chrome
@@ -781,6 +780,10 @@ func newSurface(opts Options, embedded bool) *surface {
 		inside: map[*view]struct{}{}, effects: map[*view]bool{},
 		components: opts.Components, embedded: embedded, appearance: opts.Appearance}
 	s.appName = opts.Title
+	if automationBuild {
+		// nsgo dev's automation answers alerts as a test does.
+		s.alerts = map[uint32]shownAlert{}
+	}
 	s.native = objc.ID(classSurface).Send(selAlloc).Send(sel("initWithFrame:"),
 		apple.Rect(0, 0, float64(opts.Width), float64(opts.Height)))
 	s.native.Send(selSetWantsLayer, true)

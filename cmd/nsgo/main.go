@@ -2,8 +2,10 @@
 //
 //	nsgo init  [-template go|tsx|mixed] [-name N] [-module M] [dir]
 //	                                                      write a new app
-//	nsgo dev   [-target T] [-hot-reload=false] [-trace] [-limits[=L]] [flags] [dir]
+//	nsgo dev   [-target T] [-hot-reload=false] [-trace] [-automation] [-limits[=L]] [flags] [dir]
 //	                                                      run the app and rebuild it on changes
+//	nsgo mcp   [dev flags] [dir]                         serve MCP on standard input and output to drive the
+//	                                                      app nsgo dev -automation runs, started if none does
 //	nsgo build [-target all|T,...] [flags] [dir]         build packages for nsgo.yaml's targets or all platforms
 //	nsgo test  [-run R] [-bench R] [-junit F] [-trace] [-target T [-fps]] [dir | entry] [-- go test flags]
 //	                                                      run the app's tests or benchmarks, or an entry
@@ -54,7 +56,16 @@ func main() {
 		var p *project
 		if p, err = load(fs.Arg(0)); err == nil {
 			f.apply(p)
-			err = dev(ctx, p, devOptions{apply: f.apply, port: f.port, open: f.open, device: f.device, team: f.team, release: f.release, trace: f.trace, highlight: f.highlight, devtools: f.devtools, layout: string(f.layout), fps: f.fps, lang: f.lang, clip: f.clip})
+			err = dev(ctx, p, f.options())
+		}
+	case "mcp":
+		fs := flag.NewFlagSet("mcp", flag.ExitOnError)
+		f := bindDevFlags(fs)
+		fs.Parse(args)
+		var p *project
+		if p, err = load(fs.Arg(0)); err == nil {
+			f.apply(p)
+			err = serveMCP(ctx, p, args)
 		}
 	case "init":
 		fs := flag.NewFlagSet("init", flag.ExitOnError)
@@ -191,7 +202,8 @@ func main() {
 func usage() {
 	fmt.Fprintln(os.Stderr, `usage:
   nsgo init  [-template go|tsx|mixed] [-name N] [-module M] [dir]
-  nsgo dev   [-target native|web|ios|ios_simulator|tvos|tvos_simulator|android] [-hot-reload=false] [-release] [-trace] [-fps] [-lang L] [-device D] [-port N] [-open=false] [dir]
+  nsgo dev   [-target native|web|ios|ios_simulator|tvos|tvos_simulator|android] [-hot-reload=false] [-release] [-trace] [-automation] [-fps] [-lang L] [-device D] [-port N] [-open=false] [dir]
+  nsgo mcp   [dev flags] [dir]
   nsgo build [-target all|macos_arm64,windows_x64,linux_x64,ios,web,...] [-output DIR] [-open] [-run [-device D]] [dir]
   nsgo test  [-run REGEXP] [-bench REGEXP] [-junit FILE] [-trace] [-target macos|windows|linux|web|ios_simulator|tvos_simulator|android [-fps]] [dir | App.tsx < steps] [-- go test flags]
   nsgo check [dir]

@@ -48,11 +48,14 @@ type devOptions struct {
 	trace     bool   // print the running app's commits
 	highlight bool   // outline what the running app's commits changed
 	devtools  bool   // open DevTools for the running app
-	layout    string // what DevTools' layout audit starts showing (layoutFlag)
-	fps       bool   // show the performance monitor: --nsgo-fps
-	lang      string // the locale to run the app in: --nsgo-lang
-	clip      string // the URL the App Clip opens from, run in the app's place
-	server    *devServer
+	// automation lets tools drive the running app (automation.go); hub relays their requests.
+	automation bool
+	hub        *automationHub
+	layout     string // what DevTools' layout audit starts showing (layoutFlag)
+	fps        bool   // show the performance monitor: --nsgo-fps
+	lang       string // the locale to run the app in: --nsgo-lang
+	clip       string // the URL the App Clip opens from, run in the app's place
+	server     *devServer
 }
 
 // dev builds and runs the app, with a dev server its builds connect to:
@@ -63,6 +66,14 @@ type devOptions struct {
 // running app when a build fails. After each Go build of an app with a
 // tsconfig.json it writes the TSX's types to .nsgo/types, for editors.
 func dev(ctx context.Context, p *project, opts devOptions) error {
+	if opts.automation {
+		switch {
+		case opts.release:
+			return errors.New("-automation drives dev builds; -release builds what users run")
+		case p.Dev.Target != "native" || runtime.GOOS != "darwin":
+			return errors.New("-automation drives macOS apps so far: run it on a Mac with -target native (docs/roadmap.md, Automation)")
+		}
+	}
 	p.prepareDev(opts)
 	srv, err := startDevServer(opts.port)
 	if err != nil {
@@ -71,6 +82,19 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 	defer srv.close()
 	srv.dir = p.Dir
 	opts.server = srv
+	if opts.automation {
+		hub, err := newAutomationHub(srv, p.Dev.Target)
+		if err != nil {
+			return err
+		}
+		if err := hub.writeSession(p.Dir); err != nil {
+			return err
+		}
+		defer hub.removeSession()
+		appConsole.teeTo(hub.log)
+		defer appConsole.teeTo(nil)
+		opts.hub = hub
+	}
 	s, err := sessionFor(p, opts)
 	if err != nil {
 		return err
@@ -91,6 +115,9 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 	first, hinted := true, false
 	for {
 		progress := begin("building %s", p.Dev.Target)
+		if opts.hub != nil {
+			opts.hub.setBuilding(true)
+		}
 		// The catalogs' code first, which the build and the files watched
 		// may need. One listing serves both, listed again when the
 		// catalogs' new code may import more.
@@ -115,6 +142,9 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 		err = catalogErr
 		if err == nil {
 			err = s.build(ctx, p)
+		}
+		if opts.hub != nil {
+			opts.hub.setBuilding(false)
 		}
 		switch {
 		case ctx.Err() != nil:
@@ -182,9 +212,9 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 	}
 }
 
-// prepareDev sets what dev's builds carry: the dev client, -trace's commits, -highlight's outlines, -layout's audit and the dev icons; -release strips them as nsgo build does.
+// prepareDev sets what dev's builds carry: the dev client, -trace's commits, -highlight's outlines, -layout's audit, -automation's agent and the dev icons; -release strips them as nsgo build does.
 func (p *project) prepareDev(opts devOptions) {
-	p.Release, p.Dev.Client, p.Dev.Trace, p.Dev.Highlight, p.Dev.Devtools = opts.release, true, opts.trace, opts.highlight, opts.devtools
+	p.Release, p.Dev.Client, p.Dev.Trace, p.Dev.Highlight, p.Dev.Devtools, p.Dev.Automation = opts.release, true, opts.trace, opts.highlight, opts.devtools, opts.automation
 	p.Dev.Layout = opts.layout
 	p.useDevIcons()
 }
@@ -319,6 +349,8 @@ type devServer struct {
 	last    string // the last error event, for apps that connect later
 	files   string
 	bundles map[string]string // the latest TSX bundles, by entry
+	// hub relays nsgo dev -automation's requests over the app's DevTools stream, nil without -automation.
+	hub *automationHub
 }
 
 // setBundles keeps the latest TSX bundles, which /_nsgo/bundle serves.
@@ -469,7 +501,25 @@ func (s *devServer) send(kind, text string) {
 	}
 }
 
+// events streams the server's events to an app or a page. The app's DevTools stream under -automation carries the app's token, and the tools' requests as automation events too (automation.go).
 func (s *devServer) events(w http.ResponseWriter, r *http.Request) {
+	var requests chan []byte
+	if token := r.Header.Get(appTokenHeader); token != "" {
+		s.mu.Lock()
+		hub := s.hub
+		s.mu.Unlock()
+		if hub == nil {
+			http.Error(w, "nsgo dev runs without -automation", http.StatusUnauthorized)
+			return
+		}
+		var done func()
+		var status int
+		if requests, done, status = hub.connect(token); status != 0 {
+			http.Error(w, http.StatusText(status), status)
+			return
+		}
+		defer done()
+	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -500,6 +550,10 @@ func (s *devServer) events(w http.ResponseWriter, r *http.Request) {
 		select {
 		case msg := <-ch:
 			if !write(msg) {
+				return
+			}
+		case req := <-requests:
+			if !write("automation " + string(req)) {
 				return
 			}
 		case <-r.Context().Done():
@@ -589,10 +643,13 @@ func scan(dirs []string) string {
 	return b.String()
 }
 
-// devEnv is the environment of a dev app this machine starts: where its
-// dev server is.
+// devEnv is the environment of a dev app this machine starts: where its dev server is, and with -automation the app's token for it.
 func devEnv(opts devOptions) []string {
-	return []string{"NSGO_DEV_SERVER=" + opts.server.url()}
+	env := []string{"NSGO_DEV_SERVER=" + opts.server.url()}
+	if opts.hub != nil {
+		env = append(env, "NSGO_DEV_TOKEN="+opts.hub.appToken)
+	}
+	return env
 }
 
 // macSession runs the app's bundle binary in the foreground, its output

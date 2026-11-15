@@ -209,6 +209,15 @@ var out screen
 type console struct {
 	mu  sync.Mutex
 	buf []byte
+	// tee hears each line too: nsgo dev -automation keeps them for its logs.
+	tee func(line string)
+}
+
+// teeTo has each of the app's lines go to tee too.
+func (c *console) teeTo(tee func(line string)) {
+	c.mu.Lock()
+	c.tee = tee
+	c.mu.Unlock()
 }
 
 var appConsole console
@@ -224,6 +233,9 @@ func (c *console) Write(p []byte) (int, error) {
 		}
 		line := strings.TrimSuffix(string(c.buf[:i]), "\r")
 		c.buf = c.buf[i+1:]
+		if c.tee != nil {
+			c.tee(line)
+		}
 		emit(line)
 	}
 	return len(p), nil

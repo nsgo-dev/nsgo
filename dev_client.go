@@ -39,9 +39,9 @@ func devServerURL() (server string, page bool) {
 	return server, false
 }
 
-// startDevClient has the server print each commit under -trace and starts DevTools under -devtools. Run calls it before any graph starts, for an app's function as for a root view, as both read what it sets; it starts them once, however many views SetMainView shows.
+// startDevClient has the server print each commit under -trace, starts DevTools under -devtools and serves -automation's agent. Run calls it before any graph starts, for an app's function as for a root view, as both read what it sets; it starts them once, however many views SetMainView shows.
 var startDevClient = sync.OnceFunc(func() {
-	server, _ := devServerURL()
+	server, page := devServerURL()
 	if server == "" {
 		return
 	}
@@ -50,6 +50,9 @@ var startDevClient = sync.OnceFunc(func() {
 	}
 	if devDevtools == "1" {
 		startDevTools(server)
+	}
+	if !page {
+		startAutomation(server)
 	}
 })
 

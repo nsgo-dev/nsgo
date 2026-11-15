@@ -493,6 +493,9 @@ func goBuildWith(ctx context.Context, p *project, out string, env []string, extr
 	}
 	if p.Dev.Client {
 		tags = append(tags, "nsgodev")
+		if p.Dev.Automation {
+			tags = append(tags, "nsgoautomation")
+		}
 	}
 	if len(tags) > 0 {
 		args = append(args, "-tags", strings.Join(tags, ","))
