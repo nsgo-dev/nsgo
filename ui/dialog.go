@@ -16,7 +16,9 @@ type Dialog struct {
 	Open         func() bool
 	OnOpenChange func(open bool, reason base.Reason)
 	// OnClose follows it being gone, once its motion ended.
-	OnClose         func()
+	OnClose func()
+	// OnConfirm is the default action Return runs before it closes with ReasonSelect, as base.Dialog's.
+	OnConfirm       func()
 	Title           string
 	TitleFunc       func() string
 	Description     string
@@ -71,7 +73,8 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 			body = append(body, core.View{Style: core.Style{Direction: core.ColumnReverse, Gap: 8, Margin: core.Edges{Top: 8}},
 				Children: d.Footer})
 		}
-		return base.Sheet{Open: d.Open, OnOpenChange: d.OnOpenChange, NoCloseOnEscape: d.NoCloseOnEscape,
+		return base.Sheet{Open: d.Open, OnOpenChange: d.OnOpenChange, OnClose: d.OnClose, OnConfirm: d.OnConfirm, NoCloseOnEscape: d.NoCloseOnEscape,
+			Role:                   d.Role,
 			NoCloseOnBackdropPress: d.NoCloseOnBackdropPress, CloseOnSwipe: !d.NoCloseOnBackdropPress,
 			BackdropStyle: scrim, PopupStyleFunc: func() core.Style { return sheetPanel(cx, core.PlaceBottom).Merge(d.Style) },
 			Children: sheetContent(cx, core.PlaceBottom, body), Label: label, LabelFunc: labelFunc, AccessibilityDescription: d.Description, AccessibilityDescriptionFunc: d.DescriptionFunc, TestID: d.TestID}
@@ -90,7 +93,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 	spacer := func(grow float32) core.View {
 		return core.View{Style: core.Style{FlexGrow: grow, MinHeight: core.Pt(0)}, PointerEvents: core.PointerEventsNone}
 	}
-	return base.Dialog{Open: d.Open, OnOpenChange: d.OnOpenChange, OnClose: d.OnClose, Animation: core.ModalNone, NoCloseOnEscape: d.NoCloseOnEscape,
+	return base.Dialog{Open: d.Open, OnOpenChange: d.OnOpenChange, OnClose: d.OnClose, OnConfirm: d.OnConfirm, Animation: core.ModalNone, NoCloseOnEscape: d.NoCloseOnEscape,
 		Role: d.Role, Label: label, LabelFunc: labelFunc, AccessibilityDescription: d.Description, AccessibilityDescriptionFunc: d.DescriptionFunc,
 		NoCloseOnBackdropPress: d.NoCloseOnBackdropPress, BackdropStyle: core.Style{Background: Black(0.18), Transition: dialogFade},
 		BackdropStartingStyle: core.Style{Opacity: core.Alpha(0)}, BackdropEndingStyle: core.Style{Opacity: core.Alpha(0)},

@@ -14,6 +14,8 @@ type Dialog struct {
 	OnOpen       func()
 	OnClose      func()
 	OnCancel     func()
+	// OnConfirm, when set, is the default action: Return runs it while the dialog is the topmost modal, then asks to close with ReasonSelect, once however often Return is pressed as it goes. A focused button, menu row or text input inside keeps Return for itself (core.KeyAuto). Without it Return does what it did.
+	OnConfirm func()
 
 	Animation core.ModalAnimation
 	// TransitionShader, when set, is how the dialog comes and goes

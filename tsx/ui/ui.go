@@ -77,6 +77,7 @@ func roleTokens() string {
 
 // enums name the variants and sizes of ui's components.
 var enums = []tsx.Option{
+	tsx.Enum(map[string]core.AlertRole{"default": core.AlertDefault, "cancel": core.AlertCancel, "destructive": core.AlertDestructive}),
 	tsx.Enum(map[string]ui.AvatarStatus{"none": ui.AvatarNoStatus, "online": ui.AvatarOnline, "offline": ui.AvatarOffline}),
 	tsx.Enum(map[string]ui.BadgeVariant{"neutral": ui.BadgeNeutral, "accent": ui.BadgeAccent, "info": ui.BadgeInfo, "warn": ui.BadgeWarn,
 		"danger": ui.BadgeDanger, "up": ui.BadgeUp, "down": ui.BadgeDown, "outline": ui.BadgeOutline}),

@@ -35,6 +35,8 @@ type Button struct {
 	// to a button of an icon alone.
 	Label    string
 	Disabled func() bool
+	// AutoFocus moves the keyboard focus here once it mounts, as base.Button's.
+	AutoFocus bool
 	// Flex grows it to share a row with its siblings.
 	Flex float32
 	Size Size
@@ -57,7 +59,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 	if b.OnPress != nil {
 		press = func(core.PressEvent) { b.OnPress() }
 	}
-	return base.Button{OnPress: press, Disabled: b.Disabled, Label: b.label(), TestID: b.TestID,
+	return base.Button{OnPress: press, Disabled: b.Disabled, AutoFocus: b.AutoFocus, Label: b.label(), TestID: b.TestID,
 		Style: style, StyleFunc: focus, Children: []core.Node{face}}
 }
 

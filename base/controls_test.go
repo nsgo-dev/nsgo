@@ -9,6 +9,23 @@ import (
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
+func TestButtonAutoFocusHonorsKeyboardStops(t *testing.T) {
+	for _, c := range []struct {
+		name                    string
+		disabled, noFocus, want bool
+	}{{"enabled", false, false, true}, {"disabled", true, false, false}, {"no-focus", false, true, false}} {
+		t.Run(c.name, func(t *testing.T) {
+			app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+				return base.Button{TestID: "action", AutoFocus: true, NoFocus: c.noFocus,
+					Disabled: func() bool { return c.disabled }, Style: core.Style{Width: core.Pt(40), Height: core.Pt(20)}}
+			})
+			if got := app.Find("id:action").Focused; got != c.want {
+				t.Fatalf("focused %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
 func TestControlsReportWhatTheyAskForAndStyleTheirParts(t *testing.T) {
 	var asked []bool
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {

@@ -209,9 +209,11 @@ type Layer struct {
 	Panel         parts.Part
 	// Swipe lets a finger drag the panel down, and Swiped hears a release
 	// that asks it to close.
-	Swipe                        bool
-	Swiped                       func()
-	Cancel                       func()
+	Swipe  bool
+	Swiped func()
+	Cancel func()
+	// Confirm, when set, is what Return does while the sheet is shown.
+	Confirm                      func()
 	Role                         core.Role
 	Label                        string
 	LabelFunc                    func() string
@@ -227,6 +229,9 @@ type Layer struct {
 func (l Layer) Node() core.Node {
 	m := l.Motion
 	return core.Show{When: m.shown.Get, Then: func(cx *core.Scope) core.Node {
+		if l.Confirm != nil {
+			cx.OnKey("enter", l.Confirm)
+		}
 		// The backdrop fades with the panel and with a drag away.
 		extent := core.NewAnimatedValue(cx, 1)
 		down := core.Interpolate(m.drag, core.Interpolation{Input: []float64{0, 1}, Output: []float64{0, 1},

@@ -47,11 +47,13 @@ ui.AlertDialog{
 	Title:        "删除这条笔记？",
 	Description:  "此操作无法撤销。",
 	Actions: []ui.AlertAction{
-		{Text: "取消", Variant: ui.ButtonSecondary},
-		{Text: "删除", Color: colors.Danger, OnPress: remove},
+		{Text: "取消", Variant: ui.ButtonSecondary, Role: core.AlertCancel},
+		{Text: "删除", Color: colors.Danger, Role: core.AlertDestructive, Default: true, OnPress: remove},
 	},
 }
 ```
+
+`Role: core.AlertCancel` 标记的操作会在 Escape 或返回时执行，随后调用 `OnOpenChange(false, base.ReasonCancel)`。`Default: true` 让操作在打开时获得键盘焦点，并让 Return 选择它；点击操作会先执行 `OnPress`，再调用 `OnOpenChange(false, base.ReasonSelect)`。键盘焦点不在其他操作或输入框上时，Return 执行默认操作：焦点移到另一个操作上时，Return 按下那个操作；警告框上方另有对话框时，Return 归那个对话框。执行过一个操作后，无论 `OnOpenChange` 怎么处理，警告框都会关闭，直到 `Open` 先变为 false 再变为 true 之前不再执行其他操作。同一标记出现多次时，以第一个为准。未设置标记时，Escape 直接关闭，不执行操作，Return 没有默认操作。`Role: core.AlertDestructive` 描述操作含义，外观仍由 `Variant` 或 `Color` 决定。
 
 要显示系统自己的警告框或操作表，用 `cx.ShowAlert`（[平台服务](../services.md#警告框与剪贴板)）。
 
@@ -61,7 +63,7 @@ ui.AlertDialog{
 
 ## 无障碍
 
-对话框报告 `RoleDialog` 并读出标题，标题不够时读出 `Label`，然后读出描述，居中对话框和底部面板都是如此。打开时焦点移入，关闭时焦点返回；背景不是停靠点。底部按钮保留各自的角色和标签。
+`ui.Dialog` 报告 `RoleDialog` 或显式设置的 `Role`，`ui.AlertDialog` 在桌面和触摸屏上都报告 `RoleAlertDialog`。它们读出标题，标题不够时读出 `Label`，随后读出描述。打开时焦点移入，关闭时焦点返回；背景不是停靠点。底部按钮保留各自的角色和标签。
 
 ## 平台
 

@@ -21,6 +21,8 @@ type Sheet struct {
 	OnOpen       func()
 	OnClose      func()
 	OnCancel     func()
+	// OnConfirm is the default action, as Dialog's: Return runs it while the sheet is open, then asks to close with ReasonSelect.
+	OnConfirm func()
 
 	// Side is the edge the panel sits on; the bottom by default.
 	Side                   core.Placement
@@ -47,13 +49,19 @@ type Sheet struct {
 	LabelFunc                    func() string
 	AccessibilityDescription     string
 	AccessibilityDescriptionFunc func() string
-	TestID                       string
+	// Role is what screen readers announce it as, RoleDialog when 0 or RoleAlertDialog for one asking for an answer, as Dialog's.
+	Role   core.Role
+	TestID string
 }
 
 // Render implements core.Node.
 func (s Sheet) Render(cx *core.Scope) core.Node {
 	st := newPopup(cx, s.Open, s.DefaultOpen, s.OnOpenChange, s.OnOpen, s.OnClose)
 	st.onCancel = s.OnCancel
+	role := s.Role
+	if role == core.RoleNone {
+		role = core.RoleDialog
+	}
 	side := s.Side
 	if side == core.PlaceDefault {
 		side = core.PlaceBottom
@@ -66,7 +74,8 @@ func (s Sheet) Render(cx *core.Scope) core.Node {
 		Swipe:         s.CloseOnSwipe && side == core.PlaceBottom,
 		Swiped:        func() { st.cancel(ReasonSwipe, false) },
 		Cancel:        func() { st.cancel(ReasonCancel, s.NoCloseOnEscape) },
-		Role:          core.RoleDialog, Label: s.Label, LabelFunc: s.LabelFunc, AccessibilityDescription: s.AccessibilityDescription,
+		Confirm:       st.confirm(s.OnConfirm),
+		Role:          role, Label: s.Label, LabelFunc: s.LabelFunc, AccessibilityDescription: s.AccessibilityDescription,
 		AccessibilityDescriptionFunc: s.AccessibilityDescriptionFunc, TestID: s.TestID, Content: s.Children,
 		Layer: parts.Of(s.Class, s.Style, s.StyleFunc)}.Node()
 }

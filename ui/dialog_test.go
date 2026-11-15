@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -99,6 +100,153 @@ func TestDialogTextFuncsUpdateInPlace(t *testing.T) {
 		}
 		if got := app.Find("name"); got.ID != field.ID || got.Text != "Ada" || got.Focused != field.Focused {
 			t.Fatalf("the field became %v %q focused %v, was %v %q focused %v", got.ID, got.Text, got.Focused, field.ID, field.Text, field.Focused)
+		}
+	})
+}
+
+// An alert reports its role and message, focuses its default action, and runs one action however it is answered: Return on the focused default, Return on another action Tab reached, Escape, back or a press. Keys pressed as it goes run nothing more, and it focuses the default again as it opens again.
+func TestAlertDialogRoleAndActions(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		ways := []string{"escape", "back", "press"}
+		// nsgotest presses the focused view on Return in a macOS or web environment, as those platforms do; on a phone Return is the default's through base.Sheet (TestReturnRunsTheDefaultActionOnce).
+		if e.Idiom == core.IdiomDesktop {
+			ways = append(ways, "return", "tab-return")
+		}
+		for _, how := range ways {
+			t.Run(how, func(t *testing.T) {
+				var calls []string
+				var reason base.Reason
+				var open *core.Signal[bool]
+				closed := 0
+				app, _ := start(t, e, func(cx *core.Scope) core.Node {
+					open = core.NewSignal(cx, true)
+					return AlertDialog{TestID: "alert", Title: "Delete the note?", Description: "This cannot be undone.",
+						Open: open.Get, OnClose: func() { closed++ },
+						OnOpenChange: func(v bool, r base.Reason) { calls = append(calls, "change"); reason = r; open.Set(v) },
+						Actions: []AlertAction{
+							{Text: "Cancel", Role: core.AlertCancel, TestID: "cancel", OnPress: func() { calls = append(calls, "cancel") }},
+							{Text: "Delete", Role: core.AlertDestructive, Default: true, TestID: "delete", OnPress: func() { calls = append(calls, "delete") }},
+						}}
+				})
+				alert := app.Find("role:alertdialog")
+				if alert.Props.Label != "Delete the note?" || alert.Props.Description != "This cannot be undone." {
+					t.Fatalf("alert accessibility = %+v", alert.Props)
+				}
+				if !app.Find("id:delete").Focused {
+					t.Fatal("default action did not take initial focus")
+				}
+				wantAction, wantReason := "delete", base.ReasonSelect
+				switch how {
+				case "return":
+					app.Key("Return")
+				case "tab-return":
+					app.Key("Tab")
+					if !app.Find("id:cancel").Focused {
+						t.Fatal("Tab did not reach the cancel action")
+					}
+					app.Key("Return")
+					wantAction = "cancel"
+				case "escape":
+					app.Key("Escape")
+					wantAction, wantReason = "cancel", base.ReasonCancel
+				case "back":
+					app.Back()
+					wantAction, wantReason = "cancel", base.ReasonCancel
+				case "press":
+					app.Press("id:delete")
+				}
+				// Keys pressed while it goes cannot run an action again, even on a focused action.
+				app.Key("Return")
+				app.Key("Escape")
+				app.Key("Return")
+				if !slices.Equal(calls, []string{wantAction, "change"}) || reason != wantReason {
+					t.Fatalf("calls %v, reason %v; want [%s change], %v", calls, reason, wantAction, wantReason)
+				}
+				app.Advance(time.Second)
+				app.WaitForGone("id:alert", time.Second)
+				if closed != 1 {
+					t.Fatalf("OnClose ran %d times", closed)
+				}
+				app.Post(func() { open.Set(true) })
+				app.WaitFor("id:delete", time.Second)
+				if !app.Find("id:delete").Focused {
+					t.Fatal("reopening did not focus the default action")
+				}
+			})
+		}
+	})
+}
+
+func TestAlertDialogWithoutActionMarkers(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		pressed, changed := 0, 0
+		var reason base.Reason
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			open := core.NewSignal(cx, true)
+			return AlertDialog{TestID: "alert", Open: open.Get, OnOpenChange: func(v bool, r base.Reason) {
+				changed++
+				reason = r
+				open.Set(v)
+			}, Actions: []AlertAction{{Text: "Action", TestID: "action", OnPress: func() { pressed++ }}}}
+		})
+		if !app.Exists("role:alertdialog") {
+			t.Fatal("unmarked alert lost its alert dialog role")
+		}
+		app.Key("Return")
+		if pressed != 0 || changed != 0 {
+			t.Fatalf("unmarked action ran on Return: pressed %d, changed %d", pressed, changed)
+		}
+		app.Key("Escape")
+		if pressed != 0 || changed != 1 || reason != base.ReasonCancel {
+			t.Fatalf("unmarked cancel: pressed %d, changed %d, reason %v", pressed, changed, reason)
+		}
+	})
+}
+
+// On a touch screen a Dialog is a base.Sheet, which keeps its role and description, runs OnConfirm on a hardware keyboard's Return and reports OnClose once it has gone.
+func TestDialogPreservesAlertRoleOnTouch(t *testing.T) {
+	var log []string
+	app, _ := start(t, phoneEnv, func(cx *core.Scope) core.Node {
+		open := core.NewSignal(cx, true)
+		return Dialog{Open: open.Get, OnOpenChange: func(v bool, r base.Reason) { log = append(log, r.String()); open.Set(v) },
+			OnConfirm: func() { log = append(log, "confirm") }, OnClose: func() { log = append(log, "closed") },
+			Role: core.RoleAlertDialog, Title: "Confirm", Description: "Choose an action", TestID: "dialog"}
+	})
+	if got := app.Find("role:alertdialog").Props.Description; got != "Choose an action" {
+		t.Fatalf("sheet description %q", got)
+	}
+	app.Key("Return")
+	app.Advance(time.Second)
+	app.WaitForGone("id:dialog", time.Second)
+	if want := []string{"confirm", base.ReasonSelect.String(), "closed"}; !slices.Equal(log, want) {
+		t.Fatalf("log = %q, want %q", log, want)
+	}
+}
+
+// A default action that closes the alert itself still reports the close, once.
+func TestAlertDefaultMayUpdateOpenItself(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		if e.Idiom != core.IdiomDesktop {
+			return // Return presses the focused default only where nsgotest presses focused views (TestAlertDialogRoleAndActions).
+		}
+		var calls []string
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			open := core.NewSignal(cx, true)
+			return AlertDialog{Open: open.Get, OnOpenChange: func(v bool, r base.Reason) {
+				if r != base.ReasonSelect {
+					t.Errorf("close reason %v", r)
+				}
+				calls = append(calls, "change")
+				open.Set(v)
+			}, Actions: []AlertAction{{Text: "Done", Default: true, OnPress: func() {
+				calls = append(calls, "action")
+				open.Set(false)
+			}}}}
+		})
+		app.Key("Return")
+		app.Key("Return")
+		if !slices.Equal(calls, []string{"action", "change"}) {
+			t.Fatalf("calls %v", calls)
 		}
 	})
 }

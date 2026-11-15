@@ -11,6 +11,10 @@ type AlertAction struct {
 	Text    string
 	Variant ButtonVariant
 	Color   func() core.Color
+	// Role is core.AlertCancel for the action Escape and back run before the alert closes with ReasonCancel, the first such action; core.AlertDestructive marks one that destroys, for TSX's role names. Variant and Color still choose its look.
+	Role core.AlertRole
+	// Default is the action Return chooses, the first such action: it takes the keyboard focus as the alert opens, and Return runs it while the focus is on no other action or field, then closes the alert with ReasonSelect.
+	Default bool
 	OnPress func()
 	TestID  string
 }
@@ -31,18 +35,66 @@ type AlertDialog struct {
 }
 
 // Render implements core.Node.
-func (a AlertDialog) Render(*core.Scope) core.Node {
-	var footer []core.Node
-	for _, action := range a.Actions {
-		footer = append(footer, Button{Variant: action.Variant, Color: action.Color, Text: action.Text, TestID: action.TestID, OnPress: func() {
-			if action.OnPress != nil {
-				action.OnPress()
+func (a AlertDialog) Render(cx *core.Scope) core.Node {
+	// answered closes it once an action ran, whatever the app does with OnOpenChange, until the app sets Open false and true again, as base.Dialog stays closed after Escape; a key pressed on a focused action while it goes runs nothing more.
+	answered := core.NewSignal(cx, false)
+	open := a.Open
+	if open != nil {
+		cx.Effect(func() {
+			if !a.Open() {
+				answered.Set(false)
 			}
+		})
+		open = func() bool { return a.Open() && !answered.Get() }
+	}
+	// answer reports whether an action may run, as the alert is open and unanswered, and marks it answered.
+	answer := func() bool {
+		if open == nil || !open() {
+			return false
+		}
+		answered.Set(true)
+		return true
+	}
+	run := func(f func()) {
+		if f != nil {
+			f()
+		}
+	}
+	var footer []core.Node
+	var cancel, confirm func()
+	cancelSet, defaultSet := false, false
+	for _, action := range a.Actions {
+		if action.Role == core.AlertCancel && !cancelSet {
+			cancel, cancelSet = action.OnPress, true
+		}
+		focus := action.Default && !defaultSet
+		if focus {
+			defaultSet = true
+			// base.Dialog's OnConfirm asks to close with ReasonSelect after it.
+			confirm = func() {
+				answered.Set(true)
+				run(action.OnPress)
+			}
+		}
+		footer = append(footer, Button{Variant: action.Variant, Color: action.Color, Text: action.Text, TestID: action.TestID, AutoFocus: focus, OnPress: func() {
+			if !answer() {
+				return
+			}
+			run(action.OnPress)
 			if a.OnOpenChange != nil {
 				a.OnOpenChange(false, base.ReasonSelect)
 			}
 		}})
 	}
-	return Dialog{Open: a.Open, OnOpenChange: a.OnOpenChange, OnClose: a.OnClose, Title: a.Title, TitleFunc: a.TitleFunc, Description: a.Description, DescriptionFunc: a.DescriptionFunc, Footer: footer,
-		NoCloseOnBackdropPress: true, TestID: a.TestID}
+	change := func(open bool, reason base.Reason) {
+		if !open && reason == base.ReasonCancel {
+			answered.Set(true)
+			run(cancel)
+		}
+		if a.OnOpenChange != nil {
+			a.OnOpenChange(open, reason)
+		}
+	}
+	return Dialog{Open: open, OnOpenChange: change, OnClose: a.OnClose, OnConfirm: confirm, Title: a.Title, TitleFunc: a.TitleFunc, Description: a.Description, DescriptionFunc: a.DescriptionFunc, Footer: footer,
+		Role: core.RoleAlertDialog, NoCloseOnBackdropPress: true, TestID: a.TestID}
 }

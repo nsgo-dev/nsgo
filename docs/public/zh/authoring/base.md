@@ -115,9 +115,9 @@ base.Tabs{Label: "分区", IndicatorStyle: core.Style{Height: core.Pt(2), Backgr
 
 ## Dialog
 
-`base.Dialog` 接受背景、图层和弹出层的样式、一个 `Animation` 或 `TransitionShader`，以及你的子元素。`Open`、`DefaultOpen` 和 `OnOpenChange` 控制它；`OnOpen`、`OnClose` 和 `OnCancel` 报告发生了什么。`NoCloseOnSwipe` 让 iOS 的滑动不关闭它，`Presentation` 选择 iOS 的呈现方式，`StatusBar` 在打开期间改变状态栏。
+`base.Dialog` 接受背景、图层和弹出层的样式、一个 `Animation` 或 `TransitionShader`，以及你的子元素。`Open`、`DefaultOpen` 和 `OnOpenChange` 控制它；`OnOpen`、`OnClose` 和 `OnCancel` 报告发生了什么。`OnConfirm` 是默认操作：Return 执行它，然后以 `ReasonSelect` 关闭对话框；键盘焦点在自己接收 Return 的按钮或输入框上，或上方另有模态层时除外。`Role` 和 `AccessibilityDescription` 决定屏幕阅读器读出的内容，确认框用 `RoleAlertDialog`。`NoCloseOnSwipe` 让 iOS 的滑动不关闭它，`Presentation` 选择 iOS 的呈现方式，`StatusBar` 在打开期间改变状态栏。
 
-`base.Sheet` 是任意一侧的面板，带背景和你的内容；设置 `CloseOnSwipe` 后，底部 sheet 跟随向下拖动，超过阈值后关闭。`base.ShowAlertDialog` 显示系统的警告框或操作表，按钮按角色区分：
+`base.Sheet` 是任意一侧的面板，带背景和你的内容；设置 `CloseOnSwipe` 后，底部 sheet 跟随向下拖动，超过阈值后关闭。它和 `base.Dialog` 一样接受 `OnConfirm`、`Role` 和 `AccessibilityDescription`。`base.ShowAlertDialog` 显示系统的警告框或操作表，按钮按角色区分：
 
 ```go
 base.ShowAlertDialog(cx, base.AlertDialog{

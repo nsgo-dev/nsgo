@@ -115,9 +115,9 @@ base.Tabs{Label: "Sections", IndicatorStyle: core.Style{Height: core.Pt(2), Back
 
 ## Dialog
 
-`base.Dialog` takes its backdrop, layer and popup styles, an `Animation` or a `TransitionShader`, and your children. `Open`, `DefaultOpen` and `OnOpenChange` control it; `OnOpen`, `OnClose` and `OnCancel` report what happened. `NoCloseOnSwipe` keeps iOS's swipe from closing it, `Presentation` chooses the iOS presentation, and `StatusBar` changes the bar while it is open.
+`base.Dialog` takes its backdrop, layer and popup styles, an `Animation` or a `TransitionShader`, and your children. `Open`, `DefaultOpen` and `OnOpenChange` control it; `OnOpen`, `OnClose` and `OnCancel` report what happened. `OnConfirm` is the default action: Return runs it, unless the keyboard focus is on a button or a field that takes Return itself or another modal covers the dialog, then the dialog closes with `ReasonSelect`. `Role` and `AccessibilityDescription` are what screen readers announce, `RoleAlertDialog` for a confirmation. `NoCloseOnSwipe` keeps iOS's swipe from closing it, `Presentation` chooses the iOS presentation, and `StatusBar` changes the bar while it is open.
 
-`base.Sheet` is a panel at any edge, with a backdrop and your content; with `CloseOnSwipe` a bottom sheet follows a downward drag and closes past a threshold. `base.ShowAlertDialog` shows the system's alert or action sheet with buttons by role:
+`base.Sheet` is a panel at any edge, with a backdrop and your content; with `CloseOnSwipe` a bottom sheet follows a downward drag and closes past a threshold. It takes `OnConfirm`, `Role` and `AccessibilityDescription` as `base.Dialog` does. `base.ShowAlertDialog` shows the system's alert or action sheet with buttons by role:
 
 ```go
 base.ShowAlertDialog(cx, base.AlertDialog{

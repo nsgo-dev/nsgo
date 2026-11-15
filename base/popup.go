@@ -112,6 +112,11 @@ func (p *popup) lifecycle(cx *core.Scope, there func() bool) {
 // set asks to open or close the popup for reason; a request matching
 // what is shown reports nothing.
 func (p *popup) set(open bool, r Reason) {
+	p.request(open, r, nil)
+}
+
+// request is set running action, if any, once the popup is asked to change and before OnOpenChange hears it; a request matching what is shown runs nothing.
+func (p *popup) request(open bool, r Reason, action func()) {
 	if p.open() == open {
 		return
 	}
@@ -121,6 +126,9 @@ func (p *popup) set(open bool, r Reason) {
 	}
 	if p.userClosed != nil && !open {
 		p.userClosed.Set(true)
+	}
+	if action != nil {
+		action()
 	}
 	if p.onChange != nil {
 		p.onChange(open, r)
@@ -152,6 +160,16 @@ func (p *popup) cancel(r Reason, keep bool) {
 	}
 	if !keep {
 		p.set(false, r)
+	}
+}
+
+// confirm is what Return does on a dialog or sheet whose default action is action: run it and ask to close with ReasonSelect. It is nil for no action.
+func (p *popup) confirm(action func()) func() {
+	if action == nil {
+		return nil
+	}
+	return func() {
+		p.request(false, ReasonSelect, action)
 	}
 }
 
@@ -298,6 +316,10 @@ func modalLayer(st *popup, motion *popupMotion, m core.Modal, d Dialog) core.Nod
 			return core.View{Style: parts.Fill, OnPress: func(core.PressEvent) {}, NoFocus: true}
 		}})
 		m.Children = nodes
+		// This owner shows only the modal, so its binding rests while another modal covers it (core.Scope.OnKey).
+		if confirm := st.confirm(d.OnConfirm); confirm != nil {
+			cx.OnKey("enter", confirm)
+		}
 		m.OnRequestClose = func(reason string) {
 			if reason == "swipe" {
 				// An iOS sheet's swipe; NoCloseOnSwipe kept it on screen.

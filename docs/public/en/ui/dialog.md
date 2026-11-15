@@ -47,11 +47,13 @@ ui.AlertDialog{
 	Title:        "Delete the note?",
 	Description:  "This cannot be undone.",
 	Actions: []ui.AlertAction{
-		{Text: "Cancel", Variant: ui.ButtonSecondary},
-		{Text: "Delete", Color: colors.Danger, OnPress: remove},
+		{Text: "Cancel", Variant: ui.ButtonSecondary, Role: core.AlertCancel},
+		{Text: "Delete", Color: colors.Danger, Role: core.AlertDestructive, Default: true, OnPress: remove},
 	},
 }
 ```
+
+An action with `Role: core.AlertCancel` runs on Escape or back, followed by `OnOpenChange(false, base.ReasonCancel)`. `Default: true` gives an action keyboard focus when the alert opens and makes Return choose it; an action press runs `OnPress`, then `OnOpenChange(false, base.ReasonSelect)`. Return runs the default action while the keyboard focus is on no other action or field: with the focus moved to another action, Return presses that one, and a dialog over the alert keeps Return. Once an action has run the alert closes, whatever `OnOpenChange` does, and runs no other until `Open` turns false and true again. If several actions carry the same marker, the first wins. Without markers, Escape closes without running an action and Return has no default action. `Role: core.AlertDestructive` describes an action; `Variant` or `Color` chooses its look.
 
 For the system's own alert or action sheet, use `cx.ShowAlert` ([Platform services](../services.md#alerts-and-the-clipboard)).
 
@@ -61,7 +63,7 @@ A modal blocks the app behind it, takes the keyboard focus and closes on Escape 
 
 ## Accessibility
 
-The dialog reports `RoleDialog` and reads its title, or `Label` when the title is not enough, then its description, as a centered dialog and as a sheet. Focus moves into it when it opens and returns when it closes; the backdrop is not a stop. The footer's buttons keep their roles and labels.
+`ui.Dialog` reports `RoleDialog`, or its explicit `Role`, and `ui.AlertDialog` reports `RoleAlertDialog` on desktops and touch screens. Both read their title, or `Label` when the title is not enough, followed by the description. Focus moves into a dialog when it opens and returns when it closes; the backdrop is not a stop. The footer's buttons keep their roles and labels.
 
 ## Platform
 
