@@ -183,6 +183,18 @@ cx.BiometricAvailability(func(kind core.BiometricKind) {
 
 Face ID apps declare `NSFaceIDUsageDescription` under `apple.info`; Android apps list `USE_BIOMETRIC` under `android.permissions`.
 
+## Overlays on Android
+
+`mobile.OpenOverlay` shows a view of the app's over other apps on Android, a tree of its own that shares the app's signals, and a foreground service keeps the app running while it shows. The app lists `SYSTEM_ALERT_WINDOW` under `android.permissions`, and the user grants it in the system's settings, which `mobile.RequestOverlayPermission` opens; without it the overlay ends at once and `OnEnd` hears why. It takes touches but leaves the keys and the touches around it to the app in front, unless it is `Focusable` or `Passive`, and moves with `desktop.SetWindowFrame` from its content. Other platforms open none.
+
+```go
+mobile.RequestOverlayPermission(cx, func(p core.OverlayPermission) {
+	if p == mobile.OverlayGranted {
+		mobile.OpenOverlay(cx, mobile.OverlayOptions{Width: 200, Height: 80}, Score)
+	}
+})
+```
+
 ## Next
 
 - [Notifications](notifications.md): permission, badges and presses.

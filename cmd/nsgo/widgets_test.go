@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/xml"
 	"fmt"
 	"os"
 	"os/exec"
@@ -149,6 +150,32 @@ func TestWidgetsCompile(t *testing.T) {
 		out, _ = exec.Command("otool", "-l", w.exe).Output()
 		if !strings.Contains(string(out), "LC_LOAD_WEAK_DYLIB") {
 			t.Error("the extension links ActivityKit and App Intents strongly")
+		}
+	}
+}
+
+// TestAndroidOverlayDeclarations checks that only an app listing SYSTEM_ALERT_WINDOW asks for the overlay's foreground service, in its APK's manifest and in its library's.
+func TestAndroidOverlayDeclarations(t *testing.T) {
+	p := &project{ID: "dev.example.app"}
+	p.Android.Permissions = []string{"android.permission.CAMERA"}
+	if p.androidOverlay() || slices.ContainsFunc(p.androidPermissions(), func(s string) bool { return strings.Contains(s, "FOREGROUND_SERVICE") }) {
+		t.Errorf("an app without overlays asks for %v", p.androidPermissions())
+	}
+	if m := aarManifest(false); strings.Contains(m, "FOREGROUND_SERVICE") || strings.Contains(m, "OverlayService") || strings.Contains(m, "SYSTEM_ALERT_WINDOW") {
+		t.Errorf("a library without overlays declares them:\n%s", m)
+	}
+	p.Android.Permissions = append(p.Android.Permissions, "android.permission.SYSTEM_ALERT_WINDOW")
+	want := []string{"android.permission.CAMERA", "android.permission.SYSTEM_ALERT_WINDOW", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"}
+	if got := p.androidPermissions(); !p.androidOverlay() || !slices.Equal(got, want) {
+		t.Errorf("an app with overlays asks for %v, want %v", got, want)
+	}
+	m := aarManifest(true)
+	if err := xml.Unmarshal([]byte(m), new(struct{})); err != nil {
+		t.Fatalf("the library's manifest is no XML: %v\n%s", err, m)
+	}
+	for _, s := range []string{"SYSTEM_ALERT_WINDOW", "FOREGROUND_SERVICE_SPECIAL_USE", `android:name="dev.oneo.nsgo.OverlayService"`, `android:foregroundServiceType="specialUse"`} {
+		if !strings.Contains(m, s) {
+			t.Errorf("a library with overlays lacks %s:\n%s", s, m)
 		}
 	}
 }

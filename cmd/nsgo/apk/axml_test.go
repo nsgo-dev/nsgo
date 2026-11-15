@@ -302,3 +302,35 @@ func (d xmlDocument) walk(f func(*xmlNode)) {
 	}
 	visit(d.root)
 }
+
+// TestEncodeManifestOverlay checks that only an app showing overlays declares the overlay's foreground service, of the specialUse type with its subtype.
+func TestEncodeManifestOverlay(t *testing.T) {
+	services := func(m Manifest) []*xmlNode {
+		data, err := EncodeManifest(androidruntime.Manifest, m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []*xmlNode
+		for _, kid := range decodeXML(t, data).root.child(t, "application").kids {
+			if kid.name == "service" {
+				out = append(out, kid)
+			}
+		}
+		return out
+	}
+	if got := services(Manifest{Package: "dev.oneo.nsgo.test"}); len(got) != 0 {
+		t.Fatalf("an app without overlays declares %d services", len(got))
+	}
+	got := services(Manifest{Package: "dev.oneo.nsgo.test", Overlay: true})
+	if len(got) != 1 {
+		t.Fatalf("an app with overlays declares %d services", len(got))
+	}
+	s := got[0]
+	if s.string(t, "name") != OverlayService || s.value(t, "exported") != 0 || s.value(t, "foregroundServiceType") != 0x40000000 {
+		t.Errorf("service %s, exported %d, type %#x", s.string(t, "name"), s.value(t, "exported"), s.value(t, "foregroundServiceType"))
+	}
+	p := s.child(t, "property")
+	if p.string(t, "name") != "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" || p.string(t, "value") != OverlaySubtype {
+		t.Errorf("property %s = %s", p.string(t, "name"), p.string(t, "value"))
+	}
+}

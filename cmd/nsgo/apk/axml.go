@@ -36,6 +36,8 @@ type Manifest struct {
 	Permissions []string
 	// TargetSDK replaces the runtime's targetSdkVersion when it is set.
 	TargetSDK int
+	// Overlay declares the runtime's OverlayService, the specialUse foreground service an overlay over other apps takes, for an app that asks for SYSTEM_ALERT_WINDOW; Permissions name its FOREGROUND_SERVICE permissions.
+	Overlay bool
 }
 
 // The binary XML chunk and value types, from Android's ResourceTypes.h.
@@ -87,7 +89,18 @@ var androidAttrs = map[string]attrSpec{
 	"enableOnBackInvokedCallback": {0x0101066c, typeBool, parseBool},
 	"configChanges":               {0x0101001f, typeHex, parseConfigChanges},
 	"windowSoftInputMode":         {0x0101022b, typeHex, parseSoftInputMode},
+	"foregroundServiceType":       {0x01010599, typeHex, parseFlags(foregroundServiceTypes)},
+	"value":                       {0x01010024, typeString, nil},
 }
+
+// foregroundServiceTypes are the foreground service types a service may declare, as ServiceInfo's FOREGROUND_SERVICE_TYPE_*: the overlay's only so far.
+var foregroundServiceTypes = map[string]uint32{"specialUse": 0x40000000}
+
+// OverlayService is the service overlays over other apps take (Manifest.Overlay), and OverlaySubtype the subtype of its specialUse type, which stores read.
+const (
+	OverlayService = "dev.oneo.nsgo.OverlayService"
+	OverlaySubtype = "Keeps a window the user opened over other apps showing"
+)
 
 // styles are the framework styles a manifest may name. A reference needs
 // the framework's resource ID, which the SDK's aapt2 resolves; these stay
@@ -222,6 +235,17 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 			i := slices.Index(root.kids, app)
 			root.kids = slices.Insert(root.kids, i, use)
 		}
+	}
+	if m.Overlay {
+		service := &node{name: xml.Name{Local: "service"}}
+		setAttr(service, androidNS, "name", OverlayService)
+		setAttr(service, androidNS, "exported", "false")
+		setAttr(service, androidNS, "foregroundServiceType", "specialUse")
+		property := &node{name: xml.Name{Local: "property"}}
+		setAttr(property, androidNS, "name", "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE")
+		setAttr(property, androidNS, "value", OverlaySubtype)
+		service.kids = append(service.kids, property)
+		app.kids = append(app.kids, service)
 	}
 	if m.TargetSDK > 0 {
 		sdk := child(root, "uses-sdk")

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/nsgo-dev/nsgo/cmd/nsgo/apk"
 	androidruntime "github.com/nsgo-dev/nsgo/internal/platform/android/runtime"
 )
 
@@ -386,24 +387,36 @@ func writeIOSFramework(slice, module, id, header string, catalyst bool) (string,
 	return fw, nil
 }
 
-// aarManifest is the library's manifest, which a host's build merges into
-// its own: the runtime starts the app from the native library directory,
-// so native libraries must be extracted, and the provider of the files
-// the app hands other apps is named after the host's package.
-const aarManifest = `<?xml version="1.0" encoding="utf-8"?>
+// aarManifest is the library's manifest, which a host's build merges into its own: the runtime starts the app from the native library directory, so native libraries must be extracted, and the provider of the files the app hands other apps is named after the host's package. An app that shows overlays over other apps (androidOverlay) asks for SYSTEM_ALERT_WINDOW and declares the overlay's foreground service with its permissions, which no other library does.
+func aarManifest(overlay bool) string {
+	perms, services := "", ""
+	if overlay {
+		perms = `
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />`
+		services = `
+        <service android:name="` + apk.OverlayService + `" android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="` + apk.OverlaySubtype + `" />
+        </service>`
+	}
+	return `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.oneo.nsgo">
     <uses-sdk android:minSdkVersion="28" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />` + perms + `
     <application android:extractNativeLibs="true">
         <provider
             android:name="dev.oneo.nsgo.FileProvider"
             android:authorities="${applicationId}.nsgo.files"
             android:exported="false"
-            android:grantUriPermissions="true" />
+            android:grantUriPermissions="true" />` + services + `
     </application>
 </manifest>
 `
+}
 
 // buildAndroidAAR writes <dir>/<name>.aar for a host app's Gradle build:
 // the Java runtime's classes as a jar, the app's executable for goarch as
@@ -436,7 +449,7 @@ func buildAndroidAAR(ctx context.Context, p *project, dir, goarch string) error 
 		name string
 		data []byte
 	}{
-		{"AndroidManifest.xml", []byte(aarManifest)},
+		{"AndroidManifest.xml", []byte(aarManifest(p.androidOverlay()))},
 		{"classes.jar", androidruntime.ClassesJar},
 		{"R.txt", nil},
 		{"jni/" + abi + "/libnsgo.so", app},

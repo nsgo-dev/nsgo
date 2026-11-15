@@ -72,12 +72,15 @@ type liveActivities struct {
 // its widgets or its Live Activities.
 func (p *project) iosExtension() bool { return len(p.Widgets) > 0 || p.LiveActivities.Enabled }
 
-// androidPermissions are the permissions the Android app asks for: android.permissions, with those of Live Updates when it has Live Activities, and REQUEST_INSTALL_PACKAGES on the direct channel, whose updater hands the next APK to the package installer. A store's build never asks for it, as stores review it.
+// androidPermissions are the permissions the Android app asks for: android.permissions, with those of Live Updates when it has Live Activities, the foreground service's an overlay over other apps takes when it asks for SYSTEM_ALERT_WINDOW (androidOverlay), and REQUEST_INSTALL_PACKAGES on the direct channel, whose updater hands the next APK to the package installer. A store's build never asks for it, as stores review it.
 func (p *project) androidPermissions() []string {
 	perms := p.Android.Permissions
 	var added []string
 	if p.LiveActivities.Enabled {
 		added = append(added, "android.permission.POST_NOTIFICATIONS", "android.permission.POST_PROMOTED_NOTIFICATIONS")
+	}
+	if p.androidOverlay() {
+		added = append(added, "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE")
 	}
 	if p.updates() {
 		added = append(added, "android.permission.REQUEST_INSTALL_PACKAGES")
@@ -88,6 +91,11 @@ func (p *project) androidPermissions() []string {
 		}
 	}
 	return perms
+}
+
+// androidOverlay reports whether the Android app shows overlays over other apps (mobile.OpenOverlay): it lists SYSTEM_ALERT_WINDOW in android.permissions, and its manifest declares the runtime's overlay service, which no other app does.
+func (p *project) androidOverlay() bool {
+	return slices.Contains(p.Android.Permissions, "android.permission.SYSTEM_ALERT_WINDOW")
 }
 
 // widgetKind is a kind of the app's widgets in nsgo.yaml.

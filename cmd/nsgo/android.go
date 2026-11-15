@@ -131,6 +131,7 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 		Debuggable:  p.testBinary,
 		Permissions: p.androidPermissions(),
 		TargetSDK:   p.Android.TargetSDK,
+		Overlay:     p.androidOverlay(),
 	}, files, key)
 	if err != nil {
 		return "", err
