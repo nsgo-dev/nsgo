@@ -52,6 +52,8 @@ type TextView struct {
 	Selectable bool
 	// Highlighter colors code blocks; without one their code is plain.
 	Highlighter Highlighter
+	// Search is the search the view joins, else the one ProvideSearch gives the views below it: the view finds its query in the texts it shows, which PartSearch and PartSearchSelected style, and reveals the selected match.
+	Search *Search
 
 	// OnLinkPress receives a pressed link's URL: a heading's anchor is
 	// "#<anchor>", a footnote reference "#footnote-<label>". Nothing opens
@@ -151,6 +153,15 @@ func (tv TextView) Render(cx *core.Scope) core.Node {
 		tv.Extensions = append(ext, tv.Extensions...)
 	}
 	r := &renderer{tv: tv, plugins: plugins, cx: cx}
+	search := tv.Search
+	if search == nil {
+		search = searchKey.Use(cx)
+	}
+	var root *core.Ref
+	if search != nil {
+		r.search = search.join(cx)
+		root = &r.search.root
+	}
 	// What the sources read may change more often than they do.
 	if tv.MarkdownFunc != nil {
 		tv.MarkdownFunc = core.NewMemo(cx, tv.MarkdownFunc).Get
@@ -172,8 +183,8 @@ func (tv TextView) Render(cx *core.Scope) core.Node {
 	return core.View{
 		Class:      r.class(PartRoot),
 		StyleFunc:  func() core.Style { return r.style(PartRoot) },
-		Selectable: tv.Selectable,
-		TestID:     tv.TestID, OnLayout: tv.OnLayout, Tooltip: tv.Tooltip,
+		Selectable: tv.Selectable, Ref: root,
+		TestID: tv.TestID, OnLayout: tv.OnLayout, Tooltip: tv.Tooltip,
 		Children: []core.Node{
 			core.Each(rows, func(r row) rowKey { return rowKey{r.index, r.block.Kind()} },
 				func(cx *core.Scope, item func() row, index func() int) core.Node {
@@ -182,7 +193,7 @@ func (tv TextView) Render(cx *core.Scope) core.Node {
 					// once is made again when another follows it.
 					last := core.NewMemo(cx, func() bool { return tv.StreamingCaret != nil && index() == count.Get()-1 })
 					return core.Dynamic(func(cx *core.Scope) core.Node {
-						return r.blockAt(cx, block.Get(), index() == 0, 0, last.Get())
+						return r.blockAt(cx, block.Get(), index() == 0, 0, last.Get(), TextRef{Footnote: -1, Path: []int{index()}})
 					})
 				}),
 			core.Show{When: func() bool { return tv.StreamingCaret != nil && count.Get() == 0 },
@@ -248,6 +259,8 @@ type renderer struct {
 	plugins []Plugin
 	// cx opens the links that leave the document.
 	cx *core.Scope
+	// search is the view in its search, if any.
+	search *searchView
 }
 
 // style merges the parts' styles: StyleOf's for each, then Styles'.
@@ -282,15 +295,15 @@ func joinClasses(a, b string) string {
 	return a + " " + b
 }
 
-func (r *renderer) blocks(cx *core.Scope, blocks []Block, depth int) []core.Node {
-	return r.blocksAt(cx, blocks, depth, false)
+func (r *renderer) blocks(cx *core.Scope, blocks []Block, depth int, in TextRef) []core.Node {
+	return r.blocksAt(cx, blocks, depth, false, in)
 }
 
-// blocksAt builds blocks, the caret in the last when caret.
-func (r *renderer) blocksAt(cx *core.Scope, blocks []Block, depth int, caret bool) []core.Node {
+// blocksAt builds blocks, the caret in the last when caret, each placed in in.
+func (r *renderer) blocksAt(cx *core.Scope, blocks []Block, depth int, caret bool, in TextRef) []core.Node {
 	out := make([]core.Node, len(blocks))
 	for i, b := range blocks {
-		out[i] = r.blockAt(cx, b, i == 0, depth, caret && i == len(blocks)-1)
+		out[i] = r.blockAt(cx, b, i == 0, depth, caret && i == len(blocks)-1, in.child(i))
 	}
 	if caret && len(blocks) == 0 {
 		out = append(out, r.tv.StreamingCaret)
@@ -298,8 +311,8 @@ func (r *renderer) blocksAt(cx *core.Scope, blocks []Block, depth int, caret boo
 	return out
 }
 
-func (r *renderer) block(cx *core.Scope, b Block, first bool, depth int) core.Node {
-	return r.blockAt(cx, b, first, depth, false)
+func (r *renderer) block(cx *core.Scope, b Block, first bool, depth int, at TextRef) core.Node {
+	return r.blockAt(cx, b, first, depth, false, at)
 }
 
 // caretSpans appends the streaming caret to spans, inline, when caret.
@@ -310,9 +323,8 @@ func (r *renderer) caretSpans(spans []core.Span, caret bool) []core.Span {
 	return append(spans, core.Span{Attachment: r.tv.StreamingCaret})
 }
 
-// blockAt builds b. first drops a heading's top margin; depth is how many
-// lists b is in; caret puts the streaming caret at its end.
-func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret bool) core.Node {
+// blockAt builds b. first drops a heading's top margin; depth is how many lists b is in; caret puts the streaming caret at its end; at is its place, which a search names its texts by.
+func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret bool, at TextRef) core.Node {
 	// Blocks with no text of their own to end take the caret on a line
 	// after them.
 	after := func(n core.Node) core.Node {
@@ -330,7 +342,7 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 			}
 			return after(core.Group(nodes))
 		}
-		return r.selectable(core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartParagraph), StyleFunc: func() core.Style { return r.style(PartParagraph) }})
+		return r.searched(cx, at, core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartParagraph), StyleFunc: func() core.Style { return r.style(PartParagraph) }})
 	case Heading:
 		level := min(max(b.Level, 1), 6)
 		heading := func() core.Style {
@@ -340,10 +352,10 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 			}
 			return s
 		}
-		return r.selectable(core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartHeading, PartHeading1+Part(level-1)),
+		return r.searched(cx, at, core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartHeading, PartHeading1+Part(level-1)),
 			StyleFunc: heading, Role: core.RoleHeader})
 	case Blockquote:
-		children := r.blocksAt(cx, b.Children, depth, caret)
+		children := r.blocksAt(cx, b.Children, depth, caret, at)
 		if b.Alert == AlertNone {
 			return core.View{Class: r.class(PartBlockquote), StyleFunc: func() core.Style { return r.style(PartBlockquote) }, Children: children}
 		}
@@ -354,7 +366,7 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 				core.View{Class: r.class(PartAlertContent), StyleFunc: func() core.Style { return r.style(PartAlertContent) }, Children: children},
 			}}
 	case List:
-		return r.list(cx, b, depth, caret)
+		return r.list(cx, b, depth, caret, at)
 	case CodeBlock:
 		if r.tv.RenderDiagram != nil && !caret && IsDiagram(b) {
 			// The diagram centers on a line as wide as the scroll at least, which a copy takes as the block's source between its fences.
@@ -368,13 +380,13 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 		if r.tv.RenderCodeBlock != nil {
 			return after(r.tv.RenderCodeBlock(cx, b))
 		}
-		return r.code(cx, b, caret)
+		return r.code(cx, b, caret, at)
 	case Table:
-		return r.table(cx, b, caret)
+		return r.table(cx, b, caret, at)
 	case Rule:
 		return after(core.View{Class: r.class(PartRule), StyleFunc: func() core.Style { return r.style(PartRule) }})
 	case Details:
-		return after(r.details(cx, b, depth))
+		return after(r.details(cx, b, depth, at))
 	case Math:
 		if r.tv.RenderMath != nil {
 			b.Display = true
@@ -387,23 +399,23 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 			}})
 		}
 		if caret {
-			return r.selectable(core.Text{Spans: r.caretSpans([]core.Span{{Content: b.TeX}}, true), Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) }})
+			return r.searched(cx, at, core.Text{Spans: r.caretSpans([]core.Span{{Content: b.TeX}}, true), Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) }})
 		}
-		return r.selectable(core.Text{Content: b.TeX, Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) }})
+		return r.searched(cx, at, core.Text{Content: b.TeX, Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) }})
 	case Custom:
 		if n := r.custom(cx, b); n != nil {
 			return after(n)
 		}
 		switch {
 		case len(b.Children) > 0:
-			return core.View{Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }, Children: r.blocksAt(cx, b.Children, depth, caret)}
+			return core.View{Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }, Children: r.blocksAt(cx, b.Children, depth, caret, at)}
 		case len(b.Content) > 0:
-			return r.selectable(core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
+			return r.searched(cx, at, core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
 		}
 		if caret {
-			return r.selectable(core.Text{Spans: r.caretSpans([]core.Span{{Content: b.Text}}, true), Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
+			return r.searched(cx, at, core.Text{Spans: r.caretSpans([]core.Span{{Content: b.Text}}, true), Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
 		}
-		return r.selectable(core.Text{Content: b.Text, Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
+		return r.searched(cx, at, core.Text{Content: b.Text, Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
 	}
 	return nil
 }
@@ -434,9 +446,8 @@ func (r *renderer) custom(cx *core.Scope, b Custom) core.Node {
 	return nil
 }
 
-// details shows a disclosure: its summary, which a press opens and
-// closes, and its blocks, made each time it opens.
-func (r *renderer) details(cx *core.Scope, d Details, depth int) core.Node {
+// details shows a disclosure: its summary, which a press opens and closes, and its blocks, made each time it opens, so a search finds them only while it is open.
+func (r *renderer) details(cx *core.Scope, d Details, depth int, at TextRef) core.Node {
 	open := core.NewSignal(cx, d.Open)
 	return core.View{Class: r.class(PartDetails), StyleFunc: func() core.Style { return r.style(PartDetails) }, Children: []core.Node{
 		core.View{Class: r.class(PartSummary), StyleFunc: func() core.Style { return r.style(PartSummary) }, Role: core.RoleButton, OnPress: func(core.PressEvent) { open.Set(!open.Get()) },
@@ -447,17 +458,17 @@ func (r *renderer) details(cx *core.Scope, d Details, depth int) core.Node {
 					}
 					return "▸"
 				}, Class: r.class(PartSummaryMarker), StyleFunc: func() core.Style { return r.style(PartSummaryMarker) }}),
-				r.selectable(core.Text{Spans: r.spans(nil, d.Summary, noStyle, "", nil), Style: core.Style{FlexGrow: 1, FlexShrink: 1}}),
+				r.searched(cx, at.child(-1), core.Text{Spans: r.spans(nil, d.Summary, noStyle, "", nil), Style: core.Style{FlexGrow: 1, FlexShrink: 1}}),
 			}},
 		core.Show{When: open.Get, Then: func(cx *core.Scope) core.Node {
-			return core.Group(r.blocks(cx, d.Children, depth))
+			return core.Group(r.blocks(cx, d.Children, depth, at))
 		}},
 	}}
 }
 
 var bullets = [...]string{"•", "◦", "▪"}
 
-func (r *renderer) list(cx *core.Scope, l List, depth int, caret bool) core.Node {
+func (r *renderer) list(cx *core.Scope, l List, depth int, caret bool, at TextRef) core.Node {
 	kind := PartUnorderedList
 	if l.Ordered {
 		kind = PartOrderedList
@@ -487,13 +498,13 @@ func (r *renderer) list(cx *core.Scope, l List, depth int, caret bool) core.Node
 		}
 		items[i] = core.View{Class: r.class(PartListItem), StyleFunc: func() core.Style { return r.style(PartListItem) }, Children: []core.Node{
 			marker,
-			core.View{Class: r.class(content...), StyleFunc: func() core.Style { return r.style(content...) }, Children: r.blocksAt(cx, it.Children, depth+1, caret && i == len(l.Items)-1)},
+			core.View{Class: r.class(content...), StyleFunc: func() core.Style { return r.style(content...) }, Children: r.blocksAt(cx, it.Children, depth+1, caret && i == len(l.Items)-1, at.child(i))},
 		}}
 	}
 	return core.View{Class: r.class(PartList, kind), StyleFunc: func() core.Style { return r.style(PartList, kind) }, Children: items}
 }
 
-func (r *renderer) code(cx *core.Scope, c CodeBlock, caret bool) core.Node {
+func (r *renderer) code(cx *core.Scope, c CodeBlock, caret bool, at TextRef) core.Node {
 	spans := func() []core.Span {
 		var highlights []Highlight
 		if r.tv.Highlighter != nil {
@@ -504,10 +515,12 @@ func (r *renderer) code(cx *core.Scope, c CodeBlock, caret bool) core.Node {
 	// The code recolors in place as the highlighter's colors change (the
 	// appearance, a lexer done); the caret is an attachment, which only
 	// Spans carries, so a block streaming in is built again instead.
-	code := r.selectable(core.Text{SpansFunc: spans, Class: r.class(PartCodeBlockCode), StyleFunc: func() core.Style { return r.style(PartCodeBlockCode) }})
+	// A search's parts go over the highlighter's colors.
+	code := core.Text{SpansFunc: spans, Class: r.class(PartCodeBlockCode), StyleFunc: func() core.Style { return r.style(PartCodeBlockCode) }}
 	if caret {
 		code.SpansFunc, code.Spans = nil, r.caretSpans(spans(), true)
 	}
+	code = r.searched(cx, at, code)
 	children := []core.Node{core.Scroll{Horizontal: true, HideIndicator: r.tv.NoCodeBlockScrollbar,
 		Class: r.class(PartCodeBlockScroll), StyleFunc: func() core.Style { return r.style(PartCodeBlockScroll) }, Children: []core.Node{code}}}
 	if len(r.tv.CodeBlockActions) > 0 {
@@ -578,7 +591,7 @@ func codeSpans(code string, highlights []Highlight) []core.Span {
 // each column fits its content when there is room and shrinks, its cells
 // wrapping, down to a floor estimated from its text; below the floors the
 // grid scrolls.
-func (r *renderer) table(cx *core.Scope, t Table, caret bool) core.Node {
+func (r *renderer) table(cx *core.Scope, t Table, caret bool, at TextRef) core.Node {
 	cols := t.Columns()
 	// The floors are estimates, made with the font size at hand.
 	em := core.Untracked(cx, func() core.Points { return r.style(PartTableCell).FontSize })
@@ -617,7 +630,8 @@ func (r *renderer) table(cx *core.Scope, t Table, caret bool) core.Node {
 			return r.style(rowParts...).Merge(core.Style{GridRow: line, GridColumn: core.GridLines{Start: core.GridLine(1), End: core.GridLine(-1)}})
 		}})
 		col := 0
-		for _, c := range row {
+		for k, c := range row {
+			place := at.child(i, k)
 			at, span := col, c.span()
 			s := func() core.Style {
 				s := r.style(cellParts...)
@@ -630,7 +644,7 @@ func (r *renderer) table(cx *core.Scope, t Table, caret bool) core.Node {
 				return s
 			}
 			lastCell := caret && i == len(rows)-1 && col+c.span() >= cols
-			children = append(children, r.selectable(core.Text{Spans: r.caretSpans(r.spans(nil, c.Content, noStyle, "", nil), lastCell), Class: r.class(cellParts...), StyleFunc: s}))
+			children = append(children, r.searched(cx, place, core.Text{Spans: r.caretSpans(r.spans(nil, c.Content, noStyle, "", nil), lastCell), Class: r.class(cellParts...), StyleFunc: s}))
 			col += c.span()
 		}
 	}
@@ -679,9 +693,10 @@ func (r *renderer) footnotes(cx *core.Scope, notes []Footnote) core.Node {
 	}
 	rows := make([]core.Node, len(notes))
 	for i, f := range notes {
+		in := TextRef{Footnote: i}
 		rows[i] = core.View{Class: r.class(PartFootnote), StyleFunc: func() core.Style { return r.style(PartFootnote) }, Children: []core.Node{
 			r.selectable(core.Text{Content: strconv.Itoa(f.Index) + ".", Class: r.class(PartFootnoteLabel), StyleFunc: func() core.Style { return r.style(PartFootnoteLabel) }}),
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}, Children: r.blocks(cx, f.Children, 0)},
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}, Children: r.blocks(cx, f.Children, 0, in)},
 		}}
 	}
 	return core.View{Class: r.class(PartFootnotes), StyleFunc: func() core.Style { return r.style(PartFootnotes) }, Children: rows}

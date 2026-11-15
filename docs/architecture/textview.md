@@ -2,7 +2,7 @@
 
 `base/textview` is NSH's `TextView` (`nsh/docs/dev/text-view.md`): a document of Markdown, HTML or the app's own blocks, shown with `Text`, `View`, `Scroll` and `Image`. Read this before changing the document model, the parser, the parts or highlighting.
 
-The shared find design for this document and `ui/chat` is in [Text-level search](text-search.md); it is not implemented yet.
+Finding text across views is [Text-level search](text-search.md)'s.
 
 ## Layers
 
@@ -59,6 +59,7 @@ Highlighting is its own package because chroma's lexers add about 4.5 MB to a bi
 - `CodeBlockActions` are buttons in `PartCodeBlockHeader`; `CopyAction` copies the code and reports itself done for 1.6 seconds through `CodeBlockAction.Done`. `RenderTableActions` shows content above each table. `NoTableScroll`, `NoTableScrollbar` and `NoCodeBlockScrollbar` are NSH's scroll switches, and `NoMathBlockScrollbar` hides a display formula's scroll bar as `NoCodeBlockScrollbar` does a code block's.
 - `Provide` gives every `TextView` below a scope `Plugin`s: an extension, and what renders its nodes before `RenderCustom`, as NSH's `MarkdownPlugins` context does.
 - A disclosure's summary toggles it on press; its blocks are built each time it opens.
+- A view in a `Search` (its field, else `ProvideSearch`'s) builds each text it searches with `SpansFunc` and a `Ref`, so a change of matches restyles the text in place: its view, and a selection in it, stays. Its attachments go behind pointers made once with the text (`pinned`), so their views, an image's native view, a formula and the streaming caret, stay too.
 - Tables are one CSS grid in a horizontal `Scroll`. Each column is `minmax(floor, auto)`, the floor estimated from its text as NSH does. The grid is the scroll view's width and at least the floors' sum, so narrow views wrap cells, then scroll.
 
 ## Parts

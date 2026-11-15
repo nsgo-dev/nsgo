@@ -128,6 +128,10 @@ const (
 	PartFootnoteReference
 	// PartCustom is custom nodes shown as their content.
 	PartCustom
+	// PartSearch is a search's match in text, with no look of its own: the app's styles give it one.
+	PartSearch
+	// PartSearchSelected is the selected match, after PartSearch.
+	PartSearchSelected
 )
 
 // Styles are styles by part.

@@ -1,6 +1,6 @@
 # Text-level search
 
-This is the shared design for issue [#47](https://github.com/nsgo-dev/nsgo/issues/47). It is a goal, not an implemented API. Chat transcript search will consume this capability; the matching rules and highlights belong to `base/textview`, so another document viewer can use them without importing `ui/chat`. Where it follows one of its [decisions](#decisions), confirmed by the user on 2026-11-15, the decision's number marks it.
+This is the shared design for issue [#47](https://github.com/nsgo-dev/nsgo/issues/47). `base/textview` and core's box reveal implement it; its [chat integration](#chat-integration) is still a goal. Chat transcript search will consume this capability; the matching rules and highlights belong to `base/textview`, so another document viewer can use them without importing `ui/chat`. Where it follows one of its [decisions](#decisions), confirmed by the user on 2026-11-15, the decision's number marks it.
 
 ## What a view searches
 
@@ -59,6 +59,10 @@ A `TextView` joins the search in its `Search` field, else the one `ProvideSearch
 `Open` and `Close` are the app's too, so a toolbar button can open the search on a phone with no keyboard. While the search is closed, views show no search parts and `Count` is zero; the query and options stay, so opening it again finds the same matches.
 
 `SelectedBounds` is the selected match's first box in surface points, from its text's `Ref.TextRangeBoxes` rather than the block's frame, and false while that text is not laid out. Revealing the match is the view's (decision 6): selecting a match reveals it through every scroll view around its text, innermost first, so a code block's or a table's horizontal scroll reaches the match's column rather than only the block showing. `Ref.Reveal` reveals a whole element and `Ref.ScrollTo` takes an offset, so core gains a reveal of a box within an element, with a margin kept clear at the outermost scroll view's edges for the bars that cover it, which the search's owner sets with `SetRevealMargin`.
+
+## In `base/textview`
+
+`find.go` matches a text with KMP over its characters, compared by Unicode's simple case folding unless `CaseSensitive`; `WholeWord` takes letters, numbers, marks and the underscore as a word's characters. A view and each of its texts keep at most 1,000 matches (`maxMatches`): a text stops finding there, the view drops what lies past it and highlights only what it counts. `search.go` keeps a view's texts in their places' order, each text's matches in a memo of its own, and the views' in tree order, sorted again whenever a view's matches or the views change. A text in a search is a `SpansFunc` text with a `Ref`, so its view stays as its matches change. A search starts closed with no query. The selected match is kept by its view, text and range, so a text built again, as a streaming block is, keeps it; where its view is gone, the match at its index is selected. A newly selected match, by `Next` and `Previous` or because the matches moved it, is revealed once its text is laid out, nearest on both axes and without animation.
 
 ## Chat integration
 

@@ -88,6 +88,15 @@ A `mermaid` code block shows its source until the app passes `RenderDiagram: dia
 
 `textview.Parse` reads Markdown and `textview.ParseHTML` reads HTML into blocks the app can also build. `Options.Streaming` repairs a document that arrives in pieces, closing what its end leaves open and holding back a last line whose meaning the next characters decide, such as a list marker alone, so a reply never flashes markers as text, and `StreamingCaret` draws a caret at its end, for a reply written as it streams.
 
+A `textview.Search` finds text across the views that join it, through their `Search` field or `textview.ProvideSearch` above them. `SetQuery`, `Open` and `Close` drive it from a find bar, `Count` and `Selected` say where it is, and `Next` and `Previous` step through its matches in reading order. The views mark each match with `PartSearch` and the selected one with `PartSearchSelected`, for the app's styles to color, scroll it into view, and leave the user's selection alone.
+
+```go
+search := textview.NewSearch(cx)
+textview.ProvideSearch(cx, search)
+search.SetQuery("readme")
+search.Open()
+```
+
 ## Next
 
 - [Images and icons](images.md): pictures and SVGs, in a text too.

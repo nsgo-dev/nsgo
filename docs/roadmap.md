@@ -176,7 +176,7 @@ What `base/textview` and `ui/chat` still lack, from NSGo's own issues ([text vie
 
 | Item | Reference | Done when |
 | --- | --- | --- |
-| Text-level search | NSGo's [#47](https://github.com/nsgo-dev/nsgo/issues/47), [text-level search](architecture/text-search.md) | `base/textview` finds and highlights matches across document views, and `ui/chat` adds a transcript find bar without owning matching rules |
+| Transcript search | NSGo's [#47](https://github.com/nsgo-dev/nsgo/issues/47), [text-level search](architecture/text-search.md#chat-integration) | `ui/chat` adds a transcript find bar on `textview.Search`, opened with Mod+F, unfolding folded turns and reasoning while it is open and giving the focus back as it closes |
 
 ## Widgets
 
