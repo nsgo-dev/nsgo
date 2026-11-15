@@ -35,6 +35,9 @@ func (q *QuitRequest) Cancel() {
 	}
 }
 
+// Canceled reports whether a quit handler canceled the request.
+func (q *QuitRequest) Canceled() bool { return q != nil && q.canceled }
+
 // Defer keeps the platform's quit request pending and returns a one-shot answer. quit true proceeds with quitting; false cancels it. The returned function is safe to call from another goroutine. Call it in every case: until it is called, a later quit request, such as a second Cmd+Q, waits for this one's answer. A handler that panics after Defer, without having answered, cancels the request, and the function it got then does nothing.
 func (q *QuitRequest) Defer() func(quit bool) {
 	if q == nil || q.canceled || q.deferred || q.answer == nil {

@@ -108,6 +108,55 @@ func TestCaptureSkipsHeadlessAndScreenshotNamesStayInside(t *testing.T) {
 	}
 }
 
+func TestDropFilesUsesTheNearestEnabledDropAncestor(t *testing.T) {
+	var got []string
+	app := Start(t, func(cx *core.Scope) core.Node {
+		return core.View{TestID: "zone", Style: core.Style{Width: core.Pt(100), Height: core.Pt(40)},
+			OnFileDrop: func(uris []string) { got = append([]string(nil), uris...) },
+			Children:   []core.Node{core.Text{Content: "drop here", TestID: "label"}}}
+	})
+	app.DropFiles("id:label", "file:///video.mp4")
+	if len(got) != 1 || got[0] != "file:///video.mp4" {
+		t.Fatalf("drop reached %q, want the ancestor", got)
+	}
+}
+
+func TestViewBoundsUsesSurfaceCoordinates(t *testing.T) {
+	app := Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Style: core.Style{Padding: core.All(10)}, Children: []core.Node{
+			core.View{TestID: "child", Style: core.Style{Width: core.Pt(40), Height: core.Pt(20)}}}}
+	})
+	b := app.Find("id:child").Bounds()
+	if b.Origin != (core.Point{X: 10, Y: 10}) || b.Size != (core.Size{Width: 40, Height: 20}) {
+		t.Fatalf("bounds = %+v, want 10,10 40x20", b)
+	}
+}
+
+func TestPressTogglesSystemSwitchHeadless(t *testing.T) {
+	var checked bool
+	app := Start(t, func(cx *core.Scope) core.Node {
+		return core.SystemSwitch{Checked: func() bool { return checked }, OnChange: func(v bool) { checked = v }, TestID: "switch"}
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	app.Press("id:switch")
+	if !checked {
+		t.Fatal("system switch did not receive its change event")
+	}
+}
+
+func TestNavigateReportsToHiddenMountedWebView(t *testing.T) {
+	var loaded []string
+	app := Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Style: core.Style{Display: core.DisplayNone}, Children: []core.Node{
+			core.WebView{TestID: "web", Source: core.WebSrc("https://example.com"),
+				OnLoadStart: func(n core.WebNavigation) { loaded = append(loaded, "start:"+n.URL) },
+				OnLoad:      func(n core.WebNavigation) { loaded = append(loaded, "load:"+n.URL) }}}}
+	})
+	app.Navigate("id:web", core.WebNavigation{URL: "https://example.com/next"})
+	if len(loaded) != 2 || loaded[0] != "start:https://example.com/next" || loaded[1] != "load:https://example.com/next" {
+		t.Fatalf("navigation events = %v", loaded)
+	}
+}
+
 // The model records reveals and trashes, answers them as the test says, and passes core.ErrNoTrash on as itself.
 func TestRevealAndTrashAnswerAsTheTestSays(t *testing.T) {
 	var cx *core.Scope

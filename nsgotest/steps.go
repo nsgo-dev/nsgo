@@ -36,7 +36,15 @@ func focusable(v *View) bool {
 // selector names in a text with pressable spans.
 func (a *App) pressTarget(selector string) (v *View, at driver.Point, index int) {
 	a.t.Helper()
-	if m := a.Query(selector); a.target != nil && len(m) == 1 && m[0].Kind == driver.KindNative {
+	if m := a.QueryMounted(selector); len(m) == 1 && m[0].Kind == driver.KindNative && m[0].Component == driver.SwitchComponent {
+		_, at = m[0].center()
+		if a.target != nil {
+			at = a.target.reveal(m[0])
+		}
+		return m[0], at, 0
+	}
+	if m := a.Query(selector); len(m) == 1 && m[0].Kind == driver.KindNative &&
+		(a.target != nil || m[0].Component == driver.SwitchComponent) {
 		return m[0], a.target.reveal(m[0]), 0
 	}
 	if m := a.Query(selector); len(m) == 1 && m[0].Node != nil {
@@ -132,6 +140,15 @@ func (a *App) pressAt(v *View, at driver.Point, index int) {
 	a.t.Helper()
 	if a.target != nil {
 		a.target.press(at, 0)
+		a.done()
+		return
+	}
+	if v.Kind == driver.KindNative && v.Component == driver.SwitchComponent {
+		if v.NativeProps["disabled"] == true {
+			a.t.Fatalf("nsgotest: %q is disabled", v.Props.TestID)
+		}
+		checked, _ := v.NativeProps["checked"].(bool)
+		a.dispatch(driver.Event{Kind: driver.EventNative, ID: v.ID, Text: "change", Data: !checked})
 		a.done()
 		return
 	}

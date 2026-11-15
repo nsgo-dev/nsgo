@@ -116,6 +116,31 @@ func TestWindowsShareSignals(t *testing.T) {
 	}
 }
 
+func TestWindowRequestCloseReportsCancellation(t *testing.T) {
+	w := newWindows(t, func(cx *Scope) {
+		cx.SetMainView(func(cx *Scope) Node {
+			win := cx.CurrentWindow()
+			win.OnClosing(cx, func(c *WindowClosing) { c.Cancel() })
+			return Text{Content: "main"}
+		})
+	})
+	main := w.root.MainWindow()
+	if main == nil {
+		t.Fatal("main window is nil")
+	}
+	var closing WindowClosing
+	closing.Cancel()
+	if !closing.Canceled() || (&WindowClosing{}).Canceled() {
+		t.Fatal("WindowClosing.Canceled reports the wrong state")
+	}
+	if main.RequestClose() {
+		t.Fatal("a canceled close reported success")
+	}
+	if main.Closed() {
+		t.Fatal("a canceled close closed the window")
+	}
+}
+
 // CurrentWindowOf returns the window w's content finds as its own.
 func (w *Window) CurrentWindowOf() *Window { return w.scope.CurrentWindow() }
 

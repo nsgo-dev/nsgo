@@ -73,6 +73,17 @@ func TestQuitRequestRunsNewestFirstAndCanCancel(t *testing.T) {
 	}
 }
 
+func TestQuitRequestCanceledReportsState(t *testing.T) {
+	q := &QuitRequest{}
+	if q.Canceled() {
+		t.Fatal("a new request is canceled")
+	}
+	q.Cancel()
+	if !q.Canceled() {
+		t.Fatal("Cancel did not change Canceled")
+	}
+}
+
 func TestQuitRequestApprovesAfterHandlersPass(t *testing.T) {
 	var ran []string
 	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {

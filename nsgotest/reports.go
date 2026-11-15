@@ -245,6 +245,23 @@ func (a *App) ClosePopup() {
 	a.Settle()
 }
 
+// CloseWindow asks the app's main window to close as its close button does.
+// OnClosing handlers run newest first; the return value is true when none
+// canceled and the window closed.
+func (a *App) CloseWindow() bool {
+	a.t.Helper()
+	if a.target != nil {
+		a.t.Skip("nsgotest: CloseWindow is available in headless runs only")
+	}
+	w := a.root.MainWindow()
+	if w == nil {
+		a.t.Fatalf("nsgotest: the app has no main window")
+	}
+	closed := w.RequestClose()
+	a.Settle()
+	return closed
+}
+
 // HeaderBack presses the back button in the system header of the screen
 // selector matches, as iOS and Android draw it.
 func (a *App) HeaderBack(selector string) {
@@ -330,7 +347,11 @@ func (a *App) Progress(selector string, position, duration time.Duration) {
 // nav describes, as a platform does: it starts loading, then loads.
 func (a *App) Navigate(selector string, nav driver.WebNavigation) {
 	a.t.Helper()
-	v := a.Find(selector)
+	vs := a.QueryMounted(selector)
+	if len(vs) != 1 {
+		a.t.Fatalf("nsgotest: %d mounted views match %q\n%s", len(vs), selector, a.Dump())
+	}
+	v := vs[0]
 	for _, loading := range []bool{true, false} {
 		nav.Loading = loading
 		kind := driver.EventLoad
@@ -459,11 +480,22 @@ func (a *App) scrollEvent(v *View, kind driver.EventKind) {
 }
 
 // DropFiles drops files on the view selector matches, as a desktop or
-// the web does: the drag enters, then the files drop.
-// the web does: the drag enters, then the files drop.
+// the web does: the nearest enabled ancestor that hears file drops takes it.
 func (a *App) DropFiles(selector string, uris ...string) {
 	a.t.Helper()
 	v := a.Find(selector)
+	for p := v; p != nil; p = p.Parent {
+		if p.disabled(nil) {
+			a.t.Fatalf("nsgotest: no enabled view hearing file drops matches %q\n%s", selector, a.Dump())
+		}
+		if p.Events.Has(driver.EventFileDrop) {
+			v = p
+			break
+		}
+	}
+	if v == nil || !v.Events.Has(driver.EventFileDrop) || v.disabled(nil) {
+		a.t.Fatalf("nsgotest: no enabled view hearing file drops matches %q\n%s", selector, a.Dump())
+	}
 	if v.Events.Has(driver.EventFileDragEnter) {
 		a.dispatch(driver.Event{Kind: driver.EventFileDragEnter, ID: v.ID})
 	}

@@ -21,6 +21,8 @@ func TestPress(t *testing.T) {
 
 当测试在某个目标上运行时，`TestMain` 会把主线程交给平台。
 
+`DropFiles` 可以指定放置区域中的子视图；最近的启用且带有 `OnFileDrop` 的祖先会接收文件。`app.Find("id:child").Bounds()` 返回视图在 surface 坐标中的框。`app.Emit("id:switch", "change", true)` 直接报告原生系统开关的值，无头测试中的 `app.Press` 也会切换已挂载的系统开关。`app.Navigate` 会向已挂载但隐藏的 Web 视图报告加载事件。`app.CloseWindow()` 会运行主窗口的 `OnClosing` 处理器，并返回窗口是否关闭。
+
 ## 运行测试
 
 ```sh

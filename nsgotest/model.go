@@ -866,6 +866,9 @@ func (v *View) center() (local, page driver.Point) {
 	return local, driver.Point{X: at.Origin.X + local.X, Y: at.Origin.Y + local.Y}
 }
 
+// Bounds returns v's frame in surface points, as Ref.Bounds reports.
+func (v *View) Bounds() core.Bounds { return v.surfaceFrame() }
+
 // surfaceFrame is v's frame in surface points, as its ancestors and their
 // scroll offsets place it; a modal's views are placed over the window.
 func (v *View) surfaceFrame() driver.Bounds {

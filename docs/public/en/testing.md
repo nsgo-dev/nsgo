@@ -21,6 +21,8 @@ func TestPress(t *testing.T) {
 
 `TestMain` gives the platform the main thread when the tests run on a target.
 
+`DropFiles` may name a child of a drop zone; the nearest enabled ancestor with `OnFileDrop` receives it. `app.Find("id:child").Bounds()` returns the view's frame in surface points. `app.Emit("id:switch", "change", true)` reports a native system-switch value, and `app.Press` toggles a mounted system switch in headless tests. `app.Navigate` also reports loads for mounted web views hidden behind another view. `app.CloseWindow()` runs the main window's `OnClosing` handlers and returns whether it closed.
+
 ## Run the tests
 
 ```sh
