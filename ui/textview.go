@@ -5,7 +5,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// TextView is textview.TextView in ui's type and colors: its headings, quotes and alerts, lists, code, tables and links. The app's StyleOf merges over ui's styles, and its Styles over both, as they do in base. Code is colored by the app's Highlighter, such as highlight.New's. With RenderMath, a display formula's block keeps its box but not the code type.
+// TextView is textview.TextView in ui's type and colors: its headings, quotes and alerts, lists, code, tables and links. The app's StyleOf merges over ui's styles, and its Styles over both, as they do in base. Code is colored by the app's Highlighter, such as highlight.New's. With RenderMath, a display formula's block keeps its background but not the code type, and its scroll takes the padding, so the scroll bar runs along the block's edge as a code block's does.
 type TextView textview.TextView
 
 // Render implements core.Node.
@@ -17,8 +17,9 @@ func (v TextView) Render(cx *core.Scope) core.Node {
 	out.StyleOf = func(p textview.Part) core.Style {
 		s := styles()[p]
 		if typeset && p == textview.PartMathBlock {
-			// A typeset display formula takes the type around it, as the inline ones do; the code type is for its TeX.
+			// A typeset display formula takes the type around it, as the inline ones do, and PartMathBlockScroll's padding; the code type and this padding are for its TeX.
 			s.FontFamily, s.FontSize, s.LineHeight = "", 0, 0
+			s.Padding, s.PaddingPercent = core.Edges{}, 0
 		}
 		if app != nil {
 			s = s.Merge(app(p))
@@ -105,9 +106,10 @@ func TextViewStyles(cx *core.Scope) textview.Styles {
 		textview.PartTableHeaderCell: semibold,
 		textview.PartTableActions:    {Direction: core.Row, JustifyContent: core.JustifyEnd, Gap: 4},
 
-		textview.PartRule:      {Height: core.Pt(1), Background: c.Line, Margin: core.Symmetric(8, 0)},
-		textview.PartMath:      TypeCode,
-		textview.PartMathBlock: TypeCode.Merge(core.Style{Padding: core.All(12), Background: c.Inset, CornerRadius: RadiusControl}),
+		textview.PartRule:            {Height: core.Pt(1), Background: c.Line, Margin: core.Symmetric(8, 0)},
+		textview.PartMath:            TypeCode,
+		textview.PartMathBlock:       TypeCode.Merge(core.Style{Padding: core.All(12), Background: c.Inset, CornerRadius: RadiusControl}),
+		textview.PartMathBlockScroll: {Padding: core.All(12)},
 
 		textview.PartDetails:       {Gap: 8, Padding: core.Symmetric(8, 12), BorderWidth: 1, BorderColor: c.Border, CornerRadius: RadiusControl},
 		textview.PartSummary:       TypeLabel.Merge(core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}),

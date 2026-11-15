@@ -10,6 +10,7 @@ import (
 	"github.com/nsgo-dev/nsgo/base/textview"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/i18n"
+	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
@@ -209,6 +210,65 @@ func TestTextViewRendersFormulasAndInlineNodes(t *testing.T) {
 	}
 	if got := strings.Join(copies, "|"); got != "$E=mc^2$||" {
 		t.Errorf("the attachments copy as %q", got)
+	}
+}
+
+// A display formula centers in a sideways scroll that fills its block and takes PartMathBlockScroll's padding, so its bar runs along the block's edge as a code block's does, and copies as its TeX between $$ fences.
+func TestTextViewScrollsDisplayFormulasAtTheBlocksEdge(t *testing.T) {
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return textview.TextView{Markdown: "$$\nx^2\n$$",
+			Styles: textview.Styles{textview.PartMathBlock: {Background: core.RGB(0xeeeeee)}, textview.PartMathBlockScroll: {Padding: core.All(12)}},
+			RenderMath: func(cx *core.Scope, m textview.Math) core.Node {
+				return core.View{TestID: "formula", Style: core.Style{Width: core.Pt(10), Height: core.Pt(10)}}
+			}}
+	}, nsgotest.Size(300, 200))
+	text := app.Find("id:formula")
+	for text.Kind != driver.KindText {
+		text = text.Parent
+	}
+	if text.Spans[0].Copy != "$$\nx^2\n$$" {
+		t.Errorf("the display formula copies as %q", text.Spans[0].Copy)
+	}
+	scroll := text.Parent
+	if scroll.Kind != driver.KindScroll || !scroll.Scroll.Horizontal {
+		t.Fatalf("the formula's text is in a %v, not a sideways scroll", scroll.Kind)
+	}
+	if scroll.Scroll.HideIndicator {
+		t.Errorf("the display formula's scroll bar is hidden without NoMathBlockScrollbar")
+	}
+	block := scroll.Parent
+	if block.Style.Background == 0 || scroll.Style.Background != 0 {
+		t.Errorf("the block's background is %v and its scroll's %v: PartMathBlock is the block", block.Style.Background, scroll.Style.Background)
+	}
+	if scroll.Frame.Size.Width != block.Frame.Size.Width || scroll.Frame.Size.Width != 300 {
+		t.Errorf("the scroll is %v wide in a block %v wide: it fills the block", scroll.Frame.Size.Width, block.Frame.Size.Width)
+	}
+	// Headless text lays lines out at the start: the text is centered across the scroll inside its padding.
+	if text.TextStyle.Align != core.TextAlignCenter || text.Frame.Origin.X != 12 || text.Frame.Size.Width != 300-24 {
+		t.Errorf("the formula's text aligns %v, at %v and %v wide: it centers across the scroll's padded width", text.TextStyle.Align, text.Frame.Origin.X, text.Frame.Size.Width)
+	}
+}
+
+func TestTextViewHidesDisplayFormulasScrollBarsWithNoMathBlockScrollbar(t *testing.T) {
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return textview.TextView{Markdown: "$$\nx^2\n$$\n\n```\ncode\n```", NoMathBlockScrollbar: true,
+			RenderMath: func(cx *core.Scope, m textview.Math) core.Node {
+				return core.View{TestID: "formula", Style: core.Style{Width: core.Pt(10), Height: core.Pt(10)}}
+			}}
+	})
+	scroll := app.Find("id:formula")
+	for scroll.Kind != driver.KindScroll {
+		scroll = scroll.Parent
+	}
+	if !scroll.Scroll.HideIndicator {
+		t.Errorf("NoMathBlockScrollbar leaves the display formula's scroll bar showing")
+	}
+	code := app.Find("text:code")
+	for code.Kind != driver.KindScroll {
+		code = code.Parent
+	}
+	if code.Scroll.HideIndicator {
+		t.Errorf("NoMathBlockScrollbar hides a code block's scroll bar: that is NoCodeBlockScrollbar's")
 	}
 }
 

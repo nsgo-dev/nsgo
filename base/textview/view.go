@@ -70,7 +70,7 @@ type TextView struct {
 	RenderCustom func(cx *core.Scope, node Custom) core.Node
 	// CustomSpan shows a custom node in text as a span.
 	CustomSpan func(node Custom) core.Span
-	// RenderMath shows a formula: a block of its own in PartMathBlock when its Display is set ($$…$$ on lines of its own), else as an attachment in its text, which a copy takes as its TeX between dollars. Without it a formula shows its TeX in PartMath or PartMathBlock. formula.RenderMath (base/formula) typesets them, which links Untie and its font into the app.
+	// RenderMath shows a formula, which TextView places as an attachment that a copy takes as its TeX between dollars: in its text, or, when its Display is set ($$…$$ on lines of its own), centered in a block of its own, PartMathBlock around a sideways PartMathBlockScroll. Without it a formula shows its TeX in PartMath or PartMathBlock. formula.RenderMath (base/formula) typesets them, which links Untie and its font into the app.
 	RenderMath func(cx *core.Scope, math Math) core.Node
 	// RenderCodeBlock shows a code block in place of the default: the code
 	// in a horizontal scroll view.
@@ -86,10 +86,8 @@ type TextView struct {
 	// RenderTableActions shows content above each table, in
 	// PartTableActions.
 	RenderTableActions func(cx *core.Scope, table Table) core.Node
-	// NoTableScroll lets a table shrink past its columns' floors rather
-	// than scroll; NoTableScrollbar and NoCodeBlockScrollbar hide the
-	// scroll bars of tables and code blocks.
-	NoTableScroll, NoTableScrollbar, NoCodeBlockScrollbar bool
+	// NoTableScroll lets a table shrink past its columns' floors rather than scroll; NoTableScrollbar, NoCodeBlockScrollbar and NoMathBlockScrollbar hide the scroll bars of tables, code blocks and display formulas.
+	NoTableScroll, NoTableScrollbar, NoCodeBlockScrollbar, NoMathBlockScrollbar bool
 	// RenderImage shows an image in place of the default: alone in a
 	// paragraph, a block; in a line of text, an attachment.
 	RenderImage func(cx *core.Scope, image Image) core.Node
@@ -369,8 +367,13 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 	case Math:
 		if r.tv.RenderMath != nil {
 			b.Display = true
-			return after(core.View{Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) },
-				Children: []core.Node{r.tv.RenderMath(cx, b)}})
+			// The formula centers on a line as wide as the scroll at least, which a copy takes as its TeX between $$ fences.
+			formula := r.selectable(core.Text{Style: core.Style{MinWidth: core.Pct(100), TextAlign: core.TextAlignCenter}, Spans: []core.Span{
+				{Content: "$$\n" + b.TeX + "\n$$", Attachment: r.tv.RenderMath(cx, b)},
+			}})
+			return after(core.View{Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) }, Children: []core.Node{
+				core.Scroll{Horizontal: true, HideIndicator: r.tv.NoMathBlockScrollbar, Class: r.class(PartMathBlockScroll), StyleFunc: func() core.Style { return r.style(PartMathBlockScroll) }, Children: []core.Node{formula}},
+			}})
 		}
 		if caret {
 			return r.selectable(core.Text{Spans: r.caretSpans([]core.Span{{Content: b.TeX}}, true), Class: r.class(PartMathBlock), StyleFunc: func() core.Style { return r.style(PartMathBlock) }})

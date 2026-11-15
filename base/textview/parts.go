@@ -102,8 +102,10 @@ const (
 	PartRule
 	// PartMath is a formula in text: its TeX.
 	PartMath
-	// PartMathBlock is a formula block: its TeX, or around what RenderMath shows.
+	// PartMathBlock is a formula block: its TeX, or, with RenderMath, around its scroll view.
 	PartMathBlock
+	// PartMathBlockScroll is the horizontal scroll view of a block's formula with RenderMath.
+	PartMathBlockScroll
 	// PartDetails is a disclosure: a column of its summary and, while
 	// open, its blocks.
 	PartDetails

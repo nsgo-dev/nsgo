@@ -163,7 +163,7 @@ func chatMarkdown(md func() string, streaming func() bool) core.Node {
 				if on {
 					c = caret(cx)
 				}
-				return textview.TextView{MarkdownFunc: md, Options: textview.Options{Streaming: on}, StreamingCaret: c, Selectable: true, NoCodeBlockScrollbar: true,
+				return textview.TextView{MarkdownFunc: md, Options: textview.Options{Streaming: on}, StreamingCaret: c, Selectable: true, NoCodeBlockScrollbar: true, NoMathBlockScrollbar: true,
 					StyleOf: chatStyles(cx), Highlighter: hl, RenderMath: formula.RenderMath, CodeBlockActions: []textview.CodeAction{{ID: textview.CopyAction, Label: tr.ChatCopyCode()}}, RenderCodeBlockAction: copyAction,
 					OnImagePress: func(im textview.Image) { used.Set(true); viewing.Set(im) }}
 			}),

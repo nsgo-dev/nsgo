@@ -252,7 +252,7 @@ func TestViewFallsBackToItsSource(t *testing.T) {
 	}
 }
 
-// RenderMath shows an inline formula on its own and a display one centered in a sideways scroll, both copying as TeX.
+// RenderMath typesets a text view's inline formula and its display one, which TextView centers in a sideways scroll, both copying as TeX.
 func TestRenderMath(t *testing.T) {
 	r := Default()
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {

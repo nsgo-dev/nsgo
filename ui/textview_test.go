@@ -5,6 +5,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/base/textview"
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
 // TestTextView draws Markdown in the theme, under the app's own styles.
@@ -29,7 +30,7 @@ func TestTextView(t *testing.T) {
 	})
 }
 
-// A typeset display formula is as large as the text around it, while its TeX alone shows in the code type.
+// A typeset display formula is as large as the text around it, in a scroll that fills its block and pads it, while its TeX alone shows in the code type.
 func TestTextViewMathBlock(t *testing.T) {
 	app, _ := start(t, core.Environment{}, func(cx *core.Scope) core.Node {
 		return core.View{Style: core.Style{Gap: 12}, Children: []core.Node{
@@ -44,5 +45,16 @@ func TestTextViewMathBlock(t *testing.T) {
 	}
 	if got := app.Find("source >> x").TextStyle.Font.Size; got != TypeCode.FontSize {
 		t.Errorf("a formula's TeX is %v, want the code's %v", got, TypeCode.FontSize)
+	}
+	text := app.Find("id:formula")
+	for text.Kind != driver.KindText {
+		text = text.Parent
+	}
+	scroll, block := text.Parent, text.Parent.Parent
+	if scroll.Kind != driver.KindScroll || scroll.Frame.Size.Width != block.Frame.Size.Width || block.Style.Background == 0 {
+		t.Errorf("a %v %v wide in a block %v wide with background %x: the scroll fills the block that has the background", scroll.Kind, scroll.Frame.Size.Width, block.Frame.Size.Width, block.Style.Background)
+	}
+	if got := text.Frame.Origin; got.X != 12 || got.Y != 12 {
+		t.Errorf("the formula's text is at %v in its scroll, want PartMathBlockScroll's padding", got)
 	}
 }
