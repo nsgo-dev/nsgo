@@ -1,0 +1,409 @@
+//go:build darwin && !ios
+
+package apple
+
+import (
+	"encoding/binary"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/ebitengine/purego"
+	"github.com/ebitengine/purego/objc"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+)
+
+// init keeps the main goroutine, and so TestMain, on the main thread.
+func init() { runtime.LockOSThread() }
+
+// mainLoop says when TestMain runs the main thread's run loop: only while a test holds it. The package's other tests, the canvas cache's, stand in for the main thread themselves, calling runMain on their own goroutine, so a run loop serving the main queue meanwhile would run their OnMain work on the main thread at the same time as they read what it writes.
+var mainLoop struct {
+	// running is held by the main thread while it runs the loop, so that the last release waits for the loop to stop.
+	running sync.Mutex
+	holds   atomic.Int32
+	wake    chan struct{}
+}
+
+// holdMainLoop has the main thread run its run loop until release.
+func holdMainLoop() (release func()) {
+	if mainLoop.holds.Add(1) == 1 {
+		select {
+		case mainLoop.wake <- struct{}{}:
+		default:
+		}
+	}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			if mainLoop.holds.Add(-1) == 0 {
+				mainLoop.running.Lock()
+				mainLoop.running.Unlock()
+			}
+		})
+	}
+}
+
+// TestMain runs the main thread's run loop while a test holds it, as an app does: OnMain, the players' time observers and their notifications run there.
+func TestMain(m *testing.M) {
+	mainLoop.wake = make(chan struct{}, 1)
+	go func() { os.Exit(m.Run()) }()
+	if _, err := purego.Dlopen("/System/Library/Frameworks/Foundation.framework/Foundation", purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
+		panic(err)
+	}
+	loop := objc.ID(Class("NSRunLoop")).Send(sel("mainRunLoop"))
+	// A run loop with no port to wait on returns at once.
+	loop.Send(sel("addPort:forMode:"), objc.ID(Class("NSMachPort")).Send(sel("port")), NSString("kCFRunLoopDefaultMode"))
+	for {
+		if mainLoop.holds.Load() == 0 {
+			<-mainLoop.wake
+			continue
+		}
+		mainLoop.running.Lock()
+		if mainLoop.holds.Load() > 0 {
+			withPool(func() {
+				until := objc.ID(Class("NSDate")).Send(sel("dateWithTimeIntervalSinceNow:"), 0.05)
+				loop.Send(sel("runMode:beforeDate:"), NSString("kCFRunLoopDefaultMode"), until)
+			})
+		}
+		mainLoop.running.Unlock()
+	}
+}
+
+// wav is length of silence as a WAV: 16-bit mono at 8 kHz.
+func wav(length time.Duration) []byte { return wavOf(length, 8000, 1) }
+
+// wavOf is length of 16-bit silence at rate with channels.
+func wavOf(length time.Duration, rate, channels int) []byte {
+	frame := 2 * channels
+	size := int(length.Seconds()*float64(rate)) * frame
+	b := make([]byte, 44+size)
+	copy(b, "RIFF")
+	binary.LittleEndian.PutUint32(b[4:], uint32(36+size))
+	copy(b[8:], "WAVEfmt ")
+	binary.LittleEndian.PutUint32(b[16:], 16)
+	binary.LittleEndian.PutUint16(b[20:], 1) // PCM
+	binary.LittleEndian.PutUint16(b[22:], uint16(channels))
+	binary.LittleEndian.PutUint32(b[24:], uint32(rate))
+	binary.LittleEndian.PutUint32(b[28:], uint32(rate*frame))
+	binary.LittleEndian.PutUint16(b[32:], uint16(frame))
+	binary.LittleEndian.PutUint16(b[34:], 16)
+	copy(b[36:], "data")
+	binary.LittleEndian.PutUint32(b[40:], uint32(size))
+	return b
+}
+
+type audioReport struct {
+	id uint32
+	e  driver.AudioEvent
+}
+
+// testAudio is an engine's Audio whose reports a test reads, its temporary files in a directory of the test's.
+type testAudio struct {
+	t       *testing.T
+	audio   *Audio
+	reports chan audioReport
+	dir     string
+}
+
+func newTestAudio(t *testing.T) *testAudio {
+	dir := t.TempDir()
+	t.Setenv("TMPDIR", dir)
+	ta := &testAudio{t: t, reports: make(chan audioReport, 256), dir: dir}
+	// Registered first, the hold goes last, after the audio closed.
+	t.Cleanup(holdMainLoop())
+	ta.audio = NewAudio(func(ev driver.Event) {
+		ta.reports <- audioReport{ev.Count, *ev.Data.(*driver.AudioEvent)}
+	})
+	t.Cleanup(func() { onMain(ta.audio.Close) })
+	return ta
+}
+
+// onMain runs fn on the main thread and waits for it.
+func onMain(fn func()) {
+	defer holdMainLoop()()
+	done := make(chan struct{})
+	OnMain(func() {
+		fn()
+		close(done)
+	})
+	<-done
+}
+
+func (ta *testAudio) send(id uint32, r driver.AudioRequest) {
+	onMain(func() { ta.audio.Handle(id, &r) })
+}
+
+// wait returns the next report of id in phase, failing the test after timeout; seen gets the reports of id on the way.
+func (ta *testAudio) wait(id uint32, phase driver.AudioPhase, timeout time.Duration, seen func(driver.AudioEvent)) driver.AudioEvent {
+	ta.t.Helper()
+	deadline := time.After(timeout)
+	for {
+		select {
+		case r := <-ta.reports:
+			if r.id != id {
+				continue
+			}
+			if r.e.Phase == phase {
+				return r.e
+			}
+			if r.e.Phase == driver.AudioFailure && phase != driver.AudioFailure {
+				ta.t.Fatalf("audio %d failed: %s: %s", id, r.e.Error, r.e.Message)
+			}
+			if seen != nil {
+				seen(r.e)
+			}
+		case <-deadline:
+			ta.t.Fatalf("audio %d reported no phase %d within %v", id, phase, timeout)
+		}
+	}
+}
+
+// quiet fails the test if id reports anything for d, after what it reported before the call: the main thread reports into the channel as it goes, so a command sent has had its reports queued.
+func (ta *testAudio) quiet(id uint32, d time.Duration) {
+	ta.t.Helper()
+	for len(ta.reports) > 0 {
+		<-ta.reports
+	}
+	deadline := time.After(d)
+	for {
+		select {
+		case r := <-ta.reports:
+			if r.id == id {
+				ta.t.Fatalf("audio %d reported %+v", id, r.e)
+			}
+		case <-deadline:
+			return
+		}
+	}
+}
+
+func near(got, want time.Duration) bool {
+	return got > want-20*time.Millisecond && got < want+20*time.Millisecond
+}
+
+func TestASoundDecodesOnceAndPlaysOverlapping(t *testing.T) {
+	ta := newTestAudio(t)
+	load := driver.AudioRequest{Command: driver.AudioLoad, Source: driver.ImageSource{Data: wav(200 * time.Millisecond)},
+		MaxBytes: driver.MaxSoundBytes, MaxDuration: driver.MaxSoundDuration}
+	ta.send(1, load)
+	e := ta.wait(1, driver.AudioLoaded, 5*time.Second, nil)
+	// 1,600 frames of one channel of 32-bit floats.
+	if !near(e.Duration, 200*time.Millisecond) || e.Bytes != 1600*4 || e.Cut {
+		t.Fatalf("loaded %+v", e)
+	}
+	// Another format reconnects the voices it takes, with the engine running.
+	load.Source.Data = wavOf(100*time.Millisecond, 44100, 2)
+	ta.send(2, load)
+	if e := ta.wait(2, driver.AudioLoaded, 5*time.Second, nil); e.Bytes != 4410*2*4 {
+		t.Fatalf("a stereo sound loaded %+v", e)
+	}
+	for i := range driver.MaxSoundVoices + 8 {
+		ta.send(uint32(1+i%2), driver.AudioRequest{Command: driver.AudioPlay, Volume: 0.01, Rate: 2})
+	}
+	onMain(func() {
+		if n := len(ta.audio.voices); n > driver.MaxSoundVoices {
+			t.Errorf("%d voices, past the limit of %d", n, driver.MaxSoundVoices)
+		}
+	})
+	ta.send(1, driver.AudioRequest{Command: driver.AudioStop})
+	ta.send(1, driver.AudioRequest{Command: driver.AudioUnload})
+	ta.send(2, driver.AudioRequest{Command: driver.AudioUnload})
+	onMain(func() {
+		if len(ta.audio.sounds) != 0 {
+			t.Error("the unloaded sound is still held")
+		}
+	})
+	ta.quiet(1, 100*time.Millisecond)
+	if files, _ := os.ReadDir(ta.dir); len(files) != 0 {
+		t.Errorf("%d temporary files left", len(files))
+	}
+}
+
+func TestASoundFailsAsTheDesignSays(t *testing.T) {
+	ta := newTestAudio(t)
+	path := filepath.Join(t.TempDir(), "click.wav")
+	if err := os.WriteFile(path, wav(50*time.Millisecond), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	limits := func(src driver.ImageSource) driver.AudioRequest {
+		return driver.AudioRequest{Command: driver.AudioLoad, Source: src, MaxBytes: driver.MaxSoundBytes, MaxDuration: driver.MaxSoundDuration}
+	}
+	ta.send(1, limits(driver.ImageSource{URI: path}))
+	if e := ta.wait(1, driver.AudioLoaded, 5*time.Second, nil); !near(e.Duration, 50*time.Millisecond) {
+		t.Errorf("a file path loaded %+v", e)
+	}
+	ta.send(2, limits(driver.ImageSource{Data: wav(6 * time.Second)}))
+	if e := ta.wait(2, driver.AudioLoaded, 5*time.Second, nil); !e.Cut || e.Duration != driver.MaxSoundDuration {
+		t.Errorf("a sound of 6 seconds loaded %+v, want it cut at 5", e)
+	}
+	for id, c := range map[uint32]struct {
+		src  driver.ImageSource
+		code string
+	}{
+		3: {driver.ImageSource{Data: []byte(strings.Repeat("not audio ", 100))}, driver.AudioDecode},
+		4: {driver.ImageSource{Data: make([]byte, driver.MaxSoundBytes+1)}, driver.AudioQuotaExceeded},
+		5: {driver.ImageSource{URI: filepath.Join(t.TempDir(), "missing.wav")}, driver.AudioNotSupported},
+		6: {driver.ImageSource{URI: "/tmp/\xff\xfe.wav"}, driver.AudioNotSupported},
+	} {
+		ta.send(id, limits(c.src))
+		if e := ta.wait(id, driver.AudioFailure, 5*time.Second, nil); e.Error != c.code {
+			t.Errorf("sound %d failed with %q (%s), want %q", id, e.Error, e.Message, c.code)
+		}
+	}
+	// A sound unloaded while it decodes is never reported.
+	ta.send(7, limits(driver.ImageSource{Data: wav(time.Second)}))
+	ta.send(7, driver.AudioRequest{Command: driver.AudioUnload})
+	ta.quiet(7, 300*time.Millisecond)
+}
+
+func openPlayer(ta *testAudio, id uint32, src driver.ImageSource, loop bool) {
+	ta.send(id, driver.AudioRequest{Command: driver.AudioOpen, Source: src, Volume: 0.01, Rate: 1, Loop: loop,
+		ProgressInterval: 50 * time.Millisecond})
+}
+
+func TestAPlayerPlaysToItsEndAndAgain(t *testing.T) {
+	ta := newTestAudio(t)
+	openPlayer(ta, 1, driver.ImageSource{Data: wav(400 * time.Millisecond)}, false)
+	ta.send(1, driver.AudioRequest{Command: driver.AudioResume})
+	if e := ta.wait(1, driver.AudioOpened, 5*time.Second, nil); !near(e.Duration, 400*time.Millisecond) {
+		t.Fatalf("opened %+v", e)
+	}
+	ta.wait(1, driver.AudioPlaying, time.Second, nil)
+	var last time.Duration
+	ta.wait(1, driver.AudioEnded, 5*time.Second, func(e driver.AudioEvent) {
+		if e.Phase == driver.AudioProgress {
+			if e.Position < last {
+				t.Errorf("the position went back from %v to %v", last, e.Position)
+			}
+			last = e.Position
+		}
+	})
+	onMain(func() {
+		if p := ta.audio.players[1]; p.playing || p.release != nil {
+			t.Error("an ended player plays on or holds the session")
+		}
+	})
+	// Played again, it starts over.
+	ta.send(1, driver.AudioRequest{Command: driver.AudioResume})
+	ta.wait(1, driver.AudioPlaying, time.Second, nil)
+	if e := ta.wait(1, driver.AudioProgress, 2*time.Second, nil); e.Position >= 300*time.Millisecond {
+		t.Errorf("played again from %v", e.Position)
+	}
+	ta.send(1, driver.AudioRequest{Command: driver.AudioClose})
+	ta.quiet(1, 300*time.Millisecond)
+	if files, _ := os.ReadDir(ta.dir); len(files) != 0 {
+		t.Errorf("%d temporary files left", len(files))
+	}
+}
+
+func TestAPlayerLoopsSeeksAndPauses(t *testing.T) {
+	ta := newTestAudio(t)
+	path := filepath.Join(t.TempDir(), "loop.wav")
+	if err := os.WriteFile(path, wav(300*time.Millisecond), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	openPlayer(ta, 1, driver.ImageSource{URI: path}, true)
+	ta.send(1, driver.AudioRequest{Command: driver.AudioResume})
+	ta.wait(1, driver.AudioPlaying, 5*time.Second, nil)
+	for {
+		e := ta.wait(1, driver.AudioProgress, 3*time.Second, func(e driver.AudioEvent) {
+			if e.Phase == driver.AudioEnded {
+				t.Fatal("a looping player ended")
+			}
+		})
+		if e.Laps > 0 {
+			break
+		}
+	}
+	ta.send(1, driver.AudioRequest{Command: driver.AudioSeek, Position: 100 * time.Millisecond})
+	// The reports from before the seek count none.
+	e := ta.wait(1, driver.AudioProgress, time.Second, nil)
+	for e.Seeks == 0 {
+		e = ta.wait(1, driver.AudioProgress, time.Second, nil)
+	}
+	if e.Seeks != 1 || e.Position != 100*time.Millisecond {
+		t.Errorf("after the seek %+v", e)
+	}
+	ta.send(1, driver.AudioRequest{Command: driver.AudioPause})
+	ta.wait(1, driver.AudioPaused, time.Second, nil)
+	onMain(func() {
+		if p := ta.audio.players[1]; p.playing || p.release != nil {
+			t.Error("a paused player plays on or holds the session")
+		}
+	})
+	ta.send(1, driver.AudioRequest{Command: driver.AudioClose})
+	ta.quiet(1, 200*time.Millisecond)
+}
+
+func TestAPlayerSeeksBeforeItLoads(t *testing.T) {
+	ta := newTestAudio(t)
+	ta.send(1, driver.AudioRequest{Command: driver.AudioOpen, Source: driver.ImageSource{Data: wav(time.Second)}, Volume: 0.01, Rate: 1,
+		ProgressInterval: 50 * time.Millisecond, Position: 600 * time.Millisecond})
+	ta.send(1, driver.AudioRequest{Command: driver.AudioPreload})
+	ta.wait(1, driver.AudioOpened, 5*time.Second, nil)
+	ta.send(1, driver.AudioRequest{Command: driver.AudioResume})
+	ta.wait(1, driver.AudioPlaying, time.Second, nil)
+	if e := ta.wait(1, driver.AudioProgress, 2*time.Second, nil); e.Position < 600*time.Millisecond {
+		t.Errorf("played from %v, want 600ms on", e.Position)
+	}
+}
+
+func TestAPlayerFailsAsTheDesignSays(t *testing.T) {
+	ta := newTestAudio(t)
+	for id, c := range map[uint32]struct {
+		src  driver.ImageSource
+		code string
+	}{
+		1: {driver.ImageSource{URI: filepath.Join(t.TempDir(), "missing.mp3")}, driver.AudioNotSupported},
+		2: {driver.ImageSource{Data: []byte(strings.Repeat("not audio ", 100))}, driver.AudioDecode},
+		3: {driver.ImageSource{URI: "/tmp/a\x00b.wav"}, driver.AudioNotSupported},
+		4: {driver.ImageSource{URI: "ftp://example.com/a.mp3"}, driver.AudioNotSupported},
+	} {
+		openPlayer(ta, id, c.src, false)
+		ta.send(id, driver.AudioRequest{Command: driver.AudioResume})
+		if e := ta.wait(id, driver.AudioFailure, 10*time.Second, nil); e.Error != c.code {
+			t.Errorf("player %d failed with %q (%s), want %q", id, e.Error, e.Message, c.code)
+		}
+		// Played again, it loads again and fails again.
+		ta.send(id, driver.AudioRequest{Command: driver.AudioResume})
+		ta.wait(id, driver.AudioFailure, 10*time.Second, nil)
+	}
+}
+
+func TestAudioExtension(t *testing.T) {
+	for _, c := range []struct {
+		data      []byte
+		uri, want string
+	}{
+		{wav(0), "", ".wav"},
+		{[]byte("ID3\x04"), "", ".mp3"},
+		{[]byte("????ftypM4A "), "https://example.com/a.mp3", ".m4a"},
+		{nil, "https://example.com/voice.MP3?v=2", ".mp3"},
+		{nil, "asset:sounds/click.caf", ".caf"},
+		{nil, "data:audio/mpeg;base64,AA==", ""},
+		{nil, "/tmp/name.with spaces", ""},
+	} {
+		if got := audioExtension(c.data, c.uri); got != c.want {
+			t.Errorf("audioExtension(%q) = %q, want %q", c.uri, got, c.want)
+		}
+	}
+}
+
+func TestAudioFileURLRefusesWhatNoURLNames(t *testing.T) {
+	onMain(func() {
+		for _, path := range []string{"", "/tmp/\xff.wav", "/tmp/a\x00.wav"} {
+			if audioFileURL(path) != 0 {
+				t.Errorf("audioFileURL(%q) named a URL", path)
+			}
+		}
+		if audioFileURL("/tmp/a.wav") == 0 {
+			t.Error("audioFileURL named no URL for a plain path")
+		}
+	})
+}
