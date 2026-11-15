@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/nsgo-dev/nsgo/internal/devtools"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
@@ -117,7 +118,7 @@ func (t *Tree) mountHighlights(cx *Scope, parent *node, opts UpdateHighlights) {
 			OnPress:     func(PressEvent) {}}
 	}}
 	// Topmost, so DevTools outline, inspect and pick inside the app's modals too.
-	t.mount(cx, parent, Overlay{Ref: h.root, Topmost: true, PointerEvents: PointerEventsBoxNone, TestID: "nsgo-update-highlights",
+	t.mount(cx, parent, Overlay{Ref: h.root, Topmost: true, PointerEvents: PointerEventsBoxNone, TestID: devtools.OverlayTestID,
 		Style:    Style{Width: Pct(100), Height: Pct(100)},
 		Children: []Node{t.auditLayer(h.audit), Each(h.boxes.Get, func(b highlightBox) uint64 { return b.id }, box), inspected, catcher}})
 }

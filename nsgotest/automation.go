@@ -421,7 +421,7 @@ func match(a *App, selector string) *automation.Error {
 	if _, err := parseSelector(selector); err != nil {
 		return automation.Errorf(automation.InvalidRequest, "%v", err)
 	}
-	if len(a.Query(selector)) == 0 {
+	if !slices.ContainsFunc(a.Query(selector), func(v *View) bool { return !devtoolsOwn(v) }) {
 		return automation.Errorf(automation.NoMatch, "no view shown matches %q", selector)
 	}
 	return nil
@@ -468,7 +468,12 @@ func (g *agent) find(p *automation.FindParams) (any, *automation.Error) {
 	}
 	r := automation.FindResult{Elements: []automation.Element{}}
 	for _, v := range views {
-		r.Elements = append(r.Elements, element(v, true))
+		if !devtoolsOwn(v) {
+			r.Elements = append(r.Elements, element(v, true))
+		}
+	}
+	if len(r.Elements) == 0 {
+		return nil, automation.Errorf(automation.NoMatch, "no view matches %q", p.Selector)
 	}
 	return r, nil
 }
@@ -703,6 +708,16 @@ func scrollViewOf(a *App, selector string) *View {
 	})
 }
 
+// devtoolsOwn reports whether v is one of DevTools' own views, on their overlay over the app under nsgo dev -devtools, -highlight or -layout, which the agent leaves out.
+func devtoolsOwn(v *View) bool {
+	for ; v != nil; v = v.Parent {
+		if v.Props.TestID == devtools.OverlayTestID {
+			return true
+		}
+	}
+	return false
+}
+
 // outline returns what a shows, an element a line, indented by the elements around it: the named views (a role, a label, a test ID, a text or a field) or with all every view shown.
 func outline(a *App, all, bounds bool) string {
 	shown := map[*View]bool{}
@@ -716,7 +731,7 @@ func outline(a *App, all, bounds bool) string {
 	var b strings.Builder
 	var walk func(v *View, depth int, named bool)
 	walk = func(v *View, depth int, named bool) {
-		if v.Style.Hidden {
+		if v.Style.Hidden || v.Props.TestID == devtools.OverlayTestID {
 			return
 		}
 		// A text whose words name the element around it, a button's, says nothing more.

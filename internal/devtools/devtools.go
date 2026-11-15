@@ -8,6 +8,9 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+// OverlayTestID is the test ID of DevTools' overlay (core.UpdateHighlights), whose views are DevTools' own, not the app's: the automation's Agent leaves them out of what it lists and finds, as the page's Elements does.
+const OverlayTestID = "nsgo-update-highlights"
+
 // Enabled has core record what DevTools show, and register its trees: nsgo's dev client sets it under nsgo dev -devtools, -automation and -trace, before any graph starts. While it is unset, core records nothing and pays one check where it would.
 var Enabled bool
 

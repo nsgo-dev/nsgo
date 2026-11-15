@@ -127,6 +127,39 @@ func TestAgentSnapshotsAndFinds(t *testing.T) {
 	}
 }
 
+// Under nsgo dev -devtools, -highlight or -layout, DevTools' overlay covers the app; the agent lists and finds the app's views alone, as the page's Elements does.
+func TestAgentLeavesDevToolsOverlayOut(t *testing.T) {
+	answered := new(int)
+	app := Start(t, func(cx *core.Scope) core.Node {
+		return core.Group{fixture(answered)(cx), core.UpdateHighlights{NoUpdates: true, Layout: core.LayoutAudit{Bounds: true}}}
+	}, PendingAlerts())
+	if !app.Exists("id:nsgo-layout-readout") {
+		t.Fatalf("the layout audit shows no readout:\n%s", app.Dump())
+	}
+	g := newAgent()
+	t.Cleanup(g.close)
+	g.serve(1, app, "Fixture")
+	var snap automation.SnapshotResult
+	result(t, g, automation.Snapshot, automation.SnapshotParams{All: true}, &snap)
+	if strings.Contains(snap.Text, "nsgo-") {
+		t.Errorf("the snapshot lists DevTools' overlay:\n%s", snap.Text)
+	}
+	if !strings.Contains(snap.Text, "id=add") {
+		t.Errorf("the snapshot lacks the app:\n%s", snap.Text)
+	}
+	if c := code(t, g, automation.Find, automation.FindParams{Selector: "id:nsgo-layout-readout"}); c != automation.NoMatch {
+		t.Errorf("finding the audit's readout = %v, want no match", c)
+	}
+	if c := code(t, g, automation.Press, automation.PressParams{Selector: "id:nsgo-layout-readout"}); c != automation.NoMatch {
+		t.Errorf("pressing the audit's readout = %v, want no match", c)
+	}
+	var found automation.FindResult
+	result(t, g, automation.Find, automation.FindParams{Selector: "id:add"}, &found)
+	if len(found.Elements) != 1 {
+		t.Fatalf("found %+v", found)
+	}
+}
+
 func TestAgentTakesSteps(t *testing.T) {
 	g, app, answered := serving(t)
 	var r automation.StepResult
