@@ -366,7 +366,7 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 			path += ".png"
 		}
 		path = filepath.Clean(path)
-		if seen[path] {
+		if seen[path] || sameFileAsSeen(path, seen) {
 			errs = append(errs, fmt.Errorf("screenshot %q resolves to %s more than once", name, path))
 			continue
 		}
@@ -382,6 +382,20 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 		saved = append(saved, path)
 	}
 	return kept.String(), saved, errors.Join(errs...)
+}
+
+// sameFileAsSeen reports whether path names the file of a path in seen under another spelling, as "Home.png" and "home.png" do on the case-insensitive volumes macOS and Windows default to.
+func sameFileAsSeen(path string, seen map[string]bool) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	for p := range seen {
+		if pi, err := os.Stat(p); err == nil && os.SameFile(fi, pi) {
+			return true
+		}
+	}
+	return false
 }
 
 func screenshotPathHasParent(name string) bool {

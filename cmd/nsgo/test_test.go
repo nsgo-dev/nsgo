@@ -150,4 +150,16 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 	} else if len(saved) != 1 {
 		t.Fatalf("saved %v, want only shot.png/a.png", saved)
 	}
+	// Names that differ only in case are one file where the volume ignores case.
+	seen = map[string]bool{}
+	if _, _, err := saveScreenshots(line("en/Home")+"\n", dir, seen); err != nil {
+		t.Fatal(err)
+	}
+	_, folds := os.Stat(filepath.Join(dir, "en", "home.png"))
+	_, _, err := saveScreenshots(line("en/home")+"\n", dir, seen)
+	if folds == nil && err == nil {
+		t.Error("en/home overwrote en/Home on a case-insensitive volume")
+	} else if folds != nil && err != nil {
+		t.Errorf("en/home beside en/Home on a case-sensitive volume: %v", err)
+	}
 }
