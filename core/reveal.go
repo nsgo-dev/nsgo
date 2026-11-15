@@ -69,15 +69,19 @@ func (t *Tree) revealViews() {
 	t.reveals = t.reveals[:0]
 }
 
-// revealNode scrolls the scroll views around n so box, in n's frame, shows: the box, in each one's content, goes where opts say, and on to the next one out as that scroll leaves it. The outermost one keeps opts.Margin clear around it.
+// revealNode scrolls the scroll views around n so box, in n's frame, shows: the box, in each one's content, goes where opts say, and on to the next one out as that scroll leaves it. The outermost one, up to an overlay, a modal or a fixed view, keeps opts.Margin clear around it.
 func (t *Tree) revealNode(n *node, box Bounds, opts RevealOptions) {
 	var outer *node
-	for c := n; c.parent != nil; c = c.parent {
+	for c := n; c.parent != nil && c.hoist == nil; c = c.parent {
 		if p := c.parent; p.scroll != nil && !p.deleted {
 			outer = p
 		}
 	}
 	for c := n; c.parent != nil; c = c.parent {
+		if c.hoist != nil {
+			// An overlay, a modal or a fixed view is laid out in its host, the surface or a modal, which no scroll view around it in the tree moves.
+			return
+		}
 		box.Origin.X += c.frame.Origin.X
 		box.Origin.Y += c.frame.Origin.Y
 		p := c.parent

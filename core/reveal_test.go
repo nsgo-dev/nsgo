@@ -176,3 +176,33 @@ func TestListKeepsARowHoldingAnOverlay(t *testing.T) {
 		t.Error("the list kept row 0 after its overlay closed")
 	}
 }
+
+// Reveal stops at an overlay: it scrolls the scroll views inside it, never those around the view the overlay is put in, which do not move it.
+func TestRevealStopsAtAnOverlay(t *testing.T) {
+	target := new(core.Ref)
+	var rows []core.Node
+	for i := range 10 {
+		v := core.View{Style: core.Style{Height: core.Pt(50), MinHeight: core.Pt(50)}}
+		if i == 6 {
+			v.Ref = target
+		}
+		rows = append(rows, v)
+	}
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.Scroll{TestID: "outer", Style: core.Style{Height: core.Pt(200)}, Children: []core.Node{
+			core.View{Style: core.Style{Height: core.Pt(300)}},
+			core.View{Style: core.Style{Height: core.Pt(50)}, Children: []core.Node{core.Overlay{Style: core.Style{Width: core.Pt(100)}, Children: []core.Node{
+				core.Scroll{TestID: "inner", Style: core.Style{MaxHeight: core.Pt(100), MinHeight: core.Pt(0)}, Children: rows},
+			}}}},
+			core.View{Style: core.Style{Height: core.Pt(300)}},
+		}}
+	}, nsgotest.Size(200, 400))
+	target.Reveal(core.RevealOptions{Vertical: core.ScrollAlignNearest})
+	app.Settle()
+	if y := app.Find("id:inner").Offset.Y; y != 250 {
+		t.Errorf("inner offset %v, want 250", y)
+	}
+	if y := app.Find("id:outer").Offset.Y; y != 0 {
+		t.Errorf("outer offset %v, want 0", y)
+	}
+}
