@@ -31,7 +31,7 @@ import (
 //
 // Sounds decode once, at their load, into an AVAudioPCMBuffer, through an AVAudioFile over a temporary file of their bytes as AVAudioFile reads only files, and play from memory on the engine's one AVAudioEngine: each playback is a voice, an AVAudioPlayerNode through an AVAudioUnitVarispeed, which gives the rate, and a mixer of its own, which gives the volume, as an effect between a player and the main mixer keeps the player's own volume from it. Voices are reused once their buffer played, by sounds of their format; past driver.MaxSoundVoices the oldest stops. The engine starts at a playback, again after the system stopped it, as for a device change, and pauses a moment after the last playback ends, so the output is not held open; one that cannot start is silence, never an error.
 //
-// Players are AVPlayers without a layer, as Video's, made at their first preload or play: their load is polled until the item is ready or fails, as a paused player reports no time, their position comes from a periodic time observer and their end from AVPlayerItemDidPlayToEndTimeNotification. On iOS each holds the shared audio session (internal/audiosession) at the level its AudioSession asks for while it plays, and playing sounds hold it ambient.
+// Players are AVPlayers without a layer, as Video's, made at their first preload or play: their load is polled until the item is ready or fails, as a paused player reports no time, their position comes from a periodic time observer, their end from AVPlayerItemDidPlayToEndTimeNotification and a stop no command asked for from AVPlayerRateDidChangeNotification, besides the time observer. On iOS each holds the shared audio session (internal/audiosession) at the level its AudioSession asks for while it plays, and playing sounds hold it ambient; an interruption of the session pauses the players as it begins, and they stay paused as it ends.
 type Audio struct {
 	dispatch func(driver.Event)
 	engine   objc.ID
@@ -43,7 +43,9 @@ type Audio struct {
 	// soundsHeld lets go of the session the sounds hold while they play, nil while they hold none; idle pauses the engine and lets it go once the last playback ended.
 	soundsHeld func()
 	idle       *time.Timer
-	closed     bool
+	// interruptions is the observer of AVAudioSessionInterruptionNotification, 0 until AVFoundation loaded.
+	interruptions objc.ID
+	closed        bool
 }
 
 // decodedSound is a sound decoded into memory, its buffer and format retained.
@@ -100,6 +102,7 @@ func (a *Audio) Handle(id uint32, r *driver.AudioRequest) {
 		}
 		return
 	}
+	a.watchInterruptions()
 	switch r.Command {
 	case driver.AudioLoad:
 		a.load(id, r.Source, r.MaxBytes, r.MaxDuration)
@@ -127,7 +130,35 @@ func (a *Audio) Handle(id uint32, r *driver.AudioRequest) {
 	}
 }
 
-// PausePlayers pauses the players playing, as the system would: what an iOS app does as it leaves the foreground, as NSH's do.
+// watchInterruptions has an interruption of the audio session pause the players as it begins, once. Only iOS posts AVAudioSessionInterruptionNotification. The players stay paused as the interruption ends, even when its options say they may resume: the core has them paused by the system, as for a call, and the app's Play resumes them, as after the app left the foreground (docs/architecture/audio.md).
+func (a *Audio) watchInterruptions() {
+	if a.interruptions != 0 {
+		return
+	}
+	center := objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter"))
+	queue := objc.ID(Class("NSOperationQueue")).Send(selMainQueue)
+	block := objcblock.New(func(_ objc.Block, note objc.ID) {
+		if !a.closed && interruptionBegan(note) {
+			a.PausePlayers()
+		}
+	})
+	// A nil object observes the shared AVAudioSession's.
+	a.interruptions = center.Send(selAddObserver, avName("AVAudioSessionInterruptionNotification"), objc.ID(0), queue, block).Send(sel("retain"))
+	block.Release()
+}
+
+// interruptionBegan reports whether note, an AVAudioSessionInterruptionNotification, says the interruption began rather than ended.
+func interruptionBegan(note objc.ID) bool {
+	const began = 1 // AVAudioSessionInterruptionTypeBegan
+	info := note.Send(sel("userInfo"))
+	if info == 0 {
+		return false
+	}
+	kind := info.Send(selObjectForKey, avName("AVAudioSessionInterruptionTypeKey"))
+	return kind != 0 && objc.Send[uint](kind, sel("unsignedIntegerValue")) == began
+}
+
+// PausePlayers pauses the players playing, as the system would: what an iOS app does as it leaves the foreground, as NSH's do, and as an interruption begins.
 func (a *Audio) PausePlayers() {
 	for _, p := range a.players {
 		switch {
@@ -168,6 +199,11 @@ func (a *Audio) Close() {
 		a.engine = 0
 	}
 	a.letSoundsGo()
+	if a.interruptions != 0 {
+		objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter")).Send(sel("removeObserver:"), a.interruptions)
+		a.interruptions.Send(sel("release"))
+		a.interruptions = 0
+	}
 }
 
 // --- Sounds ------------------------------------------------------------------
@@ -780,7 +816,7 @@ func (p *audioPlayer) make(rawURL, path string) {
 	p.poll(p.generation, 0)
 }
 
-// observe watches the player's time every interval, as it starts and stops and as its time jumps, and its item's end and failure.
+// observe watches the player's time every interval, as it starts and stops and as its time jumps, its rate, and its item's end and failure.
 func (p *audioPlayer) observe() {
 	player := p.player
 	// The block's CMTime argument is left out: the player's current time is the same, and purego callbacks take no structs.
@@ -794,35 +830,33 @@ func (p *audioPlayer) observe() {
 	tick.Release()
 	center := objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter"))
 	queue := objc.ID(Class("NSOperationQueue")).Send(selMainQueue)
-	watch := func(name string, fn func(note objc.ID)) {
+	watch := func(name string, object objc.ID, fn func(note objc.ID)) {
 		block := objcblock.New(func(_ objc.Block, note objc.ID) {
 			if p.player == player {
 				fn(note)
 			}
 		})
-		// The constant's value is its name; a nil name would observe every notification of the item.
-		note := Global(avPath, name)
-		if note == 0 {
-			note = NSString(name)
-		}
-		token := center.Send(selAddObserver, note, p.item, queue, block).Send(sel("retain"))
+		// A nil name would observe every notification of the object.
+		token := center.Send(selAddObserver, avName(name), object, queue, block).Send(sel("retain"))
 		block.Release()
 		p.stops = append(p.stops, func() {
 			center.Send(sel("removeObserver:"), token)
 			token.Send(sel("release"))
 		})
 	}
-	watch("AVPlayerItemDidPlayToEndTimeNotification", func(objc.ID) { p.reachedEnd() })
-	watch("AVPlayerItemFailedToPlayToEndTimeNotification", func(note objc.ID) {
+	watch("AVPlayerItemDidPlayToEndTimeNotification", p.item, func(objc.ID) { p.reachedEnd() })
+	watch("AVPlayerItemFailedToPlayToEndTimeNotification", p.item, func(note objc.ID) {
 		var nsErr objc.ID
 		if info := note.Send(sel("userInfo")); info != 0 {
-			key := Global(avPath, "AVPlayerItemFailedToPlayToEndTimeErrorKey")
-			if key == 0 {
-				key = NSString("AVPlayerItemFailedToPlayToEndTimeErrorKey")
-			}
-			nsErr = info.Send(selObjectForKey, key)
+			nsErr = info.Send(selObjectForKey, avName("AVPlayerItemFailedToPlayToEndTimeErrorKey"))
 		}
 		p.fail(p.failure(), describeError(nsErr, "the audio stopped playing"))
+	})
+	// The time observer's call as the player stops can come while its rate is not yet 0, with none after, as for an interruption on iOS: the rate's change reports the stop, from macOS 12 and iOS 15, which post it.
+	watch("AVPlayerRateDidChangeNotification", p.player, func(objc.ID) {
+		if p.playing && !p.failed && objc.Send[float32](p.player, sel("rate")) == 0 {
+			p.stopped()
+		}
 	})
 }
 
@@ -940,23 +974,28 @@ func (p *audioPlayer) tick() {
 		return
 	}
 	if objc.Send[float32](p.player, sel("rate")) == 0 {
-		at, d := p.now(), p.duration()
-		if d > 0 && at >= d-50*time.Millisecond {
-			// At its end: the notification reports it. Should none come, it paused just before.
-			generation := p.generation
-			time.AfterFunc(500*time.Millisecond, func() {
-				OnMain(func() {
-					if p.generation == generation && p.playing && !p.ended && objc.Send[float32](p.player, sel("rate")) == 0 {
-						p.paused()
-					}
-				})
-			})
-			return
-		}
-		p.paused()
+		p.stopped()
 		return
 	}
 	p.report(p.progress(p.now()))
+}
+
+// stopped reports that the playing player stopped with no command asking, a system pause, unless it is at its end, which its notification reports.
+func (p *audioPlayer) stopped() {
+	at, d := p.now(), p.duration()
+	if d > 0 && at >= d-50*time.Millisecond {
+		// Should no notification come, it paused just before its end.
+		generation := p.generation
+		time.AfterFunc(500*time.Millisecond, func() {
+			OnMain(func() {
+				if p.generation == generation && p.playing && !p.ended && objc.Send[float32](p.player, sel("rate")) == 0 {
+					p.paused()
+				}
+			})
+		})
+		return
+	}
+	p.paused()
 }
 
 // reachedEnd starts the player over when it loops, counting the lap, else reports its end.

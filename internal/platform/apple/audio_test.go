@@ -416,6 +416,72 @@ func TestAPlayerPlaysOnFromWhereItFailed(t *testing.T) {
 	}
 }
 
+// playing opens player id over 3 seconds of silence and plays it until it reported 200 ms played.
+func playing(ta *testAudio, id uint32) {
+	ta.t.Helper()
+	openPlayer(ta, id, driver.ImageSource{Data: wav(3 * time.Second)}, false)
+	ta.send(id, driver.AudioRequest{Command: driver.AudioResume})
+	ta.wait(id, driver.AudioPlaying, 5*time.Second, nil)
+	for ta.wait(id, driver.AudioProgress, 2*time.Second, nil).Position < 200*time.Millisecond {
+	}
+}
+
+// checkSystemPaused fails the test unless player id is paused, its AVPlayer too, holding no session.
+func checkSystemPaused(ta *testAudio, id uint32) {
+	ta.t.Helper()
+	onMain(func() {
+		p := ta.audio.players[id]
+		if p.playing || p.release != nil || objc.Send[float32](p.player, sel("rate")) != 0 {
+			ta.t.Error("a player the system paused plays on or holds the session")
+		}
+	})
+}
+
+// interrupt posts an AVAudioSessionInterruptionNotification of kind, 1 for began and 0 for ended, with options, as iOS posts it.
+func interrupt(kind, options uint) {
+	number := func(n uint) objc.ID { return objc.ID(Class("NSNumber")).Send(sel("numberWithUnsignedInteger:"), n) }
+	info := objc.ID(Class("NSMutableDictionary")).Send(sel("dictionary"))
+	info.Send(sel("setObject:forKey:"), number(kind), avName("AVAudioSessionInterruptionTypeKey"))
+	info.Send(sel("setObject:forKey:"), number(options), avName("AVAudioSessionInterruptionOptionKey"))
+	center := objc.ID(Class("NSNotificationCenter")).Send(sel("defaultCenter"))
+	center.Send(sel("postNotificationName:object:userInfo:"), avName("AVAudioSessionInterruptionNotification"), objc.ID(0), info)
+}
+
+func TestAnInterruptionPausesThePlayersUntilTheyPlayAgain(t *testing.T) {
+	ta := newTestAudio(t)
+	playing(ta, 1)
+	onMain(func() { interrupt(1, 0) })
+	ta.wait(1, driver.AudioPaused, 500*time.Millisecond, nil)
+	checkSystemPaused(ta, 1)
+	ta.quiet(1, 300*time.Millisecond)
+	// Ended with AVAudioSessionInterruptionOptionShouldResume, it leaves them paused: the core has them paused.
+	onMain(func() { interrupt(0, 1) })
+	ta.quiet(1, 400*time.Millisecond)
+	checkSystemPaused(ta, 1)
+	ta.send(1, driver.AudioRequest{Command: driver.AudioResume})
+	ta.wait(1, driver.AudioPlaying, time.Second, nil)
+	ta.wait(1, driver.AudioProgress, time.Second, nil)
+}
+
+func TestAStopNoCommandAskedForIsASystemPause(t *testing.T) {
+	ta := newTestAudio(t)
+	playing(ta, 1)
+	onMain(func() {
+		p := ta.audio.players[1]
+		// Without its time observer, as when its call as the player stops comes while the rate is not yet 0, only the rate's change reports the stop.
+		p.player.Send(sel("removeTimeObserver:"), p.timeToken)
+		p.timeToken.Send(sel("release"))
+		p.timeToken = 0
+		p.player.Send(sel("pause"))
+	})
+	e := ta.wait(1, driver.AudioPaused, 500*time.Millisecond, nil)
+	if e.Position <= 0 || e.Position >= 3*time.Second {
+		t.Errorf("paused at %v", e.Position)
+	}
+	checkSystemPaused(ta, 1)
+	ta.quiet(1, 300*time.Millisecond)
+}
+
 // encoded is a file of name holding length of silence that afconvert encoded with args, skipping the test where the Mac has no afconvert.
 func encoded(t *testing.T, length time.Duration, name string, args ...string) string {
 	t.Helper()
