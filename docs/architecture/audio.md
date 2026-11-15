@@ -1,6 +1,6 @@
 # Audio playback
 
-This is the design for issue #36, a port of NSH 0.5.0's audio design (`nsh/docs/dev/audio-design.md`, approved and implemented there): `Sound` for short sounds and a player for long audio. None of it exists yet, and the [roadmap](../roadmap.md#services-and-components-since-040) keeps its row until the stages below land. Read this, and NSH's design, before building any part of it; [NSH's design and this one](#nshs-design-and-this-one) lists where they part.
+This is the design for issue #36, a port of NSH 0.5.0's audio design (`nsh/docs/dev/audio-design.md`, approved and implemented there): `Sound` for short sounds and a player for long audio. The `audio` package and `core`'s part exist, with every platform reporting `Env.CanPlayAudio` false until its own stage lands, and the [roadmap](../roadmap.md#services-and-components-since-040) keeps its row until the stages below do. Read this, and NSH's design, before building any part of it; [NSH's design and this one](#nshs-design-and-this-one) lists where they part.
 
 ## The API
 
@@ -32,16 +32,16 @@ A `Source` is what an image's is: an `asset:` path in the app's resources, a fil
 
 `Sound` is NSH's `Sound`:
 
-- `LoadSound` has the platform read and decode the source into memory once, and calls back with the sound or why not. Loading a source this engine already holds (the same resolved URI, or bytes of the same digest) shares the decoded buffer, which goes with the last `Sound` over it.
+- `LoadSound` has the platform read and decode the source into memory once, and calls back with the sound or why not. Loading a source this engine already holds in the same surface (the same URI, or bytes of the same digest) shares the decoded buffer, which goes with the last `Sound` over it. Sharing stops at a surface, a window or an embedded view, because a surface's audio goes as it closes while the commands of a sound go to the surface that loaded it.
 - `Play(Voice)` starts a playback within a frame: it is a command in the batch of the turn that calls it, so nothing is opened, fetched or decoded then. Playbacks overlap. `Volume` runs from 0 to 1 and `Rate` from 0.5 to 2; 0 is 1 for both, as `Video`'s, and other values are clamped, where NSH throws a `RangeError`. A playback that cannot be heard, the device muted or a voice dropped past the limit, is no error.
 - `Stop` stops every playback of the sound, `Duration` is the decoded length, and `Close` frees the buffer. The owner that loaded the sound closes it as it goes, and the engine as it closes.
 
 `Player` is NSH's `AudioPlayer`, `Video` without a picture:
 
 - `NewPlayer` loads nothing until `Play` or `Preload`, so making one is free. `Play` loads if needed and calls back once the platform plays, or with the error.
-- `Pause`, `Seek` (clamped to the duration), `SetVolume`, `SetRate` and `SetLoop` are commands in the batch. A seek while paused or before the duration is known applies when the platform can seek, and `Play` starts from there.
-- `Position`, `Duration` (0 until loaded) and `State` (idle, loading, playing, paused, ended or failed) are kept by `core` from the platform's events, so reading them asks no platform.
-- `PlayerOptions` has `OnLoad` with the duration, `OnProgress` with a position that never goes back and the duration, every `ProgressInterval` while playing (250 milliseconds when 0, at least 16, as `Video`'s) and once more as it pauses or ends; `OnBuffer`, `OnEnd` once per play-through (never while looping) and `OnError`. It also has `AudioSession` ([sessions](#sessions)).
+- `Pause`, `Seek` (clamped to the duration), `SetVolume`, `SetRate` and `SetLoop` are commands in the batch; `SetVolume` and `SetRate` take `Voice`'s ranges, 0 as 1. A seek while paused or before the duration is known applies when the platform can seek, and `Play` starts from there.
+- `Position`, `Duration` (0 until loaded) and `State` (idle, loading, playing, paused, ended or failed) are kept by `core` from the platform's events, so reading them asks no platform. The platform counts the seeks it applied and the loops it started over in its progress reports, so `core` drops a report from before the last seek and keeps the position from going back otherwise.
+- `PlayerOptions` has `OnLoad` with the duration, `OnProgress` with a position that goes back only with a seek or a loop starting over, and the duration, every `ProgressInterval` while playing (250 milliseconds when 0, at least 16, as `Video`'s) and once more as it pauses or ends; `OnBuffer`, `OnEnd` once per play-through (never while looping) and `OnError`. It also has `AudioSession` ([sessions](#sessions)).
 - `Close` stops it and releases the platform's player. A player is not tied to a view, but it is to the owner that made it and to the engine: they close it as they go, so a window or an embedded view (`nsgo.NewView`) that closes stops its audio.
 
 Both are called on the engine's goroutine, as every scope service is; other goroutines reach them through `Scope.Post`. Their callbacks run on the engine's goroutine too, in a later turn, as an image's or a speech session's do, so they may set signals. A closed sound's or player's callbacks never run: `core` numbers sounds and players from one counter of the process, so a late event finds no one.
@@ -50,9 +50,9 @@ Both are called on the engine's goroutine, as every scope service is; other goro
 
 ## Errors and limits
 
-Failures are an `audio.Error`, named as NSH's codes, which follow the web's `MediaError`: `NotAllowed` (refused by a capability, or the web's autoplay policy before a user gesture), `Network`, `Decode` (a format the platform cannot read: an error, never silence), `NotSupported`, `QuotaExceeded`, `Unavailable` and `Failed`. A player's error arrives through `OnError` and `Play`'s callback, and it goes idle.
+Failures are an `audio.Error`, named as NSH's codes, which follow the web's `MediaError`: `NotAllowed` (refused by a capability, or the web's autoplay policy before a user gesture), `Network`, `Decode` (a format the platform cannot read: an error, never silence), `NotSupported`, `QuotaExceeded`, `Unavailable` and `Failed`. A player's error arrives through `OnError` and `Play`'s callback, and it is failed: it plays nothing until `Play` or `Preload` loads it again.
 
-An output that fails makes silence, not an error: a device unplugged or changed, an engine reconfigured or a system that refuses the output. The platform reopens on the default device when it can and keeps the sounds loaded; a player that loses its output reports `Failed` once and goes idle.
+An output that fails makes silence, not an error: a device unplugged or changed, an engine reconfigured or a system that refuses the output. The platform reopens on the default device when it can and keeps the sounds loaded; a player that loses its output reports `Failed` once and stops.
 
 NSH's limits hold per engine:
 
@@ -112,4 +112,4 @@ Each stage is one reviewable change, in NSH's order:
 3. macOS and iOS, then the web, Windows, Android and Linux, each with its format and error tests.
 4. The gallery: a sound for each kind of moment and a player demo of both levels.
 
-Issue #36 closes, and the roadmap's row with it, when a WAV and an MP3 play as sounds and through a player on macOS, iOS, Windows, Linux, Android and the web, and a FLAC either plays or fails with `Decode`; a sound plays overlapping and starts within a frame; `OnProgress` never goes back, and a seek while paused shows the new position on `Play`; `Close` on a playing player stops it, and ten open and close cycles leave no handle behind (on macOS, no audio device stays open); on an iPhone, a sound during a playing video neither pauses nor stops it, a recording and `StartSpeech` keep working through a sound, and the Ring/Silent switch silences sounds; and the gallery's demos are in.
+Issue #36 closes, and the roadmap's row with it, when a WAV and an MP3 play as sounds and through a player on macOS, iOS, Windows, Linux, Android and the web, and a FLAC either plays or fails with `Decode`; a sound plays overlapping and starts within a frame; `OnProgress` never goes back but with a seek or a loop, and a seek while paused shows the new position on `Play`; `Close` on a playing player stops it, and ten open and close cycles leave no handle behind (on macOS, no audio device stays open); on an iPhone, a sound during a playing video neither pauses nor stops it, a recording and `StartSpeech` keep working through a sound, and the Ring/Silent switch silences sounds; and the gallery's demos are in.
