@@ -222,6 +222,27 @@ func TestSVGMarkerPaint(t *testing.T) {
 			t.Fatalf("fills = %v, want blue", got)
 		}
 	})
+	t.Run("a context gradient keeps the marked shape's coordinates", func(t *testing.T) {
+		ops := svgOps(t, `<svg viewBox="0 0 100 100">
+			<linearGradient id="g"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="blue"/></linearGradient>
+			<marker id="m" overflow="visible"><path d="M0 0L5 0L5 5Z" fill="context-fill"/></marker>
+			<path d="M10 10L50 10L50 50Z" fill="url(#g)" marker-start="url(#m)" marker-end="url(#m)"/>
+		</svg>`)
+		var gradients []*CanvasGradient
+		for _, op := range ops {
+			if op.Kind == DrawFillGradient {
+				gradients = append(gradients, op.Gradient)
+			}
+		}
+		if len(gradients) != 3 {
+			t.Fatalf("%d gradient fills, want the shape's and two markers'", len(gradients))
+		}
+		for _, g := range gradients[1:] {
+			if g.X1 != gradients[0].X1 || g.Y1 != gradients[0].Y1 || g.X2 != gradients[0].X2 || g.Y2 != gradients[0].Y2 || g.Transform != gradients[0].Transform {
+				t.Fatalf("marker gradient = %+v, want the shape's %+v", g, gradients[0])
+			}
+		}
+	})
 	t.Run("a context paint outside markers paints nothing", func(t *testing.T) {
 		ops := svgOps(t, `<svg viewBox="0 0 100 100"><path d="M10 10L50 10L50 50Z" fill="context-fill"/></svg>`)
 		if got := colors(ops, DrawFillColor); len(got) != 0 {

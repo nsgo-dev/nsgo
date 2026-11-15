@@ -31,20 +31,22 @@ func (p *svgParser) markers(el *svgNode, style svgStyle) error {
 	if start == nil && mid == nil && end == nil {
 		return nil
 	}
+	// p.local is the shape until the first marker draws, so its vertices and the paints its markers' context paints name are read first.
 	vertices := svgVertices(p.local, p.joins)
+	fill, stroke := p.context(style, style.fill), p.context(style, style.stroke)
 	for i, v := range vertices {
 		if i == 0 && start != nil {
-			if err := p.paintMarker(start, v, true, style); err != nil {
+			if err := p.paintMarker(start, v, true, style, fill, stroke); err != nil {
 				return err
 			}
 		}
 		if i > 0 && i < len(vertices)-1 && mid != nil {
-			if err := p.paintMarker(mid, v, false, style); err != nil {
+			if err := p.paintMarker(mid, v, false, style, fill, stroke); err != nil {
 				return err
 			}
 		}
 		if i == len(vertices)-1 && end != nil {
-			if err := p.paintMarker(end, v, false, style); err != nil {
+			if err := p.paintMarker(end, v, false, style, fill, stroke); err != nil {
 				return err
 			}
 		}
@@ -153,8 +155,8 @@ func (v svgVertex) angle() float64 {
 	return (in + out) / 2
 }
 
-// paintMarker draws marker at the vertex v of a shape drawn with parent; start is set for the marker-start marker, which auto-start-reverse turns around.
-func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent svgStyle) error {
+// paintMarker draws marker at the vertex v of a shape drawn with parent, whose context-fill and context-stroke paint fill and stroke; start is set for the marker-start marker, which auto-start-reverse turns around.
+func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent svgStyle, fill, stroke svgPaint) error {
 	if len(marker.children) == 0 || p.using[marker] || len(p.using) >= maxSVGUses {
 		return nil
 	}
@@ -229,7 +231,7 @@ func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent
 	}
 	style.ctm = m.mul(svgMatrix{a: float64(sx), d: float64(sy)}).mul(svgTranslate(-refX, -refY))
 	style.opacity = parent.opacity
-	style.contextFill, style.contextStroke = parent.context(parent.fill), parent.context(parent.stroke)
+	style.contextFill, style.contextStroke = fill, stroke
 	if p.using == nil {
 		p.using = map[*svgNode]bool{}
 	}
@@ -243,8 +245,8 @@ func (p *svgParser) paintMarker(marker *svgNode, v svgVertex, start bool, parent
 	return nil
 }
 
-// context resolves paint, a fill or stroke of a shape drawn with s, to what context-fill or context-stroke paints in the markers on that shape.
-func (s svgStyle) context(paint svgPaint) svgPaint {
+// context resolves paint, a fill or stroke of the shape in p.local drawn with s, to what context-fill or context-stroke paints in the markers on that shape. A gradient is placed as it is on the shape, in the shape's coordinates and bounding box, not the marker content's.
+func (p *svgParser) context(s svgStyle, paint svgPaint) svgPaint {
 	switch paint.kind {
 	case paintContextFill:
 		return s.contextFill
@@ -254,6 +256,19 @@ func (s svgStyle) context(paint svgPaint) svgPaint {
 		if s.color.kind == paintFixed {
 			return s.color
 		}
+	case paintURL:
+		el := p.ids[paint.ref]
+		if el == nil || el.name != "linearGradient" && el.name != "radialGradient" {
+			return p.context(s, svgPaint{kind: paint.fall, color: paint.color})
+		}
+		g, solid, ok := p.gradient(el, s.ctm)
+		switch {
+		case !ok:
+			return svgPaint{}
+		case g == nil:
+			return fixedPaint(solid)
+		}
+		return svgPaint{kind: paintURL, gradient: g}
 	}
 	return paint
 }

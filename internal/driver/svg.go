@@ -207,6 +207,8 @@ type svgPaint struct {
 	// when it names no gradient.
 	ref  string
 	fall svgPaintKind
+	// gradient is a context paint's gradient, already placed in the coordinates of the shape the marker is drawn on.
+	gradient *CanvasGradient
 }
 
 type svgPaintKind uint8
@@ -669,27 +671,35 @@ func (p *svgParser) setPaint(paint svgPaint, style svgStyle, alpha float32, fill
 		paint = style.contextStroke
 	}
 	if paint.kind == paintURL {
-		if el := p.ids[paint.ref]; el != nil && (el.name == "linearGradient" || el.name == "radialGradient") {
-			g, solid, ok := p.gradient(el, style.ctm)
-			if !ok {
+		var g *CanvasGradient
+		if paint.gradient != nil {
+			// Every marker on a shape shares its context gradient, so this alpha goes on a copy.
+			c := *paint.gradient
+			c.Stops = slices.Clone(c.Stops)
+			g = &c
+		} else if el := p.ids[paint.ref]; el != nil && (el.name == "linearGradient" || el.name == "radialGradient") {
+			var solid Color
+			var ok bool
+			if g, solid, ok = p.gradient(el, style.ctm); !ok {
 				return false, false
 			}
 			if g == nil {
 				paint = fixedPaint(solid)
-			} else {
-				for i := range g.Stops {
-					g.Stops[i].Color = svgAlpha(g.Stops[i].Color, alpha)
-				}
-				fallback := g.average()
-				if fallback == 0 {
-					fallback = 1 // transparent but not currentColor
-				}
-				p.op(DrawOp{Kind: colorKind, Color: fallback})
-				p.op(DrawOp{Kind: gradientKind, Gradient: g})
-				return true, false
 			}
 		} else {
 			paint = svgPaint{kind: paint.fall, color: paint.color}
+		}
+		if g != nil {
+			for i := range g.Stops {
+				g.Stops[i].Color = svgAlpha(g.Stops[i].Color, alpha)
+			}
+			fallback := g.average()
+			if fallback == 0 {
+				fallback = 1 // transparent but not currentColor
+			}
+			p.op(DrawOp{Kind: colorKind, Color: fallback})
+			p.op(DrawOp{Kind: gradientKind, Gradient: g})
+			return true, false
 		}
 	}
 	if paint.kind == paintCurrent && style.color.kind == paintFixed {
