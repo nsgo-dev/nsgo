@@ -72,9 +72,12 @@ Each holder asks for a level, and the highest held sets the session:
 2. Playback, a video or player with `AudioSessionPlayback`: `Playback` in the `SpokenAudio` mode, pausing other apps' audio, as videos have it now.
 3. Mixing, `AudioSessionMixWithOthers`: the same with `MixWithOthers`.
 4. Ambient, every sound and a player with `AudioSessionDefault`: `Ambient`, as NSH sets it, which mixes with other apps' audio and which the Ring/Silent switch and the screen lock silence.
-5. None held: the category from before the first holder, then deactivation telling other apps they may play.
+5. Kept, a video with `AudioSessionDefault`: the category from before the first holder, the app's own, kept active, since deactivating the session under a playing `AVPlayer` stops it, as a playing video switching to the default session did.
+6. None held: the category from before the first holder, then deactivation telling other apps they may play.
 
-A video's `AudioSessionDefault` stays no holder at all, as it is now. Audio's is ambient instead because leaving the session alone would play under `SoloAmbient`, iOS's default category, which stops other apps' audio.
+A video's `AudioSessionDefault` leaves the category to the app, as it did when it held nothing. Audio's is ambient instead because leaving the session alone would play under `SoloAmbient`, iOS's default category, which stops other apps' audio.
+
+Deactivating waits for the system, and longer while a player's output still runs down, as an `AVPlayer`'s does for a while after its pause: on an iPhone XR, deactivating at the last release blocked the main thread for about 600 ms at every pause. So the last release only arranges the deactivation, which runs a second later on a goroutine of its own; a hold before it keeps the session active, with no call at all when its level is the session's, as for a play right after a pause, and a hold while it runs waits for it and then activates the session again.
 
 A holder holds only while it plays, so a paused or ended player and a sound with no playback hold nothing. On Android, sounds ask for no audio focus, and a player takes a video's: `AUDIOFOCUS_GAIN_TRANSIENT` while it plays with `AudioSessionPlayback`, pausing for another app's focus. Desktops and the web play through the system mixer, under the app's own volume there, and pause no other application. Mobile players pause when the app leaves the foreground, as NSH's do; background playback and lock-screen controls are not part of this design.
 

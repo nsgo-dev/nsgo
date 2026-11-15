@@ -5,6 +5,7 @@ package audiosession
 import (
 	"errors"
 	"log"
+	"runtime"
 	"sync"
 	"unsafe"
 
@@ -40,6 +41,33 @@ var system struct {
 
 func sel(name string) objc.SEL { return objc.RegisterName(name) }
 
+var pool struct {
+	once sync.Once
+	push func() uintptr
+	pop  func(uintptr)
+}
+
+// withPool runs fn inside an autorelease pool of its own thread, which the goroutine deactivating has none of; without libobjc's functions it just runs fn.
+func withPool(fn func()) {
+	pool.once.Do(func() {
+		lib, err := purego.Dlopen("/usr/lib/libobjc.A.dylib", purego.RTLD_NOW)
+		if err != nil {
+			return
+		}
+		purego.RegisterLibFunc(&pool.push, lib, "objc_autoreleasePoolPush")
+		purego.RegisterLibFunc(&pool.pop, lib, "objc_autoreleasePoolPop")
+	})
+	if pool.push == nil {
+		fn()
+		return
+	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	p := pool.push()
+	defer pool.pop(p)
+	fn()
+}
+
 // constant reads the NSString AVFAudio exports as name, 0 without it.
 func constant(name string) objc.ID {
 	system.once.Do(func() {
@@ -61,6 +89,8 @@ func constant(name string) objc.ID {
 // of is the category level sets.
 func of(level Level) category {
 	switch level {
+	case Kept:
+		return system.before
 	case Ambient:
 		return category{constant("AVAudioSessionCategoryAmbient"), constant("AVAudioSessionModeDefault"), 0}
 	case Mixing:
@@ -94,8 +124,8 @@ func restore(shared objc.ID) {
 	system.before = category{}
 }
 
-// apply moves the session from level from to level to, 0 being none held.
-func apply(from, to Level) error {
+// applySession moves the session from level from to level to, 0 being none held. Going to none runs on a goroutine of its own, inside an autorelease pool.
+func applySession(from, to Level) error {
 	if constant("AVAudioSessionCategoryAmbient") == 0 {
 		return errSession
 	}
@@ -104,7 +134,7 @@ func apply(from, to Level) error {
 		return errSession
 	}
 	if to == 0 {
-		restore(shared)
+		withPool(func() { restore(shared) })
 		return nil
 	}
 	if from == 0 {

@@ -2,5 +2,5 @@
 
 package audiosession
 
-// apply does nothing outside iOS, whose systems play every app's audio together with no session to set.
-func apply(from, to Level) error { return nil }
+// applySession does nothing outside iOS, whose systems play every app's audio together with no session to set.
+func applySession(from, to Level) error { return nil }
