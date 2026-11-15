@@ -3,6 +3,8 @@
 package ios
 
 import (
+	"sync"
+
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -239,7 +241,28 @@ func (in *input) replaceText(text string) {
 		in.field.Send(selSetText, apple.NSString(text))
 	}
 	in.applying = false
+	in.styleParagraph()
 	in.updatePlaceholder()
+}
+
+// styleParagraph reapplies the current line height after UIKit replaces the
+// text storage. UITextView keeps typing attributes for new text, but a
+// programmatic setText can drop the paragraph attributes from existing text.
+func (in *input) styleParagraph() {
+	if !in.multiline {
+		return
+	}
+	c := &in.fs.Config
+	font := apple.Font(c.Style.Font)
+	defer apple.Release(font)
+	align := uiAlignLeft
+	switch c.Style.Align {
+	case driver.TextAlignCenter:
+		align = uiAlignCenter
+	case driver.TextAlignEnd:
+		align = uiAlignRight
+	}
+	setEditorParagraph(in.field, objc.ID(font), uiColor(c.Style.Color), c.Style.LineHeight, align)
 }
 
 // replaceRange replaces the part of current that differs from text, as the keyboard's own edits do, reporting whether the editor took it.
@@ -462,6 +485,101 @@ func uiColor(c driver.Color) objc.ID {
 	return objc.ID(apple.Class("UIColor")).Send(sel("colorWithRed:green:blue:alpha:"), r, g, b, a)
 }
 
+// textAttrs are UIKit's attributed-string keys, read once because the
+// constants are process-wide. UIKit exports these Foundation constants from
+// its umbrella framework on iOS.
+var textAttrs = sync.OnceValue(func() (a struct{ font, color, paragraph objc.ID }) {
+	a.font = apple.Global(uikitPath, "NSFontAttributeName")
+	a.color = apple.Global(uikitPath, "NSForegroundColorAttributeName")
+	a.paragraph = apple.Global(uikitPath, "NSParagraphStyleAttributeName")
+	return a
+})
+
+func newParagraph(lineHeight driver.Points, align int) objc.ID {
+	para := objc.ID(apple.Class("NSMutableParagraphStyle")).Send(selAlloc).Send(sel("init"))
+	para.Send(sel("setAlignment:"), align)
+	if lineHeight > 0 {
+		para.Send(sel("setMinimumLineHeight:"), float64(lineHeight))
+		para.Send(sel("setMaximumLineHeight:"), float64(lineHeight))
+	}
+	return para
+}
+
+// setEditorParagraph applies the line height to existing text and to text
+// inserted afterward. UIKit otherwise leaves a UITextView at its font's
+// default line height even when the input's TextStyle specifies one.
+func setEditorParagraph(e, font, color objc.ID, lineHeight driver.Points, align int) {
+	if e == 0 {
+		return
+	}
+	a := textAttrs()
+	if font == 0 || color == 0 || a.font == 0 || a.color == 0 || a.paragraph == 0 {
+		return
+	}
+	para := newParagraph(lineHeight, align)
+	attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
+	attrs.Send(sel("setObject:forKey:"), font, a.font)
+	attrs.Send(sel("setObject:forKey:"), color, a.color)
+	attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
+	e.Send(sel("setTypingAttributes:"), attrs)
+	storage := e.Send(sel("textStorage"))
+	if storage != 0 {
+		text := e.Send(selText)
+		n := objc.Send[uint](text, sel("length"))
+		if n > 0 {
+			r := apple.NSRange{Length: n}
+			if lineHeight > 0 {
+				storage.Send(sel("addAttribute:value:range:"), a.paragraph, para, r)
+			} else {
+				storage.Send(sel("removeAttribute:range:"), a.paragraph, r)
+			}
+		}
+	}
+	para.Send(selRelease)
+}
+
+func setPlaceholderLabel(label objc.ID, text string, font objc.ID, color driver.Color, lineHeight driver.Points, align int) {
+	if lineHeight <= 0 {
+		label.Send(selSetText, apple.NSString(text))
+		return
+	}
+	a := textAttrs()
+	if a.font == 0 || a.color == 0 || a.paragraph == 0 {
+		label.Send(selSetText, apple.NSString(text))
+		return
+	}
+	para := newParagraph(lineHeight, align)
+	attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
+	attrs.Send(sel("setObject:forKey:"), font, a.font)
+	attrs.Send(sel("setObject:forKey:"), uiColor(color), a.color)
+	attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
+	str := objc.ID(apple.Class("NSAttributedString")).Send(selAlloc).Send(
+		sel("initWithString:attributes:"), apple.NSString(text), attrs)
+	label.Send(sel("setAttributedText:"), str)
+	str.Send(selRelease)
+	para.Send(selRelease)
+}
+
+func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, lineHeight driver.Points, align int) {
+	a := textAttrs()
+	if a.font == 0 || a.color == 0 {
+		f.Send(sel("setPlaceholder:"), apple.NSString(text))
+		return
+	}
+	attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
+	attrs.Send(sel("setObject:forKey:"), uiColor(color), a.color)
+	attrs.Send(sel("setObject:forKey:"), font, a.font)
+	if a.paragraph != 0 && lineHeight > 0 {
+		para := newParagraph(lineHeight, align)
+		attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
+		para.Send(selRelease)
+	}
+	str := objc.ID(apple.Class("NSAttributedString")).Send(selAlloc).Send(
+		sel("initWithString:attributes:"), apple.NSString(text), attrs)
+	f.Send(sel("setAttributedPlaceholder:"), str)
+	str.Send(selRelease)
+}
+
 // configure is ItemInput.
 func (v *view) configure(c *driver.InputConfig) {
 	in := v.input
@@ -496,19 +614,14 @@ func (v *view) configure(c *driver.InputConfig) {
 		in.label.Send(selSetFont, objc.ID(font))
 		in.label.Send(selSetTextColor, uiColor(placeholder))
 		in.label.Send(selSetTextAlignment, align)
-		in.label.Send(selSetText, apple.NSString(c.Placeholder))
+		setPlaceholderLabel(in.label, c.Placeholder, objc.ID(font), placeholder, c.Style.LineHeight, align)
+		setEditorParagraph(f, objc.ID(font), uiColor(c.Style.Color), c.Style.LineHeight, align)
 		f.Send(sel("setEditable:"), !c.Disabled)
 		f.Send(sel("setSelectable:"), !c.Disabled)
 		p := c.Padding
 		f.Send(sel("setTextContainerInset:"), edgeInsets{Top: float64(p.Top), Left: float64(p.Left), Bottom: float64(p.Bottom), Right: float64(p.Right)})
 	} else {
-		attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
-		attrs.Send(sel("setObject:forKey:"), uiColor(placeholder), apple.Global(uikitPath, "NSForegroundColorAttributeName"))
-		attrs.Send(sel("setObject:forKey:"), objc.ID(font), apple.Global(uikitPath, "NSFontAttributeName"))
-		str := objc.ID(apple.Class("NSAttributedString")).Send(selAlloc).Send(
-			sel("initWithString:attributes:"), apple.NSString(c.Placeholder), attrs)
-		f.Send(sel("setAttributedPlaceholder:"), str)
-		str.Send(selRelease)
+		setPlaceholder(f, c.Placeholder, objc.ID(font), placeholder, c.Style.LineHeight, align)
 		f.Send(selSetEnabled, !c.Disabled)
 	}
 	apple.Release(font)

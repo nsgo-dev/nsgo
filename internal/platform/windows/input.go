@@ -238,6 +238,12 @@ func (in *textInput) makeLayout(units []uint16, align uintptr) *comObject {
 	}
 	layout.call(formatSetTextAlignment, align)
 	s := in.config.Style
+	if lineHeight := float32(s.LineHeight); lineHeight > 0 {
+		m := metricsOf(s.Font)
+		size := float32(s.Font.Size)
+		baseline := (lineHeight-(m.ascent+m.descent)*size)/2 + m.ascent*size
+		format.callF(formatSetLineSpacing, 0b110, dwLineSpacingUniform, f32(lineHeight), f32(baseline))
+	}
 	if t := typography(s.Font.Variant); t != nil && n > 0 {
 		layout.callRange(layoutSetTypography, 0, 0, uint32(n), t.ptr())
 	}

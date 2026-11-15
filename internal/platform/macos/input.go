@@ -47,28 +47,33 @@ type input struct {
 }
 
 var (
-	selCurrentEditor   = sel("currentEditor")
-	selString          = sel("string")
-	selSetStringText   = sel("setString:")
-	selSelectedRange   = sel("selectedRange")
-	selSetSelRange     = sel("setSelectedRange:")
-	selHasMarkedText   = sel("hasMarkedText")
-	selMarkedRange     = sel("markedRange")
-	selShouldChange    = sel("textView:shouldChangeTextInRange:replacementString:")
-	selDidChangeSel    = sel("textViewDidChangeSelection:")
-	selFirstResponder  = sel("firstResponder")
-	selLength          = sel("length")
-	selUnmarkText      = sel("unmarkText")
-	selDoCommand       = sel("textView:doCommandBySelector:")
-	selControlCommand  = sel("control:textView:doCommandBySelector:")
-	selInsertNewline   = sel("insertNewline:")
-	selInsertNLIgnore  = sel("insertNewlineIgnoringFieldEditor:")
-	selInsertLineBreak = sel("insertLineBreak:")
-	selCancelOperation = sel("cancelOperation:")
-	selInsertTab       = sel("insertTab:")
-	selInsertBacktab   = sel("insertBacktab:")
-	selInsertTabIgnore = sel("insertTabIgnoringFieldEditor:")
-	selDeleteBackward  = sel("deleteBackward:")
+	selCurrentEditor       = sel("currentEditor")
+	selString              = sel("string")
+	selSetStringText       = sel("setString:")
+	selSelectedRange       = sel("selectedRange")
+	selSetSelRange         = sel("setSelectedRange:")
+	selHasMarkedText       = sel("hasMarkedText")
+	selMarkedRange         = sel("markedRange")
+	selShouldChange        = sel("textView:shouldChangeTextInRange:replacementString:")
+	selDidChangeSel        = sel("textViewDidChangeSelection:")
+	selFirstResponder      = sel("firstResponder")
+	selLength              = sel("length")
+	selUnmarkText          = sel("unmarkText")
+	selDoCommand           = sel("textView:doCommandBySelector:")
+	selControlCommand      = sel("control:textView:doCommandBySelector:")
+	selInsertNewline       = sel("insertNewline:")
+	selInsertNLIgnore      = sel("insertNewlineIgnoringFieldEditor:")
+	selInsertLineBreak     = sel("insertLineBreak:")
+	selCancelOperation     = sel("cancelOperation:")
+	selInsertTab           = sel("insertTab:")
+	selInsertBacktab       = sel("insertBacktab:")
+	selInsertTabIgnore     = sel("insertTabIgnoringFieldEditor:")
+	selDeleteBackward      = sel("deleteBackward:")
+	selSetDefaultParagraph = sel("setDefaultParagraphStyle:")
+	selSetTypingAttributes = sel("setTypingAttributes:")
+	selTextStorage         = sel("textStorage")
+	selAddAttribute        = sel("addAttribute:value:range:")
+	selRemoveAttribute     = sel("removeAttribute:range:")
 
 	classField, classSecureField, classTextView, classSecureEditor, classSecureFieldCell objc.Class
 
@@ -420,6 +425,7 @@ func (in *input) replaceText(text string) {
 	caret, ok := in.selection()
 	in.applying = true
 	in.setText(text)
+	in.styleParagraph()
 	if ok {
 		n := driver.UTF16Len(text)
 		at := min(caret.End, n)
@@ -431,6 +437,20 @@ func (in *input) replaceText(text string) {
 	in.applying = false
 	in.updatePlaceholder()
 	in.selectionChanged()
+}
+
+func (in *input) styleParagraph() {
+	c := &in.fs.Config
+	font := apple.Font(c.Style.Font)
+	defer apple.Release(font)
+	align := nsAlignLeft
+	switch c.Style.Align {
+	case driver.TextAlignCenter:
+		align = nsAlignCenter
+	case driver.TextAlignEnd:
+		align = nsAlignRight
+	}
+	setEditorParagraph(in.editor(), objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
 }
 
 func (in *input) updatePlaceholder() {
@@ -768,14 +788,16 @@ func (v *view) configure(c *driver.InputConfig) {
 		in.label.Send(selSetFont, objc.ID(font))
 		in.label.Send(selSetTextColor, nsColor(placeholderColor(c)))
 		in.label.Send(selSetAlignment, align)
-		in.label.Send(selSetString, apple.NSString(c.Placeholder))
+		setPlaceholderLabel(in.label, c.Placeholder, objc.ID(font), placeholderColor(c), align, c.Style.LineHeight)
+		setEditorParagraph(in.field, objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
 	} else {
 		in.field.Send(selSetEnabled, !c.Disabled)
-		setPlaceholder(in.field, c.Placeholder, objc.ID(font), placeholderColor(c), align)
+		setPlaceholder(in.field, c.Placeholder, objc.ID(font), placeholderColor(c), align, c.Style.LineHeight)
 		if e := in.field.Send(selCurrentEditor); e != 0 {
 			e.Send(selSetFont, objc.ID(font))
 			e.Send(selSetTextColor, nsColor(c.Style.Color))
 			e.Send(selSetAlignment, align)
+			setEditorParagraph(e, objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
 		}
 		setContentType(in.field, c.AutoComplete, in.masked)
 	}
@@ -809,7 +831,51 @@ var textAttrs = sync.OnceValue(func() (a struct{ font, color, background, paragr
 
 // setPlaceholder gives a field its placeholder in its font, color and
 // alignment: an attributed placeholder keeps to the start otherwise.
-func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, align int) {
+func newParagraph(lineHeight driver.Points, align int) objc.ID {
+	para := objc.ID(apple.Class("NSMutableParagraphStyle")).Send(selAlloc).Send(sel("init"))
+	para.Send(selSetAlignment, align)
+	if lineHeight > 0 {
+		para.Send(sel("setMinimumLineHeight:"), float64(lineHeight))
+		para.Send(sel("setMaximumLineHeight:"), float64(lineHeight))
+	}
+	return para
+}
+
+// setEditorParagraph applies the line height to existing text and to text
+// inserted afterward. AppKit otherwise keeps the default paragraph spacing
+// even when the input's TextStyle has an explicit line height.
+func setEditorParagraph(e, font, color objc.ID, lineHeight driver.Points, align int) {
+	if e == 0 {
+		return
+	}
+	a := textAttrs()
+	if font == 0 || color == 0 || a.font == 0 || a.color == 0 || a.paragraph == 0 {
+		return
+	}
+	para := newParagraph(lineHeight, align)
+	e.Send(selSetDefaultParagraph, para)
+	attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
+	attrs.Send(sel("setObject:forKey:"), font, a.font)
+	attrs.Send(sel("setObject:forKey:"), color, a.color)
+	attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
+	e.Send(selSetTypingAttributes, attrs)
+	storage := e.Send(selTextStorage)
+	if storage != 0 && a.paragraph != 0 {
+		text := e.Send(selString)
+		n := objc.Send[uint](text, selLength)
+		if n > 0 {
+			r := apple.NSRange{Length: n}
+			if lineHeight > 0 {
+				storage.Send(selAddAttribute, a.paragraph, para, r)
+			} else {
+				storage.Send(selRemoveAttribute, a.paragraph, r)
+			}
+		}
+	}
+	para.Send(selRelease)
+}
+
+func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, align int, lineHeight driver.Points) {
 	a := textAttrs()
 	if a.font == 0 || a.color == 0 {
 		f.Send(selSetPlaceholder, apple.NSString(text))
@@ -819,8 +885,7 @@ func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, al
 	attrs.Send(sel("setObject:forKey:"), font, a.font)
 	attrs.Send(sel("setObject:forKey:"), nsColor(color), a.color)
 	if a.paragraph != 0 {
-		para := objc.ID(apple.Class("NSMutableParagraphStyle")).Send(selAlloc).Send(sel("init"))
-		para.Send(selSetAlignment, align)
+		para := newParagraph(lineHeight, align)
 		attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
 		para.Send(selRelease)
 	}
@@ -828,6 +893,28 @@ func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, al
 		sel("initWithString:attributes:"), apple.NSString(text), attrs)
 	f.Send(sel("setPlaceholderAttributedString:"), str)
 	str.Send(selRelease)
+}
+
+func setPlaceholderLabel(label objc.ID, text string, font objc.ID, color driver.Color, align int, lineHeight driver.Points) {
+	if lineHeight <= 0 {
+		label.Send(selSetString, apple.NSString(text))
+		return
+	}
+	a := textAttrs()
+	if a.font == 0 || a.color == 0 || a.paragraph == 0 {
+		label.Send(selSetString, apple.NSString(text))
+		return
+	}
+	para := newParagraph(lineHeight, align)
+	attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
+	attrs.Send(sel("setObject:forKey:"), font, a.font)
+	attrs.Send(sel("setObject:forKey:"), nsColor(color), a.color)
+	attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
+	str := objc.ID(apple.Class("NSAttributedString")).Send(selAlloc).Send(
+		sel("initWithString:attributes:"), apple.NSString(text), attrs)
+	label.Send(sel("setAttributedStringValue:"), str)
+	str.Send(selRelease)
+	para.Send(selRelease)
 }
 
 // setContentType gives a field the content type AppKit's autofill knows
