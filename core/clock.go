@@ -31,8 +31,9 @@ type ManualClock struct {
 	mu     sync.Mutex
 	now    time.Time
 	timers []*manualTimer
-	// wall is how far the wall time is set from now (SetWallTime).
-	wall time.Duration
+	// wall and wallLoc are the offset and location set by SetWallTime.
+	wall    time.Duration
+	wallLoc *time.Location
 }
 
 type manualTimer struct {
@@ -56,14 +57,19 @@ func (c *ManualClock) SetWallTime(t time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.wall = t.Sub(c.now)
+	c.wallLoc = t.Location()
 }
 
 // WallTime is the wall time the app reads: Now, unless SetWallTime set
-// it apart.
+// it apart. After SetWallTime, it uses the location passed to that call.
 func (c *ManualClock) WallTime() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.now.Add(c.wall)
+	w := c.now.Add(c.wall)
+	if c.wallLoc != nil {
+		return w.In(c.wallLoc)
+	}
+	return w
 }
 
 func (c *ManualClock) AfterFunc(d time.Duration, f func()) func() bool {
@@ -150,7 +156,8 @@ func slicesDeleteStopped(ts []*manualTimer) []*manualTimer {
 func (cx *Scope) Now() time.Time { return cx.rt.clock.Now() }
 
 // WallTime returns the date and time the app shows: Now, unless a test's
-// clock set its wall time apart (ManualClock.SetWallTime).
+// manual clock set its wall time apart (ManualClock.SetWallTime). A manual
+// clock returns that wall time in the location passed to SetWallTime.
 func (cx *Scope) WallTime() time.Time {
 	if w, ok := cx.rt.clock.(interface{ WallTime() time.Time }); ok {
 		return w.WallTime()
