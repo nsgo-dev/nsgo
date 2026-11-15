@@ -123,7 +123,8 @@ A line means "imports". `layering_test.go` checks the graph on every target, and
 
 - Apps may import any public package directly, `core` included. `core` and `nsgotest` alias the internal types their API reaches (`TestPublicAPINamesNoInternalType`).
 - `internal/driver` imports from the module only `internal/shaderir`, for the shader programs it carries.
-- `core` imports only `internal/driver`, `internal/layout` and the shader compilers (`internal/shader`, `internal/shader/wgsl`, `internal/shaderir`).
+- `core` imports only `internal/driver`, `internal/devtools`, `internal/layout` and the shader compilers (`internal/shader`, `internal/shader/wgsl`, `internal/shaderir`). `internal/devtools` imports nothing of NSGo's, so DevTools' overlay, the layout audit's included, lives in `core` (`UpdateHighlights`).
+- The root's dev client (the `nsgodev` tag) imports `internal/driver` too, for its traces; `TestLayering` lists the `nsgodev` builds of macOS and the web as well.
 - Backends import `internal/driver`, `internal/engine`, `desktop/locales`, their shared packages and the shader writers, never the compilers, which only `core` links.
 - Only a backend's test host, built with the `nsgotest` tag, imports `core`.
 - `i18n` imports only `core` and `internal/cldr`; `base`'s packages import it for their catalogs, as `ui/chat/locales` does for its own.
@@ -165,7 +166,7 @@ The other packages under `internal/platform` hold what two or more backends shar
 
 Go's linker keeps what a reachable function, method or package initializer reaches, so each package keeps what only some apps use out of reach of the rest:
 
-- An element mounts through its own method (`mountIn`), not a case of the tree's type switch, so the elements an app never makes leave their code out.
+- An element mounts through its own method (`mountIn`), not a case of the tree's type switch, so the elements an app never makes leave their code out: DevTools' overlay with the layout audit, which only the dev client mounts, links only into dev builds, the hooks that keep the audit's boxes up to date included, which the overlay sets as it mounts; a release build keeps a flag frames set and the hooks' nil checks (`TestReleaseBuildsLinkNoDevClient`).
 - No package variable, `init` or package-level regular expression reaches a compiler, codec or table that only some apps need: build it on first use inside a function, as `core`'s default transition program and WGSL's built-ins are.
 - A backend leaves to the system what it has: images download through its HTTP client (`imageload.HTTP`), the web decodes and encodes images with the browser's codecs, and only Android imports `archive/zip`, for its APK.
 

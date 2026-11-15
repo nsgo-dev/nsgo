@@ -40,6 +40,7 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `nsgotest` | `nsh-testing` | App tests, headless or on a platform ([testing](docs/architecture/testing.md)) |
 | `internal/testhost` | `nsh-testing`'s agent | A backend's test host for `nsgotest`: the main thread, native input, screenshots |
 | `internal/driver` | `nsh-core`'s mount protocol | The mount protocol, events and `TextEngine`; what every backend runs, such as the `Animator` |
+| `internal/devtools` | — | What DevTools read from a running app's trees and send them; `core` draws their overlay, the layout audit's included ([tool](docs/architecture/tool.md#dev-loop)) |
 | `internal/layout` | Taffy | Block, flexbox and grid layout, checked against Taffy's fixtures |
 | `internal/shader`, `internal/shader/wgsl`, `internal/shaderir` | — (a fork of Ebitengine's Kage); `nsh-core`'s `shader` | The shader compilers: Go's syntax and WGSL checked into an IR, written as MSL, GLSL or HLSL ([shaders](docs/architecture/shaders.md)) |
 | `internal/engine` | `nsh-engine` | The engine goroutine: a mailbox, a batch per commit, storage files, the performance monitor |

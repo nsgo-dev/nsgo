@@ -56,3 +56,5 @@ built from Ghostty, https://github.com/ghostty-org/ghostty, Copyright (c) 2024
 Mitchell Hashimoto, Ghostty contributors, licensed under the MIT License.
 base/terminal/ghostty_themes.go holds iTerm2-Color-Schemes' themes as Ghostty
 ships them, under the MIT License its header gives.
+
+core/audit.go's layout audit follows mygo-layout-audit, https://github.com/knothhe/mygo-layout-audit, Copyright (c) 2026 knothhe, licensed under the MIT License: its colors, its grid and its ruler.

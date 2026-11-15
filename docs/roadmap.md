@@ -331,6 +331,11 @@ These items wait for community contributions, and a change to one backend record
 | Scrolls an embedded view cannot use | `embedding.md`, #1515 | A view embedded in another view of a macOS host passes on a scroll none of its scroll views can take, so the host scrolls |
 | The system's words in a forced language elsewhere | — | What Android, Windows and Linux say in the app themselves, such as text selection menus, file dialogs and GTK's widgets, follows the language `SetLocale` forces, as it does on macOS and iOS from the next launch ([languages](architecture/languages.md#the-tool)): Android 13's `LocaleManager.setApplicationLocales`, Windows' `SetThreadPreferredUILanguages` |
 | Native direction on devices | — | The app's direction ([languages](architecture/languages.md#which-language)) is checked to mirror the native controls on an iPhone, an Android device, Windows and Linux, where it was only built (2026-11-04), and on macOS, where headless tests ran |
+| DevTools' overlay everywhere | — | `nsgo dev` mounts DevTools' overlay, its update outlines, Pick and the layout audit, in every surface of a dev build, `desktop.OpenWindow`'s windows, panels and `nsgo.NewView`'s embedded views too, where only `Run`'s root view and `SetMainView`'s have it now, and inside the sheets iOS presents (`ModalPageSheet`, `ModalFormSheet`), which the audit leaves out and draws under now |
+| DevTools in mini programs | — | `nsgo dev` builds mini programs with the dev client, which it leaves out now, so `-devtools`, `-highlight` and `-layout` reach them |
+| The layout audit on a remote | — | Apple TV's focus reaches the audit's readout and a ruler driven by it picks points, where the readout takes no focus and the ruler needs a pointer, so only the boxes, the grid and showing and hiding it from a keyboard or DevTools work there |
+| Boxes where views draw | — | DevTools' bounds, and with them the layout audit's boxes, follow transforms, layout animations, transitions and sticky offsets, where they read layout frames now |
+| The layout audit checked on targets | — | `nsgo dev -layout` is checked by hand on Windows, Linux, the web, iOS, Android, tvOS and watchOS, where only its headless tests ran, as it was on macOS (2026-11-15) |
 
 ## TSX and dynamic delivery
 

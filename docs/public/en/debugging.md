@@ -1,6 +1,6 @@
 ---
 title: Running and debugging
-description: Run an app on any target with hot reload, and see its errors, updates, speed and other languages.
+description: Run an app on any target with hot reload, and see its errors, updates, layout, speed and other languages.
 group: Toolchain
 order: 20
 ---
@@ -45,6 +45,7 @@ go tool nsgo dev -devtools
 - **Profiler**: each commit's time, split into your code before it, the commit with its layout, and applying it on the platform's main thread. It also shows the lines whose writes caused the commit, and opens on the computations it ran, the longest first. A second list names the computations that ran most in the last second, by the line that made them. Android's runtime applies batches in its own Java code, so Android commits have no platform time.
 - **Recorder**: what you press, type, clear and scroll in the app, written as an `nsgotest` test file to copy into a `_test.go` file. In Elements, **Assert shown** and **Assert text** add a check of the selected view. A text check holds the text in the language the app showed it in, so record with the language your tests run in.
 - **Highlight updates** outlines each view a commit changes, as `-highlight` does.
+- **Layout** shows and hides the [layout audit](#layout) on the device, as `-layout` starts it.
 
 A TSX app's state, computations and writes are named by their TSX lines, through the bundles' source maps, and link to the files in your app.
 
@@ -56,7 +57,7 @@ DevTools read the app through `nsgo dev`'s server, which listens on your network
 go tool nsgo dev -highlight
 ```
 
-`-highlight` outlines for half a second each view a commit changed, so an update that redraws more than it should shows on screen as you use the app. The outlines draw over the app's main layer, under its modals. DevTools turn them on and off while the app runs.
+`-highlight` outlines for half a second each view a commit changed, so an update that redraws more than it should shows on screen as you use the app. The outlines draw over the app and its modals. DevTools turn them on and off while the app runs.
 
 ```sh
 go tool nsgo dev -trace
@@ -71,6 +72,24 @@ go tool nsgo dev -trace
 ```
 
 A line that writes many times, or many bindings run for one write, is where to batch writes (`cx.Batch`) or narrow what a binding reads. `go tool nsgo test -trace` prints the same under each step of a test.
+
+## Layout
+
+```sh
+go tool nsgo dev -layout
+go tool nsgo dev -layout=bounds,grid=4
+```
+
+`-layout` starts the app with DevTools' layout audit over it, which outlines every view: its border box in blue, the inner edge of its padding in green and the outer edge of its margin in orange, each cut where a scroll view or a view that clips hides it. `grid` draws a grid of 8 points, and `grid=N` one of N points, at least 4. Give the value after `=`: the flag alone means `bounds`.
+
+A readout in the bottom corner shows the window's size in points, with buttons that turn the boxes, the grid and the ruler on and off. While the ruler is on, presses pick two points instead of reaching the app, and the readout shows how far apart they are across and down; a third press starts again.
+
+| Key | Effect |
+| --- | --- |
+| `Cmd+Option+Shift+L`, `Ctrl+Alt+Shift+L` | Shows or hides the audit, in a build with `-layout` |
+| `Esc`, back | Stops measuring |
+
+If your app binds the same key, the app's binding wins. Without the key, as on a phone, run with `-devtools` too and show and hide the audit with DevTools' **Layout**; hide it to reach a control under the readout. The boxes are where layout placed the views, before transforms and animations move them, and follow a scroll a frame behind it. Redrawing them costs every update time, so measure speed without them.
 
 ## Speed
 
