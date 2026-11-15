@@ -954,6 +954,7 @@ func TestEnvironment(t *testing.T) {
 	var materials []WindowMaterial
 	var states []Lifecycle
 	var minimized []bool
+	var login []bool
 	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
 		cx.Effect(func() { states = append(states, cx.Env().Lifecycle()) })
 		cx.Effect(func() { widths = append(widths, cx.Env().Window().Width) })
@@ -961,6 +962,7 @@ func TestEnvironment(t *testing.T) {
 		cx.Effect(func() { contrasts = append(contrasts, cx.Env().IncreaseContrast()) })
 		cx.Effect(func() { materials = append(materials, cx.Env().WindowMaterial()) })
 		cx.Effect(func() { minimized = append(minimized, cx.Env().Minimized()) })
+		cx.Effect(func() { login = append(login, cx.Env().LaunchedAtLogin()) })
 		return Text{Content: "Aa", Style: Style{FontSize: 10}, TestID: "text"}
 	})
 	h.commit()
@@ -987,6 +989,11 @@ func TestEnvironment(t *testing.T) {
 	}
 	if !slices.Equal(minimized, []bool{false, true}) {
 		t.Fatalf("minimized %v", minimized)
+	}
+	h.tree.SetEnvironment(Environment{LaunchedAtLogin: true})
+	h.commit()
+	if !slices.Equal(login, []bool{false, true}) {
+		t.Fatalf("launched at login %v", login)
 	}
 }
 

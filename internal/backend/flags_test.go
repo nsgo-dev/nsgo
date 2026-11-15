@@ -79,3 +79,16 @@ func TestDockTaskLaunchFlag(t *testing.T) {
 		t.Errorf("an empty task = %+v", f)
 	}
 }
+
+func TestLoginLaunchFlag(t *testing.T) {
+	var f launchFlags
+	got := f.parse([]string{"app", "--nsgo-launched-at-login", "--user-option"})
+	if !f.launchedAtLogin || !slices.Equal(got, []string{"app", "--user-option"}) {
+		t.Fatalf("login launch flag = %v, args = %q", f.launchedAtLogin, got)
+	}
+	f = launchFlags{}
+	got = f.parse([]string{"app", "--", "--nsgo-launched-at-login"})
+	if f.launchedAtLogin || !slices.Equal(got, []string{"app", "--", "--nsgo-launched-at-login"}) {
+		t.Fatalf("app-owned flag changed launch reason: %v, args = %q", f.launchedAtLogin, got)
+	}
+}

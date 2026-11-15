@@ -61,6 +61,8 @@ type Options struct {
 	// HideDock starts the app out of the Dock and the app switcher, as a
 	// tray app (nsgo.HideDock); desktop.SetDockVisible changes it.
 	HideDock bool
+	// LaunchedAtLogin marks a launch by the macOS 11/12 LaunchAgent.
+	LaunchedAtLogin bool
 	// Host is what an embedding host gives the view (NewView).
 	Host engine.HostOptions
 }
@@ -571,16 +573,22 @@ func register(name string, super objc.Class, protocols []*objc.Protocol, methods
 // is gone and its storage written, leaving the process to the caller,
 // as NSH's run_app does.
 func Run(app engine.App, opts Options) {
-	nsApp := startApp(opts)
+	var s *surface
+	nsApp := startApp(opts, func(login bool) {
+		opts.LaunchedAtLogin = login
+		s = startOwn(app, opts)
+	})
 	startSparkle()
-	s := startOwn(app, opts)
+	// AppKit delivers the login Apple event as launching finishes. Start the engine from that callback so the app sees its launch reason on its first execution.
 	nsApp.Send(sel("run"))
 	for o := range surfaces {
 		if o != s {
 			o.close()
 		}
 	}
-	s.close()
+	if s != nil {
+		s.close()
+	}
 	own = nil
 	engine.SyncStorage()
 	nsApp.Send(sel("setDelegate:"), objc.ID(0))
@@ -650,12 +658,14 @@ func surfaceMoved(self objc.ID, cmd objc.SEL) {
 
 // startApp makes the process a regular app with NSGo's menu and
 // delegate, in opts' appearance, and returns NSApp.
-func startApp(opts Options) objc.ID {
+func startApp(opts Options, ready func(login bool)) objc.ID {
 	loadAppKit()
 	clearDockMenu()
 	quitPending = false
 	quitRequestID = 0
 	finished = false
+	launchedAtLogin := opts.LaunchedAtLogin
+	var launchFiles, launchLinks []string
 	apple.RegisterFonts(opts.Fonts)
 	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
 	// An accessory app set so before the loop runs never shows in the
@@ -710,7 +720,29 @@ func startApp(opts Options) objc.ID {
 			return dockMenu.menu
 		},
 	}, {
-		// Files of the types the app declares, opened from the Finder, the Dock or Open With, and links of the URL schemes it declares, which Launch Services hands the running app; at launch, this comes before the app's first frame, and the core keeps them for its handlers (core.Scope.OnOpenFiles, core.Scope.OnOpenLinks).
+		// Read the Apple event while AppKit still handles the launch, before the engine evaluates the app's first function.
+		Cmd: sel("applicationDidFinishLaunching:"),
+		Fn: func(self objc.ID, _ objc.SEL, note objc.ID) {
+			launchedAtLogin = launchedAtLogin || loginLaunchEvent()
+			// Leave AppKit's launching stack before running app code and processing the platform commands that code sends.
+			apple.OnMain(func() {
+				if ready != nil {
+					ready(launchedAtLogin)
+				}
+				if finished || own == nil || own.engine == nil {
+					return
+				}
+				if len(launchFiles) > 0 {
+					own.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: launchFiles})
+				}
+				if len(launchLinks) > 0 {
+					own.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: launchLinks})
+				}
+				launchFiles, launchLinks = nil, nil
+			})
+		},
+	}, {
+		// Files of the types the app declares, opened from the Finder, the Dock or Open With, and links of the URL schemes it declares, which Launch Services hands the running app; at launch, this comes before the app's first frame, and the core keeps them for its handlers (core.Scope.OnOpenFiles, core.Scope.OnOpenLinks). Those that arrive before the engine starts wait for it.
 		Cmd: sel("application:openURLs:"),
 		Fn: func(self objc.ID, _ objc.SEL, app, urls objc.ID) {
 			var paths, links []string
@@ -721,7 +753,12 @@ func startApp(opts Options) objc.ID {
 					links = append(links, apple.GoString(u.Send(sel("absoluteString"))))
 				}
 			})
-			if finished || own == nil || own.engine == nil {
+			if finished {
+				return
+			}
+			if own == nil || own.engine == nil {
+				launchFiles = append(launchFiles, paths...)
+				launchLinks = append(launchLinks, links...)
 				return
 			}
 			if len(paths) > 0 {
@@ -801,7 +838,7 @@ func openWindow(app engine.App, opts Options, test *testWindow) *surface {
 func newSurface(opts Options, embedded bool) *surface {
 	s := &surface{epoch: time.Now(), motions: map[*view]*motion{}, movers: map[*view]struct{}{},
 		inside: map[*view]struct{}{}, effects: map[*view]bool{},
-		components: opts.Components, embedded: embedded, appearance: opts.Appearance}
+		components: opts.Components, embedded: embedded, appearance: opts.Appearance, opts: opts}
 	s.appName = opts.Title
 	if automationBuild {
 		// nsgo dev's automation answers alerts as a test does.
@@ -999,6 +1036,7 @@ func (s *surface) environment() driver.Environment {
 		Minimized:        s.window != 0 && objc.Send[bool](s.window, sel("isMiniaturized")),
 		WindowFrame:      s.windowFrame(),
 		Lifecycle:        s.lifecycle(),
+		LaunchedAtLogin:  s.opts.LaunchedAtLogin,
 
 		// The center serves only an app in a bundle.
 		ScheduledNotifications: apple.NotificationsAvailable(),

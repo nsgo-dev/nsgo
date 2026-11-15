@@ -46,6 +46,8 @@ type Env struct {
 	appClip        *Signal[bool]
 	openedURL      *Signal[string]
 	appearance     *Signal[Appearance]
+
+	launchedAtLogin *Signal[bool]
 	// systemDark is the system's appearance, which a forced one hides.
 	systemDark bool
 	material   *Signal[WindowMaterial]
@@ -103,6 +105,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		lifecycle:        NewSignal(cx, LifecycleActive),
 		appClip:          NewSignal(cx, false),
 		openedURL:        NewSignal(cx, ""),
+		launchedAtLogin:  NewSignal(cx, false),
 		appearance:       NewSignal(cx, AppearanceSystem),
 		appleKeys:        NewSignal(cx, false),
 		material:         NewSignal(cx, WindowMaterialNone),
@@ -209,6 +212,7 @@ func (e *Env) set(v Environment) {
 	e.lifecycle.Set(v.Lifecycle)
 	e.appClip.Set(v.AppClip)
 	e.openedURL.Set(v.OpenedURL)
+	e.launchedAtLogin.Set(v.LaunchedAtLogin)
 	e.material.Set(v.WindowMaterial)
 	e.verticalBar.Set(v.VerticalBarEdge)
 	e.headers = [2]Points{v.HeaderHeight, max(v.LargeHeaderHeight, v.HeaderHeight)}
@@ -441,6 +445,9 @@ func (e *Env) AppClip() bool { return e.appClip.Get() }
 // OpenedURL returns the web link that last opened the app, "" when none
 // did: the core's part of mobile.OpenedURL, which apps use.
 func (e *Env) OpenedURL() string { return e.openedURL.Get() }
+
+// LaunchedAtLogin reports whether the system started this run as a login item: the core's part of desktop.LaunchedAtLogin, which apps use.
+func (e *Env) LaunchedAtLogin() bool { return e.launchedAtLogin.Get() }
 
 // AppleKeys reports whether shortcuts follow Apple's conventions: "mod"
 // is Command and labels use ⌘.

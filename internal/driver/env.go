@@ -94,6 +94,8 @@ type Environment struct {
 	// link; "" when none did.
 	AppClip   bool
 	OpenedURL string
+	// LaunchedAtLogin says the system started this run as a login item. It stays the same throughout the run, including subsequent reopens.
+	LaunchedAtLogin bool
 }
 
 // Equal reports whether two platform environments have the same values.

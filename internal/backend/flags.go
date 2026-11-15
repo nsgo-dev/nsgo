@@ -36,6 +36,8 @@ type launchFlags struct {
 	toastActivation bool
 	// dockTask is the label of the app icon menu's item a Windows Jump List task starts the app with, --nsgo-dock-menu=<label> (desktop.SetDockMenu).
 	dockTask string
+	// launchedAtLogin is set by the legacy macOS LaunchAgent.
+	launchedAtLogin bool
 }
 
 // launch holds the flags the app was started with.
@@ -126,6 +128,8 @@ func (f *launchFlags) set(flag string) error {
 			return errors.New("needs the item's label")
 		}
 		f.dockTask = value
+	case "launched-at-login":
+		f.launchedAtLogin = true
 	default:
 		return errors.New("no such flag: --nsgo-fps, --nsgo-lang or --nsgo-appearance")
 	}

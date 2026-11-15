@@ -147,9 +147,16 @@ func TrashFile(cx *core.Scope, path string, done func(trashedAt string, err erro
 }
 
 // SetLaunchAtLogin has the system start the app as the user logs in, or
-// no more. macOS takes only an app in a bundle, as nsgo build makes it.
+// no more. macOS takes only an app in a bundle, as nsgo build makes it:
+// SMAppService on macOS 13+, a per-user LaunchAgent on macOS 11 and 12.
 func SetLaunchAtLogin(cx *core.Scope, on bool) { cx.SetLaunchAtLogin(on) }
 
 // LaunchAtLogin calls done with whether the system starts the app at
 // login.
 func LaunchAtLogin(cx *core.Scope, done func(on bool)) { cx.LaunchAtLogin(done) }
+
+// LaunchedAtLogin reports whether the system started this run as a login
+// item. It is available when the app first runs and stays the same on
+// reopen. macOS reads its launch Apple event, or NSGo's LaunchAgent marker
+// on macOS 11/12; other platforms currently report false.
+func LaunchedAtLogin(cx *core.Scope) bool { return cx.Env().LaunchedAtLogin() }

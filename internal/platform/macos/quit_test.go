@@ -15,7 +15,17 @@ import (
 // TestTerminateAsksTheAppAndReturnsFromRun sends AppKit's terminate: as Cmd+Q, the Dock and a tray menu do, each from a block on the main queue as a tray menu's Quit is: the first request is canceled, the second deferred while a third terminate: comes and then approved, and Run returns with OnQuit run.
 func TestTerminateAsksTheAppAndReturnsFromRun(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	terminate := func() { apple.OnMain(func() { nsApp().Send(sel("terminate:"), nsApp()) }) }
+	var terminate func()
+	terminate = func() {
+		apple.OnMain(func() {
+			// Cancel's response crosses the engine's mount batch. Wait for that response before issuing a new request; otherwise the backend correctly treats it as part of the still-pending one.
+			if quitPending {
+				time.AfterFunc(time.Millisecond, terminate)
+				return
+			}
+			nsApp().Send(sel("terminate:"), nsApp())
+		})
+	}
 	var requests, quits atomic.Int32
 	app := core.AppRoot(func(cx *core.Scope) {
 		cx.OnQuitRequest(func(q *core.QuitRequest) {

@@ -3,11 +3,8 @@
 package macos
 
 import (
-	"log"
 	"time"
-	"unsafe"
 
-	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -341,45 +338,4 @@ func setDock(on bool) {
 		// The menu bar becomes the app's once it activates again.
 		activateApp()
 	}
-}
-
-// smAppService is ServiceManagement's SMAppService, loaded once; nil
-// before macOS 13.
-func smAppService() objc.ID {
-	if cls := apple.Class("SMAppService"); cls != 0 {
-		return objc.ID(cls)
-	}
-	if _, err := purego.Dlopen("/System/Library/Frameworks/ServiceManagement.framework/ServiceManagement",
-		purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
-		return 0
-	}
-	return objc.ID(apple.Class("SMAppService"))
-}
-
-// setLaunchAtLogin registers the app as a login item, or unregisters it.
-// The system takes only apps in a bundle.
-func setLaunchAtLogin(on bool) {
-	cls := smAppService()
-	if cls == 0 {
-		return
-	}
-	service := cls.Send(sel("mainAppService"))
-	var err objc.ID
-	method := "unregisterAndReturnError:"
-	if on {
-		method = "registerAndReturnError:"
-	}
-	if !objc.Send[bool](service, sel(method), unsafe.Pointer(&err)) && err != 0 {
-		log.Printf("nsgo: launch at login: %s", apple.GoString(err.Send(sel("localizedDescription"))))
-	}
-}
-
-// launchesAtLogin reports whether the app is an enabled login item.
-func launchesAtLogin() bool {
-	cls := smAppService()
-	if cls == 0 {
-		return false
-	}
-	const enabled = 1
-	return objc.Send[int](cls.Send(sel("mainAppService")), sel("status")) == enabled
 }

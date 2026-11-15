@@ -53,7 +53,7 @@ func App(app *core.Scope) {
 		func(cx *core.Scope) core.Node { return Launcher(cx, count) })
 	desktop.RegisterHotKey(app, launcherKey, launcher.Toggle)
 
-	if _, seen := app.Storage().GetItem("tray.welcomed"); !seen {
+	if _, seen := app.Storage().GetItem("tray.welcomed"); !seen && !desktop.LaunchedAtLogin(app) {
 		desktop.OpenWindow(app, desktop.WindowOptions{Title: "Welcome", Width: 360, Height: 200},
 			func(cx *core.Scope) core.Node { return Welcome(cx) })
 	}

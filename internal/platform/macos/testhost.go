@@ -18,7 +18,7 @@ func init() { testhost.Register(host{}) }
 type host struct{}
 
 func (host) Main(run func() int) {
-	nsApp := startApp(Options{Title: "NSGo test"})
+	nsApp := startApp(Options{Title: "NSGo test"}, nil)
 	go func() {
 		code := run()
 		os.Exit(code)
