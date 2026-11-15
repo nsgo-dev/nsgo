@@ -7,7 +7,7 @@ order: 49
 
 ## 检查和请求
 
-系统替用户保管着应用的一些能力，由用户授予：手机和 Mac 上的麦克风、相机、日历、提醒事项、蓝牙和媒体资料库，以及 macOS 上的辅助功能、录屏、输入监控、完全磁盘访问权限、App 管理和开发者工具。`core.Permissions()` 以 `core.Permission` 键列出它们。`cx.PermissionStatus` 不打扰用户地回答应用是否已有某项权限，`cx.RequestPermission` 在系统有弹窗且尚未询问过时用系统弹窗请求。请在用户做需要该权限的操作时再请求。
+系统替用户保管着应用的一些能力，由用户授予：手机和 Mac 上的麦克风、相机、日历、提醒事项、蓝牙和媒体资料库，以及 macOS 上的辅助功能、录屏、输入监控、完全磁盘访问权限、App 管理和开发者工具。`core.Permissions()` 以 `core.Permission` 键列出它们。`cx.PermissionStatus` 不打扰用户地回答应用是否已有某项权限，`cx.RequestPermission` 在系统有弹窗且尚未询问过时用系统弹窗请求。请在用户做需要该权限的操作时再请求。面容 ID 和触控 ID 不在其中：`cx.BiometricAvailability` 回答它们是否可用，`cx.AuthenticateBiometric` 用它们自己的弹窗请求。
 
 ```go
 cx.RequestPermission(core.PermissionCamera, func(s core.PermissionStatus) {
