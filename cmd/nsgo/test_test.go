@@ -61,6 +61,27 @@ func TestTreeOf(t *testing.T) {
 	}
 }
 
+func TestExtraPackageArgs(t *testing.T) {
+	for name, args := range map[string][]string{
+		"second package": {"./other"},
+		"import path":    {"github.com/example/app"},
+		"run value":      {"-run", "TestOne"},
+		"run equals":     {"-run=TestOne"},
+		"test args":      {"-args", "./not-a-package"},
+	} {
+		got := extraPackageArgs(args)
+		if name == "run value" || name == "run equals" || name == "test args" {
+			if len(got) != 0 {
+				t.Errorf("%s: extraPackageArgs(%q) = %q, want none", name, args, got)
+			}
+			continue
+		}
+		if len(got) != 1 || got[0] != args[0] {
+			t.Errorf("%s: extraPackageArgs(%q) = %q", name, args, got)
+		}
+	}
+}
+
 func TestLoadForTestTakesBareTrees(t *testing.T) {
 	dir := t.TempDir()
 	p, err := loadForTest(filepath.Join(dir, "..."), nil)
