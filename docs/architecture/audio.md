@@ -1,6 +1,6 @@
 # Audio playback
 
-This is the design for issue #36, a port of NSH 0.5.0's audio design (`nsh/docs/dev/audio-design.md`, approved and implemented there): `Sound` for short sounds and a player for long audio. The `audio` package and `core`'s part exist, with every platform reporting `Env.CanPlayAudio` false until its own stage lands, and the [roadmap](../roadmap.md#services-and-components-since-040) keeps its row until the stages below do. Read this, and NSH's design, before building any part of it; [NSH's design and this one](#nshs-design-and-this-one) lists where they part.
+This is the design for issue #36, a port of NSH 0.5.0's audio design (`nsh/docs/dev/audio-design.md`, approved and implemented there): `Sound` for short sounds and a player for long audio. The `audio` package, `core`'s part and `nsgotest`'s fake exist, with every platform reporting `Env.CanPlayAudio` false until its own stage lands, and the [roadmap](../roadmap.md#services-and-components-since-040) keeps its row until the stages below do. Read this, and NSH's design, before building any part of it; [NSH's design and this one](#nshs-design-and-this-one) lists where they part.
 
 ## The API
 
@@ -107,7 +107,7 @@ A sound is read by the backend's image reader (`imageload`, with its cache and l
 
 Each stage is one reviewable change, in NSH's order:
 
-1. The `audio` package with its rule in `layering_test.go`, `core`'s part, the protocol's requests and events, `Env.CanPlayAudio`, `AccessAudio` and the `audio` capability, and `nsgotest`'s fake: it records the sounds loaded and played and each player's commands, answers a load with a duration the test sets, advances progress only on the test's clock, and can fail a load with `Decode` and a play with `NotAllowed`, so tests assert on what an action played without sleeping.
+1. The `audio` package with its rule in `layering_test.go`, `core`'s part, the protocol's requests and events, `Env.CanPlayAudio`, `AccessAudio` and the `audio` capability, and `nsgotest`'s fake: it records the sounds loaded and played and each player's commands, answers a load with a duration the test sets, advances progress only on the test's clock, and can fail a load with `Decode` and a play with `NotAllowed`, so tests assert on what an action played without sleeping. Built (2026-11-15).
 2. `internal/audiosession`, with videos, speech and `microphone` moved onto it.
 3. macOS and iOS, then the web, Windows, Android and Linux, each with its format and error tests.
 4. The gallery: a sound for each kind of moment and a player demo of both levels.

@@ -612,6 +612,8 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 		case driver.ItemSpeech:
 			a.speech(it.Count, *it.Speech)
+		case driver.ItemAudio:
+			a.audio(it.Count, *it.Audio)
 		case driver.ItemAlert:
 			a.alerts = append(a.alerts, *it.Alert)
 		case driver.ItemBlockNative:
