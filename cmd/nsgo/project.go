@@ -288,7 +288,8 @@ func loadOrDir(dir string) (*project, error) {
 	if fi, err := os.Stat(abs); err != nil || !fi.IsDir() {
 		return nil, fmt.Errorf("no directory %s", dir)
 	}
-	return &project{Dir: abs, Name: filepath.Base(abs), bare: true}, nil
+	name := filepath.Base(abs)
+	return &project{Dir: abs, Name: name, ID: generatedID(name), idDefault: true, bare: true}, nil
 }
 
 func load(dir string) (*project, error) {
