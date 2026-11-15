@@ -47,8 +47,9 @@ type Env struct {
 	appleKeys  *Signal[bool]
 	tokens     *Signal[hostColors]
 	// geometry is the fold geometry Tree.Resize sets; shown is it with each region's safe area.
-	geometry *Signal[Geometry]
-	shown    *Memo[Geometry]
+	geometry    *Signal[Geometry]
+	shown       *Memo[Geometry]
+	verticalBar *Signal[VerticalBarEdge]
 	// headers are the system header's heights, which only the tree reads.
 	headers [2]Points
 }
@@ -61,6 +62,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 	e := &Env{
 		window:           NewSignal(cx, Size{}),
 		geometry:         NewSignalFunc(cx, driver.Divide(Size{}, nil), Geometry.Equal),
+		verticalBar:      NewSignal(cx, VerticalBarUnspecified),
 		safe:             NewSignal(cx, Edges{}),
 		titleBar:         NewSignal(cx, Edges{}),
 		maximized:        NewSignal(cx, false),
@@ -191,6 +193,7 @@ func (e *Env) set(v Environment) {
 	e.appClip.Set(v.AppClip)
 	e.openedURL.Set(v.OpenedURL)
 	e.material.Set(v.WindowMaterial)
+	e.verticalBar.Set(v.VerticalBarEdge)
 	e.headers = [2]Points{v.HeaderHeight, max(v.LargeHeaderHeight, v.HeaderHeight)}
 }
 
@@ -199,6 +202,9 @@ func (e *Env) Window() Size { return e.window.Get() }
 
 // Geometry returns how a fold or hinge divides the surface: its usable regions, each with the safe area that falls in it, and the obstructions between them, in the surface's coordinates and measured at Window's size, which it changes with. A surface without a fold, as on every target but Android and iOS 27.1, has one region and no obstructions. Core lays nothing out by it: an app or component reads it and chooses its own panes.
 func (e *Env) Geometry() Geometry { return e.shown.Get().Clone() }
+
+// VerticalBarEdge returns the edge the system chose for a vertical bar, such as a tab bar drawn down a side, where it may place one, as iOS 27.1 does; VerticalBarUnspecified elsewhere.
+func (e *Env) VerticalBarEdge() VerticalBarEdge { return e.verticalBar.Get() }
 
 // regionSafeArea is the part of safe, the surface's safe area at size, that falls in a region's frame, as insets of the region.
 func regionSafeArea(f Bounds, safe Edges, size Size) Edges {

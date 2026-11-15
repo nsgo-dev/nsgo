@@ -164,6 +164,8 @@ type (
 	Obstruction = driver.Obstruction
 	// HingeState is how far a fold or hinge is open.
 	HingeState = driver.HingeState
+	// VerticalBarEdge is the edge where the system places a vertical bar: Env.VerticalBarEdge.
+	VerticalBarEdge = driver.VerticalBarEdge
 	// LocaleSettings are the user's regional preferences:
 	// Env.LocaleSettings.
 	LocaleSettings = driver.LocaleSettings
@@ -476,6 +478,12 @@ const (
 	HingeClosed   = driver.HingeClosed
 	HingeHalfOpen = driver.HingeHalfOpen
 	HingeOpen     = driver.HingeOpen
+)
+
+const (
+	VerticalBarUnspecified = driver.VerticalBarUnspecified
+	VerticalBarLeading     = driver.VerticalBarLeading
+	VerticalBarTrailing    = driver.VerticalBarTrailing
 )
 
 const (

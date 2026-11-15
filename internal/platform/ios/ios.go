@@ -137,6 +137,8 @@ type view struct {
 
 type surface struct {
 	batch uint64 // batches applied
+	// hinge is the latest a UIHingeInteraction reported (watchHinge).
+	hinge hingeReading
 	// perf measures the surface while its panel, hud, shows; perfOn says
 	// the app asked for them.
 	perf   *engine.PerfMonitor
@@ -498,6 +500,7 @@ func (s *surface) watch() {
 	s.native.Send(sel("addGestureRecognizer:"), watcher)
 	watcher.Send(selRelease)
 	s.addTracker()
+	s.watchHinge()
 	s.headers = headerHeights()
 }
 
@@ -523,6 +526,8 @@ func (s *surface) startEngine(test *testOpen) {
 		opts.Size = size
 		s.alerts = map[uint32]shownAlert{}
 	}
+	// The first commit is laid out with the regions read at the size it starts at, as layoutSubviews reports them.
+	opts.Geometry = foldGeometry(opts.Size, s.reservedRegions(), s.hinge)
 	imageload.UseDiskCache(opts.CacheDir)
 	if s.perfOn && test == nil || test != nil && test.options.FPS {
 		s.perf = engine.NewPerfMonitor()
@@ -595,6 +600,7 @@ func (s *surface) environment() driver.Environment {
 		Camera:           cameraAvailable(),
 		CanSendInput:     false,
 		HasWebView:       idiom != driver.IdiomTV,
+		VerticalBarEdge:  verticalBarEdge(traits),
 		Lifecycle:        appLifecycle(),
 		AppClip:          appClip(),
 		OpenedURL:        openedURL,
@@ -1682,7 +1688,9 @@ func surfaceLayout(self objc.ID, cmd objc.SEL) {
 	apple.Super(self, cmd)
 	if v := views[self]; v != nil && v.surface.engine != nil {
 		b := objc.Send[apple.CGRect](self, selBounds)
-		v.surface.engine.Resize(driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}, driver.Geometry{})
+		// The reserved regions are read at the size reported now, so they go with it.
+		size := driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}
+		v.surface.engine.Resize(size, foldGeometry(size, v.surface.reservedRegions(), v.surface.hinge))
 		if h := v.surface.hud; h != nil {
 			h.layout()
 		}

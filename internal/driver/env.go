@@ -51,6 +51,8 @@ type Environment struct {
 	CanSendInput bool
 	// HasWebView says this target provides a web view host.
 	HasWebView bool
+	// VerticalBarEdge is the edge the system chose for a vertical bar where it may place one, as iOS 27.1 does; Unspecified elsewhere. It is not geometry: Tree.Resize reports that.
+	VerticalBarEdge VerticalBarEdge
 	// RTL lays the app out right to left.
 	RTL bool
 	// PixelRatio is device pixels per point; 0 means 1.
@@ -86,6 +88,16 @@ type Environment struct {
 // Equal reports whether two platform environments have the same values.
 // Environment includes a slice of displays, so it cannot use ==.
 func (e Environment) Equal(other Environment) bool { return reflect.DeepEqual(e, other) }
+
+// VerticalBarEdge is the edge where the system places a vertical bar.
+type VerticalBarEdge uint8
+
+const (
+	// VerticalBarUnspecified is a system without a preferred edge, or one that places no vertical bar.
+	VerticalBarUnspecified VerticalBarEdge = iota
+	VerticalBarLeading
+	VerticalBarTrailing
+)
 
 // LocaleSettings are the regional preferences the user set, in Intl's
 // names: FirstDayOfWeek 1 for Monday to 7 for Sunday (ISO 8601),

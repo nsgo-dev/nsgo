@@ -1,0 +1,70 @@
+package ios
+
+import "github.com/nsgo-dev/nsgo/internal/driver"
+
+// This file builds on every system, so tests check the mapping from UIKit's observations on any Mac.
+
+// reservedRegion is an active UIViewReservedRegion of the surface view: its frame in the view's points, which includes its margins for interactive content, and whether it is of divisionRegionKind rather than occlusionRegionKind.
+type reservedRegion struct {
+	frame    driver.Bounds
+	division bool
+}
+
+// hingeReading is the latest UIHinge a UIHingeInteraction reported; known is false before one, and once the interaction left a hierarchy that provides hinge updates.
+type hingeReading struct {
+	known  bool
+	status int
+	angle  float64
+}
+
+// UIHingeStatus's values.
+const (
+	hingeStatusUnknown       = 0
+	hingeStatusClosed        = 1
+	hingeStatusPartiallyOpen = 2
+	hingeStatusFullyOpen     = 3
+)
+
+// foldGeometry is the geometry of a surface view of size with regions and the hinge's latest reading: an occlusion region becomes an occluding obstruction and a division region a separating one, one of each at the same frame a single obstruction both occluding and separating; and the hinge's status and angle are every obstruction's. An occlusion region along an edge of the view that divides nothing is left to the safe area, as the system's bars are, so the vertical bar the system may place on either edge never becomes an obstruction.
+func foldGeometry(size driver.Size, regions []reservedRegion, h hingeReading) driver.Geometry {
+	var obstructions []driver.Obstruction
+	for _, r := range regions {
+		i := -1
+		for j, o := range obstructions {
+			if o.Frame == r.frame {
+				i = j
+			}
+		}
+		if i < 0 {
+			obstructions = append(obstructions, driver.Obstruction{Frame: r.frame, Horizontal: r.frame.Size.Width > r.frame.Size.Height})
+			i = len(obstructions) - 1
+		}
+		if r.division {
+			obstructions[i].Separating = true
+		} else {
+			obstructions[i].Occluding = true
+		}
+	}
+	kept := obstructions[:0]
+	for _, o := range obstructions {
+		f := o.Frame
+		edge := !o.Horizontal && (f.Origin.X <= 0 || f.Origin.X+f.Size.Width >= size.Width) ||
+			o.Horizontal && (f.Origin.Y <= 0 || f.Origin.Y+f.Size.Height >= size.Height)
+		if !o.Separating && edge {
+			continue
+		}
+		if h.known {
+			o.Angle, o.HasAngle = float32(h.angle), true
+			switch h.status {
+			case hingeStatusClosed:
+				o.State = driver.HingeClosed
+			case hingeStatusPartiallyOpen:
+				o.State = driver.HingeHalfOpen
+			case hingeStatusFullyOpen:
+				o.State = driver.HingeOpen
+			}
+		}
+		kept = append(kept, o)
+	}
+	return driver.Divide(size, kept)
+}

@@ -172,3 +172,18 @@ func TestPanesOnEitherSideOfAFold(t *testing.T) {
 		}
 	}
 }
+
+func TestVerticalBarEdgeComesWithTheEnvironment(t *testing.T) {
+	var edges []VerticalBarEdge
+	h := newHost(t, Size{Width: 800, Height: 600}, func(cx *Scope) Node {
+		cx.Effect(func() { edges = append(edges, cx.Env().VerticalBarEdge()) })
+		return View{}
+	})
+	h.commit()
+	h.tree.SetEnvironment(Environment{VerticalBarEdge: VerticalBarTrailing})
+	h.tree.SetEnvironment(Environment{VerticalBarEdge: VerticalBarTrailing, Dark: true})
+	h.commit()
+	if len(edges) != 2 || edges[0] != VerticalBarUnspecified || edges[1] != VerticalBarTrailing {
+		t.Fatalf("edges %v, want unspecified, then trailing", edges)
+	}
+}
