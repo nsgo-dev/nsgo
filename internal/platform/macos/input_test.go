@@ -101,3 +101,32 @@ func multilineEditorWraps(t *testing.T) {
 		window.Send(selRelease)
 	}
 }
+
+// TestMultilineEditorLineHeightStylesTyping checks that an explicit line
+// height reaches AppKit's typing attributes, which are what text inserted
+// after the first layout inherits.
+func TestMultilineEditorLineHeightStylesTyping(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		_, tv := newMultilineEditor()
+		font := apple.Font(driver.Font{Size: 13})
+		color := nsColor(driver.RGB(0x202020))
+		setEditorParagraph(tv, objc.ID(font), color, 24, nsAlignCenter)
+		attrs := tv.Send(sel("typingAttributes"))
+		para := attrs.Send(sel("objectForKey:"), textAttrs().paragraph)
+		if para == 0 {
+			t.Fatal("typing attributes have no paragraph style")
+		}
+		if got := objc.Send[float64](para, sel("minimumLineHeight")); got != 24 {
+			t.Errorf("minimum line height = %v, want 24", got)
+		}
+		if got := objc.Send[float64](para, sel("maximumLineHeight")); got != 24 {
+			t.Errorf("maximum line height = %v, want 24", got)
+		}
+		if got := objc.Send[int](para, sel("alignment")); got != nsAlignCenter {
+			t.Errorf("alignment = %d, want %d", got, nsAlignCenter)
+		}
+		apple.Release(font)
+		tv.Send(selRelease)
+	})
+}
