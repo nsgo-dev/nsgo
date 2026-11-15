@@ -460,6 +460,13 @@ func (t *testSurface) ChooseMenu(id uint32) error {
 	return err
 }
 
+// ChooseDockMenu implements testhost.Surface: a test can activate a task
+// through the same engine event the taskbar backend uses.
+func (t *testSurface) ChooseDockMenu(id uint32) error {
+	t.w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: id})
+	return nil
+}
+
 // ChoosePopup implements testhost.Surface: the context menu tracking
 // ends, and its item id is carried out after, as a click on it would.
 func (t *testSurface) ChoosePopup(id uint32) error {

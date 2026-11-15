@@ -30,6 +30,8 @@ import (
 	"math"
 	"runtime"
 	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -549,6 +551,7 @@ func wide(s string) *uint16 {
 // main; it does not return until the window closes.
 func Run(app engine.App, opts Options) {
 	comApartment()
+	setProcessAppUserModelID(opts.ID)
 	// The installer's and uninstaller's runs come first: handed off to a running copy, they would never stamp the shortcut or remove the registration.
 	if opts.RegisterToast != "" {
 		setToastActivatorShortcut(opts.RegisterToast, opts.ID)
@@ -562,7 +565,7 @@ func Run(app engine.App, opts Options) {
 	var single *instance
 	if opts.ID != "" && opts.test == nil {
 		var alreadyRunning bool
-		if single, alreadyRunning = claimInstance(opts.ID, engine.LaunchFiles()); alreadyRunning {
+		if single, alreadyRunning = claimInstance(opts.ID, launchArguments()); alreadyRunning {
 			return
 		}
 		defer single.close()
@@ -639,9 +642,23 @@ func Run(app engine.App, opts Options) {
 	if single != nil {
 		single.setDelivery(func(paths []string) {
 			w.post(func() {
-				w.engine.Dispatch(driver.Event{Kind: driver.EventReopen})
-				if len(paths) > 0 {
-					w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
+				var files []string
+				dock := false
+				for _, path := range paths {
+					if strings.HasPrefix(path, dockMenuArgument) {
+						dock = true
+						if n, err := strconv.ParseUint(strings.TrimPrefix(path, dockMenuArgument), 10, 32); err == nil && n != 0 {
+							w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: uint32(n)})
+						}
+					} else {
+						files = append(files, path)
+					}
+				}
+				if !dock {
+					w.engine.Dispatch(driver.Event{Kind: driver.EventReopen})
+				}
+				if len(files) > 0 {
+					w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: files})
 				}
 			})
 		})
@@ -652,6 +669,9 @@ func Run(app engine.App, opts Options) {
 	}
 	if opts.test != nil {
 		opts.test.ready <- w
+	} else if id, ok := dockMenuLaunchID(); ok {
+		w.engine.Sync()
+		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: id})
 	} else if paths := engine.LaunchFiles(); len(paths) > 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
 	}
@@ -1016,6 +1036,10 @@ func (w *window) chromeItem(it *driver.MountItem) {
 		}
 	case driver.ItemMenu:
 		w.setMenu(it.Menu)
+	case driver.ItemDockMenu:
+		w.setDockMenu(it.Menu)
+	case driver.ItemRecentFile:
+		recentFile(it.Value, it.On)
 	}
 }
 
@@ -1226,7 +1250,7 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemKeymap:
 			w.setKeymap(it.Keys)
 			continue
-		case driver.ItemTitle, driver.ItemWindow, driver.ItemMenu:
+		case driver.ItemTitle, driver.ItemWindow, driver.ItemMenu, driver.ItemDockMenu, driver.ItemRecentFile:
 			// An embedding host owns its window and menu bar.
 			if !w.embedded {
 				w.chromeItem(it)

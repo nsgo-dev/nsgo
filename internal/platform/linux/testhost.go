@@ -545,6 +545,9 @@ func (t *testSurface) ChooseMenu(id uint32) error {
 	return err
 }
 
+// ChooseDockMenu implements testhost.Surface: Linux has no app icon menu yet.
+func (t *testSurface) ChooseDockMenu(uint32) error { return testhost.ErrNoMenu }
+
 // ChoosePopup implements testhost.Surface: the context menu's item's
 // action is activated and the popover pops down, as a click on the item
 // does.

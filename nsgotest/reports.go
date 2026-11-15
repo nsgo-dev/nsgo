@@ -186,6 +186,41 @@ func (a *App) ChooseMenu(path ...string) {
 	}
 }
 
+// ChooseDockMenu chooses the app icon menu item at path, such as "New
+// Window". It is the Dock menu on macOS and a Jump List task on Windows.
+func (a *App) ChooseDockMenu(path ...string) {
+	a.t.Helper()
+	items := a.DockMenu
+	for i, label := range path {
+		var found *driver.MenuEntry
+		for k := range items {
+			if items[k].Label == label {
+				found = &items[k]
+			}
+		}
+		if found == nil {
+			a.t.Fatalf("nsgotest: no dock menu item %q", path[:i+1])
+		}
+		if found.Disabled {
+			a.t.Fatalf("nsgotest: the dock menu item %q is disabled", path[:i+1])
+		}
+		if i == len(path)-1 {
+			if found.ID == 0 {
+				a.t.Fatalf("nsgotest: dock menu item %q does nothing", path)
+			}
+			if a.target != nil {
+				a.step("chooseDockMenu(%q)", path)
+				a.target.menu(func(s testhost.Surface) error { return s.ChooseDockMenu(found.ID) })
+				a.done()
+				return
+			}
+			a.dispatch(driver.Event{Kind: driver.EventDockMenu, Count: found.ID})
+			return
+		}
+		items = found.Items
+	}
+}
+
 // ChoosePopup chooses the item at path in the context menu the app shows
 // with PopupMenu, its labels from the menu down, which closes the menu.
 func (a *App) ChoosePopup(path ...string) {

@@ -87,6 +87,9 @@ type Surface interface {
 	// ChooseMenu chooses the application menu's item id, as its menu bar
 	// does; ErrNoMenu where the platform shows none.
 	ChooseMenu(id uint32) error
+	// ChooseDockMenu chooses the app icon menu's item id; ErrNoMenu where
+	// the platform has no app icon menu.
+	ChooseDockMenu(id uint32) error
 	// ChoosePopup chooses item id of the context menu showing, or closes
 	// it for 0; ErrNoMenu where the platform shows none.
 	ChoosePopup(id uint32) error

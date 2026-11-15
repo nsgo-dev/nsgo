@@ -221,8 +221,9 @@ func (t *testSurface) Answer(id uint32, index int) error {
 	return err
 }
 
-func (t *testSurface) ChooseMenu(uint32) error  { return testhost.ErrNoMenu }
-func (t *testSurface) ChoosePopup(uint32) error { return testhost.ErrNoMenu }
+func (t *testSurface) ChooseMenu(uint32) error     { return testhost.ErrNoMenu }
+func (t *testSurface) ChooseDockMenu(uint32) error { return testhost.ErrNoMenu }
+func (t *testSurface) ChoosePopup(uint32) error    { return testhost.ErrNoMenu }
 
 // Screenshot has the host render the surface, as a PNG.
 func (t *testSurface) Screenshot() ([]byte, error) {

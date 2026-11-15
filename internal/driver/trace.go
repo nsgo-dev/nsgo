@@ -99,7 +99,7 @@ var itemNames = map[ItemKind]string{
 	ItemDismissKeyboard: "dismiss-keyboard", ItemScrollTo: "scroll-to", ItemCanvas: "canvas",
 	ItemSetClipboard: "set-clipboard", ItemReadClipboard: "read-clipboard", ItemAnnounce: "announce", ItemInputSource: "input-source",
 	ItemKeymap: "keymap", ItemStatusBar: "status-bar", ItemTitle: "title",
-	ItemBackUnhandled: "back-unhandled", ItemWindow: "window", ItemMenu: "menu", ItemWeb: "web",
+	ItemBackUnhandled: "back-unhandled", ItemWindow: "window", ItemMenu: "menu", ItemDockMenu: "dock-menu", ItemRecentFile: "recent-file", ItemWeb: "web",
 	ItemWebCommand: "web-command", ItemVideo: "video", ItemVideoSeek: "video-seek",
 	ItemNative: "native", ItemNativeCommand: "native-command", ItemAnimation: "animation",
 	ItemZoomTo: "zoom-to", ItemImageInfo: "image-info", ItemSelection: "selection",

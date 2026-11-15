@@ -77,7 +77,7 @@ var exempt = map[string][]string{
 		"SetShutdownMode", "SetMainWindow", "SetMainView", "OnReopen", "NewTray", "RegisterHotKey", "SetDockVisible",
 		"SetLaunchAtLogin", "OnOpenFiles", "OnOpenLinks", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
 		"OpenInstallSettings", "DataDir", "CacheDir", "LogsDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
-		"SetTaskProgress"},
+		"SetTaskProgress", "SetDockMenu", "AddRecentFile", "ClearRecentFiles"},
 }
 
 // TestServicesGoThroughTheGate holds every exported Scope method to a listing: a gated one must reach gate or denied with its service, through the Scope methods and functions it calls, and an exempt one must not. A new method fails until it is listed, so a service that reaches the platform cannot skip the gate unnoticed.

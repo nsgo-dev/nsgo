@@ -7,9 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
+
+	"github.com/nsgo-dev/nsgo/internal/engine"
 )
 
 const (
@@ -52,6 +57,29 @@ type instance struct {
 	mu      sync.Mutex
 	deliver func([]string)
 	pending [][]string
+}
+
+const dockMenuArgument = "--nsgo-dock-menu="
+
+func dockMenuLaunchID() (uint32, bool) {
+	for _, arg := range os.Args[1:] {
+		if !strings.HasPrefix(arg, dockMenuArgument) {
+			continue
+		}
+		n, err := strconv.ParseUint(strings.TrimPrefix(arg, dockMenuArgument), 10, 32)
+		if err == nil && n != 0 {
+			return uint32(n), true
+		}
+	}
+	return 0, false
+}
+
+func launchArguments() []string {
+	paths := engine.LaunchFiles()
+	if id, ok := dockMenuLaunchID(); ok {
+		paths = append(paths, dockMenuArgument+strconv.FormatUint(uint64(id), 10))
+	}
+	return paths
 }
 
 func claimInstance(id string, args []string) (*instance, bool) {

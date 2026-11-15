@@ -670,6 +670,8 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.Language, a.LanguageForced = it.Language, it.Forced
 		case driver.ItemMenu:
 			a.setMenu(a.responseTree, it.Menu)
+		case driver.ItemDockMenu:
+			a.DockMenu = it.Menu
 		case driver.ItemWindow:
 			a.Window = append(a.Window, *it.Window)
 		case driver.ItemOpenSurface:

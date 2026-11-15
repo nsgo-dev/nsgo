@@ -856,6 +856,7 @@ func (noSurface) Key(string) error                        { return errNoWindow }
 func (noSurface) Back() error                             { return errNoWindow }
 func (noSurface) Answer(uint32, int) error                { return errNoWindow }
 func (noSurface) ChooseMenu(uint32) error                 { return testhost.ErrNoMenu }
+func (noSurface) ChooseDockMenu(uint32) error             { return testhost.ErrNoMenu }
 func (noSurface) ChoosePopup(uint32) error                { return testhost.ErrNoMenu }
 func (noSurface) Screenshot() ([]byte, error)             { return nil, errNoWindow }
 func (noSurface) Animating() bool                         { return false }

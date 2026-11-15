@@ -352,6 +352,10 @@ const (
 	ItemSignInWithApple
 	// ItemAppleCredentialState asks the state of the Sign in with Apple credential of the user whose ID is Value; the platform answers with EventSignInWithApple carrying Count, Index the state (AppleCredentialAuthorized, ...), else Text the AppleSignIn error. The core sends none where the environment says no SignInWithApple.
 	ItemAppleCredentialState
+	// ItemDockMenu, after the kinds Android's Protocol.java mirrors, replaces the app icon's menu (Menu; nil removes it); a chosen item is reported with EventDockMenu.
+	ItemDockMenu
+	// ItemRecentFile records Value in the platform's recent documents, or clears the app's when On.
+	ItemRecentFile
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.

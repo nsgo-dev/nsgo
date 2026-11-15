@@ -157,6 +157,58 @@ func TestApplicationMenuFollowsItsOwner(t *testing.T) {
 	}
 }
 
+func TestDockMenuFollowsItsOwner(t *testing.T) {
+	var log []string
+	var open *Signal[bool]
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		open = NewSignal(cx, true)
+		return Show{When: open.Get, Then: func(cx *Scope) Node {
+			cx.SetDockMenu([]MenuItem{
+				{Label: "New Window", OnSelect: func() { log = append(log, "new") }},
+				{Label: "More", Items: []MenuItem{{Label: "Open", OnSelect: func() { log = append(log, "open") }}}},
+			})
+			return View{}
+		}}
+	})
+	var menu []MenuEntry
+	for _, it := range h.commit().Items {
+		if it.Kind == driver.ItemDockMenu {
+			menu = it.Menu
+		}
+	}
+	if len(menu) != 2 || menu[0].ID == 0 || menu[1].Items[0].ID == 0 {
+		t.Fatalf("dock menu = %+v", menu)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: menu[1].Items[0].ID})
+	open.Set(false)
+	removed := false
+	for _, it := range h.commit().Items {
+		removed = removed || it.Kind == driver.ItemDockMenu && it.Menu == nil
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: menu[0].ID})
+	if !removed || !slices.Equal(log, []string{"open"}) {
+		t.Fatalf("removed = %v, log = %q", removed, log)
+	}
+}
+
+func TestRecentFilesCommands(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		cx.AddRecentFile("/tmp/example.nsgo")
+		cx.ClearRecentFiles()
+		return View{}
+	})
+	items := h.commit().Items
+	var recent []driver.MountItem
+	for _, item := range items {
+		if item.Kind == driver.ItemRecentFile {
+			recent = append(recent, item)
+		}
+	}
+	if len(recent) != 2 || recent[0].Value != "/tmp/example.nsgo" || !recent[1].On {
+		t.Fatalf("recent file commands = %+v", recent)
+	}
+}
+
 // TestApplicationMenuSetAgainKeepsTheBar sends a menu an effect sets
 // again in place of the one before, without the default between them,
 // which a menu bar would show for a moment.

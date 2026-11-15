@@ -126,6 +126,13 @@ func RegisterHotKey(cx *core.Scope, key string, fn func()) *HotKey { return cx.R
 // it hidden.
 func SetDockVisible(cx *core.Scope, on bool) { cx.SetDockVisible(on) }
 
+// AddRecentFile records path in the platform's recent documents, which the
+// user can open again from the app icon or launcher.
+func AddRecentFile(cx *core.Scope, path string) { cx.AddRecentFile(path) }
+
+// ClearRecentFiles removes the app's recent documents from the platform.
+func ClearRecentFiles(cx *core.Scope) { cx.ClearRecentFiles() }
+
 // Restart ends the app as core.Scope.Quit does, and nsgo.Run starts it
 // again with the arguments it started with once it has exited, on macOS,
 // Windows and Linux, so a setting read at launch takes effect. Under nsgo

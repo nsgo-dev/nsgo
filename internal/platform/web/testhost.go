@@ -228,6 +228,9 @@ func (t *testSurface) SetEnvironment(env driver.Environment) error {
 // ChooseMenu implements testhost.Surface: no native menu bar shows here.
 func (t *testSurface) ChooseMenu(uint32) error { return testhost.ErrNoMenu }
 
+// ChooseDockMenu implements testhost.Surface: the web has no app icon menu.
+func (t *testSurface) ChooseDockMenu(uint32) error { return testhost.ErrNoMenu }
+
 // ChoosePopup implements testhost.Surface: the core shows no native
 // context menus here.
 func (t *testSurface) ChoosePopup(uint32) error { return testhost.ErrNoMenu }

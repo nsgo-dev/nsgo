@@ -265,6 +265,8 @@ const (
 	EventOpenLinks
 	// EventSignInWithApple answers ItemSignInWithApple or ItemAppleCredentialState Count: Data an *AppleCredential or Index a credential's state, else Text why it failed (AppleSignInCancelled, ...).
 	EventSignInWithApple
+	// EventDockMenu reports the app icon menu's item Count chosen, after the kinds Android's Protocol.java mirrors.
+	EventDockMenu
 )
 
 // What EventInputModality reports.

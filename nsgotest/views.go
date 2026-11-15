@@ -126,6 +126,7 @@ const (
 	EventWheel                 = driver.EventWheel
 	EventRotation              = driver.EventRotation
 	EventMenu                  = driver.EventMenu
+	EventDockMenu              = driver.EventDockMenu
 	EventMessage               = driver.EventMessage
 	EventNavigationStateChange = driver.EventNavigationStateChange
 	EventEnd                   = driver.EventEnd

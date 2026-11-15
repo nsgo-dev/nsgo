@@ -89,9 +89,12 @@ type Tree struct {
 	historyAgain bool
 	alertID      uint32
 	menuActions  map[uint32]menuAction
+	dockActions  map[uint32]menuAction
+	pendingDock  []uint32
 	popup        popupMenu
 	menuID       uint32
 	menuGen      uint32
+	dockMenuGen  uint32
 	rtl          bool // the layout direction the nodes were mapped for
 	// directionSent records that the platform has the direction and
 	// language, the language it was told last and whether the app forced it.
@@ -2184,6 +2187,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		return
 	case driver.EventMenu:
 		t.chooseMenu(ev.Count)
+		return
+	case driver.EventDockMenu:
+		t.chooseDockMenu(ev.Count)
 		return
 	case driver.EventAnimation:
 		t.animationEvent(ev)

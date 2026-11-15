@@ -523,6 +523,12 @@ func (t *testSurface) ChooseMenu(id uint32) error {
 	return err
 }
 
+// ChooseDockMenu implements testhost.Surface: it activates the app icon action through the same event the Dock delegate sends.
+func (t *testSurface) ChooseDockMenu(id uint32) error {
+	onMainSync(func() { t.s.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: id}) })
+	return nil
+}
+
 // ChoosePopup implements testhost.Surface: the tracking context menu's
 // item sends its action and the menu closes, as a click on it does.
 func (t *testSurface) ChoosePopup(id uint32) error {

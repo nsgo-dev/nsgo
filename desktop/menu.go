@@ -38,6 +38,12 @@ const (
 // the default menu comes back.
 func SetApplicationMenu(cx *core.Scope, items []MenuItem) { cx.SetApplicationMenu(items) }
 
+// SetDockMenu sets the items the app offers from its icon: the Dock menu on
+// macOS and taskbar Jump List tasks on Windows. nil removes them. The items'
+// handlers run under the current owner and disappear with it. Elsewhere it
+// does nothing.
+func SetDockMenu(cx *core.Scope, items []MenuItem) { cx.SetDockMenu(items) }
+
 // PopupMenu shows items as the platform's own context menu, its top left
 // corner at at, in the points of the root view, as a press's or
 // OnContextMenu's PagePosition. closed, when not nil, runs once it closes,

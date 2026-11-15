@@ -81,6 +81,7 @@ var (
 var rawHit bool
 
 var selMenuChosen = sel("nsgoMenuChosen:")
+var selDockMenuChosen = sel("nsgoDockMenuChosen:")
 
 // The action of the full screen role's item, in place of AppKit's
 // toggleFullScreen:, whose validation titles the item in the language of
@@ -102,6 +103,23 @@ func (s *surface) chromeItem(it *driver.MountItem) {
 		s.command(it.Window)
 	case driver.ItemMenu:
 		s.setMenu(it.Menu)
+	case driver.ItemDockMenu:
+		s.setDockMenu(it.Menu)
+	case driver.ItemRecentFile:
+		recentFile(it.Value, it.On)
+	}
+}
+
+func recentFile(path string, clearRecent bool) {
+	doc := objc.ID(apple.Class("NSDocumentController")).Send(sel("sharedDocumentController"))
+	if clearRecent {
+		doc.Send(sel("clearRecentDocuments:"), objc.ID(0))
+		return
+	}
+	url := objc.ID(apple.Class("NSURL")).Send(selAlloc).Send(sel("initFileURLWithPath:"), apple.NSString(path))
+	if url != 0 {
+		doc.Send(sel("noteNewRecentDocumentURL:"), url)
+		url.Send(selRelease)
 	}
 }
 
@@ -498,6 +516,108 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 	s.menu = bar
 }
 
+var dockMenu struct {
+	menu   objc.ID
+	target *surface
+}
+
+// setDockMenu updates the menu returned synchronously by NSApplication's
+// applicationDockMenu: delegate callback.
+func (s *surface) setDockMenu(entries []driver.MenuEntry) {
+	if dockMenu.menu != 0 {
+		dockMenu.menu.Send(selRelease)
+		dockMenu.menu = 0
+	}
+	dockMenu.target = nil
+	if entries == nil {
+		return
+	}
+	s.ensureMenuTarget()
+	m := objc.ID(apple.Class("NSMenu")).Send(selAlloc).Send(sel("initWithTitle:"), apple.NSString(""))
+	lastSeparator := true
+	for _, e := range entries {
+		switch {
+		case e.Separator:
+			if !lastSeparator {
+				sep := objc.ID(apple.Class("NSMenuItem")).Send(sel("separatorItem"))
+				sep.Send(selSetIdentifier, ownItem())
+				m.Send(sel("addItem:"), sep)
+			}
+			lastSeparator = true
+		case len(e.Items) > 0:
+			holder := s.dockHolder(e.Label, e.Items)
+			m.Send(sel("addItem:"), holder)
+			holder.Send(selRelease)
+			lastSeparator = false
+		default:
+			item := s.dockItem(e)
+			m.Send(sel("addItem:"), item)
+			item.Send(selRelease)
+			lastSeparator = false
+		}
+	}
+	if n := objc.Send[int](m, sel("numberOfItems")); n > 0 && lastSeparator {
+		m.Send(sel("removeItemAtIndex:"), n-1)
+	}
+	dockMenu.menu, dockMenu.target = m, s
+}
+
+func (s *surface) dockHolder(label string, items []driver.MenuEntry) objc.ID {
+	it := objc.ID(apple.Class("NSMenuItem")).Send(selAlloc).Send(sel("initWithTitle:action:keyEquivalent:"),
+		apple.NSString(label), objc.SEL(0), apple.NSString(""))
+	it.Send(selSetIdentifier, ownItem())
+	sub := objc.ID(apple.Class("NSMenu")).Send(selAlloc).Send(sel("initWithTitle:"), apple.NSString(label))
+	lastSeparator := true
+	for _, e := range items {
+		switch {
+		case e.Separator:
+			if !lastSeparator {
+				sep := objc.ID(apple.Class("NSMenuItem")).Send(sel("separatorItem"))
+				sep.Send(selSetIdentifier, ownItem())
+				sub.Send(sel("addItem:"), sep)
+			}
+			lastSeparator = true
+		case len(e.Items) > 0:
+			h := s.dockHolder(e.Label, e.Items)
+			sub.Send(sel("addItem:"), h)
+			h.Send(selRelease)
+			lastSeparator = false
+		default:
+			item := s.dockItem(e)
+			sub.Send(sel("addItem:"), item)
+			item.Send(selRelease)
+			lastSeparator = false
+		}
+	}
+	it.Send(sel("setSubmenu:"), sub)
+	sub.Send(selRelease)
+	return it
+}
+
+func (s *surface) dockItem(e driver.MenuEntry) objc.ID {
+	action := objc.SEL(0)
+	if e.Disabled {
+		action = selMenuDisabled
+	} else if e.ID != 0 {
+		action = selDockMenuChosen
+	}
+	it := objc.ID(apple.Class("NSMenuItem")).Send(selAlloc).Send(sel("initWithTitle:action:keyEquivalent:"),
+		apple.NSString(e.Label), action, apple.NSString(""))
+	it.Send(selSetIdentifier, ownItem())
+	if action == selDockMenuChosen {
+		it.Send(selSetTarget, s.menuTarget)
+		it.Send(sel("setTag:"), int(e.ID))
+	}
+	if e.Checkable {
+		state := 0
+		if e.Checked {
+			state = 1
+		}
+		it.Send(sel("setState:"), state)
+	}
+	return it
+}
+
 // syncMenu makes the app's items of menu m what next is, keeping those
 // still of the same kind and taking the others from next. The items
 // AppKit adds itself, such as the Edit menu's Start Dictation, stay.
@@ -839,5 +959,13 @@ func menuChosen(self objc.ID, _ objc.SEL, item objc.ID) {
 	s := menuTargets[self]
 	if id := objc.Send[int](item, sel("tag")); id > 0 && s != nil && s.engine != nil && !s.closed {
 		s.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: uint32(id)})
+	}
+}
+
+func dockMenuChosen(self objc.ID, _ objc.SEL, item objc.ID) {
+	if s := menuTargets[self]; s != nil && s.engine != nil && !s.closed {
+		if id := objc.Send[int](item, sel("tag")); id > 0 {
+			s.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: uint32(id)})
+		}
 	}
 }

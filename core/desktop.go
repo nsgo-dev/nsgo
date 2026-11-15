@@ -135,6 +135,63 @@ func (cx *Scope) SetApplicationMenu(items []MenuItem) {
 	t.changed = true
 }
 
+// SetDockMenu is the core's part of desktop.SetDockMenu, which apps use. It
+// sets the app icon's menu on macOS and the taskbar Jump List tasks on
+// Windows. Other platforms ignore it. The menu belongs to the current owner.
+func (cx *Scope) SetDockMenu(items []MenuItem) {
+	t := cx.tree()
+	if t == nil {
+		return
+	}
+	t.dockMenuGen++
+	gen := t.dockMenuGen
+	t.dockActions = map[uint32]menuAction{}
+	owner := cx.current()
+	var entries []MenuEntry
+	if items != nil {
+		entries = t.menuEntries(items, owner, t.dockActions)
+		owner.addCleanup(func() {
+			if t.dockMenuGen == gen {
+				t.dockActions = nil
+				t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemDockMenu})
+				t.changed = true
+			}
+		})
+	}
+	t.commands = slices.DeleteFunc(t.commands, func(it driver.MountItem) bool { return it.Kind == driver.ItemDockMenu })
+	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemDockMenu, Menu: entries})
+	t.changed = true
+	if len(entries) > 0 && len(t.pendingDock) > 0 {
+		pending := t.pendingDock
+		t.pendingDock = nil
+		for _, id := range pending {
+			if _, ok := t.dockActions[id]; ok {
+				t.chooseDockMenu(id)
+			} else {
+				t.pendingDock = append(t.pendingDock, id)
+			}
+		}
+	}
+}
+
+// AddRecentFile records path in the platform's recent documents. The file
+// must exist and be one the app can open. Platforms without a recent-documents
+// service ignore it.
+func (cx *Scope) AddRecentFile(path string) {
+	if t := cx.tree(); t != nil && path != "" {
+		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemRecentFile, Value: path})
+		t.changed = true
+	}
+}
+
+// ClearRecentFiles removes the app's recent documents from the platform.
+func (cx *Scope) ClearRecentFiles() {
+	if t := cx.tree(); t != nil {
+		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemRecentFile, On: true})
+		t.changed = true
+	}
+}
+
 // popupMenu is the context menu PopupMenu shows: one at a time.
 type popupMenu struct {
 	id      uint32
@@ -224,6 +281,17 @@ func (t *Tree) chooseMenu(id uint32) {
 	if ok && !a.owner.disposed {
 		// Choosing it is the user's input on its owner's views (mayMoveFocus).
 		t.activated = a.owner
+		t.within(a.owner, a.fn)
+	}
+}
+
+func (t *Tree) chooseDockMenu(id uint32) {
+	a, ok := t.dockActions[id]
+	if !ok {
+		t.pendingDock = append(t.pendingDock, id)
+		return
+	}
+	if !a.owner.disposed {
 		t.within(a.owner, a.fn)
 	}
 }

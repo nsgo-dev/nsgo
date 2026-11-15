@@ -352,9 +352,10 @@ type App struct {
 	// which Apple platforms keep for the system's words in later launches.
 	Language       string
 	LanguageForced bool
-	// Menu is the application menu the app set, with a desktop environment the main window's or else the app's own surface's; Window the window commands it sent, oldest first.
-	Menu   []driver.MenuEntry
-	Window []driver.WindowCommand
+	// Menu is the application menu the app set, with a desktop environment the main window's or else the app's own surface's; DockMenu the app icon's menu, the one any surface set last; Window the window commands it sent, oldest first.
+	Menu     []driver.MenuEntry
+	DockMenu []driver.MenuEntry
+	Window   []driver.WindowCommand
 	// ImageSizes are the pixel sizes of the images the model's platform
 	// loads, by URI, which answer Scope.ImageSize; others fail to load.
 	ImageSizes map[string]driver.Size

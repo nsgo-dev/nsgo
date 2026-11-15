@@ -503,6 +503,7 @@ func loadAppKit() {
 	registerCanvasNodes()
 	classMenuTarget = register("NsgoMenuTarget", apple.Class("NSObject"), nil, []objc.MethodDef{
 		{Cmd: selMenuChosen, Fn: menuChosen},
+		{Cmd: selDockMenuChosen, Fn: dockMenuChosen},
 		{Cmd: selMenuFullScreen, Fn: menuFullScreen},
 		{Cmd: sel("validateMenuItem:"), Fn: validateMenu},
 	})
@@ -649,6 +650,10 @@ func surfaceMoved(self objc.ID, cmd objc.SEL) {
 // delegate, in opts' appearance, and returns NSApp.
 func startApp(opts Options) objc.ID {
 	loadAppKit()
+	if dockMenu.menu != 0 {
+		dockMenu.menu.Send(selRelease)
+	}
+	dockMenu.menu, dockMenu.target = 0, nil
 	quitPending = false
 	quitRequestID = 0
 	finished = false
@@ -698,6 +703,12 @@ func startApp(opts Options) objc.ID {
 				runner.orderFront()
 			}
 			return false
+		},
+	}, {
+		// The menu above the system's Dock items, if the app set one.
+		Cmd: sel("applicationDockMenu:"),
+		Fn: func(self objc.ID, _ objc.SEL, app objc.ID) objc.ID {
+			return dockMenu.menu
 		},
 	}, {
 		// Files of the types the app declares, opened from the Finder, the Dock or Open With, and links of the URL schemes it declares, which Launch Services hands the running app; at launch, this comes before the app's first frame, and the core keeps them for its handlers (core.Scope.OnOpenFiles, core.Scope.OnOpenLinks).
@@ -850,6 +861,12 @@ func (s *surface) close() {
 		return
 	}
 	s.closed = true
+	if dockMenu.target == s {
+		if dockMenu.menu != 0 {
+			dockMenu.menu.Send(selRelease)
+		}
+		dockMenu.menu, dockMenu.target = 0, nil
+	}
 	delete(surfaces, s)
 	s.stopTicking()
 	for _, stop := range s.stops {
@@ -1608,7 +1625,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemKeymap:
 			s.keys = it.Keys
 			continue
-		case driver.ItemTitle, driver.ItemWindow, driver.ItemMenu:
+		case driver.ItemTitle, driver.ItemWindow, driver.ItemMenu, driver.ItemDockMenu, driver.ItemRecentFile:
 			if it.Kind == driver.ItemWindow && it.Window.Action == driver.WindowDestroy {
 				// Nothing follows the surface's last item.
 				s.destroy()
