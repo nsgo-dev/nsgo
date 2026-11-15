@@ -110,7 +110,12 @@ func buildMiniProgram(ctx context.Context, p *project, mp miniProgramPlatform, d
 	}
 	defer os.RemoveAll(tmp)
 	wasm := filepath.Join(tmp, "app.wasm")
-	env := []string{"GOOS=js", "GOARCH=wasm", "GOEXPERIMENT=" + experiments("nojsonv2")}
+	env := []string{"GOOS=js", "GOARCH=wasm"}
+	cur, err := goExperiment(ctx, p.Dir, env)
+	if err != nil {
+		return err
+	}
+	env = append(env, "GOEXPERIMENT="+experiments(cur, "nojsonv2"))
 	// A mini program runs no code it did not ship, which the page's
 	// engine would, and goja does not fit in its package.
 	tsx, err := linkedDir(ctx, p, append(env, "GOFLAGS=-tags="+strings.Join(miniprogramTags, ",")), "github.com/nsgo-dev/nsgo/tsx")
@@ -143,14 +148,6 @@ func buildMiniProgram(ctx context.Context, p *project, mp miniProgramPlatform, d
 		warnIn(ctx, "the main package is %s, past %s's %s: move resources the app does not need out", formatSize(main), mp.title, formatSize(packageLimit))
 	}
 	return nil
-}
-
-// experiments returns GOEXPERIMENT's value with extra added.
-func experiments(extra string) string {
-	if cur := os.Getenv("GOEXPERIMENT"); cur != "" {
-		return cur + "," + extra
-	}
-	return extra
 }
 
 // buildMiniProgramModule builds the module to wasm and returns it

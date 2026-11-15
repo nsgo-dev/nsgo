@@ -74,31 +74,73 @@ func TestSmallJSON(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("needs the go command")
 	}
-	t.Setenv("GOEXPERIMENT", "")
+	const v1 = "package main\n\nimport \"encoding/json\"\n\nfunc main() { json.Marshal(1) }\n"
+	const v2 = "package main\n\nimport \"encoding/json/v2\"\n\nfunc main() { json.Marshal(1) }\n"
 	for _, c := range []struct {
 		name, src string
-		small     bool
+		// goenv is the GOEXPERIMENT go env -w set, which smallJSON counts though the process's GOEXPERIMENT is empty.
+		goenv string
+		want  string
 	}{
-		{"v1", "package main\n\nimport \"encoding/json\"\n\nfunc main() { json.Marshal(1) }\n", true},
-		{"v2", "package main\n\nimport \"encoding/json/v2\"\n\nfunc main() { json.Marshal(1) }\n", false},
+		{"v1", v1, "", "GOEXPERIMENT=nojsonv2"},
+		{"v2", v2, "", ""},
+		{"goenv jsonv2", v1, "jsonv2", ""},
+		{"goenv other", v1, "fieldtrack", "GOEXPERIMENT=fieldtrack,nojsonv2"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("GOEXPERIMENT", "")
 			dir := t.TempDir()
 			os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module app\n\ngo 1.26\n"), 0o644)
 			os.WriteFile(filepath.Join(dir, "main.go"), []byte(c.src), 0o644)
+			// Go 1.26 builds encoding/json/v2 only under the jsonv2 experiment, which an app importing it sets, here with go env -w; from Go 1.27 it builds by default and smallJSON finds the import.
+			goenv := c.goenv
+			if c.src == v2 && !jsonv2On(t, dir) {
+				goenv = "jsonv2"
+			}
+			setGoEnv(t, goenv)
 			env, err := smallJSON(t.Context(), &project{Dir: dir}, []string{"GOOS=js", "GOARCH=wasm"}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if small := slices.Contains(env, "GOEXPERIMENT=nojsonv2"); small != c.small {
-				t.Fatalf("env = %v, want nojsonv2 %v", env, c.small)
+			got := ""
+			if e := env[len(env)-1]; strings.HasPrefix(e, "GOEXPERIMENT=") {
+				got = e
+			}
+			if got != c.want {
+				t.Fatalf("env = %v, want GOEXPERIMENT %q", env, c.want)
 			}
 		})
 	}
+	setGoEnv(t, "")
 	t.Setenv("GOEXPERIMENT", "jsonv2")
 	if env, err := smallJSON(t.Context(), &project{Dir: t.TempDir()}, nil, nil); err != nil || len(env) != 0 {
 		t.Fatalf("with GOEXPERIMENT set, env = %v, %v", env, err)
 	}
+}
+
+// setGoEnv points the go command at a go env file of its own, which sets GOEXPERIMENT to experiment, as go env -w does, unless it is empty.
+func setGoEnv(t *testing.T, experiment string) {
+	file := filepath.Join(t.TempDir(), "env")
+	data := ""
+	if experiment != "" {
+		data = "GOEXPERIMENT=" + experiment + "\n"
+	}
+	if err := os.WriteFile(file, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GOENV", file)
+}
+
+// jsonv2On reports whether the go command that builds the module in dir has the jsonv2 experiment on with no GOEXPERIMENT set.
+func jsonv2On(t *testing.T, dir string) bool {
+	setGoEnv(t, "")
+	cmd := exec.CommandContext(t.Context(), "go", "list", "-f", `{{join context.ToolTags " "}}`, "encoding/json")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list: %v", err)
+	}
+	return slices.Contains(strings.Fields(string(out)), "goexperiment.jsonv2")
 }
 
 func TestBuildJobs(t *testing.T) {

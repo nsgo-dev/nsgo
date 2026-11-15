@@ -522,17 +522,14 @@ func goBuildWith(ctx context.Context, p *project, out string, env []string, extr
 	return nil
 }
 
-// smallJSON returns env with GOEXPERIMENT=nojsonv2 added: encoding/json's
-// first implementation, which links into a page about 1 MB smaller than
-// the one on encoding/json/v2 Go builds by default, into an Android app
-// about 450 KB and into a desktop one 100 to 450 KB. An app whose
-// packages or dependencies import encoding/json/v2 or jsontext keeps
-// them, as does one whose environment sets the experiment either way.
+// smallJSON returns env with GOEXPERIMENT=nojsonv2 added: encoding/json's first implementation, which from Go 1.27, where Go builds encoding/json on encoding/json/v2 by default, links into a page about 1 MB smaller, into an Android app about 450 KB and into a desktop one 100 to 450 KB; Go 1.26 builds the first implementation already, and the experiment changes nothing. An app whose packages or dependencies import encoding/json/v2 or jsontext keeps them, as does one whose GOEXPERIMENT, in the environment or set with go env -w, names the experiment either way.
 func smallJSON(ctx context.Context, p *project, env, tags []string) ([]string, error) {
-	for _, e := range append(os.Environ(), env...) {
-		if v, ok := strings.CutPrefix(e, "GOEXPERIMENT="); ok && strings.Contains(v, "jsonv2") {
-			return env, nil
-		}
+	cur, err := goExperiment(ctx, p.Dir, env)
+	if err != nil {
+		return nil, err
+	}
+	if strings.Contains(cur, "jsonv2") {
+		return env, nil
 	}
 	args := []string{"list", "-deps", "-f", `{{if not .Standard}}{{join .Imports "\n"}}{{end}}`}
 	if p.testBinary {
@@ -555,7 +552,29 @@ func smallJSON(ctx context.Context, p *project, env, tags []string) ([]string, e
 			return env, nil
 		}
 	}
-	return append(env, "GOEXPERIMENT="+experiments("nojsonv2")), nil
+	return append(env, "GOEXPERIMENT="+experiments(cur, "nojsonv2")), nil
+}
+
+// goExperiment returns the GOEXPERIMENT the go command takes in dir under env, which counts what go env -w set, as a GOEXPERIMENT the tool adds to the environment replaces it.
+func goExperiment(ctx context.Context, dir string, env []string) (string, error) {
+	cmd := exec.CommandContext(ctx, "go", "env", "GOEXPERIMENT")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), env...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("go env GOEXPERIMENT: %w\n%s", err, stderr.Bytes())
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// experiments returns the experiments cur names with extra added.
+func experiments(cur, extra string) string {
+	if cur != "" {
+		return cur + "," + extra
+	}
+	return extra
 }
 
 func run(ctx context.Context, name string, args ...string) error {
