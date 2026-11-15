@@ -23,6 +23,8 @@ var layers = []struct {
 	{"internal/layout", nil},
 	// The microphone asks for its permission as the backends do.
 	{"microphone", []string{"internal/driver", "internal/platform/privacy"}},
+	// The automation's protocol, which the nsgo tool and the agent in a running app speak, is the standard library's JSON alone.
+	{"internal/automation", nil},
 	// Widgets take core's colors, edges and fonts, and reach WidgetKit
 	// through the files and the library the tool's extension shares, and
 	// Android's runtime through the driver's Live Updates.
@@ -59,7 +61,7 @@ var layers = []struct {
 	{"internal/platform/updates", []string{"internal/driver", "internal/platform/imageload"}},
 	{"internal/platform/webstyle", []string{"internal/driver"}},
 	{"internal/platform/", append([]string{"internal/driver", "internal/engine", "internal/testhost", "core", "desktop/locales"}, platformShared...)},
-	{"nsgotest", []string{"core", "internal/devtools", "internal/driver", "internal/testhost"}},
+	{"nsgotest", []string{"core", "internal/automation", "internal/devtools", "internal/driver", "internal/testhost"}},
 	{"", []string{"core", "internal/devtools", "internal/engine", "internal/platform/", "updater"}},
 	// The code nsgo writes from catalogs runs on i18n.
 	{"i18n", []string{"core", "internal/cldr"}},
@@ -112,7 +114,7 @@ var owned = map[string][]string{
 
 // portable lists the packages that build unchanged for every target: no
 // purego, syscall or unsafe.
-var portable = []string{"core", "internal/driver", "internal/layout", "internal/shader", "internal/shader/wgsl", "internal/shaderir/", "internal/engine",
+var portable = []string{"core", "internal/automation", "internal/driver", "internal/layout", "internal/shader", "internal/shader/wgsl", "internal/shaderir/", "internal/engine",
 	"internal/testhost", "internal/cldr", "base/", "ui/", "i18n", "mobile", "desktop", "desktop/locales", "icons/", "nsgotest", "tsx", "tsx/websrc", "updater", "updater/locales"}
 
 // unportable are the packages among portable's that reach the system: the

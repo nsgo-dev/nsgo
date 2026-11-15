@@ -4,12 +4,16 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/internal/automation"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
@@ -48,10 +52,71 @@ func Target() string { return os.Getenv("NSGO_TEST_TARGET") }
 type target struct {
 	a       *App
 	surface testhost.Surface
+	// live is set for a running app's surface the automation follows (automation.go), whose model also drops the alerts the user answers.
+	live bool
+	// quiet reports whether the last settle came to quiet before settleWait.
+	quiet bool
 
 	mu      sync.Mutex
 	batches []*driver.MountBatch
 	events  []driver.Event
+	// lost says why a live model stopped following its surface: a batch it could not apply. It queues nothing after.
+	lost string
+}
+
+// observe queues a batch the app's engine sent, which the next drain applies.
+func (t *target) observe(b *driver.MountBatch) {
+	t.mu.Lock()
+	if t.lost == "" {
+		t.batches = append(t.batches, b)
+	}
+	t.mu.Unlock()
+}
+
+// event queues what the next drain takes of an event the platform reported: scrolls, the focus and texts, and for a live app alerts answered.
+func (t *target) event(ev driver.Event) {
+	switch ev.Kind {
+	case driver.EventScroll, driver.EventFocus, driver.EventBlur, driver.EventChangeText:
+	case driver.EventAlert:
+		if !t.live {
+			return
+		}
+	default:
+		return
+	}
+	t.mu.Lock()
+	if t.lost == "" {
+		t.events = append(t.events, ev)
+	}
+	t.mu.Unlock()
+}
+
+// lostWhy says why a live model stopped following its surface, "" while it follows.
+func (t *target) lostWhy() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.lost
+}
+
+// applyLive applies b to a running app's model. One the model cannot apply leaves it lost, dropping what is queued, and fails the step taking it, rather than ending the app or leaving a model half applied to answer later steps.
+func (t *target) applyLive(b *driver.MountBatch) {
+	defer func() {
+		v := recover()
+		if v == nil {
+			return
+		}
+		why := fmt.Sprint(v)
+		if f, ok := v.(liveFailure); ok {
+			why = f.msg
+		}
+		why, _, _ = strings.Cut(strings.TrimPrefix(why, "nsgotest: "), "\n")
+		t.mu.Lock()
+		t.lost, t.batches, t.events = why, nil, nil
+		t.mu.Unlock()
+		log.Printf("nsgo: the automation stopped following a surface: %s", why)
+		fail(automation.Failed, "the automation stopped following the window: "+why)
+	}()
+	t.a.apply(b)
 }
 
 // quietFor is how long nothing must change for a step to be over, and
@@ -98,20 +163,9 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 	}
 	s, err := h.Open(app, testhost.Options{
 		Size: a.size, Environment: a.env, Storage: a.store, Host: a.host, Clock: clock,
-		FPS: os.Getenv("NSGO_TEST_FPS") != "",
-		Observe: func(b *driver.MountBatch) {
-			t.mu.Lock()
-			t.batches = append(t.batches, b)
-			t.mu.Unlock()
-		},
-		Event: func(ev driver.Event) {
-			switch ev.Kind {
-			case driver.EventScroll, driver.EventFocus, driver.EventBlur, driver.EventChangeText:
-				t.mu.Lock()
-				t.events = append(t.events, ev)
-				t.mu.Unlock()
-			}
-		},
+		FPS:     os.Getenv("NSGO_TEST_FPS") != "",
+		Observe: t.observe,
+		Event:   t.event,
 	})
 	if err != nil {
 		a.t.Fatalf("nsgotest: the platform cannot open the app: %v", err)
@@ -148,9 +202,18 @@ func (t *target) drain() bool {
 	t.mu.Unlock()
 	for _, b := range batches {
 		t.a.traceBatch(b, 0)
-		t.a.apply(b)
+		if t.live {
+			t.applyLive(b)
+		} else {
+			t.a.apply(b)
+		}
 	}
 	for _, ev := range events {
+		if ev.Kind == driver.EventAlert {
+			// The user answered it, or the app's own code did.
+			t.a.alerts = slices.DeleteFunc(t.a.alerts, func(c driver.AlertConfig) bool { return c.ID == ev.Count })
+			continue
+		}
 		v := t.a.views[ev.ID]
 		if v == nil {
 			continue
@@ -187,6 +250,7 @@ func (t *target) settle() {
 				quiet = time.Now()
 			}
 			if time.Since(quiet) >= quietFor && !t.surface.Animating() || time.Now().After(deadline) {
+				t.quiet = time.Now().Before(deadline)
 				return
 			}
 			time.Sleep(50 * time.Millisecond)
@@ -199,6 +263,7 @@ func (t *target) settle() {
 			quiet = time.Now()
 		}
 		if time.Since(quiet) >= quietFor || time.Now().After(deadline) {
+			t.quiet = time.Since(quiet) >= quietFor
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -376,8 +441,7 @@ func (a *App) Screenshot(name string) {
 		a.t.Logf("nsgotest: no screenshot %q headless; nsgo test -target takes it", name)
 		return
 	}
-	a.target.settle()
-	png, err := a.target.surface.Screenshot()
+	png, err := a.target.screenshotPNG()
 	if err != nil {
 		a.t.Fatalf("nsgotest: screenshot %q: %v", name, err)
 	}
@@ -389,4 +453,10 @@ func (a *App) Screenshot(name string) {
 	for i := range n {
 		fmt.Printf("nsgo-screenshot %s %d/%d %s\n", name, i+1, n, data[i*chunk:min((i+1)*chunk, len(data))])
 	}
+}
+
+// screenshotPNG settles and captures the app as the platform shows it.
+func (t *target) screenshotPNG() ([]byte, error) {
+	t.settle()
+	return t.surface.Screenshot()
 }

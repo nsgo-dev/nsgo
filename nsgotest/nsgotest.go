@@ -51,8 +51,8 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Tests check that each commit sends all that changed.
-func init() { driver.CheckCommits = true }
+// Tests check that each commit sends all that changed; a running app the automation follows lays each commit out once, as its users' does.
+func init() { driver.CheckCommits = !automationBuild }
 
 // Option configures Start.
 type Option func(*App)

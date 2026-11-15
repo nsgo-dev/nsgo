@@ -1,0 +1,50 @@
+package automation
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestRoundTrip(t *testing.T) {
+	// Window 0, the app's own, survives as a window named.
+	answer, window := 1, uint32(0)
+	params, _ := json.Marshal(AlertParams{Window: &window, Answer: &answer})
+	data, err := json.Marshal(Request{ID: 7, Method: Alert, Params: params})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var req Request
+	if err := json.Unmarshal(data, &req); err != nil {
+		t.Fatal(err)
+	}
+	var got AlertParams
+	if err := json.Unmarshal(req.Params, &got); err != nil {
+		t.Fatal(err)
+	}
+	if req.ID != 7 || req.Method != Alert || got.Window == nil || *got.Window != 0 || got.Answer == nil || *got.Answer != 1 {
+		t.Errorf("round trip: %+v %+v", req, got)
+	}
+}
+
+func TestReply(t *testing.T) {
+	a := Reply(3, StepResult{Settled: true}, nil)
+	var r StepResult
+	if a.ID != 3 || a.Error != nil || json.Unmarshal(a.Result, &r) != nil || !r.Settled {
+		t.Errorf("reply: %+v", a)
+	}
+	a = Reply(4, nil, Errorf(NoMatch, "no view matches %q", "id:x"))
+	if a.Error == nil || a.Error.Error() != `no_match: no view matches "id:x"` || a.Result != nil {
+		t.Errorf("error reply: %+v", a)
+	}
+}
+
+func TestEveryMethodHasParams(t *testing.T) {
+	for _, m := range []string{Windows, Snapshot, Find, Press, Type, Key, Scroll, Drag, Hover, Menu, Alert, Wait, Screenshot, Status, Logs, Reload} {
+		if Params[m] == nil {
+			t.Errorf("%s has no params type", m)
+		}
+	}
+	if len(Params) != 16 {
+		t.Errorf("%d params types for 16 methods", len(Params))
+	}
+}
