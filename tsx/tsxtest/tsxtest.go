@@ -711,7 +711,7 @@ func (r *runner) app(a *nsgotest.App, tb *appTB, env driver.Environment, net *ne
 	act("screenshot", func(c goja.FunctionCall) {
 		name := "screenshot"
 		if v := c.Argument(0); !goja.IsUndefined(v) && !goja.IsNull(v) {
-			name = strings.TrimSuffix(path.Base(v.String()), ".png")
+			name = strings.TrimSuffix(v.String(), ".png")
 		}
 		a.Screenshot(name)
 	})

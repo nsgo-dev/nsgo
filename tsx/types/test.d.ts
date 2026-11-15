@@ -107,6 +107,7 @@ export declare class App {
   waitUntil(condition: () => boolean, options?: WaitOptions | null): Promise<void>;
   setViewport(width: number, height: number): Promise<void>;
   setColorScheme(scheme: ColorScheme): Promise<void>;
+  /** Saves a screenshot under the directory nsgo test -target saves them to, at path, relative, with its folders and .png optional, or as screenshot.png; a path an earlier screenshot of the run took fails the test. Headless it does nothing. */
   screenshot(path?: string | null): Promise<void>;
   count(selector: string): number;
   shows(selector: string): boolean;
