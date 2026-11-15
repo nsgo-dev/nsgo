@@ -1,7 +1,9 @@
 package core
 
 import (
+	"bytes"
 	"errors"
+	"log"
 	"slices"
 	"strings"
 	"testing"
@@ -115,6 +117,47 @@ func TestAccessRefusesServices(t *testing.T) {
 	}
 	if h.root.CheckAccess(AccessRequest{Permission: AccessClipboard}) != nil {
 		t.Fatal("the app's own code was refused")
+	}
+}
+
+// A screen's or modal's status bar function that returns no setting, as TSX's Dialog and Screen pass without a statusBar prop, asks Access nothing, so it neither logs a refusal nor uses up the runtime's one statusBar refusal line, which a real setting and SetStatusBar still get (#218).
+func TestStatusBarAsksAccessOnlyForASetting(t *testing.T) {
+	var output bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&output)
+	defer log.SetOutput(previous)
+	refusals := func() int { return strings.Count(output.String(), `"`+AccessStatusBar+`" capability`) }
+
+	for _, set := range []string{"setting", "SetStatusBar"} {
+		output.Reset()
+		var enabled *Signal[bool]
+		var held *Scope
+		h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+			cx.ProvideAccess(hostsAccess{})
+			held = cx
+			enabled = NewSignal(cx, false)
+			setting := func() StatusBarSetting {
+				if set == "setting" && enabled.Get() {
+					return StatusBarSetting{Hidden: ToggleOn}
+				}
+				return StatusBarSetting{}
+			}
+			return View{Style: Style{FlexGrow: 1}, Children: []Node{
+				Stack{Style: Style{FlexGrow: 1}, Children: []Node{Screen{TestID: "home", StatusBarFunc: setting}}},
+				Modal{StatusBarFunc: setting},
+			}}
+		})
+		if got := statusItems(h.commit()); refusals() != 0 || len(got) != 0 {
+			t.Fatalf("%s: empty settings logged %q and sent %v", set, output.String(), got)
+		}
+		if set == "setting" {
+			enabled.Set(true)
+		} else {
+			held.SetStatusBar(StatusBarSetting{Hidden: ToggleOn})
+		}
+		if got := statusItems(h.commit()); refusals() != 1 || len(got) != 0 {
+			t.Fatalf("%s: logged %d refusals (%q) and sent %v, want one refusal and nothing sent", set, refusals(), output.String(), got)
+		}
 	}
 }
 

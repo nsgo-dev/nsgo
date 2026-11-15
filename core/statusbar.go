@@ -76,10 +76,9 @@ func (cx *Scope) SetStatusBar(patch StatusBarSetting) {
 	}
 }
 
-// bindStatusBar gives n a layer of status bar settings: the static one,
-// or fn's while it changes.
+// bindStatusBar gives n a layer of status bar settings: the static one, or fn's while it changes. Access is asked for only when the layer sets something, so a screen or modal whose function returns no setting, as TSX's Dialog and Screen do without a statusBar prop, logs no refusal and leaves the runtime's one statusBar refusal line to a request that needs it. A refused setting leaves the layer empty.
 func (t *Tree) bindStatusBar(cx *Scope, n *node, s StatusBarSetting, fn func() StatusBarSetting) {
-	if s == (StatusBarSetting{}) && fn == nil || cx.denied(serviceStatusBar, "") {
+	if fn == nil && (s == (StatusBarSetting{}) || cx.denied(serviceStatusBar, "")) {
 		return
 	}
 	l := &statusLayer{n: n, setting: s}
@@ -87,8 +86,14 @@ func (t *Tree) bindStatusBar(cx *Scope, n *node, s StatusBarSetting, fn func() S
 	t.changed = true
 	if fn != nil {
 		cx.renderEffect(func() {
-			l.setting = fn()
-			t.changed = true
+			setting := fn()
+			if setting != (StatusBarSetting{}) && cx.denied(serviceStatusBar, "") {
+				setting = StatusBarSetting{}
+			}
+			if l.setting != setting {
+				l.setting = setting
+				t.changed = true
+			}
 		})
 	}
 }
