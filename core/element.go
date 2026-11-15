@@ -213,7 +213,8 @@ type View struct {
 	// AccessibilityDescription says more about the element, read after
 	// its label and before Hint, as ARIA's aria-description: a dialog's
 	// message, what a field expects.
-	AccessibilityDescription string
+	AccessibilityDescription     string
+	AccessibilityDescriptionFunc func() string
 	// Invalid marks a field whose content the app rejected, for screen
 	// readers and the aria-invalid: styles (ARIA's aria-invalid).
 	Invalid func() bool
@@ -455,10 +456,12 @@ type Input struct {
 	OnLayout      func(Bounds)
 	Ref           *Ref
 	Label         string
+	LabelFunc     func() string
 	// AccessibilityDescription and Invalid are a View's: what the field
 	// expects, and that the app rejected its content.
-	AccessibilityDescription string
-	Invalid                  func() bool
+	AccessibilityDescription     string
+	AccessibilityDescriptionFunc func() string
+	Invalid                      func() bool
 	// Role is what it is for assistive technology, a text field when 0; RoleSearchField keeps it a text field that reads as a search field.
 	Role Role
 	// ReadonlyFunc and KeyboardTypeFunc are Readonly and KeyboardType

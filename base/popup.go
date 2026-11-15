@@ -289,8 +289,9 @@ func modalLayer(st *popup, motion *popupMotion, m core.Modal, d Dialog) core.Nod
 			role = core.RoleDialog
 		}
 		nodes = append(nodes, core.View{Class: popup.Class, ClassFunc: motion.class, Style: popup.Style, StyleFunc: motion.style(popup.Fn), Role: role,
-			OnPress: func(core.PressEvent) {}, NoFocus: true, AccessibilityDescription: d.AccessibilityDescription,
-			OnTransitionEnd: motion.transitionEnd, Label: d.Label, TestID: d.TestID, Children: d.Children})
+			OnPress: func(core.PressEvent) {}, NoFocus: true,
+			OnTransitionEnd: motion.transitionEnd, Label: d.Label, LabelFunc: d.LabelFunc, AccessibilityDescription: d.AccessibilityDescription,
+			AccessibilityDescriptionFunc: d.AccessibilityDescriptionFunc, TestID: d.TestID, Children: d.Children})
 		nodes = append(nodes, d.After...)
 		// What is going takes no more presses.
 		nodes = append(nodes, core.Show{When: motion.closing.Get, Then: func(*core.Scope) core.Node {

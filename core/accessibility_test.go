@@ -98,6 +98,27 @@ func TestALabelChangingAloneGoesAlone(t *testing.T) {
 	}
 }
 
+func TestAccessibilityDescriptionAndInputLabelFollowSignals(t *testing.T) {
+	var label, description *Signal[string]
+	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+		label, description = NewSignal(cx, "Name"), NewSignal(cx, "Your full name")
+		return View{Children: []Node{
+			View{TestID: "view", Role: RoleGroup, AccessibilityDescriptionFunc: description.Get},
+			Input{TestID: "input", LabelFunc: label.Get, AccessibilityDescriptionFunc: description.Get},
+		}}
+	})
+	props := propsOf(h.commit())
+	if p := props[h.find("input").id]; p.Label != "Name" || p.Description != "Your full name" {
+		t.Fatalf("initial input props = %+v", p)
+	}
+	label.Set("Nombre")
+	description.Set("Su nombre completo")
+	props = propsOf(h.commit())
+	if p := props[h.find("input").id]; p.Label != "Nombre" || p.Description != "Su nombre completo" {
+		t.Fatalf("updated input props = %+v", p)
+	}
+}
+
 func TestAGroupReadsItsTexts(t *testing.T) {
 	var price *Signal[string]
 	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {

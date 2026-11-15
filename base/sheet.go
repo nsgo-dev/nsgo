@@ -41,9 +41,12 @@ type Sheet struct {
 	Style     core.Style
 	StyleFunc func() core.Style
 	// Children are the content, made on each opening.
-	Children []core.Node
-	Label    string
-	TestID   string
+	Children                     []core.Node
+	Label                        string
+	LabelFunc                    func() string
+	AccessibilityDescription     string
+	AccessibilityDescriptionFunc func() string
+	TestID                       string
 }
 
 // Render implements core.Node.
@@ -62,6 +65,7 @@ func (s Sheet) Render(cx *core.Scope) core.Node {
 		Swipe:         s.CloseOnSwipe && side == core.PlaceBottom,
 		Swiped:        func() { st.cancel(ReasonSwipe, false) },
 		Cancel:        func() { st.cancel(ReasonCancel, s.NoCloseOnEscape) },
-		Role:          core.RoleDialog, Label: s.Label, TestID: s.TestID, Content: s.Children,
+		Role:          core.RoleDialog, Label: s.Label, LabelFunc: s.LabelFunc, AccessibilityDescription: s.AccessibilityDescription,
+		AccessibilityDescriptionFunc: s.AccessibilityDescriptionFunc, TestID: s.TestID, Content: s.Children,
 		Layer: parts.Of(s.Class, s.Style, s.StyleFunc)}.Node()
 }

@@ -209,13 +209,16 @@ type Layer struct {
 	Panel         parts.Part
 	// Swipe lets a finger drag the panel down, and Swiped hears a release
 	// that asks it to close.
-	Swipe   bool
-	Swiped  func()
-	Cancel  func()
-	Role    core.Role
-	Label   string
-	TestID  string
-	Content []core.Node
+	Swipe                        bool
+	Swiped                       func()
+	Cancel                       func()
+	Role                         core.Role
+	Label                        string
+	LabelFunc                    func() string
+	AccessibilityDescription     string
+	AccessibilityDescriptionFunc func() string
+	TestID                       string
+	Content                      []core.Node
 	// Layer styles the overlay holding the backdrop and the panel.
 	Layer parts.Part
 }
@@ -239,7 +242,8 @@ func (l Layer) Node() core.Node {
 			Class: l.Panel.Class,
 			Style: panelPlace(l.Side).Merge(l.Panel.Style).Merge(core.Style{Animated: &core.AnimatedStyle{
 				TranslateX: m.x, TranslateY: m.y}}),
-			StyleFunc: l.Panel.Fn, Role: l.Role, Label: l.Label, TestID: l.TestID, Children: l.Content,
+			StyleFunc: l.Panel.Fn, Role: l.Role, Label: l.Label, LabelFunc: l.LabelFunc, AccessibilityDescription: l.AccessibilityDescription,
+			AccessibilityDescriptionFunc: l.AccessibilityDescriptionFunc, TestID: l.TestID, Children: l.Content,
 			// Its blank space takes presses, which would reach the backdrop.
 			OnPress: func(core.PressEvent) {}, NoFocus: true,
 			OnLayout: func(b core.Bounds) {

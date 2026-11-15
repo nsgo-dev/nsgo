@@ -16,10 +16,12 @@ type Dialog struct {
 	Open         func() bool
 	OnOpenChange func(open bool, reason base.Reason)
 	// OnClose follows it being gone, once its motion ended.
-	OnClose     func()
-	Title       string
-	Description string
-	Children    []core.Node
+	OnClose         func()
+	Title           string
+	TitleFunc       func() string
+	Description     string
+	DescriptionFunc func() string
+	Children        []core.Node
 	// Footer holds the actions, at the end of a row on desktops, the
 	// last first in a stack across a sheet.
 	Footer                 []core.Node
@@ -35,9 +37,10 @@ type Dialog struct {
 	// Label names the dialog for assistive technology, Title when empty,
 	// which reads Description after it. Role makes it an alert dialog,
 	// one asking for an answer, as a confirmation.
-	Label  string
-	Role   core.Role
-	TestID string
+	Label     string
+	LabelFunc func() string
+	Role      core.Role
+	TestID    string
 	// Style merges over the surface's.
 	Style core.Style
 }
@@ -46,17 +49,21 @@ type Dialog struct {
 func (d Dialog) Render(cx *core.Scope) core.Node {
 	colors := ColorsOf(cx)
 	label := d.Label
-	if label == "" {
+	labelFunc := d.LabelFunc
+	if label == "" && labelFunc == nil {
 		label = d.Title
+		if d.TitleFunc != nil {
+			labelFunc = d.TitleFunc
+		}
 	}
 	var body []core.Node
-	if d.Title != "" || d.Description != "" {
+	if d.Title != "" || d.TitleFunc != nil || d.Description != "" || d.DescriptionFunc != nil {
 		var head []core.Node
-		if d.Title != "" {
-			head = append(head, core.Text{Content: d.Title, Role: core.RoleHeader, Style: TypeTitle, StyleFunc: Colored(colors.Text)})
+		if d.Title != "" || d.TitleFunc != nil {
+			head = append(head, core.Text{Content: d.Title, ContentFunc: d.TitleFunc, Role: core.RoleHeader, Style: TypeTitle, StyleFunc: Colored(colors.Text)})
 		}
-		if d.Description != "" {
-			head = append(head, core.Text{Content: d.Description, Style: TypeBody, StyleFunc: Colored(colors.Muted)})
+		if d.Description != "" || d.DescriptionFunc != nil {
+			head = append(head, core.Text{Content: d.Description, ContentFunc: d.DescriptionFunc, Style: TypeBody, StyleFunc: Colored(colors.Muted)})
 		}
 		body = append(body, core.View{Style: core.Style{Gap: 4}, Children: head})
 	}
@@ -69,7 +76,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 		return base.Sheet{Open: d.Open, OnOpenChange: d.OnOpenChange, NoCloseOnEscape: d.NoCloseOnEscape,
 			NoCloseOnBackdropPress: d.NoCloseOnBackdropPress, CloseOnSwipe: !d.NoCloseOnBackdropPress,
 			BackdropStyle: scrim, PopupStyleFunc: func() core.Style { return sheetPanel(cx, core.PlaceBottom).Merge(d.Style) },
-			Children: sheetContent(cx, core.PlaceBottom, body), Label: label, TestID: d.TestID}
+			Children: sheetContent(cx, core.PlaceBottom, body), Label: label, LabelFunc: labelFunc, AccessibilityDescription: d.Description, AccessibilityDescriptionFunc: d.DescriptionFunc, TestID: d.TestID}
 	}
 	if d.Footer != nil {
 		body = append(body, core.View{Style: core.Style{Direction: core.Row, Wrap: core.Wrap, JustifyContent: core.JustifyEnd,
@@ -86,7 +93,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 		return core.View{Style: core.Style{FlexGrow: grow, MinHeight: core.Pt(0)}, PointerEvents: core.PointerEventsNone}
 	}
 	return base.Dialog{Open: d.Open, OnOpenChange: d.OnOpenChange, OnClose: d.OnClose, Animation: core.ModalNone, NoCloseOnEscape: d.NoCloseOnEscape,
-		Role: d.Role, AccessibilityDescription: d.Description,
+		Role: d.Role, Label: label, LabelFunc: labelFunc, AccessibilityDescription: d.Description, AccessibilityDescriptionFunc: d.DescriptionFunc,
 		NoCloseOnBackdropPress: d.NoCloseOnBackdropPress, BackdropStyle: core.Style{Background: Black(0.18), Transition: dialogFade},
 		BackdropStartingStyle: core.Style{Opacity: core.Alpha(0)}, BackdropEndingStyle: core.Style{Opacity: core.Alpha(0)},
 		PopupStyle: popup, StartingStyle: dialogStarting, EndingStyle: dialogEnding,
@@ -97,7 +104,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 				MaxWidth: core.Pt(max(0, window.Width-2*inset)), MaxHeight: core.Pt(max(0, window.Height-2*inset)), FlexShrink: 0}).Merge(d.Style)
 		},
 		LayerStyle: core.Style{JustifyContent: core.JustifyStart}, Before: []core.Node{spacer(1)}, After: []core.Node{spacer(2), dialogDragStrip(cx)},
-		Children: body, Label: label, TestID: d.TestID}
+		Children: body, TestID: d.TestID}
 }
 
 // RadiusDialog rounds a dialog on desktops.

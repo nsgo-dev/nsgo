@@ -63,10 +63,12 @@ type Dialog struct {
 	// Label names the dialog for screen readers, which announce it with
 	// its role as it opens, a dialog or with Role an alert dialog, and
 	// AccessibilityDescription after it, as a confirmation's message.
-	Label                    string
-	Role                     core.Role
-	AccessibilityDescription string
-	TestID                   string
+	Label                        string
+	LabelFunc                    func() string
+	Role                         core.Role
+	AccessibilityDescription     string
+	AccessibilityDescriptionFunc func() string
+	TestID                       string
 }
 
 // Render implements core.Node.

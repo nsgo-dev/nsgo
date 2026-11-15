@@ -30,14 +30,15 @@ func (r *Ref) SetAccessibilityFocus() {
 
 // a11y is what an element's accessibility props are bound from.
 type a11y struct {
-	labelFunc  func() string
-	value      func() AccessibilityValue
-	expanded   func() bool
-	expandable func() bool
-	hidden     func() bool
-	actions    []AccessibilityAction
-	accessible bool
-	important  Importance
+	labelFunc       func() string
+	descriptionFunc func() string
+	value           func() AccessibilityValue
+	expanded        func() bool
+	expandable      func() bool
+	hidden          func() bool
+	actions         []AccessibilityAction
+	accessible      bool
+	important       Importance
 }
 
 // bindAccessibility sets n's accessibility props from a and binds those
@@ -56,6 +57,12 @@ func (t *Tree) bindAccessibility(cx *Scope, n *node, a a11y) {
 	if a.labelFunc != nil {
 		cx.renderEffect(func() {
 			p.Label = a.labelFunc()
+			t.touch(n)
+		})
+	}
+	if a.descriptionFunc != nil {
+		cx.renderEffect(func() {
+			p.Description = a.descriptionFunc()
 			t.touch(n)
 		})
 	}

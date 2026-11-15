@@ -58,3 +58,26 @@ func TestDialog(t *testing.T) {
 		}
 	})
 }
+
+func TestDialogTextFuncsUpdateInPlace(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			title, description := core.NewSignal(cx, "First title"), core.NewSignal(cx, "First description")
+			return core.View{Children: []core.Node{
+				Button{Text: "Change", TestID: "change", OnPress: func() {
+					title.Set("Second title")
+					description.Set("Second description")
+				}},
+				Dialog{Open: func() bool { return true }, TestID: "dialog", TitleFunc: title.Get, DescriptionFunc: description.Get},
+			}}
+		})
+		id := app.Find("dialog").ID
+		app.Find("First title")
+		app.Press("change")
+		app.Find("Second title")
+		app.Find("Second description")
+		if got := app.Find("dialog").ID; got != id {
+			t.Fatalf("dialog remounted on text update: %v then %v", id, got)
+		}
+	})
+}

@@ -230,7 +230,7 @@ func TestFuncFieldsBindTheirValue(t *testing.T) {
 	}
 	imp := importer.ForCompiler(token.NewFileSet(), "source", nil)
 	bound := map[string]bool{}
-	for _, rel := range []string{"core", "base", "base/textview", "base/editor", "base/diff", "mobile", "desktop"} {
+	for _, rel := range []string{"core", "base", "base/textview", "base/editor", "base/diff", "mobile", "desktop", "ui"} {
 		pkg, err := imp.Import(modulePath + "/" + rel)
 		if err != nil {
 			t.Fatal(err)
