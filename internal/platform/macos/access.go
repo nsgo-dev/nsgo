@@ -28,7 +28,7 @@ import (
 //   and AXCancel, custom ones NSAccessibilityCustomActions.
 // - Live regions are announced from here: a changed label, or a changed
 //   text inside one.
-// - An input's editor is its element and answers for the input (editorAccessMethods); one with RoleCombobox is an editable combobox, AXComboBox, where a view with RoleCombobox is a select's pop-up button.
+// - An input's editor is its element and answers for the input (editorAccessMethods); one with RoleCombobox is an editable combobox, AXComboBox, where a view with RoleCombobox is a select's pop-up button, and one with RoleSpinButton an editable AXIncrementor with the input's actions, where a view with RoleSpinButton is an incrementor of its own.
 
 const appKitPath = "/System/Library/Frameworks/AppKit.framework/AppKit"
 
@@ -42,6 +42,12 @@ var (
 		sel("accessibilityPerformIncrement"): driver.ActionIncrement,
 		sel("accessibilityPerformDecrement"): driver.ActionDecrement,
 		sel("accessibilityPerformCancel"):    driver.ActionEscape,
+	}
+	// axActions are the same actions by their names, as an input's editor answers them (editorAccessMethods).
+	axActions = map[string]string{
+		"AXIncrement": driver.ActionIncrement,
+		"AXDecrement": driver.ActionDecrement,
+		"AXCancel":    driver.ActionEscape,
 	}
 )
 
@@ -132,8 +138,8 @@ func (v *view) axRole() [2]string {
 		// A button that stays on, as browsers make ARIA's aria-pressed.
 		return [2]string{"AXCheckBox", "AXToggle"}
 	}
-	if v.input != nil && p.Role == driver.RoleCombobox {
-		// An editable combobox: its editor is the element (editorAccessMethods).
+	if v.input != nil && (p.Role == driver.RoleCombobox || p.Role == driver.RoleSpinButton) {
+		// An editable combobox or spin button: its editor is the element (editorAccessMethods).
 		return [2]string{}
 	}
 	if r, ok := roles[p.Role]; ok {
@@ -274,7 +280,7 @@ var axRoleDescription = sync.OnceValue(func() func(role, subrole objc.ID) objc.I
 	return describe
 })
 
-// editorAccessMethods are what an input's editor, a field's cell (cell) or a text view, answers VoiceOver with. AppKit's text classes answer through accessibilityAttributeValue:, which reads none of the attributes set on them, and a field's element is its cell rather than the field, so the editor answers here for its input's view, which is no element: the input's label, help, test ID and value text, and for RoleCombobox the role of an editable combobox and the popup's state. Its text, value and selection stay its class's.
+// editorAccessMethods are what an input's editor, a field's cell (cell) or a text view, answers VoiceOver with. AppKit's text classes answer through accessibilityAttributeValue:, which reads none of the attributes set on them, and a field's element is its cell rather than the field, so the editor answers here for its input's view, which is no element: the input's label, help, test ID, value text and standard actions, for RoleCombobox the role of an editable combobox and the popup's state, and for RoleSpinButton the role of an incrementor, whose AXIncrement and AXDecrement step the input. Its text, value and selection stay its class's.
 func editorAccessMethods(cell bool) []objc.MethodDef {
 	owner := func(self objc.ID) *view {
 		if cell {
@@ -310,6 +316,33 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 			}
 			return names
 		}},
+		{Cmd: sel("accessibilityActionNames"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
+			names := apple.SendSuper[objc.ID](self, cmd)
+			v := owner(self)
+			if v == nil {
+				return names
+			}
+			if names == 0 {
+				names = nsArray(nil)
+			}
+			for _, name := range []string{"AXIncrement", "AXDecrement", "AXCancel"} {
+				if !v.props.HasAction(axActions[name]) {
+					continue
+				}
+				if ns := apple.NSString(name); !objc.Send[bool](names, sel("containsObject:"), ns) {
+					names = names.Send(sel("arrayByAddingObject:"), ns)
+				}
+			}
+			return names
+		}},
+		{Cmd: sel("accessibilityPerformAction:"), Fn: func(self objc.ID, cmd objc.SEL, name objc.ID) {
+			if v := owner(self); v != nil {
+				if action, ok := axActions[apple.GoString(name)]; ok && v.action(action) {
+					return
+				}
+			}
+			apple.Super(self, cmd, name)
+		}},
 	}
 }
 
@@ -317,14 +350,22 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 func (v *view) editorAttribute(name string) (objc.ID, bool) {
 	p := &v.props
 	combobox := p.Role == driver.RoleCombobox
+	role := ""
+	switch p.Role {
+	case driver.RoleCombobox:
+		role = "AXComboBox"
+	case driver.RoleSpinButton:
+		// As browsers make a number field, ARIA's spinbutton.
+		role = "AXIncrementor"
+	}
 	switch name {
 	case "AXRole":
-		if combobox {
-			return apple.NSString("AXComboBox"), true
+		if role != "" {
+			return apple.NSString(role), true
 		}
 	case "AXRoleDescription":
-		if combobox {
-			return axRoleDescription()(apple.NSString("AXComboBox"), 0), true
+		if role != "" {
+			return axRoleDescription()(apple.NSString(role), 0), true
 		}
 	case "AXDescription":
 		if p.Label != "" {
