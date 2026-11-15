@@ -4,6 +4,7 @@ package linux
 
 import (
 	"bufio"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -199,19 +200,25 @@ func ibusAddress() string {
 // dbusCall calls a method with string arguments, which it takes, and
 // returns its reply, 0 when it failed.
 func dbusCall(bus uintptr, name, path, iface, method string, args ...uintptr) uintptr {
+	reply, _ := dbusTry(bus, name, path, iface, method, args...)
+	return reply
+}
+
+// dbusTry calls a method as dbusCall does and returns its reply, or what the bus or the service said failed.
+func dbusTry(bus uintptr, name, path, iface, method string, args ...uintptr) (uintptr, error) {
 	var params uintptr
 	if len(args) > 0 {
 		params = gVariantNewTuple(&args[0], uintptr(len(args)))
 	} else {
 		params = gVariantNewTuple(nil, 0)
 	}
-	var err uintptr
-	reply := gDBusConnectionCallSync(bus, cstr(name), cstr(path), cstr(iface), cstr(method), params, 0, 0, 1000, 0, &err)
-	if err != 0 {
-		gErrorFree(err)
-		return 0
+	var gerr uintptr
+	reply := gDBusConnectionCallSync(bus, cstr(name), cstr(path), cstr(iface), cstr(method), params, 0, 0, 1000, 0, &gerr)
+	if gerr != 0 {
+		defer gErrorFree(gerr)
+		return 0, errors.New(goString((*gError)(cPointer(gerr)).message))
 	}
-	return reply
+	return reply, nil
 }
 
 // variantString is the string child i of a tuple, "" without one.

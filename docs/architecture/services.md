@@ -186,10 +186,12 @@ It departs from MyGo where Go apps differ: answers come to callbacks on the engi
 | --- | --- | --- |
 | macOS | IOKit `IOPMAssertionCreateWithName(PreventUserIdleDisplaySleep)` | IOKit `PreventUserIdleSystemSleep` |
 | Windows | `SetThreadExecutionState(ES_DISPLAY_REQUIRED \| ES_SYSTEM_REQUIRED)`, set for each UI thread from the holds of its windows | `ES_SYSTEM_REQUIRED` |
-| Linux | `org.freedesktop.ScreenSaver.Inhibit` on the session bus | The desktop portal's `Inhibit` with its Suspend flag; without the portal, the ScreenSaver inhibitor, which keeps the display on too |
+| Linux | `org.freedesktop.ScreenSaver.Inhibit` on the session bus | For an app outside Flatpak and Snap on GNOME, `org.gnome.SessionManager.Inhibit` with its Suspend flag, since GNOME's portal backend passes on the empty ID the portal knows such an app by, which the session manager refuses while the portal answers that the hold was taken; otherwise the desktop portal's `Inhibit` with its Suspend flag, and without the portal the ScreenSaver inhibitor, which keeps the display on too |
 | iOS | `UIApplication.idleTimerDisabled`, set as the first display hold comes and cleared as the last goes | No-op; iOS controls background execution |
 | Android | No-op | No-op |
 | Web and mini programs | No-op | No-op |
+
+GNOME's inhibitors refuse an empty app ID and an empty reason, so on Linux a hold names an app built without `nsgo.yaml`'s id, as `go build` and `go run` make it, by its name, else its executable's, and gives that ID as the reason when the app gives none. A hold the session refuses is logged and keeps nothing awake.
 
 A playing `Video` keeps the display on only on iOS, where `AVPlayer`'s `preventsDisplaySleepDuringVideoPlayback` is on by default; on macOS that default is off, and the other targets' players ask for nothing, so an app that plays video, or draws its own frames, takes a display hold while it plays.
 
