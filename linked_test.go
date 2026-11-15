@@ -29,14 +29,17 @@ var unlinked = map[string][]string{
 	"linux":   {"archive/zip"},
 }
 
+// linkTargets are the targets the link tests build for.
+var linkTargets = [][2]string{{"darwin", "arm64"}, {"windows", "amd64"}, {"linux", "amd64"}, {"android", "arm64"}, {"js", "wasm"}}
+
 func TestMinimalAppLinks(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("needs the go command")
 	}
-	for _, target := range [][2]string{{"darwin", "arm64"}, {"windows", "amd64"}, {"linux", "amd64"}, {"android", "arm64"}, {"js", "wasm"}} {
+	for _, target := range linkTargets {
 		t.Run(target[0]+"_"+target[1], func(t *testing.T) {
 			t.Parallel()
-			linked := linkedPackages(t, target[0], target[1])
+			linked := linkedPackages(t, target[0], target[1], "")
 			for _, pkg := range append(unlinked[""], unlinked[target[0]]...) {
 				if linked[pkg] {
 					t.Errorf("an app showing one text links %s", pkg)
@@ -46,14 +49,25 @@ func TestMinimalAppLinks(t *testing.T) {
 	}
 }
 
-// linkedPackages returns the packages the linker keeps in
-// testdata/minimal for goos and goarch for what other packages reach:
-// those its dependency dump has an edge into from another package's
-// symbol. A package's own init and the tables it fills, and literals the
-// linker shares by content, do not count.
-func linkedPackages(t *testing.T, goos, goarch string) map[string]bool {
+// TestDevBuildsLink builds the minimal app as nsgo dev does, with the dev client (nsgodev), for each target, which TestReleaseBuildsLinkNoDevClient does for this machine's alone, and checks that the client, which reaches the dev server over HTTP, links.
+func TestDevBuildsLink(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("needs the go command")
+	}
+	for _, target := range linkTargets {
+		t.Run(target[0]+"_"+target[1], func(t *testing.T) {
+			t.Parallel()
+			if !linkedPackages(t, target[0], target[1], "nsgodev")["net/http"] {
+				t.Error("a dev build does not link the dev client")
+			}
+		})
+	}
+}
+
+// linkedPackages returns the packages the linker keeps in testdata/minimal for goos and goarch, built with tags, for what other packages reach: those its dependency dump has an edge into from another package's symbol. A package's own init and the tables it fills, and literals the linker shares by content, do not count.
+func linkedPackages(t *testing.T, goos, goarch, tags string) map[string]bool {
 	t.Helper()
-	cmd := exec.Command("go", "build", "-trimpath", "-ldflags=-dumpdep", "-o", os.DevNull, "./testdata/minimal")
+	cmd := exec.Command("go", "build", "-trimpath", "-tags="+tags, "-ldflags=-dumpdep", "-o", os.DevNull, "./testdata/minimal")
 	cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=0", "GOFLAGS=")
 	var dump bytes.Buffer
 	cmd.Stderr = &dump

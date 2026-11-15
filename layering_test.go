@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -123,17 +124,33 @@ var layerTargets = [][2]string{
 
 const modulePath = "github.com/nsgo-dev/nsgo"
 
+// devImports are what a package's nsgo dev builds (the nsgodev tag) import besides its layer's: the root's dev client reads the commit traces and their causes from the driver.
+var devImports = map[string][]string{"": {"internal/driver"}}
+
+// devLayerTargets are the targets whose nsgo dev builds (the nsgodev tag) are checked too: the dev client's files differ only between the web and the rest.
+var devLayerTargets = [][2]string{{"darwin", "arm64"}, {"js", "wasm"}}
+
 func TestLayering(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("needs the go command")
 	}
-	for _, target := range layerTargets {
-		t.Run(target[0]+"_"+target[1], func(t *testing.T) {
+	check := func(goos, goarch, tags string) {
+		name := goos + "_" + goarch
+		if tags != "" {
+			name += "_" + tags
+		}
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			for _, p := range listPackages(t, target[0], target[1]) {
-				checkLayer(t, p)
+			for _, p := range listPackages(t, goos, goarch, tags) {
+				checkLayer(t, p, tags)
 			}
 		})
+	}
+	for _, target := range layerTargets {
+		check(target[0], target[1], "")
+	}
+	for _, target := range devLayerTargets {
+		check(target[0], target[1], "nsgodev")
 	}
 }
 
@@ -144,9 +161,9 @@ type listedPackage struct {
 	Error      *struct{ Err string }
 }
 
-func listPackages(t *testing.T, goos, goarch string) []listedPackage {
+func listPackages(t *testing.T, goos, goarch, tags string) []listedPackage {
 	t.Helper()
-	cmd := exec.Command("go", "list", "-e", "-json=ImportPath,Imports,CgoFiles,Error", "./...")
+	cmd := exec.Command("go", "list", "-e", "-tags="+tags, "-json=ImportPath,Imports,CgoFiles,Error", "./...")
 	// CGO_ENABLED=1 keeps cgo files in the listing, so a C import shows.
 	cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch, "CGO_ENABLED=1", "GOFLAGS=")
 	var stderr bytes.Buffer
@@ -175,7 +192,7 @@ func listPackages(t *testing.T, goos, goarch string) []listedPackage {
 	return pkgs
 }
 
-func checkLayer(t *testing.T, p listedPackage) {
+func checkLayer(t *testing.T, p listedPackage, tags string) {
 	t.Helper()
 	pkg, ok := inModule(p.ImportPath)
 	if !ok {
@@ -185,6 +202,9 @@ func checkLayer(t *testing.T, p listedPackage) {
 		t.Errorf("%s: cgo files %v; reach system APIs through purego or syscall", p.ImportPath, p.CgoFiles)
 	}
 	allowed, ruled := layerImports(pkg)
+	if tags == "nsgodev" {
+		allowed = append(slices.Clip(allowed), devImports[pkg]...)
+	}
 	isPortable := matchesAny(pkg, portable) && !matchesAny(pkg, unportable)
 	for _, imp := range p.Imports {
 		if dep, ok := inModule(imp); ok {
