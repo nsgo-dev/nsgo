@@ -558,6 +558,9 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			case m.resize != nil:
 				t.Resize(*m.resize, m.geometry)
 				resized = append(resized, m.resized...)
+				if m.env != nil {
+					t.SetEnvironment(*m.env)
+				}
 			case m.env != nil:
 				t.SetEnvironment(*m.env)
 			case m.at != nil:
@@ -582,7 +585,7 @@ func (e *Engine) push(m message) {
 	}
 }
 
-// enqueue queues m for the engine's next pass. A mergeable event replaces one of the same kind for the same view still queued, a resize the last resize of the same surface with the geometry it carries, and a frame request the one still queued, so bursts cost one update each. A wheel's turns add up into the one queued.
+// enqueue queues m for the engine's next pass. A mergeable event replaces one of the same kind for the same view still queued, a resize the last resize of the same surface with the geometry it carries and its environment, and a frame request the one still queued, so bursts cost one update each. A wheel's turns add up into the one queued.
 func (e *Engine) enqueue(m message) {
 	e.mu.Lock()
 	merged := false
@@ -593,7 +596,22 @@ func (e *Engine) enqueue(m message) {
 		case m.resize != nil && q.resize != nil && same:
 			// The commit at the newest size answers the waits for both.
 			m.resized = append(q.resized, m.resized...)
+			if m.env == nil {
+				m.env = q.env
+			}
 			*q = m
+			merged = true
+		case m.resize != nil && q.env != nil && same:
+			// Android reports the new environment before the size measured with
+			// it. Keep both in the resize message so one commit observes them
+			// together, even when the engine has not taken the queue yet.
+			m.env = q.env
+			*q = m
+			merged = true
+		case m.env != nil && q.resize != nil && same:
+			// Apply the same rule when a backend reports the two in the other
+			// order: a size and its environment describe one change.
+			q.env = m.env
 			merged = true
 		case same && m.event.Kind == driver.EventWheel && q.event.Kind == driver.EventWheel && q.event.ID == m.event.ID &&
 			m.event.Phase == driver.GestureChanged && q.event.Phase == driver.GestureChanged &&

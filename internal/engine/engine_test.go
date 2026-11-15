@@ -531,7 +531,9 @@ func TestTraceHearsTheAppsTimeBeforeACommit(t *testing.T) {
 }
 
 func TestResizeMergesWithItsGeometry(t *testing.T) {
-	// A fold opening while a resize waits: the newer resize takes the older one's slot, ahead of an environment pushed between them, with the geometry measured at its own size, so the tree never applies the older geometry at the newer size.
+	// A fold opening while a resize waits: the newer resize takes the older
+	// one's slot, carrying an environment pushed between them, with the
+	// geometry measured at its own size.
 	e := &Engine{runner: &runner{wake: make(chan struct{}, 1)}}
 	folded := driver.Size{Width: 400, Height: 600}
 	open := driver.Size{Width: 800, Height: 600}
@@ -541,8 +543,8 @@ func TestResizeMergesWithItsGeometry(t *testing.T) {
 	e.SetEnvironment(driver.Environment{Dark: true})
 	done := e.ResizeAndWait(open, hinge)
 	q := e.take()
-	if len(q) != 2 || q[0].resize == nil || q[1].env == nil {
-		t.Fatalf("queue %+v, want the merged resize, then the environment", q)
+	if len(q) != 1 || q[0].resize == nil || q[0].env == nil {
+		t.Fatalf("queue %+v, want the merged resize and environment", q)
 	}
 	if *q[0].resize != open || !q[0].geometry.Equal(hinge) || len(q[0].resized) != 1 {
 		t.Fatalf("merged resize at %v with %+v, want %v with the hinge", *q[0].resize, q[0].geometry, open)
@@ -562,14 +564,61 @@ func TestResizeMergesWithItsGeometry(t *testing.T) {
 		cx.Effect(func() { runs = append(runs, seen{cx.Env().Window(), len(cx.Env().Geometry().Regions)}) })
 		return core.View{}
 	})
-	tree.Resize(*q[0].resize, q[0].geometry)
-	tree.SetEnvironment(*q[1].env)
+	root.Batch(func() {
+		tree.Resize(*q[0].resize, q[0].geometry)
+		tree.SetEnvironment(*q[0].env)
+	})
 	if !slices.Equal(runs, []seen{{folded, 1}, {open, 2}}) {
 		t.Errorf("runs %+v, want the folded size with one region, then the open one with two", runs)
 	}
 	select {
 	case <-done:
 		t.Error("the wait ended before a commit")
+	default:
+	}
+}
+
+func TestEnvironmentMergesWithFollowingResize(t *testing.T) {
+	// Android reports the new safe area before the new view size. The two
+	// messages describe one change and must reach the tree in one commit.
+	env := driver.Environment{SafeArea: driver.Edges{Top: 48, Bottom: 48}}
+	// Put the messages in the order Android uses, rather than relying on the
+	// resize helper to do it for us.
+	e := &Engine{runner: &runner{wake: make(chan struct{}, 1)}}
+	e.SetEnvironment(env)
+	done := e.ResizeAndWait(driver.Size{Width: 846, Height: 411}, driver.Geometry{})
+	q := e.take()
+	if len(q) != 1 || q[0].resize == nil || q[0].env == nil {
+		t.Fatalf("queue %+v, want one resize carrying its environment", q)
+	}
+	if *q[0].resize != (driver.Size{Width: 846, Height: 411}) || !q[0].env.Equal(env) {
+		t.Fatalf("merged message has size %v and environment %+v, want %v and %+v", *q[0].resize, *q[0].env, driver.Size{Width: 846, Height: 411}, env)
+	}
+
+	root := core.NewRoot(core.RootOptions{Post: func(func()) {}, Clock: core.NewManualClock(time.Unix(0, 0))})
+	defer root.Dispose()
+	tree := core.NewTree(root, core.ApproxTextEngine{})
+	tree.Resize(driver.Size{Width: 411, Height: 846}, driver.Geometry{})
+	tree.SetEnvironment(driver.Environment{})
+	type seen struct {
+		size driver.Size
+		safe driver.Edges
+	}
+	var runs []seen
+	tree.Mount(func(cx *core.Scope) core.Node {
+		cx.Effect(func() { runs = append(runs, seen{cx.Env().Window(), cx.Env().SafeArea()}) })
+		return core.View{}
+	})
+	root.Batch(func() {
+		tree.Resize(*q[0].resize, q[0].geometry)
+		tree.SetEnvironment(*q[0].env)
+	})
+	if len(runs) != 2 || runs[1] != (seen{driver.Size{Width: 846, Height: 411}, driver.Edges{Top: 48, Bottom: 48}}) {
+		t.Fatalf("runs %+v, want one new run with the landscape size and safe area", runs)
+	}
+	select {
+	case <-done:
+		t.Error("the wait ended before the resize was mounted")
 	default:
 	}
 }
