@@ -1912,3 +1912,25 @@ func TestTextViewFormulas(t *testing.T) {
 	app.Scroll("id:page", 600)
 	app.Screenshot("textview-formulas")
 }
+
+// The TextView demo's document draws its mermaid block as a diagram of a commit's path, which copies as its fenced source.
+func TestTextViewDiagram(t *testing.T) {
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.Scroll{TestID: "page", Children: []core.Node{markdownCard(cx)}}
+	}, nsgotest.Size(700, 800), nsgotest.Environment(desktopEnv))
+	d := app.Find("label:Diagram")
+	if d.Kind != driver.KindCanvas || d.Frame.Size.Width <= d.Frame.Size.Height {
+		t.Fatalf("the diagram shows as %v, %v: a left-to-right flowchart", d.Kind, d.Frame.Size)
+	}
+	var words []string
+	for _, op := range d.Ops {
+		if op.Kind == driver.DrawFillText {
+			words = append(words, op.Text)
+		}
+	}
+	if got := strings.Join(words, " "); !strings.Contains(got, "Native views") || !strings.Contains(got, "main thread") {
+		t.Errorf("the diagram writes %q", got)
+	}
+	app.Scroll("id:page", 700)
+	app.Screenshot("textview-diagram")
+}

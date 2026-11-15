@@ -47,6 +47,14 @@ $$
 t_{\text{frame}} = \tfrac{1000}{60}\,\text{ms}
 $$
 
+A write reaches the screen in one commit:
+
+` + "```mermaid" + `
+flowchart LR
+  W[Signal write] --> C{Commit}
+  C -->|main thread| V[Native views]
+` + "```" + `
+
 <details>
 <summary>Why Go</summary>
 
