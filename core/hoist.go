@@ -150,7 +150,7 @@ func (t *Tree) hostOf(parent *node) *node {
 func (t *Tree) hoist(n *node, h *hoistNode) {
 	h.host = t.hostOf(n.parent)
 	n.hoist = h
-	h.host.hosted = append(h.host.hosted, n)
+	addHosted(h.host, n)
 	t.reorder(h.host)
 	if p := n.parent; p != nil {
 		t.childrenChanged(p)
@@ -158,6 +158,20 @@ func (t *Tree) hoist(n *node, h *hoistNode) {
 	// The root's layout places it, whatever boundary holds it.
 	t.markLayout(n)
 }
+
+// addHosted puts hoisted node n among what host hosts: last, or below the Topmost overlays there when it is none, so they stay on top in the order they came in.
+func addHosted(host, n *node) {
+	i := len(host.hosted)
+	if !n.hoist.topmost() {
+		for i > 0 && host.hosted[i-1].hoist.topmost() {
+			i--
+		}
+	}
+	host.hosted = slices.Insert(host.hosted, i, n)
+}
+
+// topmost reports whether h is a Topmost overlay's.
+func (h *hoistNode) topmost() bool { return h.overlay != nil && h.overlay.Topmost }
 
 func (t *Tree) mountOverlay(cx *Scope, parent *node, o Overlay) {
 	n := t.newNode(driver.KindView, parent, cx)
@@ -649,9 +663,12 @@ func place(anchor Bounds, size Size, area Bounds, side Placement, align Align, o
 	return p, side, room
 }
 
-// back routes Escape or back: the topmost overlay listening for cancel,
-// else the topmost modal, else the innermost stack that can pop.
+// back routes Escape or back: the root view's Topmost overlay listening for cancel, else the topmost overlay listening for cancel, else the topmost modal, else the innermost stack that can pop.
 func (t *Tree) back() {
+	if o := topmostCancel(t.view); o != nil {
+		t.within(o.owner, o.h.cancel)
+		return
+	}
 	host := t.view
 	for {
 		top := topModal(host)
@@ -695,6 +712,9 @@ func (t *Tree) back() {
 // nothing takes it first: no overlay listening for cancel, no modal's
 // OnRequestClose, no Scope.OnBackPress handler and no NoPopOnBack.
 func (t *Tree) backPreview() driver.NodeID {
+	if topmostCancel(t.view) != nil {
+		return 0
+	}
 	host := t.view
 	for top := topModal(host); top != nil; top = topModal(host) {
 		host = top
@@ -747,6 +767,16 @@ func topModal(host *node) *node {
 	return nil
 }
 
+// topmostCancel returns the last of host's Topmost overlays that listens for cancel, which hears back before host's modals do.
+func topmostCancel(host *node) *node {
+	for i := len(host.hosted) - 1; i >= 0 && host.hosted[i].hoist.topmost(); i-- {
+		if n := host.hosted[i]; !n.deleted && n.h.cancel != nil && !hiddenIn(n) {
+			return n
+		}
+	}
+	return nil
+}
+
 func topOverlay(host *node) *node {
 	for i := len(host.hosted) - 1; i >= 0; i-- {
 		if n := host.hosted[i]; !n.deleted && n.kind != driver.KindModal && n.h.cancel != nil && !hiddenIn(n) {
@@ -756,8 +786,7 @@ func topOverlay(host *node) *node {
 	return nil
 }
 
-// pressOutside reports a press outside overlay n unless it landed on its
-// anchor or an overlay above it.
+// pressOutside reports a press outside overlay n unless it landed on its anchor or on what takes presses in an overlay above it.
 func (t *Tree) pressOutside(n *node, at Point) {
 	if n.h.pressOutside == nil || hiddenIn(n) {
 		return
@@ -766,16 +795,39 @@ func (t *Tree) pressOutside(n *node, at Point) {
 	if a, ok := t.anchorRect(&Overlay{Anchor: n.hoist.overlay.Anchor}, t.view); ok && a.Contains(at) {
 		return
 	}
-	host := n.hoist.host
-	above := false
-	for _, o := range host.hosted {
-		if o == n {
-			above = true
-			continue
+	// Above n are the overlays and modals after it in its host, and those after each modal around it in that modal's host, as the root view's Topmost overlays are above every modal, up to a sheet the platform presents, which shows above all its host holds.
+	for below, host := n, n.hoist.host; ; below, host = host, host.hoist.host {
+		above := false
+		for _, o := range host.hosted {
+			if o == below {
+				above = true
+				continue
+			}
+			if above && !o.deleted && !o.hidden && t.takes(o, at) {
+				return
+			}
 		}
-		if above && !o.deleted && !o.hidden && t.surfaceBounds(o).Contains(at) {
-			return
+		if host == t.view || host.hoist == nil || host.hoist.reported.GetUntracked() != nil {
+			break
 		}
 	}
 	t.within(n.owner, func() { n.h.pressOutside(at) })
+}
+
+// takes reports whether overlay o takes a press at the surface point at: its box does, unless its PointerEvents let presses through it, as a tooltip's or a developer's layer's do (UpdateHighlights), and then only a view inside it that takes them.
+func (t *Tree) takes(o *node, at Point) bool {
+	b := t.surfaceBounds(o)
+	switch o.props.PointerEvents {
+	case PointerEventsNone:
+		return false
+	case PointerEventsBoxNone:
+		local := Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}
+		for _, k := range o.nativeChildren() {
+			if id, _ := hitWith(k, local, func(*node) bool { return true }); id != 0 {
+				return true
+			}
+		}
+		return false
+	}
+	return b.Contains(at)
 }

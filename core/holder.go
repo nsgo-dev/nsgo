@@ -132,7 +132,7 @@ func (t *Tree) rehost(n *node) {
 				t.reorder(old)
 				t.markLayout(old)
 				hn.host = host
-				host.hosted = append(host.hosted, c)
+				addHosted(host, c)
 				t.reorder(host)
 				t.markLayout(host)
 			}

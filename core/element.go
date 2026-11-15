@@ -843,6 +843,8 @@ type Overlay struct {
 	// the side where it fits whole, else the one with more room. What it
 	// holds scrolls past that, as a menu's items do.
 	HoldToRoom bool
+	// Topmost keeps the overlay above the other overlays and modals its host holds, those shown after it too: a developer's layer over the app, as DevTools' overlay (UpdateHighlights). Topmost overlays stay in the order they came in, and the root view's that listen for cancel hear Escape and back before its modals do.
+	Topmost bool
 	// OnTransitionEnd is View's.
 	OnTransitionEnd func()
 	// Ref names the overlay's view: its bounds.
