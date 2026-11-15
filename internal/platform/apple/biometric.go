@@ -10,6 +10,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
 const localAuthenticationPath = "/System/Library/Frameworks/LocalAuthentication.framework/LocalAuthentication"
@@ -57,7 +58,7 @@ func HandleBiometric(it *driver.MountItem, dispatch func(driver.Event)) {
 		dispatch(driver.Event{Kind: driver.EventBiometric, Count: id, Index: driver.BiometricUnavailable})
 		return
 	}
-	if !DeclaresUsage("NSFaceIDUsageDescription") && objc.Send[int](ctx, sel("biometryType")) == 2 {
+	if !privacy.DeclaresUsage("NSFaceIDUsageDescription") && objc.Send[int](ctx, sel("biometryType")) == 2 {
 		log.Printf("nsgo: biometric authentication needs NSFaceIDUsageDescription in the app's Info.plist (nsgo.yaml's apple.info)")
 		ctx.Send(selRelease)
 		dispatch(driver.Event{Kind: driver.EventBiometric, Count: id, Index: driver.BiometricFailure})

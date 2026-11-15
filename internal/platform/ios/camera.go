@@ -42,7 +42,7 @@ func (s *surface) takePhoto(r driver.PickRequest, id uint32) {
 		fail("this device has no camera")
 		return
 	}
-	if !apple.DeclaresUsage("NSCameraUsageDescription") {
+	if !privacy.DeclaresUsage("NSCameraUsageDescription") {
 		log.Print("nsgo: taking a photo needs NSCameraUsageDescription in the app's Info.plist (nsgo.yaml's apple.info)")
 		fail("the app declares no NSCameraUsageDescription")
 		return

@@ -6,8 +6,6 @@ import (
 	"errors"
 
 	"github.com/ebitengine/purego/objc"
-
-	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
 // holdSpeechSession makes the shared AVAudioSession one that records for
@@ -35,6 +33,3 @@ func holdSpeechSession() (leave func(), err error) {
 	}
 	return restore, nil
 }
-
-// DeclaresUsage reports whether the app's Info.plist declares key, as iOS ends an app that asks for what it declares no reason for (privacy.DeclaresUsage).
-func DeclaresUsage(key string) bool { return privacy.DeclaresUsage(key) }
