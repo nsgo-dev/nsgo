@@ -2,10 +2,13 @@ package chat
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/icons/lucide"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 	"github.com/nsgo-dev/nsgo/ui"
 )
@@ -138,6 +141,193 @@ func TestComposer(t *testing.T) {
 			t.Fatalf("sends = %d", s.sends)
 		}
 	})
+}
+
+// suggestStage is a composer whose Suggest offers the files a query starts, README.md and release.md unless given others, and whose OnSend clears the draft, beside another field.
+type suggestStage struct {
+	draft                     *core.Signal[string]
+	changes, sends, submitted int
+}
+
+func startSuggest(t *testing.T, e core.Environment, files ...Suggestion) (*nsgotest.App, *suggestStage) {
+	t.Helper()
+	s := &suggestStage{}
+	if files == nil {
+		files = []Suggestion{file("readme", "README.md"), file("release", "release.md")}
+	}
+	app := start(t, e, func(cx *core.Scope) core.Node {
+		s.draft = core.NewSignal(cx, "")
+		return core.View{Children: []core.Node{
+			Composer{Draft: s.draft.Get, OnDraftChange: func(v string) { s.changes++; s.draft.Set(v) }, Label: "Message", SendLabel: "Send", SuggestLabel: "Files",
+				OnSend: func() { s.sends++; s.draft.Set("") },
+				Suggest: func(query string) []Suggestion {
+					var out []Suggestion
+					for _, row := range files {
+						if strings.HasPrefix(strings.ToLower(row.Label), strings.ToLower(query)) {
+							out = append(out, row)
+						}
+					}
+					return out
+				}},
+			core.Input{TestID: "other", Label: "Other", OnSubmit: func(string) { s.submitted++ }},
+		}}
+	})
+	return app, s
+}
+
+// file is a row of a file inserted by its name.
+func file(id, name string) Suggestion {
+	return Suggestion{SuggestItem: base.SuggestItem{ID: id, Label: name, Insert: name}}
+}
+
+// TestComposerSuggestionsSkipDisabledRows highlights and accepts the enabled rows only, and shows a row's detail.
+func TestComposerSuggestionsSkipDisabledRows(t *testing.T) {
+	off := file("rejected", "rejected.md")
+	off.Disabled, off.Detail = true, "Locked"
+	notes := file("notes", "release-notes.md")
+	notes.Icon, notes.Detail = lucide.File, "docs/"
+	app, s := startSuggest(t, desktopEnv, off, file("readme", "README.md"), notes)
+	app.Type("id:composer", "@re")
+	app.Find("text:Locked")
+	app.Find("text:docs/")
+	if !app.Find("role:option rejected.md").Props.Disabled {
+		t.Fatal("the disabled row is enabled")
+	}
+	app.Key("down")
+	app.Key("down")
+	app.Key("enter")
+	if draft := s.draft.GetUntracked(); draft != "README.md" {
+		t.Fatalf("draft %q", draft)
+	}
+}
+
+// TestComposerSuggestionsScroll scrolls the list to the highlighted row as the keys move it past the rows in view.
+func TestComposerSuggestionsScroll(t *testing.T) {
+	var files []Suggestion
+	for i := range 20 {
+		files = append(files, file("f"+strconv.Itoa(i), "file"+strconv.Itoa(i)+".go"))
+	}
+	app, s := startSuggest(t, desktopEnv, files...)
+	app.Type("id:composer", "@file")
+	list := app.Find("role:listbox Files")
+	if list.Content.Height <= list.Frame.Size.Height {
+		t.Fatalf("content %v in a list %v tall: nothing to scroll", list.Content.Height, list.Frame.Size.Height)
+	}
+	app.Key("up")
+	if y := app.Find("role:listbox Files").Offset.Y; y <= 0 {
+		t.Fatalf("offset %v with the last row highlighted", y)
+	}
+	app.Key("enter")
+	if draft := s.draft.GetUntracked(); draft != "file19.go" {
+		t.Fatalf("draft %q", draft)
+	}
+}
+
+// TestComposerSuggestions filters rows at the caret and accepts the selected row in the middle of the draft, the caret after it, without sending the message.
+func TestComposerSuggestions(t *testing.T) {
+	app, s := startSuggest(t, desktopEnv)
+	app.Type("id:composer", "@re and more")
+	app.Select("id:composer", 3, 3)
+	app.Find("role:listbox Files")
+	app.Find("text:README.md")
+	app.Find("text:release.md")
+	if !app.Find("role:combobox Message").Props.Expanded {
+		t.Fatal("the editor is not expanded while the rows show")
+	}
+	changes := s.changes
+	app.Key("down")
+	app.Key("enter")
+	if draft := s.draft.GetUntracked(); draft != "release.md and more" || s.changes != changes+1 || s.sends != 0 || app.Exists("id:composer-suggestions") {
+		t.Fatalf("draft %q, %d changes, %d sends, list shown %v", draft, s.changes-changes, s.sends, app.Exists("id:composer-suggestions"))
+	}
+	if app.Find("role:combobox Message").Props.Expanded {
+		t.Fatal("the editor stayed expanded")
+	}
+	if r := app.Find("id:composer").Selection; r.Start != 10 || r.End != 10 {
+		t.Fatalf("selection %v", r)
+	}
+}
+
+// TestComposerSuggestionsTapOnAPhone chooses a row by tapping it, as a phone's software keyboard sends no arrow keys: the list's taps leave the keyboard up and its rows take no focus, so the field keeps the focus.
+func TestComposerSuggestionsTapOnAPhone(t *testing.T) {
+	app, s := startSuggest(t, phoneEnv)
+	app.Type("id:composer", "@re")
+	if taps := app.Find("role:listbox Files").Scroll.Behavior.KeyboardShouldPersistTaps; taps != core.KeyboardTapsHandled {
+		t.Fatalf("KeyboardShouldPersistTaps = %v", taps)
+	}
+	if !app.Find("role:option README.md").Props.NoFocus {
+		t.Fatal("a row takes the focus")
+	}
+	app.Press("role:option README.md")
+	if draft := s.draft.GetUntracked(); draft != "README.md" || app.Exists("id:composer-suggestions") || !app.Find("id:composer").Focused {
+		t.Fatalf("draft %q, list shown %v, field focused %v", draft, app.Exists("id:composer-suggestions"), app.Find("id:composer").Focused)
+	}
+}
+
+// TestComposerSuggestionsPressDown accepts a row on a desktop as the button goes down, before the press could move the focus.
+func TestComposerSuggestionsPressDown(t *testing.T) {
+	app, s := startSuggest(t, desktopEnv)
+	app.Type("id:composer", "@re")
+	app.PressDown("role:option release.md")
+	if draft := s.draft.GetUntracked(); draft != "release.md" || app.Exists("id:composer-suggestions") {
+		t.Fatalf("draft %q, list shown %v", draft, app.Exists("id:composer-suggestions"))
+	}
+}
+
+// TestComposerSuggestionsEscape closes the list and keeps the draft, which Return then sends.
+func TestComposerSuggestionsEscape(t *testing.T) {
+	app, s := startSuggest(t, desktopEnv)
+	app.Type("id:composer", "@re")
+	app.Key("escape")
+	if app.Exists("id:composer-suggestions") || s.draft.GetUntracked() != "@re" {
+		t.Fatalf("list shown %v, draft %q", app.Exists("id:composer-suggestions"), s.draft.GetUntracked())
+	}
+	app.Key("enter")
+	if s.sends != 1 {
+		t.Fatalf("sends = %d", s.sends)
+	}
+}
+
+// TestComposerSuggestionsCloseWithTheFocus closes the list as another field takes the focus, whose Return is its own.
+func TestComposerSuggestionsCloseWithTheFocus(t *testing.T) {
+	app, s := startSuggest(t, desktopEnv)
+	app.Type("id:composer", "@re")
+	app.Type("id:other", "q")
+	if app.Exists("id:composer-suggestions") {
+		t.Fatal("the list stayed open")
+	}
+	app.Key("enter")
+	if s.submitted != 1 || s.draft.GetUntracked() != "@re" {
+		t.Fatalf("%d submits, draft %q", s.submitted, s.draft.GetUntracked())
+	}
+}
+
+// TestComposerSuggestionsWithNoRows shows nothing for a query no row matches, and Return sends.
+func TestComposerSuggestionsWithNoRows(t *testing.T) {
+	app, s := startSuggest(t, desktopEnv)
+	app.Type("id:composer", "ping @bob")
+	if app.Exists("id:composer-suggestions") {
+		t.Fatal("an empty list shows")
+	}
+	app.Key("enter")
+	if s.sends != 1 {
+		t.Fatalf("sends = %d", s.sends)
+	}
+}
+
+// TestComposerSuggestionsFollowTheDraft closes the list as sending clears the draft, so Return does not bring the sent text back.
+func TestComposerSuggestionsFollowTheDraft(t *testing.T) {
+	app, s := startSuggest(t, desktopEnv)
+	app.Type("id:composer", "hi @re")
+	app.Find("id:composer-suggestions")
+	app.Press("role:button Send")
+	if s.sends != 1 || s.draft.GetUntracked() != "" || app.Exists("id:composer-suggestions") {
+		t.Fatalf("%d sends, draft %q, list shown %v", s.sends, s.draft.GetUntracked(), app.Exists("id:composer-suggestions"))
+	}
+	app.Key("enter")
+	if draft := s.draft.GetUntracked(); draft != "" {
+		t.Fatalf("draft %q", draft)
+	}
 }
 
 // TestComposerFooterHidesWithKeyboard leaves the footer out while the

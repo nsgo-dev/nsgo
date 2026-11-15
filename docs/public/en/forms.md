@@ -23,7 +23,7 @@ ui.Input{
 
 `Masked` hides the characters, `Readonly` and `Disabled` stop edits, and `Multiline` wraps the text and grows with it unless its style sizes it. `KeyboardType` picks the software keyboard (`core.KeyboardEmail`, `core.KeyboardNumber`, `core.KeyboardURL` and the rest), `AutoComplete` tells the system what the field holds for autofill, and `MaxLength` caps the UTF-16 units the user enters. `AutoCapitalize` and `NoAutoCorrect` tune the keyboard's behavior.
 
-`OnSelectionChange` and `OnCaretMove` report the selection and where the caret is, for a menu that opens at it. `OnKeyPress` hears each key, `OnPaste` what the user pastes, and `OnCompositionChange` follows an input method.
+`OnSelectionChange` and `OnCaretMove` report the selection and where the caret is, for a menu that opens at it. `Suggest`, a `core.Suggest`, follows a query after a trigger such as `@`, and a `ui.SuggestList` beside the field offers rows for it at the caret, which Up, Down, Return and a press choose from, as `chat.Composer`'s `Suggest` does for mentions. `OnKeyPress` hears each key, `OnPaste` what the user pastes, and `OnCompositionChange` follows an input method.
 
 ## Focus and the keyboard
 

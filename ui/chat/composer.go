@@ -23,6 +23,10 @@ type Composer struct {
 	PlaceholderFunc func() string
 	Running         func() bool
 	OnSend, OnStop  func()
+	// Suggest offers rows for the query typed after "@" at the caret. Choosing a row replaces the "@" and the query with its Insert, or its Label when Insert is empty.
+	Suggest func(query string) []Suggestion
+	// SuggestLabel names Suggest's list for screen readers, such as "Mentions", apart from the editor's Label.
+	SuggestLabel string
 	// Accessory holds controls in the card's bottom row, such as chips, and
 	// shrinks; Trailing compact ones just before Send or Stop, which do not.
 	Accessory, Trailing View
@@ -47,6 +51,12 @@ type Composer struct {
 	TestID string
 }
 
+// Suggestion is a Composer's row: a SuggestItem and the icon drawn before it.
+type Suggestion struct {
+	base.SuggestItem
+	Icon func() *core.SVG
+}
+
 // Render implements core.Node.
 func (m Composer) Render(cx *core.Scope) core.Node {
 	colors := tonesOf(cx)
@@ -66,11 +76,18 @@ func (m Composer) Render(cx *core.Scope) core.Node {
 	}
 	focused, dragging := core.NewSignal(cx, false), core.NewSignal(cx, false)
 	height := core.NewSignal(cx, core.Points(chatEditorLine))
+	// listed follows the rows showing, for the editor's Expanded, and shown is what Suggest last returned.
+	var suggest *core.Suggest
+	var listed *core.Signal[bool]
+	var shown []Suggestion
+	if m.Suggest != nil {
+		suggest, listed = core.NewSuggest(cx, core.SuggestOptions{}), core.NewSignal(cx, false)
+	}
 	submit := core.SubmitBehaviorNewline
 	if cx.Env().Desktop() {
 		submit = core.SubmitBehaviorSubmit
 	}
-	editor := base.Input{Value: draft, OnChange: m.OnDraftChange, Multiline: true, SubmitBehavior: submit, Label: m.Label, Placeholder: m.Placeholder, PlaceholderFunc: m.PlaceholderFunc, TestID: "composer",
+	editor := base.Input{Value: draft, OnChange: m.OnDraftChange, Multiline: true, SubmitBehavior: submit, Label: m.Label, Placeholder: m.Placeholder, PlaceholderFunc: m.PlaceholderFunc, TestID: "composer", Suggest: suggest,
 		OnSubmit:            func(string) { send() },
 		OnPaste:             m.OnPaste,
 		OnFocus:             func() { focused.Set(true) },
@@ -80,6 +97,10 @@ func (m Composer) Render(cx *core.Scope) core.Node {
 		StyleFunc: func() core.Style {
 			return core.Style{Height: core.Pt(height.Get() + 2), Color: colors.Text(), PlaceholderColor: colors.Faint(), SelectionColor: cx.Palette().Selection, CaretColor: colors.Accent()}
 		}}
+	if suggest != nil {
+		// A combobox while it suggests, as base.Combobox's field is.
+		editor.Role, editor.Expanded = core.RoleCombobox, listed.Get
+	}
 	var row []core.Node
 	var accessory []core.Node
 	if m.Accessory != nil {
@@ -121,7 +142,27 @@ func (m Composer) Render(cx *core.Scope) core.Node {
 			return core.View{Style: core.Style{Direction: core.Row, Wrap: core.Wrap, Gap: 6, Padding: core.Edges{Right: 10, Bottom: 6, Left: 10}}, Children: []core.Node{core.Func(m.Attachments)}}
 		}})
 	}
-	body = append(body, editor, core.View{Style: core.Style{Direction: core.Row, MinWidth: core.Pt(0), Margin: core.Edges{Top: 8}, Padding: core.Symmetric(0, 10), AlignItems: core.AlignCenter, Gap: 8}, Children: row})
+	body = append(body, editor)
+	if suggest != nil {
+		// With no rows nothing shows, and Return sends. A phone's keyboard sends no arrow keys, so there a row is chosen by tapping it, which leaves the keyboard up and the field focused.
+		body = append(body, ui.SuggestList{Suggest: suggest, Placement: core.PlaceTop, Label: m.SuggestLabel, TestID: "composer-suggestions",
+			Items: func(query string) []base.SuggestItem {
+				shown = m.Suggest(query)
+				out := make([]base.SuggestItem, len(shown))
+				for i, row := range shown {
+					out[i] = row.SuggestItem
+				}
+				return out
+			},
+			Leading: func(_ base.SuggestItem, i int) core.Node {
+				if i < len(shown) && shown[i].Icon != nil {
+					return ui.IconOf(shown[i].Icon, 15, colors.Muted)
+				}
+				return nil
+			},
+			OnOpen: func() { listed.Set(true) }, OnClose: func() { listed.Set(false) }})
+	}
+	body = append(body, core.View{Style: core.Style{Direction: core.Row, MinWidth: core.Pt(0), Margin: core.Edges{Top: 8}, Padding: core.Symmetric(0, 10), AlignItems: core.AlignCenter, Gap: 8}, Children: row})
 	card := core.View{Style: core.Style{MinWidth: core.Pt(0), Padding: core.Symmetric(10, 0), CornerRadius: 13, BorderWidth: 1, FlexShrink: 0},
 		StyleFunc: func() core.Style {
 			surface := colors.Surface()
