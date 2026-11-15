@@ -240,7 +240,7 @@ type surface struct {
 	appearance, host driver.Appearance
 	engine           *engine.Engine
 	awake            awakeState
-	audio            *apple.Audio // the engine's sounds and players, made with its first
+	audio            *apple.Audio // the engine's sounds and players, made with its first ItemAudio and closed with the surface
 	batches          queue.Batches
 	views            []*view            // index is NodeID
 	movers           map[*view]struct{} // views following mouse moves

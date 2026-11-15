@@ -179,7 +179,7 @@ type surface struct {
 	id          string
 	native      objc.ID
 	engine      *engine.Engine
-	audio       *apple.Audio // the engine's sounds and players, made with its first
+	audio       *apple.Audio // the engine's sounds and players, made with its first ItemAudio and closed with the surface
 	batches     queue.Batches
 	views       []*view // index is NodeID
 	fingers     fingers // the touches reported
