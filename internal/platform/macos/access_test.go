@@ -12,7 +12,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// TestEditableCombobox checks, through accessibilityAttributeValue: as VoiceOver reads them, that an input with RoleCombobox is an editable combobox on its editor, the field's cell or the text view, with its text, label and the popup's state, its view no element; that a plain input's editor, masked too, takes its label; and that a view with RoleCombobox stays a pop-up button (#246).
+// TestEditableCombobox checks, through accessibilityAttributeValue: as VoiceOver reads them, that an input with RoleCombobox is an editable combobox on its editor, the field's cell or the text view, with its text, label, value text and the popup's state, its view no element; that a plain input's editor, masked too, takes its label; and that a view with RoleCombobox stays a pop-up button (#246).
 func TestEditableCombobox(t *testing.T) { onMain(func() { editableCombobox(t) }) }
 
 func editableCombobox(t *testing.T) {
@@ -86,9 +86,26 @@ func editableCombobox(t *testing.T) {
 		if got := names(editor); !slices.Contains(got, "AXExpanded") || !slices.Contains(got, "AXValue") {
 			t.Errorf("%s: a combobox's attributes %v", c.name, got)
 		}
-		v.setProps(&driver.ViewProps{Role: driver.RoleCombobox, Label: "Fruit", Expandable: true})
+		if got := attr(editor, "AXValueDescription"); got != "" {
+			t.Errorf("%s: a combobox without a value text describes its value as %q", c.name, got)
+		}
+		v.setProps(&driver.ViewProps{Role: driver.RoleCombobox, Label: "Fruit", Expandable: true, Value: driver.AccessibilityValue{Text: "Banana"}})
 		if got := attr(editor, "AXExpanded"); got != "0" {
 			t.Errorf("%s: a closed combobox's AXExpanded %q", c.name, got)
+		}
+		if got := attr(editor, "AXValueDescription"); got != "" {
+			t.Errorf("%s: a value text that is the editor's text is described again as %q", c.name, got)
+		}
+		// A multiple combobox's chosen items, while its editor holds the query.
+		v.setProps(&driver.ViewProps{Role: driver.RoleCombobox, Label: "Fruits", Expandable: true, Value: driver.AccessibilityValue{Text: "Apple, Cherry"}})
+		if got := attr(editor, "AXValueDescription"); got != "Apple, Cherry" {
+			t.Errorf("%s: a multiple combobox's value description %q, want its chosen items", c.name, got)
+		}
+		if got := attr(editor, "AXValue"); got != "Banana" {
+			t.Errorf("%s: a multiple combobox's value %q, want the editor's text", c.name, got)
+		}
+		if got := names(editor); !slices.Contains(got, "AXValueDescription") {
+			t.Errorf("%s: a described combobox's attributes %v", c.name, got)
 		}
 		v.native.Send(selRelease)
 		delete(views, v.input.field)

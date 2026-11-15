@@ -274,7 +274,7 @@ var axRoleDescription = sync.OnceValue(func() func(role, subrole objc.ID) objc.I
 	return describe
 })
 
-// editorAccessMethods are what an input's editor, a field's cell (cell) or a text view, answers VoiceOver with. AppKit's text classes answer through accessibilityAttributeValue:, which reads none of the attributes set on them, and a field's element is its cell rather than the field, so the editor answers here for its input's view, which is no element: the input's label, help and test ID, and for RoleCombobox the role of an editable combobox and the popup's state. Its text, value and selection stay its class's.
+// editorAccessMethods are what an input's editor, a field's cell (cell) or a text view, answers VoiceOver with. AppKit's text classes answer through accessibilityAttributeValue:, which reads none of the attributes set on them, and a field's element is its cell rather than the field, so the editor answers here for its input's view, which is no element: the input's label, help, test ID and value text, and for RoleCombobox the role of an editable combobox and the popup's state. Its text, value and selection stay its class's.
 func editorAccessMethods(cell bool) []objc.MethodDef {
 	owner := func(self objc.ID) *view {
 		if cell {
@@ -300,7 +300,7 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 			if v == nil || names == 0 {
 				return names
 			}
-			for _, name := range []string{"AXDescription", "AXIdentifier", "AXExpanded"} {
+			for _, name := range []string{"AXDescription", "AXIdentifier", "AXExpanded", "AXValueDescription"} {
 				if _, ok := v.editorAttribute(name); !ok {
 					continue
 				}
@@ -341,6 +341,11 @@ func (v *view) editorAttribute(name string) (objc.ID, bool) {
 	case "AXExpanded":
 		if combobox && p.Expandable {
 			return objc.ID(apple.Class("NSNumber")).Send(sel("numberWithBool:"), p.Expanded), true
+		}
+	case "AXValueDescription":
+		// The input's value text where it is not the editor's, such as a multiple combobox's chosen items: its description, as a range's text is.
+		if t := p.Value.Text; t != "" && t != v.input.text() {
+			return apple.NSString(t), true
 		}
 	}
 	return 0, false
