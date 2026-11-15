@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/firede/limu/style"
+
 	"github.com/nsgo-dev/nsgo/base/textview"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/i18n"
@@ -213,5 +215,59 @@ func TestRenderDiagram(t *testing.T) {
 	}
 	if !app.Exists("text:" + strings.SplitN(flowchart, "\n", 2)[0]) {
 		t.Errorf("a mermaid block streaming in does not show its code:\n%s", app.Dump())
+	}
+}
+
+// fills are the colors a canvas's drawing fills its paths with, opaque or not.
+func fills(v *nsgotest.View) []core.Color {
+	var out []core.Color
+	var fill core.Color
+	for _, op := range v.Ops {
+		switch op.Kind {
+		case driver.DrawFillColor:
+			fill = op.Color
+		case driver.DrawFill:
+			out = append(out, fill)
+		}
+	}
+	return out
+}
+
+// A Theme that sets some colors keeps the appearance's theme for the rest, its chart series among them: a pie under a theme that only changes the border fills its slices as the default does.
+func TestAThemeKeepsTheDefaultsItLeavesUnset(t *testing.T) {
+	pie := "pie\n  \"Dogs\" : 386\n  \"Cats\" : 85\n  \"Rats\" : 15"
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Children: []core.Node{
+			View{TestID: "plain", Source: pie},
+			View{TestID: "border", Source: pie, Theme: &Theme{Border: core.RGB(0x12ab34)}},
+		}}
+	})
+	plain, border := fills(app.Find("id:plain")), fills(app.Find("id:border"))
+	if !slices.Equal(plain, border) {
+		t.Errorf("a theme that sets only the border fills %v, the default %v", border, plain)
+	}
+	for _, c := range border {
+		if c&0xff == 0 {
+			t.Errorf("a slice is filled transparent under a theme that sets only the border: %v", border)
+			break
+		}
+	}
+}
+
+// The dark theme is the light one's family, gray with a blue accent as NSGo's own look, not another palette.
+func TestTheDarkThemeIsTheLightOnesFamily(t *testing.T) {
+	gray := func(c style.Color) bool { return c.R == c.G && c.G == c.B }
+	light, dark := defaultTheme(false), defaultTheme(true)
+	for _, c := range []style.Color{dark.Bg, dark.Fg, dark.Muted, dark.Line, dark.Surface, dark.SurfaceAlt, dark.Border} {
+		if !gray(c) {
+			t.Errorf("the dark theme's neutral %v is tinted, where the light one's are gray", c)
+		}
+	}
+	if dark.Accent.B <= dark.Accent.R || light.Accent.B <= light.Accent.R {
+		t.Errorf("accents %v and %v: both blue", light.Accent, dark.Accent)
+	}
+	lum := func(c style.Color) int { return int(c.R) + int(c.G) + int(c.B) }
+	if lum(dark.Bg) >= lum(dark.Fg) || lum(light.Bg) <= lum(light.Fg) {
+		t.Error("the dark theme's text is not lighter than its background")
 	}
 }

@@ -15,14 +15,14 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// View draws a Mermaid diagram at the size its layout gives, in points, with its labels in the platform's font at FontSize, scaled by the user's text size setting as text is. It colors itself with Theme, or with limu's light or dark theme as the app shows. A diagram that does not parse, or cannot be laid out, shows its source as text in ErrorClass and ErrorStyle. Assistive technology reads it as an image, named by Label, else by the diagram's accTitle and accDescr, else as a diagram, in the language the app shows.
+// View draws a Mermaid diagram at the size its layout gives, in points, with its labels in the platform's font at FontSize, scaled by the user's text size setting as text is. It colors itself with the appearance's theme, gray with a blue accent in light and in dark, and with what Theme sets over it. A diagram that does not parse, or cannot be laid out, shows its source as text in ErrorClass and ErrorStyle. Assistive technology reads it as an image, named by Label, else by the diagram's accTitle and accDescr, else as a diagram, in the language the app shows.
 type View struct {
 	// Source is the diagram's Mermaid text, as a mermaid code block holds it; SourceFunc follows what it reads.
 	Source     string
 	SourceFunc func() string
 	// FontSize is the size of labels with no size of their own; 0 is 16.
 	FontSize core.Points
-	// Theme colors the diagram; nil is limu's default theme in light and Kohu's dark one in dark.
+	// Theme colors the diagram over the appearance's theme: Pele's light theme in light, and its gray counterpart in dark, with the same blue accent as NSGo's own look.
 	Theme *Theme
 	// Label is what assistive technology reads in place of the diagram's title and description.
 	Label     string
@@ -35,32 +35,53 @@ type View struct {
 	TestID     string
 }
 
-// Theme is a diagram's colors, as limu's themes name them, and its corners' radius and lines' width, in points.
+// Theme is a diagram's colors, as limu's themes name them, and its corners' radius and lines' width, in points. What it leaves zero keeps the appearance's theme, so a theme may change only the colors it names.
 type Theme struct {
-	Background  core.Color // behind the diagram, and behind labels on lines
-	Text        core.Color
-	Muted       core.Color // secondary text, as the titles of groups
-	Line        core.Color // edges and other lines
-	Surface     core.Color // the inside of shapes
-	SurfaceAlt  core.Color // the inside of groups, and of shapes set apart
-	Border      core.Color // the outlines of shapes
-	Accent      core.Color // what a diagram marks out
-	Critical    core.Color // what a diagram marks as critical
+	Background core.Color // behind the diagram, and behind labels on lines
+	Text       core.Color
+	Muted      core.Color // secondary text, as the titles of groups
+	Line       core.Color // edges and other lines
+	Surface    core.Color // the inside of shapes
+	SurfaceAlt core.Color // the inside of groups, and of shapes set apart
+	Border     core.Color // the outlines of shapes
+	Accent     core.Color // what a diagram marks out
+	Critical   core.Color // what a diagram marks as critical
+	// Series are the colors of a chart's series, as a pie's slices, in turn; a series left zero keeps the appearance's.
+	Series      [8]core.Color
 	Radius      float32
 	StrokeWidth float32
 }
 
-// look is the limu look t paints with, or limu's default or dark one.
+// look is the limu look a diagram paints with: the appearance's theme, with what t sets over it.
 func (t *Theme) look(dark bool) *style.Look {
+	th := defaultTheme(dark)
 	if t == nil {
-		if dark {
-			return &style.Look{Theme: style.KohuDark()}
-		}
-		return &style.Look{Theme: style.Default()}
+		return &style.Look{Theme: th}
 	}
-	return &style.Look{Theme: &style.Theme{Bg: limuColor(t.Background), Fg: limuColor(t.Text), Muted: limuColor(t.Muted),
-		Line: limuColor(t.Line), Surface: limuColor(t.Surface), SurfaceAlt: limuColor(t.SurfaceAlt), Border: limuColor(t.Border),
-		Accent: limuColor(t.Accent), Critical: limuColor(t.Critical), Radius: float64(t.Radius), StrokeWidth: float64(t.StrokeWidth)}}
+	set := func(dst *style.Color, c core.Color) {
+		if c != 0 {
+			*dst = limuColor(c)
+		}
+	}
+	set(&th.Bg, t.Background)
+	set(&th.Fg, t.Text)
+	set(&th.Muted, t.Muted)
+	set(&th.Line, t.Line)
+	set(&th.Surface, t.Surface)
+	set(&th.SurfaceAlt, t.SurfaceAlt)
+	set(&th.Border, t.Border)
+	set(&th.Accent, t.Accent)
+	set(&th.Critical, t.Critical)
+	for i, c := range t.Series {
+		set(&th.Series[i], c)
+	}
+	if t.Radius > 0 {
+		th.Radius = float64(t.Radius)
+	}
+	if t.StrokeWidth > 0 {
+		th.StrokeWidth = float64(t.StrokeWidth)
+	}
+	return &style.Look{Theme: th}
 }
 
 // defaultFontSize is limu's size of labels with no size of their own.
@@ -183,4 +204,28 @@ func label(msgs locales.Messages, sc *scene.Scene) string {
 		return sc.Desc
 	}
 	return msgs.Described(sc.Title, sc.Desc)
+}
+
+// defaultTheme is the appearance's theme, a new one each call for look to change: Pele's light theme, limu's Default, in light, and in dark its gray counterpart, the same family with the same hues lightened to read on a dark ground, as NSGo's own look is gray with a blue accent. limu's KohuDark is another family, tinted teal with a pink accent.
+func defaultTheme(dark bool) *style.Theme {
+	if !dark {
+		return style.Default()
+	}
+	return &style.Theme{
+		Bg:         style.Hex("#1f1f1f"),
+		Fg:         style.Hex("#ececec"),
+		Muted:      style.Hex("#a0a0a0"),
+		Line:       style.Hex("#d6d6d6"),
+		Surface:    style.Hex("#2c2c2c"),
+		SurfaceAlt: style.Hex("#383838"),
+		Border:     style.Hex("#8f8f8f"),
+		Accent:     style.Hex("#8aa4ea"),
+		Critical:   style.Hex("#f07c7b"),
+		Series: [8]style.Color{
+			style.Hex("#6f9fd8"), style.Hex("#ffa04a"), style.Hex("#7cc66e"), style.Hex("#f07c7b"),
+			style.Hex("#8fd3cd"), style.Hex("#f5d75c"), style.Hex("#cf9ac2"), style.Hex("#c09a83"),
+		},
+		Radius:      4,
+		StrokeWidth: 1,
+	}
 }
