@@ -94,7 +94,7 @@ func TestTextViewStreamsWithACaret(t *testing.T) {
 	}
 }
 
-// A block growing as a reply streams in follows its text in place: its inline images, formulas and the caret keep their views as chunks arrive, in a search too.
+// A block growing as a reply streams in follows its text in place: its inline images, formulas and the caret keep their views as chunks arrive, those that arrive among them included, in a search too.
 func TestTextViewStreamKeepsAttachments(t *testing.T) {
 	for _, c := range []struct {
 		name, start string
@@ -102,6 +102,7 @@ func TestTextViewStreamKeepsAttachments(t *testing.T) {
 		attachments bool
 	}{
 		{"paragraph", "First.\n\nSee ![a](https://x.y/a.png) and $x$", []string{" then", " **mo", "re", "** words", "."}, true},
+		{"paragraph gaining a formula", "First.\n\nSee ![a](https://x.y/a.png) and", []string{" $x$", " then", " more."}, true},
 		{"list item", "> - one\n> - see ![a](https://x.y/a.png) and $x$", []string{" then", " more", " words."}, true},
 		{"code", "```go\nx := 1", []string{"\ny", " := 2", "\nz := 3"}, false},
 	} {

@@ -155,14 +155,15 @@ func TestSpansFuncAttachmentsFollowTheSpans(t *testing.T) {
 	}
 }
 
-// countedBox is an attachment that counts how often it is made.
+// countedBox is an attachment that counts how often it is made and disposed.
 type countedBox struct {
-	id      string
-	renders int
+	id            string
+	renders, gone int
 }
 
-func (b *countedBox) Render(*Scope) Node {
+func (b *countedBox) Render(cx *Scope) Node {
 	b.renders++
+	cx.Cleanup(func() { b.gone++ })
 	return View{TestID: b.id, Style: Style{Width: Pt(10), Height: Pt(6)}}
 }
 
@@ -229,5 +230,70 @@ func TestSpansFuncKeepsTheSameAttachments(t *testing.T) {
 	h.commit()
 	if h.find("func") == nil || len(text.children) != 2 {
 		t.Fatalf("%d children", len(text.children))
+	}
+}
+
+// A SpansFunc keeps the view of each attachment its new spans still hold, wherever it moves among them: one more makes only the new one, one fewer disposes only that one, and a new order moves the kept views into it.
+func TestSpansFuncKeepsEachAttachment(t *testing.T) {
+	var step *Signal[int]
+	a, b := &countedBox{id: "a"}, &countedBox{id: "b"}
+	h := newHost(t, Size{Width: 300, Height: 200}, func(cx *Scope) Node {
+		step = NewSignal(cx, 0)
+		return View{Style: Style{FontSize: 10}, Children: []Node{
+			Text{TestID: "text", SpansFunc: func() []Span {
+				switch step.Get() {
+				case 0:
+					return []Span{{Content: "x"}, {Attachment: a}}
+				case 1:
+					return []Span{{Content: "x"}, {Attachment: a}, {Content: "y"}, {Attachment: b}}
+				case 2:
+					return []Span{{Attachment: b}, {Content: "xy"}, {Attachment: a}}
+				}
+				return []Span{{Content: "xy"}, {Attachment: a}}
+			}},
+		}}
+	})
+	h.commit()
+	text := h.find("text")
+	wa := h.find("a").parent
+
+	step.Set(1)
+	h.commit()
+	wb := h.find("b").parent
+	if a.renders != 1 || a.gone != 0 || wa.deleted || h.find("a").parent != wa {
+		t.Fatalf("adding an attachment made the kept one again: renders %d, disposed %d, deleted %v", a.renders, a.gone, wa.deleted)
+	}
+	if b.renders != 1 || wb.parent != text || len(text.children) != 2 || text.text.attachments != 2 {
+		t.Fatalf("the new attachment: renders %d, %d children, %d attachments", b.renders, len(text.children), text.text.attachments)
+	}
+	// Characters are 6 wide.
+	if wa.frame.Origin.X != 6 || wb.frame.Origin.X != 22 {
+		t.Fatalf("attachments at %v and %v", wa.frame.Origin, wb.frame.Origin)
+	}
+
+	step.Set(2)
+	batch := h.commit()
+	if a.renders != 1 || b.renders != 1 || a.gone != 0 || b.gone != 0 || wa.deleted || wb.deleted {
+		t.Fatalf("reordering made the attachments again: renders %d %d, disposed %d %d", a.renders, b.renders, a.gone, b.gone)
+	}
+	if got := text.sent.children; len(got) != 2 || got[0] != wb || got[1] != wa {
+		t.Fatalf("the text's views are %v, want b then a", got)
+	}
+	for _, it := range batch.Items {
+		if (it.Kind == driver.ItemRemove || it.Kind == driver.ItemDelete) && (it.ID == wa.id || it.ID == wb.id) {
+			t.Fatalf("reordering removed an attachment's view: %+v", it)
+		}
+	}
+	if wb.frame.Origin.X != 0 || wa.frame.Origin.X != 22 {
+		t.Fatalf("reordered attachments at %v and %v", wb.frame.Origin, wa.frame.Origin)
+	}
+
+	step.Set(3)
+	h.commit()
+	if !wb.deleted || b.gone != 1 || a.gone != 0 || a.renders != 1 || wa.deleted || len(text.children) != 1 || text.text.attachments != 1 {
+		t.Fatalf("removing an attachment: b deleted %v disposed %d, a disposed %d renders %d, %d children", wb.deleted, b.gone, a.gone, a.renders, len(text.children))
+	}
+	if got := text.sent.children; len(got) != 1 || got[0] != wa {
+		t.Fatalf("the text's views are %v, want a", got)
 	}
 }

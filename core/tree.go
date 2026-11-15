@@ -485,8 +485,9 @@ type spanNode struct {
 	long    func(PressEvent)
 	attach  *node        // the view of an attachment
 	cls     *spanClasses // its classes, when it has any
-	// made is, for an attachment a SpansFunc mounted, the span its view was made of, which the spans that follow keep the view for when they hold the same.
-	made *Span
+	// made is, for an attachment a SpansFunc mounted, the span its view was made of, which the spans that follow keep the view for when they hold the same; scope owns that view.
+	made  *Span
+	scope *Scope
 }
 
 // attachNode is the view of a text's attachment: a layout root of its own at its content size, which the text places in its lines.
@@ -1682,8 +1683,6 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 	}
 	t.followSpanClasses(n)
 	if v.SpansFunc != nil {
-		// attached owns the attachments' views, kept while the spans hold the same attachments in the same order and made again when they do not.
-		var attached *Scope
 		cx.renderEffect(func() {
 			spans := v.SpansFunc()
 			for i, sp := range spans {
@@ -1716,50 +1715,57 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 				}
 				return
 			}
-			// The text around the same attachments changed: they keep their views, and the text restyles.
-			var kept []spanNode
-			if attached != nil {
-				kept = keptAttachments(n.text.spans, spans)
-			}
-			if attached != nil && kept == nil {
-				attached.Dispose()
-				attached = nil
-				for _, old := range n.text.spans {
-					if old.attach != nil {
-						t.discard(old.attach)
-					}
+			// Each attachment the spans still hold keeps its view, whatever text lies around it and wherever it moves; the others go, and the new ones are made, each in a scope of its own.
+			var olds []spanNode
+			for _, sp := range n.text.spans {
+				if sp.attach != nil {
+					olds = append(olds, sp)
 				}
-				n.children = slices.DeleteFunc(n.children, func(c *node) bool { return c.deleted })
-				t.childrenChanged(n)
-				n.text.attachments = 0
 			}
+			kept := make([]bool, len(olds))
+			moved := false // the attachments' views, or their order, changed
+			k := 0         // the attachments so far
 			n.text.spans = n.text.spans[:0]
 			for _, sp := range spans {
-				if sp.Attachment != nil && kept != nil {
-					old := kept[0]
-					kept = kept[1:]
+				if sp.Attachment == nil {
+					style, cls := t.spanStyle(n, sp.Class, sp.Style)
+					n.text.spans = append(n.text.spans, spanNode{content: sp.Content, style: style, press: sp.OnPress, long: sp.OnLongPress, cls: cls})
+					t.listenForSpan(n, sp)
+					continue
+				}
+				j := keptAttachment(olds, kept, sp)
+				if j >= 0 {
+					kept[j] = true
+					old := olds[j]
 					old.content = sp.Content
 					n.text.spans = append(n.text.spans, old)
-					continue
-				}
-				if sp.Attachment != nil {
-					if attached == nil {
-						attached = &Scope{}
-						cx.adopt(attached)
-					}
-					w := t.newNode(driver.KindView, n, attached)
+				} else {
+					s := &Scope{}
+					cx.adopt(s)
+					w := t.newNode(driver.KindView, n, s)
 					w.attach = &attachNode{}
 					t.setClasses(w, sp.Class)
-					t.bindStyle(attached, w, sp.Style, nil)
-					t.within(attached, func() { t.mount(attached, w, sp.Attachment) })
+					t.bindStyle(s, w, sp.Style, nil)
+					t.within(s, func() { t.mount(s, w, sp.Attachment) })
 					made := sp
-					n.text.spans = append(n.text.spans, spanNode{content: sp.Content, attach: w, made: &made})
-					n.text.attachments++
-					continue
+					n.text.spans = append(n.text.spans, spanNode{content: sp.Content, attach: w, made: &made, scope: s})
 				}
-				style, cls := t.spanStyle(n, sp.Class, sp.Style)
-				n.text.spans = append(n.text.spans, spanNode{content: sp.Content, style: style, press: sp.OnPress, long: sp.OnLongPress, cls: cls})
-				t.listenForSpan(n, sp)
+				moved = moved || k >= len(olds) || j != k
+				k++
+			}
+			moved = moved || k != len(olds)
+			for j, old := range olds {
+				if !kept[j] {
+					if old.scope != nil {
+						old.scope.Dispose()
+					}
+					t.discard(old.attach)
+				}
+			}
+			n.text.attachments = k
+			if moved {
+				n.children = slices.DeleteFunc(n.children, func(c *node) bool { return c.deleted })
+				t.childrenChanged(n)
 			}
 			t.followSpanClasses(n)
 			n.text.stale = true
@@ -1777,29 +1783,14 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 	}
 }
 
-// keptAttachments is the spans of old's attachments when spans hold the same ones in the same order, each with the same classes and style, else nil.
-func keptAttachments(old []spanNode, spans []Span) []spanNode {
-	var kept []spanNode
-	k := 0
-	for _, sp := range spans {
-		if sp.Attachment == nil {
-			continue
-		}
-		for k < len(old) && old[k].attach == nil {
-			k++
-		}
-		if k == len(old) || !sameAttachment(&old[k], sp) {
-			return nil
-		}
-		kept = append(kept, old[k])
-		k++
-	}
-	for ; k < len(old); k++ {
-		if old[k].attach != nil {
-			return nil // one went
+// keptAttachment returns the index of the first attachment of olds not yet kept that span sp holds with the same classes and style, or -1.
+func keptAttachment(olds []spanNode, kept []bool, sp Span) int {
+	for j := range olds {
+		if !kept[j] && sameAttachment(&olds[j], sp) {
+			return j
 		}
 	}
-	return kept
+	return -1
 }
 
 // sameAttachment reports whether span sp is an attachment the view of attachment old was made of, with the same classes and style.
