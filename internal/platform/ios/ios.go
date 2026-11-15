@@ -1682,7 +1682,7 @@ func surfaceLayout(self objc.ID, cmd objc.SEL) {
 	apple.Super(self, cmd)
 	if v := views[self]; v != nil && v.surface.engine != nil {
 		b := objc.Send[apple.CGRect](self, selBounds)
-		v.surface.engine.Resize(driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)})
+		v.surface.engine.Resize(driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}, driver.Geometry{})
 		if h := v.surface.hud; h != nil {
 			h.layout()
 		}

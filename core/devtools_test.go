@@ -230,7 +230,7 @@ func TestCommitsNameWhatTheyRanWhileDevToolsRecord(t *testing.T) {
 	defer func() { driver.TraceCauses, devtools.Enabled = false, false }()
 	root := core.NewRoot(core.RootOptions{Post: func(func()) {}, Clock: core.NewManualClock(time.Unix(0, 0))})
 	tree := core.NewTree(root, core.ApproxTextEngine{})
-	tree.Resize(core.Size{Width: 100, Height: 100})
+	tree.Resize(core.Size{Width: 100, Height: 100}, core.Geometry{})
 	var count *core.Signal[int]
 	_, file, at, _ := runtime.Caller(0)
 	tree.Mount(func(cx *core.Scope) core.Node {

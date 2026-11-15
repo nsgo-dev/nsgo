@@ -156,6 +156,14 @@ type (
 	Idiom = driver.Idiom
 	// Lifecycle is whether the app is in use: Env.Lifecycle.
 	Lifecycle = driver.Lifecycle
+	// Geometry is how a fold or hinge divides a surface: Env.Geometry.
+	Geometry = driver.Geometry
+	// Region is a part of a surface an app can lay out in.
+	Region = driver.Region
+	// Obstruction is a fold or a hinge on a surface.
+	Obstruction = driver.Obstruction
+	// HingeState is how far a fold or hinge is open.
+	HingeState = driver.HingeState
 	// LocaleSettings are the user's regional preferences:
 	// Env.LocaleSettings.
 	LocaleSettings = driver.LocaleSettings
@@ -461,6 +469,13 @@ const (
 	LifecycleActive     = driver.LifecycleActive
 	LifecycleInactive   = driver.LifecycleInactive
 	LifecycleBackground = driver.LifecycleBackground
+)
+
+const (
+	HingeUnknown  = driver.HingeUnknown
+	HingeClosed   = driver.HingeClosed
+	HingeHalfOpen = driver.HingeHalfOpen
+	HingeOpen     = driver.HingeOpen
 )
 
 const (

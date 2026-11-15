@@ -441,7 +441,7 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 	a.tree = core.NewTree(a.root, engine)
 	// Steps reach every view, not only those in sight.
 	a.tree.SetViewPacing(false)
-	a.tree.Resize(a.size)
+	a.tree.Resize(a.size, driver.Geometry{})
 	if a.env != nil {
 		a.tree.SetEnvironment(*a.env)
 	}
@@ -688,7 +688,7 @@ func (a *App) Resize(width, height driver.Points) {
 		a.target.resize(a.size)
 		return
 	}
-	a.tree.Resize(a.size)
+	a.tree.Resize(a.size, driver.Geometry{})
 	a.Settle()
 }
 

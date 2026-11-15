@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
 // Env is the environment as signals, one per part, so a binding runs
@@ -44,6 +46,9 @@ type Env struct {
 	material   *Signal[WindowMaterial]
 	appleKeys  *Signal[bool]
 	tokens     *Signal[hostColors]
+	// geometry is the fold geometry Tree.Resize sets; shown is it with each region's safe area.
+	geometry *Signal[Geometry]
+	shown    *Memo[Geometry]
 	// headers are the system header's heights, which only the tree reads.
 	headers [2]Points
 }
@@ -55,6 +60,7 @@ type displayList struct{ values []DisplayInfo }
 func newEnv(cx *Scope, app *Env) *Env {
 	e := &Env{
 		window:           NewSignal(cx, Size{}),
+		geometry:         NewSignalFunc(cx, driver.Divide(Size{}, nil), Geometry.Equal),
 		safe:             NewSignal(cx, Edges{}),
 		titleBar:         NewSignal(cx, Edges{}),
 		maximized:        NewSignal(cx, false),
@@ -92,6 +98,14 @@ func newEnv(cx *Scope, app *Env) *Env {
 	if app != nil {
 		e.forced, e.appearance, e.tokens = app.forced, app.appearance, app.tokens
 	}
+	e.shown = NewMemoFunc(cx, func() Geometry {
+		g := e.geometry.Get().Clone()
+		safe, size := e.safe.Get(), e.window.Get()
+		for i := range g.Regions {
+			g.Regions[i].SafeArea = regionSafeArea(g.Regions[i].Frame, safe, size)
+		}
+		return g
+	}, Geometry.Equal)
 	e.language = NewMemo(cx, func() string {
 		locale := e.Locale()
 		if match := languageMatch.Load(); match != nil {
@@ -182,6 +196,20 @@ func (e *Env) set(v Environment) {
 
 // Window returns the surface's size.
 func (e *Env) Window() Size { return e.window.Get() }
+
+// Geometry returns how a fold or hinge divides the surface: its usable regions, each with the safe area that falls in it, and the obstructions between them, in the surface's coordinates and measured at Window's size, which it changes with. A surface without a fold, as on every target but Android and iOS 27.1, has one region and no obstructions. Core lays nothing out by it: an app or component reads it and chooses its own panes.
+func (e *Env) Geometry() Geometry { return e.shown.Get().Clone() }
+
+// regionSafeArea is the part of safe, the surface's safe area at size, that falls in a region's frame, as insets of the region.
+func regionSafeArea(f Bounds, safe Edges, size Size) Edges {
+	inset := func(v, length Points) Points { return min(max(v, 0), length) }
+	return Edges{
+		Top:    inset(safe.Top-f.Origin.Y, f.Size.Height),
+		Right:  inset(f.Origin.X+f.Size.Width-(size.Width-safe.Right), f.Size.Width),
+		Bottom: inset(f.Origin.Y+f.Size.Height-(size.Height-safe.Bottom), f.Size.Height),
+		Left:   inset(safe.Left-f.Origin.X, f.Size.Width),
+	}
+}
 
 // SafeArea returns the insets system UI covers on each edge.
 func (e *Env) SafeArea() Edges { return e.safe.Get() }

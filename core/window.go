@@ -162,7 +162,7 @@ func (rt *runtime) openSurface(owner *Scope, cfg driver.SurfaceConfig, content f
 	env := app.reported
 	env.TitleBar, env.Maximized, env.FullScreen, env.WindowFrame, env.WindowMaterial = Edges{}, false, false, WindowFrame{}, cfg.Material
 	t.SetEnvironment(env)
-	t.Resize(Size{Width: cfg.Width, Height: cfg.Height})
+	t.Resize(Size{Width: cfg.Width, Height: cfg.Height}, Geometry{})
 	app.commands = append(app.commands, driver.MountItem{Kind: driver.ItemOpenSurface, Surface: &cfg})
 	app.changed = true
 	s.addCleanup(w.gone)

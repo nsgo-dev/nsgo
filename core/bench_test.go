@@ -21,7 +21,7 @@ func benchTree(b *testing.B, size Size, app func(cx *Scope) Node) *Tree {
 	b.Cleanup(func() { driver.CheckCommits = check })
 	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), RequestFrame: func() {}})
 	tree := NewTree(root, ApproxTextEngine{})
-	tree.Resize(size)
+	tree.Resize(size, Geometry{})
 	tree.Mount(app)
 	tree.Commit()
 	return tree

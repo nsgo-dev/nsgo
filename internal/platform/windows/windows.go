@@ -906,7 +906,7 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 	getClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 	size := child.point(client.Right, client.Bottom)
 	child.engine = w.engine.Attach(cfg.ID, child)
-	child.engine.Resize(driver.Size{Width: size.X, Height: size.Y})
+	child.engine.Resize(driver.Size{Width: size.X, Height: size.Y}, driver.Geometry{})
 	child.engine.SetEnvironment(child.env)
 	if !opts.Hidden {
 		if cfg.Kind == driver.SurfacePanel {
@@ -2129,7 +2129,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 			var client rect
 			getClientRect.Call(hwnd, uintptr(unsafe.Pointer(&client)))
 			if size := w.point(client.Right, client.Bottom); size.X > 0 && size.Y > 0 {
-				w.engine.Resize(driver.Size{Width: size.X, Height: size.Y})
+				w.engine.Resize(driver.Size{Width: size.X, Height: size.Y}, driver.Geometry{})
 			}
 			w.updateEnvironment()
 		}
@@ -2153,7 +2153,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 			size := w.point(width, height)
 			switch {
 			case w.engine != nil:
-				w.engine.Resize(driver.Size{Width: size.X, Height: size.Y})
+				w.engine.Resize(driver.Size{Width: size.X, Height: size.Y}, driver.Geometry{})
 			case width > 0 && height > 0:
 				w.startEngine(w.app, w.opts, driver.Size{Width: size.X, Height: size.Y})
 			}

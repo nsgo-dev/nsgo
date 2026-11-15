@@ -35,14 +35,14 @@ func TestIdenticalTextsMeasureOnce(t *testing.T) {
 	}
 	h := newHost(t, Size{Width: 300, Height: 900}, nil)
 	h.tree = NewTree(h.root, countingEngine{&measures})
-	h.tree.Resize(Size{Width: 300, Height: 900})
+	h.tree.Resize(Size{Width: 300, Height: 900}, Geometry{})
 	h.tree.Mount(app)
 	h.commit()
 	one := measures
 	h2 := newHost(t, Size{Width: 300, Height: 900}, nil)
 	measures = 0
 	h2.tree = NewTree(h2.root, countingEngine{&measures})
-	h2.tree.Resize(Size{Width: 300, Height: 900})
+	h2.tree.Resize(Size{Width: 300, Height: 900}, Geometry{})
 	h2.tree.Mount(func(cx *Scope) Node {
 		return View{Children: []Node{View{Style: Style{Direction: Row}, Children: []Node{Text{Content: "same words"}}}}}
 	})

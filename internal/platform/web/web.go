@@ -384,7 +384,7 @@ func open(app engine.App, opts Options, test *testOpen) *surface {
 	s.engine = engine.Start(s, app, eopts)
 	// The host can change size without the window doing so.
 	observer := js.Global().Get("ResizeObserver").New(js.FuncOf(func(js.Value, []js.Value) any {
-		s.engine.Resize(s.size())
+		s.engine.Resize(s.size(), driver.Geometry{})
 		return nil
 	}))
 	observer.Call("observe", host)

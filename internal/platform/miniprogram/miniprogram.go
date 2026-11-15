@@ -169,7 +169,7 @@ func (s *surface) changed() {
 		s.m.reduce = env.ReduceMotion
 		s.engine.SetEnvironment(env)
 	}
-	s.engine.Resize(s.size())
+	s.engine.Resize(s.size(), driver.Geometry{})
 }
 
 // event handles what the runtime reports: its name, the view's ID, then

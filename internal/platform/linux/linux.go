@@ -395,7 +395,7 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 	child.env = child.environment()
 	child.engine = w.engine.Attach(cfg.ID, child)
 	size := driver.Size{Width: opts.Width, Height: opts.Height}
-	child.engine.Resize(size)
+	child.engine.Resize(size, driver.Geometry{})
 	child.engine.SetEnvironment(child.env)
 	if !opts.Hidden {
 		gtkWindowPresent(child.win)

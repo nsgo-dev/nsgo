@@ -292,7 +292,7 @@ func TestAgentFollowsALiveSurface(t *testing.T) {
 	root := core.NewRoot(core.RootOptions{})
 	t.Cleanup(root.Dispose)
 	tree := core.NewTree(root, core.ApproxTextEngine{})
-	tree.Resize(driver.Size{Width: 300, Height: 200})
+	tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
 	answered := new(int)
 	tree.Mount(fixture(answered))
 	own := register(g, 0)
@@ -395,7 +395,7 @@ func TestAgentWaitsForTheFirstWindow(t *testing.T) {
 	root := core.NewRoot(core.RootOptions{})
 	t.Cleanup(root.Dispose)
 	tree := core.NewTree(root, core.ApproxTextEngine{})
-	tree.Resize(driver.Size{Width: 300, Height: 200})
+	tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
 	tree.Mount(fixture(new(int)))
 	own := register(g, 0)
 	opened := make(chan struct{})
@@ -439,7 +439,7 @@ func TestAgentTellsSurfacesApart(t *testing.T) {
 		root := core.NewRoot(core.RootOptions{})
 		t.Cleanup(root.Dispose)
 		tree := core.NewTree(root, core.ApproxTextEngine{})
-		tree.Resize(driver.Size{Width: 300, Height: 200})
+		tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
 		menu := []core.MenuItem{{Label: "Actions", Items: []core.MenuItem{{Label: "Reset", OnSelect: func() {}}}}}
 		if id == 1 {
 			menu = []core.MenuItem{{Label: "Edit", Items: []core.MenuItem{{Label: "Delete", OnSelect: func() {}}}}}
@@ -496,7 +496,7 @@ func TestAgentLosesAModelRatherThanTheApp(t *testing.T) {
 	root := core.NewRoot(core.RootOptions{})
 	t.Cleanup(root.Dispose)
 	tree := core.NewTree(root, core.ApproxTextEngine{})
-	tree.Resize(driver.Size{Width: 300, Height: 200})
+	tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
 	tree.Mount(fixture(new(int)))
 	own := register(g, 0)
 	live := &fakeLive{surface: register(g, 1), tree: tree}

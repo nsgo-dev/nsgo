@@ -251,7 +251,7 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.frameWanted.Store(false)
 			s.engine.Frame()
 		case msgResize:
-			s.engine.Resize(driver.Size{Width: r.points(), Height: r.points()})
+			s.engine.Resize(driver.Size{Width: r.points(), Height: r.points()}, driver.Geometry{})
 		case msgEvent:
 			// The surface the event is for: 0 for the activity's view, else an overlay's.
 			from := r.u32()

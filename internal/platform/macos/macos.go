@@ -2735,7 +2735,7 @@ func (s *surface) resize(size driver.Size) {
 		default:
 		}
 	}
-	done := s.engine.ResizeAndWait(size)
+	done := s.engine.ResizeAndWait(size, driver.Geometry{})
 	if s.resized != nil || s.applying {
 		return
 	}

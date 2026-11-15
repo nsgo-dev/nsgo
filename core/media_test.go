@@ -108,7 +108,7 @@ func TestInputAccessoryViewIsADetachedRootNamedByInputs(t *testing.T) {
 	if bar.frame != (Bounds{Size: Size{Width: 320, Height: 44}}) {
 		t.Fatalf("frame %v", bar.frame)
 	}
-	h.tree.Resize(Size{Width: 400, Height: 600})
+	h.tree.Resize(Size{Width: 400, Height: 600}, Geometry{})
 	h.commit()
 	if bar.frame.Size.Width != 400 {
 		t.Fatalf("frame %v after a resize", bar.frame)
@@ -234,7 +234,7 @@ func TestLayoutTransitionMovesTheFrameItsStyleChanges(t *testing.T) {
 	}
 	// The parent's resize alone moves it at once, as CSS's percentage
 	// width does not transition when its container grows.
-	h.tree.Resize(Size{Width: 400, Height: 300})
+	h.tree.Resize(Size{Width: 400, Height: 300}, Geometry{})
 	if it := frame(h.commit()); it.Frame.Size.Width != 400 || it.Transition != nil {
 		t.Fatalf("resized %v transition %+v", it.Frame, it.Transition)
 	}
@@ -242,7 +242,7 @@ func TestLayoutTransitionMovesTheFrameItsStyleChanges(t *testing.T) {
 	if it := frame(h.commit()); it.Transition == nil {
 		t.Fatal("shrinking did not move")
 	}
-	h.tree.Resize(Size{Width: 300, Height: 300})
+	h.tree.Resize(Size{Width: 300, Height: 300}, Geometry{})
 	if it := frame(h.commit()); it.Transition != nil {
 		t.Fatalf("a later resize moved: %+v", it.Transition)
 	}

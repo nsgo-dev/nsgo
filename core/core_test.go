@@ -42,7 +42,7 @@ func newHost(t *testing.T, size Size, app func(cx *Scope) Node) *host {
 		RequestFrame: func() { h.frameWanted = true },
 	})
 	h.tree = NewTree(h.root, ApproxTextEngine{})
-	h.tree.Resize(size)
+	h.tree.Resize(size, Geometry{})
 	if app != nil {
 		h.tree.Mount(app)
 	}
@@ -685,7 +685,7 @@ func TestEnvironment(t *testing.T) {
 		return Text{Content: "Aa", Style: Style{FontSize: 10}, TestID: "text"}
 	})
 	h.commit()
-	h.tree.Resize(Size{Width: 200, Height: 100})
+	h.tree.Resize(Size{Width: 200, Height: 100}, Geometry{})
 	h.tree.SetEnvironment(Environment{Dark: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar})
 	h.tree.SetEnvironment(Environment{Dark: true, FontScale: 2, WindowMaterial: WindowMaterialSidebar}) // unchanged: no runs
 	h.commit()

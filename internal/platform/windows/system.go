@@ -1129,7 +1129,7 @@ func (w *window) movePanel(x, y, width, height int32) {
 	w.scale = float64(dpi) / 96
 	if w.engine != nil {
 		size := w.point(width, height)
-		w.engine.Resize(driver.Size{Width: size.X, Height: size.Y})
+		w.engine.Resize(driver.Size{Width: size.X, Height: size.Y}, driver.Geometry{})
 		w.updateEnvironment()
 	}
 }

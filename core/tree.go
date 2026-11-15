@@ -705,14 +705,23 @@ func (t *Tree) Mount(app func(cx *Scope) Node) {
 	})
 }
 
-// Resize sets the surface size the root fills.
-func (t *Tree) Resize(size Size) {
+// Resize sets the surface size the root fills and the fold geometry measured at it (Env.Geometry), in one batch, so what reads either sees both new. A geometry without regions is divided at size; the zero Geometry is a surface without a fold. A new geometry at the same size still applies.
+func (t *Tree) Resize(size Size, g Geometry) {
+	if len(g.Regions) == 0 {
+		g = driver.Divide(size, g.Obstructions)
+	}
 	if size != t.size {
 		t.size = size
 		t.markLayout(t.view)
 		t.changed = true
-		t.root.Env().window.Set(size)
 	}
+	e := t.root.Env()
+	t.root.Batch(func() {
+		e.window.Set(size)
+		if !e.geometry.GetUntracked().Equal(g) {
+			e.geometry.Set(g.Clone())
+		}
+	})
 }
 
 // SetEnvironment records what the platform reports about where the app

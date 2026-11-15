@@ -325,7 +325,7 @@ func TestHotKeysWithoutWindows(t *testing.T) {
 		w := &windows{t: t, items: map[uint32][]driver.MountItem{}}
 		w.root = NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), HotKeys: takes})
 		w.app = NewTree(w.root, ApproxTextEngine{})
-		w.app.Resize(Size{Width: 100, Height: 100})
+		w.app.Resize(Size{Width: 100, Height: 100}, Geometry{})
 		w.app.Mount(AppRoot(func(cx *Scope) {
 			cx.SetMainView(func(cx *Scope) Node { return Text{Content: "main"} })
 			cx.RegisterHotKey("Ctrl+Alt+K", func() { fired++ })

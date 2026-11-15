@@ -59,7 +59,7 @@ func (a *App) place(o *Overlay, frame driver.WindowFrame) {
 	o.Frame = frame.Within(driver.Bounds{Size: a.size})
 	o.Frame.Move = true
 	o.env.WindowFrame = o.Frame
-	o.tree.Resize(driver.Size{Width: o.Frame.Width, Height: o.Frame.Height})
+	o.tree.Resize(driver.Size{Width: o.Frame.Width, Height: o.Frame.Height}, driver.Geometry{})
 	o.tree.SetEnvironment(o.env)
 }
 

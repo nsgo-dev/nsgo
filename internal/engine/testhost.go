@@ -33,7 +33,8 @@ func (p *TestPin) apply(env driver.Environment) driver.Environment {
 // and cache directories of its own, so a test never sees the app's.
 func (o *Options) UseTest(t testhost.Options, pin *TestPin) {
 	if t.Size.Width > 0 && t.Size.Height > 0 {
-		o.Size = t.Size
+		// A geometry measured at the surface's size is not the test's.
+		o.Size, o.Geometry = t.Size, driver.Geometry{}
 	}
 	o.Observe, o.Event = t.Observe, t.Event
 	o.LogPerf = t.FPS

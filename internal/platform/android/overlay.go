@@ -99,7 +99,7 @@ func (s *surface) surfaceReport(r *reader) {
 		frame := driver.WindowFrame{X: r.points(), Y: r.points(), Move: true, Width: size.Width, Height: size.Height}
 		env := readEnvironment(r)
 		env.WindowFrame = frame
-		e.Resize(size)
+		e.Resize(size, driver.Geometry{})
 		e.SetEnvironment(env)
 	case surfaceEnded:
 		reason := int(r.byte())

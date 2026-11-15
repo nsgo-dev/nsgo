@@ -123,7 +123,7 @@ func TestAgentKeepsSharedBatches(t *testing.T) {
 	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0))})
 	defer root.Dispose()
 	tree := NewTree(root, ApproxTextEngine{})
-	tree.Resize(Size{Width: 100, Height: 100})
+	tree.Resize(Size{Width: 100, Height: 100}, Geometry{})
 	var count *Signal[int]
 	tree.Mount(func(cx *Scope) Node {
 		count = NewSignal(cx, 1)

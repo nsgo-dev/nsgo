@@ -198,7 +198,7 @@ func TestARegisteredFontPreparesTheTextAgain(t *testing.T) {
 	var scope *Scope
 	h := newHost(t, Size{Width: 400, Height: 400}, nil)
 	h.tree = NewTree(h.root, fontEngine{&registered})
-	h.tree.Resize(Size{Width: 400, Height: 400})
+	h.tree.Resize(Size{Width: 400, Height: 400}, Geometry{})
 	h.tree.Mount(func(cx *Scope) Node {
 		scope = cx
 		return View{Style: Style{AlignItems: AlignStart}, Children: []Node{Text{TestID: "t", Content: "hello"}}}

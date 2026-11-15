@@ -234,7 +234,7 @@ func hostSize(w, h, scale, top, left, bottom, right float64, flags uint32) {
 	}
 	if size != s.size {
 		s.size = size
-		s.engine.Resize(size)
+		s.engine.Resize(size, driver.Geometry{})
 	}
 	if !env.Equal(s.env) {
 		s.env = env

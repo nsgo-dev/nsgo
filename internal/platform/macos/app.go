@@ -168,7 +168,7 @@ func (s *surface) attach(app *engine.Engine) {
 	s.env = s.environment()
 	s.engine = app.Attach(s.id, s)
 	size := objc.Send[apple.CGRect](s.native, selBounds).Size
-	s.engine.Resize(driver.Size{Width: driver.Points(size.Width), Height: driver.Points(size.Height)})
+	s.engine.Resize(driver.Size{Width: driver.Points(size.Width), Height: driver.Points(size.Height)}, driver.Geometry{})
 	s.engine.SetEnvironment(s.env)
 	if s.kind == driver.SurfaceTrayIcon {
 		observeApp()

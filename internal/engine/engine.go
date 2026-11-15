@@ -79,6 +79,8 @@ type App = func(cx *core.Scope) core.Node
 type Options struct {
 	// Size is the surface's size at start.
 	Size driver.Size
+	// Geometry is the fold geometry measured at Size, which the first commit is laid out with (Engine.Resize); the zero Geometry is a surface without a fold.
+	Geometry driver.Geometry
 	// Environment is what the platform knows at start.
 	Environment driver.Environment
 	// Clock runs the app's timers; the system's when nil.
@@ -242,6 +244,8 @@ type message struct {
 	frame   bool
 	event   driver.Event
 	resize  *driver.Size
+	// geometry is the fold geometry measured at resize, which travels with it.
+	geometry driver.Geometry
 	// resized are closed once the commit after the resize is mounted.
 	resized []chan struct{}
 	env     *driver.Environment
@@ -381,7 +385,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 	})
 	defer root.Dispose()
 	tree := core.NewTree(root, p)
-	tree.Resize(opts.Size)
+	tree.Resize(opts.Size, opts.Geometry)
 	tree.SetEnvironment(opts.Environment)
 	tree.SetAppearance(opts.Appearance)
 	tree.SetTokens(tokens)
@@ -529,7 +533,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 					delete(surfaces, m.surface)
 				}
 			case m.resize != nil:
-				t.Resize(*m.resize)
+				t.Resize(*m.resize, m.geometry)
 				resized = append(resized, m.resized...)
 			case m.env != nil:
 				t.SetEnvironment(*m.env)
@@ -555,10 +559,7 @@ func (e *Engine) push(m message) {
 	}
 }
 
-// enqueue queues m for the engine's next pass. A mergeable event replaces
-// one of the same kind for the same view still queued, a resize the last
-// resize of the same surface, and a frame request the one still queued, so
-// bursts cost one update each. A wheel's turns add up into the one queued.
+// enqueue queues m for the engine's next pass. A mergeable event replaces one of the same kind for the same view still queued, a resize the last resize of the same surface with the geometry it carries, and a frame request the one still queued, so bursts cost one update each. A wheel's turns add up into the one queued.
 func (e *Engine) enqueue(m message) {
 	e.mu.Lock()
 	merged := false
@@ -665,15 +666,15 @@ func (e *Engine) Sync() {
 // engine runs the callbacks waiting for it on its goroutine, then commits.
 func (e *Engine) Frame() { e.push(message{frame: true}) }
 
-// Resize sets the surface size.
-func (e *Engine) Resize(size driver.Size) { e.push(message{surface: e.surface, resize: &size}) }
+// Resize sets the surface size and the fold geometry measured at it, the zero Geometry for a surface without a fold. A change of the geometry alone is a resize to the same size.
+func (e *Engine) Resize(size driver.Size, g driver.Geometry) {
+	e.push(message{surface: e.surface, resize: &size, geometry: g})
+}
 
-// ResizeAndWait sets the surface size and returns a channel closed once
-// the commit laid out at it is mounted: a platform that shows a new size
-// at once waits on it, briefly.
-func (e *Engine) ResizeAndWait(size driver.Size) <-chan struct{} {
+// ResizeAndWait sets the surface size and its fold geometry as Resize does and returns a channel closed once the commit laid out at it is mounted: a platform that shows a new size at once waits on it, briefly.
+func (e *Engine) ResizeAndWait(size driver.Size, g driver.Geometry) <-chan struct{} {
 	done := make(chan struct{})
-	e.push(message{surface: e.surface, resize: &size, resized: []chan struct{}{done}})
+	e.push(message{surface: e.surface, resize: &size, geometry: g, resized: []chan struct{}{done}})
 	return done
 }
 

@@ -22,7 +22,7 @@ func newEmbedded(t *testing.T, ch *Host, app func(cx *Scope) Node) *host {
 		Host:   ch,
 	})
 	h.tree = NewTree(h.root, ApproxTextEngine{})
-	h.tree.Resize(Size{Width: 100, Height: 100})
+	h.tree.Resize(Size{Width: 100, Height: 100}, Geometry{})
 	h.tree.Mount(app)
 	h.drain()
 	return h

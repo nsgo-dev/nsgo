@@ -316,7 +316,7 @@ func (w *window) allocateSurface(width, height int32) {
 	if size.Width != w.lastWidth || size.Height != w.lastHeight {
 		w.lastWidth, w.lastHeight = size.Width, size.Height
 		if w.engine != nil {
-			w.engine.Resize(size)
+			w.engine.Resize(size, driver.Geometry{})
 		}
 	}
 	if root := w.view(w.root); root != nil && root.widget != 0 && gtkWidgetGetParent(root.widget) == w.surface {
