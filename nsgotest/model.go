@@ -223,11 +223,21 @@ func (a *App) drawCanvas(v *View, d *driver.Drawing) {
 }
 
 func (a *App) dispatch(ev driver.Event) {
+	a.dispatchOn(a.tree, ev)
+}
+
+// dispatchOn sends an event to the surface that owns its request. Most
+// input goes to the visible window; application alerts and services may be
+// owned by the app surface in a desktop run.
+func (a *App) dispatchOn(tree *core.Tree, ev driver.Event) {
 	if a.target != nil {
 		// What the test makes up, a real platform reports itself.
 		a.t.Skipf("nsgotest: the test reports what a platform would (%s): it runs headless only", a.stepName)
 	}
-	a.tree.Dispatch(ev)
+	if tree == nil {
+		tree = a.tree
+	}
+	tree.Dispatch(ev)
 	a.Settle()
 }
 
@@ -635,6 +645,10 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.audio(it.Count, *it.Audio)
 		case driver.ItemAlert:
 			a.alerts = append(a.alerts, *it.Alert)
+			if a.alertTrees == nil {
+				a.alertTrees = map[uint32]*core.Tree{}
+			}
+			a.alertTrees[it.Alert.ID] = a.responseTree
 		case driver.ItemBlockNative:
 			// The touch responder keeps native drags from starting.
 			a.blocked = it.ID != 0
@@ -688,6 +702,7 @@ func (a *App) permission(it *driver.MountItem) {
 	case driver.PermissionGuide:
 		// One guide shows at a time, and none for what the app has.
 		a.endGuide()
+		a.guideTree = a.responseTree
 		if !a.Permissions[p].Allowed() {
 			a.Guide, a.guideID = p, it.Count
 			return
@@ -706,8 +721,9 @@ func (a *App) endGuide() {
 	if a.Guide == "" {
 		return
 	}
-	a.post(driver.Event{Kind: driver.EventPermission, Count: a.guideID, Index: int(a.Permissions[a.Guide])})
+	a.postTo(a.guideTree, driver.Event{Kind: driver.EventPermission, Count: a.guideID, Index: int(a.Permissions[a.Guide])})
 	a.Guide, a.guideID = "", 0
+	a.guideTree = nil
 }
 
 // GrantPermission has the user turn p on in the system's settings, which ends a guide of p, and settles.
@@ -772,12 +788,22 @@ func (a *App) EndSpeech(err string) {
 }
 
 func (a *App) post(ev driver.Event) {
+	a.postTo(a.responseTree, ev)
+}
+
+// postTo delivers an answer to the surface that issued its request. A
+// desktop app has an application surface alongside its main window, and
+// platform services may keep waits on either one.
+func (a *App) postTo(tree *core.Tree, ev driver.Event) {
 	if a.target != nil {
 		// The platform answers itself.
 		return
 	}
+	if tree == nil {
+		tree = a.tree
+	}
 	a.mu.Lock()
-	a.posts = append(a.posts, func() { a.tree.Dispatch(ev) })
+	a.posts = append(a.posts, func() { tree.Dispatch(ev) })
 	a.mu.Unlock()
 }
 

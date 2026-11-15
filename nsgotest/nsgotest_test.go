@@ -196,3 +196,46 @@ func TestRevealAndTrashAnswerAsTheTestSays(t *testing.T) {
 		t.Fatalf("recorded %q", app.TrashedFiles)
 	}
 }
+
+func TestHeadlessDesktopHasMainWindowAndCloseStep(t *testing.T) {
+	var current *desktop.Window
+	var calls []string
+	app := Start(t, func(cx *core.Scope) core.Node {
+		current = desktop.CurrentWindow(cx)
+		if current == nil {
+			t.Fatal("the main view has no current window")
+		}
+		current.OnClosing(cx, func(c *desktop.WindowClosing) {
+			calls = append(calls, "old")
+			c.Cancel()
+		})
+		current.OnClosing(cx, func(c *desktop.WindowClosing) {
+			calls = append(calls, "new")
+		})
+		return core.Text{Content: "main", TestID: "main"}
+	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	if app.CloseWindow() {
+		t.Fatal("a canceled close reported success")
+	}
+	if got, want := strings.Join(calls, ","), "new,old"; got != want {
+		t.Fatalf("closing handlers ran %q, want %q", got, want)
+	}
+	if app.root.MainWindow() == nil || app.root.MainWindow().Closed() {
+		t.Fatal("the canceled close lost the main window")
+	}
+}
+
+func TestHeadlessDesktopCloseWindowClosesWhenAccepted(t *testing.T) {
+	app := Start(t, func(cx *core.Scope) core.Node {
+		if desktop.CurrentWindow(cx) == nil {
+			t.Fatal("the main view has no current window")
+		}
+		return core.Text{Content: "main"}
+	}, Environment(core.Environment{OS: core.OSLinux, Idiom: core.IdiomDesktop}))
+	if !app.CloseWindow() {
+		t.Fatal("an accepted close reported cancellation")
+	}
+	if app.root.MainWindow() != nil {
+		t.Fatal("the accepted close left a main window")
+	}
+}
