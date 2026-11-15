@@ -23,6 +23,10 @@ type Surface interface {
 	Inspect(id uint32)
 	// Highlight turns the outlines of what each commit changed on or off.
 	Highlight(on bool)
+	// Layout shows the layout audit over the surface or hides it.
+	Layout(on bool)
+	// WatchLayout reports to shown whether the layout audit shows, now and each time that changes, until the next call; a surface without DevTools' overlay reports false once.
+	WatchLayout(shown func(on bool))
 	// Pick has the next press on the surface choose a view rather than reach the app, reporting each view the pointer is over to hover and the one pressed to picked; off ends it.
 	Pick(on bool, hover, picked func(id uint32))
 	// Record reports what the user does on the surface as test steps, until off.

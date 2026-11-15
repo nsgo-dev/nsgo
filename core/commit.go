@@ -265,6 +265,9 @@ func (t *Tree) commitRound() {
 	t.commands = t.commands[:0]
 	t.emitMatches()
 	t.emitDeletes()
+	if len(t.deleted) > 0 {
+		t.framesMoved = true
+	}
 	for _, id := range t.deleted {
 		t.nodes[id] = nil
 		t.free = append(t.free, id)
@@ -275,6 +278,9 @@ func (t *Tree) commitRound() {
 			frame := n.frame
 			t.within(n.owner, func() { n.h.layout(frame) })
 		}
+	}
+	if t.bumpAudit != nil {
+		t.bumpAudit()
 	}
 	t.sizeBars()
 	t.reportWatches()
@@ -566,6 +572,7 @@ func (t *Tree) placeAttachments(n *node, l driver.TextLayout) {
 		i++
 		if w.attach.cut != !ok {
 			w.attach.cut = !ok
+			t.framesMoved = true
 			t.mark(w)
 		}
 		if ok {

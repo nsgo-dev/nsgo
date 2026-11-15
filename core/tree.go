@@ -112,6 +112,10 @@ type Tree struct {
 	// says what they follow changed.
 	followers   []*node
 	followMoved bool
+	// framesMoved says a frame, a scroll, a deletion, a restyle layout reads or a Visibility changed the boxes the layout audit draws since a round last looked; auditRead and bumpAudit are what keep them up to date, nil until DevTools' overlay mounts (keepAudit).
+	framesMoved bool
+	auditRead   func() bool
+	bumpAudit   func()
 	// edgeBars are the views that are bars over a scroll view's side, and
 	// edgeScrolls the scroll views they last reached into.
 	edgeBars, edgeScrolls []*node
@@ -1054,7 +1058,7 @@ func (t *Tree) restyle(n *node) bool {
 	}
 	z, sticky := n.stackRank()
 	was := &n.style
-	lines, overflow, pointer := was.NumberOfLines, was.TextOverflow, was.PointerEvents
+	lines, overflow, pointer, visibility := was.NumberOfLines, was.TextOverflow, was.PointerEvents, was.Visibility
 	n.style = merged.withStates(statesOf(t.shownInteraction(n), &p, n.part.Data), g)
 	if p.Disabled {
 		// The platform still follows the states a disabled view's own
@@ -1070,6 +1074,10 @@ func (t *Tree) restyle(n *node) bool {
 	}
 	if n.style.PointerEvents != pointer {
 		t.pointerStyled, t.pointersMoved = true, true
+	}
+	if n.style.Visibility != visibility {
+		// Hiding a view leaves its frame where it is, but not among the boxes the layout audit draws.
+		t.framesMoved = true
 	}
 	n.applyEnv()
 	if z2, sticky2 := n.stackRank(); z2 != z || sticky2 != sticky {
@@ -1091,6 +1099,8 @@ func (t *Tree) restyle(n *node) bool {
 		}
 	}
 	n.lstyleOK = false
+	// Its edges may change where its frame does not, as a padding does.
+	t.framesMoved = true
 	// A style transition moves the frame its own change gives n, as CSS
 	// transitions a changed width; a parent's resize alone does not.
 	if n.created && !n.transit && n.style.Transition.Properties&TransitionLayout != 0 && n.style.Transition.Duration > 0 {
@@ -2241,6 +2251,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 			if anchored(t.view) {
 				t.markLayout(t.view) // anchored overlays follow the scroll
 				t.changed = true
+			}
+			if t.auditRead != nil && t.auditRead() {
+				t.framesMoved, t.changed = true, true
 			}
 		}
 		if h.scroll != nil {

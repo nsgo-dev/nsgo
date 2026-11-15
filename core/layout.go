@@ -656,6 +656,7 @@ func (t *Tree) setFrame(n *node, f Bounds) bool {
 		return false
 	}
 	n.frame = f
+	t.framesMoved = true
 	t.mark(n)
 	return true
 }

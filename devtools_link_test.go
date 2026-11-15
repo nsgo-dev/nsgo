@@ -11,7 +11,10 @@ import (
 // devClientSymbols are functions only the dev client has, which nsgo dev's builds link with the nsgodev tag; small ones the compiler inlines are left out, as they leave no symbol.
 var devClientSymbols = []string{"nsgo.startDevTools", "nsgo.runDevCommand", "nsgo.listenDevTools", "nsgo.traceTo"}
 
-// TestReleaseBuildsLinkNoDevClient builds an app as nsgo build does and as nsgo dev does and reads their symbols: the dev client, which serves DevTools and traces, links only into dev builds. Core's recording for DevTools links into both, behind devtools.Enabled.
+// devOverlaySymbols are functions of DevTools' overlay in core, the layout audit's among them, which only the dev client mounts (core.UpdateHighlights).
+var devOverlaySymbols = []string{"core.(*Tree).mountHighlights", "core.(*Tree).auditBoxes", "core.paintAudit", "core.(*layoutAudit).readout"}
+
+// TestReleaseBuildsLinkNoDevClient builds an app as nsgo build does and as nsgo dev does and reads their symbols: the dev client, which serves DevTools and traces, and DevTools' overlay with the layout audit link only into dev builds. Core's recording for DevTools links into both, behind devtools.Enabled.
 func TestReleaseBuildsLinkNoDevClient(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds an app twice")
@@ -36,7 +39,7 @@ func TestReleaseBuildsLinkNoDevClient(t *testing.T) {
 		return string(out)
 	}
 	release, dev := symbols(""), symbols("nsgodev")
-	for _, s := range devClientSymbols {
+	for _, s := range append(devClientSymbols, devOverlaySymbols...) {
 		if strings.Contains(release, s) {
 			t.Errorf("a release build links %s", s)
 		}

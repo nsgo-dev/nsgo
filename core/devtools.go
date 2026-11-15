@@ -309,6 +309,19 @@ func (s *devSurface) highlights(fn func(*highlights)) {
 	}
 }
 
+func (s *devSurface) Layout(on bool) { s.highlights(func(h *highlights) { h.audit.show(on) }) }
+
+func (s *devSurface) WatchLayout(shown func(bool)) {
+	h := s.t.highlights
+	if h != nil {
+		h.audit.watch = shown
+	}
+	if shown != nil {
+		// A surface without DevTools' overlay has no audit to show.
+		shown(h != nil && h.audit.shown.GetUntracked())
+	}
+}
+
 func (s *devSurface) Inspect(id uint32) {
 	s.highlights(func(h *highlights) { h.inspect.Set(s.t.inspected(s.t.node(NodeID(id)))) })
 }
@@ -409,40 +422,48 @@ var kindNames = map[driver.ViewKind]string{
 
 // Elements returns the tree's views from its root, leaving out DevTools' own.
 func (s *devSurface) Elements() devtools.Node {
-	t := s.t
 	var walk func(n *node) []devtools.Node
 	walk = func(n *node) []devtools.Node {
 		var out []devtools.Node
-		for _, c := range n.children {
-			if c.deleted || t.highlights != nil && t.highlights.owns(c) {
-				continue
-			}
-			if c.id == 0 {
-				out = append(out, walk(c)...)
-				continue
-			}
-			out = append(out, s.element(c, walk))
-		}
+		s.t.devChildren(n, func(c *node) { out = append(out, s.element(c, walk)) })
 		return out
 	}
-	return s.element(t.view, walk)
+	return s.element(s.t.view, walk)
+}
+
+// devChildren calls visit with each of n's children as DevTools list them, the layout audit too: through those that are no view to the views they hold, leaving out deleted views and DevTools' own.
+func (t *Tree) devChildren(n *node, visit func(*node)) {
+	for _, c := range n.children {
+		if c.deleted || t.highlights != nil && t.highlights.owns(c) {
+			continue
+		}
+		if c.id == 0 {
+			t.devChildren(c, visit)
+			continue
+		}
+		visit(c)
+	}
+}
+
+// devBox is n's box as DevTools show it, the layout audit too: its border box in the surface, and its margin, border and padding as laid out.
+func (t *Tree) devBox(n *node) (Bounds, devtools.Box) {
+	l := &n.lstate.Rounded
+	return t.surfaceBounds(n), devtools.Box{Margin: fourSides(l.Margin.Top, l.Margin.Right, l.Margin.Bottom, l.Margin.Left),
+		Border: fourSides(l.Border.Top, l.Border.Right, l.Border.Bottom, l.Border.Left), Padding: fourSides(l.Padding.Top, l.Padding.Right, l.Padding.Bottom, l.Padding.Left)}
 }
 
 func (s *devSurface) element(n *node, walk func(*node) []devtools.Node) devtools.Node {
 	t := s.t
-	b := t.surfaceBounds(n)
+	b, box := t.devBox(n)
 	e := devtools.Node{ID: uint32(n.id), Kind: kindNames[n.kind], TestID: n.props.TestID, Role: driver.RoleName(n.props.Role),
 		Label: n.props.Label, Bounds: [4]float32{float32(b.Origin.X), float32(b.Origin.Y), float32(b.Size.Width), float32(b.Size.Height)},
-		Hidden: n.hidden || n.style.Display == DisplayNone, Style: styleProps(n.style), Selector: selectorFor(n)}
+		Hidden: n.hidden || n.style.Display == DisplayNone, Style: styleProps(n.style), Selector: selectorFor(n), Box: box}
 	if e.Kind == "" {
 		e.Kind = "View"
 	}
 	if n.cls != nil && n.cls.list != nil {
 		e.Classes = strings.TrimSpace(n.cls.list.class)
 	}
-	l := &n.lstate.Rounded
-	e.Box = devtools.Box{Margin: fourSides(l.Margin.Top, l.Margin.Right, l.Margin.Bottom, l.Margin.Left),
-		Border: fourSides(l.Border.Top, l.Border.Right, l.Border.Bottom, l.Border.Left), Padding: fourSides(l.Padding.Top, l.Padding.Right, l.Padding.Bottom, l.Padding.Left)}
 	if n.text != nil {
 		e.Text, e.Clipped = clip(n.text.content), len(n.text.content) > clipAt
 	}
