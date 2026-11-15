@@ -237,18 +237,19 @@ const webNoScroll = "html, body { overflow: hidden !important; }"
 // widget is 0.
 type web struct {
 	hosted
-	widget     uintptr // WebKitWebView
-	session    uintptr // the ephemeral network session an Incognito page owns, released with it; 0 for the app's
-	content    uintptr // its WebKitUserContentManager
-	token      string  // what its top frame's messages start with (webBridge)
-	page       string  // the URI of the page last committed, which its messages report
-	config     driver.WebConfig
-	made       bool
-	failed     bool             // the navigation failed; WebKit still finishes it
-	pending    bool             // a load waits for the page to be mapped
-	source     driver.WebSource // what the pending or last load shows: the config's, or Ref.Load's
-	background [4]float32       // WebKit's own, for views without an opaque one
-	pointer    driver.Point     // where the pointer is in the page
+	widget        uintptr // WebKitWebView
+	session       uintptr // the ephemeral network session an Incognito page owns, released with it; 0 for the app's
+	content       uintptr // its WebKitUserContentManager
+	token         string  // what its top frame's messages start with (webBridge)
+	page          string  // the URI of the page last committed, which its messages report
+	config        driver.WebConfig
+	made          bool
+	failed        bool             // the navigation failed; WebKit still finishes it
+	pending       bool             // a load waits for the page to be mapped
+	ownNavigation bool             // the next top-level navigation is the app's source load
+	source        driver.WebSource // what the pending or last load shows: the config's, or Ref.Load's
+	background    [4]float32       // WebKit's own, for views without an opaque one
+	pointer       driver.Point     // where the pointer is in the page
 }
 
 // webPage is the window and view a WebKitWebView belongs to.
@@ -653,12 +654,14 @@ func (w *window) loadWeb(v *view) {
 	src := wv.source
 	switch {
 	case src.HTML != "":
+		wv.ownNavigation = true
 		var base *byte
 		if src.BaseURL != "" {
 			base = cstr(src.BaseURL)
 		}
 		webkitWebViewLoadHTML(wv.widget, cstr(src.HTML), base)
 	case src.Src != "":
+		wv.ownNavigation = true
 		if len(wv.config.Headers) == 0 {
 			webkitWebViewLoadURI(wv.widget, cstr(src.Src))
 			return
@@ -790,6 +793,7 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 	switch event {
 	case webkitLoadStarted:
 		v.web.failed = false
+		v.web.ownNavigation = false
 		w.navigated(v, true, driver.EventLoadStart)
 	case webkitLoadCommitted:
 		// From here the view's URI is the page that posts; until a load commits, the page before it still does.
@@ -841,6 +845,10 @@ func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 
 		return 0
 	}
 	url := goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
+	if v.web.ownNavigation {
+		v.web.ownNavigation = false
+		return 0
+	}
 	if v.web.config.Navigable(url) {
 		return 0
 	}

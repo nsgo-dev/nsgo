@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -151,6 +152,9 @@ type WebConfig struct {
 	// Hosts are the hosts Navigable allows, space-separated patterns:
 	// "*", "*.example.com" or a host.
 	Hosts string
+	// Schemes are the schemes of pages' own top-level navigations that are
+	// allowed, space-separated: "about", "blob" or "data".
+	Schemes string
 	// Media is what the pages may capture through getUserMedia; the
 	// platform refuses the rest as the page asks.
 	Media WebMedia
@@ -169,9 +173,9 @@ const (
 func (m WebMedia) Allows(want WebMedia) bool { return want != 0 && m&want == want }
 
 // Navigable reports whether a restricted view's page may navigate to
-// rawURL at its top level: a page of its own (about:, data:, blob:), or
-// an http or https one of a host Hosts allows. Other schemes, file:
-// among them, are refused.
+// rawURL at its top level: a page of its own (about:, data:, blob:) whose
+// scheme Schemes allows, or an http or https one of a host Hosts allows.
+// Other schemes, file: among them, are refused.
 func (c *WebConfig) Navigable(rawURL string) bool {
 	if !c.Restricted {
 		return true
@@ -182,7 +186,7 @@ func (c *WebConfig) Navigable(rawURL string) bool {
 	}
 	switch strings.ToLower(u.Scheme) {
 	case "about", "data", "blob":
-		return true
+		return slices.Contains(strings.Fields(c.Schemes), strings.ToLower(u.Scheme))
 	case "http", "https":
 		return AllowsHost(strings.Fields(c.Hosts), u.Hostname())
 	}
@@ -195,7 +199,7 @@ func (c *WebConfig) Navigable(rawURL string) bool {
 // RefusedNavigation is the message of EventError for a navigation
 // Navigable refused.
 func RefusedNavigation(url string) string {
-	return "nsgo: the web view may not navigate to " + url + " (the webview capability's hosts)"
+	return "nsgo: the web view may not navigate to " + url + " (the webview capability's hosts or schemes)"
 }
 
 // AllowsHost reports whether one of patterns allows host: "*" any, "*.example.com"
@@ -208,6 +212,19 @@ func AllowsHost(patterns []string, host string) bool {
 		}
 	}
 	return false
+}
+
+// IntersectSchemes returns the supported page schemes both lists allow. An
+// empty list allows none; the result uses the stable about, blob, data order.
+func IntersectSchemes(a, b []string) []string {
+	var out []string
+	for _, scheme := range []string{"about", "blob", "data"} {
+		if slices.ContainsFunc(a, func(s string) bool { return strings.EqualFold(s, scheme) }) &&
+			slices.ContainsFunc(b, func(s string) bool { return strings.EqualFold(s, scheme) }) {
+			out = append(out, scheme)
+		}
+	}
+	return out
 }
 
 // HostCovers reports whether pattern covers other, a host or a pattern.

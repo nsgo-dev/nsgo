@@ -16,6 +16,13 @@ type hostsAccess struct {
 	handlers []string
 }
 
+type schemesAccess struct {
+	hostsAccess
+	schemes []string
+}
+
+func (a schemesAccess) WebSchemes() []string { return a.schemes }
+
 func (a hostsAccess) Allows(req AccessRequest) bool {
 	switch req.Permission {
 	case AccessNetwork, AccessWebView:
@@ -70,7 +77,7 @@ func TestAccessHoldsWhatItsOwnerRenders(t *testing.T) {
 			t.Errorf("%s loads %q, want %q", id, uris[id], uri)
 		}
 	}
-	if web == nil || web.Source.Src != "" || !web.Restricted || web.Hosts != "ok.com *.cdn.com" {
+	if web == nil || web.Source.Src != "" || !web.Restricted || web.Hosts != "ok.com *.cdn.com" || web.Schemes != "about blob data" {
 		t.Fatalf("the web view is sent %+v", web)
 	}
 	h.drain()
@@ -124,6 +131,30 @@ func TestAccessAllowsRegisteredWebScheme(t *testing.T) {
 		if item.Kind == driver.ItemWeb {
 			if item.Web.Source.Src != "app://index.html" || !item.Web.Restricted || item.Web.SchemeHandlers["app"] == nil {
 				t.Fatalf("web config %+v", item.Web)
+			}
+			return
+		}
+	}
+	t.Fatal("no web item")
+}
+
+func TestAccessWebSchemesRestrictPageOwnedNavigations(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		outer := Func(func(cx *Scope) Node {
+			cx.ProvideAccess(schemesAccess{hostsAccess: hostsAccess{hosts: []string{"*"}}, schemes: []string{"about", "blob"}})
+			inner := Func(func(cx *Scope) Node {
+				cx.ProvideAccess(schemesAccess{hostsAccess: hostsAccess{hosts: []string{"*"}}, schemes: []string{"blob", "data"}})
+				return WebView{Source: WebSrc("https://example.com"), TestID: "web"}
+			})
+			return inner
+		})
+		return outer
+	})
+	b := h.commit()
+	for _, item := range b.Items {
+		if item.Kind == driver.ItemWeb {
+			if item.Web.Schemes != "blob" {
+				t.Fatalf("web schemes %q, want blob", item.Web.Schemes)
 			}
 			return
 		}
@@ -260,7 +291,7 @@ func TestProvideStoragePartitions(t *testing.T) {
 }
 
 func TestWebConfigNavigable(t *testing.T) {
-	c := driver.WebConfig{Restricted: true, Hosts: "ok.com *.cdn.com", SchemeHandlers: map[string]func(string) []byte{"app": nil}}
+	c := driver.WebConfig{Restricted: true, Hosts: "ok.com *.cdn.com", Schemes: "about blob data", SchemeHandlers: map[string]func(string) []byte{"app": nil}}
 	for url, want := range map[string]bool{
 		"https://ok.com/a": true, "http://OK.com": true, "https://a.cdn.com/x": true, "https://cdn.com/": false,
 		"https://evil.io": false, "https://ok.com@evil.io/": false, "about:blank": true, "data:text/html,x": true,
@@ -272,6 +303,16 @@ func TestWebConfigNavigable(t *testing.T) {
 	}
 	if got := driver.IntersectHosts([]string{"*.example.com", "a.com"}, []string{"api.example.com", "*"}); !slices.Equal(got, []string{"api.example.com", "*.example.com", "a.com"}) {
 		t.Fatalf("IntersectHosts = %v", got)
+	}
+	if got := driver.IntersectSchemes([]string{"data", "blob"}, []string{"blob", "about"}); !slices.Equal(got, []string{"blob"}) {
+		t.Fatalf("IntersectSchemes = %v", got)
+	}
+	limited := c
+	limited.Schemes = "blob"
+	for raw, want := range map[string]bool{"about:blank": false, "blob:https://ok.com/id": true, "data:text/html,x": false} {
+		if got := limited.Navigable(raw); got != want {
+			t.Errorf("limited Navigable(%q) = %v, want %v", raw, got, want)
+		}
 	}
 }
 

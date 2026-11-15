@@ -1450,6 +1450,7 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			// Android has no back and forward swipes.
 			w.flags(c.NoScroll, c.NoJavaScript, c.Restricted, c.Incognito, c.Media&driver.WebMicrophone != 0, c.Media&driver.WebCamera != 0, c.PinchZoom)
 			w.str(c.Hosts)
+			w.str(c.Schemes)
 			w.str(c.DownloadDir)
 			w.u32(uint32(len(c.Headers)))
 			for name, value := range c.Headers {

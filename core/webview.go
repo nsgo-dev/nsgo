@@ -213,7 +213,7 @@ func (t *Tree) restrictWeb(n *node, c *driver.WebConfig) {
 	if c.Source.BaseURL != "" && sourceRefusal(n.owner, AccessWebView, c.Source.BaseURL) != nil {
 		c.Source.BaseURL = ""
 	}
-	c.Restricted, c.Hosts, c.DownloadDir = true, strings.Join(a.WebHosts(), " "), ""
+	c.Restricted, c.Hosts, c.Schemes, c.DownloadDir = true, strings.Join(a.WebHosts(), " "), strings.Join(webSchemes(a), " "), ""
 	for _, m := range webMediaNames {
 		if c.Media&m.media != 0 && !a.Allows(AccessRequest{Permission: AccessWebView, Resource: m.name, Method: AccessMedia}) {
 			c.Media &^= m.media

@@ -23,8 +23,20 @@ type Access interface {
 	Allows(req AccessRequest) bool
 	// WebHosts are the hosts a web view's pages may navigate to at the
 	// top level: "*", "*.example.com" or a host. The platform refuses
-	// other navigations as they start.
+	// other http and https navigations as they start. AccessWebSchemes
+	// additionally controls pages of their own making.
 	WebHosts() []string
+}
+
+// AccessWebSchemes is an Access that also says which pages made by a web
+// view's current page may navigate to at the top level. The schemes are
+// "about", "blob" and "data". An Access without WebSchemes allows all three
+// for compatibility; an implementation that has it and returns nil allows
+// none. The app's own source and schemes served by ServeScheme are not held
+// to this list.
+type AccessWebSchemes interface {
+	Access
+	WebSchemes() []string
 }
 
 // AccessRequest is what Access is asked for.
@@ -257,6 +269,19 @@ func (b bothAccess) Allows(req AccessRequest) bool { return b.outer.Allows(req) 
 
 func (b bothAccess) WebHosts() []string {
 	return driver.IntersectHosts(b.outer.WebHosts(), b.inner.WebHosts())
+}
+
+func (b bothAccess) WebSchemes() []string {
+	return driver.IntersectSchemes(webSchemes(b.outer), webSchemes(b.inner))
+}
+
+var allWebSchemes = []string{"about", "blob", "data"}
+
+func webSchemes(a Access) []string {
+	if s, ok := a.(AccessWebSchemes); ok {
+		return s.WebSchemes()
+	}
+	return allWebSchemes
 }
 
 // sourceRefusal is the refusal of what a node of owner o loads from uri:

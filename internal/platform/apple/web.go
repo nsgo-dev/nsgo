@@ -29,12 +29,13 @@ type Web struct {
 	// Dispatch reports the web view's events.
 	Dispatch func(driver.Event)
 
-	holder  objc.ID
-	web     objc.ID
-	handler objc.ID
-	config  driver.WebConfig
-	fileDir string // the directory a file: page, or HTML with a file: base URL, may navigate in; "" for other sources
-	made    bool
+	holder        objc.ID
+	web           objc.ID
+	handler       objc.ID
+	config        driver.WebConfig
+	fileDir       string // the directory a file: page, or HTML with a file: base URL, may navigate in; "" for other sources
+	ownNavigation bool   // the next top-level navigation is the app's source load
+	made          bool
 }
 
 var (
@@ -163,8 +164,10 @@ func loadWebKit() {
 					frame := action.Send(sel("targetFrame"))
 					if frame == 0 || objc.Send[bool](frame, sel("isMainFrame")) {
 						url := GoString(action.Send(sel("request")).Send(sel("URL")).Send(sel("absoluteString")))
+						own := w.ownNavigation
+						w.ownNavigation = false
 						allowed := fileNavigable(url, w.fileDir, w.config.Restricted)
-						if allowed && w.config.Restricted {
+						if allowed && w.config.Restricted && !own {
 							allowed = w.config.Navigable(url)
 						}
 						if !allowed {
@@ -413,6 +416,7 @@ func (w *Web) addScripts() {
 }
 
 func (w *Web) load(src driver.WebSource) {
+	w.ownNavigation = true
 	w.fileDir = ""
 	switch {
 	case src.HTML != "":
