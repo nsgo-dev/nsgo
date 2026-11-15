@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -82,16 +83,17 @@ func TestWrite(t *testing.T) {
 	if err != nil {
 		t.Skip("apksigner is not installed")
 	}
-	// The SDK's apksigner script runs java; use the JDK this machine has
-	// beside the SDK when PATH does not.
+	// The SDK's apksigner script runs the java on PATH, which on macOS is a stub that starts the JDK JAVA_HOME names, else the one java_home finds, and hangs with none.
+	env := os.Environ()
 	java, err := exec.LookPath("java")
-	if err != nil {
-		java = filepath.Join(os.Getenv("HOME"), "Android", "jdk", "bin", "java")
-		if _, err := os.Stat(java); err != nil {
-			t.Skip("apksigner needs a JDK")
-		}
+	if jdk := jdkHome(); jdk != "" {
+		java, err = filepath.Join(jdk, "bin", "java"), nil
+		env = append(env, "JAVA_HOME="+jdk, "PATH="+filepath.Join(jdk, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}
-	if why, ok := javaRuns(java); !ok {
+	if err != nil {
+		t.Skip("apksigner needs a JDK")
+	}
+	if why, ok := javaRuns(java, env); !ok {
 		t.Skipf("apksigner needs a working JDK: %s", why)
 	}
 	path := filepath.Join(t.TempDir(), "test.apk")
@@ -104,8 +106,7 @@ func TestWrite(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, apksigner, "verify", "--verbose", path)
 	cmd.WaitDelay = 5 * time.Second
-	jdk := filepath.Dir(filepath.Dir(java))
-	cmd.Env = append(os.Environ(), "JAVA_HOME="+jdk, "PATH="+filepath.Join(jdk, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
+	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() != nil {
 		t.Fatalf("apksigner did not finish in a minute:\n%s", out)
@@ -118,13 +119,38 @@ func TestWrite(t *testing.T) {
 	}
 }
 
-// javaRuns reports whether java starts, and says why when it does not.
-// macOS's /usr/bin/java is a stub that asks for a JDK installation, and
-// blocks when a tool runs it with a jar.
-func javaRuns(java string) (string, bool) {
+// jdkHome returns the JDK to run apksigner with: the one JAVA_HOME names, else on macOS the one /usr/libexec/java_home finds, else the one this machine may keep beside the SDK in ~/Android/jdk. It returns "" when there is none, leaving the java on PATH to apksigner.
+func jdkHome() string {
+	hasJava := func(home string) bool {
+		_, err := os.Stat(filepath.Join(home, "bin", "java"))
+		return home != "" && err == nil
+	}
+	if home := os.Getenv("JAVA_HOME"); hasJava(home) {
+		return home
+	}
+	if runtime.GOOS == "darwin" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if out, err := exec.CommandContext(ctx, "/usr/libexec/java_home").Output(); err == nil {
+			if home := strings.TrimSpace(string(out)); hasJava(home) {
+				return home
+			}
+		}
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		if jdk := filepath.Join(home, "Android", "jdk"); hasJava(jdk) {
+			return jdk
+		}
+	}
+	return ""
+}
+
+// javaRuns reports whether java starts under env, and says why when it does not. macOS's /usr/bin/java is a stub that asks for a JDK installation, and blocks when a tool runs it with a jar.
+func javaRuns(java string, env []string) (string, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, java, "-version")
+	cmd.Env = env
 	cmd.WaitDelay = 2 * time.Second
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
