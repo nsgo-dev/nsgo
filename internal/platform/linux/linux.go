@@ -297,6 +297,7 @@ func start(app engine.App, opts Options) (*window, error) {
 	if err := openLibs(); err != nil {
 		return nil, fmt.Errorf("the Linux backend needs GTK 4, Pango and Cairo: %w", err)
 	}
+	setProgramIdentity(opts.ID)
 	runtime.LockOSThread()
 	registerFonts(opts.Fonts)
 	preferGLOnNvidia()
@@ -429,10 +430,7 @@ func preferGLOnNvidia() {
 	}
 }
 
-// NewView makes a GtkWidget showing app, for a host that has initialized
-// GTK and runs its main loop itself. Its engine starts once GTK first
-// allocates the widget, so settings made before that are in the app's
-// first frame. Call it on GTK's thread; several views may show at once.
+// NewView makes a GtkWidget showing app, for a host that has initialized GTK and runs its main loop itself. Its engine starts once GTK first allocates the widget, so settings made before that are in the app's first frame. Call it on GTK's thread; several views may show at once. It leaves the program name, which docks match the host's windows by, to the host.
 func NewView(app engine.App, opts Options) (*View, error) {
 	if err := openLibs(); err != nil {
 		return nil, fmt.Errorf("the Linux backend needs GTK 4, Pango and Cairo: %w", err)

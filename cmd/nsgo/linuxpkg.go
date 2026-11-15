@@ -128,7 +128,7 @@ func linuxPackageFiles(p *project, dir string) ([]linuxPackageEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID, WMClass: p.Name}
+	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID}
 	if n != nil {
 		entry.Name = n.names[n.source]
 		for _, lang := range n.languages()[1:] {

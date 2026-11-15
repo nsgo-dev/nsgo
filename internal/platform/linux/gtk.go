@@ -94,6 +94,7 @@ var (
 	gIdleAdd           func(uintptr, uintptr) uint32
 	gFree              func(uintptr)
 	gErrorFree         func(uintptr)
+	gSetPrgname        func(*byte)
 	gObjectUnref       func(uintptr)
 	gObjectGetData     func(uintptr, *byte) uintptr
 	gObjectSetData     func(uintptr, *byte, uintptr)
@@ -398,6 +399,14 @@ func cstr(s string) *byte {
 	return &b[0]
 }
 
+// setProgramIdentity names the process after the app's ID, which its desktop entry's name and StartupWMClass are, so docks match its windows to the entry. GTK 4 has no program class of its own: X11 windows take the program name as both parts of WM_CLASS, and Wayland toplevels take it as their app ID. It runs before gtk_init_check, as GDK's X11 client leader window reads it when the display opens.
+func setProgramIdentity(id string) {
+	if id == "" {
+		return
+	}
+	gSetPrgname(cstr(id))
+}
+
 // cStrings is a NULL-terminated array of C strings and the Go memory
 // holding them: the array keeps only their addresses, which the collector
 // does not follow, so bufs keeps the strings alive while it is reachable.
@@ -432,6 +441,7 @@ func bind() {
 	purego.RegisterLibFunc(&gIdleAdd, glibLib, "g_idle_add")
 	purego.RegisterLibFunc(&gFree, glibLib, "g_free")
 	purego.RegisterLibFunc(&gErrorFree, glibLib, "g_error_free")
+	purego.RegisterLibFunc(&gSetPrgname, glibLib, "g_set_prgname")
 	purego.RegisterLibFunc(&gStrfreev, glibLib, "g_strfreev")
 	purego.RegisterLibFunc(&gVariantNewString, glibLib, "g_variant_new_string")
 	purego.RegisterLibFunc(&gVariantNewBoolean, glibLib, "g_variant_new_boolean")

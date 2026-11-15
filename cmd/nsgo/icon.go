@@ -625,12 +625,10 @@ func writeLinuxIcon(p *project, dir string) error {
 	return desktopEntry.Execute(f, entry)
 }
 
-// desktopData is what a desktop entry says: the app's name, in its other
-// languages by locale too, its executable and its icon, and for an
-// installed app its windows' class, which docks match them by.
+// desktopData is what a desktop entry says: the app's name, in its other languages by locale too, its executable, and its ID, which names its icon and is the class of its windows that docks match them by, as the Linux backend gives them the ID as the program name.
 type desktopData struct {
-	Name, Exec, ID, WMClass string
-	Names                   [][2]string
+	Name, Exec, ID string
+	Names          [][2]string
 }
 
 var desktopEntry = template.Must(template.New("desktop").Parse(`[Desktop Entry]
@@ -642,9 +640,7 @@ Name[{{index . 0}}]={{index . 1}}
 Exec="{{.Exec}}"
 Icon={{.ID}}
 Terminal=false
-{{- if .WMClass}}
-StartupWMClass={{.WMClass}}
-{{- end}}
+StartupWMClass={{.ID}}
 `))
 
 // writeWindowsResources writes the app's resources, its icon and its version, as an object into the app's package directory, so go build links it into the executable, and returns the object and the function that removes it again. Go only links .syso files from the package's own directory, and its linker takes resources from one object alone: when an object of the app's own holds resources, the executable takes those instead, and the object returned is nil.

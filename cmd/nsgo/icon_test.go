@@ -224,3 +224,27 @@ func TestEdgeColor(t *testing.T) {
 		t.Errorf("edge color = %x %x %x %x, want the border's 20 40 80, opaque", r>>8, g>>8, b>>8, a)
 	}
 }
+
+// The desktop entry beside a Linux executable, which the AppImage and the Flatpak install, names its windows' class by the app's ID, the program name the Linux backend gives them, so docks match a running window that is not pinned to the entry.
+func TestLinuxDesktopEntryNamesTheWindowClass(t *testing.T) {
+	dir := t.TempDir()
+	icon := filepath.Join(dir, "icon.png")
+	var b bytes.Buffer
+	if err := png.Encode(&b, testIcon(16)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(icon, b.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := &project{Name: "App", ID: "dev.example.app", Icon: icons{PNG: icon}}
+	if err := writeLinuxIcon(p, dir); err != nil {
+		t.Fatal(err)
+	}
+	entry, err := os.ReadFile(filepath.Join(dir, "dev.example.app.desktop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(entry), "\nIcon=dev.example.app\n") || !strings.Contains(string(entry), "\nStartupWMClass=dev.example.app\n") {
+		t.Errorf("desktop entry:\n%s", entry)
+	}
+}

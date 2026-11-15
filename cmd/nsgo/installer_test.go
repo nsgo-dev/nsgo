@@ -279,7 +279,7 @@ func TestLinuxPackages(t *testing.T) {
 		t.Errorf("the command links to %q", f.link)
 	}
 	if entry := string(byName["usr/share/applications/dev.example.app.desktop"].data); !strings.Contains(entry, `Exec="/opt/app/App"`) ||
-		!strings.Contains(entry, "StartupWMClass=App") {
+		!strings.Contains(entry, "StartupWMClass=dev.example.app") {
 		t.Errorf("desktop entry:\n%s", entry)
 	}
 
