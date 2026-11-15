@@ -96,6 +96,8 @@ const (
 	msgLiveReport = 15
 	// msgSurface is what an overlay's view reports of its surface: its size, frame and environment, the first of which attaches its tree, or its end (overlay.go).
 	msgSurface = 16
+	// msgTimeZone is the device's time zone, after the process starts and as it changes (timezone.go).
+	msgTimeZone = 17
 )
 
 // The parts of an image view's request msgImage carries.
@@ -371,6 +373,9 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.hostMessage(&r)
 		case msgLiveReport:
 			driver.ReportLiveUpdate(slices.Clone(payload))
+		case msgTimeZone:
+			// Go has no other way to change the zone: the store races with readers of time.Local, but it is one pointer, which none sees torn.
+			time.Local = readTimeZone(&r)
 		case msgDNS:
 			servers := make([]string, r.u32())
 			for i := range servers {
@@ -381,11 +386,15 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 	}
 }
 
-// init points os.TempDir at the app's cache, as Android gives an app's
-// process no TMPDIR and its default, /data/local/tmp, is the shell's.
+// init points os.TempDir at the app's cache, as Android gives an app's process no TMPDIR and its default, /data/local/tmp, is the shell's, and time.Local at the zone the runtime passes as TZ, which Go on Android does not read (timezone.go).
 func init() {
 	if dir := os.Getenv("NSGO_CACHE_DIR"); dir != "" && os.Getenv("TMPDIR") == "" {
 		os.Setenv("TMPDIR", dir)
+	}
+	if tz := os.Getenv("TZ"); tz != "" {
+		if loc, err := time.LoadLocation(tz); err == nil {
+			time.Local = loc
+		}
 	}
 }
 

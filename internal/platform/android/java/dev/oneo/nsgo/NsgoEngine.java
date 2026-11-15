@@ -1,15 +1,20 @@
 package dev.oneo.nsgo;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.util.Log;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.TimeZone;
 
 /**
  * Owns one NSGo process and its pipe. A host may keep this object in an Application or foreground service, so that the app runs on while the NsgoView showing it is detached from its Activity.
@@ -35,6 +40,8 @@ public final class NsgoEngine {
     private Listener listener;
     private boolean readerStarted;
     private boolean closed;
+    /** Tells the process of the device's time zone changes while it runs. */
+    private BroadcastReceiver zones;
 
     /** Creates an engine without retaining an Activity or another UI context. */
     public NsgoEngine(Context context) {
@@ -42,11 +49,51 @@ public final class NsgoEngine {
         application = context.getApplicationContext();
     }
 
-    /** Starts the process; an engine starts one only. NsgoView supplies the immutable launch config. */
+    /**
+     * Starts the process; an engine starts one only. NsgoView supplies the immutable launch config, to which this adds the device's time zone as TZ, as Go reads it from nowhere else; the zone follows in TIME_ZONE, then again whenever it changes.
+     */
     synchronized void start(ProcessBuilder builder) throws IOException {
         if (!canStart()) throw new IllegalStateException(closed ? "engine is destroyed" : "engine has started its process");
+        builder.environment().put("TZ", TimeZone.getDefault().getID());
         process = builder.start();
         out = new DataOutputStream(new BufferedOutputStream(process.getOutputStream()));
+        watchTimeZone();
+    }
+
+    /**
+     * Sends the zone now and as ACTION_TIMEZONE_CHANGED reports it, until the process ends: a zone Go cannot load from the system's tzdata still gets its current offset, and a change between the launch and the receiver's registration is not lost.
+     */
+    private void watchTimeZone() {
+        zones = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                // The intent's ID is the new zone; the process's default may not have followed it yet.
+                String id = intent.getStringExtra(Intent.EXTRA_TIMEZONE);
+                timeZone(id != null ? TimeZone.getTimeZone(id) : TimeZone.getDefault());
+            }
+        };
+        // A system broadcast, which the receiver hears without being exported.
+        application.registerReceiver(zones, new IntentFilter(Intent.ACTION_TIMEZONE_CHANGED));
+        timeZone(TimeZone.getDefault());
+    }
+
+    private void timeZone(TimeZone zone) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream d = new DataOutputStream(bytes);
+        try {
+            Protocol.writeString(d, zone.getID());
+            d.writeInt(zone.getOffset(System.currentTimeMillis()) / 1000);
+        } catch (IOException impossible) {
+            throw new AssertionError(impossible);
+        }
+        write(Protocol.TIME_ZONE, bytes.toByteArray());
+    }
+
+    /** Stops telling the process of the zone's changes, as it ends; it is safe to call twice. */
+    private synchronized void unwatchTimeZone() {
+        if (zones == null) return;
+        application.unregisterReceiver(zones);
+        zones = null;
     }
 
     /** Says whether the engine has neither started a process nor been destroyed. */
@@ -109,6 +156,7 @@ public final class NsgoEngine {
                 out = null;
             }
             if (process != null) process.destroy();
+            unwatchTimeZone();
             // Without a reader, nothing else tells the view.
             idle = readerStarted ? null : listener;
             if (!readerStarted) listener = null;
@@ -138,6 +186,7 @@ public final class NsgoEngine {
             current = listener;
             listener = null;
             out = null;
+            unwatchTimeZone();
         }
         if (current != null) current.onProcessEnded(failure);
     }

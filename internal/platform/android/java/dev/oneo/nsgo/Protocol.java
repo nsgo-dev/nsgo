@@ -50,6 +50,8 @@ final class Protocol {
     static final int LIVE_REPORT = 15;
     /** What an overlay's view reports of its surface, after its ID: SURFACE_STATE or SURFACE_ENDED (overlay.go). */
     static final int SURFACE = 16;
+    /** The device's time zone: its ID, then its offset from UTC now in seconds (timezone.go). */
+    static final int TIME_ZONE = 17;
 
     // What a SURFACE message reports, as overlay.go has them: the window's size and place in points, then the environment, or its end, an OVERLAY_END_*.
     static final int SURFACE_STATE = 1;
