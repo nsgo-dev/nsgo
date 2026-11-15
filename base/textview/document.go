@@ -123,6 +123,9 @@ type CodeBlock struct {
 	Code           string
 }
 
+// IsDiagram reports whether b holds a diagram TextView.RenderDiagram draws: its language is mermaid, as GitHub's and Obsidian's Markdown write one, in any case.
+func IsDiagram(b CodeBlock) bool { return strings.EqualFold(b.Language, "mermaid") }
+
 // Table is a table: its column alignments, its header row and its body.
 type Table struct {
 	Align []ColumnAlign

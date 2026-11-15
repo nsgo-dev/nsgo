@@ -106,6 +106,10 @@ const (
 	PartMathBlock
 	// PartMathBlockScroll is the horizontal scroll view of a block's formula with RenderMath.
 	PartMathBlockScroll
+	// PartDiagramBlock is a diagram block with RenderDiagram, around its scroll view.
+	PartDiagramBlock
+	// PartDiagramBlockScroll is the horizontal scroll view of a block's diagram with RenderDiagram.
+	PartDiagramBlockScroll
 	// PartDetails is a disclosure: a column of its summary and, while
 	// open, its blocks.
 	PartDetails

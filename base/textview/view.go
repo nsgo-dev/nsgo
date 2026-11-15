@@ -75,6 +75,8 @@ type TextView struct {
 	// RenderCodeBlock shows a code block in place of the default: the code
 	// in a horizontal scroll view.
 	RenderCodeBlock func(cx *core.Scope, code CodeBlock) core.Node
+	// RenderDiagram shows a mermaid code block's diagram, which TextView places as an attachment that a copy takes as the block's source between ```mermaid fences, centered in PartDiagramBlock around a sideways PartDiagramBlockScroll. A block still streaming behind the caret shows as code until it is complete. Without it, and for other code blocks, RenderCodeBlock or the default shows them. diagram.RenderDiagram (base/diagram) draws them, which links limu into the app.
+	RenderDiagram func(cx *core.Scope, code CodeBlock) core.Node
 	// CodeBlockActions are buttons over each code block's top right
 	// corner, in PartCodeBlockHeader, each a PartCodeBlockAction showing
 	// RenderCodeBlockAction (its label, else its ID, as text without it).
@@ -86,8 +88,8 @@ type TextView struct {
 	// RenderTableActions shows content above each table, in
 	// PartTableActions.
 	RenderTableActions func(cx *core.Scope, table Table) core.Node
-	// NoTableScroll lets a table shrink past its columns' floors rather than scroll; NoTableScrollbar, NoCodeBlockScrollbar and NoMathBlockScrollbar hide the scroll bars of tables, code blocks and display formulas.
-	NoTableScroll, NoTableScrollbar, NoCodeBlockScrollbar, NoMathBlockScrollbar bool
+	// NoTableScroll lets a table shrink past its columns' floors rather than scroll; NoTableScrollbar, NoCodeBlockScrollbar, NoMathBlockScrollbar and NoDiagramBlockScrollbar hide the scroll bars of tables, code blocks, display formulas and diagrams.
+	NoTableScroll, NoTableScrollbar, NoCodeBlockScrollbar, NoMathBlockScrollbar, NoDiagramBlockScrollbar bool
 	// RenderImage shows an image in place of the default: alone in a
 	// paragraph, a block; in a line of text, an attachment.
 	RenderImage func(cx *core.Scope, image Image) core.Node
@@ -354,6 +356,15 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 	case List:
 		return r.list(cx, b, depth, caret)
 	case CodeBlock:
+		if r.tv.RenderDiagram != nil && !caret && IsDiagram(b) {
+			// The diagram centers on a line as wide as the scroll at least, which a copy takes as the block's source between its fences.
+			diagram := r.selectable(core.Text{Style: core.Style{MinWidth: core.Pct(100), TextAlign: core.TextAlignCenter}, Spans: []core.Span{
+				{Content: "```" + b.Language + "\n" + b.Code + "\n```", Attachment: r.tv.RenderDiagram(cx, b)},
+			}})
+			return after(core.View{Class: r.class(PartDiagramBlock), StyleFunc: func() core.Style { return r.style(PartDiagramBlock) }, Children: []core.Node{
+				core.Scroll{Horizontal: true, HideIndicator: r.tv.NoDiagramBlockScrollbar, Class: r.class(PartDiagramBlockScroll), StyleFunc: func() core.Style { return r.style(PartDiagramBlockScroll) }, Children: []core.Node{diagram}},
+			}})
+		}
 		if r.tv.RenderCodeBlock != nil {
 			return after(r.tv.RenderCodeBlock(cx, b))
 		}

@@ -106,10 +106,12 @@ func TextViewStyles(cx *core.Scope) textview.Styles {
 		textview.PartTableHeaderCell: semibold,
 		textview.PartTableActions:    {Direction: core.Row, JustifyContent: core.JustifyEnd, Gap: 4},
 
-		textview.PartRule:            {Height: core.Pt(1), Background: c.Line, Margin: core.Symmetric(8, 0)},
-		textview.PartMath:            TypeCode,
-		textview.PartMathBlock:       TypeCode.Merge(core.Style{Padding: core.All(12), Background: c.Inset, CornerRadius: RadiusControl}),
-		textview.PartMathBlockScroll: {Padding: core.All(12)},
+		textview.PartRule:               {Height: core.Pt(1), Background: c.Line, Margin: core.Symmetric(8, 0)},
+		textview.PartMath:               TypeCode,
+		textview.PartMathBlock:          TypeCode.Merge(core.Style{Padding: core.All(12), Background: c.Inset, CornerRadius: RadiusControl}),
+		textview.PartMathBlockScroll:    {Padding: core.All(12)},
+		textview.PartDiagramBlock:       {Background: c.Inset, CornerRadius: RadiusControl},
+		textview.PartDiagramBlockScroll: {Padding: core.All(12)},
 
 		textview.PartDetails:       {Gap: 8, Padding: core.Symmetric(8, 12), BorderWidth: 1, BorderColor: c.Border, CornerRadius: RadiusControl},
 		textview.PartSummary:       TypeLabel.Merge(core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}),
