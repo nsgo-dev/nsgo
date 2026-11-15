@@ -82,7 +82,7 @@ What NSGo's own issues ask for beyond NSH's releases, each issue where its desig
 
 | Item | Reference | Done when |
 | --- | --- | --- |
-| Mention completion in Composer | [#46](https://github.com/nsgo-dev/nsgo/issues/46), [mention completion](architecture/mention-completion.md) | A `core.Suggest` owns a field's trigger, query and UTF-16 insertion and a `base.SuggestList` its rows, keys and announcements, while `Composer`'s `Suggest` supplies rows and `ui` the look; a test types `@re`, sees two rows, presses Down and Return, and finds the chosen row inserted at the caret with the list gone |
+| Mention completion in Composer | [#46](https://github.com/nsgo-dev/nsgo/issues/46), [mention completion](architecture/mention-completion.md) | The test that presses a row, run with `nsgo test -target` in the iOS simulator and the Android emulator, where the platform's own keyboard-dismissing tap runs, finds the row inserted and the field still focused |
 | Task progress on app icons | [#116](https://github.com/nsgo-dev/nsgo/issues/116) | `core.SetTaskProgress` shows, updates and clears a bar beside the badge on the macOS Dock tile, the Windows taskbar button, indeterminate there, and Linux launchers with LauncherEntry (Ubuntu dock, Plasma, Dash to Dock), and clearing it on macOS brings back the plain icon; so far it ran only in `nsgotest` and pure-logic tests, on no Dock, taskbar or launcher (2026-11-15) |
 
 ## Application and windows

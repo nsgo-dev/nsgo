@@ -125,7 +125,6 @@ Record a design question here, and confirm the answer with the user before choos
 - **Sizes on a TV.** `ui`'s sizes are constants on every device, but a TV is read from across a room. Since `core` scales nothing by device, does `ui` take larger sizes on a TV, or leave them to the app ([roadmap](docs/roadmap.md#apple-tv))?
 - **Remote push.** [Remote push](docs/architecture/remote-push.md#open-decisions) is designed but not built, and five choices block it: the public API's shape, whether `nsgo build` packages an FCM adapter for standalone apps, whether a background push runs app code with no view, whether data delivery takes a capability of its own beside `AccessNotifications`, and which provider metadata the API exposes, a press's ID among it. Which answers?
 - **Contacts and calendar.** [The design](docs/architecture/contacts-calendar.md#open-decisions) for #57 waits on five answers: whether the first release writes contacts and events or only picks and reads, whether contacts and calendar are separate capabilities and how contacts' limited and calendars' write-only access read through `core.Permission`, which contact fields, recurrence forms and attendee data are stable across platforms, whether the calendar reports the provider's changes or apps query again, and whether provider IDs are strings or handles that expire with an engine. Which, before building it?
-- **Mention completion.** The design for #46 ([mention completion](docs/architecture/mention-completion.md#open-decisions)) leaves five choices open: whether `Items` runs synchronously or is an app-owned resource, whether an empty result keeps the list open, whether Tab accepts as Return does and either submits with no row highlighted, whether a field takes one trigger or several, and whether an `Insert` replaces only the trigger and query or an explicit range.
 
 ## Verification
 
@@ -149,7 +148,7 @@ Record a design question here, and confirm the answer with the user before choos
 | [Picture in Picture](docs/architecture/picture-in-picture.md) | iOS video or custom-content Picture in Picture |
 | [Android floating windows](docs/architecture/android-floating-windows.md) | Android system overlays, service ownership or overlay permissions |
 | [Foldable displays](docs/architecture/foldable.md) | Hinge geometry, reserved regions or a hinge's state in the environment |
-| [Mention completion](docs/architecture/mention-completion.md) | Suggestion state, text-field key capture or composer rows |
+| [Mention completion](docs/architecture/mention-completion.md) | `core.Suggest`, `base.SuggestList` or Composer's mentions |
 | [Android recording](docs/architecture/android-recording.md) | Long-running microphone capture, foreground services or level metering |
 | [Bluetooth Low Energy](docs/architecture/bluetooth.md) | Bluetooth central sessions, GATT operations or platform permissions |
 | [Updates](docs/architecture/updates.md) | `updater`, an update check, the updaters `nsgo build` bundles or a release channel |
