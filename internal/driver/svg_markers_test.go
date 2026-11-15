@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"testing"
 )
 
@@ -104,8 +105,11 @@ func TestSVGMarkerReferences(t *testing.T) {
 		{"single quotes", `<path d="M0 0L10 0" marker-end="url('#m')"/>`, 1},
 		{"double quotes", `<path d="M0 0L10 0" style="marker-end: url(&quot;#m&quot;)"/>`, 1},
 		{"inherited from a group", `<g marker-end="url(#m)"><path d="M0 0L10 0"/></g>`, 1},
-		{"the marker shorthand", `<path d="M0 0L10 0L20 0" marker="url(#m)"/>`, 3},
-		{"a longhand over the shorthand", `<path d="M0 0L10 0L20 0" marker="url(#m)" marker-mid="none"/>`, 2},
+		{"the marker shorthand in a style attribute", `<path d="M0 0L10 0L20 0" style="marker: url(#m)"/>`, 3},
+		{"the marker shorthand in a style sheet", `<style>.s { marker: url(#m) }</style><path class="s" d="M0 0L10 0L20 0"/>`, 3},
+		{"a marker attribute, which is no presentation attribute", `<path d="M0 0L10 0L20 0" marker="url(#m)"/>`, 0},
+		{"a longhand after the shorthand", `<path d="M0 0L10 0L20 0" style="marker: url(#m); marker-mid: none"/>`, 2},
+		{"the shorthand after a longhand", `<path d="M0 0L10 0L20 0" style="marker-mid: none; marker: url(#m)"/>`, 3},
 		{"none over an inherited marker", `<g marker-end="url(#m)"><path d="M0 0L10 0" marker-end="none"/></g>`, 0},
 		{"an element that is not a marker", `<g id="grp"><path d="M0 0L5 0" stroke="red"/></g><path d="M0 0L10 0" marker-end="url(#grp)"/>`, 1},
 	} {
@@ -114,6 +118,40 @@ func TestSVGMarkerReferences(t *testing.T) {
 			// The group the last case names draws once, where it is.
 			if len(lines) != tt.markers {
 				t.Fatalf("lines = %v, want %d", lines, tt.markers)
+			}
+		})
+	}
+}
+
+func TestSVGMarkerCascade(t *testing.T) {
+	// Marker a draws a red line and marker b a blue one; the path paints nothing itself, so the strokes are its start, mid and end markers in turn.
+	red, blue := RGB(0xff0000), RGB(0x0000ff)
+	for _, tt := range []struct {
+		name, sheet, path string
+		want              []Color
+	}{
+		{"an inline shorthand over a presentation attribute", "", `style="marker: url(#b)" marker-start="url(#a)"`, []Color{blue, blue, blue}},
+		{"a sheet's shorthand over a presentation attribute", ".s { marker: url(#b) }", `class="s" marker-start="url(#a)"`, []Color{blue, blue, blue}},
+		{"a more specific sheet longhand over a shorthand", ".s { marker: url(#b) } #p { marker-start: url(#a) }", `class="s" id="p"`, []Color{red, blue, blue}},
+		{"an inline shorthand over a more specific sheet longhand", "#p { marker-start: url(#a) }", `id="p" style="marker: url(#b)"`, []Color{blue, blue, blue}},
+		{"an inline longhand over a sheet's shorthand", ".s { marker: url(#b) }", `class="s" style="marker-end: url(#a)"`, []Color{blue, blue, red}},
+		{"a presentation attribute under no style", "", `marker="url(#b)" marker-start="url(#a)"`, []Color{red}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ops := svgOps(t, `<svg viewBox="0 0 200 200" fill="none">
+				<style>`+tt.sheet+`</style>
+				<marker id="a" markerUnits="userSpaceOnUse" overflow="visible"><path d="M0 0L10 0" stroke="red"/></marker>
+				<marker id="b" markerUnits="userSpaceOnUse" overflow="visible"><path d="M0 0L10 0" stroke="blue"/></marker>
+				<path d="M0 0L50 0L100 0" `+tt.path+`/>
+			</svg>`)
+			var got []Color
+			for _, op := range ops {
+				if op.Kind == DrawStrokeColor {
+					got = append(got, op.Color)
+				}
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("marker strokes = %v, want %v", got, tt.want)
 			}
 		})
 	}

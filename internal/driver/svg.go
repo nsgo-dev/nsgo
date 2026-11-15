@@ -169,7 +169,7 @@ func parseSVGTree(data []byte) (*svgNode, error) {
 		applyCSSRules(n, rules)
 		if v, ok := n.attrs["style"]; ok {
 			for _, d := range parseCSSDeclarations(v) {
-				n.attrs[d[0]] = d[1]
+				setCSSDeclaration(n.attrs, d[0], d[1])
 			}
 		}
 		for _, c := range n.children {
@@ -819,10 +819,6 @@ func (p *svgParser) emitOps(ops []DrawOp, m svgMatrix) {
 
 // apply reads the presentation attributes on an element.
 func (s *svgStyle) apply(a map[string]string) error {
-	// The marker shorthand sets all three markers, and an element's own marker-start, marker-mid or marker-end overrides it.
-	if id, ok := svgMarkerRef(a["marker"]); ok {
-		s.markerStart, s.markerMid, s.markerEnd = id, id, id
-	}
 	for name, value := range a {
 		value = strings.TrimSpace(value)
 		if value == "inherit" {

@@ -743,8 +743,7 @@ func (r *cssRule) matches(n *svgNode) bool {
 	return true
 }
 
-// applyCSSRules sets the declarations of the rules that match n on its
-// attributes, the more specific ones last.
+// applyCSSRules sets the declarations of the rules that match n on its attributes, the more specific ones last.
 func applyCSSRules(n *svgNode, rules []cssRule) {
 	var matched []*cssRule
 	for i := range rules {
@@ -755,9 +754,18 @@ func applyCSSRules(n *svgNode, rules []cssRule) {
 	slices.SortStableFunc(matched, func(a, b *cssRule) int { return a.specificity - b.specificity })
 	for _, r := range matched {
 		for _, d := range r.decls {
-			n.attrs[d[0]] = d[1]
+			setCSSDeclaration(n.attrs, d[0], d[1])
 		}
 	}
+}
+
+// setCSSDeclaration sets a style declaration on an element's attributes, over the presentation attribute of its name. The marker shorthand, which only CSS reads, sets marker-start, marker-mid and marker-end, so it and the longhands override each other in the order they are declared.
+func setCSSDeclaration(attrs map[string]string, name, value string) {
+	if name == "marker" {
+		attrs["marker-start"], attrs["marker-mid"], attrs["marker-end"] = value, value, value
+		return
+	}
+	attrs[name] = value
 }
 
 // parseCSSDeclarations reads "name: value" pairs separated by semicolons.

@@ -10,11 +10,11 @@ An icon is a vector element, not an image: `core.SVG` turns a document into canv
 
 | Read | Not read |
 | --- | --- |
-| `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` inside `svg`, `g`, `a`, `switch` and `use` (of shapes, groups and symbols), with markers from `marker-start`, `marker-mid`, `marker-end` and `marker` | Text, images, patterns, masks, filters, animations, nested viewports' `viewBox`es |
+| `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` inside `svg`, `g`, `a`, `switch` and `use` (of shapes, groups and symbols), with markers from `marker-start`, `marker-mid`, `marker-end` and, in `style` attributes and style sheets, the `marker` shorthand | A `marker` attribute, which is not a presentation attribute; text, images, patterns, masks, filters, animations, nested viewports' `viewBox`es |
 | `fill`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `stroke-dasharray`, `stroke-dashoffset`, `fill-rule`, `clip-rule`, `fill-opacity`, `stroke-opacity`, `color`, `visibility`, inherited through groups; `opacity`, `display="none"`, `transform` | `stroke-miterlimit`, `paint-order`, blend modes |
 | `none`, `currentColor`, hex, `rgb()`, `rgba()`, `hsl()`, `hsla()`, CSS names, `transparent`; `url(#id)` with a fallback | `var()`, `currentColor` in a gradient stop (black) |
 | Linear and radial gradients with `href` inheritance, both units, `gradientTransform` and spread methods; clip paths in user space units | Clip paths in `objectBoundingBox` units; a focal point outside its circle moves onto it, as in SVG 1.1 |
-| Presentation attributes, the `style` attribute, and style sheets' type, class and id selectors | Other selectors, at-rules |
+| Presentation attributes, the `style` attribute, and style sheets' type, class and id selectors, a style declaration overriding a presentation attribute, more specific rules overriding less specific ones and the `style` attribute overriding both | Other selectors, at-rules, `!important` |
 
 Parsing reads the document into a tree first, so references may point forward, then records `DrawOp`s in the `viewBox` with the color zero standing for `currentColor`. `SVG.Draw` substitutes the icon's color, scales the document uniformly to fit its box, centers it and leaves it as one immutable `Drawing` the platform replays. A non-square box keeps the aspect ratio.
 
