@@ -59,6 +59,8 @@ Mitchell Hashimoto, Ghostty contributors, licensed under the MIT License.
 base/terminal/ghostty_themes.go holds iTerm2-Color-Schemes' themes as Ghostty
 ships them, under the MIT License its header gives.
 
+base/diagram/paint.go draws limu's scenes as limumygo, limu's adapter to MyGo, draws them, https://github.com/firede/limu, Copyright (c) 2026 Firede, licensed under the MIT License: what each item's parts, markers and label are painted in, and where a label's lines and spans go. limu, which base/diagram imports, ports much of Pele, https://github.com/obsidianmd/pele, Copyright (c) 2026 kepano, under the MIT License, and carries both notices in its LICENSE.
+
 core/audit.go's layout audit follows mygo-layout-audit, https://github.com/knothhe/mygo-layout-audit, Copyright (c) 2026 knothhe, licensed under the MIT License: its colors, its grid and its ruler.
 
 internal/platform/macos/permissionguide.go and permissionguide_layout.go, macOS's permission guide, port MyGo's permissionflow plugin, https://github.com/egoist/mygo, Copyright (c) 2026 MyGo contributors, licensed under the MIT License, which follows PermissionFlow, https://github.com/jaywcjlove/PermissionFlow, Copyright (c) 2026 小弟调调: what the guide does, the panes it opens and which of them take a drag, the pasteboard types of the dragged app, and the panel's geometry and text. None of PermissionFlow's code is copied. PermissionFlow's license:

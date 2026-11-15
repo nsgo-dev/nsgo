@@ -110,6 +110,8 @@ var platformShared = []string{
 var owned = map[string][]string{
 	// Untie and the font it lays out in, for the formulas apps ask for.
 	"github.com/caelyreth/untie": {"base/formula"},
+	// limu, which reads and lays out Mermaid, for the diagrams apps ask for.
+	"github.com/firede/limu": {"base/diagram"},
 }
 
 // portable lists the packages that build unchanged for every target: no

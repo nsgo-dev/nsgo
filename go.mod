@@ -9,6 +9,7 @@ require (
 	github.com/dop251/goja v0.0.0-20261027234916-5f913d1693d9
 	github.com/ebitengine/purego v0.11.3
 	github.com/evanw/esbuild v0.28.2
+	github.com/firede/limu v0.5.1
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/yuin/goldmark v1.8.7

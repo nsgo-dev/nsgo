@@ -1,0 +1,6 @@
+diagram:
+  message: "Diagram"
+  description: "What assistive technology calls a diagram whose text gives it no title (accTitle) or description (accDescr)."
+described:
+  message: "{title}: {description}"
+  description: "A diagram's title (accTitle) and description (accDescr), read together."
