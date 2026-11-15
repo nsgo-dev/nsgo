@@ -3273,7 +3273,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private boolean recordingAsking;
     private String recordingSent;
 
-    /** Takes a RECORDING message, on the engine's reader thread: a stop goes to the service at once, a start and an authorize to the UI thread. */
+    /** Takes a RECORDING message, on the engine's reader thread: a stop and the app's taking of an earlier recording go to the service at once, a start and an authorize to the UI thread. */
     private void recording(byte[] payload) {
         JSONObject m;
         try {
@@ -3292,6 +3292,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 break;
             case "authorize":
                 ui.post(() -> recordingAuthorize(id));
+                break;
+            case "taken":
+                RecordingService.taken(m.optString("path"));
                 break;
             default:
         }

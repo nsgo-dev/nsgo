@@ -135,7 +135,7 @@ func (r *Recording) Interrupted() bool {
 	return r.interrupted
 }
 
-// RecordWAV records 16-bit PCM WAV to the file name in the app's recordings directory, private storage the runtime keeps under the app's data directory, until it stops or ends by itself. The file goes under a temporary name until then, and its header follows what was written about once a second, so a file whose app was killed plays up to its last second; the next RecordWAV repairs it under its name and Earlier reports it. It asks for the microphone as Authorize does and waits for the answer, so call it off the UI. On Android it records in the runtime's foreground service, through a hidden activity and the screen going off, and starts only while an activity of the app is visible, in an app whose nsgo.yaml sets android.recording; it reports ErrUnsupported elsewhere. From Android 13 the service's notification shows only once the user lets the app post notifications, so the first RecordWAV asks for POST_NOTIFICATIONS with RECORD_AUDIO, or alone where RECORD_AUDIO is granted; a user who refuses notifications still records, without a visible notification.
+// RecordWAV records 16-bit PCM WAV to the file name in the app's recordings directory, private storage the runtime keeps under the app's data directory, until it stops or ends by itself. The file goes under a temporary name until then, and its header follows what was written about once a second, so a file whose app was killed plays up to its last second; the next RecordWAV repairs it under its name and Earlier reports it, in that process or a later one, until the app takes it. It asks for the microphone as Authorize does and waits for the answer, so call it off the UI. On Android it records in the runtime's foreground service, through a hidden activity and the screen going off, and starts only while an activity of the app is visible, in an app whose nsgo.yaml sets android.recording; it reports ErrUnsupported elsewhere. From Android 13 the service's notification shows only once the user lets the app post notifications, so the first RecordWAV asks for POST_NOTIFICATIONS with RECORD_AUDIO, or alone where RECORD_AUDIO is granted; a user who refuses notifications still records, without a visible notification.
 func RecordWAV(name string, o RecordOptions) (*Recording, error) {
 	if name == "" || strings.ContainsAny(name, "/\\\x00") || strings.HasPrefix(name, ".") {
 		return nil, &fs.PathError{Op: "record", Path: name, Err: fs.ErrInvalid}
@@ -182,13 +182,16 @@ func RecordWAV(name string, o RecordOptions) (*Recording, error) {
 // minLevelInterval is the shortest level interval in milliseconds, about one read of the recorder's.
 const minLevelInterval = 20
 
-// Earlier returns, once each, the recordings of earlier runs that ended unseen: ErrAbandoned's, whose Go process ended while the app's lived on, and ErrPartial's, whose app was killed, which a RecordWAV repaired. Their Ended is closed.
+// Earlier returns, once each, the recordings of earlier runs that ended unseen: ErrAbandoned's, whose Go process ended while the app's lived on, and ErrPartial's, whose app was killed, which a RecordWAV repaired. Their Ended is closed. The runtime keeps each one's record until Earlier returns it, so a recording a process heard of but did not take, as it ended first, is reported to the next process; one whose file the app deleted is not.
 func Earlier() []*Recording {
 	listen()
 	recorder.mu.Lock()
-	defer recorder.mu.Unlock()
 	earlier := recorder.earlier
 	recorder.earlier = nil
+	recorder.mu.Unlock()
+	for _, r := range earlier {
+		send(command{Op: "taken", Path: r.file.Path})
+	}
 	return earlier
 }
 

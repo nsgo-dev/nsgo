@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"runtime"
+	"slices"
 	"sync"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -15,7 +16,7 @@ import (
 
 // command is a message to the recorder.
 type command struct {
-	Op       string `json:"op"` // start, stop or authorize
+	Op       string `json:"op"` // start, stop, authorize or taken
 	ID       uint64 `json:"id"`
 	Name     string `json:"name,omitempty"`
 	Rate     int    `json:"rate,omitempty"`
@@ -23,6 +24,8 @@ type command struct {
 	// Level is the level interval in milliseconds, 0 for no levels.
 	Level int64 `json:"level,omitempty"`
 	Pause bool  `json:"pause,omitempty"`
+	// Path is the file of the earlier recording a taken command says Earlier returned, whose record the recorder then lets go of.
+	Path string `json:"path,omitempty"`
 }
 
 // report is what the recorder reports: its state, as it connects and as it changes; a recording's start, levels, interruption and end, and the frames it wrote about once a second when it reports no levels; an earlier run's recording; and the answer to an authorize.
@@ -98,6 +101,8 @@ func hear(data []byte) {
 		r.err = reportError(m)
 		close(r.started)
 		close(r.ended)
+		// The recorder keeps a record until Earlier takes it, so a newer record of the same file, such as its repair after the record of its abandonment, replaces the older one.
+		recorder.earlier = slices.DeleteFunc(recorder.earlier, func(e *Recording) bool { return e.file.Path == m.Path })
 		recorder.earlier = append(recorder.earlier, r)
 	default:
 		r := recorder.recordings[m.ID]

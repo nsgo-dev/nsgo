@@ -50,10 +50,9 @@ public final class RecordingService extends Service {
     private static final long RESERVE = 8 << 20;
     private static final String PART = ".part";
 
-    // The app's one recording, from its start to the end of its file, the service running it, the terminal records of recordings whose process ended, for the next process, and the engine whose process connected last, which hears such a record at once when its file finishes after that process connected; guarded by RecordingService.class.
+    // The app's one recording, from its start to the end of its file, the service running it, and the engine whose process connected last, which hears the terminal record of a recording whose process ended at once when its file finishes after that process connected; guarded by RecordingService.class, as is the journal (RecordingJournal) that keeps such records, and those of repaired files, until the app takes them.
     private static Recorder current;
     private static RecordingService service;
-    private static final ArrayList<byte[]> orphans = new ArrayList<>();
     private static NsgoEngine heir;
     // The service's last start, which it stops with so that a start made since keeps it.
     private int lastStart;
@@ -77,30 +76,54 @@ public final class RecordingService extends Service {
         return json(new Json().put("type", "state").put("supported", declared(context)).put("allowed", granted(context)));
     }
 
-    /** Hands engine, whose Go process just started, the terminal records of recordings whose Go process ended, and those of recordings still finishing their file as they finish. */
+    /** Hands engine, whose Go process just started, the terminal records its recordings directory's journal keeps: those of recordings whose Go process ended and of files a start repaired, which earlier processes heard but did not take. Those of recordings still finishing their file go to it as they finish. */
     static void connected(NsgoEngine engine) {
-        List<byte[]> records;
+        File dir = engine.recordings();
+        List<byte[]> records = new ArrayList<>();
         synchronized (RecordingService.class) {
-            records = new ArrayList<>(orphans);
-            orphans.clear();
+            if (dir != null) {
+                try {
+                    records = RecordingJournal.pending(dir);
+                } catch (IOException e) {
+                    Log.w(TAG, "recording: the earlier recordings cannot be read");
+                }
+            }
             heir = engine;
         }
         for (byte[] record : records) engine.write(Protocol.RECORDING_REPORT, record);
     }
 
-    /** Hands an ended process's terminal record to the engine that connected since, or keeps it for the next one. */
-    private static void orphan(Recorder r, byte[] record) {
+    /** Keeps an ended process's terminal record, of the file at path, until the app takes it, and hands it to the engine that connected since; the next one to connect hears it otherwise. */
+    private static void orphan(Recorder r, String path, byte[] record) {
         NsgoEngine to = null;
         synchronized (RecordingService.class) {
-            // Decided with connected's taking of orphans, so that no record waits for a process that connected already. The engine's lock never takes this one.
-            if (heir != null && heir != r.owner && heir.isAlive()) {
-                to = heir;
-            } else {
-                orphans.add(record);
-            }
+            keep(path, record);
+            // Decided with connected's reading of the journal, so that no record waits for a process that connected already. The engine's lock never takes this one.
+            if (heir != null && heir != r.owner && heir.isAlive()) to = heir;
         }
         // Written outside the lock, as a pipe Go does not read may block.
         if (to != null) to.write(Protocol.RECORDING_REPORT, record);
+    }
+
+    /** Keeps the terminal record of the file at path in its directory's journal; the caller holds RecordingService.class. */
+    private static void keep(String path, byte[] record) {
+        try {
+            RecordingJournal.put(new File(path).getParentFile(), path, record);
+        } catch (IOException e) {
+            Log.w(TAG, "recording: an earlier recording cannot be kept for the next process");
+        }
+    }
+
+    /** Lets go of the terminal record of the file at path, which the app's Earlier took. */
+    static void taken(String path) {
+        if (path.isEmpty()) return;
+        synchronized (RecordingService.class) {
+            try {
+                RecordingJournal.remove(new File(path).getParentFile(), path);
+            } catch (IOException e) {
+                Log.w(TAG, "recording: a taken earlier recording cannot be let go of");
+            }
+        }
     }
 
     /** A report ending recording id before it started, or the answer to an authorize. */
@@ -262,7 +285,7 @@ public final class RecordingService extends Service {
 
 
     /**
-     * Repairs the files in dir that killed processes left under their temporary names: each header takes the sizes of what its file holds, and the file its final name unless that is taken. Returns their terminal records.
+     * Repairs the files in dir that killed processes left under their temporary names: each header takes the sizes of what its file holds, and the file its final name unless that is taken. Returns their terminal records, which dir's journal keeps until the app takes them; the caller holds RecordingService.class.
      */
     private static List<byte[]> repair(File dir) {
         List<byte[]> records = new ArrayList<>();
@@ -289,8 +312,11 @@ public final class RecordingService extends Service {
                 f.getFD().sync();
                 File target = new File(dir, name.substring(1, name.length() - PART.length()));
                 File at = !target.exists() && part.renameTo(target) ? target : part;
-                records.add(json(new Json().put("type", "earlier").put("path", at.getAbsolutePath()).put("rate", rate)
-                        .put("channels", channels).put("frames", data / frame).put("error", "partial")));
+                byte[] record = json(new Json().put("type", "earlier").put("path", at.getAbsolutePath()).put("rate", rate)
+                        .put("channels", channels).put("frames", data / frame).put("error", "partial"));
+                // Kept until the app takes it, as the process that hears it may end first.
+                keep(at.getAbsolutePath(), record);
+                records.add(record);
             } catch (IOException e) {
                 Log.w(TAG, "recording: a partial file cannot be repaired");
             }
@@ -604,13 +630,13 @@ public final class RecordingService extends Service {
                 gone = orphaned;
             }
             Json end = new Json().put("type", gone ? "earlier" : "ended").put("id", id).put("error", c).put("detail", d);
+            String path = (renamed ? target : part).getAbsolutePath();
             if (rate > 0) {
-                end.put("path", (renamed ? target : part).getAbsolutePath()).put("rate", rate).put("channels", channels)
-                        .put("frames", frames);
+                end.put("path", path).put("rate", rate).put("channels", channels).put("frames", frames);
             }
             if (gone) {
                 // Nothing reports what nobody recorded.
-                if (rate > 0) orphan(this, json(end));
+                if (rate > 0) orphan(this, path, json(end));
                 sender.finish(null);
             } else {
                 sender.finish(json(end));

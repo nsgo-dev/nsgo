@@ -267,6 +267,33 @@ func TestEarlierRecordings(t *testing.T) {
 	}
 }
 
+// TestEarlierTellsTheRecorderWhatItTook holds the runtime's side of an earlier recording: it keeps the record until Earlier takes it, reporting it to each process that connects meanwhile, so Earlier names each file it returned, and a record heard again, from the runtime's journal or a repair after an abandonment, replaces the one not taken yet.
+func TestEarlierTellsTheRecorderWhatItTook(t *testing.T) {
+	f := connect(t, func(command) []report { return nil })
+	reportJSON(report{Type: "earlier", Path: "/data/recordings/a.wav", Rate: 48000, Channels: 1, Frames: 48000, Error: "abandoned"})
+	reportJSON(report{Type: "earlier", Path: "/data/recordings/b.wav", Rate: 48000, Channels: 1, Frames: 48000, Error: "partial"})
+	reportJSON(report{Type: "earlier", Path: "/data/recordings/a.wav", Rate: 48000, Channels: 1, Frames: 96000, Error: "partial"})
+	earlier := Earlier()
+	if len(earlier) != 2 || earlier[0].File().Path != "/data/recordings/b.wav" || earlier[1].File().Path != "/data/recordings/a.wav" ||
+		!errors.Is(earlier[1].Err(), ErrPartial) || earlier[1].File().Duration != 2*time.Second {
+		t.Fatalf("Earlier = %v, want b.wav and a.wav's newer record", earlier)
+	}
+	f.mu.Lock()
+	var taken []string
+	for _, c := range f.commands {
+		if c.Op == "taken" {
+			taken = append(taken, c.Path)
+		}
+	}
+	f.mu.Unlock()
+	if len(taken) != 2 || taken[0] != "/data/recordings/b.wav" || taken[1] != "/data/recordings/a.wav" {
+		t.Errorf("taken = %q, want both files", taken)
+	}
+	if len(Earlier()) != 0 {
+		t.Error("Earlier reported a recording twice")
+	}
+}
+
 func TestAuthorizeThroughTheRecorder(t *testing.T) {
 	denied := true
 	connect(t, func(c command) []report {
