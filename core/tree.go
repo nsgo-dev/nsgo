@@ -178,6 +178,8 @@ type Tree struct {
 	// record, while DevTools record a test, hears what the user does; devScrolls holds each scroll view's offset until the scroll is a step (devFlushScrolls).
 	record     func(devtools.Step)
 	devScrolls map[*node]Point
+	// follower, while nsgo dev -automation's agent follows the tree (devtools.Surface.Follow), hears each batch it commits and each event it dispatches.
+	follower devtools.Follower
 	// suspended holds the regions of the Contents of the Suspenses that wait, whose views hide.
 	suspended map[*node]bool
 }
@@ -664,25 +666,24 @@ type sent struct {
 // NewTree returns an empty tree under root, laying text out with text.
 func NewTree(root *Scope, text driver.TextEngine) *Tree {
 	root.rt.tree = nil
-	t := newTree(root, text)
+	t := newTree(root, text, 0)
 	root.rt.tree = t
 	return t
 }
 
-// newTree returns an empty tree under root, which becomes the graph's
-// first unless one is.
-func newTree(root *Scope, text driver.TextEngine) *Tree {
-	t := &Tree{root: root, rt: root.rt, text: text, nodes: []*node{nil}, measures: newMeasureCache(), ratio: 1}
+// newTree returns an empty tree under root, numbered id, which becomes the graph's first unless one is.
+func newTree(root *Scope, text driver.TextEngine, id uint32) *Tree {
+	t := &Tree{root: root, rt: root.rt, id: id, text: text, nodes: []*node{nil}, measures: newMeasureCache(), ratio: 1}
 	t.anim.t = t
 	if root.rt.tree != nil {
 		root.surf = t
 	}
 	t.view = t.newNode(driver.KindView, nil, root)
 	t.view.style = Style{Direction: Column}
-	// An app that opens windows has a first tree of its own that shows no view (RootOptions.Windows): DevTools leave it out.
-	if root.rt.dev != nil && (root.rt.windows == nil || root.rt.tree != nil) {
+	if root.rt.dev != nil {
+		// An app that opens windows has a first tree of its own that shows no view (RootOptions.Windows): DevTools pages leave it out, while the automation's agent follows it for the app's alerts and main menu.
 		s := &devSurface{t}
-		devtools.Register(s)
+		devtools.Register(s, root.rt.windows == nil || root.rt.tree != nil)
 		root.addCleanup(func() { devtools.Unregister(s) })
 	}
 	return t
@@ -1935,6 +1936,9 @@ func (t *Tree) mountCatch(cx *Scope, parent *node, c Catch) {
 
 // Dispatch handles a platform event.
 func (t *Tree) Dispatch(ev driver.Event) {
+	if f := t.follower; f != nil {
+		f.Event(ev)
+	}
 	if ev.Kind >= driver.EventWindowClose && t.surfaceEvent(ev) {
 		return
 	}

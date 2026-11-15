@@ -1,18 +1,46 @@
-// Package devtools is what nsgo dev -devtools reads from a running app and sends it: core registers each surface's tree here while Enabled, and nsgo's dev client serves them to the DevTools page. Its types are what the page receives as JSON.
+// Package devtools is what nsgo dev -devtools and -automation read from a running app and send it: core registers each surface's tree here while Enabled, and nsgo's dev client serves them to the DevTools page and hands them to the automation's Agent, over one channel. Its types are what the page receives as JSON.
 package devtools
 
-import "sync"
+import (
+	"slices"
+	"sync"
 
-// Enabled has core record what DevTools show, and register its trees: nsgo's dev client sets it under nsgo dev -devtools, before any graph starts. While it is unset, core records nothing and pays one check where it would.
+	"github.com/nsgo-dev/nsgo/internal/driver"
+)
+
+// Enabled has core record what DevTools show, and register its trees: nsgo's dev client sets it under nsgo dev -devtools, -automation and -trace, before any graph starts. While it is unset, core records nothing and pays one check where it would.
 var Enabled bool
 
 // ScriptSite, which tsx sets while Enabled, is the line of TSX its JS runs now, through the bundles' source maps; ok is false while none runs. A site that falls in tsx's Go code takes it, so DevTools name the app's TSX rather than the Go that ran it.
 var ScriptSite func() (file string, line int, ok bool)
 
-// Surface is one surface's tree, as DevTools read and drive it. Every method but Post runs on the surface's graph goroutine: call it through Post.
+// Agent is nsgo dev -automation's agent, package nsgotest's, which keeps a model of each surface as a test keeps one of the app it opened, and answers the automation's requests with them. The builds with the nsgoautomation tag link it.
+type Agent interface {
+	// Registered hears each surface core registers, on its graph goroutine and before the surface commits its first batch, so following it (Surface.Follow) hears every batch.
+	Registered(s Surface)
+	// Unregistered hears that s went, as its window closed, on its graph goroutine.
+	Unregistered(s Surface)
+	// Do answers a request of package internal/automation's protocol, JSON in and out, from any goroutine.
+	Do(request []byte) []byte
+}
+
+// Automation is the agent while nsgo dev -automation drives the app: nsgotest sets it as the process starts, and the dev client clears it in an app the tool gave no token. Register and Unregister hand it every surface, the ones DevTools pages leave out too.
+var Automation Agent
+
+// Follower hears what a surface it follows commits and what the surface's platform reports, on the surface's graph goroutine.
+type Follower interface {
+	// Batch hears each batch the surface sends its platform; it may keep the batch and must not block.
+	Batch(b *driver.MountBatch)
+	// Event hears each event the surface's platform reports; it must not block.
+	Event(ev driver.Event)
+}
+
+// Surface is one surface's tree, as DevTools read and drive it. Every method but ID, Graph and Post, whose answers never change, runs on the surface's graph goroutine: call it through Post.
 type Surface interface {
-	// ID numbers the surface within the app, 0 for the main window's.
+	// ID numbers the surface within its graph, 0 for the main window's.
 	ID() int
+	// Graph numbers the surface's graph within the process, from 1: a process that runs several graphs, as a host embedding several apps does, has surfaces of the same ID.
+	Graph() int
 	// Post runs fn on the surface's graph goroutine, from any goroutine.
 	Post(fn func())
 	// Elements returns the surface's views as a tree, from its root view.
@@ -35,6 +63,8 @@ type Surface interface {
 	Set(signal uint64, value string) error
 	// Hot returns the computations that ran most since the last call, at most n.
 	Hot(n int) []Computation
+	// Follow has f hear the surface's batches and events from now on, nil none.
+	Follow(f Follower)
 }
 
 // Node is a view and the views in it.
@@ -114,33 +144,49 @@ type Step struct {
 	Offset   [2]float32 `json:"offset,omitempty"`
 }
 
+// registered is a surface core registered, and whether DevTools pages list it.
+type registered struct {
+	s      Surface
+	listed bool
+}
+
 var (
 	mu       sync.Mutex
-	surfaces []Surface
+	surfaces []registered
 )
 
-// Register adds s to the surfaces DevTools show.
-func Register(s Surface) {
+// Register adds s to the surfaces DevTools pages list, where listed, and hands it to the automation's agent, listed or not: the first tree of an app that opens windows shows no view of its own, but holds the app's alerts and main menu.
+func Register(s Surface, listed bool) {
 	mu.Lock()
-	defer mu.Unlock()
-	surfaces = append(surfaces, s)
+	surfaces = append(surfaces, registered{s, listed})
+	mu.Unlock()
+	if a := Automation; a != nil {
+		a.Registered(s)
+	}
 }
 
 // Unregister removes s.
 func Unregister(s Surface) {
 	mu.Lock()
-	defer mu.Unlock()
-	for i, x := range surfaces {
-		if x == s {
-			surfaces = append(surfaces[:i], surfaces[i+1:]...)
-			return
-		}
+	at := slices.IndexFunc(surfaces, func(r registered) bool { return r.s == s })
+	if at >= 0 {
+		surfaces = slices.Delete(surfaces, at, at+1)
+	}
+	mu.Unlock()
+	if a := Automation; a != nil && at >= 0 {
+		a.Unregistered(s)
 	}
 }
 
-// Surfaces returns the surfaces registered, the main window's first.
+// Surfaces returns the surfaces DevTools pages list, the main window's first.
 func Surfaces() []Surface {
 	mu.Lock()
 	defer mu.Unlock()
-	return append([]Surface(nil), surfaces...)
+	var out []Surface
+	for _, r := range surfaces {
+		if r.listed {
+			out = append(out, r.s)
+		}
+	}
+	return out
 }

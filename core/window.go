@@ -149,9 +149,9 @@ func (rt *runtime) openSurface(owner *Scope, cfg driver.SurfaceConfig, content f
 	app := rt.tree
 	s := &Scope{}
 	owner.adopt(s)
-	t := newTree(s, app.text)
 	rt.surfaceID++
-	t.id, cfg.ID = rt.surfaceID, rt.surfaceID
+	t := newTree(s, app.text, rt.surfaceID)
+	cfg.ID = t.id
 	w := &Window{t: t, scope: s, kind: cfg.Kind, visible: NewSignal(s, !cfg.Hidden)}
 	t.window = w
 	rt.surfaces = append(rt.surfaces, t)

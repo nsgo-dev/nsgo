@@ -31,7 +31,8 @@ var layers = []struct {
 	{"internal/cldr/", nil},
 	{"internal/cldr", nil},
 	{"internal/driver", []string{"internal/shaderir"}},
-	{"internal/devtools", nil},
+	// DevTools hand the automation's agent each surface's batches and events.
+	{"internal/devtools", []string{"internal/driver"}},
 	{"internal/shaderir/", []string{"internal/shaderir"}},
 	{"internal/shader", []string{"internal/shaderir"}},
 	{"internal/shader/wgsl", []string{"internal/shaderir"}},

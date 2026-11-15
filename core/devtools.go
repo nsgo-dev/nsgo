@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 	"weak"
@@ -27,7 +28,12 @@ type devState struct {
 	sweepAt int
 	// commit is what ran since the last commit took it, by kind and site.
 	commit map[ranKey]*driver.Ran
+	// graph numbers the graph within the process (devtools.Surface.Graph).
+	graph int
 }
+
+// graphs counts the graphs made while devtools.Enabled.
+var graphs atomic.Int64
 
 type ranKey struct{ kind, site string }
 
@@ -55,7 +61,7 @@ type devComp struct {
 
 func newDevState() *devState {
 	return &devState{components: map[*Scope]devComponent{}, values: map[*Scope][]*devValue{}, byID: map[uint64]*devValue{}, comps: map[*computation]*devComp{},
-		sweepAt: minSweep, commit: map[ranKey]*driver.Ran{}}
+		sweepAt: minSweep, commit: map[ranKey]*driver.Ran{}, graph: int(graphs.Add(1))}
 }
 
 // minSweep is the fewest signals devSignal lets byID hold before it sweeps.
@@ -299,9 +305,11 @@ func clip(s string) string {
 // devSurface is a tree as DevTools read and drive it.
 type devSurface struct{ t *Tree }
 
-func (s *devSurface) ID() int           { return int(s.t.id) }
-func (s *devSurface) Post(fn func())    { s.t.root.Post(fn) }
-func (s *devSurface) Highlight(on bool) { s.highlights(func(h *highlights) { h.updates = on }) }
+func (s *devSurface) ID() int                    { return int(s.t.id) }
+func (s *devSurface) Graph() int                 { return s.t.rt.dev.graph }
+func (s *devSurface) Post(fn func())             { s.t.root.Post(fn) }
+func (s *devSurface) Highlight(on bool)          { s.highlights(func(h *highlights) { h.updates = on }) }
+func (s *devSurface) Follow(f devtools.Follower) { s.t.follower = f }
 
 func (s *devSurface) highlights(fn func(*highlights)) {
 	if h := s.t.highlights; h != nil {

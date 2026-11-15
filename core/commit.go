@@ -43,6 +43,10 @@ func (t *Tree) commit(shared bool) *driver.MountBatch {
 	if !t.changed {
 		return nil
 	}
+	if t.follower != nil {
+		// The automation's agent keeps batches past the next commit.
+		shared = false
+	}
 	if t.lastShared {
 		// The last batch was these items, done with now.
 		t.shrinkItems(t.lastItems)
@@ -99,6 +103,9 @@ func (t *Tree) commit(shared bool) *driver.MountBatch {
 	}
 	b := &driver.MountBatch{Root: t.view.id, Items: items, LayoutAnimation: t.layoutAnim, Causes: causes}
 	t.layoutAnim = nil
+	if f := t.follower; f != nil {
+		f.Batch(b)
+	}
 	return b
 }
 
