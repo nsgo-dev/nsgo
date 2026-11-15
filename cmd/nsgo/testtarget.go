@@ -306,7 +306,7 @@ func parseTestOutput(name, out string, code int, runErr error) *testResult {
 // name, then the PNG in base64, in chunks a device's log keeps whole.
 var screenshotLine = regexp.MustCompile(`nsgo-screenshot (\S+) (\d+)/(\d+) (\S*)`)
 
-// saveScreenshots saves the screenshots out carries in dir and returns out without them, the files written and an error for each invalid or duplicate path, whose shot it skips.
+// saveScreenshots saves the screenshots out carries in dir and returns out without them, the files written and an error for each shot whose path is invalid, taken before or cannot be written, which it skips.
 func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, error) {
 	var kept strings.Builder
 	// Each Screenshot call is a shot of its own, so a name taken twice in one process is a duplicate rather than one image's chunks overwritten.
@@ -375,9 +375,11 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 			errs = append(errs, fmt.Errorf("screenshot %q: create directory: %w", name, err))
 			continue
 		}
-		if err := os.WriteFile(path, data, 0o644); err == nil {
-			saved = append(saved, path)
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			errs = append(errs, fmt.Errorf("screenshot %q: %w", name, err))
+			continue
 		}
+		saved = append(saved, path)
 	}
 	return kept.String(), saved, errors.Join(errs...)
 }

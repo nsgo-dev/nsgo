@@ -144,4 +144,10 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 	if _, err := os.Stat(dir + ".png"); err == nil {
 		t.Error("screenshot \".\" wrote a file beside the directory")
 	}
+	// A path an earlier screenshot made a directory cannot be written.
+	if _, saved, err := saveScreenshots(line("shot.png/a")+"\n"+line("shot.png")+"\n", dir, map[string]bool{}); err == nil {
+		t.Fatal("a screenshot over a directory succeeded")
+	} else if len(saved) != 1 {
+		t.Fatalf("saved %v, want only shot.png/a.png", saved)
+	}
 }
