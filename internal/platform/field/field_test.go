@@ -91,3 +91,31 @@ func TestInsertAndReturn(t *testing.T) {
 		t.Fatalf("keys %q", keys)
 	}
 }
+
+// TestReplaced checks the range a backend replaces to turn one text into another, in UTF-16 units, as an accepted suggestion replaces its trigger and query.
+func TestReplaced(t *testing.T) {
+	for _, c := range []struct {
+		old, text  string
+		start, end int
+		insert     string
+	}{
+		{"@re", "README.md", 0, 3, "README.md"},
+		{"hi @re there", "hi README.md there", 3, 6, "README.md"},
+		{"see @al", "see @alice ", 7, 7, "ice "},
+		{"same", "same", 4, 4, ""},
+		{"", "new", 0, 0, "new"},
+		{"draft", "", 0, 5, ""},
+		{"aaa", "aaaa", 3, 3, "a"},
+		// Offsets past an emoji count its two units.
+		{"😀 @b", "😀 @bob", 5, 5, "ob"},
+		// Emoji that share a high surrogate are replaced whole.
+		{"x😀y", "x😁y", 1, 3, "😁"},
+		{"😀", "😀😁", 2, 2, "😁"},
+		{"a😀😁", "a😁", 1, 3, ""},
+	} {
+		start, end, insert := Replaced(c.old, c.text)
+		if start != c.start || end != c.end || insert != c.insert {
+			t.Errorf("Replaced(%q, %q) = %d, %d, %q, want %d, %d, %q", c.old, c.text, start, end, insert, c.start, c.end, c.insert)
+		}
+	}
+}

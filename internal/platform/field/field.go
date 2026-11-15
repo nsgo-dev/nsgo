@@ -5,6 +5,8 @@
 package field
 
 import (
+	"unicode/utf16"
+
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
@@ -185,3 +187,26 @@ func SingleLine(s string) string {
 	}
 	return string(out)
 }
+
+// Replaced is what turns old into text, in UTF-16 units, the offsets UIKit's and AppKit's text inputs take: old's units from start to end become insert. A surrogate pair stays whole, and equal texts give an empty range at old's end.
+func Replaced(old, text string) (start, end int, insert string) {
+	a, b := utf16.Encode([]rune(old)), utf16.Encode([]rune(text))
+	for start < len(a) && start < len(b) && a[start] == b[start] {
+		start++
+	}
+	if start > 0 && isHighSurrogate(a[start-1]) {
+		start--
+	}
+	same := 0
+	for same < len(a)-start && same < len(b)-start && a[len(a)-1-same] == b[len(b)-1-same] {
+		same++
+	}
+	if same > 0 && isLowSurrogate(a[len(a)-same]) {
+		same--
+	}
+	return start, len(a) - same, string(utf16.Decode(b[start : len(b)-same]))
+}
+
+func isHighSurrogate(u uint16) bool { return u >= 0xd800 && u < 0xdc00 }
+
+func isLowSurrogate(u uint16) bool { return u >= 0xdc00 && u < 0xe000 }

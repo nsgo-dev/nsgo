@@ -81,8 +81,8 @@ func registerInput() {
 		}
 	}}
 	classField = register("NsgoField", apple.Class("UITextField"), nil,
-		append([]objc.MethodDef{caretRect, deleteBackward}, pasteMethods()...))
-	classTextView = register("NsgoTextView", apple.Class("UITextView"), nil, append(pasteMethods(), caretRect, deleteBackward,
+		append(append([]objc.MethodDef{caretRect, deleteBackward}, pasteMethods()...), editorAccess()...))
+	classTextView = register("NsgoTextView", apple.Class("UITextView"), nil, append(append(pasteMethods(), editorAccess()...), caretRect, deleteBackward,
 		// Shift and Option with Return break the line of a text view whose
 		// Return submits, as chat apps do on hardware keyboards.
 		objc.MethodDef{Cmd: sel("keyCommands"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
@@ -215,23 +215,67 @@ func (in *input) selectRange(r driver.TextRange) {
 	f.Send(sel("setSelectedTextRange:"), f.Send(sel("textRangeFromPosition:toPosition:"), from, to))
 }
 
-// replaceText sets the text without reporting it, keeping the caret
-// where it was, at the end if it was there.
+// replaceText sets the text without reporting it, keeping the caret where it was, at the end if it was there. A focused editor replaces only what changed, through UITextInput, and tells the keyboard (programmatic).
 func (in *input) replaceText(text string) {
-	old := driver.UTF16Len(in.text())
+	current := in.text()
+	old := driver.UTF16Len(current)
 	caret, ok := in.selection()
 	in.applying = true
-	in.field.Send(selSetText, apple.NSString(text))
-	if ok && in.focused {
-		n := driver.UTF16Len(text)
-		at := min(caret.End, n)
-		if caret.End >= old {
-			at = n
-		}
-		in.selectRange(driver.TextRange{Start: at, End: at})
+	if in.focused {
+		in.programmatic(true, func() {
+			if !in.replaceRange(current, text) {
+				in.field.Send(selSetText, apple.NSString(text))
+			}
+			if ok {
+				n := driver.UTF16Len(text)
+				at := min(caret.End, n)
+				if caret.End >= old {
+					at = n
+				}
+				in.selectRange(driver.TextRange{Start: at, End: at})
+			}
+		})
+	} else {
+		in.field.Send(selSetText, apple.NSString(text))
 	}
 	in.applying = false
 	in.updatePlaceholder()
+}
+
+// replaceRange replaces the part of current that differs from text, as the keyboard's own edits do, reporting whether the editor took it.
+func (in *input) replaceRange(current, text string) bool {
+	start, end, insert := field.Replaced(current, text)
+	f := in.field
+	begin := f.Send(sel("beginningOfDocument"))
+	from := f.Send(sel("positionFromPosition:offset:"), begin, start)
+	to := f.Send(sel("positionFromPosition:offset:"), begin, end)
+	if from == 0 || to == 0 {
+		return false
+	}
+	r := f.Send(sel("textRangeFromPosition:toPosition:"), from, to)
+	if r == 0 {
+		return false
+	}
+	f.Send(sel("replaceRange:withText:"), r, apple.NSString(insert))
+	return in.text() == text
+}
+
+// programmatic makes change, NSGo's change to a focused editor's text (when text) and selection, between the input delegate's will and did calls, as UITextInput asks of changes from outside the text input system, so the keyboard rereads the text around the caret and drops what it offered for the old text. A keyboard that counts the characters of the word it is completing may still delete that many on its next key: on an iPhone, Qwen's English mode turned "@re" accepted as "README.md" into "README.c" with a following "c", as it does after a tap that moves the caret in Apple's own text fields, and only hiding and showing the keyboard resets it.
+func (in *input) programmatic(text bool, change func()) {
+	d := in.field.Send(sel("inputDelegate"))
+	if d != 0 {
+		if text {
+			d.Send(sel("textWillChange:"), in.field)
+		}
+		d.Send(sel("selectionWillChange:"), in.field)
+	}
+	change()
+	if d != 0 {
+		d.Send(sel("selectionDidChange:"), in.field)
+		if text {
+			d.Send(sel("textDidChange:"), in.field)
+		}
+	}
 }
 
 func (in *input) updatePlaceholder() {
@@ -357,7 +401,11 @@ func (in *input) value(text string, count uint32) {
 func (in *input) setSelection(r driver.TextRange) {
 	in.fs.SetSelection(r)
 	in.applying = true
-	in.selectRange(r)
+	if in.focused {
+		in.programmatic(false, func() { in.selectRange(r) })
+	} else {
+		in.selectRange(r)
+	}
 	in.applying = false
 }
 

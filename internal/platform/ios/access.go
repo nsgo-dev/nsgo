@@ -261,7 +261,8 @@ func (v *view) updateAccessibility() {
 	}
 	element := p.Role != driver.RoleNone || v.kind == driver.KindText || pressable || p.Label != "" ||
 		p.Accessible == driver.AccessibleYes
-	if p.Accessible == driver.AccessibleNo || p.Role == driver.RoleTextField {
+	// An input's editor is its element, whatever its role (editorAccess): a combobox's field stays a text field.
+	if p.Accessible == driver.AccessibleNo || p.Role == driver.RoleTextField || v.input != nil {
 		element = false
 	}
 	v.axElement = element
@@ -305,8 +306,7 @@ func (v *view) updateAccessibility() {
 	}
 }
 
-// spokenValue is the value VoiceOver reads: the value's text, else a
-// range's percentage, then the checked and expanded states.
+// spokenValue is the value VoiceOver reads: the value's text, else a range's percentage, then the checked and expanded states.
 func spokenValue(p *driver.ViewProps) string {
 	var parts []string
 	val := p.Value
@@ -316,6 +316,12 @@ func spokenValue(p *driver.ViewProps) string {
 	case val.IsRange():
 		parts = append(parts, fmt.Sprintf("%g%%", math.Round(float64((val.Now-val.Min)/(val.Max-val.Min)*100))))
 	}
+	return strings.Join(append(parts, spokenStates(p)...), ", ")
+}
+
+// spokenStates are the states VoiceOver reads after a value, which UIKit has no traits for.
+func spokenStates(p *driver.ViewProps) []string {
+	var parts []string
 	switch p.Role {
 	case driver.RoleCheckbox, driver.RoleSwitch, driver.RoleRadio, driver.RoleMenuItemCheckbox, driver.RoleMenuItemRadio:
 		switch {
@@ -338,7 +344,51 @@ func spokenValue(p *driver.ViewProps) string {
 	if p.Invalid {
 		parts = append(parts, "invalid data")
 	}
-	return strings.Join(parts, ", ")
+	return parts
+}
+
+// editorValue is what VoiceOver reads as an input's value: the editor's own, its text, then the input's value text when it differs, such as a multiple combobox's chosen items, and its states, such as a combobox's expanded state.
+func editorValue(own string, p *driver.ViewProps) string {
+	var parts []string
+	if own != "" {
+		parts = append(parts, own)
+	}
+	if t := p.Value.Text; t != "" && t != own {
+		parts = append(parts, t)
+	}
+	return strings.Join(append(parts, spokenStates(p)...), ", ")
+}
+
+// editorAccess are an input's editor's answers to VoiceOver. The editor is the input's element, as UIKit's text field or text view, so it can be edited whatever the input's role; it reads the input's label and hint, and the value editorValue gives.
+func editorAccess() []objc.MethodDef {
+	return []objc.MethodDef{
+		{Cmd: sel("accessibilityLabel"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
+			if v := views[self]; v != nil && v.props.Label != "" {
+				return apple.NSString(v.props.Label)
+			}
+			return apple.SendSuper[objc.ID](self, cmd)
+		}},
+		{Cmd: sel("accessibilityHint"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
+			if v := views[self]; v != nil {
+				if h := v.props.HelpText(); h != "" {
+					return apple.NSString(h)
+				}
+			}
+			return apple.SendSuper[objc.ID](self, cmd)
+		}},
+		{Cmd: sel("accessibilityValue"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
+			own := apple.SendSuper[objc.ID](self, cmd)
+			v := views[self]
+			if v == nil {
+				return own
+			}
+			text := apple.GoString(own)
+			if value := editorValue(text, &v.props); value != text {
+				return apple.NSString(value)
+			}
+			return own
+		}},
+	}
 }
 
 // action reports the accessibility action name if v offers it.
