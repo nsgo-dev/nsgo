@@ -61,7 +61,7 @@ core.View{Style: core.Style{
 core.View{Style: core.Style{Position: core.Absolute, Top: core.Pt(8), Right: core.Pt(8)}}
 ```
 
-`Static` 让盒子留在流中并忽略 inset，因此其中的绝对定位子元素会去找更上层的祖先。`Overflow` 把子元素裁剪在盒子内，`DisplayNone` 把盒子移出布局。
+`Static` 让盒子留在流中并忽略 inset，因此其中的绝对定位子元素会去找更上层的祖先。`Overflow` 把子元素裁剪在盒子内，同时保留盒子自身的阴影和描边，`DisplayNone` 把盒子移出布局。
 
 ## 方向与环境
 

@@ -128,7 +128,8 @@ type Style struct {
 	// pointer and screen readers, keeping its place in layout.
 	Visibility Visibility
 	// Overflow Hidden clips children to the node's bounds and corners, and
-	// keeps their overflow out of an enclosing scroll view's content.
+	// keeps their overflow out of an enclosing scroll view's content. The
+	// node's own shadows and outlines remain visible outside that clip.
 	// OverflowX and OverflowY override it per axis.
 	Overflow             Overflow
 	OverflowX, OverflowY Overflow

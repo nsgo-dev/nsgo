@@ -61,7 +61,7 @@ core.View{Style: core.Style{
 core.View{Style: core.Style{Position: core.Absolute, Top: core.Pt(8), Right: core.Pt(8)}}
 ```
 
-`Static` keeps a box in the flow and ignores its insets, so absolutely positioned children find an ancestor above it. `Overflow` clips children to a box, and `DisplayNone` takes a box out of layout.
+`Static` keeps a box in the flow and ignores its insets, so absolutely positioned children find an ancestor above it. `Overflow` clips children to a box while keeping the box's own shadows and outlines visible, and `DisplayNone` takes a box out of layout.
 
 ## Direction and the environment
 

@@ -345,13 +345,20 @@ func (v *view) restyle() {
 // styleLayer draws vs with v's layer, only what changed since it was
 // last drawn when that is all an animation moves.
 func (v *view) styleLayer(vs *driver.ViewStyle) {
+	v.prepareClipHolder(vs)
 	v.followScale(vs)
 	// A view created by an earlier batch shows the default style.
 	var shown *driver.ViewStyle
 	if v.styled || v.born != v.surface.batch {
 		shown = &v.drawn
 	}
-	apple.RestyleLayer(v.native.Send(selLayer), shown, vs, v.native)
+	drawn := *vs
+	if v.content != 0 && v.content != v.native {
+		// The holder clips children; leave the styled layer, including any
+		// shape mask, available for its own shadow and outline.
+		drawn.Clip = false
+	}
+	apple.RestyleLayer(v.native.Send(selLayer), shown, &drawn, v.native)
 	v.drawn, v.styled = *vs, true
 	v.transform = vs.Transform
 }
@@ -417,6 +424,15 @@ func (v *view) place(f driver.Bounds) {
 		apple.SetTransform(v.native.Send(selLayer), v.transform)
 	}
 	apple.LayoutDecor(v.native.Send(selLayer))
+	if v.content != 0 && v.content != v.native {
+		b := objc.Send[apple.CGRect](v.native, selBounds)
+		v.content.Send(selSetFrame, b)
+		holderStyle := v.style
+		if v.sc != nil {
+			holderStyle.Clip = true
+		}
+		apple.SetClipLayer(v.content.Send(selLayer), &holderStyle)
+	}
 	if v.backdrop != 0 && !v.glass {
 		v.fitBackdrop(&v.style)
 	}

@@ -310,3 +310,24 @@ func (s *surface) endEffect(v *view) {
 	}
 	fx.before.Release()
 }
+
+// prepareClipHolder keeps a view's own Apple decoration outside the child
+// clipping layer. The holder is also reused by effects and scroll views.
+func (v *view) prepareClipHolder(vs *driver.ViewStyle) {
+	if apple.NeedsClipHolder(vs) && v.content == v.native {
+		v.surface.container(v)
+	}
+	if v.content == v.native {
+		return
+	}
+	b := objc.Send[apple.CGRect](v.native, selBounds)
+	v.content.Send(selSetFrame, b)
+	holderStyle := *vs
+	if v.sc != nil {
+		holderStyle.Clip = true
+	}
+	apple.SetClipLayer(v.content.Send(selLayer), &holderStyle)
+	// The styled layer must stay unclipped whenever children live in a
+	// holder; otherwise its shadow and outline would still be cut off.
+	v.native.Send(selLayer).Send(sel("setMasksToBounds:"), false)
+}
