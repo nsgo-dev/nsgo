@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
 // javaNames are the driver's names of the kinds Java names otherwise.
@@ -68,5 +70,66 @@ func TestJavaProtocolMatchesTheDriver(t *testing.T) {
 	}
 	if checked < 50 {
 		t.Fatalf("checked only %d constants", checked)
+	}
+}
+
+// TestOverlayProtocolMatchesJava holds Protocol.java's overlay constants to Go's: the window commands writeWindow sends, what a SURFACE message reports, and the driver's permissions and ends.
+func TestOverlayProtocolMatchesJava(t *testing.T) {
+	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := map[string]int{}
+	for _, m := range regexp.MustCompile(`static final int (\w+) = (\d+);`).FindAllStringSubmatch(string(java), -1) {
+		values[m[1]], _ = strconv.Atoi(m[2])
+	}
+	for name, want := range map[string]int{
+		"WINDOW_NONE": windowNone, "WINDOW_FRAME": windowFrame, "WINDOW_SHOW": windowShow, "WINDOW_HIDE": windowHide,
+		"WINDOW_FRONT": windowFront, "WINDOW_DESTROY": windowDestroy,
+		"SURFACE_STATE": surfaceState, "SURFACE_ENDED": surfaceEnded,
+		"OVERLAY_DENIED": driver.OverlayDenied, "OVERLAY_GRANTED": driver.OverlayGranted, "OVERLAY_UNAVAILABLE": driver.OverlayUnavailable,
+		"OVERLAY_END_DENIED": driver.OverlayEndDenied, "OVERLAY_END_UNAVAILABLE": driver.OverlayEndUnavailable,
+		"OVERLAY_END_REVOKED": driver.OverlayEndRevoked, "OVERLAY_END_REMOVED": driver.OverlayEndRemoved,
+		"OVERLAY_END_FAILED": driver.OverlayEndFailed,
+	} {
+		if got, ok := values[name]; !ok || got != want {
+			t.Errorf("Protocol.java's %s is %d (found %v), Go's %d", name, got, ok, want)
+		}
+	}
+}
+
+// TestOverlayItemsEncode checks the fields ItemOpenSurface and ItemWindow send, in the order Overlays and NsgoView.apply read them.
+func TestOverlayItemsEncode(t *testing.T) {
+	var w writer
+	writeSurface(&w, &driver.SurfaceConfig{ID: 3, Kind: driver.SurfaceOverlay, Width: 200, Height: 100,
+		Frame: driver.WindowFrame{X: 10, Y: 20, Move: true}, Focusable: true, Accessible: true})
+	r := reader{w.buf}
+	if id, width, height, x, y, flags := r.u32(), r.points(), r.points(), r.points(), r.points(), r.byte(); id != 3 ||
+		width != 200 || height != 100 || x != 10 || y != 20 || flags != 1|2|8|32 || len(r.buf) != 0 {
+		t.Errorf("surface %d %v %v %v %v %b, %d left", id, width, height, x, y, flags, len(r.buf))
+	}
+	for _, c := range []struct {
+		cmd   driver.WindowCommand
+		op    byte
+		flags byte
+	}{
+		{driver.WindowCommand{Action: driver.WindowSetFrame, Frame: driver.WindowFrame{X: 5, Y: 6, Move: true}}, windowFrame, 1},
+		{driver.WindowCommand{Action: driver.WindowSetFrame, Frame: driver.WindowFrame{Width: 50, Height: 60}}, windowFrame, 2},
+		{driver.WindowCommand{Action: driver.WindowShow}, windowShow, 0},
+		{driver.WindowCommand{Action: driver.WindowHide}, windowHide, 0},
+		{driver.WindowCommand{Action: driver.WindowOrderFront}, windowFront, 0},
+		{driver.WindowCommand{Action: driver.WindowDestroy}, windowDestroy, 0},
+		{driver.WindowCommand{Action: driver.WindowMinimize}, windowNone, 0},
+	} {
+		var w writer
+		writeWindow(&w, &c.cmd)
+		r := reader{w.buf}
+		op := r.byte()
+		x, y, width, height := r.points(), r.points(), r.points(), r.points()
+		flags := r.byte()
+		f := c.cmd.Frame
+		if op != c.op || flags != c.flags || x != f.X || y != f.Y || width != f.Width || height != f.Height || len(r.buf) != 0 {
+			t.Errorf("%v: op %d flags %b frame %v %v %v %v", c.cmd.Action, op, flags, x, y, width, height)
+		}
 	}
 }

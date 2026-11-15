@@ -199,6 +199,58 @@ func writeGradient(w *writer, g *driver.CanvasGradient) {
 	}
 }
 
+// What a msgSurface reports, after the surface's ID, as Protocol.java's SURFACE_*.
+const (
+	// surfaceState is the window's size and place in points, then the environment as msgEnvironment's; the first attaches the tree.
+	surfaceState = 1
+	// surfaceEnded is the end Java gave the overlay, an OverlayEnd* of driver's.
+	surfaceEnded = 2
+)
+
+// What writeWindow sends of an overlay's ItemWindow, as Protocol.java's WINDOW_*: the commands an overlay takes, and windowNone for the rest, which it ignores.
+const (
+	windowNone    = 0
+	windowFrame   = 1
+	windowShow    = 2
+	windowHide    = 3
+	windowFront   = 4
+	windowDestroy = 5
+)
+
+// writeSurface writes an ItemOpenSurface as NsgoView reads it: the surface's ID, its size and place in points, then whether it is an overlay, the only kind Java opens, whether it is placed, hidden, focusable, passive and accessible.
+func writeSurface(w *writer, c *driver.SurfaceConfig) {
+	w.u32(c.ID)
+	w.points(c.Width)
+	w.points(c.Height)
+	w.points(c.Frame.X)
+	w.points(c.Frame.Y)
+	w.flags(c.Kind == driver.SurfaceOverlay, c.Frame.Move, c.Hidden, c.Focusable, c.Passive, c.Accessible)
+}
+
+// writeWindow writes an ItemWindow as an overlay's view reads it: its command (windowFrame, ...), then the frame it sets in points, whether it moves and whether it resizes.
+func writeWindow(w *writer, c *driver.WindowCommand) {
+	op := byte(windowNone)
+	switch c.Action {
+	case driver.WindowSetFrame:
+		op = windowFrame
+	case driver.WindowShow:
+		op = windowShow
+	case driver.WindowHide:
+		op = windowHide
+	case driver.WindowOrderFront:
+		op = windowFront
+	case driver.WindowDestroy:
+		op = windowDestroy
+	}
+	w.byte(op)
+	f := c.Frame
+	w.points(f.X)
+	w.points(f.Y)
+	w.points(f.Width)
+	w.points(f.Height)
+	w.flags(f.Move, f.Width > 0 && f.Height > 0)
+}
+
 // writer and reader are the protocol's encoding: big-endian, lengths
 // as uint32, points as float32, strings as a length and UTF-8 bytes and
 // booleans as the bits of one byte, the first lowest.

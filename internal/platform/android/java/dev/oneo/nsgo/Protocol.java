@@ -48,6 +48,20 @@ final class Protocol {
     static final int FETCHED = 14;
     /** What LiveUpdates reports: JSON. */
     static final int LIVE_REPORT = 15;
+    /** What an overlay's view reports of its surface, after its ID: SURFACE_STATE or SURFACE_ENDED (overlay.go). */
+    static final int SURFACE = 16;
+
+    // What a SURFACE message reports, as overlay.go has them: the window's size and place in points, then the environment, or its end, an OVERLAY_END_*.
+    static final int SURFACE_STATE = 1;
+    static final int SURFACE_ENDED = 2;
+
+    // The ITEM_WINDOW commands an overlay takes, as protocol.go's writeWindow has them.
+    static final int WINDOW_NONE = 0;
+    static final int WINDOW_FRAME = 1;
+    static final int WINDOW_SHOW = 2;
+    static final int WINDOW_HIDE = 3;
+    static final int WINDOW_FRONT = 4;
+    static final int WINDOW_DESTROY = 5;
 
     // What a FOLDER message asks, as folders.go has them.
     static final int FOLDER_LIST = 0;
@@ -149,6 +163,18 @@ final class Protocol {
     static final int ITEM_BADGE = 85;
     static final int ITEM_BIOMETRIC_AVAILABILITY = 86;
     static final int ITEM_BIOMETRIC_AUTHENTICATE = 87;
+    static final int ITEM_OPEN_SURFACE = 68;
+    static final int ITEM_OVERLAY_PERMISSION = 89;
+
+    // What EVENT_OVERLAY_PERMISSION answers ITEM_OVERLAY_PERMISSION with, and why an overlay ends, as the driver's.
+    static final int OVERLAY_DENIED = 0;
+    static final int OVERLAY_GRANTED = 1;
+    static final int OVERLAY_UNAVAILABLE = 2;
+    static final int OVERLAY_END_DENIED = 1;
+    static final int OVERLAY_END_UNAVAILABLE = 2;
+    static final int OVERLAY_END_REVOKED = 3;
+    static final int OVERLAY_END_REMOVED = 4;
+    static final int OVERLAY_END_FAILED = 5;
 
     // What EVENT_NOTIFICATION answers ITEM_NOTIFICATION_PERMISSION with, as the driver's.
     static final int NOTIFICATIONS_NOT_ASKED = 0;
@@ -232,6 +258,7 @@ final class Protocol {
     static final int EVENT_NOTIFICATION = 76;
     static final int EVENT_NOTIFICATION_PRESS = 77;
     static final int EVENT_BIOMETRIC = 78;
+    static final int EVENT_OVERLAY_PERMISSION = 80;
 
     static final int BIOMETRIC_NONE = 0;
     static final int BIOMETRIC_FACE = 1;

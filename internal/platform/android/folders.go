@@ -31,9 +31,8 @@ type folders struct {
 	mu      sync.Mutex
 	last    uint32
 	waiting map[uint32]chan *reader
-	// picks are the folder picks Java has yet to answer, whose EventFiles
-	// carry folders rather than files.
-	picks map[uint32]bool
+	// picks are the folder picks Java has yet to answer, by their answerKey, whose EventFiles carry folders rather than files.
+	picks map[uint64]bool
 }
 
 // ask sends a msgFolder of op for the document id in tree, with what
@@ -78,12 +77,12 @@ func (s *surface) folderReply(r *reader) {
 	}
 }
 
-// pickFolders records a folder pick for its answer.
-func (s *surface) pickFolders(id uint32) {
+// pickFolders records a folder pick, by its answerKey, for its answer.
+func (s *surface) pickFolders(id uint64) {
 	f := &s.folders
 	f.mu.Lock()
 	if f.picks == nil {
-		f.picks = map[uint32]bool{}
+		f.picks = map[uint64]bool{}
 	}
 	f.picks[id] = true
 	f.mu.Unlock()
@@ -91,7 +90,7 @@ func (s *surface) pickFolders(id uint32) {
 
 // pickedFolders reports whether EventFiles id answers a folder pick, which
 // it then forgets.
-func (s *surface) pickedFolders(id uint32) bool {
+func (s *surface) pickedFolders(id uint64) bool {
 	f := &s.folders
 	f.mu.Lock()
 	defer f.mu.Unlock()

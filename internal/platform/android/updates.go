@@ -22,9 +22,8 @@ var updateConfig updates.Config
 // (updates.AndroidStore).
 func InstalledBy() string { return updates.AndroidStore(os.Getenv("NSGO_INSTALLER")) }
 
-// withoutUpdateChecks answers b's checks for updates, which Go carries
-// out, and returns b without them, as the runtime knows no such item.
-func (s *surface) withoutUpdateChecks(b *driver.MountBatch) *driver.MountBatch {
+// withoutUpdateChecks answers the checks for updates of surface id's batch b, which Go carries out, and returns b without them, as the runtime knows no such item.
+func (s *surface) withoutUpdateChecks(id uint32, b *driver.MountBatch) *driver.MountBatch {
 	check := func(it driver.MountItem) bool { return it.Kind == driver.ItemCheckForUpdates }
 	if !slices.ContainsFunc(b.Items, check) {
 		return b
@@ -32,7 +31,8 @@ func (s *surface) withoutUpdateChecks(b *driver.MountBatch) *driver.MountBatch {
 	c := updateConfig
 	for _, it := range b.Items {
 		if check(it) {
-			updates.Answer(it.Count, func(ctx context.Context) driver.Update { return updates.Find(ctx, c) }, s.engine.Dispatch)
+			updates.Answer(it.Count, func(ctx context.Context) driver.Update { return updates.Find(ctx, c) },
+				func(ev driver.Event) { s.dispatchTo(id, ev) })
 		}
 	}
 	out := *b

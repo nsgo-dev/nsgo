@@ -115,14 +115,22 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final SparseArray<Node> nodes = new SparseArray<>();
     /** The node each node's view is, for a group to find its children's hit slop and areas. */
     private final java.util.HashMap<View, Node> byView = new java.util.HashMap<>();
-    /** Prepared text by ID, on the reader thread. */
-    private final SparseArray<Text.Prepared> prepared = new SparseArray<>();
+    /** Prepared text by ID, on the reader thread; an overlay's view shares the first view's, as text is the process's. */
+    private final SparseArray<Text.Prepared> prepared;
     /** Laid-out text by ID: the reader thread adds it, the batch that draws it takes it. */
-    private final ConcurrentHashMap<Integer, StaticLayout> layouts = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, StaticLayout> layouts;
     /** Laid-out text a text view shows, by layout id, for hit testing on the reader thread. */
-    private final ConcurrentHashMap<Integer, StaticLayout> shown = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, StaticLayout> shown;
     /** The lines a clipped layout shows, by layout id, until its ITEM_TEXT. */
-    private final ConcurrentHashMap<Integer, Integer> clips = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, Integer> clips;
+    /**
+     * The first view, which the engine serves, for an overlay's view: null for the first view itself. The first view receives every message and hands an overlay's batches and images on to its view, whose events name its surface.
+     */
+    private final NsgoView primary;
+    /** The surface this view shows, 0 for the first view's, else an overlay's (driver.SurfaceOverlay). */
+    private final int surface;
+    /** The first view's overlays over other apps, null on an overlay's view. */
+    private final Overlays overlays;
     /** Decodes images off the UI thread, one at a time. */
     private final ExecutorService decoder = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "nsgo-images");
@@ -141,6 +149,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private NsgoEngine engine;
     private boolean ownsEngine;
     private boolean attached;
+    /** Whether the app's process runs on, off screen, for its overlays over other apps alone, its activity ended (keepForOverlays); and whether the app quit, which keeps nothing. */
+    private boolean keptForOverlays, quit;
     // The engine's flags the app starts with (--nsgo-fps).
     private final ArrayList<String> flags = new ArrayList<>();
     // The test nsgo test -target android runs, and its agent.
@@ -210,10 +220,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     // node shown above the keyboard.
     private Node focusedInput, accessoryShown;
 
-    /** The channel to the embedding app, and its settings over the system's. */
-    private final Host host = new Host(this);
+    /** The channel to the embedding app, and its settings over the system's: the first view's. */
+    private final Host host;
     /** Downloads the app's images, as its Go process asks. */
-    private final Downloads downloads = new Downloads(this::write);
+    private final Downloads downloads;
     private java.util.Locale hostLocale;
     private float hostFontScale;
     private int hostAppearance;
@@ -251,13 +261,44 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     /** The constructor layouts inflate. */
     public NsgoView(Context context, android.util.AttributeSet attrs) {
+        this(context, attrs, null, 0);
+    }
+
+    /** The view of overlay surface, in a window of its own, which first serves; Overlays makes it. */
+    NsgoView(Context context, NsgoView first, int surface) {
+        this(context, null, first, surface);
+    }
+
+    private NsgoView(Context context, android.util.AttributeSet attrs, NsgoView first, int surface) {
         super(context, attrs);
+        primary = first;
+        this.surface = surface;
+        if (first == null) {
+            prepared = new SparseArray<>();
+            layouts = new ConcurrentHashMap<>();
+            shown = new ConcurrentHashMap<>();
+            clips = new ConcurrentHashMap<>();
+            host = new Host(this);
+            downloads = new Downloads(this::write);
+            overlays = new Overlays(this);
+        } else {
+            prepared = first.prepared;
+            layouts = first.layouts;
+            shown = first.shown;
+            clips = first.clips;
+            host = first.host;
+            downloads = first.downloads;
+            overlays = null;
+            engine = first.engine;
+        }
         density = context.getResources().getDisplayMetrics().density;
         ime = context.getSystemService(InputMethodManager.class);
         accessibility = context.getSystemService(AccessibilityManager.class);
         gestures = new Gestures(context);
         setOnApplyWindowInsetsListener((v, insets) -> {
             insets(insets);
+            // An overlay's usable area changes with the system bars and the cutout.
+            if (primary != null) primary.overlays.fit(this);
             environment();
             updateAccessory();
             return insets;
@@ -287,6 +328,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        if (primary != null) {
+            // An overlay's size goes with its environment.
+            environment();
+            return;
+        }
         boolean first = false;
         if (!attached) {
             if (engine == null) {
@@ -313,10 +359,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         float d = getResources().getDisplayMetrics().density;
         if (d != density && engine != null && engine.isAlive()) {
             density = d;
-            send(Protocol.RESIZE, getWidth() / density, getHeight() / density);
+            if (primary == null) send(Protocol.RESIZE, getWidth() / density, getHeight() / density);
         }
+        // A rotation or a display change moves an overlay's usable area: its window moves back onto it before it reports its frame.
+        if (primary != null) primary.overlays.fit(this);
         environment();
-        systemBars();
+        if (primary == null) systemBars();
     }
 
     @Override
@@ -325,23 +373,27 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         accessibility.addTouchExplorationStateChangeListener(screenReader);
         getContext().getContentResolver().registerContentObserver(
                 Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, motion);
+        if (primary != null) return;
         // Back goes to the app only while it can answer, so not on a detached view or an ended engine.
         boolean answers = attached || engine == null || engine.canStart();
         if (Build.VERSION.SDK_INT >= 33 && answers) registerBack();
         systemBars();
     }
 
-    /** The app's lifecycle follows the window's focus and visibility. */
+    /** The app's lifecycle follows the window's focus and visibility; coming back to the front answers the overlay permission requests the setting held. */
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         environment();
+        if (hasFocus && overlays != null) overlays.returned();
     }
 
+    /** An overlay's window showing starts the service that keeps it, and one the system hides may have lost its grant. */
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
         environment();
+        if (primary != null) primary.overlays.visibility(this, visibility);
     }
 
     @Override
@@ -349,7 +401,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         accessibility.removeTouchExplorationStateChangeListener(screenReader);
         getContext().getContentResolver().unregisterContentObserver(motion);
         unregisterBack();
-        if (!ownsEngine) detachFromEngine();
+        if (!ownsEngine && primary == null) detachFromEngine();
         super.onDetachedFromWindow();
     }
 
@@ -533,6 +585,34 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /**
+     * Keeps the app's process running off screen as the activity showing this view ends while the app's overlays over other apps show, on a view that owns its engine and an app that did not quit: the view detaches, as from a host's engine, an activity that shows the app again takes it back (showAgain) and the process ends with the last overlay. Whether it kept the process; the activity stops the view otherwise.
+     */
+    boolean keepForOverlays() {
+        if (!ownsEngine || quit || engine == null || !engine.isAlive() || overlays == null || !overlays.any()) return false;
+        detachFromEngine();
+        keptForOverlays = true;
+        return true;
+    }
+
+    /** Whether keepForOverlays kept the app's process, which still runs. */
+    boolean keptForOverlays() {
+        return keptForOverlays && engine != null && engine.isAlive();
+    }
+
+    /** Shows the app keepForOverlays kept again, in the activity whose context this view's now wraps, before it goes into that activity's window: its appearance and direction restyle that window. */
+    void showAgain() {
+        keptForOverlays = false;
+        themed = null;
+        if (engine != null && engine.isAlive()) attachRunningEngine();
+        applyDirection();
+    }
+
+    /** The last overlay over other apps closed: a view kept only for them ends the app's process, as its activity did. */
+    void overlaysClosed() {
+        if (keptForOverlays) stop();
+    }
+
+    /**
      * Ends the app's process and destroys its native components. On a view showing a host-owned engine it only detaches the view, as NsgoEngine.destroy ends that engine.
      */
     public void stop() {
@@ -555,8 +635,37 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         decoder.shutdownNow();
         folders.shutdownNow();
         attached = false;
+        keptForOverlays = false;
         unregisterBack();
+        // Overlays are the system's windows, not the activity's: nothing else removes them as the process ends, and they would stay above every app, frozen, with the service's notification.
+        if (overlays != null) overlays.closeAll();
         destroyComponents();
+    }
+
+    /**
+     * Lets go of an overlay's view as its window closes, on the UI thread: its decoders and every node's web view, video and native component, as a closed tree deletes none of its views.
+     */
+    void releaseOverlay() {
+        decoder.shutdownNow();
+        folders.shutdownNow();
+        for (int i = 0; i < nodes.size(); i++) {
+            Node n = nodes.valueAt(i);
+            if (n.animator != null) n.animator.cancel();
+            if (n.keyframer != null) n.keyframer.cancel();
+            if (n.web != null) n.web.destroy();
+            if (n.video != null) n.video.destroy();
+            if (n.embedded != null) n.embedded.destroy();
+            n.embedded = null;
+        }
+        nodes.clear();
+        byView.clear();
+        outside.clear();
+        moving.clear();
+    }
+
+    /** The surface this view shows. */
+    int surface() {
+        return surface;
     }
 
     /** Destroys the native components still showing, on the UI thread. */
@@ -575,12 +684,31 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         DataInputStream message = new DataInputStream(new ByteArrayInputStream(payload));
         try {
             switch (kind) {
-                case Protocol.BATCH:
-                    ui.post(() -> mount(payload));
+                case Protocol.BATCH: {
+                    // Each batch names its surface: an overlay's goes to its view.
+                    int to = message.readInt();
+                    if (to == 0) ui.post(() -> mount(payload));
+                    else ui.post(() -> overlays.mount(to, payload));
                     break;
-                case Protocol.IMAGE:
-                    image(message);
+                }
+                case Protocol.IMAGE: {
+                    int to = message.readInt();
+                    if (to == 0) {
+                        image(message);
+                        break;
+                    }
+                    // The overlays are the UI thread's: an overlay's image finds its view there, unless it closed meanwhile.
+                    ui.post(() -> {
+                        NsgoView view = overlays.view(to);
+                        if (view == null) return;
+                        try {
+                            view.image(message);
+                        } catch (IOException e) {
+                            Log.w(TAG, "invalid message from app", e);
+                        }
+                    });
                     break;
+                }
                 case Protocol.CANVAS_IMAGE:
                     canvasImage(message);
                     break;
@@ -651,13 +779,13 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /**
-     * Sends the environment if it changed: before START, then whenever the
-     * insets, the configuration, an accessibility setting or the window's
-     * focus and visibility change. The keyboard takes the system's default
-     * duration.
+     * Sends the environment if it changed: before START, then whenever the insets, the configuration, an accessibility setting or the window's focus and visibility change. The keyboard takes the system's default duration. An overlay's view sends it with its size and place (SURFACE_STATE), the first of which attaches its tree, and takes the host's settings from the first view.
      */
-    private void environment() {
+    void environment() {
         if (engine == null || !engine.isAlive()) return;
+        NsgoView first = primary != null ? primary : this;
+        float hostFontScale = first.hostFontScale;
+        java.util.Locale hostLocale = first.hostLocale;
         Configuration config = getResources().getConfiguration();
         boolean dark = dark();
         followAppearance(dark);
@@ -698,9 +826,18 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             throw new AssertionError(impossible);
         }
         byte[] payload = bytes.toByteArray();
+        if (primary != null) {
+            byte[] state = primary.overlays.state(this, payload);
+            if (state == null || Arrays.equals(state, environment)) return;
+            environment = state;
+            write(Protocol.SURFACE, state);
+            return;
+        }
         if (Arrays.equals(payload, environment)) return;
         environment = payload;
         write(Protocol.ENVIRONMENT, payload);
+        // The app's forced appearance and the host's settings reach its overlays.
+        overlays.environment();
     }
 
     /** The appearance the app forces, as driver.Appearance; 0 follows the system's. */
@@ -722,10 +859,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private Services.Pick photo;
     private java.io.File photoFile;
 
-    /** Dark as shown: the app's forced appearance, else the host's, else the system's. */
+    /** Dark as shown: the app's forced appearance, else the host's, else the system's; an overlay's, the first view's. */
     private boolean dark() {
-        if (appearance != 0) return appearance == Protocol.APPEARANCE_DARK;
-        if (hostAppearance != 0) return hostAppearance == APPEARANCE_DARK;
+        NsgoView first = primary != null ? primary : this;
+        if (first.appearance != 0) return first.appearance == Protocol.APPEARANCE_DARK;
+        if (first.hostAppearance != 0) return first.hostAppearance == APPEARANCE_DARK;
         int night = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
         return night == Configuration.UI_MODE_NIGHT_YES;
     }
@@ -741,7 +879,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         if (themed != null && themed == dark) return;
         themed = dark;
         if (activity() instanceof NsgoActivity) ((NsgoActivity) activity()).followAppearance(dark);
-        boolean forced = appearance != 0 || hostAppearance != 0;
+        NsgoView first = primary != null ? primary : this;
+        boolean forced = first.appearance != 0 || first.hostAppearance != 0;
         for (int i = 0; i < nodes.size(); i++) {
             Node n = nodes.valueAt(i);
             if (n.web != null) n.web.appearance(dark, forced);
@@ -1104,13 +1243,24 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
             ui.post(() -> {
                 CanvasNode.pictures.put(key, new CanvasNode.Picture(bitmap, scale));
-                for (int i = 0; i < nodes.size(); i++) {
-                    Node n = nodes.valueAt(i);
-                    if (n.canvas != null) n.canvas.invalidate();
-                    if (n.shader != null) n.shader.draw();
-                }
+                redrawCanvases();
+                overlays.redrawCanvases();
             });
         });
+    }
+
+    /** Answers ITEM_OVERLAY_PERMISSION count of this view's tree with permission, an OVERLAY_* of Protocol's. */
+    void answerOverlayPermission(long count, int permission) {
+        event(Protocol.EVENT_OVERLAY_PERMISSION, 0, count, 0, 0, "", 0, 0, permission);
+    }
+
+    /** Draws the canvases and shaders again, as an image they draw arrived. */
+    void redrawCanvases() {
+        for (int i = 0; i < nodes.size(); i++) {
+            Node n = nodes.valueAt(i);
+            if (n.canvas != null) n.canvas.invalidate();
+            if (n.shader != null) n.shader.draw();
+        }
     }
 
     private void image(DataInputStream in) throws IOException {
@@ -1288,6 +1438,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream d = new DataOutputStream(bytes);
         try {
+            // The surface first: an overlay's events go to its tree.
+            d.writeInt(surface);
             d.writeByte(kind);
             d.writeInt(id);
             d.writeInt((int) count);
@@ -1821,8 +1973,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         return false;
     }
 
-    private void mount(byte[] batch) {
-        if (!mounted) {
+    /** Applies a batch of this view's surface, whose ID comes first. */
+    void mount(byte[] batch) {
+        if (!mounted && primary == null) {
             // The engine runs: a press that started the app goes to it.
             mounted = true;
             notificationPressed(pressedEarly);
@@ -1830,6 +1983,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(batch));
         try {
+            in.readInt();
             int root = in.readInt();
             layoutCreate = layoutUpdate = layoutDelete = null;
             if (in.readUnsignedByte() != 0) {
@@ -2300,8 +2454,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 applyDirection();
                 break;
             case Protocol.ITEM_QUIT: {
+                // Quitting ends the overlays with the app.
+                quit = true;
                 Activity activity = activity();
                 if (activity != null) activity.finishAndRemoveTask();
+                else if (keptForOverlays) stop();
                 break;
             }
             case Protocol.ITEM_POPUP_MENU:
@@ -2384,11 +2541,33 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.ITEM_SCREEN:
                 screen(n, in);
                 break;
-            case Protocol.ITEM_WINDOW:
+            case Protocol.ITEM_OPEN_SURFACE: {
+                int id = in.readInt();
+                float width = in.readFloat(), height = in.readFloat(), x = in.readFloat(), y = in.readFloat();
+                int flags = in.readUnsignedByte();
+                // Phones open no windows: only an overlay, from the first view's tree.
+                if (Protocol.flag(flags, 0) && overlays != null) overlays.open(id, width, height, x, y, flags);
+                break;
+            }
+            case Protocol.ITEM_WINDOW: {
+                int op = in.readUnsignedByte();
+                float x = in.readFloat(), y = in.readFloat(), width = in.readFloat(), height = in.readFloat();
+                int flags = in.readUnsignedByte();
+                // An overlay's commands; the first view has no window of the app's to command.
+                if (primary != null && op != Protocol.WINDOW_NONE) {
+                    primary.overlays.command(this, op, x, y, width, height, Protocol.flag(flags, 0), Protocol.flag(flags, 1));
+                }
+                break;
+            }
+            case Protocol.ITEM_OVERLAY_PERMISSION: {
+                long count = in.readInt() & 0xffffffffL;
+                boolean ask = in.readUnsignedByte() != 0;
+                (primary != null ? primary : this).overlays.permission(this, count, ask);
+                break;
+            }
             case Protocol.ITEM_MENU:
             case Protocol.ITEM_HISTORY:
-                // Desktop windows' and menus', and the web's history; Go
-                // writes no fields.
+                // Desktop menus and the web's history; Go writes no fields.
                 break;
             case Protocol.ITEM_BACK_PREVIEW:
                 previewBack(n);
@@ -2870,7 +3049,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
     }
 
-    private Activity activity() {
+    Activity activity() {
         for (Context c = getContext(); c instanceof ContextWrapper; c = ((ContextWrapper) c).getBaseContext()) {
             if (c instanceof Activity) return (Activity) c;
         }
@@ -2883,6 +3062,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * hides the status bar when asked.
      */
     private void systemBars() {
+        // The system bars are the activity's window's: an overlay's sets none.
+        if (primary != null) return;
         boolean dark = dark();
         boolean darkIcons = statusBarStyle == Protocol.STATUS_BAR_DARK
                 || statusBarStyle != Protocol.STATUS_BAR_LIGHT && !dark;
@@ -3258,6 +3439,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         b.setOnCancelListener(d -> answer.accept(dismissed));
         AlertDialog dialog = b.create();
         if (direction >= 0 && dialog.getWindow() != null) dialog.getWindow().getDecorView().setLayoutDirection(direction);
+        // An overlay has no activity to show a dialog in, nor the first view while its overlays keep the app without one: their alerts show over other apps.
+        if (activity() == null && dialog.getWindow() != null) {
+            dialog.getWindow().setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+        }
         dialog.show();
         alerts.put(id, new TestAgent.Alert(dialog, buttons, listIndices(count, sheet, roles)));
         for (int i = 0; buttons != null && i < count; i++) {

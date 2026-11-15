@@ -1,20 +1,6 @@
 //go:build android
 
-// Package android is NSGo's Android backend. The app is a plain Go
-// executable that the prebuilt Java runtime in java/ starts as a child
-// process; nsgo packages it as libnsgo.so in an APK. The two talk over
-// the process's pipes:
-// one message per commit, per event and per step of text. Java keeps the
-// text the engine prepares, measures it and lays it out with StaticLayout,
-// and mounts one Android view per node; measuring, and laying out text
-// with attachments, are the only round trips.
-// Go fetches images and Java decodes them, animated GIF and WebP
-// included; Go rasterizes SVG with imagedecode first, as Android cannot.
-// Java hosts web views, videos and native components' views, plays canvas
-// drawings, runs style transitions, a port of core.Animator and layout
-// animations on Choreographer frames, shows input accessory bars above
-// the keyboard and reports the environment, back, keys, presses outside
-// overlays and answers to alerts and clipboard reads.
+// Package android is NSGo's Android backend. The app is a plain Go executable that the prebuilt Java runtime in java/ starts as a child process; nsgo packages it as libnsgo.so in an APK. The two talk over the process's pipes: one message per commit, per event and per step of text. Java keeps the text the engine prepares, measures it and lays it out with StaticLayout, and mounts one Android view per node; measuring, and laying out text with attachments, are the only round trips. Go fetches images and Java decodes them, animated GIF and WebP included; Go rasterizes SVG with imagedecode first, as Android cannot. Java hosts web views, videos and native components' views, plays canvas drawings, runs style transitions, a port of core.Animator and layout animations on Choreographer frames, shows input accessory bars above the keyboard and reports the environment, back, keys, presses outside overlays and answers to alerts and clipboard reads. An overlay over other apps shows in a window of its own, an NsgoView the first view hands its surface's batches, images and events on to (overlay.go).
 //
 // Go builds Android shared libraries only with cgo and the NDK; a second
 // process keeps every build an executable, so arm64 needs only Go. An
@@ -108,6 +94,8 @@ const (
 	// msgLiveReport is what the runtime reports of Live Activities, JSON
 	// (driver.ReportLiveUpdate).
 	msgLiveReport = 15
+	// msgSurface is what an overlay's view reports of its surface: its size, frame and environment, the first of which attaches its tree, or its end (overlay.go).
+	msgSurface = 16
 )
 
 // The parts of an image view's request msgImage carries.
@@ -128,6 +116,9 @@ type surface struct {
 	engine   *engine.Engine
 	started  chan struct{}      // closed once engine is set
 	env      driver.Environment // the last reported, on the reader goroutine
+	// omu guards overlays, the overlays over other apps the app opened, by their surface IDs (overlay.go).
+	omu      sync.Mutex
+	overlays map[uint32]*overlay
 	// frameWanted is set while the app waits for a display frame, from
 	// its request until the runtime's answer.
 	frameWanted atomic.Bool
@@ -137,10 +128,9 @@ type surface struct {
 	ratio atomic.Uint32 // the pixel ratio's float32 bits, for rasterizing SVG
 
 	// On the engine goroutine.
-	// defaultsSent is set once a batch carried the defaults.
-	defaultsSent bool
-	images       map[driver.NodeID]*imageView
-	requests     uint32 // the last image request number
+	// main is the activity's view, the first surface; requests is the last image request number, across surfaces.
+	main     treeView
+	requests uint32
 	// canvasImages are the images canvases and shaders asked for, by their
 	// key; programs the shader programs translated, numbered from
 	// nextProgram.
@@ -152,12 +142,11 @@ type surface struct {
 	// hands them their views' events.
 	cmu        sync.Mutex
 	components driver.NativeComponents
-	natives    map[driver.NodeID]*nativeView
+	natives    map[nativeKey]*nativeView
 
-	// staged are the directories of the files saves of data were written
-	// to for Java to copy, by save, until it answers; smu guards them.
+	// staged are the directories of the files saves of data were written to for Java to copy, by save and its surface (answerKey), until it answers; smu guards them.
 	smu    sync.Mutex
-	staged map[uint32]string
+	staged map[uint64]string
 	// folders are the folder picks and reads Java has yet to answer.
 	folders folders
 	// downloads are the image downloads Java has yet to finish.
@@ -208,10 +197,11 @@ func connect(opts Options) *surface {
 		carets:   make(chan driver.CaretLayout, 1),
 		started:  make(chan struct{}),
 		env:      driver.Environment{OS: driver.OSAndroid, HasWebView: true},
-		images:   map[driver.NodeID]*imageView{},
+		main:     treeView{images: map[driver.NodeID]*imageView{}},
+		overlays: map[uint32]*overlay{},
 
 		components: opts.Components,
-		natives:    map[driver.NodeID]*nativeView{},
+		natives:    map[nativeKey]*nativeView{},
 		host:       newEmbedHost(),
 	}
 	useDNS()
@@ -253,6 +243,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 		case msgResize:
 			s.engine.Resize(driver.Size{Width: r.points(), Height: r.points()})
 		case msgEvent:
+			// The surface the event is for: 0 for the activity's view, else an overlay's.
+			from := r.u32()
 			ev := driver.Event{
 				Kind:  driver.EventKind(r.byte()),
 				ID:    driver.NodeID(r.u32()),
@@ -280,11 +272,16 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			mods := r.byte()
 			ev.Modifiers = driver.Modifiers{Control: mods&1 != 0, Alt: mods&2 != 0, Shift: mods&4 != 0, Platform: mods&8 != 0}
 			if ev.Kind == driver.EventNative {
-				s.nativeEvent(ev.ID, ev.Text, data)
+				s.nativeEvent(from, ev.ID, ev.Text, data)
+				break
+			}
+			target := s.target(from)
+			if target == nil {
+				// An overlay that ended, or never attached.
 				break
 			}
 			if ev.Kind == driver.EventInputModality {
-				s.engine.InputModality(ev.Count)
+				target.InputModality(ev.Count)
 				break
 			}
 			if ev.Kind == driver.EventTouch {
@@ -298,12 +295,12 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			case driver.EventPick:
 				ev.Data = readPicked(data)
 			case driver.EventFiles:
-				if s.pickedFolders(ev.Count) {
+				if s.pickedFolders(answerKey(from, ev.Count)) {
 					ev.Data = s.readFolders(data)
 				} else {
 					ev.Data = readFiles(data)
 				}
-				s.unstage(ev.Count)
+				s.unstage(answerKey(from, ev.Count))
 			case driver.EventDownload:
 				var download driver.WebDownload
 				if json.Unmarshal([]byte(data), &download) == nil {
@@ -324,9 +321,9 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 				// it applies them: while the app waits for a frame, the
 				// report rides with it, where it cost a pass of its own
 				// every frame of an app scrolling in its frames.
-				s.engine.DispatchBeforeFrame(ev)
+				target.DispatchBeforeFrame(ev)
 			} else {
-				s.engine.Dispatch(ev)
+				target.Dispatch(ev)
 			}
 		case msgMeasured:
 			s.measured <- driver.Size{Width: r.points(), Height: r.points()}
@@ -360,6 +357,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			if s.engine != nil {
 				s.engine.SetEnvironment(env)
 			}
+		case msgSurface:
+			s.surfaceReport(&r)
 		case msgFolderReply:
 			s.folderReply(&r)
 		case msgFetched:
@@ -503,7 +502,7 @@ func readFiles(data string) []driver.File {
 // stage writes the data of the batch's saves that have no file to the
 // cache, for Java to copy from. A save that cannot be written fails at
 // once, and Java, seeing no path, leaves it.
-func (s *surface) stage(b *driver.MountBatch) {
+func (s *surface) stage(id uint32, b *driver.MountBatch) {
 	for i := range b.Items {
 		it := &b.Items[i]
 		if it.Kind != driver.ItemSaveFile || it.Save.Path != "" {
@@ -512,22 +511,23 @@ func (s *surface) stage(b *driver.MountBatch) {
 		r := *it.Save
 		path, err := r.Stage(filepath.Join(os.Getenv("NSGO_CACHE_DIR"), "nsgo-save"))
 		if err != nil {
-			go s.engine.Dispatch(driver.Event{Kind: driver.EventFiles, Count: it.Count, Text: err.Error()})
+			ev := driver.Event{Kind: driver.EventFiles, Count: it.Count, Text: err.Error()}
+			go s.dispatchTo(id, ev)
 		} else {
 			r.Path = path
 			s.smu.Lock()
 			if s.staged == nil {
-				s.staged = map[uint32]string{}
+				s.staged = map[uint64]string{}
 			}
-			s.staged[it.Count] = filepath.Dir(path)
+			s.staged[answerKey(id, it.Count)] = filepath.Dir(path)
 			s.smu.Unlock()
 		}
 		it.Save = &r
 	}
 }
 
-// unstage removes what stage wrote for save once Java answered it.
-func (s *surface) unstage(save uint32) {
+// unstage removes what stage wrote for save, an answerKey, once Java answered it.
+func (s *surface) unstage(save uint64) {
 	s.smu.Lock()
 	dir, ok := s.staged[save]
 	delete(s.staged, save)
@@ -812,7 +812,13 @@ func (s *surface) RequestFrame() {
 // Mount implements engine.Platform: one message per commit, then the
 // loads of the image sources it changed.
 func (s *surface) Mount(b *driver.MountBatch) {
-	b = s.withoutPermissions(s.withoutUpdateChecks(withoutTaskProgress(withoutEffects(b))))
+	s.openOverlays(b)
+	s.mount(&s.main, b)
+}
+
+// mount sends the batch of v's tree to Java, which names its surface, and loads the image sources it changed.
+func (s *surface) mount(v *treeView, b *driver.MountBatch) {
+	b = s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutTaskProgress(withoutEffects(b))))
 	// Android has no file manager an app can reveal in or trash through. The batch may be the engine's own, which a test's observer holds, so the items are filtered from a copy.
 	fileManager := func(it driver.MountItem) bool {
 		return it.Kind == driver.ItemRevealFile || it.Kind == driver.ItemTrashFile
@@ -820,35 +826,71 @@ func (s *surface) Mount(b *driver.MountBatch) {
 	if slices.ContainsFunc(b.Items, fileManager) {
 		for _, it := range b.Items {
 			if fileManager(it) {
-				s.engine.Dispatch(driver.Event{Kind: driver.EventFiles, Count: it.Count, Text: driver.NoFileRevealer})
+				s.dispatchTo(v.id, driver.Event{Kind: driver.EventFiles, Count: it.Count, Text: driver.NoFileRevealer})
 			}
 		}
 		out := *b
 		out.Items = slices.DeleteFunc(slices.Clone(b.Items), fileManager)
 		b = &out
 	}
-	requests, loads := s.trackImages(b)
-	s.stage(b)
+	requests, loads := s.trackImages(v, b)
+	s.stage(v.id, b)
 	for i := range b.Items {
 		if it := &b.Items[i]; it.Kind == driver.ItemPickDirectories {
-			s.pickFolders(it.Count)
+			s.pickFolders(answerKey(v.id, it.Count))
 		}
 	}
-	natives := s.trackNatives(b)
+	natives := s.trackNatives(v.id, b)
 	shaders := s.trackShaders(b)
-	first := !s.defaultsSent
-	s.defaultsSent = true
-	s.send(msgBatch, func(w *writer) { encode(w, b, first, requests, natives, shaders) })
+	first := !v.defaultsSent
+	v.defaultsSent = true
+	s.send(msgBatch, func(w *writer) {
+		w.u32(v.id)
+		encode(w, b, first, requests, natives, shaders)
+	})
 	for _, l := range loads {
 		go s.load(l)
 	}
 	// Go loads the images Java shows, so it answers ImageSize too.
 	for i := range b.Items {
 		if it := b.Items[i]; it.Kind == driver.ItemImageInfo {
-			go s.engine.Dispatch(imageload.Info(&it, imagedecode.Size))
+			go s.dispatchTo(v.id, imageload.Info(&it, imagedecode.Size))
 		}
 	}
 }
+
+// treeView is what Go keeps of a tree a view of the runtime shows, on the engine goroutine: the activity's, the first surface, or an overlay's.
+type treeView struct {
+	// id is the surface's, 0 for the activity's view.
+	id uint32
+	// defaultsSent is set once a batch carried the defaults.
+	defaultsSent bool
+	images       map[driver.NodeID]*imageView
+}
+
+// target is the Engine of surface id, for the reader goroutine: the first's, else an attached overlay's that has not ended, else nil.
+func (s *surface) target(id uint32) *engine.Engine {
+	if id == 0 {
+		return s.engine
+	}
+	s.omu.Lock()
+	defer s.omu.Unlock()
+	if o := s.overlays[id]; o != nil && !o.ended {
+		return o.engine
+	}
+	return nil
+}
+
+// dispatchTo reports ev to surface id from any goroutine, once the first surface's engine started; an overlay gone takes nothing.
+func (s *surface) dispatchTo(id uint32, ev driver.Event) {
+	<-s.started
+	if e := s.target(id); e != nil {
+		e.Dispatch(ev)
+	}
+}
+
+// answerKey keys a service request Java answers by the surface that asked and its count, which each tree numbers on its own.
+func answerKey(surface, count uint32) uint64 { return uint64(surface)<<32 | uint64(count) }
 
 // imageView is what Go keeps of an image view: the sources of its
 // current request and how to stop loading them.
@@ -866,9 +908,10 @@ func (v *imageView) stop() {
 	}
 }
 
-// imageLoad fetches the sources of one request of an image view.
+// imageLoad fetches the sources of one request of an image view, node id of surface's tree.
 type imageLoad struct {
 	ctx                 context.Context
+	surface             uint32
 	id                  driver.NodeID
 	request             uint32
 	source, placeholder driver.ImageSource
@@ -880,20 +923,21 @@ type imageLoad struct {
 // gets a new request number, which its ItemImage carries and its bytes
 // name, so Java drops the bytes of requests it has moved past. It returns
 // the request of each ItemImage in b, in order, and the loads to start.
-func (s *surface) trackImages(b *driver.MountBatch) ([]uint32, []imageLoad) {
+func (s *surface) trackImages(tv *treeView, b *driver.MountBatch) ([]uint32, []imageLoad) {
 	var requests []uint32
 	var loads []imageLoad
+	images := tv.images
 	for i := range b.Items {
 		it := &b.Items[i]
-		v := s.images[it.ID]
+		v := images[it.ID]
 		switch it.Kind {
 		case driver.ItemCreate, driver.ItemDelete:
 			if v != nil {
 				v.stop()
-				delete(s.images, it.ID)
+				delete(images, it.ID)
 			}
 			if it.Kind == driver.ItemCreate && it.View == driver.KindImage {
-				s.images[it.ID] = &imageView{}
+				images[it.ID] = &imageView{}
 			}
 		case driver.ItemEvents:
 			if v != nil {
@@ -908,7 +952,7 @@ func (s *surface) trackImages(b *driver.MountBatch) ([]uint32, []imageLoad) {
 		case driver.ItemImage:
 			if v == nil {
 				v = &imageView{}
-				s.images[it.ID] = v
+				images[it.ID] = v
 			}
 			c := it.Image
 			if v.request == 0 || !sameSource(v.source, c.Source) || !sameSource(v.placeholder, c.Placeholder) {
@@ -916,14 +960,14 @@ func (s *surface) trackImages(b *driver.MountBatch) ([]uint32, []imageLoad) {
 				s.requests++
 				ctx, cancel := context.WithCancel(context.Background())
 				v.source, v.placeholder, v.request, v.cancel = c.Source, c.Placeholder, s.requests, cancel
-				loads = append(loads, imageLoad{ctx, it.ID, v.request, c.Source, c.Placeholder, v.events, v.size})
+				loads = append(loads, imageLoad{ctx, tv.id, it.ID, v.request, c.Source, c.Placeholder, v.events, v.size})
 			}
 			requests = append(requests, v.request)
 		}
 	}
 	// A frame may follow its view's ItemImage.
 	for i := range loads {
-		if v := s.images[loads[i].id]; v != nil {
+		if v := images[loads[i].id]; v != nil {
 			loads[i].size = v.size
 		}
 	}
@@ -980,14 +1024,14 @@ func (s *surface) load(l imageLoad) {
 // report dispatches ev about l's view if the view reports its kind.
 func (s *surface) report(l imageLoad, ev driver.Event) {
 	if l.events.Has(ev.Kind) {
-		<-s.started
 		ev.ID = l.id
-		s.engine.Dispatch(ev)
+		s.dispatchTo(l.surface, ev)
 	}
 }
 
 func (s *surface) sendImage(l imageLoad, part byte, img decodedImage) {
 	s.send(msgImage, func(w *writer) {
+		w.u32(l.surface)
 		w.u32(uint32(l.id))
 		w.u32(l.request)
 		w.byte(part)
@@ -1071,13 +1115,7 @@ var defaults = sync.OnceValue(func() []byte {
 	return w.buf
 })
 
-// encode writes a batch in the format NsgoView.mount reads: each item is
-// its kind, its ID and the fields of that kind; requests numbers its
-// ItemImage items in order, and natives says what its ItemNative items
-// send. Kinds it does not know, ItemBackUnhandled and the desktop-only
-// ItemWindow and ItemMenu, which Java ignores, have no fields. The batch's
-// layout animation comes before its items, and the first batch's defaults
-// after it.
+// encode writes a batch in the format NsgoView.mount reads, after the surface's ID mount writes: each item is its kind, its ID and the fields of that kind; requests numbers its ItemImage items in order, and natives says what its ItemNative items send. Kinds it does not know, ItemBackUnhandled and the desktop-only ItemMenu, which Java ignores, have no fields, and ItemWindow only an overlay's (writeWindow). The batch's layout animation comes before its items, and the first batch's defaults after it.
 func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, natives []nativeItem, shaders []shaderItem) {
 	w.u32(uint32(b.Root))
 	writeLayoutAnimation(w, b.LayoutAnimation)
@@ -1248,9 +1286,13 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 		case driver.ItemBiometricAuthenticate:
 			w.u32(it.Count)
 			w.str(it.Value)
-		case driver.ItemNotificationPermission:
+		case driver.ItemNotificationPermission, driver.ItemOverlayPermission:
 			w.u32(it.Count)
 			w.flags(it.On)
+		case driver.ItemOpenSurface:
+			writeSurface(w, it.Surface)
+		case driver.ItemWindow:
+			writeWindow(w, it.Window)
 		case driver.ItemShowNotification:
 			n := it.Notification
 			w.u32(it.Count)

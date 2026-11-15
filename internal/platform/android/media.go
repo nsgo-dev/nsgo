@@ -23,6 +23,12 @@ type nativeView struct {
 	host      bool
 }
 
+// nativeKey names a native view: its node in the tree of its surface, 0 for the activity's view.
+type nativeKey struct {
+	surface uint32
+	id      driver.NodeID
+}
+
 // hostClass prefixes the name of a component Go does not know, for Java to
 // look it up among the host's (NsgoView.registerComponent).
 const hostClass = "host:"
@@ -31,11 +37,26 @@ const hostClass = "host:"
 func (s *surface) closeNatives() {
 	s.cmu.Lock()
 	defer s.cmu.Unlock()
-	for id, v := range s.natives {
+	for key, v := range s.natives {
 		if v.component != nil {
 			v.component.Close()
 		}
-		delete(s.natives, id)
+		delete(s.natives, key)
+	}
+}
+
+// closeSurfaceNatives closes the components of surface id's tree, which closed without deleting its views.
+func (s *surface) closeSurfaceNatives(id uint32) {
+	s.cmu.Lock()
+	defer s.cmu.Unlock()
+	for key, v := range s.natives {
+		if key.surface != id {
+			continue
+		}
+		if v.component != nil {
+			v.component.Close()
+		}
+		delete(s.natives, key)
 	}
 }
 
@@ -46,26 +67,26 @@ type nativeItem struct {
 	props []driver.AndroidViewProp
 }
 
-// trackNatives makes and updates the components of b's native views and
-// returns what each ItemNative in b sends Java, in order.
-func (s *surface) trackNatives(b *driver.MountBatch) []nativeItem {
+// trackNatives makes and updates the components of the native views of surface's batch b and returns what each ItemNative in b sends Java, in order.
+func (s *surface) trackNatives(surface uint32, b *driver.MountBatch) []nativeItem {
 	var items []nativeItem
 	s.cmu.Lock()
 	defer s.cmu.Unlock()
 	for i := range b.Items {
 		it := &b.Items[i]
+		key := nativeKey{surface, it.ID}
 		switch it.Kind {
 		case driver.ItemCreate, driver.ItemDelete:
-			if v := s.natives[it.ID]; v != nil {
+			if v := s.natives[key]; v != nil {
 				if v.component != nil {
 					v.component.Close()
 				}
-				delete(s.natives, it.ID)
+				delete(s.natives, key)
 			}
 		case driver.ItemNative:
-			items = append(items, s.configureNative(it.ID, it.Native))
+			items = append(items, s.configureNative(key, it.Native))
 		case driver.ItemNativeCommand:
-			if v := s.natives[it.ID]; v != nil && v.component != nil {
+			if v := s.natives[key]; v != nil && v.component != nil {
 				v.component.Command(it.Value, it.Data)
 			}
 		}
@@ -73,14 +94,14 @@ func (s *surface) trackNatives(b *driver.MountBatch) []nativeItem {
 	return items
 }
 
-// configureNative makes id's component on its first item and passes it
+// configureNative makes key's component on its first item and passes it
 // the props that changed.
-func (s *surface) configureNative(id driver.NodeID, c *driver.NativeConfig) nativeItem {
+func (s *surface) configureNative(key nativeKey, c *driver.NativeConfig) nativeItem {
 	var item nativeItem
-	v := s.natives[id]
+	v := s.natives[key]
 	if v == nil {
 		v = &nativeView{}
-		s.natives[id] = v
+		s.natives[key] = v
 		factory := s.components[c.Component]
 		if factory == nil && c.Component == driver.TabBarComponent {
 			factory = newTabBar
@@ -90,12 +111,14 @@ func (s *surface) configureNative(id driver.NodeID, c *driver.NativeConfig) nati
 			v.host = true
 			item.class = hostClass + c.Component
 		} else {
-			e := s.engine
+			surface, id := key.surface, key.id
 			v.component = factory(driver.NewNativeContext(
 				func(name string, data any) {
-					e.Dispatch(driver.Event{Kind: driver.EventNative, ID: id, Text: name, Data: data})
+					s.dispatchTo(surface, driver.Event{Kind: driver.EventNative, ID: id, Text: name, Data: data})
 				},
-				func(size driver.Size) { e.Dispatch(driver.Event{Kind: driver.EventNativeSize, ID: id, Size: size}) },
+				func(size driver.Size) {
+					s.dispatchTo(surface, driver.Event{Kind: driver.EventNativeSize, ID: id, Size: size})
+				},
 			))
 		}
 		if v.component != nil {
@@ -135,17 +158,20 @@ func (s *surface) configureNative(id driver.NodeID, c *driver.NativeConfig) nati
 	return item
 }
 
-// nativeEvent hands a listener callback of a native view's View to its
-// component, or emits it.
-func (s *surface) nativeEvent(id driver.NodeID, name, data string) {
+// nativeEvent hands a listener callback of the View of surface's native view id to its component, or emits it.
+func (s *surface) nativeEvent(surface uint32, id driver.NodeID, name, data string) {
+	e := s.target(surface)
+	if e == nil {
+		return
+	}
 	s.cmu.Lock()
-	v := s.natives[id]
+	v := s.natives[nativeKey{surface, id}]
 	if v != nil && v.host {
 		// A host's component emits one value.
 		s.cmu.Unlock()
 		var value any
 		json.Unmarshal([]byte(data), &value)
-		s.engine.Dispatch(driver.Event{Kind: driver.EventNative, ID: id, Text: name, Data: value})
+		e.Dispatch(driver.Event{Kind: driver.EventNative, ID: id, Text: name, Data: value})
 		return
 	}
 	var args []any
@@ -161,7 +187,7 @@ func (s *surface) nativeEvent(id driver.NodeID, name, data string) {
 	}
 	s.cmu.Unlock()
 	if mapper == nil && v != nil {
-		s.engine.Dispatch(driver.Event{Kind: driver.EventNative, ID: id, Text: name, Data: args})
+		e.Dispatch(driver.Event{Kind: driver.EventNative, ID: id, Text: name, Data: args})
 	}
 }
 

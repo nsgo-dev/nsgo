@@ -1,10 +1,13 @@
 package dev.oneo.nsgo;
 
 import android.app.Activity;
+import android.content.MutableContextWrapper;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.ContextThemeWrapper;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 
@@ -15,14 +18,24 @@ import android.view.WindowManager;
  * configuration changes it handles, or the system restarts the app on each.
  */
 public class NsgoActivity extends Activity {
+    /**
+     * The view of an activity that ended while the app's overlays over other apps kept its process running, as when the user removes the app's task, which the next activity shows again: the engine serves the one view that first attached to it, so the view moves to the new activity, its context wrapping that one. Null otherwise.
+     */
+    private static NsgoView kept;
+
     private NsgoView view;
+    /** The theme the window shows, which a kept view's context takes while no activity holds it. */
+    private int theme = android.R.style.Theme_DeviceDefault_NoActionBar;
 
     @Override
     protected void onCreate(Bundle state) {
         // The manifest's theme is dark; web views take prefers-color-scheme
         // from the theme, so it follows the system's mode at launch.
         int night = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        if (night != Configuration.UI_MODE_NIGHT_YES) setTheme(android.R.style.Theme_DeviceDefault_Light_NoActionBar);
+        if (night != Configuration.UI_MODE_NIGHT_YES) {
+            theme = android.R.style.Theme_DeviceDefault_Light_NoActionBar;
+            setTheme(theme);
+        }
         super.onCreate(state);
         Window window = getWindow();
         WindowManager.LayoutParams lp = window.getAttributes();
@@ -35,9 +48,17 @@ public class NsgoActivity extends Activity {
         window.setNavigationBarColor(Color.TRANSPARENT);
         if (Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false);
         // The view lays itself out behind the system bars and styles them.
-        view = new NsgoView(this);
-        view.setFlags(getIntent().getExtras());
-        view.setTest(getIntent().getStringExtra(TestAgent.EXTRA));
+        NsgoView again = kept;
+        kept = null;
+        if (again != null && again.keptForOverlays()) {
+            ((MutableContextWrapper) again.getContext()).setBaseContext(this);
+            view = again;
+            view.showAgain();
+        } else {
+            view = new NsgoView(new MutableContextWrapper(this));
+            view.setFlags(getIntent().getExtras());
+            view.setTest(getIntent().getStringExtra(TestAgent.EXTRA));
+        }
         setContentView(view);
         view.notificationPressed(getIntent().getStringExtra(Notifications.EXTRA));
         view.liveActionPressed(getIntent());
@@ -56,7 +77,7 @@ public class NsgoActivity extends Activity {
      * views it makes from now on read, and the window's background.
      */
     void followAppearance(boolean dark) {
-        int theme = dark ? android.R.style.Theme_DeviceDefault_NoActionBar
+        theme = dark ? android.R.style.Theme_DeviceDefault_NoActionBar
                 : android.R.style.Theme_DeviceDefault_Light_NoActionBar;
         setTheme(theme);
         getTheme().applyStyle(theme, true);
@@ -83,9 +104,16 @@ public class NsgoActivity extends Activity {
         view.permissionResult(request, permissions, results);
     }
 
+    /** Ends the app with the activity, unless its overlays over other apps keep it running, off screen, for the next activity. */
     @Override
     protected void onDestroy() {
-        view.stop();
+        if (view.keepForOverlays()) {
+            ((ViewGroup) view.getParent()).removeView(view);
+            ((MutableContextWrapper) view.getContext()).setBaseContext(new ContextThemeWrapper(getApplicationContext(), theme));
+            kept = view;
+        } else {
+            view.stop();
+        }
         super.onDestroy();
     }
 }

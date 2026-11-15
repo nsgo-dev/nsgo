@@ -1,6 +1,6 @@
 # Android engine and view lifetime
 
-This document is the design for issue #12. It is a dependency for Android recording, floating windows and push delivery. The first stage is implemented: `NsgoEngine` owns the process and pipe, and its view can detach and attach again while the app runs on. The protocol still carries one surface, so an engine serves only the view that first attached to it, and a fresh Activity's view cannot show an engine's app yet. Surface IDs, resync and several surfaces per process are the later stages described below.
+This document is the design for issue #12. It is a dependency for Android recording, floating windows and push delivery. The first stage is implemented: `NsgoEngine` owns the process and pipe, and its view can detach and attach again while the app runs on. Batches, images and events name their surface, which only an overlay over other apps uses so far, through the view that first attached ([Android floating windows](android-floating-windows.md#how-android-shows-it)): an engine serves only that view, and a fresh Activity's view cannot show an engine's app yet. Attaching and resyncing other views and several Activities per process are the later stages described below.
 
 ## Ownership
 
