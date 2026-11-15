@@ -4,7 +4,9 @@ package linux
 
 import (
 	"os"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // TestAwakeAppIDFallsBack names an app built without nsgo.yaml's id, as go build and go run make it, by its name, else its executable: GNOME's inhibitors refuse an empty ID.
@@ -64,4 +66,39 @@ func TestAwakeSandboxDetection(t *testing.T) {
 	if !sandboxed() {
 		t.Error("a Snap counted as unsandboxed")
 	}
+}
+
+// TestEndAwakeWaitsForTheReleases sends every hold's release before a quitting app's main loop returns, as the process exits right after and would drop releases only queued, and bounds the wait by a queue that does not answer.
+func TestEndAwakeWaitsForTheReleases(t *testing.T) {
+	w := &window{}
+	var ended atomic.Bool
+	ready := make(chan struct{})
+	portalQueue() <- func() {
+		awake.holds = map[awakeKey]bool{{w, 1}: false}
+		awake.groups[0] = awakeGroup{refs: 1, end: func() {
+			time.Sleep(50 * time.Millisecond) // a synchronous Uninhibit on the bus
+			ended.Store(true)
+		}}
+		close(ready)
+	}
+	<-ready
+	awakeTaken.Store(true)
+	t.Cleanup(func() { awakeTaken.Store(false) })
+	if !endAwake(5*time.Second) || !ended.Load() {
+		t.Fatal("endAwake returned before the computer-only hold's release was sent")
+	}
+	if len(awake.holds) != 0 || awake.groups[0].refs != 0 || awake.groups[0].end != nil {
+		t.Fatalf("endAwake left holds %v and group %+v", awake.holds, awake.groups[0])
+	}
+
+	stuck := make(chan struct{})
+	portalQueue() <- func() { <-stuck }
+	start := time.Now()
+	if endAwake(100 * time.Millisecond) {
+		t.Fatal("endAwake reported the releases sent behind a call that never returned")
+	}
+	if waited := time.Since(start); waited > 2*time.Second {
+		t.Fatalf("endAwake waited %v behind a stuck queue, past its bound", waited)
+	}
+	close(stuck)
 }

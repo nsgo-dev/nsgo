@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync/atomic"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -87,11 +89,18 @@ var awake struct {
 	groups [2]awakeGroup     // the computer-only holds and the display holds
 }
 
+// awakeTaken reports whether the app has taken a hold, so that an app that never did quits without waiting on portalQueue.
+var awakeTaken atomic.Bool
+
+// awakeEndTimeout bounds how long a quitting app waits for its holds' releases to reach the bus.
+const awakeEndTimeout = 2 * time.Second
+
 func (w *window) keepAwake(id uint32, req driver.KeepAwake) {
 	if w.closing {
 		return
 	}
 	bindGlobalHotKeys()
+	awakeTaken.Store(true)
 	key, appID := awakeKey{w, id}, w.opts.ID
 	portalQueue() <- func() {
 		if _, ok := awake.holds[key]; ok {
@@ -122,6 +131,33 @@ func (w *window) releaseAllAwake() {
 				releaseAwakeHold(key)
 			}
 		}
+	}
+}
+
+// endAwake releases every hold as the app ends and waits, up to timeout, for the releases to reach the bus: the process exits once the main loop returns, before portalQueue's thread would send releases only queued, and an inhibitor whose release never came lasts as long as the session's connection to the app. It reports whether the releases were sent in time.
+func endAwake(timeout time.Duration) bool {
+	if !awakeTaken.Load() {
+		return true
+	}
+	done := make(chan struct{})
+	expired := time.After(timeout)
+	select {
+	case portalQueue() <- func() {
+		for key := range awake.holds {
+			releaseAwakeHold(key)
+		}
+		close(done)
+	}:
+	case <-expired:
+		log.Print("nsgo: keep awake: the holds were not released before the app quit")
+		return false
+	}
+	select {
+	case <-done:
+		return true
+	case <-expired:
+		log.Print("nsgo: keep awake: the holds were not released before the app quit")
+		return false
 	}
 }
 

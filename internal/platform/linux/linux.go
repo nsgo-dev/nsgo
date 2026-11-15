@@ -680,7 +680,12 @@ func (w *window) close() {
 	}
 	w.closing = true
 	w.closeHotKeys()
-	w.releaseAllAwake()
+	if w.loop != 0 {
+		// The app ends with this window: every hold goes, sent before the main loop returns.
+		endAwake(awakeEndTimeout)
+	} else {
+		w.releaseAllAwake()
+	}
 	w.visible = false
 	w.removeTrays()
 	if w.tickID != 0 {
