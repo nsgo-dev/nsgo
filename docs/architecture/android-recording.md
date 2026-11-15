@@ -1,6 +1,6 @@
 # Long-running Android recording
 
-This is the design for issue [#38](https://github.com/nsgo-dev/nsgo/issues/38). It is not an implemented API. Android long recording is a runtime service, not a view feature: `AudioRecord`, a foreground service, app-owned storage and level callbacks must share one owner and one lifecycle.
+This is the design for issue [#38](https://github.com/nsgo-dev/nsgo/issues/38). It is not an implemented API. Where it follows one of its [decisions](#decisions), confirmed by the user on 2026-11-15, the decision's number marks it. Android long recording is a runtime service, not a view feature: `AudioRecord`, a foreground service, app-owned storage and level callbacks must share one owner and one lifecycle.
 
 The process/view split in [#12](https://github.com/nsgo-dev/nsgo/issues/12) is a prerequisite. An `NsgoView` detaching must not stop a recording, and an activity recreation must not create a second reader for the same microphone.
 
@@ -10,7 +10,7 @@ The existing `microphone` package remains the portable entry point. The proposed
 
 On Android the app's Go code is an executable the runtime starts (`NsgoView` with `ProcessBuilder`), with no audio API of its own, so `microphone` reaches the runtime the way `widget`'s Live Activities do: through a channel in `internal/driver` outside any surface, which the Android backend connects and whose messages wait until it does (`driver.SendLiveUpdate` and `ConnectLiveUpdates` are the model, carried as a message of the backend's protocol as `msgLiveUpdate` is). The implementation therefore changes `layering_test.go`'s `{"microphone", nil}` to allow `internal/driver`, and the paragraph of [layers](layers.md) that says `microphone` stands apart; `internal/driver` stays portable, so `microphone` still builds on every target.
 
-The first API records to an app-owned file rather than streaming unbounded PCM through the Go/Java pipe, so `microphone.Capture` stays unsupported on Android until open question 1 is answered. The backend reports the actual format and rejects a format it cannot write. Raw PCM and a bounded frame-stream API may follow, but they are separate because they change memory, bridge and back-pressure guarantees.
+The first API records to an app-owned file rather than streaming unbounded PCM through the Go/Java pipe, so `microphone.Capture` stays unsupported on Android (decision 1). The backend reports the actual format and rejects a format it cannot write. Raw PCM and a bounded frame-stream API are separate APIs, if any follow, because they change memory, bridge and back-pressure guarantees.
 
 Level callbacks carry peak and RMS values over a configurable interval, at least ten a second by default so a waveform can be drawn. They are metering data, not a second audio stream, and describe frames already written to the file. They run on a goroutine of `microphone`'s, never on an engine's, as `Capture`'s samples run on a thread of the system's on macOS and iOS; an app that updates its views from one hops with `Scope.Post`. A level the callback has not taken yet is replaced by the next, so a slow callback never holds up the recording.
 
@@ -28,7 +28,7 @@ The foreground-service rules span the whole supported range, API 28 to the targe
 
 So the service starts only while an activity of the app is visible and after `RECORD_AUDIO` is granted, on every API level, not only on Android 14. The service shows the required ongoing notification; `POST_NOTIFICATIONS` controls that notification's visibility, not whether the microphone permission is granted.
 
-Two processes can die. If the Go process ends while the app's process lives, the service finishes and closes the current file itself and reports the terminal record when Go connects again. If the app's process is killed (low memory, force stop, an OEM's swipe from recents), the service and the Go child die with it and no code runs, so the file on disk must already be usable: that is what the format below guarantees. A recording never resumes silently with a new file. The lifecycle design decides whether a stopped process may be restarted to deliver `Ended`; until then the app can inspect the durable file and the next start of the channel reports the terminal record.
+Two processes can die. If the Go process ends while the app's process lives, the service finishes and closes the current file itself and reports the terminal record when Go connects again. If the app's process is killed (low memory, force stop, an OEM's swipe from recents), the service and the Go child die with it and no code runs, so the file on disk must already be usable: that is what the format below guarantees. A recording never resumes silently with a new file. No service restarts a stopped process to deliver `Ended`: the app can inspect the durable file, and the next start of the channel reports the terminal record (decision 4).
 
 ## Files and formats
 
@@ -46,7 +46,7 @@ The API reports denied, unavailable, busy, interrupted, stopped and completed se
 - Before Android 10, `startRecording` fails while another app captures, which is reported as busy.
 - A revoked permission or an `AudioRecord` read error ends the recording.
 
-Whether an interruption pauses the file, inserts nothing and goes on, or ends the recording is an explicit option; the handle never claims to record while the capture is silenced. The recorder requests no audio focus and listens for none: focus arbitrates output, `AudioRecord` needs none, and requesting it would pause the app's own playback, so a recording and the app's playback, or another app's, run together as #38 asks.
+Whether an interruption pauses the file, inserts nothing and goes on, or ends the recording is an explicit option, which ends it by default (decision 3); the handle never claims to record while the capture is silenced. The recorder requests no audio focus and listens for none: focus arbitrates output, `AudioRecord` needs none, and requesting it would pause the app's own playback, so a recording and the app's playback, or another app's, run together as #38 asks.
 
 The recording indicator and system privacy controls remain Android's. NSGo does not upload, transcribe or inspect the recording. Level values are not written into the audio file. Logs contain IDs and error codes only, never microphone data or file contents.
 
@@ -59,14 +59,14 @@ The implementation is complete only when these checks exist:
 - runtime tests use a fake `AudioRecord` to cover permission, buffer starvation, a silenced capture reported through the recording callback, rotation and the rename at stop; and
 - device tests on an Android 9 or 10 device, one of Android 11 to 13 and one of Android 14 or later run a 30-minute recording across an activity recreation and a screen-off period, verify the foreground notification and file duration, play a sound while recording and record while playing with neither interrupted, report a phone call as an interruption, keep a playable WAV after the app's process is killed, and confirm that stopping leaves no open descriptor.
 
-`nsgotest` recording what an app records, as it records speech, as #38 asks, depends on open question 5: a channel in `internal/driver` is one per process, while `nsgotest` runs many apps in one.
+`nsgotest` records what an app records, as #38 asks, through a fake that connects to the channel in `internal/driver` as the runtime does. The channel is one per process while `nsgotest` runs many apps in one, so one app at a time uses the fake (decision 5).
 
-## Open decisions
+## Decisions
 
-These decisions need confirmation before an implementation chooses them; [ARCHITECTURE.md](../../ARCHITECTURE.md#open-questions) lists them too:
+The user confirmed on 2026-11-15 the answers the body proposes:
 
-1. Is the first public recording API file-only, or must it expose bounded PCM frames as well, which `microphone.Capture` on Android would need?
-2. Is an encoded format such as AAC in MPEG-4 added after WAV, accepting that a killed recording in it is lost, or only one that stays playable when killed?
-3. Does an interruption pause and resume, finish the file, or fail the recording by default?
-4. May a background service restart a stopped process to deliver completion, or is durable file inspection enough?
-5. Does recording stay in `microphone` behind the `internal/driver` channel, with callbacks off every engine, or become a `core` service as `StartSpeech` is, with callbacks on the engine's goroutine of the scope that started it and records in `nsgotest`, at the cost of moving the API out of `microphone`? Is level metering then part of `microphone.Stream`, or a separate recorder option and callback type?
+1. The first public recording API is file-only; `microphone.Capture` exposes no bounded PCM frames on Android and stays unsupported there.
+2. Only formats that stay playable when a recording is killed are offered: WAV, with no encoded format such as AAC in MPEG-4 that a killed recording loses.
+3. An interruption is an explicit option, pausing and resuming or ending the recording. The body proposes no default, so the implementation takes the conservative one: it ends the recording, its file finished and the end reported as interrupted, as an interruption ends a capture on iOS.
+4. No background service restarts a stopped process to deliver completion; the durable file and the terminal record the next start of the channel reports are enough.
+5. Recording stays in `microphone` behind the channel in `internal/driver`, with callbacks on a goroutine of `microphone`'s rather than an engine's, and `nsgotest` records one app at a time. Level metering is a recorder option and callback type of the file API, not part of `microphone.Stream`.
