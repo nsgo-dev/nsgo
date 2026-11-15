@@ -26,3 +26,11 @@ test("types and saves", async () => {
 });
 
 test.skip("is skipped", () => { throw new Error("ran"); });
+
+test("checks a screenshot's whole path", async () => {
+  const app = await open("App.tsx");
+  await app.screenshot("en/home.png");
+  let failed = "";
+  try { await app.screenshot("en/../home"); } catch (e) { failed = String(e); }
+  expect(failed).toContain("relative file path without ..");
+});
