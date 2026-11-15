@@ -53,6 +53,8 @@ core.Scroll{
 row.Reveal(core.RevealOptions{Vertical: core.ScrollAlignCenter, Animated: true})
 ```
 
+`RevealBox` 改为让视图里的一个矩形进入视野，比如文本 `TextRangeBoxes` 给出的某个词的矩形；`Margin` 在最外层滚动视图的边缘留出空白，给盖在上面的栏。
+
 键盘把焦点移到的视图会自己滚动到视野内。
 
 ## 布局

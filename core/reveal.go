@@ -20,12 +20,15 @@ const (
 type RevealOptions struct {
 	Vertical, Horizontal ScrollAlignment
 	Animated             bool
+	// Margin is kept clear at the outermost scroll view's edges, for the bars that cover them, such as a find bar over a transcript.
+	Margin Edges
 }
 
-// reveal is a Reveal waiting for its commit's layout.
+// reveal is a Reveal waiting for its commit's layout: of n's whole box, or of box in n's frame.
 type reveal struct {
 	n    *node
 	opts RevealOptions
+	box  *Bounds
 }
 
 // Reveal scrolls every scroll view around the element until it shows,
@@ -37,7 +40,16 @@ func (r *Ref) Reveal(opts RevealOptions) {
 	if r == nil || r.n == nil || r.n.deleted {
 		return
 	}
-	r.t.reveals = append(r.t.reveals, reveal{r.n, opts})
+	r.t.reveals = append(r.t.reveals, reveal{n: r.n, opts: opts})
+	r.t.changed = true
+}
+
+// RevealBox scrolls every scroll view around the element until box, in the element's frame as TextRangeBoxes gives a text's ranges, shows, as Reveal shows the whole element: a match in a long line of code reaches its column, not only the code's block.
+func (r *Ref) RevealBox(box Bounds, opts RevealOptions) {
+	if r == nil || r.n == nil || r.n.deleted {
+		return
+	}
+	r.t.reveals = append(r.t.reveals, reveal{n: r.n, opts: opts, box: &box})
 	r.t.changed = true
 }
 
@@ -46,18 +58,25 @@ func (r *Ref) Reveal(opts RevealOptions) {
 func (t *Tree) revealViews() {
 	for _, rv := range t.reveals {
 		if !rv.n.deleted {
-			t.revealNode(rv.n, rv.opts)
+			box := Bounds{Size: rv.n.frame.Size}
+			if rv.box != nil {
+				box = *rv.box
+			}
+			t.revealNode(rv.n, box, rv.opts)
 		}
 	}
 	clear(t.reveals)
 	t.reveals = t.reveals[:0]
 }
 
-// revealNode scrolls the scroll views around n so it shows: the box it
-// takes, in each one's content, goes where opts say, and on to the next
-// one out as that scroll leaves it.
-func (t *Tree) revealNode(n *node, opts RevealOptions) {
-	box := Bounds{Size: n.frame.Size}
+// revealNode scrolls the scroll views around n so box, in n's frame, shows: the box, in each one's content, goes where opts say, and on to the next one out as that scroll leaves it. The outermost one keeps opts.Margin clear around it.
+func (t *Tree) revealNode(n *node, box Bounds, opts RevealOptions) {
+	var outer *node
+	for c := n; c.parent != nil; c = c.parent {
+		if p := c.parent; p.scroll != nil && !p.deleted {
+			outer = p
+		}
+	}
 	for c := n; c.parent != nil; c = c.parent {
 		box.Origin.X += c.frame.Origin.X
 		box.Origin.Y += c.frame.Origin.Y
@@ -71,12 +90,18 @@ func (t *Tree) revealNode(n *node, opts RevealOptions) {
 		to := sc.offset
 		in := sc.config.Behavior.ContentInset
 		size, content := p.frame.Size, sc.content
+		shown := box
+		if p == outer {
+			m := opts.Margin
+			shown = Bounds{Origin: Point{X: box.Origin.X - m.Left, Y: box.Origin.Y - m.Top},
+				Size: Size{Width: box.Size.Width + m.Left + m.Right, Height: box.Size.Height + m.Top + m.Bottom}}
+		}
 		if sc.config.Horizontal || sc.config.Zooms() {
-			to.X = revealAt(box.Origin.X, box.Size.Width, sc.offset.X, size.Width, content.Width, in.Left, in.Right,
+			to.X = revealAt(shown.Origin.X, shown.Size.Width, sc.offset.X, size.Width, content.Width, in.Left, in.Right,
 				orDefault(opts.Horizontal, ScrollAlignNearest))
 		}
 		if !sc.config.Horizontal || sc.config.Zooms() {
-			to.Y = revealAt(box.Origin.Y, box.Size.Height, sc.offset.Y, size.Height, content.Height, in.Top, in.Bottom,
+			to.Y = revealAt(shown.Origin.Y, shown.Size.Height, sc.offset.Y, size.Height, content.Height, in.Top, in.Bottom,
 				orDefault(opts.Vertical, ScrollAlignStart))
 		}
 		if to != sc.offset {

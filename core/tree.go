@@ -1199,7 +1199,7 @@ func (t *Tree) focusReported(n *node, focused bool) {
 		t.focusByKeyboard = n != nil && t.keyboardMovesFocus()
 		if t.focusByKeyboard {
 			// A stop the keyboard reaches scrolls into view.
-			t.reveals = append(t.reveals, reveal{n, RevealOptions{Vertical: ScrollAlignNearest, Horizontal: ScrollAlignNearest}})
+			t.reveals = append(t.reveals, reveal{n: n, opts: RevealOptions{Vertical: ScrollAlignNearest, Horizontal: ScrollAlignNearest}})
 		}
 		t.focus, t.focusMoved = n, true
 		t.changed = true

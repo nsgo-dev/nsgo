@@ -58,6 +58,38 @@ func TestRevealScrollsNestedScrollViews(t *testing.T) {
 	}
 }
 
+// RevealBox reveals a box within a view, as a match in a long line, through every scroll view around it, with the margin kept clear at the outermost one's edges.
+func TestRevealBoxKeepsTheMarginClear(t *testing.T) {
+	target, outer := new(core.Ref), new(core.Ref)
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.Scroll{Ref: outer, TestID: "outer", Style: core.Style{Height: core.Pt(200)}, Children: []core.Node{
+			core.View{Style: core.Style{Height: core.Pt(300)}},
+			core.Scroll{TestID: "inner", Horizontal: true, Style: core.Style{Height: core.Pt(50), MinHeight: core.Pt(50), Width: core.Pt(100)},
+				Children: []core.Node{core.View{Ref: target, Style: core.Style{Width: core.Pt(1000), Height: core.Pt(50)}}}},
+			core.View{Style: core.Style{Height: core.Pt(300)}},
+		}}
+	}, nsgotest.Size(200, 400))
+	box := core.Bounds{Origin: core.Point{X: 600, Y: 10}, Size: core.Size{Width: 20, Height: 20}}
+	opts := core.RevealOptions{Vertical: core.ScrollAlignNearest, Margin: core.Edges{Top: 40, Bottom: 30}}
+	target.RevealBox(box, opts)
+	app.Settle()
+	// The box's right edge at the inner view's end, and its bottom 30 points above the outer one's.
+	if x := app.Find("id:inner").Offset.X; x != 520 {
+		t.Errorf("inner offset %v, want 520", x)
+	}
+	if y := app.Find("id:outer").Offset.Y; y != 160 {
+		t.Errorf("outer offset %v, want 160", y)
+	}
+	// From below, its top lands 40 points under the outer view's top.
+	outer.ScrollTo(core.Point{Y: 400}, false)
+	app.Settle()
+	target.RevealBox(box, opts)
+	app.Settle()
+	if y := app.Find("id:outer").Offset.Y; y != 270 {
+		t.Errorf("outer offset from below %v, want 270", y)
+	}
+}
+
 // The keyboard moving the focus scrolls the stop it reaches into view; a
 // press's focus scrolls nothing.
 func TestKeyboardFocusScrollsIntoView(t *testing.T) {

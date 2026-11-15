@@ -53,6 +53,8 @@ core.Scroll{
 row.Reveal(core.RevealOptions{Vertical: core.ScrollAlignCenter, Animated: true})
 ```
 
+`RevealBox` brings a box within the view into view instead, such as a word's box from a text's `TextRangeBoxes`, and `Margin` keeps room clear at the outermost scroll view's edges for a bar over it.
+
 A view the keyboard moves the focus to scrolls into view by itself.
 
 ## Layout
