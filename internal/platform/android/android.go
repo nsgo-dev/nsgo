@@ -392,7 +392,7 @@ func init() {
 		os.Setenv("TMPDIR", dir)
 	}
 	if tz := os.Getenv("TZ"); tz != "" {
-		if loc, err := time.LoadLocation(tz); err == nil {
+		if loc, err := loadZone(tz); err == nil {
 			time.Local = loc
 		}
 	}
