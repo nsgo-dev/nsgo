@@ -1172,13 +1172,30 @@ func TestAppearanceRestylesInPlace(t *testing.T) {
 			// answers the terminal when it will.
 			drawings := d.name != "Stocks" && d.name != "Terminal"
 			shown := "id:demo-" + d.name
-			// The live price ticks each second and glides to each tick: both
-			// builds pause it, so they show the same prices at rest.
+			// The live price ticks each second and glides to each tick: both builds pause it, so they show the same prices at rest. What goroutines of their own do, which the clock does not wait for, is waited for in real time: the Editor's language server answering, the code lexing in the Editor, the DiffView and the TextView's document, and the font of the document's formulas loading, once a process.
 			settle := func(app *nsgotest.App) {
 				if d.name == "Plot" {
 					app.Press("role:button Pause")
 				}
 				app.FastForward(2 * time.Second)
+				switch d.name {
+				case "Editor":
+					app.WaitUntil(5*time.Second, func() bool {
+						return len(app.Query("text:Problems 6")) == 1 && lexed(app, "id:editor >> text:interface Order {")
+					})
+				case "DiffView":
+					app.WaitUntil(5*time.Second, func() bool { return lexed(app, `id:diff-rows >> text:/^ *"sync"$/`) })
+				case "TextView":
+					app.WaitUntil(10*time.Second, func() bool {
+						// A formula draws nothing until its font has loaded.
+						for _, v := range views(app.Find("id:document")) {
+							if v.Kind == driver.KindCanvas && len(v.Ops) == 0 {
+								return false
+							}
+						}
+						return lexed(app, "id:document >> text:/func Root/")
+					})
+				}
 			}
 			app := startDesktop(t)
 			open(app, d.name)
@@ -1244,6 +1261,17 @@ func TestPhoneAppearanceRestylesInPlace(t *testing.T) {
 		fresh.FastForward(2 * time.Second)
 		checkLooks(t, got, snapshot(fresh, shown, true))
 	}
+}
+
+// lexed reports whether a lexer has colored the texts selector matches, lines of several tokens each, which it splits into spans.
+func lexed(app *nsgotest.App, selector string) bool {
+	matched := app.Query(selector)
+	for _, v := range matched {
+		if len(v.Spans) < 2 {
+			return false
+		}
+	}
+	return len(matched) > 0
 }
 
 // shot is the views from a root down: where each is, what it shows, how
