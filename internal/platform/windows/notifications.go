@@ -80,6 +80,8 @@ const (
 	toastAddActivated                = 11
 	toast2PutTag                     = 6
 	toast2PutGroup                   = 8
+	toastHistoryRemoveGroup          = 6
+	toastHistoryRemoveGroupID        = 7
 	toastHistoryRemoveGroupedTagID   = 8
 	toastHistoryRemoveGroupedTag     = 9
 	xmlDocumentIOLoadXML             = 6
@@ -529,10 +531,14 @@ func (w *window) showToast(n driver.Notification) bool {
 	return true
 }
 
-// closeToast removes the toast tagged id from the screen and the action
-// center.
+// closeToast removes the toast tagged id from the screen and the action center, and with an empty id every toast in the app's group, those of earlier runs included, which leaves other apps' toasts alone.
 func (w *window) closeToast(id string) {
-	if old := toasts.shown[id]; old != nil {
+	if id == "" {
+		for tag, old := range toasts.shown {
+			old.release()
+			delete(toasts.shown, tag)
+		}
+	} else if old := toasts.shown[id]; old != nil {
 		old.release()
 		delete(toasts.shown, id)
 	}
@@ -553,12 +559,20 @@ func (w *window) closeToast(id string) {
 	defer deleteHString(tag)
 	defer deleteHString(group)
 	if toasts.packaged {
-		history.call(toastHistoryRemoveGroupedTag, tag, group)
+		if id == "" {
+			history.call(toastHistoryRemoveGroup, group)
+		} else {
+			history.call(toastHistoryRemoveGroupedTag, tag, group)
+		}
 		return
 	}
 	aumid := hstring(toasts.aumid)
-	history.call(toastHistoryRemoveGroupedTagID, tag, group, aumid)
-	deleteHString(aumid)
+	defer deleteHString(aumid)
+	if id == "" {
+		history.call(toastHistoryRemoveGroupID, group, aumid)
+	} else {
+		history.call(toastHistoryRemoveGroupedTagID, tag, group, aumid)
+	}
 }
 
 // taskbarList is the shell's taskbar list once made, and taskbarFailure the HRESULT the last attempt to make it failed with; the main thread keeps both.

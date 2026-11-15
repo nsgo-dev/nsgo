@@ -60,6 +60,46 @@ func TestNotificationsAskShowCloseAndReportPresses(t *testing.T) {
 	if !slices.Equal(pressed, []string{"chat:1", "chat:3"}) {
 		t.Errorf("pressed %v", pressed)
 	}
+
+	// An empty ID names no notification, and closing all presses none.
+	show(core.Notification{ID: "chat:4", Title: "Dee"})
+	show(core.Notification{ID: "chat:5", Title: "Eli"})
+	scope.CloseNotification("")
+	app.Settle()
+	if len(app.Notifications) != 2 {
+		t.Fatalf("CloseNotification(\"\") left %+v", app.Notifications)
+	}
+	scope.CloseNotifications()
+	scope.SetBadge(2)
+	app.Settle()
+	if len(app.Notifications) != 0 || app.Badge != 2 {
+		t.Errorf("after CloseNotifications: notifications %+v, badge %d", app.Notifications, app.Badge)
+	}
+	if !slices.Equal(pressed, []string{"chat:1", "chat:3"}) {
+		t.Errorf("closing all pressed %v", pressed)
+	}
+}
+
+func TestCloseNotificationsHeldToAccess(t *testing.T) {
+	var scope *core.Scope
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		scope = cx
+		return core.View{}
+	})
+	scope.RequestNotificationPermission(nil)
+	app.Settle()
+	for _, id := range []string{"a", "b"} {
+		if err := scope.ShowNotification(core.Notification{ID: id, Title: id}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	refused := scope.Child()
+	refused.ProvideAccess(denyAll{})
+	refused.CloseNotifications()
+	app.Settle()
+	if len(app.Notifications) != 2 {
+		t.Errorf("refused code closed notifications: %+v", app.Notifications)
+	}
 }
 
 func TestNotificationsHeldToAccess(t *testing.T) {

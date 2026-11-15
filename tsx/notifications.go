@@ -57,6 +57,12 @@ func (r *runtime) notifications() js.Value {
 		done(js.Undefined)
 		return r.vm.ToValue(p)
 	})
+	set("closeAll", func(js.FunctionCall) js.Value {
+		r.cx.CloseNotifications()
+		p, done := r.promise()
+		done(js.Undefined)
+		return r.vm.ToValue(p)
+	})
 	set("setBadge", func(call js.FunctionCall) js.Value {
 		count := arg(call, 0).ToFloat()
 		p, resolve, reject := r.vm.NewPromise()

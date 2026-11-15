@@ -20,6 +20,7 @@ var gated = map[string]service{
 	"RequestNotificationPermission": serviceNotifications,
 	"ShowNotification":              serviceNotifications,
 	"CloseNotification":             serviceNotifications,
+	"CloseNotifications":            serviceNotifications,
 	"SetBadge":                      serviceNotifications,
 	"OnNotificationPress":           serviceNotifications,
 	"BiometricAvailability":         serviceBiometrics,

@@ -66,6 +66,13 @@ func (s *surface) notify(it *driver.MountItem) {
 		}
 		s.engine.Dispatch(driver.Event{Kind: driver.EventNotification, Count: id, Finished: ok})
 	case driver.ItemCloseNotification:
+		if it.Value == "" {
+			for id, note := range shownNotifications {
+				note.Call("close")
+				delete(shownNotifications, id)
+			}
+			break
+		}
 		if note, ok := shownNotifications[it.Value]; ok {
 			note.Call("close")
 			delete(shownNotifications, it.Value)

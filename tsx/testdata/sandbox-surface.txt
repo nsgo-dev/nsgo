@@ -65,6 +65,7 @@ nsgo.LayoutAnimation.spring
 nsgo.List
 nsgo.Notifications
 nsgo.Notifications.close
+nsgo.Notifications.closeAll
 nsgo.Notifications.on
 nsgo.Notifications.permission
 nsgo.Notifications.requestPermission

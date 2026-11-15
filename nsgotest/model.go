@@ -448,7 +448,11 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 			a.post(driver.Event{Kind: driver.EventNotification, Count: it.Count, Finished: shown})
 		case driver.ItemCloseNotification:
-			a.Notifications = slices.DeleteFunc(a.Notifications, func(o core.Notification) bool { return o.ID == it.Value })
+			if it.Value == "" {
+				a.Notifications = nil
+			} else {
+				a.Notifications = slices.DeleteFunc(a.Notifications, func(o core.Notification) bool { return o.ID == it.Value })
+			}
 		case driver.ItemBadge:
 			a.Badge = int(it.Count)
 		case driver.ItemKeepAwake:

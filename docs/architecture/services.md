@@ -146,15 +146,26 @@ The installer refuses an app whose manifest does not ask for `REQUEST_INSTALL_PA
 
 ## Notifications and the badge
 
-`NotificationPermission` answers whether the app may show notifications without asking, `RequestNotificationPermission` asks with the system's prompt the first time, as NSH's `Notifications`: not asked (`"default"`), granted, denied, or unavailable where the platform or build shows none. `ShowNotification` shows one, replacing one of its ID, also while the app is in front, and answers whether the system took it; `CloseNotification` removes it; `OnNotificationPress` hears a press, the one that started the app kept for the first handler. `SetBadge` sets the count on the app's icon. Code its `Access` does not grant `AccessNotifications` gets unavailable and nothing shown.
+`NotificationPermission` answers whether the app may show notifications without asking, `RequestNotificationPermission` asks with the system's prompt the first time, as NSH's `Notifications`: not asked (`"default"`), granted, denied, or unavailable where the platform or build shows none. `ShowNotification` shows one, replacing one of its ID, also while the app is in front, and answers whether the system took it; `CloseNotification` removes one, and `CloseNotifications` all those `ShowNotification` showed, carried by the same item with an empty ID; `OnNotificationPress` hears a press, the one that started the app kept for the first handler. `SetBadge` sets the count on the app's icon. Code its `Access` does not grant `AccessNotifications` gets unavailable and nothing shown.
 
-| Target | Notifications | Permission | Press | Badge |
-| --- | --- | --- | --- | --- |
-| macOS, iOS | `UNUserNotificationCenter` (`apple/notifications.go`), its delegate set before launching ends, showing them in front | The center's; a bare executable outside an app bundle has none | The delegate's default action | The Dock tile's label; iOS's needs the permission, `setBadgeCount:` from iOS 16 |
-| Android | `NotificationManager` in `Notifications.java`, a channel with the system's sound and a silent one | `POST_NOTIFICATIONS` from API 33 where the manifest asks for it (`android.permissions`), else the app's setting | A `PendingIntent` bringing the activity back with the ID, kept until the first batch | None: the count goes with notifications shown after it |
-| Windows | Toasts through WinRT's `ToastNotificationManager`, tagged with the ID and launching `n=<nonce>;id=<ID>`, the nonce new for each toast shown; an app outside an MSIX registers its ID as an AppUserModelID in the current user's registry with its name and icon, and on each launch a COM toast activator under the user's `CLSID` key, which the installer names on the Start menu shortcut (`toast_activation.go`) | The notifier's setting: granted or denied | The toast's `Activated` while the app runs, and the activator's `Activate`, which also starts the app after it ended where the installer made the shortcut; a press arriving both ways counts once, told apart by the nonce from a press of a toast that replaced it | The taskbar button's overlay icon, a red disc drawn with GDI |
-| Linux | `org.freedesktop.Notifications` over GDBus, with `desktop-entry` and `suppress-sound` hints | Granted where a server answers, else unavailable | The `default` action's `ActionInvoked`, presenting the window | Unity LauncherEntry where the launcher supports it; otherwise none |
-| Web | The page's `Notification` | The page's | Its `onclick`, focusing the window | `navigator.setAppBadge` for an installed web app |
+| Target | Notifications | Permission | Press | Closing all | Badge |
+| --- | --- | --- | --- | --- | --- |
+| macOS, iOS | `UNUserNotificationCenter` (`apple/notifications.go`), its delegate set before launching ends, showing them in front | The center's; a bare executable outside an app bundle has none | The delegate's default action | `removeAllDeliveredNotifications` and `removeAllPendingNotificationRequests`, earlier runs' included | The Dock tile's label; iOS's needs the permission, `setBadgeCount:` from iOS 16 |
+| Android | `NotificationManager` in `Notifications.java`, a channel with the system's sound and a silent one | `POST_NOTIFICATIONS` from API 33 where the manifest asks for it (`android.permissions`), else the app's setting | A `PendingIntent` bringing the activity back with the ID, kept until the first batch | Those of the two channels among `getActiveNotifications`, earlier runs' included; not `cancelAll`, which would end Live Updates | None: the count goes with notifications shown after it |
+| Windows | Toasts through WinRT's `ToastNotificationManager`, tagged with the ID in the `nsgo` group and launching `n=<nonce>;id=<ID>`, the nonce new for each toast shown; an app outside an MSIX registers its ID as an AppUserModelID in the current user's registry with its name and icon, and on each launch a COM toast activator under the user's `CLSID` key, which the installer names on the Start menu shortcut (`toast_activation.go`) | The notifier's setting: granted or denied | The toast's `Activated` while the app runs, and the activator's `Activate`, which also starts the app after it ended where the installer made the shortcut; a press arriving both ways counts once, told apart by the nonce from a press of a toast that replaced it | `ToastNotificationHistory.RemoveGroup`, `RemoveGroupWithId` outside an MSIX, earlier runs' included | The taskbar button's overlay icon, a red disc drawn with GDI |
+| Linux | `org.freedesktop.Notifications` over GDBus, with `desktop-entry` and `suppress-sound` hints | Granted where a server answers, else unavailable | The `default` action's `ActionInvoked`, presenting the window | `CloseNotification` for each server ID this run got: the interface lists none, and IDs do not outlive the server | Unity LauncherEntry where the launcher supports it; otherwise none |
+| Web | The page's `Notification` | The page's | Its `onclick`, focusing the window | `close` on each this page showed | `navigator.setAppBadge` for an installed web app |
+
+An app that shows in its window what its notifications told clears them as it comes to the front:
+
+```go
+cx.Effect(func() {
+	if cx.Env().Lifecycle() == core.LifecycleActive {
+		cx.CloseNotifications()
+		cx.SetBadge(0)
+	}
+})
+```
 
 `nsgotest` keeps the notifications shown, the badge and the permission (`NotificationPermission`, `NotificationAnswer`), and `PressNotification` presses one.
 

@@ -26,6 +26,17 @@ err := cx.ShowNotification(core.Notification{ID: "sync", Title: "Synced", Body: 
 cx.CloseNotification("sync")
 ```
 
+`cx.CloseNotifications` removes every notification the app showed. On macOS, iOS, Windows and Android that includes those earlier runs left in Notification Center, Action Center or the shade; on Linux and the web it reaches only those this run showed. Call it as the app comes to the front when its window shows what they told:
+
+```go
+cx.Effect(func() {
+	if cx.Env().Lifecycle() == core.LifecycleActive {
+		cx.CloseNotifications()
+		cx.SetBadge(0)
+	}
+})
+```
+
 ## Presses
 
 `cx.OnNotificationPress` runs its function with the `ID` of a notification the user pressed, while the component that set it lives, and brings the app to the front. A press that started the app reaches the first handler registered. Keep in `ID` what the press opens (`"chat:42"`), as a press can start the app anew. On Windows it does so for an app its installer put in the Start menu; one run otherwise hears presses only while it runs.

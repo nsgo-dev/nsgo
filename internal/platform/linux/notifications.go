@@ -95,10 +95,21 @@ func (w *window) notify(it *driver.MountItem) {
 			e.Dispatch(driver.Event{Kind: driver.EventNotification, Count: item.Count, Finished: shown})
 		case driver.ItemCloseNotification:
 			notices.mu.Lock()
-			id, ok := notices.server[item.Value]
+			ids := []uint32{}
+			if item.Value == "" {
+				for _, id := range notices.server {
+					ids = append(ids, id)
+				}
+				clear(notices.server)
+			} else if id, ok := notices.server[item.Value]; ok {
+				ids = append(ids, id)
+				delete(notices.server, item.Value)
+			}
 			notices.mu.Unlock()
-			if ok && bus != 0 {
-				gVariantUnrefNonZero(dbusCall(bus, notifyName, notifyPath, notifyIface, "CloseNotification", gVariantNewUint32(id)))
+			if bus != 0 {
+				for _, id := range ids {
+					gVariantUnrefNonZero(dbusCall(bus, notifyName, notifyPath, notifyIface, "CloseNotification", gVariantNewUint32(id)))
+				}
 			}
 		case driver.ItemBadge:
 			setLauncherBadge(bus, appID, item.Count)

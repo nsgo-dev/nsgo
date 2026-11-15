@@ -157,11 +157,15 @@ func ShowNotification(n driver.Notification, answer func(bool)) {
 	added.Release()
 }
 
-// CloseNotification removes the notification called id, shown or still
-// to show.
+// CloseNotification removes the notification called id, shown or still to show, and every one the app's notification center holds when id is empty, those earlier runs left included.
 func CloseNotification(id string) {
 	center := notificationCenter()
 	if center == 0 {
+		return
+	}
+	if id == "" {
+		center.Send(sel("removeAllDeliveredNotifications"))
+		center.Send(sel("removeAllPendingNotificationRequests"))
 		return
 	}
 	ids := objc.ID(Class("NSArray")).Send(sel("arrayWithObject:"), NSString(id))

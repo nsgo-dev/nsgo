@@ -250,6 +250,8 @@ export interface NotificationsModule {
   /** Resolves with whether the system took it: not without the permission. */
   show(options: ShowNotificationOptions): Promise<boolean>;
   close(id: string): Promise<void>;
+  /** Closes every notification `show` showed, also those earlier runs left on macOS, iOS, Windows and Android; Linux and the web reach only this run's. */
+  closeAll(): Promise<void>;
   /** Shows `count` on the app's icon; `0` clears it. */
   setBadge(count: number): Promise<void>;
   /** The user pressed a notification, the one that started the app included. Returns a function that stops listening. */

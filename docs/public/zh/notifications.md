@@ -26,6 +26,17 @@ err := cx.ShowNotification(core.Notification{ID: "sync", Title: "已同步", Bod
 cx.CloseNotification("sync")
 ```
 
+`cx.CloseNotifications` 移除应用显示过的所有通知。在 macOS、iOS、Windows 和 Android 上，这也包括之前运行留在通知中心、操作中心或通知栏里的通知；在 Linux 和 Web 上，它只能移除本次运行显示的通知。应用的窗口已经显示了通知所说的内容时，在应用回到前台时调用它：
+
+```go
+cx.Effect(func() {
+	if cx.Env().Lifecycle() == core.LifecycleActive {
+		cx.CloseNotifications()
+		cx.SetBadge(0)
+	}
+})
+```
+
 ## 点按
 
 `cx.OnNotificationPress` 在设置它的组件存活期间，以用户点按的通知的 `ID` 调用函数，并把应用带到前台。启动应用的那一次点按会交给第一个注册的处理函数。把点按要打开的内容记在 `ID` 里（如 `"chat:42"`），因为点按也可能重新启动应用。在 Windows 上，只有由安装程序放进开始菜单的应用才会被点按重新启动；以其他方式运行的应用只在运行期间收到点按。

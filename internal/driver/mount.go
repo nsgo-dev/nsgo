@@ -318,7 +318,7 @@ const (
 	// the platform answers with EventNotification carrying Count, Finished
 	// when the system took it.
 	ItemShowNotification
-	// ItemCloseNotification removes the notification whose ID is Value.
+	// ItemCloseNotification removes the notification whose ID is Value, and every notification ShowNotification showed when Value is empty (core.Scope.CloseNotifications).
 	ItemCloseNotification
 	// ItemBadge shows Count on the app's icon; 0 clears it.
 	ItemBadge

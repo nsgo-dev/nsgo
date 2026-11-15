@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.service.notification.StatusBarNotification;
 
 /**
  * System notifications through NotificationManager, as core's
@@ -103,10 +104,20 @@ final class Notifications {
         return true;
     }
 
-    /** Removes the notification called id, if it still shows. */
+    /**
+     * Removes the notification called id, if it still shows, and with an empty id every one show posted, those of earlier runs included. It leaves the app's other notifications, such as Live Updates' and foreground services', which cancelAll would end.
+     */
     static void close(Context context, String id) {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager != null) manager.cancel(id, 0);
+        if (manager == null) return;
+        if (!id.isEmpty()) {
+            manager.cancel(id, 0);
+            return;
+        }
+        for (StatusBarNotification shown : manager.getActiveNotifications()) {
+            String channel = shown.getNotification().getChannelId();
+            if (CHANNEL.equals(channel) || SILENT.equals(channel)) manager.cancel(shown.getTag(), shown.getId());
+        }
     }
 
     /**

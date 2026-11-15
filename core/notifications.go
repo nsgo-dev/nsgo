@@ -119,6 +119,15 @@ func (cx *Scope) CloseNotification(id string) {
 	}
 }
 
+// CloseNotifications removes every notification ShowNotification showed, also those earlier runs left where the system keeps them: on macOS, iOS, Windows and Android. Linux and the web reach only those this run showed. It leaves the app's other notifications alone, such as Android's Live Updates and its foreground services', and the badge.
+func (cx *Scope) CloseNotifications() {
+	if t := cx.tree(); t != nil && !cx.denied(serviceNotifications, "") {
+		// An empty Value, which CloseNotification never sends, means all.
+		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemCloseNotification})
+		t.changed = true
+	}
+}
+
 // SetBadge shows count on the app's icon, and 0 or less clears it: the Dock's on macOS, the Home Screen's on iOS, which needs the notification permission, the taskbar button's on Windows, the launcher's on Linux where it follows Unity's LauncherEntry API, such as Ubuntu's dock, Plasma and Dash to Dock, and an installed web app's. Android has no count to set: launchers mark an app whose notifications show, and count goes with those shown after it. Elsewhere nothing happens.
 func (cx *Scope) SetBadge(count int) {
 	t := cx.tree()
