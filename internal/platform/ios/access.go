@@ -39,7 +39,7 @@ var (
 	layoutChanged                     uint32 // UIAccessibilityLayoutChangedNotification
 )
 
-var traitNames = []string{"Button", "Link", "Header", "Image", "StaticText", "Selected", "NotEnabled", "TabBar",
+var traitNames = []string{"Button", "Link", "Header", "Image", "StaticText", "Selected", "NotEnabled", "TabBar", "SearchField",
 	"Adjustable", "UpdatesFrequently"}
 
 func loadAccessibility(uikit uintptr) {
@@ -177,6 +177,9 @@ func (v *view) textChanged(text string) {
 	}
 	for p := v; p != nil; p = p.parent() {
 		if p.props.LiveRegion != driver.LiveRegionNone {
+			if p.props.Role == driver.RoleStatus {
+				text = p.spokenLabel()
+			}
 			uiAccessibilityPost(announcement, apple.NSString(text))
 			return
 		}
@@ -212,7 +215,7 @@ func (v *view) updateAccessibility() {
 	pressable := v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress)
 	var t uint64
 	switch p.Role {
-	case driver.RoleRadioGroup, driver.RoleTabList, driver.RoleMenu, driver.RoleDialog, driver.RoleAlertDialog, driver.RoleAlert,
+	case driver.RoleRadioGroup, driver.RoleTabList, driver.RoleMenu, driver.RoleDialog, driver.RoleAlertDialog, driver.RoleAlert, driver.RoleStatus,
 		driver.RoleTable, driver.RoleGrid, driver.RoleRowGroup, driver.RoleRow, driver.RoleListbox, driver.RoleGroup,
 		driver.RoleRegion, driver.RoleNavigation, driver.RoleTree, driver.RoleToolbar:
 		// Groups are containers, so their children stay accessible.
@@ -244,6 +247,8 @@ func (v *view) updateAccessibility() {
 		t = traits["Adjustable"]
 	case driver.RoleProgressBar:
 		t = traits["UpdatesFrequently"]
+	case driver.RoleSearchField:
+		t = traits["SearchField"]
 	}
 	if p.HasAction(driver.ActionIncrement) || p.HasAction(driver.ActionDecrement) {
 		t |= traits["Adjustable"]

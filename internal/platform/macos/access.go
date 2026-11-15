@@ -111,6 +111,8 @@ var roles = map[driver.Role][2]string{
 	driver.RoleAlert:  {"AXGroup", "AXApplicationAlert"},
 	// And for alertdialog.
 	driver.RoleAlertDialog: {"AXGroup", "AXApplicationAlertDialog"},
+	driver.RoleStatus:      {"AXGroup", "AXApplicationStatus"},
+	driver.RoleSearchField: {"AXTextField", "AXSearchField"},
 	// A listbox and a tree are lists, as WebKit maps ARIA's. Their items
 	// are static text that reports its state: AppKit's rows need a
 	// table's columns, and its menu items a menu.
@@ -404,6 +406,9 @@ func (v *view) textChanged(text string) {
 	}
 	for p := v; p != nil; p = p.up {
 		if p.props.LiveRegion != driver.LiveRegionNone {
+			if p.props.Role == driver.RoleStatus {
+				text = p.spokenLabel()
+			}
 			announceWith(text, p.props.LiveRegion)
 			return
 		}

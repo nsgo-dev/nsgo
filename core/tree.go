@@ -1626,6 +1626,9 @@ func (t *Tree) setViewParts(n *node, v View) {
 	n.props = driver.ViewProps{Role: v.Role, Label: v.Label, Hint: v.Hint, Description: v.AccessibilityDescription,
 		LiveRegion: v.LiveRegion, TestID: v.TestID, WindowDrag: v.Desktop.WindowDrag, SelectionArea: v.Selectable, PointerEvents: v.PointerEvents, HitSlop: v.HitSlop,
 		DelayLongPress: v.DelayLongPress, NoFocus: v.NoFocus, Ripple: v.Android.Ripple}
+	if n.props.Role == RoleStatus && n.props.LiveRegion == LiveRegionNone {
+		n.props.LiveRegion = LiveRegionPolite
+	}
 	n.material, n.elevation = v.IOS.BackdropMaterial, v.Android.Elevation
 	if v.EdgeBar.Scroll != nil {
 		bar := v.EdgeBar
@@ -1708,6 +1711,9 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 	n.h = handlers{press: v.OnPress, longPress: v.OnLongPress, layout: v.OnLayout}
 	n.props = driver.ViewProps{Role: v.Role, Label: v.Label, Hint: v.Hint, LiveRegion: v.LiveRegion, TestID: v.TestID,
 		Selectable: v.Selectable, PointerEvents: v.PointerEvents}
+	if n.props.Role == RoleStatus && n.props.LiveRegion == LiveRegionNone {
+		n.props.LiveRegion = LiveRegionPolite
+	}
 	n.ownPointer = v.PointerEvents
 	if n.props.Role == RoleNone {
 		n.props.Role = RoleText
@@ -1903,6 +1909,9 @@ func (t *Tree) mountInput(cx *Scope, parent *node, v Input) {
 	t.bindStyle(cx, n, v.Style, v.StyleFunc)
 	n.h = handlers{change: v.OnChange, submit: v.OnSubmit, focus: v.OnFocus, blur: v.OnBlur, layout: v.OnLayout}
 	n.props = driver.ViewProps{Role: cmpOr(v.Role, RoleTextField), Label: v.Label, Description: v.AccessibilityDescription, TestID: v.TestID}
+	if n.props.Role == RoleStatus && n.props.LiveRegion == LiveRegionNone {
+		n.props.LiveRegion = LiveRegionPolite
+	}
 	t.bindBool(cx, n, v.Invalid, &n.props.Invalid)
 	n.h.action = v.OnAccessibilityAction
 	t.bindAccessibility(cx, n, a11y{value: v.AccessibilityValue, actions: v.AccessibilityActions, expanded: v.Expanded})

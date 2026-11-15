@@ -13,6 +13,7 @@ var roleNames = map[Role]string{
 	RoleNavigation: "navigation", RoleTree: "tree", RoleTreeItem: "treeitem",
 	RoleToolbar: "toolbar", RoleMenuItemCheckbox: "menuitemcheckbox",
 	RoleMenuItemRadio: "menuitemradio", RoleCombobox: "combobox",
+	RoleStatus: "status", RoleSearchField: "searchbox",
 }
 
 // RoleName is r's name in selectors such as nsgotest's role:button, "" for none.

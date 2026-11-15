@@ -185,6 +185,9 @@ func (s *surface) setInput(v *view, c *driver.InputConfig) {
 	setStyle(el, frameStyle(c.Content))
 	if !c.Multiline {
 		kind := "text"
+		if v.props.Role == driver.RoleSearchField {
+			kind = "search"
+		}
 		if c.Masked {
 			kind = "password"
 		}

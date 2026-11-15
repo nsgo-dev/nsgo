@@ -7,7 +7,7 @@ order: 61
 
 ## 屏幕阅读器读到什么
 
-视图的 `Label` 是辅助技术朗读的内容，`AccessibilityDescription` 是在标签之后朗读的补充说明，`Hint` 说明激活它会发生什么，`Role` 说明它是什么：`core.RoleButton`、`RoleLink`、`RoleHeader`、`RoleImage`、`RoleCheckbox`、`RoleSwitch`、`RoleRadio`、`RoleTab`、`RoleTextField`、`RoleMenu`、`RoleMenuItem`、`RoleDialog`、`RoleAlertDialog`、`RoleAlert`、`RoleAdjustable`、`RoleProgressBar`、`RoleTable` 等。对话框打开时会朗读它的角色和标签，再朗读它的说明，`ui.Dialog` 的标题和描述就是这样朗读的。没有标签的文本会朗读它的内容。
+视图的 `Label` 是辅助技术朗读的内容，`AccessibilityDescription` 是在标签之后朗读的补充说明，`Hint` 说明激活它会发生什么，`Role` 说明它是什么：`core.RoleButton`、`RoleLink`、`RoleHeader`、`RoleImage`、`RoleCheckbox`、`RoleSwitch`、`RoleRadio`、`RoleTab`、`RoleTextField`、`RoleSearchField`、`RoleStatus`、`RoleMenu`、`RoleMenuItem`、`RoleDialog`、`RoleAlertDialog`、`RoleAlert`、`RoleAdjustable`、`RoleProgressBar`、`RoleTable` 等。状态视图默认是礼貌播报的 live region；搜索框仍是文本输入框，但辅助技术会将其读作搜索框。对话框打开时会朗读它的角色和标签，再朗读它的说明，`ui.Dialog` 的标题和描述就是这样朗读的。没有标签的文本会朗读它的内容。
 
 ```go
 core.View{

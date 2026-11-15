@@ -2019,6 +2019,8 @@ var roles = map[driver.Role]string{
 	driver.RoleToolbar:          "toolbar",
 	driver.RoleMenuItemCheckbox: "menuitemcheckbox",
 	driver.RoleMenuItemRadio:    "menuitemradio",
+	driver.RoleStatus:           "status",
+	driver.RoleSearchField:      "searchbox",
 }
 
 // colorSchemes are CSS's color-scheme of each appearance, inherited for
@@ -2041,6 +2043,9 @@ func setViewProps(v *view, p *driver.ViewProps) {
 	el := v.el
 	if v.kind == driver.KindInput {
 		el = v.inner
+		if p.Role == driver.RoleSearchField {
+			el.Set("type", "search")
+		}
 	}
 	flag := func(on bool) string {
 		if on {
@@ -2096,6 +2101,11 @@ func setViewProps(v *view, p *driver.ViewProps) {
 	setAttr(el, "aria-valuenow", now)
 	setAttr(el, "aria-valuetext", p.Value.Text)
 	setAttr(el, "aria-live", liveRegions[p.LiveRegion])
+	atomic := ""
+	if p.Role == driver.RoleStatus {
+		atomic = "true"
+	}
+	setAttr(el, "aria-atomic", atomic)
 	setAttr(el, "aria-hidden", flag(p.ElementsHidden))
 	setAttr(el, "data-testid", p.TestID)
 	v.el.Get("style").Set("colorScheme", colorSchemes[p.Appearance])

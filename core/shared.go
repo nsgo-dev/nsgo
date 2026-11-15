@@ -740,6 +740,11 @@ const (
 	// RoleAlertDialog is a dialog asking for an answer, a confirmation.
 	RoleAlertDialog = driver.RoleAlertDialog
 	RoleAlert       = driver.RoleAlert
+	// RoleStatus is changing advisory information and a polite live region
+	// by default, such as a save or upload status.
+	RoleStatus = driver.RoleStatus
+	// RoleSearchField is an Input used to search or filter content.
+	RoleSearchField = driver.RoleSearchField
 	RoleAdjustable  = driver.RoleAdjustable
 	// RoleSpinButton is a field for a number, stepped with its actions.
 	RoleSpinButton = driver.RoleSpinButton

@@ -115,6 +115,7 @@ const (
 	ctTab         = 50018
 	ctTabItem     = 50019
 	ctText        = 50020
+	ctStatusBar   = 50017
 	ctList        = 50008
 	ctListItem    = 50007
 	ctTree        = 50023
@@ -310,6 +311,7 @@ func patternIID(id uintptr) (guid, bool) {
 type uiaSpec struct {
 	control                        int32
 	name, help, automationID       string
+	localizedType                  string
 	description                    string
 	invalid                        bool
 	enabled, focusable, focused    bool
@@ -333,7 +335,7 @@ var uiaControls = [...]int32{
 	driver.RoleOption: ctListItem, driver.RoleGroup: ctGroup, driver.RoleRegion: ctGroup,
 	driver.RoleNavigation: ctGroup, driver.RoleTree: ctTree, driver.RoleTreeItem: ctTreeItem,
 	driver.RoleToolbar: ctToolBar, driver.RoleMenuItemCheckbox: ctMenuItem, driver.RoleMenuItemRadio: ctMenuItem,
-	driver.RoleAlertDialog: ctWindow,
+	driver.RoleAlertDialog: ctWindow, driver.RoleStatus: ctStatusBar, driver.RoleSearchField: ctEdit,
 }
 
 // groups reports whether role groups the texts and images inside it.
@@ -342,6 +344,8 @@ func groups(p *driver.ViewProps, pressable bool) bool {
 	case driver.RoleButton, driver.RoleLink, driver.RoleCheckbox, driver.RoleSwitch, driver.RoleRadio, driver.RoleTab,
 		driver.RoleMenuItem, driver.RoleHeader, driver.RoleCell, driver.RoleColumnHeader, driver.RoleOption,
 		driver.RoleTreeItem, driver.RoleMenuItemCheckbox, driver.RoleMenuItemRadio:
+		return true
+	case driver.RoleStatus:
 		return true
 	}
 	return p.Accessible == driver.AccessibleYes || p.Role == driver.RoleNone && pressable
@@ -385,6 +389,11 @@ func (e *uiaElement) spec(v *view) uiaSpec {
 	}
 	p := &v.props
 	s := uiaSpec{name: p.Label, help: p.Hint, description: p.Description, invalid: p.Invalid, automationID: p.TestID, enabled: !p.Disabled, toggle: -1, live: p.LiveRegion}
+	if p.Role == driver.RoleSearchField {
+		s.localizedType = "search box"
+	} else if p.Role == driver.RoleStatus {
+		s.localizedType = "status bar"
+	}
 	pressable := takesPresses(v)
 	switch {
 	case int(p.Role) < len(uiaControls) && uiaControls[p.Role] != 0:
@@ -576,6 +585,8 @@ func uiaGetPropertyValue(i *uiaIface, id uintptr, out *variant) uintptr {
 	switch id {
 	case propControlType:
 		out.setInt(s.control)
+	case propLocalizedType:
+		out.setString(s.localizedType)
 	case propName:
 		out.setString(s.name)
 	case propHelpText:

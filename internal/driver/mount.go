@@ -1040,6 +1040,12 @@ const (
 	// says, as a confirmation, ARIA's alertdialog; RoleDialog is any
 	// other.
 	RoleAlertDialog
+	// RoleStatus is advisory information that changes, such as "Saved" or
+	// "3 rows selected"; it is a polite live region by default.
+	RoleStatus
+	// RoleSearchField is a text field used to filter or find content:
+	// ARIA's searchbox.
+	RoleSearchField
 )
 
 // ScrollConfig configures a scroll view.

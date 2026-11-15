@@ -3,6 +3,7 @@
 package linux
 
 import (
+	"strings"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -138,6 +139,7 @@ var roleNicks = [...]string{
 	driver.RoleRegion: "region", driver.RoleNavigation: "navigation", driver.RoleTree: "tree",
 	driver.RoleTreeItem: "tree-item", driver.RoleToolbar: "toolbar",
 	driver.RoleMenuItemCheckbox: "menu-item-checkbox", driver.RoleMenuItemRadio: "menu-item-radio",
+	driver.RoleStatus: "status", driver.RoleSearchField: "search-box",
 }
 
 // roleNick returns the GTK role of a view: its Role's, else a text's
@@ -354,10 +356,43 @@ func (w *window) accessChanged(v *view) {
 	}
 	for p := v; p != nil; p = p.parent {
 		if p.props.LiveRegion != driver.LiveRegionNone {
-			w.announce(v.access.label, p.props.LiveRegion == driver.LiveRegionAssertive)
+			text := v.access.label
+			if p.props.Role == driver.RoleStatus {
+				text = groupedText(v)
+			}
+			w.announce(text, p.props.LiveRegion == driver.LiveRegionAssertive)
 			return
 		}
 	}
+}
+
+// groupedText returns the text exposed by a status container, in tree order.
+func groupedText(v *view) string {
+	if v.props.Label != "" {
+		return v.props.Label
+	}
+	var parts []string
+	var walk func(*view)
+	walk = func(n *view) {
+		if n.kind == driver.KindText && n.plain != "" {
+			parts = append(parts, n.plain)
+			return
+		}
+		if n.props.Label != "" {
+			parts = append(parts, n.props.Label)
+			return
+		}
+		for _, c := range n.children {
+			if c.props.ElementsHidden || c.style.Hidden || c.deleted {
+				continue
+			}
+			walk(c)
+		}
+	}
+	for _, c := range v.children {
+		walk(c)
+	}
+	return strings.Join(parts, " ")
 }
 
 // announce has assistive technology read text.

@@ -4433,6 +4433,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.ROLE_TAB: role = "tab"; break;
             case Protocol.ROLE_TEXT: className = "android.widget.TextView"; break;
             case Protocol.ROLE_TEXT_FIELD: className = "android.widget.EditText"; break;
+            case Protocol.ROLE_SEARCH_FIELD: className = "android.widget.EditText"; role = "search box"; break;
+            case Protocol.ROLE_STATUS: role = "status"; break;
             case Protocol.ROLE_RADIO_GROUP: className = "android.widget.RadioGroup"; break;
             case Protocol.ROLE_TAB_LIST: className = "android.widget.TabWidget"; break;
             case Protocol.ROLE_MENU: role = "menu"; break;

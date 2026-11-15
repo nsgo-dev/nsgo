@@ -342,6 +342,8 @@ final class Protocol {
     static final int ROLE_MENU_ITEM_CHECKBOX = 33;
     static final int ROLE_MENU_ITEM_RADIO = 34;
     static final int ROLE_SPIN_BUTTON = 35;
+    static final int ROLE_STATUS = 38;
+    static final int ROLE_SEARCH_FIELD = 39;
 
     // The keys a focused view uses itself, as driver.KeyUse: a keymap binding's flags carry the ones it yields from bit 2 on.
     static final int KEY_USE_PRESS = 1;

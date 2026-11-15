@@ -165,3 +165,25 @@ func TestAccessibilityActionsAndFocus(t *testing.T) {
 		t.Error("IsStandardAction")
 	}
 }
+
+func TestStatusAndSearchRoles(t *testing.T) {
+	h := newHost(t, Size{Width: 200, Height: 100}, func(*Scope) Node {
+		return View{Children: []Node{
+			View{TestID: "status", Role: RoleStatus, Children: []Node{Text{Content: "Saved"}}},
+			Input{TestID: "search", Role: RoleSearchField, Label: "Search"},
+		}}
+	})
+	props := propsOf(h.commit())
+	if p := props[h.find("status").id]; p.Role != RoleStatus || p.LiveRegion != LiveRegionPolite {
+		t.Fatalf("status props = %+v", p)
+	}
+	if p := props[h.find("search").id]; p.Role != RoleSearchField {
+		t.Fatalf("search props = %+v", p)
+	}
+	if got := driver.RoleName(RoleStatus); got != "status" {
+		t.Fatalf("status selector name = %q", got)
+	}
+	if got := driver.RoleName(RoleSearchField); got != "searchbox" {
+		t.Fatalf("search selector name = %q", got)
+	}
+}
