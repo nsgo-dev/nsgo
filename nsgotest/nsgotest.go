@@ -57,6 +57,9 @@ func init() { driver.CheckCommits = !automationBuild }
 // Option configures Start.
 type Option func(*App)
 
+// HotKeyState is the state a headless platform reports for a global shortcut.
+type HotKeyState = core.HotKeyState
+
 // Size sets the surface size; 390 by 844 points by default.
 func Size(width, height driver.Points) Option {
 	return func(a *App) { a.size = driver.Size{Width: width, Height: height} }
@@ -73,6 +76,32 @@ func Storage(entries map[string]string) Option {
 // env has HeaderHeight.
 func Environment(env driver.Environment) Option {
 	return func(a *App) { a.env = &env }
+}
+
+// HotKeyTaken marks normalized keys as held by another registration in the
+// headless platform. Unlisted keys register successfully.
+func HotKeyTaken(keys ...string) Option {
+	return func(a *App) {
+		if a.hotKeyStates == nil {
+			a.hotKeyStates = map[string]core.HotKeyState{}
+		}
+		for _, key := range keys {
+			a.hotKeyStates[driver.NormalizeKey(key)] = core.HotKeyTaken
+		}
+	}
+}
+
+// HotKeyUnsupported marks normalized keys as unsupported by the headless
+// platform, so tests can exercise an app's unavailable path.
+func HotKeyUnsupported(keys ...string) Option {
+	return func(a *App) {
+		if a.hotKeyStates == nil {
+			a.hotKeyStates = map[string]core.HotKeyState{}
+		}
+		for _, key := range keys {
+			a.hotKeyStates[driver.NormalizeKey(key)] = core.HotKeyUnsupported
+		}
+	}
 }
 
 // Host runs the app with h as its channel to an embedding host, so a test
@@ -362,6 +391,8 @@ type App struct {
 	pendingAlerts bool
 	// noCaretMoves keeps typing from reporting caret moves.
 	noCaretMoves bool
+	// hotKeyStates are the headless platform's configured registration answers.
+	hotKeyStates map[string]core.HotKeyState
 	// textEngine measures text; core.ApproxTextEngine when nil.
 	textEngine driver.TextEngine
 	// lastPress and lastPressAt are the view pressed last and when;
@@ -426,6 +457,7 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 		},
 		Storage: a.store,
 		Host:    a.host,
+		HotKeys: true,
 	})
 	t.Cleanup(a.root.Dispose)
 	a.start = a.Clock.Now()

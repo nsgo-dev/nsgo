@@ -262,6 +262,8 @@ const (
 	EventAudio
 	// EventWindowPlacementFailed reports that a panel could not be placed at the requested screen rectangle. Text explains the platform reason. It is appended so Android's wire event numbers stay compatible.
 	EventWindowPlacementFailed
+	// EventHotKeyState answers global shortcut Count of the latest ItemHotKeys with its registration state, a HotKeyState, in Index, after the kinds Android's Protocol.java mirrors so that they keep their values.
+	EventHotKeyState
 )
 
 // What EventInputModality reports.

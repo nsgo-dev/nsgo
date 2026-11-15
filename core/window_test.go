@@ -469,6 +469,31 @@ func TestHotKeysWithoutWindows(t *testing.T) {
 	}
 }
 
+func TestHotKeyRegistrationState(t *testing.T) {
+	var handle *HotKey
+	w := newWindows(t, func(cx *Scope) {
+		handle = cx.RegisterHotKey("Ctrl+Alt+K", nil)
+	})
+	keys := w.take(0, driver.ItemHotKeys)
+	if handle == nil || handle.State() != HotKeyPending {
+		t.Fatalf("initial hot key state %v, want pending", handle.State())
+	}
+	w.dispatch(0, driver.Event{Kind: driver.EventHotKeyState, Count: keys[0].Keys[0].ID, Index: int(HotKeyRegistered)})
+	if got := handle.State(); got != HotKeyRegistered {
+		t.Fatalf("registered hot key state %v", got)
+	}
+	w.dispatch(0, driver.Event{Kind: driver.EventHotKeyState, Count: keys[0].Keys[0].ID, Index: int(HotKeyTaken)})
+	if got := handle.State(); got != HotKeyTaken {
+		t.Fatalf("taken hot key state %v", got)
+	}
+
+	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0))})
+	unsupported := root.RegisterHotKey("Ctrl+Alt+K", nil)
+	if unsupported.State() != HotKeyUnsupported {
+		t.Errorf("headless unsupported state %v", unsupported.State())
+	}
+}
+
 func TestTrayWithoutWindows(t *testing.T) {
 	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), Tray: true})
 	tree := NewTree(root, ApproxTextEngine{})

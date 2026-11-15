@@ -5,6 +5,7 @@ package windows
 import (
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -37,11 +38,23 @@ func (w *window) hotKeysApply(keys []driver.KeyBinding) {
 	for _, key := range keys {
 		mods, vk, ok := globalHotKey(key.Key)
 		if !ok {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
-		if r, _, _ := registerHotKey.Call(w.hwnd, uintptr(key.ID), uintptr(mods|modNoRepeat), vk); r != 0 {
+		if r, _, err := registerHotKey.Call(w.hwnd, uintptr(key.ID), uintptr(mods|modNoRepeat), vk); r != 0 {
 			w.hotKeys[key.ID] = struct{}{}
+			w.hotKeyState(key.ID, driver.HotKeyRegistered)
+		} else if err == syscall.Errno(1409) { // ERROR_HOTKEY_ALREADY_REGISTERED
+			w.hotKeyState(key.ID, driver.HotKeyTaken)
+		} else {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 		}
+	}
+}
+
+func (w *window) hotKeyState(id uint32, state driver.HotKeyState) {
+	if w.engine != nil {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventHotKeyState, Count: id, Index: int(state)})
 	}
 }
 

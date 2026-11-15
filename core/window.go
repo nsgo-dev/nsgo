@@ -631,18 +631,49 @@ type hotKey struct {
 	driver.KeyBinding
 	owner *Scope
 	fn    func()
+	state *Signal[HotKeyState]
+}
+
+// HotKeyState is the core's part of desktop.HotKeyState: the answer to a global shortcut registration.
+type HotKeyState = driver.HotKeyState
+
+const (
+	// HotKeyPending is the core's part of desktop.HotKeyPending.
+	HotKeyPending = driver.HotKeyPending
+	// HotKeyRegistered is the core's part of desktop.HotKeyRegistered.
+	HotKeyRegistered = driver.HotKeyRegistered
+	// HotKeyTaken is the core's part of desktop.HotKeyTaken.
+	HotKeyTaken = driver.HotKeyTaken
+	// HotKeyUnsupported is the core's part of desktop.HotKeyUnsupported.
+	HotKeyUnsupported = driver.HotKeyUnsupported
+)
+
+// HotKey is a global shortcut registration. State reads the latest answer
+// from the platform and can be read inside a reactive computation.
+type HotKey struct {
+	state *Signal[HotKeyState]
+}
+
+// State returns the registration state. It starts Pending and changes when
+// the platform answers the latest registration.
+func (h *HotKey) State() HotKeyState {
+	if h == nil || h.state == nil {
+		return HotKeyUnsupported
+	}
+	return h.state.Get()
 }
 
 // RegisterHotKey is the core's part of desktop.RegisterHotKey, which apps
 // use: fn runs when key, in OnKey's form, is pressed whichever app has
 // the focus, while the current owner lives.
-func (cx *Scope) RegisterHotKey(key string, fn func()) {
+func (cx *Scope) RegisterHotKey(key string, fn func()) *HotKey {
 	rt := cx.rt
 	if rt.windows == nil && !rt.takesHotKeys {
-		return
+		return &HotKey{state: NewSignal(cx, HotKeyUnsupported)}
 	}
 	rt.hotKeyID++
-	h := &hotKey{KeyBinding: driver.KeyBinding{Key: driver.NormalizeKey(key), ID: rt.hotKeyID}, owner: cx.current(), fn: fn}
+	h := &hotKey{KeyBinding: driver.KeyBinding{Key: driver.NormalizeKey(key), ID: rt.hotKeyID}, owner: cx.current(), fn: fn,
+		state: NewSignal(cx, HotKeyPending)}
 	rt.hotKeys = append(rt.hotKeys, h)
 	rt.sendHotKeys()
 	h.owner.addCleanup(func() {
@@ -651,14 +682,25 @@ func (cx *Scope) RegisterHotKey(key string, fn func()) {
 			rt.sendHotKeys()
 		}
 	})
+	return &HotKey{state: h.state}
 }
 
 func (rt *runtime) sendHotKeys() {
 	keys := make([]driver.KeyBinding, len(rt.hotKeys))
 	for i, h := range rt.hotKeys {
+		h.state.Set(HotKeyPending)
 		keys[i] = h.KeyBinding
 	}
 	rt.app(driver.MountItem{Kind: driver.ItemHotKeys, Keys: keys})
+}
+
+func (rt *runtime) hotKeyState(id uint32, state HotKeyState) {
+	for _, h := range rt.hotKeys {
+		if h.ID == id {
+			h.state.Set(state)
+			return
+		}
+	}
 }
 
 func (rt *runtime) hotKey(id uint32) {
@@ -776,6 +818,11 @@ func (t *Tree) surfaceEvent(ev driver.Event) bool {
 		}
 	case driver.EventHotKey:
 		rt.hotKey(ev.Count)
+	case driver.EventHotKeyState:
+		state := driver.HotKeyState(ev.Index)
+		if state <= driver.HotKeyUnsupported {
+			rt.hotKeyState(ev.Count, state)
+		}
 	case driver.EventLaunchAtLogin, driver.EventNotification, driver.EventBiometric, driver.EventPermission, driver.EventOverlayPermission:
 		t.answer(ev)
 	case driver.EventNotificationPress:

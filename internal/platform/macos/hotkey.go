@@ -73,21 +73,37 @@ func loadCarbon() bool {
 // hotKeys registers keys as the app's global shortcuts in place of the
 // ones before.
 func (s *surface) hotKeys(keys []driver.KeyBinding) {
-	if len(keys) == 0 && len(registered) == 0 || !loadCarbon() {
+	if len(keys) == 0 && len(registered) == 0 {
 		return
 	}
 	unregisterHotKeys()
+	if !loadCarbon() {
+		for _, k := range keys {
+			s.hotKeyState(k.ID, driver.HotKeyUnsupported)
+		}
+		return
+	}
 	signature := uint64(fourCC("nsgo"))
 	for _, k := range keys {
 		code, mods, ok := carbonKey(k.Key)
 		if !ok {
+			s.hotKeyState(k.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		var ref uintptr
 		// EventHotKeyID is its signature and the ID, passed in one register.
 		if carbon.registerEventHotKey(code, mods, signature|uint64(k.ID)<<32, carbon.getApplicationEventTarget(), 0, &ref) == 0 {
 			registered[k.ID] = hotKey{ref, s}
+			s.hotKeyState(k.ID, driver.HotKeyRegistered)
+		} else {
+			s.hotKeyState(k.ID, driver.HotKeyTaken)
 		}
+	}
+}
+
+func (s *surface) hotKeyState(id uint32, state driver.HotKeyState) {
+	if s.engine != nil {
+		s.engine.Dispatch(driver.Event{Kind: driver.EventHotKeyState, Count: id, Index: int(state)})
 	}
 }
 

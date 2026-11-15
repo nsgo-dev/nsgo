@@ -5,6 +5,35 @@ import (
 	"strings"
 )
 
+// HotKeyState is the platform's answer to a global shortcut registration.
+type HotKeyState uint8
+
+const (
+	// HotKeyPending says the platform has not answered the latest registration.
+	HotKeyPending HotKeyState = iota
+	// HotKeyRegistered says the shortcut is active.
+	HotKeyRegistered
+	// HotKeyTaken says another registration owns the combination.
+	HotKeyTaken
+	// HotKeyUnsupported says the key or the current session cannot provide a global shortcut.
+	HotKeyUnsupported
+)
+
+func (s HotKeyState) String() string {
+	switch s {
+	case HotKeyPending:
+		return "pending"
+	case HotKeyRegistered:
+		return "registered"
+	case HotKeyTaken:
+		return "taken"
+	case HotKeyUnsupported:
+		return "unsupported"
+	default:
+		return "unknown"
+	}
+}
+
 // KeyBinding is one binding of the keymap the platform matches key
 // presses against, on the main thread.
 type KeyBinding struct {

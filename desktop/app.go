@@ -98,11 +98,27 @@ func OnOpenFiles(cx *core.Scope, fn func(paths []string)) { cx.OnOpenFiles(fn) }
 // under it, and a menu its secondary click shows.
 func NewTray(cx *core.Scope, opts TrayOptions) *Tray { return cx.NewTray(opts) }
 
+// HotKeyState says whether a global shortcut is still pending, registered,
+// held by another registration, or unsupported by the key or session.
+type HotKeyState = core.HotKeyState
+
+const (
+	HotKeyPending     = core.HotKeyPending
+	HotKeyRegistered  = core.HotKeyRegistered
+	HotKeyTaken       = core.HotKeyTaken
+	HotKeyUnsupported = core.HotKeyUnsupported
+)
+
+// HotKey is a global shortcut registration whose State changes when the
+// platform answers it.
+type HotKey = core.HotKey
+
 // RegisterHotKey runs fn when key, in core.Scope.OnKey's form such as
 // "alt+space", is pressed whichever app has the focus, while the current
-// owner lives. Linux uses its compositor's global-shortcut portal on Wayland
-// and X11 passive grabs; unsupported desktop sessions ignore the binding.
-func RegisterHotKey(cx *core.Scope, key string, fn func()) { cx.RegisterHotKey(key, fn) }
+// owner lives. Its returned handle starts Pending and settles to Registered,
+// Taken or Unsupported. Linux uses its compositor's global-shortcut portal
+// on Wayland and X11 passive grabs.
+func RegisterHotKey(cx *core.Scope, key string, fn func()) *HotKey { return cx.RegisterHotKey(key, fn) }
 
 // SetDockVisible shows the app in the Dock and the app switcher, or
 // leaves it to its tray icon and windows, on macOS; nsgo.HideDock starts

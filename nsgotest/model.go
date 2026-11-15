@@ -346,6 +346,14 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 		case driver.ItemNativeCommand:
 			v.NativeCommands = append(v.NativeCommands, NativeCommand{it.Value, it.Data})
+		case driver.ItemHotKeys:
+			for _, key := range it.Keys {
+				state := core.HotKeyRegistered
+				if configured, ok := a.hotKeyStates[key.Key]; ok {
+					state = configured
+				}
+				a.post(driver.Event{Kind: driver.EventHotKeyState, Count: key.ID, Index: int(state)})
+			}
 		case driver.ItemCanvas:
 			a.drawCanvas(v, it.Drawing)
 		case driver.ItemShader:

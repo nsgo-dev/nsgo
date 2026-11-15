@@ -165,24 +165,29 @@ func (w *window) applyX11HotKeys(keys []driver.KeyBinding) bool {
 	for _, key := range keys {
 		trigger, ok := portalTrigger(key.Key)
 		if !ok {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		parts := strings.Split(trigger, "+")
 		name := parts[len(parts)-1]
 		keysym := x11StringToKeysym(cstr(name))
 		if keysym == 0 {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		keycode := x11KeysymToKeycode(display, keysym)
 		if keycode == 0 {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		mods, ok := x11TriggerModifiers(parts[:len(parts)-1])
 		if !ok {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		combo := x11HotKey{keycode: keycode, modifiers: mods}
 		if _, exists := x.bindings[combo]; exists {
+			w.hotKeyState(key.ID, driver.HotKeyTaken)
 			continue
 		}
 		grabs := make([]x11Grab, 0, 4)
@@ -196,17 +201,25 @@ func (w *window) applyX11HotKeys(keys []driver.KeyBinding) bool {
 		}
 		if gdkX11DisplayErrorTrapPop(gdk) != 0 {
 			x.ungrab(grabs)
+			w.hotKeyState(key.ID, driver.HotKeyTaken)
 			continue
 		}
 		x.grabs = append(x.grabs, grabs...)
 		x.bindings[combo] = key.ID
+		w.hotKeyState(key.ID, driver.HotKeyRegistered)
 	}
 	if len(x.grabs) == 0 {
-		return false
+		return true
 	}
 	x.handler = gSignalConnect(gdk, "xevent", cbX11HotKeyEvent, w.handle)
 	w.hotKeys = &globalHotKeys{x11: x}
 	return true
+}
+
+func (w *window) hotKeyState(id uint32, state driver.HotKeyState) {
+	if w.engine != nil {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventHotKeyState, Count: id, Index: int(state)})
+	}
 }
 
 // ungrab releases grabs, those that failed included: XUngrabKey leaves other clients' grabs alone.
@@ -363,6 +376,7 @@ func (w *window) applyHotKeys(keys []driver.KeyBinding) {
 	for _, key := range keys {
 		trigger, ok := portalTrigger(key.Key)
 		if !ok {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		id := strconv.FormatUint(uint64(key.ID), 10)
@@ -378,6 +392,12 @@ func (w *window) applyHotKeys(keys []driver.KeyBinding) {
 	portalQueue() <- func() {
 		bus := portalBus(appID)
 		if bus == 0 {
+			w.post(func() {
+				if w.hotKeys == state {
+					w.hotKeyStates(state, driver.HotKeyUnsupported)
+					w.closeHotKeys()
+				}
+			})
 			return
 		}
 		w.post(func() {
@@ -387,11 +407,21 @@ func (w *window) applyHotKeys(keys []driver.KeyBinding) {
 			state.bus = bus
 			token := portalToken("nsgo_create")
 			if !w.awaitHotKeyResponse(state, globalHotKeyCreating, token) {
+				w.hotKeyStates(state, driver.HotKeyUnsupported)
 				w.closeHotKeys()
 				return
 			}
 			w.callHotKeyPortal(state, "CreateSession", func() []uintptr { return []uintptr{portalCreateOptions(token)} })
 		})
+	}
+}
+
+func (w *window) hotKeyStates(state *globalHotKeys, status driver.HotKeyState) {
+	if w.engine == nil || w.hotKeys != state {
+		return
+	}
+	for _, spec := range state.specs {
+		w.hotKeyState(spec.key, status)
 	}
 }
 
@@ -427,11 +457,17 @@ func (w *window) callHotKeyPortal(state *globalHotKeys, method string, args func
 				state.requestSub = 0
 			}
 			if request == "" {
+				status := driver.HotKeyUnsupported
+				if state.stage == globalHotKeyBinding {
+					status = driver.HotKeyTaken
+				}
+				w.hotKeyStates(state, status)
 				w.closeHotKeys()
 				return
 			}
 			state.request = request
 			if state.requestSub = subscribeGlobalHotKeyResponse(state, w); state.requestSub == 0 {
+				w.hotKeyStates(state, driver.HotKeyUnsupported)
 				w.closeHotKeys()
 			}
 		})
@@ -485,6 +521,11 @@ func globalHotKeyResponse(conn, sender, path, iface, signal, params, data uintpt
 		state.requestSub = 0
 	}
 	if gVariantNChildren(params) < 2 || portalTupleUint32(params, 0) != 0 {
+		status := driver.HotKeyUnsupported
+		if state.stage == globalHotKeyBinding {
+			status = driver.HotKeyTaken
+		}
+		w.hotKeyStates(state, status)
 		w.closeHotKeys()
 		return
 	}
@@ -494,6 +535,7 @@ func globalHotKeyResponse(conn, sender, path, iface, signal, params, data uintpt
 	case globalHotKeyCreating:
 		session := portalLookupText(results, "session_handle")
 		if session == "" {
+			w.hotKeyStates(state, driver.HotKeyUnsupported)
 			w.closeHotKeys()
 			return
 		}
@@ -502,11 +544,13 @@ func globalHotKeyResponse(conn, sender, path, iface, signal, params, data uintpt
 		state.activatedSub = gDBusConnectionSignalSubscribe(state.bus, cstr(globalShortcutName), cstr(globalShortcutIface), cstr("Activated"),
 			cstr(globalShortcutPath), nil, 0, cbGlobalHotKeyActivated, w.handle, 0)
 		if state.activatedSub == 0 {
+			w.hotKeyStates(state, driver.HotKeyUnsupported)
 			w.closeHotKeys()
 			return
 		}
 		token := portalToken("nsgo_bind")
 		if !w.awaitHotKeyResponse(state, globalHotKeyBinding, token) {
+			w.hotKeyStates(state, driver.HotKeyUnsupported)
 			w.closeHotKeys()
 			return
 		}
@@ -516,6 +560,7 @@ func globalHotKeyResponse(conn, sender, path, iface, signal, params, data uintpt
 		})
 	case globalHotKeyBinding:
 		// The portal's successful response means the session is active. The Activated signal carries each shortcut ID from here on.
+		w.hotKeyStates(state, driver.HotKeyRegistered)
 	}
 }
 

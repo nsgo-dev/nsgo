@@ -52,6 +52,33 @@ func TestEnvironmentReportsMinimized(t *testing.T) {
 	}
 }
 
+func TestHotKeyRegistrationAnswers(t *testing.T) {
+	var registered *core.HotKey
+	Start(t, func(cx *core.Scope) core.Node {
+		registered = cx.RegisterHotKey("Ctrl+Alt+K", nil)
+		return core.View{}
+	})
+	if registered.State() != core.HotKeyRegistered {
+		t.Fatalf("default hot key state %v, want registered", registered.State())
+	}
+	var taken *core.HotKey
+	Start(t, func(cx *core.Scope) core.Node {
+		taken = cx.RegisterHotKey("Ctrl+Alt+K", nil)
+		return core.View{}
+	}, HotKeyTaken("ctrl+alt+k"))
+	if taken.State() != core.HotKeyTaken {
+		t.Fatalf("taken hot key state %v", taken.State())
+	}
+	var unsupported *core.HotKey
+	Start(t, func(cx *core.Scope) core.Node {
+		unsupported = cx.RegisterHotKey("Ctrl+Alt+K", nil)
+		return core.View{}
+	}, HotKeyUnsupported("ctrl+alt+k"))
+	if unsupported.State() != core.HotKeyUnsupported {
+		t.Fatalf("unsupported hot key state %v", unsupported.State())
+	}
+}
+
 // Headless there are no native pixels: Capture and CapturePNG skip the test, and Screenshot only logs, but still fails on a name that leaves the screenshots directory.
 func TestCaptureSkipsHeadlessAndScreenshotNamesStayInside(t *testing.T) {
 	if Target() != "" {
