@@ -94,6 +94,84 @@ func TestTextViewStreamsWithACaret(t *testing.T) {
 	}
 }
 
+// A block growing as a reply streams in follows its text in place: its inline images, formulas and the caret keep their views as chunks arrive, in a search too.
+func TestTextViewStreamKeepsAttachments(t *testing.T) {
+	for _, c := range []struct {
+		name, start string
+		chunks      []string
+		attachments bool
+	}{
+		{"paragraph", "First.\n\nSee ![a](https://x.y/a.png) and $x$", []string{" then", " **mo", "re", "** words", "."}, true},
+		{"list item", "> - one\n> - see ![a](https://x.y/a.png) and $x$", []string{" then", " more", " words."}, true},
+		{"code", "```go\nx := 1", []string{"\ny", " := 2", "\nz := 3"}, false},
+	} {
+		for _, searching := range []bool{false, true} {
+			t.Run(fmt.Sprint(c.name, " searching ", searching), func(t *testing.T) {
+				var md *core.Signal[string]
+				var images, formulas, carets int
+				app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+					md = core.NewSignal(cx, c.start)
+					var s *textview.Search
+					if searching {
+						s = textview.NewSearch(cx)
+						s.SetQuery("e")
+						s.Open()
+					}
+					return textview.TextView{MarkdownFunc: md.Get, Options: textview.Options{Streaming: true}, Search: s,
+						RenderImage: func(cx *core.Scope, im textview.Image) core.Node {
+							images++
+							return core.View{TestID: "image", Style: core.Style{Width: core.Pt(10), Height: core.Pt(10)}}
+						},
+						RenderMath: func(cx *core.Scope, m textview.Math) core.Node {
+							formulas++
+							return core.View{TestID: "formula", Style: core.Style{Width: core.Pt(10), Height: core.Pt(10)}}
+						},
+						StreamingCaret: core.Func(func(cx *core.Scope) core.Node {
+							carets++
+							return core.View{TestID: "caret", Style: core.Style{Width: core.Pt(6), Height: core.Pt(12)}}
+						})}
+				})
+				text := c.start
+				for _, chunk := range c.chunks {
+					text += chunk
+					md.Set(text)
+					app.Settle()
+				}
+				want := 0
+				if c.attachments {
+					want = 1
+				}
+				if images != want || formulas != want || carets != 1 {
+					t.Errorf("after %d chunks the image was made %d times, the formula %d and the caret %d, want %d, %d and 1", len(c.chunks), images, formulas, carets, want, want)
+				}
+				if p := app.Find("id:caret").Parent.Parent; p.Kind != nsgotest.KindText || !strings.HasSuffix(p.Text, c.chunks[len(c.chunks)-1][1:]+"\ufffc") {
+					t.Errorf("the caret is not at the end of the text: %q", p.Text)
+				}
+			})
+		}
+	}
+}
+
+// A code block growing in place copies all the code that has arrived.
+func TestTextViewStreamCopiesGrownCode(t *testing.T) {
+	var md *core.Signal[string]
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		md = core.NewSignal(cx, "```go\nx := 1")
+		return textview.TextView{MarkdownFunc: md.Get, Options: textview.Options{Streaming: true}, CodeBlockActions: []textview.CodeAction{{ID: textview.CopyAction}},
+			StreamingCaret: core.View{TestID: "caret", Style: core.Style{Width: core.Pt(6), Height: core.Pt(12)}}}
+	})
+	code := app.Find("text:/x := 1/").ID
+	md.Set("```go\nx := 1\ny := 2")
+	app.Settle()
+	if app.Find("text:/y := 2/").ID != code {
+		t.Error("the code's text was made again")
+	}
+	app.Press("label:copy")
+	if app.Clipboard != "x := 1\ny := 2" {
+		t.Errorf("clipboard %q", app.Clipboard)
+	}
+}
+
 func TestTextViewOptionsAndPlugins(t *testing.T) {
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		textview.Provide(cx, textview.Plugin{

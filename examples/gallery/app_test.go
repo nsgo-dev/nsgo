@@ -1178,6 +1178,13 @@ func TestAppearanceRestylesInPlace(t *testing.T) {
 				if d.name == "Plot" {
 					app.Press("role:button Pause")
 				}
+				// The editor's simulated language server answers on its own
+				// goroutine; wait for its diagnostics before taking the view
+				// identity snapshot, or a late answer can look like an
+				// appearance rebuild.
+				if d.name == "Editor" {
+					app.WaitFor("text:Problems 6", 5*time.Second)
+				}
 				app.FastForward(2 * time.Second)
 			}
 			app := startDesktop(t)

@@ -15,10 +15,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// TextView shows a document: Markdown or HTML, parsed once per change,
-// else the app's own Document. Its blocks are rows keyed by position and kind, so
-// a document that grows at its end (a reply streaming in) builds only its
-// last block again.
+// TextView shows a document: Markdown or HTML, parsed once per change, else the app's own Document. Its blocks are rows keyed by position and kind, so a document that grows at its end (a reply streaming in) changes only its last block, whose texts follow their content in place while its frame stays: paragraphs, headings and code, in quotes, lists and custom containers, keep their views, the inline images, formulas and caret in them included.
 type TextView struct {
 	// Markdown is the document, read by Parse with Extensions.
 	Markdown     string
@@ -101,10 +98,7 @@ type TextView struct {
 	Tooltip  core.Node
 }
 
-// Highlighter colors code: byte ranges of the code with their styles, in
-// order and apart. Ranges out of order, overlapping or off a character
-// boundary are skipped. It runs while the block is built, so the signals
-// it reads (the appearance) build the block again.
+// Highlighter colors code: byte ranges of the code with their styles, in order and apart. Ranges out of order, overlapping or off a character boundary are skipped. It runs as the code's text is made, and again, recoloring it in place, as the code or the signals it reads (the appearance) change.
 type Highlighter func(code CodeBlock) []Highlight
 
 // Highlight styles the bytes from Start to End of a code block's code,
@@ -153,6 +147,9 @@ func (tv TextView) Render(cx *core.Scope) core.Node {
 		tv.Extensions = append(ext, tv.Extensions...)
 	}
 	r := &renderer{tv: tv, plugins: plugins, cx: cx}
+	if tv.StreamingCaret != nil {
+		r.caret = &pinnedNode{tv.StreamingCaret}
+	}
 	search := tv.Search
 	if search == nil {
 		search = searchKey.Use(cx)
@@ -189,15 +186,18 @@ func (tv TextView) Render(cx *core.Scope) core.Node {
 			core.Each(rows, func(r row) rowKey { return rowKey{r.index, r.block.Kind()} },
 				func(cx *core.Scope, item func() row, index func() int) core.Node {
 					block := core.NewMemoFunc(cx, func() Block { return item().block }, equal[Block])
+					// The row is made again as its frame changes; while it stays, its texts follow the block.
+					frame := core.NewMemoFunc(cx, func() Block { return r.frame(block.Get()) }, equal[Block])
 					// The last row holds the caret, so a row made last
 					// once is made again when another follows it.
 					last := core.NewMemo(cx, func() bool { return tv.StreamingCaret != nil && index() == count.Get()-1 })
 					return core.Dynamic(func(cx *core.Scope) core.Node {
-						return r.blockAt(cx, block.Get(), index() == 0, 0, last.Get(), TextRef{Footnote: -1, Path: []int{index()}})
+						frame.Get()
+						return r.blockAt(cx, block.GetUntracked(), block.Get, index() == 0, 0, last.Get(), TextRef{Footnote: -1, Path: []int{index()}})
 					})
 				}),
 			core.Show{When: func() bool { return tv.StreamingCaret != nil && count.Get() == 0 },
-				Then: func(*core.Scope) core.Node { return tv.StreamingCaret }},
+				Then: func(*core.Scope) core.Node { return r.caret }},
 			core.Dynamic(func(cx *core.Scope) core.Node { return r.footnotes(cx, notes.Get()) }),
 		},
 	}
@@ -261,6 +261,8 @@ type renderer struct {
 	cx *core.Scope
 	// search is the view in its search, if any.
 	search *searchView
+	// caret is the StreamingCaret behind a pointer, made once, so the texts that follow their content keep its view.
+	caret core.Node
 }
 
 // style merges the parts' styles: StyleOf's for each, then Styles'.
@@ -296,23 +298,32 @@ func joinClasses(a, b string) string {
 }
 
 func (r *renderer) blocks(cx *core.Scope, blocks []Block, depth int, in TextRef) []core.Node {
-	return r.blocksAt(cx, blocks, depth, false, in)
+	return r.blocksAt(cx, blocks, nil, depth, false, in)
 }
 
-// blocksAt builds blocks, the caret in the last when caret, each placed in in.
-func (r *renderer) blocksAt(cx *core.Scope, blocks []Block, depth int, caret bool, in TextRef) []core.Node {
+// blocksAt builds blocks, the caret in the last when caret, each placed in in; live, when set, gives them as they grow.
+func (r *renderer) blocksAt(cx *core.Scope, blocks []Block, live func() []Block, depth int, caret bool, in TextRef) []core.Node {
 	out := make([]core.Node, len(blocks))
 	for i, b := range blocks {
-		out[i] = r.blockAt(cx, b, i == 0, depth, caret && i == len(blocks)-1, in.child(i))
+		var child func() Block
+		if live != nil {
+			child = func() Block {
+				if bs := live(); i < len(bs) {
+					return bs[i]
+				}
+				return b
+			}
+		}
+		out[i] = r.blockAt(cx, b, child, i == 0, depth, caret && i == len(blocks)-1, in.child(i))
 	}
 	if caret && len(blocks) == 0 {
-		out = append(out, r.tv.StreamingCaret)
+		out = append(out, r.caret)
 	}
 	return out
 }
 
 func (r *renderer) block(cx *core.Scope, b Block, first bool, depth int, at TextRef) core.Node {
-	return r.blockAt(cx, b, first, depth, false, at)
+	return r.blockAt(cx, b, nil, first, depth, false, at)
 }
 
 // caretSpans appends the streaming caret to spans, inline, when caret.
@@ -320,18 +331,80 @@ func (r *renderer) caretSpans(spans []core.Span, caret bool) []core.Span {
 	if !caret {
 		return spans
 	}
-	return append(spans, core.Span{Attachment: r.tv.StreamingCaret})
+	return append(spans, core.Span{Attachment: r.caret})
 }
 
-// blockAt builds b. first drops a heading's top margin; depth is how many lists b is in; caret puts the streaming caret at its end; at is its place, which a search names its texts by.
-func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret bool, at TextRef) core.Node {
+// frame is b without what its texts follow in place: the content of paragraphs' and headings' texts and code blocks' code, also in quotes, lists and custom containers. A row keeps its views while its block's frame stays.
+func (r *renderer) frame(b Block) Block {
+	switch b := b.(type) {
+	case Paragraph:
+		if _, ok := onlyImages(b.Content); !ok {
+			return Paragraph{}
+		}
+	case Heading:
+		return Heading{Level: b.Level}
+	case Blockquote:
+		return Blockquote{Alert: b.Alert, Children: r.frames(b.Children)}
+	case List:
+		items := make([]ListItem, len(b.Items))
+		for i, it := range b.Items {
+			items[i] = ListItem{Task: it.Task, Done: it.Done, Children: r.frames(it.Children)}
+		}
+		b.Items = items
+		return b
+	case CodeBlock:
+		if r.tv.RenderCodeBlock == nil && (r.tv.RenderDiagram == nil || !IsDiagram(b)) {
+			b.Code = ""
+		}
+		return b
+	case Custom:
+		if r.tv.RenderCustom == nil && !r.renders(b.Name) && len(b.Children) > 0 {
+			b.Children = r.frames(b.Children)
+		}
+		return b
+	}
+	return b
+}
+
+func (r *renderer) frames(blocks []Block) []Block {
+	out := make([]Block, len(blocks))
+	for i, b := range blocks {
+		out[i] = r.frame(b)
+	}
+	return out
+}
+
+// grown is what live gives in b's place: a block of b's kind, else b, while its row waits to be made again.
+func grown[T Block](live func() Block, b T) T {
+	if g, ok := live().(T); ok {
+		return g
+	}
+	return b
+}
+
+// inlineText is t at at showing content, the caret after it when caret. With live, which gives the content as it grows, t follows it in place, and its attachments keep their views while they stay.
+func (r *renderer) inlineText(cx *core.Scope, at TextRef, content []Inline, live func() []Inline, caret bool, t core.Text) core.Text {
+	if live == nil {
+		t.Spans = r.caretSpans(r.spans(nil, content, inlineContext{style: noStyle}, nil), caret)
+		return r.searched(cx, at, t)
+	}
+	keep := new(keeper)
+	t.SpansFunc = func() []core.Span {
+		keep.run()
+		return r.caretSpans(r.spans(nil, live(), inlineContext{style: noStyle}, keep), caret)
+	}
+	return r.searched(cx, at, t)
+}
+
+// blockAt builds b. live, when set, gives b as it grows, which the texts whose content its frame leaves out follow; first drops a heading's top margin; depth is how many lists b is in; caret puts the streaming caret at its end; at is its place, which a search names its texts by.
+func (r *renderer) blockAt(cx *core.Scope, b Block, live func() Block, first bool, depth int, caret bool, at TextRef) core.Node {
 	// Blocks with no text of their own to end take the caret on a line
 	// after them.
 	after := func(n core.Node) core.Node {
 		if !caret {
 			return n
 		}
-		return core.Group{n, r.tv.StreamingCaret}
+		return core.Group{n, r.caret}
 	}
 	switch b := b.(type) {
 	case Paragraph:
@@ -342,7 +415,11 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 			}
 			return after(core.Group(nodes))
 		}
-		return r.searched(cx, at, core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartParagraph), StyleFunc: func() core.Style { return r.style(PartParagraph) }})
+		var content func() []Inline
+		if live != nil {
+			content = func() []Inline { return grown(live, b).Content }
+		}
+		return r.inlineText(cx, at, b.Content, content, caret, core.Text{Class: r.class(PartParagraph), StyleFunc: func() core.Style { return r.style(PartParagraph) }})
 	case Heading:
 		level := min(max(b.Level, 1), 6)
 		heading := func() core.Style {
@@ -352,10 +429,18 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 			}
 			return s
 		}
-		return r.searched(cx, at, core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartHeading, PartHeading1+Part(level-1)),
+		var content func() []Inline
+		if live != nil {
+			content = func() []Inline { return grown(live, b).Content }
+		}
+		return r.inlineText(cx, at, b.Content, content, caret, core.Text{Class: r.class(PartHeading, PartHeading1+Part(level-1)),
 			StyleFunc: heading, Role: core.RoleHeader})
 	case Blockquote:
-		children := r.blocksAt(cx, b.Children, depth, caret, at)
+		var quoted func() []Block
+		if live != nil {
+			quoted = func() []Block { return grown(live, b).Children }
+		}
+		children := r.blocksAt(cx, b.Children, quoted, depth, caret, at)
 		if b.Alert == AlertNone {
 			return core.View{Class: r.class(PartBlockquote), StyleFunc: func() core.Style { return r.style(PartBlockquote) }, Children: children}
 		}
@@ -366,7 +451,11 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 				core.View{Class: r.class(PartAlertContent), StyleFunc: func() core.Style { return r.style(PartAlertContent) }, Children: children},
 			}}
 	case List:
-		return r.list(cx, b, depth, caret, at)
+		var items func() []ListItem
+		if live != nil {
+			items = func() []ListItem { return grown(live, b).Items }
+		}
+		return r.list(cx, b, items, depth, caret, at)
 	case CodeBlock:
 		if r.tv.RenderDiagram != nil && !caret && IsDiagram(b) {
 			// The diagram centers on a line as wide as the scroll at least, which a copy takes as the block's source between its fences.
@@ -380,7 +469,11 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 		if r.tv.RenderCodeBlock != nil {
 			return after(r.tv.RenderCodeBlock(cx, b))
 		}
-		return r.code(cx, b, caret, at)
+		var code func() CodeBlock
+		if live != nil {
+			code = func() CodeBlock { return grown(live, b) }
+		}
+		return r.code(cx, b, code, caret, at)
 	case Table:
 		return r.table(cx, b, caret, at)
 	case Rule:
@@ -408,9 +501,13 @@ func (r *renderer) blockAt(cx *core.Scope, b Block, first bool, depth int, caret
 		}
 		switch {
 		case len(b.Children) > 0:
-			return core.View{Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }, Children: r.blocksAt(cx, b.Children, depth, caret, at)}
+			var children func() []Block
+			if live != nil {
+				children = func() []Block { return grown(live, b).Children }
+			}
+			return core.View{Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }, Children: r.blocksAt(cx, b.Children, children, depth, caret, at)}
 		case len(b.Content) > 0:
-			return r.searched(cx, at, core.Text{Spans: r.caretSpans(r.spans(nil, b.Content, noStyle, "", nil), caret), Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
+			return r.inlineText(cx, at, b.Content, nil, caret, core.Text{Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
 		}
 		if caret {
 			return r.searched(cx, at, core.Text{Spans: r.caretSpans([]core.Span{{Content: b.Text}}, true), Class: r.class(PartCustom), StyleFunc: func() core.Style { return r.style(PartCustom) }})
@@ -458,7 +555,7 @@ func (r *renderer) details(cx *core.Scope, d Details, depth int, at TextRef) cor
 					}
 					return "▸"
 				}, Class: r.class(PartSummaryMarker), StyleFunc: func() core.Style { return r.style(PartSummaryMarker) }}),
-				r.searched(cx, at.child(-1), core.Text{Spans: r.spans(nil, d.Summary, noStyle, "", nil), Style: core.Style{FlexGrow: 1, FlexShrink: 1}}),
+				r.inlineText(cx, at.child(-1), d.Summary, nil, false, core.Text{Style: core.Style{FlexGrow: 1, FlexShrink: 1}}),
 			}},
 		core.Show{When: open.Get, Then: func(cx *core.Scope) core.Node {
 			return core.Group(r.blocks(cx, d.Children, depth, at))
@@ -468,7 +565,8 @@ func (r *renderer) details(cx *core.Scope, d Details, depth int, at TextRef) cor
 
 var bullets = [...]string{"•", "◦", "▪"}
 
-func (r *renderer) list(cx *core.Scope, l List, depth int, caret bool, at TextRef) core.Node {
+// list builds l; live, when set, gives its items as they grow.
+func (r *renderer) list(cx *core.Scope, l List, live func() []ListItem, depth int, caret bool, at TextRef) core.Node {
 	kind := PartUnorderedList
 	if l.Ordered {
 		kind = PartOrderedList
@@ -496,43 +594,60 @@ func (r *renderer) list(cx *core.Scope, l List, depth int, caret bool, at TextRe
 		if it.Task && it.Done {
 			content = append(content, PartTaskDone)
 		}
+		var children func() []Block
+		if live != nil {
+			children = func() []Block {
+				if items := live(); i < len(items) {
+					return items[i].Children
+				}
+				return it.Children
+			}
+		}
 		items[i] = core.View{Class: r.class(PartListItem), StyleFunc: func() core.Style { return r.style(PartListItem) }, Children: []core.Node{
 			marker,
-			core.View{Class: r.class(content...), StyleFunc: func() core.Style { return r.style(content...) }, Children: r.blocksAt(cx, it.Children, depth+1, caret && i == len(l.Items)-1, at.child(i))},
+			core.View{Class: r.class(content...), StyleFunc: func() core.Style { return r.style(content...) }, Children: r.blocksAt(cx, it.Children, children, depth+1, caret && i == len(l.Items)-1, at.child(i))},
 		}}
 	}
 	return core.View{Class: r.class(PartList, kind), StyleFunc: func() core.Style { return r.style(PartList, kind) }, Children: items}
 }
 
-func (r *renderer) code(cx *core.Scope, c CodeBlock, caret bool, at TextRef) core.Node {
+// code builds c; live, when set, gives it as it grows.
+func (r *renderer) code(cx *core.Scope, c CodeBlock, live func() CodeBlock, caret bool, at TextRef) core.Node {
+	current := func() CodeBlock { return c }
+	if live != nil {
+		current = live
+	}
+	// The code recolors in place as the highlighter's colors change (the appearance, a lexer done) and grows in place as it streams in, the caret, made once, kept at its end. A search's parts go over the highlighter's colors.
 	spans := func() []core.Span {
+		c := current()
 		var highlights []Highlight
 		if r.tv.Highlighter != nil {
 			highlights = r.tv.Highlighter(c)
 		}
-		return codeSpans(c.Code, highlights)
+		return r.caretSpans(codeSpans(c.Code, highlights), caret)
 	}
-	// The code recolors in place as the highlighter's colors change (the
-	// appearance, a lexer done); the caret is an attachment, which only
-	// Spans carries, so a block streaming in is built again instead.
-	// A search's parts go over the highlighter's colors.
-	code := core.Text{SpansFunc: spans, Class: r.class(PartCodeBlockCode), StyleFunc: func() core.Style { return r.style(PartCodeBlockCode) }}
-	if caret {
-		code.SpansFunc, code.Spans = nil, r.caretSpans(spans(), true)
-	}
-	code = r.searched(cx, at, code)
+	code := r.searched(cx, at, core.Text{SpansFunc: spans, Class: r.class(PartCodeBlockCode), StyleFunc: func() core.Style { return r.style(PartCodeBlockCode) }})
 	children := []core.Node{core.Scroll{Horizontal: true, HideIndicator: r.tv.NoCodeBlockScrollbar,
 		Class: r.class(PartCodeBlockScroll), StyleFunc: func() core.Style { return r.style(PartCodeBlockScroll) }, Children: []core.Node{code}}}
 	if len(r.tv.CodeBlockActions) > 0 {
-		actions := make([]core.Node, len(r.tv.CodeBlockActions))
-		for i, a := range r.tv.CodeBlockActions {
-			actions[i] = r.codeAction(cx, a, c)
+		// The actions take the code they act on, so they are made again as it grows.
+		header := func(cx *core.Scope) core.Node {
+			c := current()
+			actions := make([]core.Node, len(r.tv.CodeBlockActions))
+			for i, a := range r.tv.CodeBlockActions {
+				actions[i] = r.codeAction(cx, a, c)
+			}
+			return core.View{
+				Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Right: core.Pt(0), Direction: core.Row},
+				Class: r.class(PartCodeBlockHeader), StyleFunc: func() core.Style { return r.style(PartCodeBlockHeader) },
+				Children: actions,
+			}
 		}
-		children = append(children, core.View{
-			Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Right: core.Pt(0), Direction: core.Row},
-			Class: r.class(PartCodeBlockHeader), StyleFunc: func() core.Style { return r.style(PartCodeBlockHeader) },
-			Children: actions,
-		})
+		if live != nil {
+			children = append(children, core.Dynamic(header))
+		} else {
+			children = append(children, header(cx))
+		}
 	}
 	return core.View{Class: r.class(PartCodeBlock), StyleFunc: func() core.Style { return r.style(PartCodeBlock) }, Children: children}
 }
@@ -644,7 +759,7 @@ func (r *renderer) table(cx *core.Scope, t Table, caret bool, at TextRef) core.N
 				return s
 			}
 			lastCell := caret && i == len(rows)-1 && col+c.span() >= cols
-			children = append(children, r.searched(cx, place, core.Text{Spans: r.caretSpans(r.spans(nil, c.Content, noStyle, "", nil), lastCell), Class: r.class(cellParts...), StyleFunc: s}))
+			children = append(children, r.inlineText(cx, place, c.Content, nil, lastCell, core.Text{Class: r.class(cellParts...), StyleFunc: s}))
 			col += c.span()
 		}
 	}
@@ -702,61 +817,115 @@ func (r *renderer) footnotes(cx *core.Scope, notes []Footnote) core.Node {
 	return core.View{Class: r.class(PartFootnotes), StyleFunc: func() core.Style { return r.style(PartFootnotes) }, Children: rows}
 }
 
-// spans appends content's spans to out, each styled over style and
-// class, the inline parts around it, and pressing link, the link around
-// it, if any.
-func (r *renderer) spans(out []core.Span, content []Inline, style func() core.Style, class string, link func(core.PressEvent)) []core.Span {
-	// under is style with part p's over it, and inner class with p's.
-	under := func(p Part) func() core.Style {
-		return func() core.Style { return style().Merge(r.style(p)) }
+// inlineContext is what inline content takes from the inline parts around it: their style and classes, the press of the link around it, if any, and trail, which names the parts and the link for a keeper.
+type inlineContext struct {
+	style func() core.Style
+	class string
+	link  func(core.PressEvent)
+	trail string
+}
+
+// in is c inside part p, its style over c's.
+func (c inlineContext) in(r *renderer, p Part) inlineContext {
+	style := c.style
+	return inlineContext{style: func() core.Style { return style().Merge(r.style(p)) }, class: joinClasses(c.class, r.class(p)), link: c.link,
+		trail: c.trail + "/" + strconv.Itoa(int(p))}
+}
+
+// keeper keeps the attachments of a text that follows its content in place: each run of its spans gives an attachment the node the run before gave the one in its place, when it was made of the same inline in the same parts, so core keeps its view.
+type keeper struct{ last, next []kept }
+
+type kept struct {
+	key  keptKey
+	node core.Node
+}
+
+type keptKey struct {
+	trail  string
+	inline Inline
+}
+
+// run starts a run of the spans.
+func (k *keeper) run() { k.last, k.next = k.next, nil }
+
+// node is the attachment showing inline in parts trail, which build makes; a nil keeper builds it each time.
+func (k *keeper) node(trail string, inline Inline, build func() core.Node) core.Node {
+	if k == nil {
+		return build()
 	}
-	inner := func(p Part) string { return joinClasses(class, r.class(p)) }
+	key := keptKey{trail, inline}
+	i := len(k.next)
+	var n core.Node
+	if i < len(k.last) && reflect.DeepEqual(k.last[i].key, key) {
+		n = k.last[i].node
+	} else {
+		n = &pinnedNode{build()}
+	}
+	k.next = append(k.next, kept{key, n})
+	return n
+}
+
+// spans appends content's spans to out, each styled over c's style and classes, the inline parts around it, and pressing c's link, if any; keep, if set, keeps their attachments.
+func (r *renderer) spans(out []core.Span, content []Inline, c inlineContext, keep *keeper) []core.Span {
+	style, class, link := c.style, c.class, c.link
 	for _, in := range content {
 		switch in := in.(type) {
 		case Text:
 			out = append(out, core.Span{Content: in.Text, Class: class, StyleFunc: style, OnPress: link})
 		case Strong:
-			out = r.spans(out, in.Content, under(PartStrong), inner(PartStrong), link)
+			out = r.spans(out, in.Content, c.in(r, PartStrong), keep)
 		case Emphasis:
-			out = r.spans(out, in.Content, under(PartEmphasis), inner(PartEmphasis), link)
+			out = r.spans(out, in.Content, c.in(r, PartEmphasis), keep)
 		case Strikethrough:
-			out = r.spans(out, in.Content, under(PartStrikethrough), inner(PartStrikethrough), link)
+			out = r.spans(out, in.Content, c.in(r, PartStrikethrough), keep)
 		case Underline:
-			out = r.spans(out, in.Content, under(PartUnderline), inner(PartUnderline), link)
+			out = r.spans(out, in.Content, c.in(r, PartUnderline), keep)
 		case Mark:
-			mark := func() core.Style {
-				s := style().Merge(r.style(PartMark))
-				if in.Color != 0 {
+			mark := c.in(r, PartMark)
+			if in.Color != 0 {
+				under := mark.style
+				mark.style = func() core.Style {
+					s := under()
 					s.Background = in.Color
+					return s
 				}
-				return s
+				mark.trail += "#" + strconv.FormatUint(uint64(in.Color), 16)
 			}
-			out = r.spans(out, in.Content, mark, inner(PartMark), link)
+			out = r.spans(out, in.Content, mark, keep)
 		case Superscript:
-			out = r.spans(out, in.Content, under(PartSuperscript), inner(PartSuperscript), link)
+			out = r.spans(out, in.Content, c.in(r, PartSuperscript), keep)
 		case Subscript:
-			out = r.spans(out, in.Content, under(PartSubscript), inner(PartSubscript), link)
+			out = r.spans(out, in.Content, c.in(r, PartSubscript), keep)
 		case Small:
-			out = r.spans(out, in.Content, under(PartSmall), inner(PartSmall), link)
+			out = r.spans(out, in.Content, c.in(r, PartSmall), keep)
 		case Code:
-			out = append(out, core.Span{Content: in.Code, Class: inner(PartCode), StyleFunc: under(PartCode), OnPress: link})
+			code := c.in(r, PartCode)
+			out = append(out, core.Span{Content: in.Code, Class: code.class, StyleFunc: code.style, OnPress: link})
 		case Keyboard:
-			out = append(out, core.Span{Content: in.Text, Class: inner(PartKeyboard), StyleFunc: under(PartKeyboard), OnPress: link})
+			kbd := c.in(r, PartKeyboard)
+			out = append(out, core.Span{Content: in.Text, Class: kbd.class, StyleFunc: kbd.style, OnPress: link})
 		case Math:
 			if render := r.tv.RenderMath; render != nil {
-				out = append(out, core.Span{Content: "$" + in.TeX + "$", Attachment: core.Func(func(cx *core.Scope) core.Node { return render(cx, in) })})
+				out = append(out, core.Span{Content: "$" + in.TeX + "$", Attachment: keep.node(c.trail, in, func() core.Node {
+					return core.Func(func(cx *core.Scope) core.Node { return render(cx, in) })
+				})})
 			} else {
-				out = append(out, core.Span{Content: in.TeX, Class: inner(PartMath), StyleFunc: under(PartMath), OnPress: link})
+				math := c.in(r, PartMath)
+				out = append(out, core.Span{Content: in.TeX, Class: math.class, StyleFunc: math.style, OnPress: link})
 			}
 		case Link:
-			out = r.spans(out, in.Content, under(PartLink), inner(PartLink), r.press(in.URL))
+			linked := c.in(r, PartLink)
+			linked.link = r.press(in.URL)
+			linked.trail += "\x00" + in.URL + "\x00"
+			out = r.spans(out, in.Content, linked, keep)
 		case Image:
-			out = append(out, core.Span{Attachment: r.inlineImage(in, style, link)})
+			out = append(out, core.Span{Attachment: keep.node(c.trail, in, func() core.Node { return r.inlineImage(in, style, link) })})
 		case Break:
 			out = append(out, core.Span{Content: "\n", Class: class, StyleFunc: style})
 		case FootnoteReference:
-			out = append(out, core.Span{Content: "[" + strconv.Itoa(in.Index) + "]", Class: inner(PartFootnoteReference),
-				StyleFunc: under(PartFootnoteReference), OnPress: r.press("#footnote-" + in.Label)})
+			ref := c.in(r, PartFootnoteReference)
+			out = append(out, core.Span{Content: "[" + strconv.Itoa(in.Index) + "]", Class: ref.class,
+				StyleFunc: ref.style, OnPress: r.press("#footnote-" + in.Label)})
 		case Custom:
 			if r.tv.CustomSpan != nil {
 				s := r.tv.CustomSpan(in)
@@ -769,13 +938,20 @@ func (r *renderer) spans(out []core.Span, content []Inline, style func() core.St
 					}
 					return st
 				}
+				if s.Attachment != nil {
+					attachment := s.Attachment
+					s.Attachment = keep.node(c.trail, in, func() core.Node { return attachment })
+				}
 				out = append(out, s)
 			} else if r.tv.RenderCustom != nil || r.renders(in.Name) {
-				out = append(out, core.Span{Attachment: core.Func(func(cx *core.Scope) core.Node { return r.custom(cx, in) })})
+				out = append(out, core.Span{Attachment: keep.node(c.trail, in, func() core.Node {
+					return core.Func(func(cx *core.Scope) core.Node { return r.custom(cx, in) })
+				})})
 			} else {
 				var b strings.Builder
 				in.write(&b)
-				out = append(out, core.Span{Content: b.String(), Class: inner(PartCustom), StyleFunc: under(PartCustom), OnPress: link})
+				custom := c.in(r, PartCustom)
+				out = append(out, core.Span{Content: b.String(), Class: custom.class, StyleFunc: custom.style, OnPress: link})
 			}
 		}
 	}
