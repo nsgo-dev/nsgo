@@ -80,7 +80,7 @@ if token, ok := store.GetItem("token"); ok {
 store.SetItem("token", token)
 ```
 
-`store.Keys()` lists the keys, `RemoveItem` deletes one and `Clear` empties the storage. `cx.DataDir()` and `cx.CacheDir()` give the app's folders for files the key-value storage is too small for; a `Scope.ProvideStorage` gives a subtree a partition of its own.
+`store.Keys()` lists the keys, `RemoveItem` deletes one and `Clear` empties the storage. `cx.DataDir()` and `cx.CacheDir()` give the app's folders for files the key-value storage is too small for; `cx.LogsDir()` gives the platform's directory for log files, and a `Scope.ProvideStorage` gives a subtree a partition of its own.
 
 ## Networking
 

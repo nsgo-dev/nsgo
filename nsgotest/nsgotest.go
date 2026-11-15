@@ -40,6 +40,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -491,6 +492,13 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 	if desktop {
 		windows = &core.WindowOptions{Width: a.size.Width, Height: a.size.Height}
 	}
+	dir := t.TempDir()
+	data, cache, logs := filepath.Join(dir, "data"), filepath.Join(dir, "cache"), filepath.Join(dir, "logs")
+	for _, path := range []string{data, cache, logs} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatalf("nsgotest: cannot create app directory: %v", err)
+		}
+	}
 	a.root = core.NewRoot(core.RootOptions{
 		Post: func(fn func()) {
 			a.mu.Lock()
@@ -512,6 +520,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 			a.mu.Unlock()
 		},
 		Storage: a.store,
+		DataDir: data, CacheDir: cache, LogsDir: logs,
 		Host:    a.host,
 		HotKeys: true,
 		Windows: windows,

@@ -51,7 +51,7 @@ The loader keeps a bridge per app in the global `NSGO_HOST` names (`internal/pla
 
 `engine.HostEnvironment` (a locale, a text size, light or dark) stands in for the platform's values: the engine applies it over each environment the platform reports, before a test's pin. The layout direction stays the system's, and an appearance the app forces still wins. Android writes the three into the environment its runtime reports instead.
 
-The host's theme overrides are `core.Tokens`: CSS colors by role name, `Values` in both appearances and `Dark` over them, which go over every theme's palette ([themes](themes.md#hosts)). `OnError` hears each failure `RootOptions.Report` does, and `DataDir` moves the app's data and storage.
+The host's theme overrides are `core.Tokens`: CSS colors by role name, `Values` in both appearances and `Dark` over them, which go over every theme's palette ([themes](themes.md#hosts)). `OnError` hears each failure `RootOptions.Report` does, and `DataDir` moves the app's data, storage and logs.
 
 ## iOS
 

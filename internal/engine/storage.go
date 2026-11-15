@@ -18,16 +18,12 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// AppDirs returns app id's data and cache directories on this system:
-// Application Support and Caches on Apple platforms, %APPDATA% and
-// %LOCALAPPDATA% on Windows, the XDG directories elsewhere, each with a
-// directory named by id, or "default" when id names no directory. Both are
-// "" where only the platform knows them, on Android and the web.
-func AppDirs(id string) (data, cache string) {
+// AppDirs returns app id's data, cache and logs directories on this system: Application Support, Caches and, on macOS, Logs in Library on Apple platforms, %APPDATA%, %LOCALAPPDATA% and its Logs on Windows, XDG_DATA_HOME, XDG_CACHE_HOME and XDG_STATE_HOME elsewhere, each with a directory named by id, or "default" when id names no directory. On iOS and watchOS, which have no place for logs, they go in logs in the data directory. All are "" where only the platform knows them, on Android and the web.
+func AppDirs(id string) (data, cache, logs string) {
 	return appDirs(runtime.GOOS, id, os.Getenv)
 }
 
-func appDirs(goos, id string, env func(string) string) (data, cache string) {
+func appDirs(goos, id string, env func(string) string) (data, cache, logs string) {
 	home := env("HOME")
 	under := func(dir, rest string) string {
 		if dir == "" {
@@ -37,22 +33,37 @@ func appDirs(goos, id string, env func(string) string) (data, cache string) {
 	}
 	switch goos {
 	case "android", "js":
-		return "", ""
+		return "", "", ""
 	case "darwin", "ios":
 		data, cache = under(home, "Library/Application Support"), under(home, "Library/Caches")
+		if goos == "darwin" {
+			logs = under(home, "Library/Logs")
+		}
 	case "windows":
 		data, cache = env("APPDATA"), env("LOCALAPPDATA")
 	default:
-		data, cache = env("XDG_DATA_HOME"), env("XDG_CACHE_HOME")
+		data, cache, logs = env("XDG_DATA_HOME"), env("XDG_CACHE_HOME"), env("XDG_STATE_HOME")
 		if data == "" {
 			data = under(home, ".local/share")
 		}
 		if cache == "" {
 			cache = under(home, ".cache")
 		}
+		if logs == "" {
+			logs = under(home, ".local/state")
+		}
 	}
 	name := appDirName(id)
-	return under(data, name), under(cache, name)
+	data, cache, logs = under(data, name), under(cache, name), under(logs, name)
+	switch goos {
+	case "windows":
+		// Local, not roaming: logs stay on the machine that wrote them.
+		logs = under(cache, "Logs")
+	case "ios":
+		// Not under Caches, which the system purges.
+		logs = under(data, "logs")
+	}
+	return data, cache, logs
 }
 
 // appDirName is the directory of app id: the id, or "default" for an id
@@ -228,8 +239,8 @@ func writeFile(path string, data []byte) error {
 
 // SetDirs sets the app's directories and keeps its storage in a file in
 // data, unless data is "".
-func (o *Options) SetDirs(data, cache string) {
-	o.DataDir, o.CacheDir = data, cache
+func (o *Options) SetDirs(data, cache, logs string) {
+	o.DataDir, o.CacheDir, o.LogsDir = data, cache, logs
 	if data != "" {
 		o.Storage = OpenFileStorage(data)
 	}

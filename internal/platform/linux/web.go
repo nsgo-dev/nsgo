@@ -634,7 +634,7 @@ func webDownloadFailedCallback(download, gerr, _ uintptr) {
 
 // webFolders are where web views of app id keep their data and cache.
 func webFolders(id string) (data, cache string) {
-	data, cache = engine.AppDirs(id)
+	data, cache, _ = engine.AppDirs(id)
 	return filepath.Join(data, "webkit"), filepath.Join(cache, "webkit")
 }
 

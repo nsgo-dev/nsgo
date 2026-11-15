@@ -40,6 +40,33 @@ func TestFramesFollowTheClock(t *testing.T) {
 	}
 }
 
+// The app's directories are the test's own, made before the app starts, so a test never writes to the user's data, cache or logs.
+func TestAppDirectoriesAreTemporary(t *testing.T) {
+	if Target() == "web" {
+		t.Skip("the web has no app directories")
+	}
+	var dirs []string
+	Start(t, func(cx *core.Scope) core.Node {
+		dirs = []string{cx.DataDir(), cx.CacheDir(), cx.LogsDir()}
+		return core.View{}
+	})
+	tmp, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, d := range dirs {
+		real, err := filepath.EvalSymlinks(d)
+		if err != nil {
+			t.Fatalf("%q: %v", d, err)
+		}
+		if fi, err := os.Stat(real); err != nil || !fi.IsDir() || !strings.HasPrefix(real, tmp+string(filepath.Separator)) || seen[real] {
+			t.Fatalf("app directories %q: %q is not a directory of its own in %s", dirs, d, tmp)
+		}
+		seen[real] = true
+	}
+}
+
 func TestEnvironmentReportsMinimized(t *testing.T) {
 	var states []bool
 	app := Start(t, func(cx *core.Scope) core.Node {

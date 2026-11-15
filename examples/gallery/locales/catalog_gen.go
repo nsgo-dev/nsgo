@@ -2318,9 +2318,10 @@ const (
 	textStorageTheDataStaysOnThis
 	textStorageNoneOnThisTarget
 	textStorageAppDirectories
-	textStorageDatadirAndCachedirNamedBy
+	textStorageDatadirCachedirAndLogsdirNamedBy
 	textStorageData
 	textStorageCache
+	textStorageLogs
 	textPhysicsDragAndRelease
 	textPhysicsTapToPulseLongPress
 	textPhysicsClickToPulsePressAnd
@@ -4586,9 +4587,10 @@ var keyOfText = [numTexts]string{
 	"storageTheDataStaysOnThis",
 	"storageNoneOnThisTarget",
 	"storageAppDirectories",
-	"storageDatadirAndCachedirNamedBy",
+	"storageDatadirCachedirAndLogsdirNamedBy",
 	"storageData",
 	"storageCache",
+	"storageLogs",
 	"physicsDragAndRelease",
 	"physicsTapToPulseLongPress",
 	"physicsClickToPulsePressAnd",
@@ -6852,9 +6854,10 @@ var textsEn = i18n.NewTexts(""+
 	"The data stays on this device and survives restarts, under the app's id from nsgo.yaml."+
 	"none on this target"+
 	"App directories"+
-	"DataDir and CacheDir, named by the app's id"+
+	"DataDir, CacheDir and LogsDir, named by the app's id"+
 	"Data"+
 	"Cache"+
+	"Logs"+
 	"Drag and release"+
 	"Tap to pulse, long press to reset"+
 	"Click to pulse, press and hold to reset"+
@@ -9115,9 +9118,10 @@ var textsEn = i18n.NewTexts(""+
 		87,
 		19,
 		15,
-		43,
+		52,
 		4,
 		5,
+		4,
 		16,
 		33,
 		39,
@@ -11381,9 +11385,10 @@ var textsZhHans = i18n.NewTexts(""+
 	"数据保存在这台设备上，重启后仍在，存放在 nsgo.yaml 中应用 ID 对应的位置。"+
 	"此目标平台上没有"+
 	"应用目录"+
-	"DataDir 和 CacheDir，以应用 ID 命名"+
+	"DataDir、CacheDir 和 LogsDir，以应用 ID 命名"+
 	"数据"+
 	"缓存"+
+	"日志"+
 	"拖动后松手"+
 	"轻点产生脉冲，长按重置"+
 	"点按产生脉冲，按住重置"+
@@ -13644,7 +13649,8 @@ var textsZhHans = i18n.NewTexts(""+
 		102,
 		24,
 		12,
-		42,
+		52,
+		6,
 		6,
 		6,
 		15,
@@ -32600,15 +32606,15 @@ func StorageAppDirectories(cx *core.Scope) string { return For(cx).StorageAppDir
 // StorageAppDirectories is the package's StorageAppDirectories in the language of msgs.
 func (msgs Messages) StorageAppDirectories() string { return msgs.text(textStorageAppDirectories) }
 
-// StorageDatadirAndCachedirNamedBy says "DataDir and CacheDir, named by the app's id"
+// StorageDatadirCachedirAndLogsdirNamedBy says "DataDir, CacheDir and LogsDir, named by the app's id"
 // in the language the app shows under cx.
-func StorageDatadirAndCachedirNamedBy(cx *core.Scope) string {
-	return For(cx).StorageDatadirAndCachedirNamedBy()
+func StorageDatadirCachedirAndLogsdirNamedBy(cx *core.Scope) string {
+	return For(cx).StorageDatadirCachedirAndLogsdirNamedBy()
 }
 
-// StorageDatadirAndCachedirNamedBy is the package's StorageDatadirAndCachedirNamedBy in the language of msgs.
-func (msgs Messages) StorageDatadirAndCachedirNamedBy() string {
-	return msgs.text(textStorageDatadirAndCachedirNamedBy)
+// StorageDatadirCachedirAndLogsdirNamedBy is the package's StorageDatadirCachedirAndLogsdirNamedBy in the language of msgs.
+func (msgs Messages) StorageDatadirCachedirAndLogsdirNamedBy() string {
+	return msgs.text(textStorageDatadirCachedirAndLogsdirNamedBy)
 }
 
 // StorageData says "Data"
@@ -32624,6 +32630,13 @@ func StorageCache(cx *core.Scope) string { return For(cx).StorageCache() }
 
 // StorageCache is the package's StorageCache in the language of msgs.
 func (msgs Messages) StorageCache() string { return msgs.text(textStorageCache) }
+
+// StorageLogs says "Logs"
+// in the language the app shows under cx.
+func StorageLogs(cx *core.Scope) string { return For(cx).StorageLogs() }
+
+// StorageLogs is the package's StorageLogs in the language of msgs.
+func (msgs Messages) StorageLogs() string { return msgs.text(textStorageLogs) }
 
 // PhysicsDragAndRelease says "Drag and release"
 // in the language the app shows under cx.

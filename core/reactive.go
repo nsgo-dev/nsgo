@@ -98,9 +98,8 @@ type RootOptions struct {
 	RequestFrame func()
 	// Storage keeps the app's entries; a store in memory when nil.
 	Storage *Store
-	// DataDir and CacheDir are the app's directories, "" where the target
-	// has none.
-	DataDir, CacheDir string
+	// DataDir, CacheDir and LogsDir are the app's directories, "" where the target has none.
+	DataDir, CacheDir, LogsDir string
 	// Host is the channel to the host app that embeds the app: its
 	// parameters, events, handlers and URL handler. The graph attaches to
 	// it until its root is disposed.
@@ -122,7 +121,7 @@ func NewRoot(opts RootOptions) *Scope {
 		opts.Clock = SystemClock{}
 	}
 	rt := &runtime{post: opts.Post, clock: opts.Clock, report: opts.Report,
-		store: opts.Storage, dataDir: opts.DataDir, cacheDir: opts.CacheDir,
+		store: opts.Storage, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
 		requestFrame: opts.RequestFrame, windows: opts.Windows, takesHotKeys: opts.HotKeys, tray: opts.Tray}
 	rt.root = &Scope{rt: rt}
 	if devtools.Enabled {
@@ -162,6 +161,7 @@ type runtime struct {
 	storage        *storageWatch
 	dataDir        string
 	cacheDir       string
+	logsDir        string
 	host           *hostApp
 	// restricted says an owner was given an Access (ProvideAccess), so
 	// requests look for one.

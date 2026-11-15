@@ -12,21 +12,35 @@ import (
 func TestAppDirs(t *testing.T) {
 	env := map[string]string{"HOME": "/h", "APPDATA": `C:\r`, "LOCALAPPDATA": `C:\l`}
 	get := func(k string) string { return env[k] }
-	for _, c := range []struct{ goos, id, data, cache string }{
-		{"darwin", "dev.app", "/h/Library/Application Support/dev.app", "/h/Library/Caches/dev.app"},
-		{"ios", "", "/h/Library/Application Support/default", "/h/Library/Caches/default"},
-		{"linux", "../x", "/h/.local/share/default", "/h/.cache/default"},
-		{"windows", "dev.app", filepath.Join(`C:\r`, "dev.app"), filepath.Join(`C:\l`, "dev.app")},
-		{"android", "dev.app", "", ""},
-		{"js", "dev.app", "", ""},
+	for _, c := range []struct{ goos, id, data, cache, logs string }{
+		{"darwin", "dev.app", "/h/Library/Application Support/dev.app", "/h/Library/Caches/dev.app", "/h/Library/Logs/dev.app"},
+		{"darwin", "a/b", "/h/Library/Application Support/default", "/h/Library/Caches/default", "/h/Library/Logs/default"},
+		{"ios", "", "/h/Library/Application Support/default", "/h/Library/Caches/default", "/h/Library/Application Support/default/logs"},
+		{"linux", "../x", "/h/.local/share/default", "/h/.cache/default", "/h/.local/state/default"},
+		{"windows", "dev.app", filepath.Join(`C:\r`, "dev.app"), filepath.Join(`C:\l`, "dev.app"), filepath.Join(`C:\l`, "dev.app", "Logs")},
+		{"windows", "..", filepath.Join(`C:\r`, "default"), filepath.Join(`C:\l`, "default"), filepath.Join(`C:\l`, "default", "Logs")},
+		{"android", "dev.app", "", "", ""},
+		{"js", "dev.app", "", "", ""},
 	} {
-		data, cache := appDirs(c.goos, c.id, get)
+		data, cache, logs := appDirs(c.goos, c.id, get)
 		if data != filepath.FromSlash(c.data) && data != c.data || cache != filepath.FromSlash(c.cache) && cache != c.cache {
 			t.Errorf("%s %q: %q, %q; want %q, %q", c.goos, c.id, data, cache, c.data, c.cache)
 		}
+		if logs != filepath.FromSlash(c.logs) && logs != c.logs {
+			t.Errorf("%s %q: logs %q, want %q", c.goos, c.id, logs, c.logs)
+		}
 	}
-	if data, _ := appDirs("linux", "a", func(string) string { return "" }); data != "" {
-		t.Errorf("without a home: %q", data)
+	if data, cache, logs := appDirs("linux", "a", func(string) string { return "" }); data != "" || cache != "" || logs != "" {
+		t.Errorf("without a home: %q, %q, %q", data, cache, logs)
+	}
+	if _, _, logs := appDirs("windows", "a", func(k string) string { return map[string]string{"APPDATA": `C:\r`}[k] }); logs != "" {
+		t.Errorf("without LOCALAPPDATA: logs %q", logs)
+	}
+	env["XDG_STATE_HOME"] = "/state"
+	for id, want := range map[string]string{"dev.app": "/state/dev.app", "default": "/state/default", "": "/state/default"} {
+		if _, _, logs := appDirs("linux", id, get); logs != filepath.FromSlash(want) {
+			t.Errorf("XDG_STATE_HOME, %q: logs %q, want %q", id, logs, want)
+		}
 	}
 }
 
@@ -72,11 +86,12 @@ func TestFileStorage(t *testing.T) {
 func TestEngineMakesAppDirs(t *testing.T) {
 	root := t.TempDir()
 	opts := Options{Size: driver.Size{Width: 100, Height: 100}}
-	opts.SetDirs(filepath.Join(root, "data"), filepath.Join(root, "cache"))
-	var data string
+	opts.SetDirs(filepath.Join(root, "data"), filepath.Join(root, "cache"), filepath.Join(root, "logs"))
+	var data, logs string
 	r := &recorder{mounted: make(chan struct{}, 8)}
 	e := Start(r, func(cx *core.Scope) core.Node {
 		data = cx.DataDir()
+		logs = cx.LogsDir()
 		return core.View{}
 	}, opts)
 	<-r.mounted
@@ -84,9 +99,40 @@ func TestEngineMakesAppDirs(t *testing.T) {
 	if data != opts.DataDir {
 		t.Fatalf("DataDir = %q", data)
 	}
-	for _, d := range []string{opts.DataDir, opts.CacheDir} {
+	if logs != opts.LogsDir {
+		t.Fatalf("LogsDir = %q", logs)
+	}
+	for _, d := range []string{opts.DataDir, opts.CacheDir, opts.LogsDir} {
 		if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
 			t.Fatalf("%s: %v", d, err)
+		}
+	}
+}
+
+// A host's data directory (nsgo.DataDir, an embedding's) moves the logs with the data, so an embedded app writes nothing in the system's directories for its ID.
+func TestHostDataDirMovesLogs(t *testing.T) {
+	root := t.TempDir()
+	opts := Options{Size: driver.Size{Width: 100, Height: 100}}
+	opts.SetDirs(filepath.Join(root, "system", "data"), filepath.Join(root, "system", "cache"), filepath.Join(root, "system", "logs"))
+	host := filepath.Join(root, "host")
+	opts.Host.DataDir = host
+	var data, logs string
+	r := &recorder{mounted: make(chan struct{}, 8)}
+	e := Start(r, func(cx *core.Scope) core.Node {
+		data, logs = cx.DataDir(), cx.LogsDir()
+		return core.View{}
+	}, opts)
+	<-r.mounted
+	e.Close()
+	if want := filepath.Join(host, "logs"); data != host || logs != want {
+		t.Fatalf("DataDir, LogsDir = %q, %q; want %q, %q", data, logs, host, want)
+	}
+	if fi, err := os.Stat(logs); err != nil || !fi.IsDir() {
+		t.Fatalf("%s: %v", logs, err)
+	}
+	for _, d := range []string{"data", "logs"} {
+		if _, err := os.Stat(filepath.Join(root, "system", d)); !os.IsNotExist(err) {
+			t.Fatalf("the system's %s directory was made: %v", d, err)
 		}
 	}
 }

@@ -159,9 +159,10 @@ func storageDemo(cx *core.Scope) core.Node {
 			}
 			return d
 		}
-		return Card{Title: tr.StorageAppDirectories(), Description: tr.StorageDatadirAndCachedirNamedBy(), Children: []core.Node{
+		return Card{Title: tr.StorageAppDirectories(), Description: tr.StorageDatadirCachedirAndLogsdirNamedBy(), Children: []core.Node{
 			Caption{Label: tr.StorageData()}, Code{Text: dir(cx.DataDir())},
 			Caption{Label: tr.StorageCache()}, Code{Text: dir(cx.CacheDir())},
+			Caption{Label: tr.StorageLogs()}, Code{Text: dir(cx.LogsDir())},
 		}}
 	}
 

@@ -123,7 +123,7 @@ Style `Transition`s, animated values and layout animations run on the platform, 
 - A file that does not parse is set aside as `storage.json.corrupt`, and one that cannot be read leaves changes in memory. Platforms call `engine.SyncStorage` as the process ends.
 - The web keeps entries in `localStorage` under `nsgo:<app id>:`.
 - `Scope.ProvideStorage(name, quota)` gives a subtree a partition: its keys are stored under a prefix starting with a zero byte, which the app's own `Storage` neither lists nor clears, and hold at most `quota` bytes besides the app's quota. A partition's `Clear`, and the app's while partitions hold entries, remove key by key.
-- `Scope.DataDir` and `Scope.CacheDir` are named by the app's ID, which the tool passes from `nsgo.yaml`: `engine.AppDirs` on Apple platforms, Windows and Linux, the files and cache directories the runtime passes on Android, and none on the web. The engine makes them as it starts.
+- `Scope.DataDir`, `Scope.CacheDir` and `Scope.LogsDir` are named by the app's ID, which the tool passes from `nsgo.yaml`: `engine.AppDirs` on Apple platforms, Windows and Linux, the files and cache directories the runtime passes on Android, and none on the web. Logs go where each platform's tools look: `~/Library/Logs/<id>` on macOS, `%LOCALAPPDATA%\<id>\Logs` on Windows, which is inside the cache directory, and `$XDG_STATE_HOME/<id>` on Linux; iOS, watchOS and Android, which have no such place, keep them in `logs` in the data directory. A host's data directory (`nsgo.DataDir`, `dataDirectory`, `setStorageDirectory`) moves logs with the data, and tests keep all three in a temporary directory. The engine makes them as it starts; NSGo writes no logs there itself.
 
 ## Access
 

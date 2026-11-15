@@ -74,7 +74,7 @@ var exempt = map[string][]string{
 		"SetApplicationMenu", "ExitApp", "OnQuitRequest", "OnQuit", "Quit", "Restart", "OpenWindow", "OpenPanel",
 		"SetShutdownMode", "SetMainWindow", "SetMainView", "OnReopen", "NewTray", "RegisterHotKey", "SetDockVisible",
 		"SetLaunchAtLogin", "OnOpenFiles", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
-		"OpenInstallSettings", "DataDir", "CacheDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
+		"OpenInstallSettings", "DataDir", "CacheDir", "LogsDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
 		"SetTaskProgress"},
 }
 

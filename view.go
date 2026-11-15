@@ -89,8 +89,7 @@ func Parent(handle uintptr) Option {
 	return func(o *options) { o.platform.Parent = handle }
 }
 
-// DataDir keeps a view's app data, its storage included, in dir rather
-// than in the system's directory for the app's ID.
+// DataDir keeps a view's app data, its storage included, in dir rather than in the system's directory for the app's ID, and its logs (Scope.LogsDir) in dir/logs.
 func DataDir(dir string) Option {
 	return func(o *options) { o.dataDir = dir }
 }

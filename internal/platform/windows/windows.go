@@ -808,8 +808,8 @@ func (w *window) startEngine(app engine.App, opts Options, size driver.Size) {
 		eopts.Windows = &engine.WindowOptions{Title: opts.Title, Width: opts.Width, Height: opts.Height,
 			Frame: opts.Frame, Material: opts.Material, Constraints: opts.Constraints}
 	}
-	data, cache := engine.AppDirs(opts.ID)
-	eopts.SetDirs(data, cache)
+	data, cache, logs := engine.AppDirs(opts.ID)
+	eopts.SetDirs(data, cache, logs)
 	if opts.test != nil {
 		eopts.UseTest(opts.test.options, &opts.test.pin)
 		cache = eopts.CacheDir
