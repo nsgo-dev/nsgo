@@ -154,6 +154,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final Runnable foldsReported = this::foldsChanged;
     /** A report of the folds is waiting for the view's next layout (foldsChanged). */
     private boolean foldsPending;
+    /** The app's start waits for the first report of the folds on a device that folds (Folds.waiting), so an app started half open builds its first tree with both regions. The library reports once the window has drawn its first frame, and until then the main thread may be too busy for a timer to mean anything: the start waits FOLDS_WAIT_MS from that frame, or FOLDS_WAIT_LONGEST_MS from the view's first size for a window that does not draw, then goes without the folds, which a RESIZE brings. */
+    private boolean startHeld;
+    private final Runnable startUnheld = this::releaseStart;
+    private static final long FOLDS_WAIT_MS = 300, FOLDS_WAIT_LONGEST_MS = 3000;
     private boolean ownsEngine;
     private boolean attached;
     /** Whether the app's process runs on, off screen, for its overlays over other apps alone, its activity ended (keepForOverlays); and whether the app quit, which keeps nothing. */
@@ -340,6 +344,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             environment();
             return;
         }
+        // The start sends the size the view has by then.
+        if (startHeld) return;
         boolean first = false;
         if (!attached) {
             if (engine == null) {
@@ -348,6 +354,16 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
             // An engine whose process ended stays ended: a host decides whether to make another.
             if (engine.canStart()) {
+                if (folds != null && folds.waiting()) {
+                    startHeld = true;
+                    postDelayed(startUnheld, FOLDS_WAIT_LONGEST_MS);
+                    getViewTreeObserver().registerFrameCommitCallback(() -> {
+                        if (!startHeld) return;
+                        removeCallbacks(startUnheld);
+                        postDelayed(startUnheld, FOLDS_WAIT_MS);
+                    });
+                    return;
+                }
                 start();
                 first = true;
             } else if (engine.isAlive()) {
@@ -413,6 +429,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     @Override
     protected void onDetachedFromWindow() {
+        // An app waiting for the folds starts as the view leaves its window, as it would have without them.
+        releaseStart();
         accessibility.removeTouchExplorationStateChangeListener(screenReader);
         getContext().getContentResolver().unregisterContentObserver(motion);
         unregisterBack();
@@ -1437,7 +1455,23 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         // onSizeChanged has sent a new size with the folds already.
         if (!foldsPending) return;
         foldsPending = false;
+        if (startHeld) {
+            if (!folds.waiting()) releaseStart();
+            return;
+        }
         if (engine != null && engine.isAlive() && getWidth() > 0) sendSize(Protocol.RESIZE);
+    }
+
+    /** Starts the app onSizeChanged held for the folds, with the size the view has and the folds reported by now. */
+    private void releaseStart() {
+        if (!startHeld) return;
+        startHeld = false;
+        removeCallbacks(startUnheld);
+        if (attached || !engine.canStart()) return;
+        start();
+        environment();
+        foldsPending = false;
+        sendSize(Protocol.START);
     }
 
     /**

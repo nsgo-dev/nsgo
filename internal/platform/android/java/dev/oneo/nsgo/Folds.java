@@ -1,6 +1,7 @@
 package dev.oneo.nsgo;
 
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.graphics.Rect;
 import android.os.Build;
 import android.util.Log;
@@ -30,12 +31,17 @@ final class Folds {
     /** The latest report: each feature's left, top, right and bottom in window pixels, its type and its state; and the window's bounds it was measured at. */
     private int[] features = new int[0];
     private Rect measured;
+    /** Whether the device's display folds or has a hinge, which a view waits for the first report on (waiting). */
+    private final boolean folding;
+    /** Whether a report came since the listener was added. */
+    private boolean reported;
 
-    private Folds(Activity activity, Object component, Object consumer, Method remove) {
+    private Folds(Activity activity, Object component, Object consumer, Method remove, boolean folding) {
         this.activity = activity;
         this.component = component;
         this.consumer = consumer;
         this.remove = remove;
+        this.folding = folding;
     }
 
     /** Listens to activity's window layout for a view, calling changed on the main thread after each report from now on; null where the device reports none. The report the library sends as it registers calls no view, so a view sends its size with current() once this returns. Call on the main thread. */
@@ -92,7 +98,7 @@ final class Folds {
                 add = type.getMethod("addWindowLayoutInfoListener", Activity.class, Consumer.class);
                 remove = type.getMethod("removeWindowLayoutInfoListener", Consumer.class);
             }
-            self[0] = new Folds(activity, component, consumer, remove);
+            self[0] = new Folds(activity, component, consumer, remove, folding(activity, type, component, level));
             add.invoke(component, activity, consumer);
             return self[0];
         } catch (ClassNotFoundException | NoSuchMethodException missing) {
@@ -101,6 +107,26 @@ final class Folds {
             Log.w(TAG, "the device's window extensions failed", e);
             return null;
         }
+    }
+
+    /** Whether the device's display folds or has a hinge: from vendor level 6 by the folds the library lists for it, which are none on a device that does not fold, else, or where the list fails, by a hinge angle sensor, which foldables have. */
+    private static boolean folding(Activity activity, Class<?> type, Object component, int level) {
+        if (level >= 6) {
+            try {
+                ClassLoader loader = Folds.class.getClassLoader();
+                Object supported = type.getMethod("getSupportedWindowFeatures").invoke(component);
+                Class<?> features = Class.forName("androidx.window.extensions.layout.SupportedWindowFeatures", false, loader);
+                return !((List<?>) features.getMethod("getDisplayFoldFeatures").invoke(supported)).isEmpty();
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                Log.w(TAG, "the device's window extensions failed", e);
+            }
+        }
+        return activity.getPackageManager().hasSystemFeature(PackageManager.FEATURE_SENSOR_HINGE_ANGLE);
+    }
+
+    /** Whether the folds are not known yet on a device that folds: the library sends its first report after the window's first layout, and until then current() reports none whatever the hinge's state. */
+    boolean waiting() {
+        return folding && !reported;
     }
 
     /** Stops calling changed, which listen was given, and stops listening once no view is left. */
@@ -140,6 +166,7 @@ final class Folds {
             Log.w(TAG, "the device's window extensions failed", e);
         }
         features = out;
+        reported = true;
         measured = activity.getWindowManager().getCurrentWindowMetrics().getBounds();
     }
 
