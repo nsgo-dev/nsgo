@@ -224,6 +224,9 @@ greeting: "Hallo, {name}!"
 github.com/nsgo-dev/nsgo/base/locales:
   sortBy: "Nach {column} sortieren"
   diffExpandAll: "Alle aufklappen"
+  calendarMonth: "Monat: {d, date, ::yMMMM}"
+  calendarMonthName: "Monat: {d, date, ::MMM}"
+  calendarWeekday: "Tag: {d, date, ::EEEEE}"
 `,
 		"locales/en-GB.yaml":  `greeting: "Hiya, {name}!"`,
 		"locales/ar.yaml":     `due: "{d, date, medium}"`,
@@ -277,6 +280,9 @@ func TestMessages(t *testing.T) {
 		{baselocales.In("en-XA").SortBy("Name"), "[Śóŕť ƀý Name ~~~]"},
 		{baselocales.In("de-AT").SortBy("Name"), "Nach Name sortieren"},
 		{baselocales.In("de-AT").DiffExpandAll(), "Alle aufklappen"},
+		{baselocales.In("de-AT").CalendarMonth(day), "Monat: Januar 2026"},
+		{baselocales.In("de-AT").CalendarMonthName(day), "Monat: Jan"},
+		{baselocales.In("de-AT").CalendarWeekday(day), "Tag: M"},
 		{baselocales.In("fr").DiffExpandAll(), "Expand all"},
 		{baselocales.In("zh-CN").SortBy("名称"), "按名称排序"},
 		{baselocales.In("fr").SortBy("Nom"), "Sort by Nom"},
@@ -319,6 +325,23 @@ func TestMessages(t *testing.T) {
 	writeFiles(t, dir, map[string]string{"locales/en-GB.yaml": `greeting: "Hello there, {name}!"`})
 	if err := p.prepareCatalogs(ctx, "./...", true); err == nil || !strings.Contains(err.Error(), "out of date") {
 		t.Errorf("check after a change: %v", err)
+	}
+}
+
+func TestTranslationTimeSignature(t *testing.T) {
+	params := []param{{name: "d", typ: "time.Time"}}
+	if got := translationSignature(params); got != "hc string, d time.Time" {
+		t.Fatalf("translationSignature = %q", got)
+	}
+	if got := translationArguments(params); got != "msgs.hc, d" {
+		t.Fatalf("translationArguments = %q", got)
+	}
+	plain := []param{{name: "name", typ: "string"}}
+	if got := translationSignature(plain); got != "name string" {
+		t.Fatalf("plain translationSignature = %q", got)
+	}
+	if got := translationArguments(plain); got != "name" {
+		t.Fatalf("plain translationArguments = %q", got)
 	}
 }
 

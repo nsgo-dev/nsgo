@@ -56,9 +56,9 @@ type Translation struct {
 	Texts              map[string]string
 	SortBy             func(column string) string
 	DiffUnchangedLines func(n int) string
-	CalendarMonth      func(d time.Time) string
-	CalendarMonthName  func(d time.Time) string
-	CalendarWeekday    func(d time.Time) string
+	CalendarMonth      func(hc string, d time.Time) string
+	CalendarMonthName  func(hc string, d time.Time) string
+	CalendarWeekday    func(hc string, d time.Time) string
 	FlowLabel          func(nodes int, edges int) string
 }
 
@@ -699,7 +699,7 @@ func (msgs Messages) CalendarMonth(d time.Time) string {
 	}
 	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
 		if f := supplied[lang].CalendarMonth; f != nil {
-			return f(d)
+			return f(msgs.hc, d)
 		}
 		switch lang {
 		case "", "en":
@@ -723,7 +723,7 @@ func (msgs Messages) CalendarMonthName(d time.Time) string {
 	}
 	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
 		if f := supplied[lang].CalendarMonthName; f != nil {
-			return f(d)
+			return f(msgs.hc, d)
 		}
 		switch lang {
 		case "", "en":
@@ -747,7 +747,7 @@ func (msgs Messages) CalendarWeekday(d time.Time) string {
 	}
 	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
 		if f := supplied[lang].CalendarWeekday; f != nil {
-			return f(d)
+			return f(msgs.hc, d)
 		}
 		switch lang {
 		case "", "en":

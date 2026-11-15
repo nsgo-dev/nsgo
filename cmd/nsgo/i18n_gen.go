@@ -83,7 +83,7 @@ func (c *catalog) generate() ([]byte, error) {
 	g.p("\tTexts map[string]string")
 	for _, key := range c.keys {
 		if len(c.params[key]) > 0 {
-			g.p("\t%s func(%s) string", exportName(key), signature(c.params[key]))
+			g.p("\t%s func(%s) string", exportName(key), translationSignature(c.params[key]))
 		}
 	}
 	g.p("}")
@@ -269,7 +269,7 @@ func (c *catalog) generate() ([]byte, error) {
 		g.p("\t}")
 		g.p("\tfor lang := msgs.lang; ; lang = i18n.Parent(lang) {")
 		g.p("\t\tif f := supplied[lang].%s; f != nil {", name)
-		g.p("\t\t\treturn f(%s)", arguments(params))
+		g.p("\t\t\treturn f(%s)", translationArguments(params))
 		g.p("\t\t}")
 		g.p("\t\tswitch lang {")
 		for _, lang := range langs {
@@ -370,7 +370,10 @@ func (c *catalog) writeSupplies(g *goWriter) error {
 		}
 		for _, key := range funcs {
 			params := t.params[key]
-			g.p("\t\t%s: func(%s) string {", exportName(key), signature(params))
+			g.p("\t\t%s: func(%s) string {", exportName(key), translationSignature(params))
+			if hasTimeParam(params) {
+				g.p("\t\t\tmsgs := Messages{hc: hc}")
+			}
 			g.say(e.s.msgs[key].parts, e.lang, params, "\t\t\t")
 			g.p("\t\t},")
 		}
@@ -641,7 +644,7 @@ func findParam(params []param, name string) param {
 // parameters.
 var reservedLocal = map[string]bool{
 	"cx": true, "msgs": true, "lang": true, "b": true, "f": true, "s": true, "t": true,
-	"supplied": true, "core": true, "i18n": true, "strings": true, "fmt": true, "math": true, "time": true,
+	"supplied": true, "hc": true, "core": true, "i18n": true, "strings": true, "fmt": true, "math": true, "time": true,
 }
 
 // predeclared are Go's predeclared identifiers, which a parameter must not
@@ -676,6 +679,27 @@ func signature(params []param) string {
 	return strings.Join(parts, ", ")
 }
 
+// hasTimeParam reports whether a message formats a date or time argument.
+func hasTimeParam(params []param) bool {
+	for _, p := range params {
+		if p.typ == "time.Time" {
+			return true
+		}
+	}
+	return false
+}
+
+// translationSignature is the function type used when another package
+// supplies a message. Date and time messages receive the target's hour cycle
+// so their formatting follows the user's locale settings.
+func translationSignature(params []param) string {
+	sig := signature(params)
+	if !hasTimeParam(params) {
+		return sig
+	}
+	return "hc string, " + sig
+}
+
 // names are the parameters' names in Go.
 func names(params []param) []string {
 	var out []string
@@ -691,6 +715,17 @@ func arguments(params []param) string {
 		parts = append(parts, goName(p.name))
 	}
 	return strings.Join(parts, ", ")
+}
+
+func translationArguments(params []param) string {
+	args := arguments(params)
+	if !hasTimeParam(params) {
+		return args
+	}
+	if args == "" {
+		return "msgs.hc"
+	}
+	return "msgs.hc, " + args
 }
 
 func quoteList(items []string) string {
