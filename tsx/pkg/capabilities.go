@@ -21,16 +21,14 @@ type Capabilities struct {
 	WebView *WebView `json:"webview,omitempty"`
 	// OpenURL is openUrl: every URL, or those of Schemes.
 	OpenURL *OpenURL `json:"openUrl,omitempty"`
-	// Clipboard is reading and writing the system clipboard, Picker the
-	// photo and camera pickers, Speech the microphone and speech
-	// recognizer, StatusBar setting the status bar, Notifications system
-	// notifications and the app's badge, Biometrics device authentication.
+	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, Audio the audio package's sounds and players.
 	Clipboard     bool `json:"clipboard,omitempty"`
 	Picker        bool `json:"picker,omitempty"`
 	Speech        bool `json:"speech,omitempty"`
 	StatusBar     bool `json:"statusBar,omitempty"`
 	Notifications bool `json:"notifications,omitempty"`
 	Biometrics    bool `json:"biometrics,omitempty"`
+	Audio         bool `json:"audio,omitempty"`
 	// Host names the host's handlers host.call and host.post may reach:
 	// a name, a prefix ending in "*", or "*" for all.
 	Host []string `json:"host,omitempty"`
@@ -122,6 +120,8 @@ func ParseCapabilities(data []byte, strict bool) (c Capabilities, ignored []stri
 			err = json.Unmarshal(raw, &c.Notifications)
 		case "biometrics":
 			err = json.Unmarshal(raw, &c.Biometrics)
+		case "audio":
+			err = json.Unmarshal(raw, &c.Audio)
 		case "host":
 			if string(bytes.TrimSpace(raw)) == "true" {
 				c.Host = []string{"*"}
@@ -172,6 +172,8 @@ func dropCapability(c *Capabilities, key string) {
 		c.Host = nil
 	case "biometrics":
 		c.Biometrics = false
+	case "audio":
+		c.Audio = false
 	}
 }
 
@@ -309,6 +311,7 @@ const (
 	capStatusBar     = "statusBar"
 	capNotifications = "notifications"
 	capBiometrics    = "biometrics"
+	capAudio         = "audio"
 	capHost          = "host"
 )
 
@@ -353,6 +356,8 @@ func (c *Capabilities) Allows(permission, resource, method string) bool {
 		return c.Notifications
 	case capBiometrics:
 		return c.Biometrics
+	case capAudio:
+		return c.Audio
 	case capHost:
 		if !validHostName(resource) {
 			return false

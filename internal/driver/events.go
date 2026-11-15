@@ -258,6 +258,8 @@ const (
 	EventWindowEnded
 	// EventPermission answers ItemPermission Count, after the kinds Android's Protocol.java mirrors: Index is the permission's status (PermissionNotAsked, ...), and Finished says whether PermissionOpenSettings opened the settings.
 	EventPermission
+	// EventAudio reports sound or player Count (Data, an *AudioEvent).
+	EventAudio
 )
 
 // What EventInputModality reports.

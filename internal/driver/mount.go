@@ -346,6 +346,8 @@ const (
 	ItemReleaseAwake
 	// ItemTaskProgress, after the kinds Android's Protocol.java mirrors, sets the app's task progress bar to Progress.
 	ItemTaskProgress
+	// ItemAudio asks of sound or player Count what Audio says; the platform reports it with EventAudio carrying Count. The core sends none where the environment says no Audio.
+	ItemAudio
 )
 
 // OverlayPermission is what EventOverlayPermission answers an ItemOverlayPermission with, as core's.
@@ -480,8 +482,9 @@ type MountItem struct {
 	Screen    *ScreenConfig
 	// Pick is ItemPickImages' and ItemTakePhoto's request.
 	Pick *PickRequest
-	// Speech is an ItemSpeech's request.
+	// Speech is an ItemSpeech's request, Audio an ItemAudio's.
 	Speech *SpeechRequest
+	Audio  *AudioRequest
 	// Notification is what ItemShowNotification shows.
 	Notification *Notification
 	// Permission is an ItemPermission's request.

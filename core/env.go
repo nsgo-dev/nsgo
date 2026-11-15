@@ -19,6 +19,7 @@ type Env struct {
 	keyboardDuration     *Signal[time.Duration]
 	dark, reduce, reader *Signal[bool]
 	screenColor, speech  *Signal[bool]
+	audio                *Signal[bool]
 	camera               *Signal[bool]
 	canSendInput         *Signal[bool]
 	hasWebView           *Signal[bool]
@@ -67,6 +68,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		reader:           NewSignal(cx, false),
 		screenColor:      NewSignal(cx, false),
 		speech:           NewSignal(cx, false),
+		audio:            NewSignal(cx, false),
 		camera:           NewSignal(cx, false),
 		canSendInput:     NewSignal(cx, false),
 		hasWebView:       NewSignal(cx, false),
@@ -156,6 +158,7 @@ func (e *Env) set(v Environment) {
 	e.reader.Set(v.ScreenReader)
 	e.screenColor.Set(v.ScreenColor)
 	e.speech.Set(v.Speech)
+	e.audio.Set(v.Audio)
 	e.camera.Set(v.Camera)
 	e.canSendInput.Set(v.CanSendInput)
 	e.hasWebView.Set(v.HasWebView)
@@ -241,6 +244,9 @@ func (e *Env) CanPickScreenColor() bool { return e.screenColor.Get() }
 // CanRecognizeSpeech reports whether Scope.StartSpeech recognizes speech
 // here: macOS and iOS.
 func (e *Env) CanRecognizeSpeech() bool { return e.speech.Get() }
+
+// CanPlayAudio reports whether the platform plays the audio package's sounds and players; elsewhere they fail with AudioUnavailable without asking it.
+func (e *Env) CanPlayAudio() bool { return e.audio.Get() }
 
 // CanTakePhoto reports whether Scope.TakePhoto shows a camera here: iOS
 // and Android devices with one, and browsers on touch screens.

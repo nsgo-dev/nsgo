@@ -42,8 +42,9 @@ type Environment struct {
 	ScreenReader bool
 	// ScreenColor says ItemPickScreenColor works here.
 	ScreenColor bool
-	// Speech says ItemSpeech recognizes speech here.
+	// Speech says ItemSpeech recognizes speech here, Audio that ItemAudio plays sounds and players.
 	Speech bool
+	Audio  bool
 	// Camera says ItemTakePhoto shows a camera here.
 	Camera bool
 	// CanSendInput says Ref.SendInput can deliver trusted input to web views.
