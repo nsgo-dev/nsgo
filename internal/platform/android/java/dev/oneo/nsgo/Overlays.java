@@ -1,6 +1,7 @@
 package dev.oneo.nsgo;
 
 import android.app.Activity;
+import android.app.AppOpsManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -12,6 +13,8 @@ import android.hardware.display.DisplayManager;
 import android.hardware.input.InputManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -31,7 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
- * The overlays over other apps the app opened (driver.SurfaceOverlay, mobile.OpenOverlay), for the first view, on the UI thread. Each is a TYPE_APPLICATION_OVERLAY window of WindowManager's showing an NsgoView of its own, which the first view hands its surface's batches and images on to and whose events name its surface. The window is added first and OverlayService, the foreground service that keeps the process while an overlay shows, starts only once a window is visible, as Android 15 lets an app holding SYSTEM_ALERT_WINDOW start one from the background only then; it stops with the last overlay. An overlay the system refuses, hides for a revoked grant or loses its service ends with its reason (SURFACE_ENDED); one the app closes, or the process ending, ends without one.
+ * The overlays over other apps the app opened (driver.SurfaceOverlay, mobile.OpenOverlay), for the first view, on the UI thread. Each is a TYPE_APPLICATION_OVERLAY window of WindowManager's showing an NsgoView of its own, which the first view hands its surface's batches and images on to and whose events name its surface. The window is added first and OverlayService, the foreground service that keeps the process while an overlay shows, starts only once a window is visible, as Android 15 lets an app holding SYSTEM_ALERT_WINDOW start one from the background only then; it stops with the last overlay. An overlay the system refuses, loses its service or whose grant the user revokes ends with its reason (SURFACE_ENDED), the last heard by watching the app's SYSTEM_ALERT_WINDOW op while an overlay is open, as the system hides the windows of a revoked app without telling them and the app need not come back to the front; one the app closes, or the process ending, ends without one.
  */
 final class Overlays {
     private static final String TAG = "nsgo";
@@ -64,6 +67,12 @@ final class Overlays {
     private final ArrayList<Object[]> asks = new ArrayList<>();
     /** Whether this started OverlayService, which it stops with the last overlay. */
     private boolean serviceStarted;
+    /** How long after the op changed the grant is read a second time, as Settings.canDrawOverlays can still answer the old grant as the change is reported. */
+    private static final long RECHECK_LATER_MS = 500;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Runnable recheck = this::recheck;
+    /** What hears the app's SYSTEM_ALERT_WINDOW op change while an overlay is open, null while none is or the system refused the watch. */
+    private AppOpsManager.OnOpChangedListener watcher;
 
     Overlays(NsgoView first) {
         this.first = first;
@@ -195,8 +204,50 @@ final class Overlays {
             ended(id, Protocol.OVERLAY_END_FAILED);
             return;
         }
+        watch();
         // The first report attaches the tree, also for a hidden window that lays nothing out.
         view.environment();
+    }
+
+    /**
+     * Watches the app's SYSTEM_ALERT_WINDOW op, once an overlay is open: revoking the grant hides the app's windows by policy, which leaves their views' visibility as it was, so neither the windows nor a resumed activity, which the app may never have again, would tell. The system calls the listener on a binder thread; the grant is read on the main thread at once and once more a moment later.
+     */
+    private void watch() {
+        if (watcher != null) return;
+        Context app = first.getContext().getApplicationContext();
+        AppOpsManager ops = app.getSystemService(AppOpsManager.class);
+        if (ops == null) return;
+        String pkg = app.getPackageName();
+        AppOpsManager.OnOpChangedListener w = (op, packageName) -> {
+            if (!pkg.equals(packageName)) return;
+            main.removeCallbacks(recheck);
+            main.post(recheck);
+            main.postDelayed(recheck, RECHECK_LATER_MS);
+        };
+        try {
+            ops.startWatchingMode(AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, pkg, w);
+        } catch (RuntimeException e) {
+            // The overlays still end on the resume check and the window's own visibility.
+            Log.w(TAG, "the overlay permission cannot be watched", e);
+            return;
+        }
+        watcher = w;
+    }
+
+    /** Stops watching the op, as the last overlay closed. */
+    private void unwatch() {
+        main.removeCallbacks(recheck);
+        if (watcher == null) return;
+        AppOpsManager ops = first.getContext().getApplicationContext().getSystemService(AppOpsManager.class);
+        if (ops != null) ops.stopWatchingMode(watcher);
+        watcher = null;
+    }
+
+    /** Reads the grant again as the op changed: a revoked one ends every overlay, removing its window, and the service with the last. */
+    private void recheck() {
+        if (open.size() > 0 && !Settings.canDrawOverlays(first.getContext().getApplicationContext())) {
+            endAll(Protocol.OVERLAY_END_REVOKED);
+        }
     }
 
     /**
@@ -342,7 +393,7 @@ final class Overlays {
     }
 
     /**
-     * Hears an overlay's window's visibility: showing starts the service once the window's first frame is on screen, as the system counts the overlay visible from then; the system hiding one the app did not hide reads the grant again, as revoking it hides the app's overlays.
+     * Hears an overlay's window's visibility: showing starts the service once the window's first frame is on screen, as the system counts the overlay visible from then; the system hiding one the app did not hide reads the grant again, where a revoked grant has not ended it yet (watch).
      */
     void visibility(NsgoView view, int visibility) {
         Overlay o = open.get(view.surface());
@@ -415,6 +466,7 @@ final class Overlays {
     /** Closes every overlay without a report, as the process ends, and stops the service. */
     void closeAll() {
         endAll(0);
+        unwatch();
         asks.clear();
         stopService();
     }
@@ -430,6 +482,7 @@ final class Overlays {
         o.view.releaseOverlay();
         if (reason != 0) ended(o.id, reason);
         if (open.size() > 0) return;
+        unwatch();
         stopService();
         first.overlaysClosed();
     }

@@ -101,3 +101,22 @@ func TestOverlayEndsAsThePermissionIsRevoked(t *testing.T) {
 		t.Fatalf("revoked: %+v, the app heard %v", app.Overlay, o.ends)
 	}
 }
+
+// TestHiddenOverlayEndsOnceAsThePermissionIsRevoked holds the end Android reports as the user revokes the grant, which comes whether or not the overlay shows and whether or not the app is in front: an overlay the app hid ends too, and the app hears it once.
+func TestHiddenOverlayEndsOnceAsThePermissionIsRevoked(t *testing.T) {
+	o := &overlayApp{}
+	app := Start(t, func(cx *core.Scope) core.Node { return core.View{} }, android)
+	app.OverlayPermission = core.OverlayGranted
+	app.Post(func() { app.root.Batch(func() { o.root(core.OverlayOptions{})(app.root) }) })
+	app.Settle()
+	app.Post(o.overlay.Hide)
+	app.Settle()
+	if app.Overlay == nil || app.Overlay.Closed || app.Overlay.Visible {
+		t.Fatalf("hidden %+v", app.Overlay)
+	}
+	app.RevokeOverlayPermission()
+	app.RevokeOverlayPermission()
+	if !app.Overlay.Closed || app.Overlay.Ended != core.OverlayEndRevoked || !o.overlay.Closed() || len(o.ends) != 1 || o.ends[0] != core.OverlayEndRevoked {
+		t.Fatalf("revoked: %+v, closed %v, the app heard %v", app.Overlay, o.overlay.Closed(), o.ends)
+	}
+}
