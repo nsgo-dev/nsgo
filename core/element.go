@@ -417,6 +417,8 @@ type Input struct {
 	// InputAccessoryViewID names the InputAccessoryView shown above the
 	// software keyboard while the field has focus.
 	InputAccessoryViewID string
+	// Suggest follows a trigger query in the field, such as a mention after "@", for a list beside it, base.SuggestList. What it accepts sets the field's text, through OnChange when Value controls it, and puts the caret after it; it needs no Ref.
+	Suggest *Suggest
 	// NoFontScaling and MaxFontSizeMultiplier limit the user's text size
 	// setting for the field's text, as Text's do.
 	NoFontScaling         bool

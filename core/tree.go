@@ -507,6 +507,7 @@ type inputNode struct {
 	count     uint32 // the platform's last edit
 	autoFocus bool
 	accessory string // the InputAccessoryView's ID
+	suggest   *Suggest
 	// themeSelection and themeCaret are its theme's colors, which the
 	// input shows without a SelectionColor of its style's.
 	themeSelection, themeCaret Color
@@ -1847,6 +1848,20 @@ func (t *Tree) mountInput(cx *Scope, parent *node, v Input) {
 		AutoCapitalize: v.AutoCapitalize, NoAutoCorrect: v.NoAutoCorrect, AutoComplete: v.AutoComplete,
 		KeyboardAppearance: v.IOS.KeyboardAppearance, HideCaret: v.HideCaret, PasteBehavior: v.PasteBehavior}
 	n.input = in
+	in.suggest = v.Suggest
+	if in.suggest != nil {
+		in.suggest.bind(t, n)
+		in.suggest.sync(in.value)
+		if in.selection == nil {
+			in.selection = func(TextRange) {}
+		}
+		if in.caret == nil {
+			in.caret = func(CaretEvent) {}
+		}
+		if in.composition == nil {
+			in.composition = func(Composition) {}
+		}
+	}
 	t.bindInputTheme(cx, n)
 	t.bindBool(cx, n, v.Disabled, &in.config.Disabled)
 	if v.PlaceholderFunc != nil {
@@ -1861,6 +1876,10 @@ func (t *Tree) mountInput(cx *Scope, parent *node, v Input) {
 	if v.Value != nil {
 		cx.renderEffect(func() {
 			in.value = v.Value()
+			if s := in.suggest; s != nil {
+				value := in.value
+				cx.Untrack(func() { s.sync(value) })
+			}
 			t.markResolve(n) // a multiline field measures it
 		})
 	}
@@ -2182,10 +2201,18 @@ func (t *Tree) Dispatch(ev driver.Event) {
 	case driver.EventFocus:
 		t.setState(n, stateFocused, true)
 		t.focusReported(n, true)
+		if in := n.input; in != nil && in.suggest != nil {
+			s := in.suggest
+			t.within(n.owner, func() { s.focus(true) })
+		}
 		call(h.focus)
 	case driver.EventBlur:
 		t.setState(n, stateFocused, false)
 		t.focusReported(n, false)
+		if in := n.input; in != nil && in.suggest != nil {
+			s := in.suggest
+			t.within(n.owner, func() { s.focus(false) })
+		}
 		call(h.blur)
 	case driver.EventChangeText:
 		in := n.input
@@ -2197,6 +2224,10 @@ func (t *Tree) Dispatch(ev driver.Event) {
 			t.devRecordEdit(n, in.value, ev.Text)
 		}
 		in.shown, in.value, in.count = ev.Text, ev.Text, ev.Count
+		if s := in.suggest; s != nil {
+			// The app's OnOpen and OnClose run in it.
+			t.within(n.owner, func() { s.changed(ev.Text) })
+		}
 		if h.change != nil {
 			t.within(n.owner, func() { h.change(ev.Text) })
 		}
@@ -2204,6 +2235,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		if in.valueFn != nil {
 			if v := Untracked(t.root, in.valueFn); v != in.value {
 				in.value = v
+				if s := in.suggest; s != nil {
+					t.within(n.owner, func() { s.sync(v) })
+				}
 			}
 		}
 		t.markResolve(n)
@@ -2212,8 +2246,14 @@ func (t *Tree) Dispatch(ev driver.Event) {
 			t.within(n.owner, func() { h.submit(ev.Text) })
 		}
 	case driver.EventSelectionChange:
-		if in := n.input; in != nil && in.selection != nil {
-			t.within(n.owner, func() { in.selection(TextRange{Start: ev.Index, End: int(ev.Count)}) })
+		if in := n.input; in != nil {
+			r := TextRange{Start: ev.Index, End: int(ev.Count)}
+			if s := in.suggest; s != nil {
+				t.within(n.owner, func() { s.selectionChanged(r) })
+			}
+			if in.selection != nil {
+				t.within(n.owner, func() { in.selection(r) })
+			}
 		}
 		if h.textSelection != nil {
 			t.within(n.owner, func() { h.textSelection(Bounds{Origin: ev.Point, Size: ev.Size}) })
@@ -2228,7 +2268,12 @@ func (t *Tree) Dispatch(ev driver.Event) {
 			if ev.Finished {
 				c.Text = ""
 			}
-			t.within(n.owner, func() { in.composition(c) })
+			t.within(n.owner, func() {
+				if s := in.suggest; s != nil {
+					s.compose(c.Composing)
+				}
+				in.composition(c)
+			})
 		}
 	case driver.EventCaretMove:
 		if in := n.input; in != nil && in.caret != nil {
@@ -2236,7 +2281,13 @@ func (t *Tree) Dispatch(ev driver.Event) {
 			page := b
 			o := t.surfaceBounds(n).Origin
 			page.Origin = Point{X: o.X + b.Origin.X, Y: o.Y + b.Origin.Y}
-			t.within(n.owner, func() { in.caret(CaretEvent{Bounds: b, PageBounds: page}) })
+			e := CaretEvent{Bounds: b, PageBounds: page}
+			t.within(n.owner, func() {
+				if s := in.suggest; s != nil {
+					s.caretMoved(e)
+				}
+				in.caret(e)
+			})
 		}
 	case driver.EventPaste:
 		if in := n.input; in != nil && in.paste != nil {

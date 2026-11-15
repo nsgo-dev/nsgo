@@ -363,9 +363,24 @@ func (t *Tree) setInput(n *node, v Input) {
 		in.value, in.autoFocus = v.DefaultValue, v.AutoFocus
 	}
 	in.accessory = v.InputAccessoryViewID
+	in.suggest = v.Suggest
+	if in.suggest != nil {
+		in.suggest.bind(t, n)
+	}
 	in.noScale, in.maxScale = v.NoFontScaling, v.MaxFontSizeMultiplier
 	in.selection, in.keyPress, in.composition = v.OnSelectionChange, v.OnKeyPress, v.OnCompositionChange
 	in.contentSize, in.caret, in.paste = v.OnContentSizeChange, v.OnCaretMove, v.OnPaste
+	if in.suggest != nil {
+		if in.selection == nil {
+			in.selection = func(TextRange) {}
+		}
+		if in.caret == nil {
+			in.caret = func(CaretEvent) {}
+		}
+		if in.composition == nil {
+			in.composition = func(Composition) {}
+		}
+	}
 	placeholder := v.Placeholder
 	if v.PlaceholderFunc != nil {
 		placeholder = v.PlaceholderFunc()
@@ -380,6 +395,9 @@ func (t *Tree) setInput(n *node, v Input) {
 		value := v.Value()
 		in.valueFn = func() string { return value }
 		in.value = value
+	}
+	if in.suggest != nil {
+		in.suggest.sync(in.value)
 	}
 	t.markResolve(n) // a multiline field measures its value
 	t.restyled(n)
