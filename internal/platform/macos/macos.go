@@ -240,6 +240,7 @@ type surface struct {
 	appearance, host driver.Appearance
 	engine           *engine.Engine
 	awake            awakeState
+	audio            *apple.Audio // the engine's sounds and players, made with its first
 	batches          queue.Batches
 	views            []*view            // index is NodeID
 	movers           map[*view]struct{} // views following mouse moves
@@ -978,6 +979,10 @@ func (s *surface) close() {
 	}
 	s.awake.releaseAll()
 	s.loopback.Close()
+	if s.audio != nil {
+		s.audio.Close()
+		s.audio = nil
+	}
 	for _, v := range s.views {
 		if v != nil && v.component != nil {
 			v.component.Close()
@@ -1085,6 +1090,7 @@ func (s *surface) environment() driver.Environment {
 		ScreenColor:      true,
 		Speech:           apple.SpeechAvailable(),
 		Speak:            apple.SpeakAvailable(),
+		Audio:            apple.AudioAvailable(),
 		CanSendInput:     true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
@@ -1692,6 +1698,12 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemWebCookies:
 			apple.SetWebCookies(it.Count, *it.Cookies, s.engine.Dispatch)
+			continue
+		case driver.ItemAudio:
+			if s.audio == nil {
+				s.audio = apple.NewAudio(s.engine.Dispatch)
+			}
+			s.audio.Handle(it.Count, it.Audio)
 			continue
 		case driver.ItemSetClipboard:
 			pb := objc.ID(apple.Class("NSPasteboard")).Send(sel("generalPasteboard"))

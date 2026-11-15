@@ -179,6 +179,7 @@ type surface struct {
 	id          string
 	native      objc.ID
 	engine      *engine.Engine
+	audio       *apple.Audio // the engine's sounds and players, made with its first
 	batches     queue.Batches
 	views       []*view // index is NodeID
 	fingers     fingers // the touches reported
@@ -611,6 +612,7 @@ func (s *surface) environment() driver.Environment {
 		Idiom:            idiom,
 		Speech:           apple.SpeechAvailable(),
 		Speak:            apple.SpeakAvailable(),
+		Audio:            idiom != driver.IdiomTV && apple.AudioAvailable(), // none on tvOS in the first stages (docs/architecture/audio.md)
 		Camera:           cameraAvailable(),
 		CanSendInput:     false,
 		HasWebView:       idiom != driver.IdiomTV,
@@ -682,6 +684,10 @@ func (s *surface) observe() {
 	for name, state := range lifecycleNote {
 		on(apple.Global(uikitPath, name), func(objc.ID) {
 			lifecycleNow = state
+			// Players pause as the app leaves the foreground, as NSH's do.
+			if state == driver.LifecycleBackground && s.audio != nil {
+				s.audio.PausePlayers()
+			}
 			s.refresh()
 		})
 	}
@@ -915,6 +921,12 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemWebCookies:
 			apple.SetWebCookies(it.Count, *it.Cookies, s.engine.Dispatch)
+			continue
+		case driver.ItemAudio:
+			if s.audio == nil {
+				s.audio = apple.NewAudio(s.engine.Dispatch)
+			}
+			s.audio.Handle(it.Count, it.Audio)
 			continue
 		case driver.ItemSetClipboard:
 			objc.ID(apple.Class("UIPasteboard")).Send(sel("generalPasteboard")).Send(sel("setString:"), apple.NSString(it.Value))

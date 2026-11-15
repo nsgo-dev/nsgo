@@ -308,6 +308,10 @@ func (s *surface) close() {
 		engine.SyncStorage()
 	}
 	s.releaseAllAwake()
+	if s.audio != nil {
+		s.audio.Close()
+		s.audio = nil
+	}
 	for _, v := range s.views {
 		if v != nil && v.component != nil {
 			v.component.Close()
