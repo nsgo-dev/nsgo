@@ -38,6 +38,8 @@ ui.Input{Masked: true, Value: password.Get, OnChange: password.Set,
 
 `KeyboardType` 选择软件键盘（`KeyboardEmail`、`KeyboardNumber`、`KeyboardURL` 等），`ReturnKeyType` 设置回车键的标签，`SubmitBehavior` 决定回车是提交还是换行。`AutoCapitalize`、`NoAutoCorrect` 和 `AutoComplete` 调整系统的辅助行为。
 
+`Style` 会合并在输入框的默认尺寸和外观之上，因此可以设置高度、内边距、字体和其他字段样式。`StyleFunc` 同样会合并在响应式外观之上；如果不设置边框属性，焦点和悬停边框仍会自动生效。
+
 ## 焦点与事件
 
 `Ref` 让输入框获得或失去焦点。`OnFocus` 和 `OnBlur` 跟随焦点，`OnSelectionChange` 和 `OnCaretMove` 跟随选区和光标，`OnKeyPress` 收到每个按键，`OnPaste` 收到粘贴内容，`OnCompositionChange` 跟随输入法组合。

@@ -38,6 +38,8 @@ ui.Input{Masked: true, Value: password.Get, OnChange: password.Set,
 
 `KeyboardType` picks a software keyboard (`KeyboardEmail`, `KeyboardNumber`, `KeyboardURL` and the rest), `ReturnKeyType` labels its return key, and `SubmitBehavior` says whether Return submits or breaks a multiline line. `AutoCapitalize`, `NoAutoCorrect` and `AutoComplete` tune the system's help.
 
+`Style` is merged over the input's default size and look, so it can set the height, padding, font or any other field style. `StyleFunc` is merged over the reactive look as well; the focus and hover rims remain automatic when it leaves those properties unset.
+
 ## Focus and events
 
 `Ref` focuses and blurs the field. `OnFocus` and `OnBlur` follow the focus, `OnSelectionChange` and `OnCaretMove` the selection and the caret, `OnKeyPress` each typed key, `OnPaste` what is pasted and `OnCompositionChange` an input method composing.
