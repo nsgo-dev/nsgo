@@ -89,6 +89,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.IntConsumer;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * A surface showing one NSGo app. It starts the app's Go executable
@@ -386,6 +388,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         super.onWindowFocusChanged(hasFocus);
         environment();
         if (hasFocus && overlays != null) overlays.returned();
+        // The user may have changed RECORD_AUDIO in the system's settings; the first view tells the app.
+        if (primary == null) recordingState();
     }
 
     /** An overlay's window showing starts the service that keeps it, and one the system hides may have lost its grant. */
@@ -581,6 +585,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         write(Protocol.LIVE_REPORT, LiveUpdates.state(getContext()));
         if (livePressEarly != null) write(Protocol.LIVE_REPORT, livePressEarly);
         livePressEarly = null;
+        recordingState();
+        RecordingService.connected(engine);
         watchNetwork();
     }
 
@@ -634,6 +640,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
         decoder.shutdownNow();
         folders.shutdownNow();
+        // An ended process hears no answer, and a late grant starts nothing.
+        recordingStarts.clear();
+        recordingAsks.clear();
         attached = false;
         keptForOverlays = false;
         unregisterBack();
@@ -735,6 +744,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                         LiveUpdates.apply(getContext(), activity(), payload);
                         write(Protocol.LIVE_REPORT, LiveUpdates.state(getContext()));
                     });
+                    break;
+                case Protocol.RECORDING:
+                    recording(payload);
                     break;
                 case Protocol.WANT_FRAME:
                     ui.post(() -> {
@@ -951,9 +963,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /**
-     * Hears the activity's permission prompts: the camera's, which a
-     * photo waits for, and the notifications'. A host's activity passes
-     * its own here.
+     * Hears the activity's permission prompts: the camera's, which a photo waits for, the notifications' and the microphone's, which a recording waits for. A host's activity passes its own here.
      */
     public void permissionResult(int request, String[] permissions, int[] results) {
         if (request == MEDIA_PERMISSION_REQUEST) {
@@ -962,6 +972,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             java.util.List<java.util.function.Consumer<Boolean>> answered = new java.util.ArrayList<>(mediaAsks);
             mediaAsks.clear();
             for (java.util.function.Consumer<Boolean> a : answered) a.accept(allowed);
+            return;
+        }
+        if (request == RecordingService.PERMISSION_REQUEST) {
+            recordingPermission(results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED);
             return;
         }
         if (request == Notifications.PERMISSION_REQUEST) {
@@ -3250,6 +3264,115 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     /** A Live Activity's press that came before the app's process started. */
     private byte[] livePressEarly;
+
+    // Package microphone's recordings (RecordingService), on the UI thread: the starts and the authorizes waiting for RECORD_AUDIO's prompt, whether it shows, and the state last sent.
+    private final ArrayList<JSONObject> recordingStarts = new ArrayList<>();
+    private final ArrayList<Long> recordingAsks = new ArrayList<>();
+    private boolean recordingAsking;
+    private String recordingSent;
+
+    /** Takes a RECORDING message, on the engine's reader thread: a stop goes to the service at once, a start and an authorize to the UI thread. */
+    private void recording(byte[] payload) {
+        JSONObject m;
+        try {
+            m = new JSONObject(new String(payload, java.nio.charset.StandardCharsets.UTF_8));
+        } catch (JSONException e) {
+            Log.w(TAG, "invalid recording message from app");
+            return;
+        }
+        long id = m.optLong("id");
+        switch (m.optString("op")) {
+            case "stop":
+                RecordingService.stop(engine, id);
+                break;
+            case "start":
+                ui.post(() -> recordingStart(m));
+                break;
+            case "authorize":
+                ui.post(() -> recordingAuthorize(id));
+                break;
+            default:
+        }
+    }
+
+    /**
+     * Starts a recording, on the UI thread: only for an app that declares the service, while an activity of the app is visible, as Android lets only a foreground app start using the microphone, and once RECORD_AUDIO is granted, which it asks for first.
+     */
+    private void recordingStart(JSONObject m) {
+        long id = m.optLong("id");
+        String refusal = recordingRefusal();
+        if (refusal != null) {
+            write(Protocol.RECORDING_REPORT, RecordingService.refusal("ended", id, "unavailable", refusal));
+        } else if (RecordingService.granted(getContext())) {
+            RecordingService.start(getContext().getApplicationContext(), engine, m);
+        } else {
+            recordingStarts.add(m);
+            askRecording();
+        }
+    }
+
+    /** Answers an authorize, on the UI thread: at once if the app holds RECORD_AUDIO or cannot ask, else once the user answers. */
+    private void recordingAuthorize(long id) {
+        String refusal = recordingRefusal();
+        if (RecordingService.granted(getContext())) {
+            write(Protocol.RECORDING_REPORT, RecordingService.refusal("authorized", id, "", ""));
+        } else if (refusal != null) {
+            write(Protocol.RECORDING_REPORT, RecordingService.refusal("authorized", id, "unavailable", refusal));
+        } else {
+            recordingAsks.add(id);
+            askRecording();
+        }
+    }
+
+    /** Why the app cannot ask for the microphone or start recording now, or null. */
+    private String recordingRefusal() {
+        if (!RecordingService.declared(getContext())) return "the app declares no recording service (nsgo.yaml's android.recording)";
+        Activity activity = activity();
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()
+                || activity.getWindow().getDecorView().getWindowVisibility() != View.VISIBLE) {
+            return "no activity of the app is visible";
+        }
+        return null;
+    }
+
+    private void askRecording() {
+        if (recordingAsking) return;
+        recordingAsking = true;
+        activity().requestPermissions(new String[] {"android.permission.RECORD_AUDIO"}, RecordingService.PERMISSION_REQUEST);
+    }
+
+    /** Hears RECORD_AUDIO's prompt answered: the authorizes and the starts waiting for it go on. */
+    private void recordingPermission(boolean granted) {
+        recordingAsking = false;
+        recordingState();
+        for (long id : recordingAsks) {
+            write(Protocol.RECORDING_REPORT, RecordingService.refusal("authorized", id, granted ? "" : "denied", ""));
+        }
+        recordingAsks.clear();
+        ArrayList<JSONObject> starts = new ArrayList<>(recordingStarts);
+        recordingStarts.clear();
+        for (JSONObject m : starts) {
+            long id = m.optLong("id");
+            String refusal = recordingRefusal();
+            if (!granted) {
+                write(Protocol.RECORDING_REPORT, RecordingService.refusal("ended", id, "denied", ""));
+            } else if (refusal != null) {
+                write(Protocol.RECORDING_REPORT, RecordingService.refusal("ended", id, "unavailable", refusal));
+            } else {
+                RecordingService.start(getContext().getApplicationContext(), engine, m);
+            }
+        }
+    }
+
+    /** Tells an app that records whether it does and may, when that changed. */
+    private void recordingState() {
+        if (engine == null || !engine.isAlive() || !RecordingService.declared(getContext())) return;
+        byte[] state = RecordingService.state(getContext());
+        String sent = new String(state, java.nio.charset.StandardCharsets.UTF_8);
+        if (sent.equals(recordingSent)) return;
+        recordingSent = sent;
+        write(Protocol.RECORDING_REPORT, state);
+    }
 
     /** A notification's press that came before the engine mounted its first batch. */
     private String pressedEarly;

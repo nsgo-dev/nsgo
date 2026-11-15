@@ -38,6 +38,15 @@ type Manifest struct {
 	TargetSDK int
 	// Overlay declares the runtime's OverlayService, the specialUse foreground service an overlay over other apps takes, for an app that asks for SYSTEM_ALERT_WINDOW; Permissions name its FOREGROUND_SERVICE permissions.
 	Overlay bool
+	// Recording declares the runtime's RecordingService, the microphone foreground service microphone.RecordWAV records in, with the permissions it needs. An app without it declares no such service, as Google Play asks an app to justify each foreground-service type its manifest has.
+	Recording bool
+}
+
+// recordingPermissions are what the runtime's recording service needs: the microphone, a foreground service and, from Android 14, one of the microphone type.
+var recordingPermissions = []string{
+	"android.permission.RECORD_AUDIO",
+	"android.permission.FOREGROUND_SERVICE",
+	"android.permission.FOREGROUND_SERVICE_MICROPHONE",
 }
 
 // The binary XML chunk and value types, from Android's ResourceTypes.h.
@@ -112,10 +121,11 @@ var foregroundServiceTypes = map[string]uint32{
 	"specialUse":      0x40000000,
 }
 
-// OverlayService is the service overlays over other apps take (Manifest.Overlay), and OverlaySubtype the subtype of its specialUse type, which stores read.
+// The runtime's foreground services: RecordingService is the one microphone.RecordWAV records in (Manifest.Recording), of the microphone type, OverlayService the one overlays over other apps take (Manifest.Overlay), of the specialUse type, and OverlaySubtype the subtype of its specialUse type, which stores read.
 const (
-	OverlayService = "dev.oneo.nsgo.OverlayService"
-	OverlaySubtype = "Keeps a window the user opened over other apps showing"
+	RecordingService = "dev.oneo.nsgo.RecordingService"
+	OverlayService   = "dev.oneo.nsgo.OverlayService"
+	OverlaySubtype   = "Keeps a window the user opened over other apps showing"
 )
 
 // styles are the framework styles a manifest may name. A reference needs
@@ -240,7 +250,11 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 	if m.Icon != nil {
 		setAttr(app, androidNS, "icon", iconResource)
 	}
-	for _, perm := range m.Permissions {
+	perms := m.Permissions
+	if m.Recording {
+		perms = append(slices.Clip(perms), recordingPermissions...)
+	}
+	for _, perm := range perms {
 		if err := validPermission(perm); err != nil {
 			return nil, err
 		}
@@ -252,11 +266,11 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 			root.kids = slices.Insert(root.kids, i, use)
 		}
 	}
+	if m.Recording {
+		app.kids = append(app.kids, foregroundService(RecordingService, "microphone"))
+	}
 	if m.Overlay {
-		service := &node{name: xml.Name{Local: "service"}}
-		setAttr(service, androidNS, "name", OverlayService)
-		setAttr(service, androidNS, "exported", "false")
-		setAttr(service, androidNS, "foregroundServiceType", "specialUse")
+		service := foregroundService(OverlayService, "specialUse")
 		property := &node{name: xml.Name{Local: "property"}}
 		setAttr(property, androidNS, "name", "android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE")
 		setAttr(property, androidNS, "value", OverlaySubtype)
@@ -271,6 +285,15 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 		setAttr(sdk, androidNS, "targetSdkVersion", strconv.Itoa(m.TargetSDK))
 	}
 	return root, nil
+}
+
+// foregroundService declares the runtime's service name, not exported, as a foreground service of types, names of foregroundServiceTypes.
+func foregroundService(name, types string) *node {
+	service := &node{name: xml.Name{Local: "service"}}
+	setAttr(service, androidNS, "name", name)
+	setAttr(service, androidNS, "exported", "false")
+	setAttr(service, androidNS, "foregroundServiceType", types)
+	return service
 }
 
 // validPackage rejects IDs Android cannot install.

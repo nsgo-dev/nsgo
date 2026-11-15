@@ -106,16 +106,32 @@ func load() error {
 	return system.err
 }
 
-// Supported says this target can record.
-func Supported() bool { return load() == nil }
+// Supported says this target can record. While nsgotest's fake microphone is connected, it and Allowed and Authorize answer from the fake.
+func Supported() bool {
+	if reachable() {
+		return recorderSupported()
+	}
+	return load() == nil
+}
 
 // Allowed says the system lets this process record, without asking. It reads the same status as core.Scope.PermissionStatus of core.PermissionMicrophone, which apps with an engine use; this serves recording without one.
 func Allowed() bool {
+	if reachable() {
+		return recorderAllowed()
+	}
 	return load() == nil && privacy.Status(driver.PermissionMicrophone) == driver.PermissionGranted
 }
 
 // Authorize asks the user the first time, waiting for the answer, so call it off the UI. It answers nil once this process may record, and ErrDenied when it may not. It asks as core.Scope.RequestPermission of core.PermissionMicrophone does, which apps with an engine use; this serves recording without one.
 func Authorize() error {
+	if reachable() {
+		return recorderAuthorize()
+	}
+	return authorizeSystem()
+}
+
+// authorizeSystem is Authorize of the system's microphone, which Capture records.
+func authorizeSystem() error {
 	if err := load(); err != nil {
 		return fmt.Errorf("microphone: %w", err)
 	}
@@ -142,7 +158,7 @@ func Authorize() error {
 // system takes the microphone away, which Ended tells. It may wait for the user to answer the permission prompt, so call it off
 // the UI.
 func Capture(rate int, samples func([]int16)) (*Stream, error) {
-	if err := Authorize(); err != nil {
+	if err := authorizeSystem(); err != nil {
 		return nil, err
 	}
 	format := streamDescription{sampleRate: float64(rate), formatID: kAudioFormatLinearPCM,

@@ -75,6 +75,9 @@ const (
 	// msgLiveUpdate starts, updates or ends one of package widget's Live
 	// Activities, JSON (driver.SendLiveUpdate).
 	msgLiveUpdate = 17
+	// msgRecording starts or stops package microphone's recording or
+	// asks for the microphone, JSON (driver.SendRecording).
+	msgRecording = 18
 
 	// Java to Go.
 	msgStart       = 1
@@ -98,6 +101,8 @@ const (
 	msgSurface = 16
 	// msgTimeZone is the device's time zone, after the process starts and as it changes (timezone.go).
 	msgTimeZone = 17
+	// msgRecordingReport is what the runtime's recording service reports, JSON (driver.ReportRecording).
+	msgRecordingReport = 18
 )
 
 // The parts of an image view's request msgImage carries.
@@ -210,6 +215,9 @@ func connect(opts Options) *surface {
 	s.sendFonts(opts.Fonts)
 	driver.ConnectLiveUpdates(func(msg []byte) {
 		s.send(msgLiveUpdate, func(w *writer) { w.buf = append(w.buf, msg...) })
+	})
+	driver.ConnectRecordings(func(msg []byte) {
+		s.send(msgRecording, func(w *writer) { w.buf = append(w.buf, msg...) })
 	})
 	return s
 }
@@ -379,6 +387,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 		case msgTimeZone:
 			// Go has no other way to change the zone: the store races with readers of time.Local, but it is one pointer, which none sees torn.
 			time.Local = readTimeZone(&r)
+		case msgRecordingReport:
+			driver.ReportRecording(slices.Clone(payload))
 		case msgDNS:
 			servers := make([]string, r.u32())
 			for i := range servers {

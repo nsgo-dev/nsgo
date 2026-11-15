@@ -21,7 +21,7 @@ var layers = []struct {
 	imports []string
 }{
 	{"internal/layout", nil},
-	// The microphone asks for its permission as the backends do, and holds iOS's audio session with the backends' videos and speech.
+	// Recording reaches Android's runtime, and nsgotest's fake, through the driver's channel outside any surface, asks for its permission as the backends do, and holds iOS's audio session with the backends' videos and speech.
 	{"microphone", []string{"internal/audiosession", "internal/driver", "internal/platform/privacy"}},
 	{"internal/audiosession", nil},
 	// The automation's protocol, which the nsgo tool and the agent in a running app speak, is the standard library's JSON alone.

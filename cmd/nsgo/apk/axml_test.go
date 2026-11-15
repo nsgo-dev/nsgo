@@ -1,6 +1,7 @@
 package apk
 
 import (
+	"bytes"
 	"encoding/binary"
 	"testing"
 	"unicode/utf16"
@@ -386,5 +387,95 @@ func TestForegroundServiceTypes(t *testing.T) {
 	}
 	if _, err := parseForegroundServiceType("speaker"); err == nil {
 		t.Error("an unknown type was accepted")
+	}
+}
+
+// TestEncodeManifestRecording checks that only an app that records declares the recording service, with the microphone type and its permissions, in the APK's manifest and the bundle's.
+func TestEncodeManifestRecording(t *testing.T) {
+	declared := func(recording bool) (map[string]bool, *xmlNode) {
+		data, err := EncodeManifest(androidruntime.Manifest, Manifest{Package: "dev.oneo.nsgo.test", Recording: recording})
+		if err != nil {
+			t.Fatal(err)
+		}
+		root := decodeXML(t, data).root
+		asked := map[string]bool{}
+		for _, kid := range root.kids {
+			if kid.name == "uses-permission" {
+				asked[kid.string(t, "name")] = true
+			}
+		}
+		for _, kid := range root.child(t, "application").kids {
+			if kid.name == "service" && kid.string(t, "name") == RecordingService {
+				return asked, kid
+			}
+		}
+		return asked, nil
+	}
+	asked, service := declared(false)
+	if service != nil {
+		t.Error("an app that does not record declares the recording service")
+	}
+	for _, p := range recordingPermissions {
+		if asked[p] {
+			t.Errorf("an app that does not record asks for %s", p)
+		}
+	}
+	asked, service = declared(true)
+	if service == nil {
+		t.Fatal("an app that records declares no recording service")
+	}
+	if got := service.value(t, "foregroundServiceType"); got != 0x80 {
+		t.Errorf("the recording service's type = %#x, want microphone (0x80)", got)
+	}
+	for _, p := range recordingPermissions {
+		if !asked[p] {
+			t.Errorf("an app that records does not ask for %s", p)
+		}
+	}
+
+	root, err := appManifest(androidruntime.Manifest, Manifest{Package: "dev.oneo.nsgo.test", Recording: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proto, err := protoElement(root, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(proto, pbVarint(nil, 5, 0x01010599)) || !bytes.Contains(proto, []byte(RecordingService)) {
+		t.Error("the bundle's manifest lacks the recording service's type")
+	}
+}
+
+// TestEncodeManifestServices checks that an app that records and shows overlays declares both services, each of its own type, and asks once for the foreground-service permission they share.
+func TestEncodeManifestServices(t *testing.T) {
+	data, err := EncodeManifest(androidruntime.Manifest, Manifest{
+		Package:     "dev.oneo.nsgo.test",
+		Permissions: []string{"android.permission.SYSTEM_ALERT_WINDOW", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"},
+		Overlay:     true,
+		Recording:   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := decodeXML(t, data).root
+	asked := map[string]int{}
+	for _, kid := range root.kids {
+		if kid.name == "uses-permission" {
+			asked[kid.string(t, "name")]++
+		}
+	}
+	for _, p := range []string{"android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_MICROPHONE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE", "android.permission.RECORD_AUDIO"} {
+		if asked[p] != 1 {
+			t.Errorf("the app asks for %s %d times", p, asked[p])
+		}
+	}
+	types := map[string]uint32{}
+	for _, kid := range root.child(t, "application").kids {
+		if kid.name == "service" {
+			types[kid.string(t, "name")] = kid.value(t, "foregroundServiceType")
+		}
+	}
+	if len(types) != 2 || types[RecordingService] != 0x80 || types[OverlayService] != 0x40000000 {
+		t.Errorf("services %#x, want %s of microphone (0x80) and %s of specialUse (0x40000000)", types, RecordingService, OverlayService)
 	}
 }

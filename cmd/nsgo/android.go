@@ -132,6 +132,7 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 		Permissions: p.androidPermissions(),
 		TargetSDK:   p.Android.TargetSDK,
 		Overlay:     p.androidOverlay(),
+		Recording:   p.Android.Recording,
 	}, files, key)
 	if err != nil {
 		return "", err

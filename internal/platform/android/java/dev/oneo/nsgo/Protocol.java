@@ -30,6 +30,8 @@ final class Protocol {
     static final int FETCH = 16;
     /** Starts, updates or ends a Live Activity: JSON (LiveUpdates). */
     static final int LIVE_UPDATE = 17;
+    /** Starts or stops a recording or asks for the microphone: JSON (RecordingService). */
+    static final int RECORDING = 18;
 
     // Java to Go.
     static final int START = 1;
@@ -52,6 +54,8 @@ final class Protocol {
     static final int SURFACE = 16;
     /** The device's time zone: its ID, then its offset from UTC now in seconds (timezone.go). */
     static final int TIME_ZONE = 17;
+    /** What RecordingService reports: JSON. */
+    static final int RECORDING_REPORT = 18;
 
     // What a SURFACE message reports, as overlay.go has them: the window's size and place in points, then the environment, or its end, an OVERLAY_END_*.
     static final int SURFACE_STATE = 1;

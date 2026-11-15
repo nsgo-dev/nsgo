@@ -12,6 +12,7 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.TimeZone;
@@ -42,6 +43,8 @@ public final class NsgoEngine {
     private boolean closed;
     /** Tells the process of the device's time zone changes while it runs. */
     private BroadcastReceiver zones;
+    /** The app's data directory, which its process was started with. */
+    private File data;
 
     /** Creates an engine without retaining an Activity or another UI context. */
     public NsgoEngine(Context context) {
@@ -57,6 +60,8 @@ public final class NsgoEngine {
         builder.environment().put("TZ", TimeZone.getDefault().getID());
         process = builder.start();
         out = new DataOutputStream(new BufferedOutputStream(process.getOutputStream()));
+        String dir = builder.environment().get("NSGO_DATA_DIR");
+        data = dir == null ? application.getFilesDir() : new File(dir);
         watchTimeZone();
     }
 
@@ -94,6 +99,11 @@ public final class NsgoEngine {
         if (zones == null) return;
         application.unregisterReceiver(zones);
         zones = null;
+    }
+
+    /** Where the app's recordings go: under its data directory, the host's storage root. */
+    synchronized File recordings() {
+        return data == null ? null : new File(data, "recordings");
     }
 
     /** Says whether the engine has neither started a process nor been destroyed. */
@@ -144,6 +154,8 @@ public final class NsgoEngine {
      */
     public void destroy() {
         Listener idle;
+        // Its recording's file is finished, for the next process to hear of.
+        RecordingService.ownerEnded(this);
         synchronized (this) {
             if (closed) return;
             closed = true;
@@ -181,6 +193,7 @@ public final class NsgoEngine {
         } catch (IOException e) {
             failure = e;
         }
+        RecordingService.ownerEnded(this);
         Listener current;
         synchronized (this) {
             current = listener;
