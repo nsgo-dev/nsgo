@@ -41,7 +41,7 @@
 - `EventLoad` carries the duration and the picture's size in points; `EventProgress` comes every `ProgressInterval` while playing.
 - `EventEnd` follows the platform: AVFoundation and Android report every end, then a repeating video starts over; a looping Media Foundation engine, `<video>` or GTK stream never ends.
 - `Controls` shows the platform's controls. Windows has none, so it draws NSH's bar.
-- `AudioSession` is NSH's `audioSession`. On iOS, while a video with one plays, the shared `AVAudioSession` is the playback category in the spoken-audio mode (mixing with others for `AudioSessionMixWithOthers`), and goes back to what it was, deactivated to let other apps play, once none plays (`apple/audiosession_ios.go`). On Android the sound is speech, and a playback video holds `AUDIOFOCUS_GAIN_TRANSIENT` while it plays, pausing for another app's focus and playing on when it returns; a change opens the source again. The desktops and the web ignore it.
+- `AudioSession` is NSH's `audioSession`. On iOS, while a video with one plays, the shared `AVAudioSession` is the playback category in the spoken-audio mode (mixing with others for `AudioSessionMixWithOthers`), and goes back to what it was, deactivated to let other apps play, once none plays (`apple/audiosession_ios.go`); `AudioSessionFunc` (TSX's `audioSession`) changes it as the video plays, and iOS holds the new session before letting the old go, so playback goes on without a gap. On Android the sound is speech, and a playback video holds `AUDIOFOCUS_GAIN_TRANSIENT` while it plays, pausing for another app's focus and playing on when it returns; a change opens the source again. The desktops and the web ignore it.
 
 | Target | Player |
 | --- | --- |

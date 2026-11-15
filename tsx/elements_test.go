@@ -118,6 +118,28 @@ mount(App);`)
 	app.WaitFor("text:100@0", time.Second)
 }
 
+func TestVideoAudioSessionFollowsItsProp(t *testing.T) {
+	app := run(t, `import { mount, signal, Text, View, Video } from "nsgo";
+function App() {
+	const session = signal("playback");
+	return <View style={{ flex: 1 }}>
+		<Video testID="video" src="talk.mp4" audioSession={session()} style={{ height: 50 }} />
+		<Text testID="mix" onPress={() => session.set("mixWithOthers")}>Mix</Text>
+	</View>;
+}
+mount(App);`)
+	v := app.Find("id:video")
+	if v.Video.AudioSession != core.AudioSessionPlayback {
+		t.Fatalf("mounted with %+v, want AudioSessionPlayback", v.Video)
+	}
+	id := v.ID
+	app.Press("id:mix")
+	app.Settle()
+	if v := app.Find("id:video"); v.ID != id || v.Video.AudioSession != core.AudioSessionMixWithOthers || v.Video.Source != "talk.mp4" {
+		t.Errorf("after the change: view %v (was %v), %+v", v.ID, id, v.Video)
+	}
+}
+
 func TestPlatformPropsApplyOnTheirPlatform(t *testing.T) {
 	src := `import { mount, View } from "nsgo";
 mount(() => <View testID="v" style={{ width: 10, height: 10 }} ios={{ testID: "ios" }} desktop={{ accessibilityLabel: "desk" }} />);`

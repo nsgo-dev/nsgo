@@ -109,3 +109,36 @@ func TestVideoDefaults(t *testing.T) {
 		}
 	}
 }
+
+func TestVideoChangesItsAudioSessionInPlace(t *testing.T) {
+	var session *Signal[AudioSession]
+	h := newHost(t, Size{Width: 300, Height: 400}, func(cx *Scope) Node {
+		session = NewSignal(cx, AudioSessionPlayback)
+		return Video{Source: "asset:/talk.mp4", AudioSessionFunc: session.Get, TestID: "video", Style: Style{Width: Pt(300), Height: Pt(200)}}
+	})
+	config := func(b *driver.MountBatch) []driver.VideoConfig {
+		var got []driver.VideoConfig
+		for _, it := range b.Items {
+			if it.Kind == driver.ItemVideo {
+				got = append(got, *it.Video)
+			}
+		}
+		return got
+	}
+	if got := config(h.commit()); len(got) != 1 || got[0].AudioSession != AudioSessionPlayback {
+		t.Fatalf("mounted with %+v, want AudioSessionPlayback", got)
+	}
+	id := h.find("video").id
+
+	session.Set(AudioSessionMixWithOthers)
+	b := h.commit()
+	if got := config(b); len(got) != 1 || got[0].AudioSession != AudioSessionMixWithOthers || got[0].Source != "asset:/talk.mp4" || got[0].Paused {
+		t.Fatalf("after the change %+v, want the same playing source with AudioSessionMixWithOthers", got)
+	}
+	if k := kinds(b); k[driver.ItemCreate] != 0 || k[driver.ItemDelete] != 0 || h.find("video").id != id {
+		t.Fatalf("the change remounted the video: %v", k)
+	}
+	if k := kinds(h.commit()); k[driver.ItemVideo] != 0 {
+		t.Fatalf("resent an unchanged session: %v", k)
+	}
+}

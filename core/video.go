@@ -33,13 +33,9 @@ type Video struct {
 	// ProgressInterval is the time between OnProgress calls while the
 	// video plays: 250 milliseconds when 0, and at least 16.
 	ProgressInterval time.Duration
-	// AudioSession is what the sound does to other apps' audio while it
-	// plays: by default the app's settings decide, and on iOS the
-	// device's silent mode silences it; a video of speech, as an
-	// audiobook's, plays in silent mode with AudioSessionPlayback or
-	// AudioSessionMixWithOthers. Changing it on Android opens the source
-	// again.
-	AudioSession AudioSession
+	// AudioSession is what the sound does to other apps' audio while it plays: by default the app's settings decide, and on iOS the device's silent mode silences it; a video of speech, as an audiobook's, plays in silent mode with AudioSessionPlayback or AudioSessionMixWithOthers. AudioSessionFunc changes it as the video plays: iOS holds the new session before letting the old go, so playback goes on without a gap, and Android opens the source again.
+	AudioSession     AudioSession
+	AudioSessionFunc func() AudioSession
 	// Class is Tailwind CSS classes, as View's.
 	Class     string
 	Style     Style
@@ -132,6 +128,9 @@ func (t *Tree) mountVideo(cx *Scope, parent *node, v Video) {
 	}
 	if f := v.RateFunc; f != nil {
 		bind(func(c *driver.VideoConfig) { c.Rate = videoRate(f()) })
+	}
+	if f := v.AudioSessionFunc; f != nil {
+		bind(func(c *driver.VideoConfig) { c.AudioSession = f() })
 	}
 }
 
