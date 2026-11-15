@@ -2479,3 +2479,17 @@ cameraPay: "支付"
 cameraPick: "选择饮品"
 cameraReady: "到柜台取餐"
 cameraDeclined: "被拒"
+
+systemSensorsTitle: 定位与运动
+systemSensorsSummary: 显式授权、新定位与随作用域停止的传感器采样。
+systemSensorsIdle: 未开始
+systemSensorsTracking: 正在持续定位
+systemSensorsBackgroundPermission: 后台定位授权
+systemSensorsMotionPermission: 运动传感器授权
+systemSensorsLocate: 获取新定位
+systemSensorsTrack: 持续定位
+systemSensorsBackground: 后台持续定位
+systemSensorsStop: 停止传感器
+systemSensorsAccelerometer: 加速度计
+systemSensorsFused: 融合运动
+systemSensorsAuthorization: "{state, select, granted {已授权} denied {已拒绝} restricted {受限制} unavailable {不可用} other {未请求}}"

@@ -173,6 +173,8 @@ type view struct {
 }
 
 type surface struct {
+	sensors apple.Sensors
+
 	// openFrame is the frame the window opened at, until its first batch,
 	// whose title bar would change it.
 	openFrame driver.WindowFrame
@@ -862,6 +864,7 @@ func (s *surface) close() {
 	if dockMenu.target == s {
 		clearDockMenu()
 	}
+	s.sensors.Close()
 	delete(surfaces, s)
 	s.stopTicking()
 	for _, stop := range s.stops {
@@ -1484,6 +1487,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemInputSource:
 			setInputSource(it.Value)
+			continue
+		case driver.ItemSensor:
+			s.sensors.Handle(it, s.engine.Dispatch, false, true)
 			continue
 		case driver.ItemSpeech:
 			apple.HandleSpeech(it.Count, *it.Speech, s.engine.Dispatch)

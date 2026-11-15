@@ -277,7 +277,7 @@ sign:
   notarize: hello   # the keychain profile above; or -notarize hello
 ```
 
-`build` then signs with the hardened runtime, submits the disk image, waits for Apple's verdict, a few minutes, and staples the ticket to the image and the app; a rejection prints Apple's log. In CI, `NSGO_NOTARY_KEY`, `NSGO_NOTARY_KEY_ID` and `NSGO_NOTARY_ISSUER`, an App Store Connect API key's `.p8` file, ID and issuer, take the profile's place. The hardened runtime denies the microphone, the camera and the calendars unless the app claims them, which `build` does when `apple.info` has `NSMicrophoneUsageDescription`, `NSCameraUsageDescription`, or a calendars or reminders usage description.
+`build` then signs with the hardened runtime, submits the disk image, waits for Apple's verdict, a few minutes, and staples the ticket to the image and the app; a rejection prints Apple's log. In CI, `NSGO_NOTARY_KEY`, `NSGO_NOTARY_KEY_ID` and `NSGO_NOTARY_ISSUER`, an App Store Connect API key's `.p8` file, ID and issuer, take the profile's place. The hardened runtime denies the microphone, the camera, the calendars and location unless the app claims them, which `build` does when `apple.info` has `NSMicrophoneUsageDescription`, `NSCameraUsageDescription`, a calendars or reminders usage description, or a location usage description.
 
 ## Widgets and Live Activities
 

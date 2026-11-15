@@ -106,6 +106,8 @@ type boxKey struct {
 }
 
 type surface struct {
+	sensors apple.Sensors
+
 	opts    Options
 	app     engine.App
 	engine  *engine.Engine
@@ -444,6 +446,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 					s.w.op(opBlur, v.id)
 				}
 			}
+			continue
+		case driver.ItemSensor:
+			s.sensors.Handle(it, s.engine.Dispatch, true, true)
 			continue
 		case driver.ItemSpeech:
 			// watchOS has no Speech framework: the session reports it

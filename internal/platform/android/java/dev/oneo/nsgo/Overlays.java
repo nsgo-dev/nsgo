@@ -471,7 +471,7 @@ final class Overlays {
         stopService();
     }
 
-    /** Removes o's window and lets go of its view; reason, unless 0, ends its tree. The service stops with the last overlay, and a first view kept only for the overlays ends the app's process. */
+    /** Removes o's window and lets go of its view; reason, unless 0, ends its tree. The service stops with the last overlay, and a first view kept only for the overlays ends the app's process unless a background location stream keeps it. */
     private void close(Overlay o, int reason) {
         open.remove(o.id);
         try {
@@ -484,7 +484,7 @@ final class Overlays {
         if (open.size() > 0) return;
         unwatch();
         stopService();
-        first.overlaysClosed();
+        first.keeperEnded();
     }
 
     /** Reports that overlay id ended for reason (SURFACE_ENDED): its tree closes. */

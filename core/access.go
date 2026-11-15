@@ -79,6 +79,10 @@ const (
 	AccessAuthSession = "authSession"
 	// AccessHost is the host's handlers, by name (CallHost, PostHost).
 	AccessHost = "host"
+	// AccessLocation, AccessBackgroundLocation and AccessMotion are independent sensor grants.
+	AccessLocation           = "location"
+	AccessBackgroundLocation = "backgroundLocation"
+	AccessMotion             = "motion"
 )
 
 // AccessInput is AccessRequest.Method for a web view's trusted input,

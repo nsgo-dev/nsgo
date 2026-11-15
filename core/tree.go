@@ -26,6 +26,8 @@ import (
 // Tree is the shadow tree of one surface. Commit turns its changes into a
 // MountBatch. It is not safe for concurrent use: the engine owns it.
 type Tree struct {
+	sensors map[uint32]*SensorStream
+
 	root *Scope
 	// env is a window's own environment (Scope.Env); the first tree's is
 	// the graph's. reported is the platform's last report of it.
@@ -2166,6 +2168,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		return
 	case driver.EventMenuClosed:
 		t.popupClosed(ev.Count, true)
+		return
+	case driver.EventSensor:
+		t.sensorEvent(ev)
 		return
 	case driver.EventSpeech:
 		t.rt.speechEvent(ev)

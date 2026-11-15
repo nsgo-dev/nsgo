@@ -159,10 +159,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private boolean startHeld;
     private final Runnable startUnheld = this::releaseStart;
     private static final long FOLDS_WAIT_MS = 300, FOLDS_WAIT_LONGEST_MS = 3000;
+    private Sensors sensors;
     private boolean ownsEngine;
     private boolean attached;
-    /** Whether the app's process runs on, off screen, for its overlays over other apps alone, its activity ended (keepForOverlays); and whether the app quit, which keeps nothing. */
-    private boolean keptForOverlays, quit;
+    /** Whether the app's process runs on, off screen, for its overlays over other apps or its background location streams alone, its activity ended (keepOffScreen); and whether the app quit, which keeps nothing. */
+    private boolean keptOffScreen, quit;
     // The engine's flags the app starts with (--nsgo-fps).
     private final ArrayList<String> flags = new ArrayList<>();
     // The test nsgo test -target android runs, and its agent.
@@ -637,31 +638,36 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /**
-     * Keeps the app's process running off screen as the activity showing this view ends while the app's overlays over other apps show, on a view that owns its engine and an app that did not quit: the view detaches, as from a host's engine, an activity that shows the app again takes it back (showAgain) and the process ends with the last overlay. Whether it kept the process; the activity stops the view otherwise.
+     * Keeps the app's process running off screen as the activity showing this view ends while the app's overlays over other apps show or a background location stream runs (keeps), on a view that owns its engine and an app that did not quit: the view detaches, as from a host's engine, an activity that shows the app again takes it back (showAgain) and the process ends with the last of them (keeperEnded). Whether it kept the process; the activity stops the view otherwise.
      */
-    boolean keepForOverlays() {
-        if (!ownsEngine || quit || engine == null || !engine.isAlive() || overlays == null || !overlays.any()) return false;
+    boolean keepOffScreen() {
+        if (!ownsEngine || quit || engine == null || !engine.isAlive() || !keeps()) return false;
         detachFromEngine();
-        keptForOverlays = true;
+        keptOffScreen = true;
         return true;
     }
 
-    /** Whether keepForOverlays kept the app's process, which still runs. */
-    boolean keptForOverlays() {
-        return keptForOverlays && engine != null && engine.isAlive();
+    /** Whether something keeps the app's process running without an activity: an overlay over other apps, or a background location stream in its foreground service. */
+    private boolean keeps() {
+        return (overlays != null && overlays.any()) || (sensors != null && sensors.hasBackground());
     }
 
-    /** Shows the app keepForOverlays kept again, in the activity whose context this view's now wraps, before it goes into that activity's window: its appearance and direction restyle that window. */
+    /** Whether keepOffScreen kept the app's process, which still runs. */
+    boolean keptOffScreen() {
+        return keptOffScreen && engine != null && engine.isAlive();
+    }
+
+    /** Shows the app keepOffScreen kept again, in the activity whose context this view's now wraps, before it goes into that activity's window: its appearance and direction restyle that window. */
     void showAgain() {
-        keptForOverlays = false;
+        keptOffScreen = false;
         themed = null;
         if (engine != null && engine.isAlive()) attachRunningEngine();
         applyDirection();
     }
 
-    /** The last overlay over other apps closed: a view kept only for them ends the app's process, as its activity did. */
-    void overlaysClosed() {
-        if (keptForOverlays) stop();
+    /** The last overlay over other apps closed or the last background location stream stopped: a view kept only for them ends the app's process, as its activity did, once nothing else keeps it. */
+    void keeperEnded() {
+        if (keptOffScreen && !keeps()) stop();
     }
 
     /**
@@ -680,6 +686,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * Lets go of what serves the app's process once it ends or the view stops, on the UI thread: the network callback, the decoders, back and the native components, as an ended app sends no deletes. It runs again harmlessly.
      */
     private void release() {
+        if (sensors != null) { sensors.close(); sensors = null; }
         if (network != null) {
             getContext().getSystemService(ConnectivityManager.class).unregisterNetworkCallback(network);
             network = null;
@@ -690,7 +697,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         recordingStarts.clear();
         recordingAsks.clear();
         attached = false;
-        keptForOverlays = false;
+        keptOffScreen = false;
         unregisterBack();
         // Overlays are the system's windows, not the activity's: nothing else removes them as the process ends, and they would stay above every app, frozen, with the service's notification.
         if (overlays != null) overlays.closeAll();
@@ -1033,6 +1040,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             recordingPermission(RecordingService.granted(getContext()));
             return;
         }
+        if (request == Sensors.PERMISSION_REQUEST) { if (sensors != null) sensors.permissionResult(); return; }
         if (request == Notifications.PERMISSION_REQUEST) {
             Notifications.markAsked(getContext());
             for (long count : permissionAsks) answerPermission(count);
@@ -2466,6 +2474,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.ITEM_HAPTIC:
                 haptic(in.readInt());
                 break;
+            case Protocol.ITEM_SENSOR: {
+                if (sensors == null) sensors = new Sensors(getContext(), this::activity, engine, this::keeperEnded);
+                sensors.handle(in);
+                break;
+            }
             case Protocol.ITEM_NOTIFICATION_PERMISSION: {
                 long count = in.readInt() & 0xffffffffL;
                 boolean ask = in.readUnsignedByte() != 0;
@@ -2619,7 +2632,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 quit = true;
                 Activity activity = activity();
                 if (activity != null) activity.finishAndRemoveTask();
-                else if (keptForOverlays) stop();
+                else if (keptOffScreen) stop();
                 break;
             }
             case Protocol.ITEM_POPUP_MENU:

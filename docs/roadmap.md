@@ -69,10 +69,13 @@ NSGo's own, beyond NSH: OAuth sign-in in the system's authentication session ([s
 | Sign-in in mini programs | `wx.login` and the platforms' own | A mini program signs in through its platform's login, where a session ends unavailable now |
 
 ## Location and motion
-NSGo's own design for [#56](https://github.com/nsgo-dev/nsgo/issues/56) ([location and motion](architecture/location-motion.md)), which waits on its [open questions](../ARCHITECTURE.md#open-questions).
-| Location and motion on phones | `CLLocationManager`, `CMMotionManager`, `LocationManager`, `SensorManager` | The gallery's System page, the permission granted, gets a one-shot fix and a stream and accelerometer, gyroscope and device-motion samples at the rate it asks on an iPhone, an Android 9 device and one on API 31 or later, a phone lying face up reading +9.81 m/s² on z on both; a denied permission reaches the app as denied, and `nsgotest` grants, denies and feeds fixes and samples headless |
-| Location on Macs and TVs | `CLLocationManager` | A notarized macOS build and a Mac App Store build get fixes, with the location entitlement `nsgo build` claims, and a tvOS app a one-shot fix, its streams reporting unavailable |
-| Location and motion elsewhere | Geolocation API, `DeviceMotionEvent`, `Windows.Devices.Geolocation`, GeoClue | The web, Windows and Linux give location fixes, and the web motion samples, where they report both unavailable in the first release |
+Scoped fresh/cached fixes, streams, explicit background location and raw/fused motion are implemented in core, the Apple backends and Android, with permission APIs, separate TSX capabilities, bounded delivery, `nsgotest` fixtures and a gallery card ([contract](architecture/location-motion.md), #56). Native device acceptance remains open.
+
+| Item | Reference | Done when |
+| --- | --- | --- |
+| Native sensor acceptance | Core Location, Core Motion, LocationManager, SensorManager | Recorded or simulator fixtures verify native permission changes and reduced accuracy, background delivery and foreground-service notifications, Android Activity destruction/reopening, hardware rate/calibration and stop-on-disposal on supported devices |
+| Other sensor providers | Geolocation API, DeviceMotionEvent, Windows.Devices.Geolocation, GeoClue | Web, Windows and Linux gain location providers and the web a motion provider, where these backends and mini programs now explicitly report unavailable |
+| Extended sensor services | Platform providers | Geofencing, steps, activity recognition, barometer, temporary precise-location authorization and bounded background motion gain explicit scoped contracts |
 
 ## Bluetooth
 

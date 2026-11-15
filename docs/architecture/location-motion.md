@@ -1,80 +1,59 @@
 # Location and motion sensors
 
-This is the design for issue [#56](https://github.com/nsgo-dev/nsgo/issues/56). It is not an implemented API. Location and motion are separate providers with different permission, accuracy and power behavior, but share a lifecycle-aware sensor service in the engine.
+`core.Scope` owns location requests and motion streams (#56). Apple uses Core Location and Core Motion through purego; Android uses the framework's LocationManager and SensorManager, without Google Play services. The approved contract is fresh one-shot fixes by default, explicit cached age, opt-in background location, raw and fused motion, separate capabilities and latest-value delivery with drop counts (decided by the user, 2026-11-15). NSH v0.5.1 has no corresponding sensor service; NSGo follows its scoped service and capability boundaries with its own protocol and tests.
 
-## Scope
+## API and ownership
 
-The first scope covers:
+- `ReadSensorPermission(kind, done)` reads without prompting; `RequestSensorPermission` explicitly requests location, background-location or motion authorization. Both return a cancelable `SensorStream`.
+- `Locate(options, done)` waits for a new fix unless `MaxAge` explicitly allows a cached one, then stops. Its foreground timeout defaults to 30 seconds. `Stop` cancels silently.
+- `WatchLocation(options, sample, failed)` and `WatchMotion(options, sample, failed)` return streams owned by their requesting scope. Disposal stops providers and suppresses pending callbacks, including permission answers.
+- Callbacks run on the engine goroutine. Failures are stable `SensorError` codes: `not-allowed`, `unavailable`, `not-configured`, `timeout` or `failed`; none contains coordinates.
+- TSX's `Sensors` exposes permission promises, `locate`, `watchLocation` and `watchMotion`; subscriptions return a stop function. TSX durations and timestamps use milliseconds.
 
-- one-shot and continuous location fixes;
-- authorization, read and asked through `core.Permission` ([permissions](services.md#permissions)), and availability state;
-- accelerometer, gyroscope, magnetometer and device-motion samples where a target provides them; and
-- explicit start, stop, rate and accuracy choices with timestamps and a documented coordinate frame.
+Foreground streams keep running while inactive and pause in background. A paused one-shot waits with its remaining timeout. Resuming increments its generation, rejects queued samples from before the pause and marks the next delivered sample `Gap`. Explicit background location keeps running; motion always pauses. No service restores a killed process.
 
-Geofencing, significant-location-change monitoring, step counting, activity recognition, barometer data and background navigation are separate features. A target that lacks a sensor reports unavailable; it does not synthesize values from another sensor.
-
-## Layers and lifecycle
-
-`core` owns provider-neutral requests, copied sample values and scoped callbacks. `internal/driver` carries request IDs, timestamps, coordinates and numeric sample arrays. Apple uses Core Location and Core Motion; Android uses the framework's `LocationManager` and `SensorManager` in the runtime's Java, never Google Play services' fused location client, which the prebuilt runtime, built against `android.jar` alone, cannot link. Platform objects and callback queues stay in backends.
+## Providers
 
 | Target | Location | Motion |
 | --- | --- | --- |
-| iOS, watchOS | Core Location: one-shot fixes and streams | Core Motion, the sensors `CMMotionManager` says are available |
-| macOS | Core Location: one-shot fixes and streams | Unavailable: `CMMotionManager` is not on macOS |
-| tvOS | One-shot fixes (`requestLocation`); streams report unavailable, as `startUpdatingLocation` is not on tvOS | Unavailable: Core Motion's updates are not on tvOS |
-| Android | `LocationManager`: its `FUSED_PROVIDER` from API 31, and below it, down to the runtime's API 28, the best of `GPS_PROVIDER` and `NETWORK_PROVIDER` the permission allows; a one-shot fix through `getCurrentLocation` from API 30 and `requestSingleUpdate` before it | `SensorManager` |
-| The web, Windows, Linux, mini programs | Unavailable in the first release; the web's Geolocation API, Windows' `Windows.Devices.Geolocation` and Linux's GeoClue are the later backends, recorded in the [roadmap](../roadmap.md#location-and-motion) | Unavailable; the web's `DeviceMotionEvent` is the later backend |
+| iOS, watchOS | Core Location fixes and streams | Available Core Motion raw sensors and fused device motion |
+| macOS | Core Location fixes and streams | Unavailable |
+| tvOS | One-shot `requestLocation`; streams unavailable | Unavailable |
+| Android | API 31+ framework fused provider when enabled; otherwise GPS with precise permission or network, with coarse accuracy preferring network; API 30+ `getCurrentLocation`, older `requestSingleUpdate` | SensorManager accelerometer, gyroscope, magnetometer and rotation vector with gravity, linear acceleration and gyro readings |
+| Web, Windows, Linux, mini programs | Explicit unavailable answers | Explicit unavailable answers |
 
-Sensor callbacks never run user code on a platform thread. The backend copies a sample, acknowledges the provider callback promptly and posts the sample to the engine goroutine. A scope stopping a stream removes it before later samples are delivered. A pending one-shot location is canceled when its owner ends.
+`LocationOptions` chooses desired accuracy in meters, minimum distance, interval, cache age, timeout and background policy. Providers may give a worse accuracy or slower interval; samples carry actual accuracy and motion intervals. Apple does not offer a minimum-time location filter. The API neither geocodes nor infers place names. Missing sensors fail explicitly; fused motion requires its companion sensors on Android.
 
-The default policy follows `Env.Lifecycle` ([the app's lifecycle](services.md#the-apps-lifecycle)): streams keep running while the app is `inactive`, which still shows it (another app frontmost on a Mac, the other half of Android's split screen, Control Center over an iPhone app), and pause when it turns `background`. A paused stream stays the app's until its scope ends or the app stops it; the backend restarts the provider when the app shows again, and the first sample after the pause says it follows a gap, so the app can tell a cold fix from a continuous track. A one-shot request waits through the pause rather than failing. A separate background policy may opt in to location updates or a bounded motion session after the Android engine/view lifetime design is complete. The core must not keep a process or a radio alive merely because a handler remains registered.
+## Location values
 
-## Location
+`LocationFix` uses WGS 84 coordinates, meters, m/s and course in degrees. `SensorNumber.Valid` distinguishes a missing field from zero. `Altitude` is ellipsoidal; `MSLAltitude` is above mean sea level, available from Apple's altitude and Android API 34's MSL altitude where supplied. Older Apple versions without ellipsoidal altitude leave it absent.
 
-A location sample has WGS 84 latitude and longitude, altitude, horizontal and vertical accuracy, course, speed and times. The API reports unavailable fields explicitly rather than using zero as a value. Altitude is above the WGS 84 ellipsoid, as Android's `getAltitude` and Apple's `ellipsoidalAltitude` give it; height above mean sea level is a separate field, Apple's `altitude` and Android's `getMslAltitudeMeters` (API 34), unavailable where the provider has none, since the two differ by the geoid's tens of meters. Each fix carries the wall-clock time the provider gives (`CLLocation.timestamp`, `Location.getTime`), which can jump when the clock is set, and a monotonic time since boot only where the provider has one (`getElapsedRealtimeNanos` on Android; none on Apple). The core delivers fixes in the order the provider sends them and does not compare location times with motion timestamps.
+`Timestamp` is provider wall time. Android additionally supplies monotonic time since boot with `HasMonotonic`; Apple supplies none. Cache decisions use monotonic time on Android and provider wall time on Apple. `Cached` identifies a fix predating the request and `Age` reports its delivery age. A future cached monotonic timestamp is rejected. Updates preserve provider ordering except samples explicitly replaced under back-pressure.
 
-A request chooses desired accuracy, minimum distance and whether a one-shot or stream is wanted. The backend may deliver a less accurate fix while the provider warms up, but each sample says its accuracy. The core does not reverse-geocode, snap to roads or infer a place name.
+## Motion values
 
-The location permission joins `core.Permission` as a location key, which `Scope.PermissionStatus` reads and `RequestPermission` asks for, so the service adds no permission API of its own. Apple uses `CLLocationManager`'s authorization and accuracy state. `WhenInUse` and `Always` are distinct app declarations. Continuous background delivery needs the `location` background mode and `allowsBackgroundLocationUpdates` set before the stream starts, under either grant: with When In Use the system shows its background location indicator while it runs. `Always` is needed only for services that relaunch the app, such as region monitoring, significant changes and visits, which this scope leaves out; the system may still reduce updates. Android separates fine and coarse location and its background location grant. The tool adds only the usage descriptions and manifest permissions named by the app, and code never starts a prompt implicitly.
+`MotionOptions.Sensors` is a set of `SensorAccelerometer`, `SensorGyroscope`, `SensorMagnetometer` and `SensorDeviceMotion`. Zero requests accelerometer. The default interval is 20 ms, clamped to 10 ms–1 s and then to hardware limits. Each `MotionSample` identifies its sensor, monotonic timestamp, interval, accuracy where known, gap and drop count.
 
-`nsgo build` needs work for this. `apple.info` writes only string entries, so it cannot declare the `UIBackgroundModes` array that background delivery needs, or the `NSLocationTemporaryUsageDescriptionDictionary` that `requestTemporaryFullAccuracyAuthorizationWithPurposeKey` needs to ask for a precise fix after the user chose an approximate one; `nsgo.yaml` gains keys for both. On macOS, `hardenedEntitlements` (`cmd/nsgo/sign.go`) claims `com.apple.security.personal-information.location` when `apple.info` gives a location usage description, as it claims the microphone and the camera, so a notarized build under the hardened runtime, and a Mac App Store build whose sandbox entitlements copy that map, may use Location Services.
+Vectors use natural, right-handed device axes: x toward screen right, y toward top, z out of the face, without an orientation-dependent transform. Acceleration uses m/s² with Android's sign; face-up at rest is +9.80665 on z. Core Motion acceleration, gravity and user acceleration multiply by -9.80665. Rotation is rad/s and magnetic field µT. `Vector` belongs to raw readings; fused samples use `Gravity`, `UserAcceleration`, `RotationRate` and `Attitude`.
 
-The final API must decide whether a one-shot request can use the last cached fix. If it can, the result must identify its age and accuracy; otherwise the backend waits for a new provider fix. A cached fix is never treated as proof that the user is currently at a place.
+Attitude rotates device axes into east-north-up world axes when `HeadingReferenced` is true. Apple prefers magnetic-north reference and rotates its north-west-up frame a quarter turn about z; otherwise its arbitrary horizontal frame reports no heading reference. Android uses its rotation vector's world frame. The contract promises neither identical noise nor synchronized companion readings.
 
-## Motion
+## Back-pressure
 
-Motion samples use SI units in the right-handed device frame Android and Core Motion share: x toward the screen's right, y toward its top and z out of its face, in the device's natural orientation. Accelerometer, gravity and user-acceleration vectors are in m/s² with Android's sign, so a device lying face up at rest reads +9.81 on z; rotation rates are in rad/s, positive by the right-hand rule, and magnetic fields in µT. A fused attitude rotates the device frame into an east-north-up world frame, as Android's rotation vector does. The core distinguishes raw accelerometer and gyroscope readings from a fused device-motion estimate. Every stream carries the provider's monotonic timestamps (`CMLogItem.timestamp`, `SensorEvent.timestamp`), its sampling interval and an accuracy or calibration state where the platform supplies one.
+A `driver.SensorPacket` holds the latest copied sample per stream/sensor under a mutex and queues at most one engine wake-up. Replacement accumulates `Dropped` since the preceding delivery. Permission and terminal reports never replace samples. Android also keeps only the latest sample per stream/sensor before writing the pipe, adding those drops to the engine's count. Providers may independently sample slower than requested; the count measures replaced deliveries rather than estimating unseen hardware samples.
 
-The app requests a bounded sample interval and a set of sensors. The backend clamps an interval the platform cannot provide and reports the effective interval once. It may drop samples under back-pressure, but it must preserve the latest sample and report whether a stream is throttled; it must not silently allocate an unbounded queue.
+## Permissions and packaging
 
-Apple keeps Core Motion's axes but not its unit or sign for acceleration: `CMAccelerometerData`, `CMDeviceMotion.gravity` and `userAcceleration` are in g and point the other way (a face-up device reads −1 on z), so the backend multiplies them by −9.80665. Rotation rates and magnetic fields map as they are. Core Motion's north-referenced attitude frames (`CMAttitudeReferenceFrameXMagneticNorthZVertical`, `XTrueNorthZVertical`) put x toward north, so the backend turns them a quarter turn about the vertical into east-north-up; an attitude from an arbitrary-x frame says its heading has no reference. Android maps `SensorManager` events as they are and documents its event timestamps. Device orientation is metadata, not a hidden transform. The API does not promise identical noise, calibration or rate across platforms.
+`AccessLocation`, `AccessBackgroundLocation` and `AccessMotion` are separate capabilities, mirrored by TSX package grants `location`, `backgroundLocation` and `motion`. Background sampling also needs foreground location access. Starting a stream never requests a grant implicitly.
 
-Android's raw motion sensors need no user prompt, while activity recognition, body sensors and target-specific sensors may. iOS, watchOS and visionOS 27.2 add `CMMotionManager.authorizationStatus`, the authorization for access to motion sensor data, so the user can deny or restrict the accelerometer, gyroscope and device motion there: the backend reads it before starting a stream and reports a denied or restricted motion grant as such rather than starting a stream that delivers nothing. The backend reports each required authorization separately, the motion grant as a `core.Permission` key of its own. An app can stop a high-rate stream without changing location or notification permission.
+Apple declarations live in `apple.info`: `NSLocationWhenInUseUsageDescription`, macOS's `NSLocationUsageDescription` where needed, and `NSMotionUsageDescription`. Hardened-runtime and store signing add the location entitlement only with a nonempty location usage description. Arrays and dictionaries encode as native plist values, including `UIBackgroundModes: [location]` and temporary-accuracy purpose dictionaries; requesting temporary full accuracy is a later API. Background updates need the declared mode and a manager supporting background delivery; When In Use may continue with the native indicator. This service provides no region-monitoring relaunch guarantee.
 
-## Power, privacy and capabilities
+Android declares `ACCESS_COARSE_LOCATION`, optional `ACCESS_FINE_LOCATION`, and for background streams `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_LOCATION` on API 34+. A location foreground service continues an explicitly started foreground grant. Apps additionally declaring `ACCESS_BACKGROUND_LOCATION` request it separately, after foreground authorization; Android 11+ opens the app's settings only on that explicit request. A background stream requires the app's notification title, with an optional body. Starting its foreground service can still be refused by the system's background-start rules.
 
-High accuracy and high sample rates cost battery. The API requires an explicit stream and rate, uses provider batching where the target supports it, and exposes a stop operation. Background policies are opt-in and bounded by a declared purpose and budget. The service never uploads samples or writes them to storage on the app's behalf.
+`LocationService` is non-exported and non-sticky. It owns the visible notification while background streams exist. A standalone Activity destroyed during tracking retains its engine's one view with an application context, and reattaches that same view when reopened; the final stopped stream releases a retained engine. Embedded hosts keep ownership of their engines. The prebuilt runtime's dex and jar ship with the Java sources and `runtime/build.sh` that rebuilds them.
 
-Location and motion data use a dedicated capability, distinct from network, contacts and calendar. The final access model must decide whether location and motion are separate grants. A denied scope receives no coordinates or sensor arrays, and diagnostics contain only stable error codes, never a location.
+## Verification and remaining acceptance
 
-## Verification
+Core tests cover separate grants, scope cancellation, one-shot completion, inactive/background transitions, generation rejection, resume gaps, timeout pause and rate validation. Driver tests exercise concurrent latest-value delivery and drop accounting; Android tests cover wire values, per-sensor coalescing and JVM provider/cache/rate fixtures. Apple tests use constructed CLLocation fixtures, never live positions, and check struct returns, cache rejection, missing values, acceleration units and frame conversion. TSX and the gallery use `nsgotest.SensorPermissions`, `SensorAnswers`, `LocationCache`, `FeedLocation` and `FeedMotion`.
 
-The implementation is complete only when these checks exist:
-
-- headless `core` tests cover authorization, one-shot versus stream ownership, cancellation, pausing in the background and resuming with a gap, sample ordering, missing fields, rate clamping and bounded back-pressure;
-- `internal/driver` tests cover coordinate encoding, timestamps, empty sensor sets and large batches;
-- Apple tests use fake location and motion managers for permission changes, reduced accuracy, denied motion access, unavailable sensors, a face-up device reading +9.81 m/s² on z and stop-on-disposal;
-- Android tests use fake location and sensor providers for coarse/fine permission, provider changes, sensor accuracy and API-level differences;
-- `nsgotest` keeps the permissions the platform reports and the answers a prompt gets in `Permissions` and `PermissionAnswers`, as it does every permission, and a location and motion model of the fixes and samples a test feeds, so apps test location headless;
-- `examples/gallery`'s System page shows a fix and live motion samples and checks them with that model; and
-- target tests use recorded fixtures or simulator providers, never a user's live location, and verify no sample reaches a disposed scope.
-
-## Open decisions
-
-These decisions block the implementation and are recorded in [Open questions](../../ARCHITECTURE.md#open-questions); confirm each with the user before choosing it:
-
-1. Can a one-shot location use a cached fix, and what maximum age is acceptable?
-2. Does the first release offer background location at all, through When In Use with the background mode on Apple and a location foreground service or `ACCESS_BACKGROUND_LOCATION` on Android, or only foreground fixes?
-3. Is the public motion API raw sensors only, or does it include fused device motion, with its east-north-up attitude and gravity split, from the start?
-4. Does the capability model separate location from motion and foreground from background access?
-5. Are dropped high-rate samples reported as an explicit event, a counter, or only through effective-rate metadata?
+Device acceptance remains necessary for native authorization changes, reduced accuracy, service notifications, Activity destruction/reopening, suspended Apple delivery and sensor calibration/rates on actual hardware. Tests must use injected simulator locations or recorded fixtures, never a user's live location. Other providers, geofencing, steps, barometer, activity recognition and bounded background motion remain in the roadmap.

@@ -1352,6 +1352,11 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemOpenURL:
 			s.openURL(it.Value, it.Count)
 			continue
+		case driver.ItemSensor:
+			if it.Sensor.Command != driver.SensorStop {
+				s.engine.Dispatch(driver.NoSensor(it))
+			}
+			continue
 		case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 			s.engine.Dispatch(driver.NoBiometric(it))
 			continue

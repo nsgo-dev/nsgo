@@ -296,6 +296,7 @@ func (s *surface) close() {
 		return
 	}
 	s.closed = true
+	s.sensors.Close()
 	s.dropLink()
 	for _, stop := range s.stops {
 		stop()

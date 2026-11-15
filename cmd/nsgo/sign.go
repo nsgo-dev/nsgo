@@ -154,20 +154,21 @@ func (p *project) macSignArgs(path string) []string {
 	return append(args, path)
 }
 
-// hardenedEntitlements are what the hardened runtime denies unless the app claims it, as the Info.plist entries apple.info gives ask for: the microphone, the camera, and the calendars, whose entitlement reminders share.
+// hardenedEntitlements are what the hardened runtime denies unless the app claims it, as the Info.plist entries apple.info gives ask for: the microphone, the camera, the calendars, whose entitlement reminders share, and location.
 func (p *project) hardenedEntitlements() map[string]any {
 	ents := map[string]any{}
-	info := p.Apple.Info
-	if info["NSMicrophoneUsageDescription"] != "" {
+	described := p.appleInfoDescribes
+	if described("NSMicrophoneUsageDescription") {
 		ents["com.apple.security.device.audio-input"] = true
 	}
-	if info["NSCameraUsageDescription"] != "" {
+	if described("NSCameraUsageDescription") {
 		ents["com.apple.security.device.camera"] = true
 	}
-	for _, key := range []string{"NSCalendarsFullAccessUsageDescription", "NSCalendarsUsageDescription", "NSRemindersFullAccessUsageDescription", "NSRemindersUsageDescription"} {
-		if info[key] != "" {
-			ents["com.apple.security.personal-information.calendars"] = true
-		}
+	if described("NSCalendarsFullAccessUsageDescription", "NSCalendarsUsageDescription", "NSRemindersFullAccessUsageDescription", "NSRemindersUsageDescription") {
+		ents["com.apple.security.personal-information.calendars"] = true
+	}
+	if described("NSLocationUsageDescription", "NSLocationWhenInUseUsageDescription", "NSLocationAlwaysAndWhenInUseUsageDescription") {
+		ents["com.apple.security.personal-information.location"] = true
 	}
 	return ents
 }
@@ -483,4 +484,14 @@ func encodePlist(v any) []byte {
 	write(v, "")
 	b.WriteString("</plist>\n")
 	return b.Bytes()
+}
+
+// appleInfoDescribes reports whether apple.info gives any of keys a nonempty string, as a usage description is.
+func (p *project) appleInfoDescribes(keys ...string) bool {
+	for _, key := range keys {
+		if s, _ := p.Apple.Info[key].(string); s != "" {
+			return true
+		}
+	}
+	return false
 }

@@ -38,7 +38,7 @@ func TestReleaseNames(t *testing.T) {
 // picks, what apple.info explains and macos.entitlements.
 func TestSandboxEntitlements(t *testing.T) {
 	p := &project{}
-	p.Apple.Info = map[string]string{"NSMicrophoneUsageDescription": "Calls"}
+	p.Apple.Info = map[string]any{"NSMicrophoneUsageDescription": "Calls"}
 	p.MacOS.Entitlements = map[string]any{"com.apple.security.files.downloads.read-write": true}
 	ents := p.sandboxEntitlements()
 	for _, key := range []string{"com.apple.security.app-sandbox", "com.apple.security.network.client",

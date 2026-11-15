@@ -137,6 +137,8 @@ type view struct {
 }
 
 type surface struct {
+	sensors apple.Sensors
+
 	batch uint64 // batches applied
 	// hinge is the latest a UIHingeInteraction reported (watchHinge).
 	hinge hingeReading
@@ -889,6 +891,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemDismissKeyboard:
 			s.native.Send(sel("endEditing:"), true)
+			continue
+		case driver.ItemSensor:
+			s.sensors.Handle(it, s.engine.Dispatch, !onTV(), !onTV())
 			continue
 		case driver.ItemSpeech:
 			apple.HandleSpeech(it.Count, *it.Speech, s.engine.Dispatch)

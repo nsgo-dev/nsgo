@@ -21,18 +21,21 @@ type Capabilities struct {
 	WebView *WebView `json:"webview,omitempty"`
 	// OpenURL is openUrl: every URL, or those of Schemes.
 	OpenURL *OpenURL `json:"openUrl,omitempty"`
-	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, TextToSpeech speaking text with the system's voices, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Secrets the package's own part of the app's secure store, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session.
-	Clipboard       bool `json:"clipboard,omitempty"`
-	Picker          bool `json:"picker,omitempty"`
-	Speech          bool `json:"speech,omitempty"`
-	TextToSpeech    bool `json:"textToSpeech,omitempty"`
-	StatusBar       bool `json:"statusBar,omitempty"`
-	Notifications   bool `json:"notifications,omitempty"`
-	Biometrics      bool `json:"biometrics,omitempty"`
-	SignInWithApple bool `json:"signInWithApple,omitempty"`
-	Secrets         bool `json:"secrets,omitempty"`
-	Audio           bool `json:"audio,omitempty"`
-	AuthSession     bool `json:"authSession,omitempty"`
+	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, TextToSpeech speaking text with the system's voices, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Secrets the package's own part of the app's secure store, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session, Location foreground location, BackgroundLocation location that continues in the background, Motion the motion sensors.
+	Clipboard          bool `json:"clipboard,omitempty"`
+	Picker             bool `json:"picker,omitempty"`
+	Speech             bool `json:"speech,omitempty"`
+	TextToSpeech       bool `json:"textToSpeech,omitempty"`
+	StatusBar          bool `json:"statusBar,omitempty"`
+	Notifications      bool `json:"notifications,omitempty"`
+	Biometrics         bool `json:"biometrics,omitempty"`
+	SignInWithApple    bool `json:"signInWithApple,omitempty"`
+	Secrets            bool `json:"secrets,omitempty"`
+	Audio              bool `json:"audio,omitempty"`
+	AuthSession        bool `json:"authSession,omitempty"`
+	Location           bool `json:"location,omitempty"`
+	BackgroundLocation bool `json:"backgroundLocation,omitempty"`
+	Motion             bool `json:"motion,omitempty"`
 	// Host names the host's handlers host.call and host.post may reach:
 	// a name, a prefix ending in "*", or "*" for all.
 	Host []string `json:"host,omitempty"`
@@ -134,6 +137,12 @@ func ParseCapabilities(data []byte, strict bool) (c Capabilities, ignored []stri
 			err = json.Unmarshal(raw, &c.Audio)
 		case "authSession":
 			err = json.Unmarshal(raw, &c.AuthSession)
+		case "location":
+			err = json.Unmarshal(raw, &c.Location)
+		case "backgroundLocation":
+			err = json.Unmarshal(raw, &c.BackgroundLocation)
+		case "motion":
+			err = json.Unmarshal(raw, &c.Motion)
 		case "host":
 			if string(bytes.TrimSpace(raw)) == "true" {
 				c.Host = []string{"*"}
@@ -322,21 +331,24 @@ func validHostGrant(g string) bool {
 
 // The capabilities' keys, which core.Access names as its permissions.
 const (
-	capNetwork         = "network"
-	capWebView         = "webview"
-	capOpenURL         = "openUrl"
-	capClipboard       = "clipboard"
-	capPicker          = "picker"
-	capSpeech          = "speech"
-	capTextToSpeech    = "textToSpeech"
-	capStatusBar       = "statusBar"
-	capNotifications   = "notifications"
-	capBiometrics      = "biometrics"
-	capSignInWithApple = "signInWithApple"
-	capSecrets         = "secrets"
-	capAudio           = "audio"
-	capAuthSession     = "authSession"
-	capHost            = "host"
+	capNetwork            = "network"
+	capWebView            = "webview"
+	capOpenURL            = "openUrl"
+	capClipboard          = "clipboard"
+	capPicker             = "picker"
+	capSpeech             = "speech"
+	capTextToSpeech       = "textToSpeech"
+	capStatusBar          = "statusBar"
+	capNotifications      = "notifications"
+	capBiometrics         = "biometrics"
+	capSignInWithApple    = "signInWithApple"
+	capSecrets            = "secrets"
+	capAudio              = "audio"
+	capAuthSession        = "authSession"
+	capLocation           = "location"
+	capBackgroundLocation = "backgroundLocation"
+	capMotion             = "motion"
+	capHost               = "host"
 )
 
 // Allows reports whether c grants permission, a capability's key, for
@@ -390,6 +402,12 @@ func (c *Capabilities) Allows(permission, resource, method string) bool {
 		return c.Audio
 	case capAuthSession:
 		return c.AuthSession
+	case capLocation:
+		return c.Location
+	case capBackgroundLocation:
+		return c.BackgroundLocation
+	case capMotion:
+		return c.Motion
 	case capHost:
 		if !validHostName(resource) {
 			return false

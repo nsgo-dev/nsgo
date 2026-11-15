@@ -6,6 +6,8 @@ Audio playback is the `audio` package, whose engine part `core` carries as a ser
 
 Remote push is designed separately in [Remote push](remote-push.md); it is not implemented by the local notification service described below.
 
+Location and motion use scoped permission requests and bounded streams on Apple and Android; [location and motion](location-motion.md) defines caching, units, lifecycle, background declarations and unavailable targets.
+
 ## Requests and answers
 
 A service is a command item in the batch. One that answers, such as a clipboard read, an opened URL or a pick, carries a number in `Count` and comes back as an event with it.

@@ -356,6 +356,8 @@ const (
 	ItemRecentFile
 	// ItemSpeak asks the platform's speech synthesizer what Speak says, of utterance or request Count; the platform reports it with EventSpeak carrying Count. The core sends none where the environment says no Speak.
 	ItemSpeak
+	// ItemSensor starts, stops or queries sensor session Count.
+	ItemSensor
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -535,7 +537,8 @@ type MountItem struct {
 	Screen    *ScreenConfig
 	// Pick is ItemPickImages' and ItemTakePhoto's request.
 	Pick *PickRequest
-	// Speech is an ItemSpeech's request, Audio an ItemAudio's.
+	// Sensor is an ItemSensor's request, Speech an ItemSpeech's, Audio an ItemAudio's.
+	Sensor *SensorRequest
 	Speech *SpeechRequest
 	Audio  *AudioRequest
 	// Auth is an ItemAuthSession's request.

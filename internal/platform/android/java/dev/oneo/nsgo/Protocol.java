@@ -60,6 +60,8 @@ final class Protocol {
     static final int RECORDING_REPORT = 18;
     /** Answers a SECRET: its number, an error ("" for none), whether a value was found and the value. */
     static final int SECRET_REPLY = 19;
+    /** A sensor session's report or coalesced sample: JSON (sensors.go). */
+    static final int SENSOR_REPORT = 20;
 
     // What a SECRET message asks, as secrets.go has them.
     static final int SECRET_READ = 0;
@@ -181,6 +183,7 @@ final class Protocol {
     static final int ITEM_OPEN_SURFACE = 68;
     static final int ITEM_OVERLAY_PERMISSION = 89;
     static final int ITEM_SPEAK = 102;
+    static final int ITEM_SENSOR = 103;
 
     // What EVENT_OVERLAY_PERMISSION answers ITEM_OVERLAY_PERMISSION with, and why an overlay ends, as the driver's.
     static final int OVERLAY_DENIED = 0;

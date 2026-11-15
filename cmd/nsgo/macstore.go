@@ -27,7 +27,7 @@ func (p *project) sandboxEntitlements() map[string]any {
 		"com.apple.security.files.user-selected.read-write": true,
 	}
 	maps.Copy(ents, p.hardenedEntitlements())
-	if p.Apple.Info["NSBluetoothAlwaysUsageDescription"] != "" {
+	if p.appleInfoDescribes("NSBluetoothAlwaysUsageDescription") {
 		ents["com.apple.security.device.bluetooth"] = true
 	}
 	maps.Copy(ents, p.MacOS.Entitlements)

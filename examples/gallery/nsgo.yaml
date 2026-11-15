@@ -28,6 +28,9 @@ apple:
     NSMicrophoneUsageDescription: The System page dictates what you say.
     NSSpeechRecognitionUsageDescription: The System page turns what you say into text.
     NSCameraUsageDescription: The System page takes a photo with the camera.
+    NSLocationWhenInUseUsageDescription: The System page shows location fixes when you request them.
+    NSMotionUsageDescription: The System page shows motion samples when you start a sensor.
+    UIBackgroundModes: [location]
     NSFaceIDUsageDescription: The System page asks for Face ID to show the prompt.
     NSCalendarsFullAccessUsageDescription: The System page shows how the app asks for your calendars.
     NSCalendarsUsageDescription: The System page shows how the app asks for your calendars.
@@ -37,4 +40,4 @@ apple:
     NSAppleMusicUsageDescription: The System page shows how the app asks for your media library.
 
 android:
-  permissions: [POST_NOTIFICATIONS, USE_BIOMETRIC]
+  permissions: [POST_NOTIFICATIONS, USE_BIOMETRIC, ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION, FOREGROUND_SERVICE, FOREGROUND_SERVICE_LOCATION]

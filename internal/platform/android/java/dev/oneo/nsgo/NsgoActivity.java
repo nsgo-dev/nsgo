@@ -19,7 +19,7 @@ import android.view.WindowManager;
  */
 public class NsgoActivity extends Activity {
     /**
-     * The view of an activity that ended while the app's overlays over other apps kept its process running, as when the user removes the app's task, which the next activity shows again: the engine serves the one view that first attached to it, so the view moves to the new activity, its context wrapping that one. Null otherwise.
+     * The view of an activity that ended while the app's overlays over other apps or its background location streams kept its process running, as when the user removes the app's task, which the next activity shows again: the engine serves the one view that first attached to it, so the view moves to the new activity, its context wrapping that one. Null otherwise.
      */
     private static NsgoView kept;
 
@@ -50,7 +50,7 @@ public class NsgoActivity extends Activity {
         // The view lays itself out behind the system bars and styles them.
         NsgoView again = kept;
         kept = null;
-        if (again != null && again.keptForOverlays()) {
+        if (again != null && again.keptOffScreen()) {
             ((MutableContextWrapper) again.getContext()).setBaseContext(this);
             view = again;
             view.showAgain();
@@ -104,10 +104,10 @@ public class NsgoActivity extends Activity {
         view.permissionResult(request, permissions, results);
     }
 
-    /** Ends the app with the activity, unless its overlays over other apps keep it running, off screen, for the next activity. */
+    /** Ends the app with the activity, unless its overlays over other apps or its background location streams keep it running, off screen, for the next activity. */
     @Override
     protected void onDestroy() {
-        if (view.keepForOverlays()) {
+        if (view.keepOffScreen()) {
             ((ViewGroup) view.getParent()).removeView(view);
             ((MutableContextWrapper) view.getContext()).setBaseContext(new ContextThemeWrapper(getApplicationContext(), theme));
             kept = view;

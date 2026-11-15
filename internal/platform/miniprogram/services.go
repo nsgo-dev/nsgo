@@ -100,6 +100,10 @@ func (s *surface) service(it *driver.MountItem) {
 		s.navigationColors()
 	case driver.ItemStatusBar:
 		s.statusBar(it.StatusBar)
+	case driver.ItemSensor:
+		if it.Sensor.Command != driver.SensorStop {
+			s.engine.Dispatch(driver.NoSensor(it))
+		}
 	case driver.ItemSpeech:
 		// The environment says it has no speech: the core sends none.
 	case driver.ItemPermission:

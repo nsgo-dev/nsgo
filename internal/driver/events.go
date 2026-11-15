@@ -269,6 +269,8 @@ const (
 	EventDockMenu
 	// EventSpeak reports utterance Count's end, or answers ItemSpeak Count's SpeakVoices (Data, a *SpeakEvent).
 	EventSpeak
+	// EventSensor delivers a SensorReport or a coalesced SensorPacket.
+	EventSensor
 )
 
 // What EventInputModality reports.

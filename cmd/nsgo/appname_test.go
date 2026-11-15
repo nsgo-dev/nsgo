@@ -68,7 +68,7 @@ func TestAppNames(t *testing.T) {
 
 func TestApplePlistTakesTheProjectsEntries(t *testing.T) {
 	p := &project{Name: "App", ID: "dev.oneo.app"}
-	p.Apple.Info = map[string]string{"NSMicrophoneUsageDescription": "Dictate & send"}
+	p.Apple.Info = map[string]any{"NSMicrophoneUsageDescription": "Dictate & send"}
 	path := filepath.Join(t.TempDir(), "Info.plist")
 	if err := writePlist(path, p, macPlist, ""); err != nil {
 		t.Fatal(err)

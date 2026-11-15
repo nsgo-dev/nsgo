@@ -194,6 +194,12 @@ const AuthLoopback = "http://127.0.0.1:49152"
 // goroutine; the app's goroutines reach it through Scope.Post, which App
 // runs when it settles.
 type App struct {
+	// SensorPermissions are read without prompting; SensorAnswers supply explicit prompt answers.
+	SensorPermissions, SensorAnswers map[core.SensorKind]core.SensorGrant
+	SensorPrompts                    []core.SensorKind
+	LocationCache                    *core.LocationFix
+	sensorRuns                       map[uint32]*sensorRun
+
 	t    testing.TB
 	size driver.Size
 	// modality is the input modality last reported, as a platform reports

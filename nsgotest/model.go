@@ -703,6 +703,8 @@ func (a *App) apply(b *driver.MountBatch) {
 			} else {
 				a.InputSource = a.inputSourceWas
 			}
+		case driver.ItemSensor:
+			a.sensor(it.Count, *it.Sensor)
 		case driver.ItemSpeech:
 			a.speech(it.Count, *it.Speech)
 		case driver.ItemAuthSession:

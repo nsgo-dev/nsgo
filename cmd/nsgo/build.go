@@ -1088,7 +1088,7 @@ const plistHead = `<?xml version="1.0" encoding="UTF-8"?>
 	<key>CFBundleShortVersionString</key><string>{{.Version}}</string>
 	<key>CFBundleVersion</key><string>{{.BundleVersion}}</string>
 {{- range $key, $value := .Apple.Info}}
-	<key>{{html $key}}</key><string>{{html $value}}</string>
+	<key>{{html $key}}</key>{{$.InfoValue $value}}
 {{- end}}
 `
 

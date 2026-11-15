@@ -2579,3 +2579,17 @@ cameraPay: "Pay"
 cameraPick: "Pick a drink"
 cameraReady: "Collect at the counter"
 cameraDeclined: "declined"
+
+systemSensorsTitle: Location and motion
+systemSensorsSummary: Explicit permissions, fresh fixes and scoped sensor streams.
+systemSensorsIdle: Not started
+systemSensorsTracking: Location tracking is active
+systemSensorsBackgroundPermission: Background permission
+systemSensorsMotionPermission: Motion permission
+systemSensorsLocate: Fresh location
+systemSensorsTrack: Track location
+systemSensorsBackground: Track in background
+systemSensorsStop: Stop sensors
+systemSensorsAccelerometer: Accelerometer
+systemSensorsFused: Fused motion
+systemSensorsAuthorization: "{state, select, granted {Granted} denied {Denied} restricted {Restricted} unavailable {Unavailable} other {Not asked}}"

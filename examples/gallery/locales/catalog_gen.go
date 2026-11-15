@@ -232,6 +232,7 @@ var Parameters = map[string][]string{
 	"WidgetsHours":                 {"count"},
 	"WidgetsOfGoal":                {"goal"},
 	"SystemPermissionsUnavailable": {"permissions"},
+	"SystemSensorsAuthorization":   {"state"},
 }
 
 // Translation is a language's messages another package supplies:
@@ -428,6 +429,7 @@ type Translation struct {
 	WidgetsHours                 func(count int) string
 	WidgetsOfGoal                func(goal int) string
 	SystemPermissionsUnavailable func(permissions string) string
+	SystemSensorsAuthorization   func(state string) string
 }
 
 var supplied = map[string]Translation{}
@@ -2727,6 +2729,18 @@ const (
 	textCameraPick
 	textCameraReady
 	textCameraDeclined
+	textSystemSensorsTitle
+	textSystemSensorsSummary
+	textSystemSensorsIdle
+	textSystemSensorsTracking
+	textSystemSensorsBackgroundPermission
+	textSystemSensorsMotionPermission
+	textSystemSensorsLocate
+	textSystemSensorsTrack
+	textSystemSensorsBackground
+	textSystemSensorsStop
+	textSystemSensorsAccelerometer
+	textSystemSensorsFused
 	numTexts
 )
 
@@ -5026,6 +5040,18 @@ var keyOfText = [numTexts]string{
 	"cameraPick",
 	"cameraReady",
 	"cameraDeclined",
+	"systemSensorsTitle",
+	"systemSensorsSummary",
+	"systemSensorsIdle",
+	"systemSensorsTracking",
+	"systemSensorsBackgroundPermission",
+	"systemSensorsMotionPermission",
+	"systemSensorsLocate",
+	"systemSensorsTrack",
+	"systemSensorsBackground",
+	"systemSensorsStop",
+	"systemSensorsAccelerometer",
+	"systemSensorsFused",
 }
 
 // textsEn are the messages without arguments in en.
@@ -7322,7 +7348,19 @@ var textsEn = i18n.NewTexts(""+
 	"Pay"+
 	"Pick a drink"+
 	"Collect at the counter"+
-	"declined",
+	"declined"+
+	"Location and motion"+
+	"Explicit permissions, fresh fixes and scoped sensor streams."+
+	"Not started"+
+	"Location tracking is active"+
+	"Background permission"+
+	"Motion permission"+
+	"Fresh location"+
+	"Track location"+
+	"Track in background"+
+	"Stop sensors"+
+	"Accelerometer"+
+	"Fused motion",
 	[]uint16{
 		7,
 		7,
@@ -9617,6 +9655,18 @@ var textsEn = i18n.NewTexts(""+
 		12,
 		22,
 		8,
+		19,
+		60,
+		11,
+		27,
+		21,
+		17,
+		14,
+		14,
+		19,
+		12,
+		13,
+		12,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -11913,7 +11963,19 @@ var textsZhHans = i18n.NewTexts(""+
 	"支付"+
 	"选择饮品"+
 	"到柜台取餐"+
-	"被拒",
+	"被拒"+
+	"定位与运动"+
+	"显式授权、新定位与随作用域停止的传感器采样。"+
+	"未开始"+
+	"正在持续定位"+
+	"后台定位授权"+
+	"运动传感器授权"+
+	"获取新定位"+
+	"持续定位"+
+	"后台持续定位"+
+	"停止传感器"+
+	"加速度计"+
+	"融合运动",
 	[]uint16{
 		6,
 		6,
@@ -14208,6 +14270,18 @@ var textsZhHans = i18n.NewTexts(""+
 		12,
 		15,
 		6,
+		15,
+		66,
+		9,
+		18,
+		18,
+		21,
+		15,
+		12,
+		18,
+		15,
+		12,
+		12,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -14827,6 +14901,9 @@ func Supply(lang string, t Translation) {
 	}
 	if t.SystemPermissionsUnavailable != nil {
 		s.SystemPermissionsUnavailable = t.SystemPermissionsUnavailable
+	}
+	if t.SystemSensorsAuthorization != nil {
+		s.SystemSensorsAuthorization = t.SystemSensorsAuthorization
 	}
 	supplied[lang] = s
 	Catalog.Add(lang)
@@ -36519,3 +36596,147 @@ func CameraDeclined(cx *core.Scope) string { return For(cx).CameraDeclined() }
 
 // CameraDeclined is the package's CameraDeclined in the language of msgs.
 func (msgs Messages) CameraDeclined() string { return msgs.text(textCameraDeclined) }
+
+// SystemSensorsTitle says "Location and motion"
+// in the language the app shows under cx.
+func SystemSensorsTitle(cx *core.Scope) string { return For(cx).SystemSensorsTitle() }
+
+// SystemSensorsTitle is the package's SystemSensorsTitle in the language of msgs.
+func (msgs Messages) SystemSensorsTitle() string { return msgs.text(textSystemSensorsTitle) }
+
+// SystemSensorsSummary says "Explicit permissions, fresh fixes and scoped sensor streams."
+// in the language the app shows under cx.
+func SystemSensorsSummary(cx *core.Scope) string { return For(cx).SystemSensorsSummary() }
+
+// SystemSensorsSummary is the package's SystemSensorsSummary in the language of msgs.
+func (msgs Messages) SystemSensorsSummary() string { return msgs.text(textSystemSensorsSummary) }
+
+// SystemSensorsIdle says "Not started"
+// in the language the app shows under cx.
+func SystemSensorsIdle(cx *core.Scope) string { return For(cx).SystemSensorsIdle() }
+
+// SystemSensorsIdle is the package's SystemSensorsIdle in the language of msgs.
+func (msgs Messages) SystemSensorsIdle() string { return msgs.text(textSystemSensorsIdle) }
+
+// SystemSensorsTracking says "Location tracking is active"
+// in the language the app shows under cx.
+func SystemSensorsTracking(cx *core.Scope) string { return For(cx).SystemSensorsTracking() }
+
+// SystemSensorsTracking is the package's SystemSensorsTracking in the language of msgs.
+func (msgs Messages) SystemSensorsTracking() string { return msgs.text(textSystemSensorsTracking) }
+
+// SystemSensorsBackgroundPermission says "Background permission"
+// in the language the app shows under cx.
+func SystemSensorsBackgroundPermission(cx *core.Scope) string {
+	return For(cx).SystemSensorsBackgroundPermission()
+}
+
+// SystemSensorsBackgroundPermission is the package's SystemSensorsBackgroundPermission in the language of msgs.
+func (msgs Messages) SystemSensorsBackgroundPermission() string {
+	return msgs.text(textSystemSensorsBackgroundPermission)
+}
+
+// SystemSensorsMotionPermission says "Motion permission"
+// in the language the app shows under cx.
+func SystemSensorsMotionPermission(cx *core.Scope) string {
+	return For(cx).SystemSensorsMotionPermission()
+}
+
+// SystemSensorsMotionPermission is the package's SystemSensorsMotionPermission in the language of msgs.
+func (msgs Messages) SystemSensorsMotionPermission() string {
+	return msgs.text(textSystemSensorsMotionPermission)
+}
+
+// SystemSensorsLocate says "Fresh location"
+// in the language the app shows under cx.
+func SystemSensorsLocate(cx *core.Scope) string { return For(cx).SystemSensorsLocate() }
+
+// SystemSensorsLocate is the package's SystemSensorsLocate in the language of msgs.
+func (msgs Messages) SystemSensorsLocate() string { return msgs.text(textSystemSensorsLocate) }
+
+// SystemSensorsTrack says "Track location"
+// in the language the app shows under cx.
+func SystemSensorsTrack(cx *core.Scope) string { return For(cx).SystemSensorsTrack() }
+
+// SystemSensorsTrack is the package's SystemSensorsTrack in the language of msgs.
+func (msgs Messages) SystemSensorsTrack() string { return msgs.text(textSystemSensorsTrack) }
+
+// SystemSensorsBackground says "Track in background"
+// in the language the app shows under cx.
+func SystemSensorsBackground(cx *core.Scope) string { return For(cx).SystemSensorsBackground() }
+
+// SystemSensorsBackground is the package's SystemSensorsBackground in the language of msgs.
+func (msgs Messages) SystemSensorsBackground() string { return msgs.text(textSystemSensorsBackground) }
+
+// SystemSensorsStop says "Stop sensors"
+// in the language the app shows under cx.
+func SystemSensorsStop(cx *core.Scope) string { return For(cx).SystemSensorsStop() }
+
+// SystemSensorsStop is the package's SystemSensorsStop in the language of msgs.
+func (msgs Messages) SystemSensorsStop() string { return msgs.text(textSystemSensorsStop) }
+
+// SystemSensorsAccelerometer says "Accelerometer"
+// in the language the app shows under cx.
+func SystemSensorsAccelerometer(cx *core.Scope) string { return For(cx).SystemSensorsAccelerometer() }
+
+// SystemSensorsAccelerometer is the package's SystemSensorsAccelerometer in the language of msgs.
+func (msgs Messages) SystemSensorsAccelerometer() string {
+	return msgs.text(textSystemSensorsAccelerometer)
+}
+
+// SystemSensorsFused says "Fused motion"
+// in the language the app shows under cx.
+func SystemSensorsFused(cx *core.Scope) string { return For(cx).SystemSensorsFused() }
+
+// SystemSensorsFused is the package's SystemSensorsFused in the language of msgs.
+func (msgs Messages) SystemSensorsFused() string { return msgs.text(textSystemSensorsFused) }
+
+// SystemSensorsAuthorization says "{state, select, granted {Granted} denied {Denied} restricted {Restricted} unavailable {Unavailable} other {Not asked}}"
+// in the language the app shows under cx.
+func SystemSensorsAuthorization(cx *core.Scope, state string) string {
+	return For(cx).SystemSensorsAuthorization(state)
+}
+
+// SystemSensorsAuthorization is the package's SystemSensorsAuthorization in the language of msgs.
+func (msgs Messages) SystemSensorsAuthorization(state string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemSensorsAuthorization(state))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemSensorsAuthorization; f != nil {
+			return f(state)
+		}
+		switch lang {
+		case "", "en":
+			var b strings.Builder
+			switch state {
+			case "granted":
+				b.WriteString("Granted")
+			case "denied":
+				b.WriteString("Denied")
+			case "restricted":
+				b.WriteString("Restricted")
+			case "unavailable":
+				b.WriteString("Unavailable")
+			default:
+				b.WriteString("Not asked")
+			}
+			return b.String()
+		case "zh-Hans":
+			var b strings.Builder
+			switch state {
+			case "granted":
+				b.WriteString("已授权")
+			case "denied":
+				b.WriteString("已拒绝")
+			case "restricted":
+				b.WriteString("受限制")
+			case "unavailable":
+				b.WriteString("不可用")
+			default:
+				b.WriteString("未请求")
+			}
+			return b.String()
+		}
+	}
+}

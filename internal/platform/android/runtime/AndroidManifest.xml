@@ -44,6 +44,7 @@
         <!-- Serves the app's files to the apps it hands them to: the
              clipboard's image, a file it opens and the files it shares;
              nsgo build names its authority after the app's package. -->
+        <service android:name="dev.oneo.nsgo.LocationService" android:exported="false" android:foregroundServiceType="location" />
         <provider
             android:name="dev.oneo.nsgo.FileProvider"
             android:authorities="dev.oneo.nsgo.app.nsgo.files"

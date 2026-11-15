@@ -579,12 +579,12 @@ func TestNotarization(t *testing.T) {
 	if args, _ := p.notaryCredentials(); strings.Join(args, " ") != "--key key.p8 --key-id KEY --issuer ISSUER" {
 		t.Errorf("credentials %v", args)
 	}
-	p.Apple.Info = map[string]string{"NSMicrophoneUsageDescription": "Records"}
+	p.Apple.Info = map[string]any{"NSMicrophoneUsageDescription": "Records"}
 	if ents := p.hardenedEntitlements(); ents["com.apple.security.device.audio-input"] != true || len(ents) != 1 {
 		t.Errorf("entitlements %v", ents)
 	}
 	// Reminders share the calendars' entitlement.
-	p.Apple.Info = map[string]string{"NSRemindersFullAccessUsageDescription": "Lists"}
+	p.Apple.Info = map[string]any{"NSRemindersFullAccessUsageDescription": "Lists"}
 	if ents := p.hardenedEntitlements(); ents["com.apple.security.personal-information.calendars"] != true || len(ents) != 1 {
 		t.Errorf("reminders' entitlements %v", ents)
 	}

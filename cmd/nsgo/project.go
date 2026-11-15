@@ -124,10 +124,10 @@ type project struct {
 		AppID            map[string]string `yaml:"appid"`
 		CustomNavigation bool              `yaml:"custom_navigation"`
 	} `yaml:"miniprogram"`
-	// Apple is the macOS and iOS targets': Info holds string entries for
+	// Apple is the macOS and iOS targets': Info holds scalar and array entries for
 	// their Info.plist, such as NSMicrophoneUsageDescription.
 	Apple struct {
-		Info map[string]string `yaml:"info"`
+		Info map[string]any `yaml:"info"`
 		// AppGroup is the app group an iOS app shares with its widgets,
 		// group.<id> by default.
 		AppGroup string `yaml:"app_group"`

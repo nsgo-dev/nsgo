@@ -107,6 +107,8 @@ const (
 	msgRecordingReport = 18
 	// msgSecretReply answers a msgSecret.
 	msgSecretReply = 19
+	// msgSensorReport is a sensor session's report or coalesced packet (sensors.go).
+	msgSensorReport = 20
 )
 
 // The parts of an image view's request msgImage carries.
@@ -116,6 +118,8 @@ const (
 )
 
 type surface struct {
+	sensorReports sensorReports
+
 	mu       sync.Mutex // guards out and buf
 	out      *os.File
 	buf      []byte
@@ -395,6 +399,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			}
 		case msgHost:
 			s.hostMessage(&r)
+		case msgSensorReport:
+			s.sensorReports.receive(payload, s.engine.Dispatch)
 		case msgLiveReport:
 			driver.ReportLiveUpdate(slices.Clone(payload))
 		case msgTimeZone:
@@ -1340,6 +1346,8 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 		case driver.ItemBiometricAuthenticate:
 			w.u32(it.Count)
 			w.str(it.Value)
+		case driver.ItemSensor:
+			writeSensorRequest(w, it.Count, *it.Sensor)
 		case driver.ItemNotificationPermission, driver.ItemOverlayPermission:
 			w.u32(it.Count)
 			w.flags(it.On)
