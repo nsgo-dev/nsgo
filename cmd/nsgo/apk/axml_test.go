@@ -106,6 +106,35 @@ func TestEncodeManifestPermissions(t *testing.T) {
 	}
 }
 
+// TestEncodeManifestLibraries checks that the device's libraries the app uses go into its application as uses-library elements that do not require them, and none without.
+func TestEncodeManifestLibraries(t *testing.T) {
+	data, err := EncodeManifest(androidruntime.Manifest, Manifest{Package: "dev.oneo.nsgo.test", Libraries: []string{"androidx.window.extensions"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var libs []*xmlNode
+	for _, kid := range decodeXML(t, data).root.child(t, "application").kids {
+		if kid.name == "uses-library" {
+			libs = append(libs, kid)
+		}
+	}
+	if len(libs) != 1 || libs[0].string(t, "name") != "androidx.window.extensions" || libs[0].value(t, "required") != 0 {
+		t.Fatalf("uses-library elements %+v, want one that does not require the window extensions", libs)
+	}
+	data, err = EncodeManifest(androidruntime.Manifest, Manifest{Package: "dev.oneo.nsgo.test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kid := range decodeXML(t, data).root.child(t, "application").kids {
+		if kid.name == "uses-library" {
+			t.Fatal("an app that uses no library declares one")
+		}
+	}
+	if _, err := EncodeManifest(androidruntime.Manifest, Manifest{Package: "dev.oneo.nsgo.test", Libraries: []string{"not a library"}}); err == nil {
+		t.Error("a bad library name was accepted")
+	}
+}
+
 func TestEncodeManifestRejectsBadIDs(t *testing.T) {
 	for _, id := range []string{"", "hello", "dev..nsgo", "dev.nsgo.hello world", "1dev.nsgo.hello"} {
 		if _, err := EncodeManifest(androidruntime.Manifest, Manifest{Package: id}); err == nil {
@@ -351,6 +380,7 @@ func TestFrameworkAttributeIDs(t *testing.T) {
 		"theme":                       0x01010000,
 		"icon":                        0x01010002,
 		"debuggable":                  0x0101000f,
+		"required":                    0x0101028e,
 		"extractNativeLibs":           0x010104ea,
 		"enableOnBackInvokedCallback": 0x0101066c,
 		"foregroundServiceType":       0x01010599,

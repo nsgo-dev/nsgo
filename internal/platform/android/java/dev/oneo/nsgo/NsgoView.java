@@ -149,6 +149,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final ArrayList<Node> outside = new ArrayList<>();
     private final int[] location = new int[2];
     private NsgoEngine engine;
+    /** The window's folds and hinges while the view is in one, null where the device reports none. */
+    private Folds folds;
+    private final Runnable foldsReported = this::foldsChanged;
+    /** A report of the folds is waiting for the view's next layout (foldsChanged). */
+    private boolean foldsPending;
     private boolean ownsEngine;
     private boolean attached;
     /** Whether the app's process runs on, off screen, for its overlays over other apps alone, its activity ended (keepForOverlays); and whether the app quit, which keeps nothing. */
@@ -350,7 +355,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
         }
         environment();
-        send(first ? Protocol.START : Protocol.RESIZE, w / density, h / density);
+        foldsPending = false;
+        sendSize(first ? Protocol.START : Protocol.RESIZE);
     }
 
     @Override
@@ -361,7 +367,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         float d = getResources().getDisplayMetrics().density;
         if (d != density && engine != null && engine.isAlive()) {
             density = d;
-            if (primary == null) send(Protocol.RESIZE, getWidth() / density, getHeight() / density);
+            if (primary == null) sendSize(Protocol.RESIZE);
         }
         // A rotation or a display change moves an overlay's usable area: its window moves back onto it before it reports its frame.
         if (primary != null) primary.overlays.fit(this);
@@ -380,6 +386,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         boolean answers = attached || engine == null || engine.canStart();
         if (Build.VERSION.SDK_INT >= 33 && answers) registerBack();
         systemBars();
+        if (folds == null) {
+            folds = Folds.listen(activity(), foldsReported);
+            // The folds may have changed while the view was out of a window, and the report the library sends as it registers reaches no view.
+            if (folds != null) foldsChanged();
+        }
     }
 
     /** The app's lifecycle follows the window's focus and visibility; coming back to the front answers the overlay permission requests the setting held. */
@@ -405,6 +416,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         accessibility.removeTouchExplorationStateChangeListener(screenReader);
         getContext().getContentResolver().unregisterContentObserver(motion);
         unregisterBack();
+        // A view out of its window keeps the geometry it last reported.
+        if (folds != null) {
+            folds.stop(foldsReported);
+            folds = null;
+        }
+        foldsPending = false;
         if (!ownsEngine && primary == null) detachFromEngine();
         super.onDetachedFromWindow();
     }
@@ -1406,6 +1423,61 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     float density() {
         return density;
+    }
+
+    /** A report of the window's folds is a resize to the size the view has, with the geometry measured at it, sent at the view's next layout: the library reports as a configuration is applied, before the traversal that gives the view the window's new size. */
+    private void foldsChanged() {
+        foldsPending = true;
+        requestLayout();
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        // onSizeChanged has sent a new size with the folds already.
+        if (!foldsPending) return;
+        foldsPending = false;
+        if (engine != null && engine.isAlive() && getWidth() > 0) sendSize(Protocol.RESIZE);
+    }
+
+    /**
+     * Sends START or RESIZE: the view's size in points, then the folds and hinges measured at it (Folds), each a frame in the view's points, the extensions' type and state; none while the window has other bounds than the latest report was measured at. Frames are clipped to the view in pixels, so an edge the view cuts a feature at is the view's own edge in points to the bit, and one outside the view is left out.
+     */
+    private void sendSize(int kind) {
+        int[] f = folds != null ? folds.current() : new int[0];
+        int[] at = new int[2];
+        getLocationInWindow(at);
+        int w = getWidth(), h = getHeight();
+        int[] in = new int[f.length];
+        int n = 0;
+        for (int i = 0; i + 5 < f.length; i += 6) {
+            int left = f[i] - at[0], top = f[i + 1] - at[1], right = f[i + 2] - at[0], bottom = f[i + 3] - at[1];
+            if (right < 0 || bottom < 0 || left > w || top > h) continue;
+            in[n++] = Math.max(left, 0);
+            in[n++] = Math.max(top, 0);
+            in[n++] = Math.min(right, w);
+            in[n++] = Math.min(bottom, h);
+            in[n++] = f[i + 4];
+            in[n++] = f[i + 5];
+        }
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream(12 + n / 6 * 18);
+        DataOutputStream d = new DataOutputStream(bytes);
+        try {
+            d.writeFloat(w / density);
+            d.writeFloat(h / density);
+            d.writeInt(n / 6);
+            for (int i = 0; i < n; i += 6) {
+                d.writeFloat(in[i] / density);
+                d.writeFloat(in[i + 1] / density);
+                d.writeFloat(in[i + 2] / density);
+                d.writeFloat(in[i + 3] / density);
+                d.writeByte(in[i + 4]);
+                d.writeByte(in[i + 5]);
+            }
+        } catch (IOException impossible) {
+            throw new AssertionError(impossible);
+        }
+        write(kind, bytes.toByteArray());
     }
 
     private void send(int kind, float a, float b) {

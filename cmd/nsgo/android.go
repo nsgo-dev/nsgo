@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"os"
 	"os/exec"
@@ -120,6 +124,10 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 	if err != nil {
 		return "", err
 	}
+	libraries, err := androidLibraries(ctx, p, goarch, app)
+	if err != nil {
+		return "", err
+	}
 	err = write(f, androidruntime.Manifest, apk.Manifest{
 		Package:     p.ID,
 		Label:       p.Name,
@@ -133,11 +141,117 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 		TargetSDK:   p.Android.TargetSDK,
 		Overlay:     p.androidOverlay(),
 		Recording:   p.Android.Recording,
+		Libraries:   libraries,
 	}, files, key)
 	if err != nil {
 		return "", err
 	}
 	return path, f.Close()
+}
+
+// windowExtensions is the device's library of its folds and hinges, which the runtime reads by reflection (Folds.java).
+const windowExtensions = "androidx.window.extensions"
+
+// geometryReader is the function an app reads its fold geometry with. Its name is in the executable's function table only when the linker keeps the function: as the app's code reaches it, or as reflection by names that are not constants, as tsx's, keeps every exported method of the types in interfaces.
+const geometryReader = "github.com/nsgo-dev/nsgo/core.(*Env).Geometry"
+
+// nsgoInternal is the import path prefix of NSGo's internal packages.
+const nsgoInternal = "github.com/nsgo-dev/nsgo/internal/"
+
+// androidLibraries are the device's libraries app, the app's linked executable for goarch, uses where the device has them: the window extensions for an app that reads its fold geometry, so no other app declares them. The name in the function table alone does not tell, as reflection may have kept it, so the app's sources must also select a Geometry.
+func androidLibraries(ctx context.Context, p *project, goarch string, app []byte) ([]string, error) {
+	if !bytes.Contains(app, []byte(geometryReader)) {
+		return nil, nil
+	}
+	cgo := "CGO_ENABLED=0"
+	if goarch != "arm64" {
+		cgo = "CGO_ENABLED=1"
+	}
+	reads, err := selectsGeometry(ctx, p, []string{"GOOS=android", "GOARCH=" + goarch, cgo})
+	if err != nil || !reads {
+		return nil, err
+	}
+	return []string{windowExtensions}, nil
+}
+
+// selectsGeometry reports whether a Go file of the packages the app's build for env links selects Geometry from anything but an imported package, as reading core.Env.Geometry does; core.Geometry, the type, does not count, nor do NSGo's internal packages, which pass the geometry on but never read it for an app. It reads the files build constraints leave out as well, so a tag the build adds cannot hide one. Without types it counts a field or method of another type named Geometry too, declaring the optional library where it was not needed rather than leaving it out where it was.
+func selectsGeometry(ctx context.Context, p *project, env []string) (bool, error) {
+	files := "{{range .GoFiles}}\t{{.}}{{end}}{{range .CgoFiles}}\t{{.}}{{end}}{{range .IgnoredGoFiles}}\t{{.}}{{end}}"
+	args := []string{"list", "-deps"}
+	if p.testBinary {
+		files += "{{range .TestGoFiles}}\t{{.}}{{end}}{{range .XTestGoFiles}}\t{{.}}{{end}}"
+		args = append(args, "-test", "-tags", "nsgotest")
+	}
+	args = append(args, "-f", "{{if not .Standard}}{{.ImportPath}}\t{{.Name}}\t{{.Dir}}"+files+"{{end}}", ".")
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = p.Dir
+	cmd.Env = append(os.Environ(), env...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("go list: %w\n%s", err, stderr.Bytes())
+	}
+	names := map[string]string{}
+	var pkgs [][]string
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Split(line, "\t")
+		if len(fields) < 3 {
+			continue
+		}
+		// A test's variant of a package, "p [p.test]", is p to what imports it.
+		path, _, _ := strings.Cut(fields[0], " ")
+		names[path] = fields[1]
+		if !strings.HasPrefix(path, nsgoInternal) {
+			pkgs = append(pkgs, fields[2:])
+		}
+	}
+	fset := token.NewFileSet()
+	for _, pkg := range pkgs {
+		for _, name := range pkg[1:] {
+			src, err := os.ReadFile(filepath.Join(pkg[0], name))
+			if err != nil {
+				return false, err
+			}
+			if !bytes.Contains(src, []byte("Geometry")) {
+				continue
+			}
+			f, err := parser.ParseFile(fset, name, src, parser.SkipObjectResolution)
+			if err != nil {
+				// A file left out of the build need not parse; one in it has, as the app built.
+				continue
+			}
+			if fileSelectsGeometry(f, names) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// fileSelectsGeometry reports whether f selects Geometry from anything but a package it imports, whose names are by import path in names.
+func fileSelectsGeometry(f *ast.File, names map[string]string) bool {
+	imported := map[string]bool{}
+	for _, spec := range f.Imports {
+		path, _ := strconv.Unquote(spec.Path.Value)
+		if spec.Name != nil {
+			imported[spec.Name.Name] = true
+		} else if name, ok := names[path]; ok {
+			imported[name] = true
+		} else {
+			imported[path[strings.LastIndex(path, "/")+1:]] = true
+		}
+	}
+	found := false
+	ast.Inspect(f, func(n ast.Node) bool {
+		if s, ok := n.(*ast.SelectorExpr); ok && s.Sel.Name == "Geometry" {
+			if id, ok := s.X.(*ast.Ident); !ok || !imported[id.Name] {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
 }
 
 // androidThemes are the activity's themes, so the window starts in the

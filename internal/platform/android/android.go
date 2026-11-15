@@ -80,7 +80,7 @@ const (
 	msgRecording = 18
 
 	// Java to Go.
-	msgStart       = 1
+	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
 	msgResize      = 2
 	msgEvent       = 3
 	msgMeasured    = 4
@@ -240,18 +240,21 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 		r := reader{payload}
 		switch kind {
 		case msgStart:
-			size := driver.Size{Width: r.points(), Height: r.points()}
+			size, folds := readSize(&r)
+			g := foldGeometry(size, folds)
 			if test != nil {
+				test.geometry = g
 				test.size <- size
 				<-s.started
 				break
 			}
-			s.startEngine(app, size, opts.Appearance, nil)
+			s.startEngine(app, size, g, opts.Appearance, nil)
 		case msgFrame:
 			s.frameWanted.Store(false)
 			s.engine.Frame()
 		case msgResize:
-			s.engine.Resize(driver.Size{Width: r.points(), Height: r.points()}, driver.Geometry{})
+			size, folds := readSize(&r)
+			s.engine.Resize(size, foldGeometry(size, folds))
 		case msgEvent:
 			// The surface the event is for: 0 for the activity's view, else an overlay's.
 			from := r.u32()
@@ -411,16 +414,15 @@ func init() {
 	}
 }
 
-// startEngine starts app's engine at size; test, when set, is what a test
-// host opens it with.
-func (s *surface) startEngine(app engine.App, size driver.Size, appearance driver.Appearance, test *testOpen) {
-	eopts := engine.Options{Size: size, Environment: s.env, Appearance: appearance, Host: s.hostOptions()}
+// startEngine starts app's engine at size with the fold geometry g measured at it; test, when set, is what a test host opens it with.
+func (s *surface) startEngine(app engine.App, size driver.Size, g driver.Geometry, appearance driver.Appearance, test *testOpen) {
+	eopts := engine.Options{Size: size, Geometry: g, Environment: s.env, Appearance: appearance, Host: s.hostOptions()}
 	// The runtime passes the app's own files and cache directories.
 	eopts.SetDirs(os.Getenv("NSGO_DATA_DIR"), os.Getenv("NSGO_CACHE_DIR"))
 	if test != nil {
 		eopts.UseTest(test.options, &test.pin)
 		// A phone's screen is what it is.
-		eopts.Size = size
+		eopts.Size, eopts.Geometry = size, g
 		if test.options.FPS {
 			s.perf = engine.NewPerfMonitor()
 			eopts.Perf = s.perf
@@ -438,6 +440,8 @@ type testOpen struct {
 	options testhost.Options
 	pin     engine.TestPin
 	size    chan driver.Size
+	// geometry is the fold geometry measured at the runtime's size, set before it is sent.
+	geometry driver.Geometry
 }
 
 // readNavigation reads the web view's navigation NsgoView.event writes

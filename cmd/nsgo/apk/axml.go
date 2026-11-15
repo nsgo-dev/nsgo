@@ -40,6 +40,8 @@ type Manifest struct {
 	Overlay bool
 	// Recording declares the runtime's RecordingService, the microphone foreground service microphone.RecordWAV records in, with the permissions it needs. An app without it declares no such service, as Google Play asks an app to justify each foreground-service type its manifest has.
 	Recording bool
+	// Libraries are the shared libraries of the device the app uses where it has them, by name, as uses-library elements that do not require them.
+	Libraries []string
 }
 
 // recordingPermissions are what the runtime's recording service needs: the microphone, a foreground service, from Android 14 one of the microphone type, and from Android 13 the notifications the service's notification shows with, which RecordWAV asks for with the microphone.
@@ -94,6 +96,7 @@ var androidAttrs = map[string]attrSpec{
 	"theme":               {0x01010000, typeReference, parseStyle},
 	"icon":                {0x01010002, typeReference, parseAppResource},
 	"debuggable":          {0x0101000f, typeBool, parseBool},
+	"required":            {0x0101028e, typeBool, parseBool},
 
 	"extractNativeLibs":           {0x010104ea, typeBool, parseBool},
 	"enableOnBackInvokedCallback": {0x0101066c, typeBool, parseBool},
@@ -277,6 +280,15 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 		setAttr(property, androidNS, "value", OverlaySubtype)
 		service.kids = append(service.kids, property)
 		app.kids = append(app.kids, service)
+	}
+	for _, lib := range m.Libraries {
+		if err := validPackage(lib); err != nil {
+			return nil, fmt.Errorf("library %q is not a library's name", lib)
+		}
+		use := &node{name: xml.Name{Local: "uses-library"}}
+		setAttr(use, androidNS, "name", lib)
+		setAttr(use, androidNS, "required", "false")
+		app.kids = append(app.kids, use)
 	}
 	if m.TargetSDK > 0 {
 		sdk := child(root, "uses-sdk")

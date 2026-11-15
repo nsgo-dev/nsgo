@@ -140,3 +140,18 @@ func TestProtoWire(t *testing.T) {
 		t.Errorf("a string field is %x", got)
 	}
 }
+
+// TestBundleManifestLibraries checks that a bundle's manifest compiles the device's libraries the app uses.
+func TestBundleManifestLibraries(t *testing.T) {
+	root, err := appManifest(androidruntime.Manifest, Manifest{Package: "dev.oneo.nsgo.test", Libraries: []string{"androidx.window.extensions"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pb, err := protoElement(root, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(pb, []byte("uses-library")) || !bytes.Contains(pb, []byte("androidx.window.extensions")) {
+		t.Error("the bundle's manifest lacks the library")
+	}
+}
