@@ -292,6 +292,21 @@ What NSGo's own [#57](https://github.com/nsgo-dev/nsgo/issues/57) asks for, whic
 | --- | --- | --- |
 | Contacts and calendar | [Contacts and calendar](architecture/contacts-calendar.md) | On an iPhone with iOS 18 and an Android phone, the picker returns the contacts the user chose and the system's editor adds an event, neither asking for a permission; with the permission, a query reads the contacts, all of them or the ones iOS's limited access shares, and a week's occurrences, and the same queries work in a notarized and a Mac App Store build on a Mac; each permission reads without asking, `Env` says where none exists, and `nsgotest` and the gallery's System page check each service |
 
+## Automation
+
+What `nsgo dev -automation` and `nsgo mcp` lack beyond macOS ([tool](architecture/tool.md#automation)). NSH has no counterpart; MyGo's `plugins/automation` is the reference.
+
+| Item | Reference | Done when |
+| --- | --- | --- |
+| Linux | `linux/testhost.go` | Its `testSurface` builds with `nsgoautomation` too and a live surface wraps the app's window as surface 0, and the end-to-end test passes under xvfb in a `go tool nsgo test` run someone starts by hand or dispatches |
+| Windows | `windows/testhost.go` | The same split around the app's `*window`, with posted messages and `PrintWindow`, and the end-to-end test passes on a Windows machine |
+| The iOS, tvOS and watchOS simulators | `ios/testhost.go`, `watchos/testhost.go` | A live surface wraps the scene's surface, the private HID and keyboard lookups link under `nsgoautomation` alone, and the token reaches the app through `SIMCTL_CHILD_` |
+| Apple devices | `devicectl` | An iPhone, an Apple TV and an Apple Watch take presses through accessibility actions or the engine's hit testing, as the simulator's HID path is not a device's, with the token through `-X` as `devServer` is |
+| Android | `TestAgent.java` | A debuggable build launched with an automation extra creates the test agent, with `classes.dex` rebuilt, reaching the server over `adb reverse` |
+| The web | `web/testhost.go`, `cdp.go` | `nsgo dev -target web -automation` opens its own browser over the DevTools protocol, installs the `nsgoTest` binding and passes the token in the page's query |
+| Several engines | ARCHITECTURE.md (Boundaries) | The automation follows every graph of a process, as a host embedding several apps has, telling their surfaces apart, where it now follows the first graph that registers a surface |
+| Mini programs | `run_miniprogram.go` | `nsgo dev -automation` on a mini-program target drives the app in its developer tool's simulator, with the token in the build as `devServer` is, where it now refuses those targets |
+
 ## Finish the existing platforms
 
 These items wait for community contributions, and a change to one backend records the gaps it leaves here.

@@ -110,6 +110,22 @@ go tool nsgo dev -lang ar-XB   # right to left
 
 `-lang` starts the app in a locale, a pseudo locale too ([Localization](localization.md)).
 
+## Agents
+
+```sh
+go tool nsgo dev -automation
+```
+
+`-automation` lets an AI agent or an end-to-end runner use the running app as a person does, on macOS so far: list its windows, outline what one shows, press, type, send keys, scroll, drag, hover, choose menu items, answer alerts, wait for what appears and take screenshots. Agents reach it over MCP through `go tool nsgo mcp`, which uses the `dev -automation` running for the directory, or starts one with the same flags and stops it as the client leaves:
+
+```sh
+claude mcp add nsgo -- go tool nsgo mcp
+```
+
+Other clients take the same command, `go` with the arguments `tool nsgo mcp`, run in the app's directory. Views are named with the selectors of [tests](testing.md#a-test), or with the `view:` references a snapshot prints, which a save makes stale as it restarts the app.
+
+The agent acts on the app's real data, as `dev` runs it. Only `dev -automation` builds carry it, and only tools on this machine holding the token in `.nsgo/automation.yaml`, which only you can read, reach it.
+
 ## Flags of every build
 
 Every build of an app, packages included, takes NSGo's own flags as it starts, which override `nsgo.yaml` and the app's code and never reach the app's own flags:

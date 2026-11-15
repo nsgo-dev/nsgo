@@ -110,6 +110,22 @@ go tool nsgo dev -lang ar-XB   # 从右到左
 
 `-lang` 以某个语言区域启动应用，也可以是伪语言区域（[本地化](localization.md)）。
 
+## 智能体
+
+```sh
+go tool nsgo dev -automation
+```
+
+`-automation` 让 AI 智能体或端到端测试工具像人一样使用运行中的应用（目前仅限 macOS）：列出窗口、概括某个窗口显示的内容、点击、输入、按键、滚动、拖动、悬停、选择菜单项、回答提示框、等待内容出现以及截图。智能体通过 `go tool nsgo mcp` 以 MCP 连接：它使用当前目录正在运行的 `dev -automation`，没有时就用相同的参数启动一个，并在客户端断开时停止它：
+
+```sh
+claude mcp add nsgo -- go tool nsgo mcp
+```
+
+其他客户端使用同样的命令：在应用目录中运行 `go`，参数为 `tool nsgo mcp`。视图用[测试](testing.md#一个测试)的选择器命名，或者用快照打印的 `view:` 引用；保存文件会重启应用，之前的引用随之失效。
+
+智能体操作的是应用的真实数据，与 `dev` 运行时相同。只有 `dev -automation` 的构建带有它，也只有本机上持有 `.nsgo/automation.yaml` 中令牌的工具能连接它，而这个文件只有你能读取。
+
 ## 所有构建都接受的参数
 
 应用的每个构建（包括发布包）在启动时都接受 NSGo 自己的参数。它们优先于 `nsgo.yaml` 和应用代码中的设置，也不会传到应用自己的参数解析中：

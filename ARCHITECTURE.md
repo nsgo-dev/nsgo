@@ -38,7 +38,8 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `microphone` | — | Recording the default input on macOS and iOS, reporting `ErrUnsupported` elsewhere |
 | `updater`, `updater/locales` | `nsh/updater` | Updating the app the way its platform and channel do: Sparkle, WinSparkle, the appcast `nsgo build` signs, or the App Store ([updates](docs/architecture/updates.md)) |
 | `widget` | — | Timelines of views that macOS and iOS widgets show, drawn by a SwiftUI extension the tool compiles, and Live Activities, which the extension draws on iOS and Android's runtime posts as Live Updates ([widgets](docs/architecture/tool.md#widgets)) |
-| `nsgotest` | `nsh-testing` | App tests, headless or on a platform ([testing](docs/architecture/testing.md)) |
+| `nsgotest` | `nsh-testing` | App tests, headless or on a platform, and the agent `nsgo dev -automation` drives a running app through ([testing](docs/architecture/testing.md)) |
+| `internal/automation` | — (MyGo's `plugins/automation`) | The requests the nsgo tool sends a running dev build's agent ([automation](docs/architecture/tool.md#automation)) |
 | `internal/testhost` | `nsh-testing`'s agent | A backend's test host for `nsgotest`: the main thread, native input, screenshots |
 | `internal/driver` | `nsh-core`'s mount protocol | The mount protocol, events and `TextEngine`; what every backend runs, such as the `Animator` |
 | `internal/devtools` | — | What DevTools read from a running app's trees and send them; `core` draws their overlay, the layout audit's included ([tool](docs/architecture/tool.md#dev-loop)) |
@@ -57,7 +58,7 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `examples/widgets` | — | A counter whose macOS and iOS widgets show its count in each family, and whose Live Activity changes it, with tests |
 | `examples/appclip` | — | A café whose iOS App Clip, a package of its own, orders at the table its link names, with tests |
 | `examples/hello` | — | A greeting in English and Chinese, small enough for every target, mini programs included, and an App Clip greeting the name its link gives, to try the packages and installers, with tests |
-| `cmd/nsgo` | `nsh-cli` | The `nsgo` tool, run on an app's `nsgo.yaml` ([tool](docs/architecture/tool.md)); `apk` signs Android packages in Go, and `install` holds the scripts installing a release from GitHub |
+| `cmd/nsgo` | `nsh-cli` | The `nsgo` tool, run on an app's `nsgo.yaml` ([tool](docs/architecture/tool.md)), with `nsgo mcp` serving agents MCP; `apk` signs Android packages in Go, and `install` holds the scripts installing a release from GitHub |
 
 ## Platforms
 

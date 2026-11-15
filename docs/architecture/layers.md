@@ -22,7 +22,7 @@ nsgo
 │   │   ├── bundler, compiler            Compiles and loads their bundles
 │   │   ├── textview, editor, diff, terminal  Register base's optional components
 │   │   └── tsxtest                      Runs *.test.tsx as Go tests
-│   └── nsgotest                         Runs apps in tests, headless or on a target
+│   └── nsgotest                         Runs apps in tests, headless or on a target, and drives nsgo dev -automation's
 │
 ├── Components
 │   ├── ui                               Styled components on base
@@ -75,9 +75,10 @@ nsgo
 │   └── internal/shader, shader/wgsl     The shader compilers
 │
 ├── Protocol
+│   ├── internal/automation              Requests the nsgo tool sends a running dev build's agent
 │   ├── internal/woff                    WOFF and WOFF2 fonts unpacked, for the bundler
 │   ├── internal/driver                  Mount items, events, TextEngine, shared values
-│   ├── internal/devtools                What DevTools read from core's trees, and send them
+│   ├── internal/devtools                What DevTools and the automation's agent read from core's trees
 │   └── internal/shaderir                Shader IR, written as MSL, GLSL or HLSL
 │
 └── Build time, outside the layers
@@ -98,7 +99,7 @@ What keeps each layer in its place:
 | Core | Touch a native view or call the system |
 | Protocol | Hold app logic |
 
-The `nsgo` tool links no component or runtime, so changing them does not rebuild it.
+The `nsgo` tool links no component or runtime, so changing them does not rebuild it. It is the only package that imports the MCP SDK (`github.com/modelcontextprotocol/go-sdk`), which every app's module graph gains through its `tool` line.
 
 ## Dependency graph
 
@@ -124,10 +125,10 @@ A line means "imports". `layering_test.go` checks the graph on every target, and
 
 - Apps may import any public package directly, `core` included. `core` and `nsgotest` alias the internal types their API reaches (`TestPublicAPINamesNoInternalType`).
 - `internal/driver` imports from the module only `internal/shaderir`, for the shader programs it carries.
-- `core` imports only `internal/driver`, `internal/devtools`, `internal/layout` and the shader compilers (`internal/shader`, `internal/shader/wgsl`, `internal/shaderir`). `internal/devtools` imports nothing of NSGo's, so DevTools' overlay, the layout audit's included, lives in `core` (`UpdateHighlights`).
-- The root's dev client (the `nsgodev` tag) imports `internal/driver` too, for its traces; `TestLayering` lists the `nsgodev` builds of macOS and the web as well.
+- `core` imports only `internal/driver`, `internal/devtools`, `internal/layout` and the shader compilers (`internal/shader`, `internal/shader/wgsl`, `internal/shaderir`). `internal/devtools` imports only `internal/driver`, for the batches and events it hands `nsgo dev -automation`'s agent, so DevTools' overlay, the layout audit's included, lives in `core` (`UpdateHighlights`).
 - Backends import `internal/driver`, `internal/engine`, `desktop/locales`, their shared packages and the shader writers, never the compilers, which only `core` links.
-- Only a backend's test host, built with the `nsgotest` tag, imports `core`.
+- Only a backend's test host, built with the `nsgotest` tag, imports `core`; its surface (`testsurface.go`) also builds with `nsgoautomation`, for `nsgo dev -automation`'s live windows.
+- The root imports `internal/driver` only in dev builds, to write `-trace`'s batches and DevTools' commits, and `nsgotest` only in `nsgo dev -automation`'s (`dev_automation.go`, the `nsgodev` and `nsgoautomation` tags), whose agent `nsgotest` and the tool reach through `internal/automation`, which imports nothing of NSGo's; `TestLayering` lists that build too, and `TestMinimalAppLinks` fails a release app that links `testing`, `nsgotest` or the protocol.
 - `i18n` imports only `core` and `internal/cldr`; `base`'s packages import it for their catalogs, as `ui/chat/locales` does for its own.
 - `updater` imports only `core` and its catalogs; the root imports it, to check as the app starts where the platform's updater keeps no schedule.
 - `ui` imports `base`, `core`, `mobile`, `desktop` and the icons; `base` never imports it.
@@ -146,7 +147,7 @@ Backends reach `core` only through the engine and `core` imports no backend, so 
 
 `microphone` stands apart from the layers, as recording has nothing to do with views: it loads the system's audio libraries through purego, holds iOS's audio session of its own while it records, and elsewhere builds to report that it cannot. It asks for the microphone through `internal/platform/privacy`, which the Apple backends answer `core`'s permission requests, speech and iOS's camera with, so the permission has one implementation; `privacy` imports only `internal/driver`. `widget` stands apart too, as widgets are drawn by an extension the tool compiles rather than by the engine: it imports `core`, for its colors, edges and fonts, writes timelines for the extension and loads the tool's library of Swift through purego ([tool](tool.md#widgets)). On Android its Live Activities reach the runtime through `internal/driver`'s Live Updates, a channel outside any surface, which the backend connects, as an activity outlives the app's views.
 
-Portable packages build unchanged for every target, with no purego, `syscall` or `unsafe`: `core`, `base` but for `base/terminal`, `ui`, `i18n`, `mobile`, `desktop`, `icons`, `tsx`, `nsgotest`, `internal/driver`, `internal/layout`, `internal/testhost`, the shader compilers and `internal/engine`. No package has cgo files or hand-written C.
+Portable packages build unchanged for every target, with no purego, `syscall` or `unsafe`: `core`, `base` but for `base/terminal`, `ui`, `i18n`, `mobile`, `desktop`, `icons`, `tsx`, `nsgotest`, `internal/automation`, `internal/driver`, `internal/layout`, `internal/testhost`, the shader compilers and `internal/engine`. No package has cgo files or hand-written C.
 
 ## Backends
 
