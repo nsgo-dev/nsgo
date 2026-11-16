@@ -11,7 +11,7 @@ order: 22
 go tool nsgo build
 ```
 
-`build` writes a stripped release package for each target `nsgo.yaml` lists, into `dist/<name>-<version>-<target>`: an `.app`, an `.ipa`, an `.apk`, Windows' and Linux's directories, or a web site, whose page fetches each TSX module an `import()` names when the import runs. `-target` replaces the list, and `all` means every target that needs only Go and Xcode; add `android_x64` when an Android NDK is installed, and `miniprogram`, or `miniprogram_wechat`, `miniprogram_qq`, `miniprogram_alipay` or `miniprogram_douyin` alone, for [mini programs](#mini-programs). `-run` starts the package built for this machine, or installs it on the iPhone, simulator or Android device `-device` picks.
+`build` writes a stripped release package for each target `nsgo.yaml` lists, into `dist/<name>-<version>-<target>`: an `.app`, an `.ipa`, an `.apk`, Windows' and Linux's directories, or a web site, whose page fetches each TSX module an `import()` names when the import runs. `-target` replaces the list, and `all` means every target that needs only Go and Xcode; add `android_x64` when an Android NDK is installed, and `miniprogram`, or `miniprogram_wechat`, `miniprogram_qq`, `miniprogram_alipay` or `miniprogram_douyin` alone, for [mini programs](#mini-programs), and `harmonyos` for a [HarmonyOS](#harmonyos) preview. `-run` starts the package built for this machine, or installs it on the iPhone, simulator or Android device `-device` picks.
 
 Everything to hand out lands in `dist/releases`, the only directory to look in:
 
@@ -44,7 +44,7 @@ icon:
   tvos: assets/AppIconTV.brandassets  # the Apple TV's layered icon and top shelf art, or a wide PNG
   watchos: assets/AppIconWatch.icon   # the Apple Watch's own, drawn in circles, or a square PNG
 dev:
-  target: native        # native, web, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android or miniprogram_<platform>
+  target: native        # native, web, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android, harmonyos or miniprogram_<platform>
   hot_reload: true      # false builds once, watching no files
   # icon: { png: assets/Icon-dev.png }  # replaces icon's files in dev's builds; defaults to assets/*-dev.*
 build:
@@ -250,6 +250,18 @@ Each target writes a project for its platform's developer tool, also in `dist/re
 `miniprogram.appid` gives the mini program's AppID on each platform (`wechat`, `qq`, `alipay`, `douyin`); without one, WeChat DevTools previews it with its tourist AppID and the other tools ask for one. The platform's navigation bar shows the app's title; with `custom_navigation`, the app fills the page and its safe area keeps it clear of the menu button. QQ, Alipay and Douyin have not been tried in their tools yet, and Alipay does not yet take back through the app, keyframes or the keyboard's height.
 
 Mini programs are experimental. A mini program runs Go apps alone, not TSX, and the platforms hold the app's compressed module to 2 MB: an app of a few screens fits, larger ones do not yet, and `build` says when one does not. Shaders draw nothing there, and web views, videos, native components and the app's font files are not shown yet.
+
+## HarmonyOS
+
+```sh
+go tool nsgo build -target harmonyos -run
+```
+
+`harmonyos` writes `<name>-<version>-harmonyos.hap` to `dist/releases`. The engine runs as WebAssembly in ArkWeb, and an ArkTS host draws what it mounts with ArkUI views, so text, fields, scrolling and dialogs are the system's own. With `hdc` on `PATH`, `-run` installs the HAP on the connected device or emulator and starts it, and `nsgo test -target harmonyos` runs an app's tests on an emulator.
+
+The bundle name comes from the app's `id` when the machine has the OpenHarmony SDK (`hvigorw` on `PATH` and `OHOS_BASE_SDK_HOME` set); without it, `build` pads the id to the committed host's fixed length. `build.harmonyos_bundles` picks `auto`, the default, `exact`, which fails without the SDK, or `padded`. `harmonyos.permissions` lists the `ohos.permission` names the app asks for, such as `MICROPHONE` and `CAMERA`, and `widget.title` is what its home-screen card shows.
+
+HarmonyOS is a preview. Emulators install the HAP as it is, but a phone takes only a HAP signed with an AppGallery Connect certificate and a debug profile whose bundle name is exactly the app's, so build with `exact` and sign the HAP with the SDK's `hap-sign-tool` before installing it. ArkUI draws a first set of views: tab bars, paging scroll views, inline HTML in web views, single-side borders and shadows are not drawn yet; [the architecture notes](https://github.com/nsgo-dev/nsgo/blob/main/docs/architecture/harmonyos.md) list what runs.
 
 ## Sign
 

@@ -40,7 +40,7 @@ export function llmsIndex(groups: ReturnType<typeof groupDocs>): string {
   });
   return [
     '# NSGo',
-    '> A cross-platform native UI engine with a Go backend: app logic, the reactive graph and layout run in Go, and each platform draws with its own native views, on iOS, Android, macOS, Windows, Linux, the web, tvOS, watchOS and mini programs.',
+    '> A cross-platform native UI engine with a Go backend: app logic, the reactive graph and layout run in Go, and each platform draws with its own native views, on iOS, Android, macOS, Windows, Linux, the web, tvOS, watchOS, HarmonyOS as a preview and mini programs.',
     [
       `NSGo is early, with no stable API: use the latest version (\`go get github.com/nsgo-dev/nsgo@latest\`) and read its source, \`go list -m -f '{{.Dir}}' github.com/nsgo-dev/nsgo\`, before relying on a signature. Each page below is Markdown; ${site}/llms-full.txt holds them all.`,
       `Coding agents can install NSGo's skill, which keeps an app on NSGo's conventions: \`bunx skills add nsgo-dev/nsgo\`.`,

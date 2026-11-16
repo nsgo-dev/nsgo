@@ -92,6 +92,7 @@ export const platforms: {
   { name: 'watchOS', kind: 'app', icon: 'watch', stack: 'SwiftUI · CoreText' },
   { name: 'macOS', kind: 'app', icon: 'laptop', stack: 'AppKit · CoreText' },
   { name: 'Android', kind: 'app', icon: 'android', stack: 'Android Views' },
+  { name: 'HarmonyOS', zh: '鸿蒙', kind: 'app', icon: 'smartphone', stack: 'ArkUI · ArkWeb', experimental: true },
   { name: 'Windows', kind: 'app', icon: 'windows', stack: 'Direct2D · DirectWrite' },
   { name: 'Linux', kind: 'app', icon: 'terminal', stack: 'GTK 4 · Pango' },
   { name: 'Web', kind: 'web', icon: 'globe', stack: 'WebAssembly · DOM' },

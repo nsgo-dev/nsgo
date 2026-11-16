@@ -35,7 +35,7 @@
 
 ## Status
 
-NSGo is early: 0.1.0 is its first release, and its API is not stable yet. It runs on macOS, iOS and its App Clips, tvOS, watchOS, Windows, Linux, the web, Android, and experimentally in WeChat, QQ, Alipay and Douyin mini programs, which hold an app to 2 MB, and apps embed in iOS, Android and Go desktop apps of their own; [ARCHITECTURE.md](ARCHITECTURE.md#platforms) tracks each target.
+NSGo is early: 0.1.0 is its first release, and its API is not stable yet. It runs on macOS, iOS and its App Clips, tvOS, watchOS, Windows, Linux, the web, Android, as a preview on HarmonyOS, and experimentally in WeChat, QQ, Alipay and Douyin mini programs, which hold an app to 2 MB, and apps embed in iOS, Android and Go desktop apps of their own; [ARCHITECTURE.md](ARCHITECTURE.md#platforms) tracks each target.
 
 ## Getting started
 

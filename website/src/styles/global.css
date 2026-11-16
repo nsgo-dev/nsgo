@@ -1016,8 +1016,17 @@ html[data-theme='dark'] .phone {
   padding: 0;
 }
 
+/* A phone keeps its content below its speaker. */
 .platform--phone {
+  padding-top: 12px;
   border-radius: calc(18 * var(--u));
+}
+
+/* A phone's name may break before its "OS" where the tile is too narrow for it, as HarmonyOS's is. */
+.platform--phone .platform__name {
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
 }
 
 .platform--phone::before {
@@ -1237,6 +1246,14 @@ html[data-theme='dark'] .phone {
   .platform svg {
     width: 15px;
     height: 15px;
+  }
+
+  .platform--phone {
+    gap: 3px;
+  }
+
+  .platform--phone .platform__name {
+    line-height: 1.1;
   }
 }
 

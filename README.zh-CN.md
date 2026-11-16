@@ -35,7 +35,7 @@
 
 ## 状态
 
-NSGo 处于早期阶段：0.1.0 是它的首个版本，API 尚未稳定。它可在 macOS、iOS 及其轻 App（App Clip）、tvOS、watchOS、Windows、Linux、Web、Android 上运行，也可试验性地运行在微信、QQ、支付宝和抖音小程序中（小程序限制应用在 2 MB 以内），应用也可嵌入独立的 iOS、Android 和 Go 桌面应用；各平台进度见 [ARCHITECTURE.md](ARCHITECTURE.md#platforms)。
+NSGo 处于早期阶段：0.1.0 是它的首个版本，API 尚未稳定。它可在 macOS、iOS 及其轻 App（App Clip）、tvOS、watchOS、Windows、Linux、Web、Android 上运行，以预览形式运行在鸿蒙上，也可试验性地运行在微信、QQ、支付宝和抖音小程序中（小程序限制应用在 2 MB 以内），应用也可嵌入独立的 iOS、Android 和 Go 桌面应用；各平台进度见 [ARCHITECTURE.md](ARCHITECTURE.md#platforms)。
 
 ## 快速开始
 

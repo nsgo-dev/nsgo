@@ -11,7 +11,7 @@ order: 22
 go tool nsgo build
 ```
 
-`build` 为 `nsgo.yaml` 列出的每个目标写出精简的发布包，放在 `dist/<name>-<version>-<target>`：`.app`、`.ipa`、`.apk`、Windows 和 Linux 的目录，或一个网站，网站页面会在 `import()` 执行时才获取它指定的 TSX 模块。`-target` 替换目标列表，`all` 表示所有只需 Go 和 Xcode 的目标；安装 Android NDK 后可再加上 `android_x64`；`miniprogram` 构建全部[小程序](#小程序)，也可单独指定 `miniprogram_wechat`、`miniprogram_qq`、`miniprogram_alipay` 或 `miniprogram_douyin`。`-run` 启动为本机构建的包，或把它安装到 `-device` 选中的 iPhone、模拟器或 Android 设备上。
+`build` 为 `nsgo.yaml` 列出的每个目标写出精简的发布包，放在 `dist/<name>-<version>-<target>`：`.app`、`.ipa`、`.apk`、Windows 和 Linux 的目录，或一个网站，网站页面会在 `import()` 执行时才获取它指定的 TSX 模块。`-target` 替换目标列表，`all` 表示所有只需 Go 和 Xcode 的目标；安装 Android NDK 后可再加上 `android_x64`；`miniprogram` 构建全部[小程序](#小程序)，也可单独指定 `miniprogram_wechat`、`miniprogram_qq`、`miniprogram_alipay` 或 `miniprogram_douyin`；`harmonyos` 构建[鸿蒙](#鸿蒙)预览版。`-run` 启动为本机构建的包，或把它安装到 `-device` 选中的 iPhone、模拟器或 Android 设备上。
 
 所有要交付出去的东西都在 `dist/releases`，只需看这一个目录：
 
@@ -44,7 +44,7 @@ icon:
   tvos: assets/AppIconTV.brandassets  # Apple TV 的分层图标和顶部横幅，或一张宽图
   watchos: assets/AppIconWatch.icon   # Apple Watch 自己的图标，按圆形绘制，或一张方图
 dev:
-  target: native        # native、web、ios、ios_simulator、tvos、tvos_simulator、watchos、watchos_simulator、android 或 miniprogram_<平台>
+  target: native        # native、web、ios、ios_simulator、tvos、tvos_simulator、watchos、watchos_simulator、android、harmonyos 或 miniprogram_<平台>
   hot_reload: true      # false 时只构建一次，不监听文件
   # icon: { png: assets/Icon-dev.png }  # 在 dev 构建中替换 icon 的文件；默认取 assets/*-dev.*
 build:
@@ -250,6 +250,18 @@ go tool nsgo dev -target miniprogram_alipay
 `miniprogram.appid` 按平台（`wechat`、`qq`、`alipay`、`douyin`）设置小程序的 AppID；没有时微信开发者工具以测试号预览，其他工具会要求填写。平台的导航栏显示应用的标题；开启 `custom_navigation` 后应用占满页面，安全区让它避开右上角的胶囊按钮。QQ、支付宝和抖音尚未在各自的工具中试过；支付宝暂不支持由应用处理返回、关键帧动画和键盘高度。
 
 小程序为试验性支持。小程序只运行 Go 应用，不运行 TSX，且各平台把应用压缩后的模块限制在 2 MB 以内：几个页面的应用放得下，更大的应用暂时放不下，放不下时 `build` 会说明。着色器在小程序中不绘制，网页视图、视频、原生组件和应用自带的字体文件暂不显示。
+
+## 鸿蒙
+
+```sh
+go tool nsgo build -target harmonyos -run
+```
+
+`harmonyos` 在 `dist/releases` 写出 `<name>-<version>-harmonyos.hap`。引擎以 WebAssembly 运行在 ArkWeb 中，ArkTS 宿主用 ArkUI 视图绘制它挂载的内容，文字、输入框、滚动和对话框都是系统自己的。`PATH` 中有 `hdc` 时，`-run` 把 HAP 安装到连接的设备或模拟器上并启动，`nsgo test -target harmonyos` 在模拟器上运行应用的测试。
+
+本机装有 OpenHarmony SDK（`PATH` 中有 `hvigorw` 且设置了 `OHOS_BASE_SDK_HOME`）时，包名取自应用的 `id`；没有时，`build` 把 id 填充到已提交宿主的固定长度。`build.harmonyos_bundles` 可选 `auto`（默认）、`exact`（没有 SDK 时报错）或 `padded`。`harmonyos.permissions` 列出应用要申请的 `ohos.permission` 名称，如 `MICROPHONE` 和 `CAMERA`；`widget.title` 是桌面卡片显示的标题。
+
+鸿蒙为预览支持。模拟器可直接安装 HAP，手机只接受用 AppGallery Connect 证书签名、且调试 profile 的包名与应用完全一致的 HAP，所以要用 `exact` 构建，再用 SDK 的 `hap-sign-tool` 签名后安装。ArkUI 目前只绘制首批视图：标签栏、分页滚动、网页视图中的内联 HTML、单边边框和阴影暂不绘制；能运行的部分见[架构说明](https://github.com/nsgo-dev/nsgo/blob/main/docs/architecture/harmonyos.md)。
 
 ## 签名
 
