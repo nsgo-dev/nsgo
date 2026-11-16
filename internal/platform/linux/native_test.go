@@ -320,11 +320,7 @@ func TestTextDrawsBackgroundsAndAttachments(t *testing.T) {
 	waitForTitle(t, w, title+"|1")
 }
 
-// TestWebViewTalksToThePage opens a window with a web view showing
-// inline HTML, receives the message the page posts and posts one back,
-// which the page answers. It skips where WebKitGTK 6.0 is missing.
-// WebKit keeps the GTK thread that creates its first view, so this test
-// runs in its own process, as the other WebKit tests do.
+// TestWebViewTalksToThePage opens a window with a web view showing inline HTML, receives the message the page posts and posts one back, which the page answers. It skips where WebKitGTK 6.0 is missing. WebKit keeps the GTK thread that creates its first view, so this test runs in its own process, as the other WebKit tests do.
 func TestWebViewTalksToThePage(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -852,14 +848,26 @@ func TestVideoReportsWhatGStreamerCannotPlay(t *testing.T) {
 	}
 }
 
-// TestWebViewWithoutWebKitShowsAPlaceholder runs where WebKitGTK 6.0 is
-// missing, as NSH's Linux backend built without it does.
+// TestWebViewWithoutWebKitShowsAPlaceholder shows a web view where WebKitGTK 6.0 cannot be loaded, as NSH's Linux backend built without it does. It runs in a process of its own in which WebKit counts as missing, so it runs where WebKit is installed too and never loads it into the test process.
 func TestWebViewWithoutWebKitShowsAPlaceholder(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
 	}
+	if os.Getenv("NSGO_TEST_WEBKIT_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		cmd.Env = append(os.Environ(), "NSGO_TEST_WEBKIT_PROCESS="+t.Name())
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
+	}
+	webkitOnce.Do(func() { webkitErr = fmt.Errorf("WebKitGTK 6.0 is hidden from %s", t.Name()) })
 	if openWebKit() == nil {
-		t.Skip("WebKitGTK 6.0 is installed")
+		t.Fatal("WebKitGTK 6.0 loaded although the test hid it")
 	}
 	title := "nsgo-native-" + t.Name()
 	app := func(cx *core.Scope) core.Node {
