@@ -96,9 +96,10 @@ func main() {
 		fs.StringVar(&o.bench, "bench", "", "run the benchmarks matching this `regexp`, as go test's -bench, and no tests unless -run names them")
 		fs.StringVar(&o.junit, "junit", "", "write a JUnit XML report to `file`")
 		fs.BoolVar(&o.trace, "trace", false, "print each step's mount items and commit times")
-		fs.StringVar(&o.target, "target", "", "run on a `platform`: macos, windows, linux, web, ios_simulator, tvos_simulator, watchos_simulator or android (default: headless)")
+		fs.StringVar(&o.target, "target", "", "run on a `platform`: macos, windows, linux, web, ios, ios_simulator, tvos_simulator, watchos_simulator or android (default: headless)")
 		fs.StringVar(&o.screenshots, "screenshots", "", "write target screenshots under this relative `directory` (default: .nsgo/test/screenshots/<target>)")
-		fs.StringVar(&o.device, "device", "", "the simulator, by name or UDID, or the adb device the target runs on")
+		fs.StringVar(&o.device, "device", "", "the `device` the target runs on: an iPhone's name, UDID, serial or ECID, a simulator's name or UDID, or an adb serial (default: the only one connected, or the booted simulator)")
+		fs.StringVar(&o.team, "team", "", "the Apple developer `team` -target ios signs the tests with (default: the team Xcode last used)")
 		fs.BoolVar(&o.fps, "fps", false, "log the performance monitor's readings once a second (with -target macos, windows, linux, ios_simulator, web or android)")
 		fs.Func("env", "set `KEY=VALUE` in the tests' environment, a phone's too; repeat for more", func(kv string) error {
 			if k, _, ok := strings.Cut(kv, "="); !ok || k == "" {

@@ -531,6 +531,8 @@ func targetFor(ctx context.Context, p *project, opts testOptions) (targetRunner,
 		return local(filepath.Join(dir, p.Name)), nil
 	case "web":
 		return webTestRunner(ctx, p, dir, opts)
+	case "ios":
+		return iosDeviceTestRunner(ctx, p, iOS, dir, opts)
 	case "ios_simulator":
 		return iosTestRunner(ctx, p, iOS, dir, opts)
 	case "tvos_simulator":
@@ -540,7 +542,7 @@ func targetFor(ctx context.Context, p *project, opts testOptions) (targetRunner,
 	case "android":
 		return androidTestRunner(ctx, p, dir, opts)
 	}
-	return targetRunner{}, fmt.Errorf("unknown test target %q; use macos, windows, linux, web, ios_simulator, tvos_simulator, watchos_simulator or android", opts.target)
+	return targetRunner{}, fmt.Errorf("unknown test target %q; use macos, windows, linux, web, ios, ios_simulator, tvos_simulator, watchos_simulator or android", opts.target)
 }
 
 // runLocal runs bin on this machine.

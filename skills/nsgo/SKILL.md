@@ -75,7 +75,7 @@ Run the tool, never `go vet`, `go test`, `go build` or `go run` directly: it typ
 
 ```sh
 go tool nsgo check                 # vet; -target all vets code behind every platform's build tags
-go tool nsgo test                  # headless; -run as go test's, -target macos|ios_simulator|android|web|all on a platform
+go tool nsgo test                  # headless; -run as go test's, -target macos|ios|ios_simulator|android|web|all on a platform
 ```
 
 Test an app as a user uses it with `nsgotest`, finding views by text, role, label or test ID. Read [references/testing.md](references/testing.md) before writing tests.

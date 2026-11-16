@@ -28,6 +28,7 @@ type testOptions struct {
 	screenshots string        // screenshot output directory for target runs
 	fps         bool          // log the performance monitor's readings on target
 	device      string        // the simulator or device a mobile target runs on
+	team        string        // the Apple developer team an iPhone's test build is signed with
 	// env are the tests' KEY=VALUE variables, on every target: a
 	// phone's tests see no others of this machine's.
 	env  []string
