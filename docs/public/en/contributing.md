@@ -34,13 +34,15 @@ go tool nsgo build -target all examples/gallery     # every platform's packages 
 
 ```sh
 go tool nsgo check                 # vet every package
-go tool nsgo check -target all     # vet them for every target too
+go tool nsgo check -target all     # also vet every available Go/Xcode target
 go tool nsgo test                  # every package's tests
 go tool nsgo test -bench . ./core  # core's benchmarks
 (cd benchmark && go run ./runner)  # measure against other frameworks
 ```
 
 Run at the repository root, or in `internal/dev`, the headless command tests `internal/dev` a second time with the `nsgodev` build tag, which the dev client's files need, so its tests run locally and in CI. Both runs take the same filters and flags and share one tally and JUnit report, where the second run's package is named `internal/dev [nsgodev]`.
+
+`check -target all` vets the macOS, Windows, Linux, Android arm64 and web targets on any host. It also vets iOS, tvOS and watchOS when their Xcode SDKs are available, and lists the ones it skips. An explicitly named target, such as `check -target ios`, fails if its tools are unavailable, including when combined with `all`. A failed target does not prevent checking the remaining targets, and the command fails if any required check fails. `build -target all` still needs macOS with Xcode.
 
 ## NSH
 

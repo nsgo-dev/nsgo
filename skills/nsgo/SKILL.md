@@ -75,7 +75,7 @@ func main() { nsgo.Run(Root) }
 Run the tool, never `go vet`, `go test`, `go build` or `go run` directly: it type-checks TSX, generates catalogs and vets build tags for every target.
 
 ```sh
-go tool nsgo check                 # vet; -target all vets code behind every platform's build tags
+go tool nsgo check                 # vet; -target all also vets available Go/Xcode targets
 go tool nsgo test                  # headless; -run as go test's, -target macos|ios|ios_simulator|android|web|all on a platform
 ```
 

@@ -117,7 +117,7 @@ func main() {
 		}
 	case "check":
 		fs := flag.NewFlagSet("check", flag.ExitOnError)
-		target := fs.String("target", "", "also vet for these comma-separated `targets` (all for every one but android_x64)")
+		target := fs.String("target", "", "also vet for these comma-separated `targets` (all for available Go/Xcode targets)")
 		fs.Parse(args)
 		var p *project
 		if p, err = loadOrDir(treeOf(fs.Arg(0))); err == nil {
@@ -211,7 +211,7 @@ func usage() {
   nsgo mcp   [dev flags] [dir]
   nsgo build [-target all|macos_arm64,windows_x64,linux_x64,ios,web,...] [-output DIR] [-open] [-fps] [-run [-device D]] [dir]
   nsgo test  [-run REGEXP] [-bench REGEXP] [-junit FILE] [-trace] [-target macos|windows|linux|web|ios_simulator|tvos_simulator|android [-fps]] [dir | App.tsx < steps] [-- go test flags]
-  nsgo check [dir]
+  nsgo check [-target all|macos_arm64,windows_x64,linux_x64,ios,web,...] [dir]
   nsgo i18n  [-source L] [dir]
   nsgo doctor
   nsgo keygen

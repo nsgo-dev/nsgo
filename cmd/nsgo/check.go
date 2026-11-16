@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 )
@@ -51,27 +53,58 @@ func check(ctx context.Context, p *project, target string) error {
 		s.done("vetted the dev client", "")
 	}
 	if target != "" {
-		names, err := expandTargets(strings.Split(target, ","))
-		if err != nil {
+		if err := checkTargets(ctx, p, target); err != nil {
 			return err
-		}
-		for _, name := range names {
-			s = begin("vetting for %s", name)
-			env, err := vetEnv(ctx, name)
-			if err == nil {
-				err = goToolWithTags(ctx, p, env, targetTags(name), "vet", "./...")
-			}
-			if err != nil {
-				s.fail()
-				return err
-			}
-			s.done("vetted for "+name, "")
 		}
 	}
 	if p.bare {
 		return nil
 	}
 	return checkTSX(ctx, p)
+}
+
+// checkTargets vets every requested target. Only Apple mobile targets included
+// through all may be skipped for an unavailable SDK; explicit names stay strict.
+// A target's failure does not prevent checking the independent targets after it.
+func checkTargets(ctx context.Context, p *project, target string) error {
+	requested := strings.Split(target, ",")
+	names, err := expandTargets(requested)
+	if err != nil {
+		return err
+	}
+	var skipped []string
+	var failures []error
+	for _, name := range names {
+		if ctx.Err() != nil {
+			failures = append(failures, ctx.Err())
+			break
+		}
+		_, _, apple := appleOSOf(name)
+		optional := apple && slices.Contains(requested, "all") && !slices.Contains(requested, name)
+		if optional && runtime.GOOS != "darwin" {
+			skipped = append(skipped, name)
+			continue
+		}
+		env, err := vetEnv(ctx, name)
+		if err != nil && optional && ctx.Err() == nil {
+			skipped = append(skipped, name)
+			continue
+		}
+		s := begin("vetting for %s", name)
+		if err == nil {
+			err = goToolWithTags(ctx, p, env, targetTags(name), "vet", "./...")
+		}
+		if err != nil {
+			s.fail()
+			failures = append(failures, fmt.Errorf("%s: %w", name, err))
+			continue
+		}
+		s.done("vetted for "+name, "")
+	}
+	if len(skipped) > 0 {
+		warn("skipped %s: Xcode's SDKs and clang are unavailable", strings.Join(skipped, ", "))
+	}
+	return errors.Join(failures...)
 }
 
 // checkTSX writes the app's types and type-checks its TSX. An app

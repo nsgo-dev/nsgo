@@ -35,5 +35,5 @@ These are the rules NSGo's own `base` and `ui` follow, for components other apps
 ## Words and tests
 
 - Say the component's own words, such as an icon button's label, through the package's `locales/` catalogs in English and the languages you translate to, never string literals. Add `//go:generate go tool nsgo i18n` to the package and commit the generated `catalog_gen.go`, so apps build with Go alone.
-- Test with `nsgotest` by role and text, in both appearances (`nsgotest.Environment`), look at it under `go tool nsgo dev -lang en-XA` for cut and untranslated words, and run `go tool nsgo check -target all` so code behind every platform's build tags is vetted.
+- Test with `nsgotest` by role and text, in both appearances (`nsgotest.Environment`), look at it under `go tool nsgo dev -lang en-XA` for cut and untranslated words, and run `go tool nsgo check -target all` to vet every available Go/Xcode target. It lists unavailable Apple SDKs it skips; explicitly naming an Apple target keeps it required.
 - Register Go components for TSX in an `init` function with `tsx.Register("example.com/chips", ...)`.
