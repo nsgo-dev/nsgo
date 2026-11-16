@@ -1,6 +1,6 @@
 ---
 title: 平台服务
-description: 警告框、剪贴板、文件、照片、分享、存储、机密、语音、网络、登录和应用生命周期。
+description: 警告框、剪贴板、文件、照片、分享、存储、机密、语音、朗读、网络、登录和应用生命周期。
 group: 平台功能
 order: 44
 ---
@@ -270,6 +270,18 @@ apple:
 ```
 
 `nsgo dev` 的设备构建由 Xcode 注册这项能力；`sign.profile` 或 `sign.macos_profile` 中的描述文件必须来自开启了「通过 Apple 登录」的 App ID。macOS 只在有描述文件时授予它，所以磁盘映像和 Mac 上的 `nsgo dev` 都无法登录，模拟器也不行，它的构建不声明任何开发者授权。
+
+## 朗读文本
+
+`cx.Speak` 在 `cx.Env().CanSpeak()` 为真时用系统中某种语言的语音朗读文本：macOS、iOS、tvOS、Android、Windows、Web，以及装有 speech-dispatcher 的 Linux。同一时间只朗读一段：新的 `Speak` 会打断正在朗读的那段，`cx.StopSpeaking` 和发起朗读的作用域结束也会停止它。`done` 只会收到一次结束方式：读完、被停止，或因 `core.SpeakError` 失败，例如没有安装该语言的语音时返回 `core.SpeakLanguageUnavailable`。
+
+```go
+cx.Speak("おはようございます", core.Voice{Lang: "ja-JP", Rate: 0.8}, func(stopped bool, err error) {
+	speaking.Set(false)
+})
+```
+
+`Rate` 和 `Pitch` 的范围是 0.5 到 2，1 为语音本身的语速和音高。`cx.Voices("ja", ...)` 列出某种语言已安装的语音，应用可以提示用户安装缺少的语音，或让用户挑选，把选中语音的 `ID` 填进 `core.Voice`。浏览器要等用户在页面上按过某个控件后才会朗读，在此之前返回 `core.SpeakNotAllowed`。TSX 包里的 Go 组件需要 `text_to_speech` 能力才能朗读。
 
 ## Android 上的悬浮窗
 

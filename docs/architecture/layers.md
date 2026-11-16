@@ -63,6 +63,7 @@ nsgo
 │   │   ├── webstyle, canvas2d           Shared CSS and 2D canvas player of the web and mini programs
 │   │   ├── field, hover, finger         Shared input
 │   │   ├── scrollbar, textselect        Shared scrolling and selection
+│   │   ├── speechd                      speech-dispatcher's protocol, Linux's speaking
 │   │   ├── imagedecode, imageload       Shared images
 │   │   ├── menutext                     Shared menu labels
 │   │   ├── loopback                     Shared loopback redirects of desktops' sign-ins

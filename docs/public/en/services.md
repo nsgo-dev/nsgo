@@ -1,6 +1,6 @@
 ---
 title: Platform services
-description: Alerts, the clipboard, files, photos, sharing, storage, secrets, speech, networking, signing in and the app's lifecycle.
+description: Alerts, the clipboard, files, photos, sharing, storage, secrets, speech, speaking text, networking, signing in and the app's lifecycle.
 group: Platform features
 order: 44
 ---
@@ -212,6 +212,18 @@ warning := core.Text{ContentFunc: func() string {
 	return ""
 }}
 ```
+
+## Speaking text
+
+`cx.Speak` reads text aloud in the system's voice for a language where `cx.Env().CanSpeak()` says the platform speaks: macOS, iOS, tvOS, Android, Windows, the web and Linux with speech-dispatcher. One utterance speaks at a time: another `Speak` cuts the one speaking, and so do `cx.StopSpeaking` and the end of the scope that spoke it. `done` hears once how it ended: finished, stopped, or failed with a `core.SpeakError`, such as `core.SpeakLanguageUnavailable` when no voice installed speaks the language.
+
+```go
+cx.Speak("Guten Morgen", core.Voice{Lang: "de-DE", Rate: 0.8}, func(stopped bool, err error) {
+	speaking.Set(false)
+})
+```
+
+`Rate` and `Pitch` run from 0.5 to 2, 1 being the voice's own. `cx.Voices("ja", ...)` lists the voices installed for a language, so the app can ask the user to install one it lacks or let them pick one, whose `ID` goes in `core.Voice`. Browsers speak only after the user has pressed something on the page, and fail with `core.SpeakNotAllowed` before. A TSX package's Go components speak only with the `text_to_speech` capability.
 
 ## Biometrics
 

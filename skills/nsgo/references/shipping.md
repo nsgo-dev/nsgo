@@ -55,7 +55,7 @@ Never commit secret keys or passwords. The tool reads them from the environment:
 
 ## Permissions and platform entries
 
-Ask for a permission where the app uses it, through `cx`'s permission calls, and explain it in `apple.info`'s usage descriptions; on Android, `android.permissions` adds manifest permissions beyond the runtime's. An app calling `cx.SignInWithApple` sets `apple.sign_in_with_apple: true`, which signs it with the entitlement the sheet needs. Check `cx.Env()` (`CanRecognizeSpeech`, `HasWebView` and the rest) before using a service a target may lack, rather than testing the target's name.
+Ask for a permission where the app uses it, through `cx`'s permission calls, and explain it in `apple.info`'s usage descriptions; on Android, `android.permissions` adds manifest permissions beyond the runtime's. An app calling `cx.SignInWithApple` sets `apple.sign_in_with_apple: true`, which signs it with the entitlement the sheet needs. Check `cx.Env()` (`CanRecognizeSpeech`, `CanSpeak`, `HasWebView` and the rest) before using a service a target may lack, rather than testing the target's name.
 
 ## Embedding
 
