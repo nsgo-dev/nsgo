@@ -759,7 +759,7 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 		found := false
 		w.onLoop(t, func() {
 			for _, v := range w.views {
-				if v.video != nil {
+				if v != nil && v.video != nil {
 					c := v.video.config
 					change(&c)
 					w.configureVideo(v, &c)
@@ -791,7 +791,7 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 	waitTitle(t, w, func(s string) bool { return strings.HasSuffix(s, "|2") })
 	w.onLoop(t, func() {
 		for _, v := range w.views {
-			if v.video != nil {
+			if v != nil && v.video != nil {
 				v.video.seek(200 * time.Millisecond)
 			}
 		}
