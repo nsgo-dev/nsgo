@@ -91,8 +91,7 @@ type Surface interface {
 	ChooseMenu(id uint32) error
 	// ChooseDockMenu chooses the app icon menu's item id, as the Dock menu or the Jump List does; ErrNoMenu where the platform has none.
 	ChooseDockMenu(id uint32) error
-	// ChoosePopup chooses item id of the context menu showing, or closes
-	// it for 0; ErrNoMenu where the platform shows none.
+	// ChoosePopup chooses item id of the context menu showing, or closes it for 0, doing nothing when none shows; ErrNoMenu where the platform shows none.
 	ChoosePopup(id uint32) error
 	// Screenshot returns the surface as a PNG.
 	Screenshot() ([]byte, error)

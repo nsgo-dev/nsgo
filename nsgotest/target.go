@@ -171,7 +171,13 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 		},
 		Clock: a.Clock, Storage: a.store, Secrets: a.Secrets,
 	})
-	a.t.Cleanup(a.root.Dispose)
+	a.t.Cleanup(func() {
+		// A native context menu tracks outside the test's graph and its window stays open, so one left open would take the next test's first input. Cancel it before disposing the graph, even if its close event has not reached the model yet.
+		if t.surface != nil && a.popupID != 0 {
+			_ = t.surface.ChoosePopup(0)
+		}
+		a.root.Dispose()
+	})
 	a.seed()
 	a.anim = driver.NewAnimator(func(driver.Event) {})
 	// A nil clock is the system's; a nil *ManualClock would not be.

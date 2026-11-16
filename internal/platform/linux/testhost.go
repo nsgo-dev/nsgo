@@ -382,17 +382,17 @@ func (t *testSurface) Back() error {
 }
 
 var (
-	gtkWindowGetToplevels func() uintptr
-	gtkButtonGetLabel     func(b uintptr) uintptr
-	gtkButtonType         func() uintptr
-	gTypeCheckInstanceIs  func(instance, gtype uintptr) int32
+	hostWindowGetToplevels func() uintptr
+	gtkButtonGetLabel      func(b uintptr) uintptr
+	gtkButtonType          func() uintptr
+	gTypeCheckInstanceIs   func(instance, gtype uintptr) int32
 )
 
 func loadDialogs() {
-	if gtkWindowGetToplevels != nil {
+	if hostWindowGetToplevels != nil {
 		return
 	}
-	purego.RegisterLibFunc(&gtkWindowGetToplevels, gtkLib, "gtk_window_get_toplevels")
+	purego.RegisterLibFunc(&hostWindowGetToplevels, gtkLib, "gtk_window_get_toplevels")
 	purego.RegisterLibFunc(&gtkButtonGetLabel, gtkLib, "gtk_button_get_label")
 	purego.RegisterLibFunc(&gtkButtonType, gtkLib, "gtk_button_get_type")
 	purego.RegisterLibFunc(&gTypeCheckInstanceIs, gobjectLib, "g_type_check_instance_is_a")
@@ -445,7 +445,7 @@ func (t *testSurface) answer(id uint32, index int) (done bool, err error) {
 				}
 			}
 		}
-		tops := gtkWindowGetToplevels()
+		tops := hostWindowGetToplevels()
 		for i := range gListModelGetNItems(tops) {
 			win := gListModelGetItem(tops, i)
 			if win == t.w.win {
@@ -565,7 +565,9 @@ func (t *testSurface) ChoosePopup(id uint32) error {
 	t.onLoop(func() {
 		w := t.w
 		if w.popover == 0 {
-			err = fmt.Errorf("no context menu shows")
+			if id != 0 {
+				err = fmt.Errorf("no context menu shows")
+			}
 			return
 		}
 		if id != 0 {

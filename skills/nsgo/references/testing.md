@@ -47,6 +47,8 @@ Keep a test off the network and disk the user owns: inject the fetcher or the `h
 
 ## On a platform
 
+Cleanup closes native context menus left open by an app, including between subtests in one process.
+
 ```sh
 go tool nsgo test -target macos            # windows, linux, web, ios (a connected iPhone), ios_simulator, tvos_simulator, watchos_simulator, android or all
 go tool nsgo test -target macos -run TestAdd

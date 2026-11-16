@@ -569,6 +569,10 @@ func (t *testSurface) ChooseDockMenu(id uint32) error {
 // ChoosePopup implements testhost.Surface: the tracking context menu's
 // item sends its action and the menu closes, as a click on it does.
 func (t *testSurface) ChoosePopup(id uint32) error {
+	if id == 0 {
+		onMainSync(t.s.closePopup)
+		return nil
+	}
 	var err error
 	deadline := time.Now().Add(3 * time.Second)
 	for {

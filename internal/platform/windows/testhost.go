@@ -478,6 +478,15 @@ func (t *testSurface) ChooseDockMenu(id uint32) error {
 // ChoosePopup implements testhost.Surface: the context menu tracking
 // ends, and its item id is carried out after, as a click on it would.
 func (t *testSurface) ChoosePopup(id uint32) error {
+	if id == 0 {
+		t.onMain(func() {
+			if t.w.popupTracking {
+				t.w.popupChoice = &id
+				endMenu.Call()
+			}
+		})
+		return nil
+	}
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		tracking := false
