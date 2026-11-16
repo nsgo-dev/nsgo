@@ -34,13 +34,19 @@ const (
 	PermissionBluetooth Permission = driver.PermissionBluetooth
 	// PermissionMediaLibrary is Media & Apple Music: iOS tells and asks it (NSAppleMusicUsageDescription), macOS never tells it.
 	PermissionMediaLibrary Permission = driver.PermissionMediaLibrary
+	// PermissionLocation is the device's location while the app shows (Locate, WatchLocation): asking needs NSLocationWhenInUseUsageDescription, or NSLocationUsageDescription on macOS, and on Android ACCESS_COARSE_LOCATION, with ACCESS_FINE_LOCATION for a precise one, in android.permissions. Whether the user allowed only an approximate location shows on each fix (LocationFix.Approximate).
+	PermissionLocation Permission = driver.PermissionLocation
+	// PermissionBackgroundLocation is a location stream going on in the background (LocationOptions.Background): on Apple platforms PermissionLocation with UIBackgroundModes' location, and on Android also ACCESS_BACKGROUND_LOCATION where android.permissions lists it, which Android 11 and later give only on the app's page of the settings, which asking opens. Ask for it after PermissionLocation.
+	PermissionBackgroundLocation Permission = driver.PermissionBackgroundLocation
+	// PermissionMotion is the accelerometer, gyroscope, magnetometer and device motion (WatchMotion): iOS and watchOS keep it from 27.2, asking with NSMotionUsageDescription, and Android grants it.
+	PermissionMotion Permission = driver.PermissionMotion
 )
 
-// Permissions returns every Permission, in the order of macOS's Privacy & Security.
+// Permissions returns every Permission, in the order of macOS's Privacy & Security, then the sensors'.
 func Permissions() []Permission {
 	return []Permission{PermissionAccessibility, PermissionScreenRecording, PermissionInputMonitoring, PermissionFullDiskAccess,
 		PermissionAppManagement, PermissionDeveloperTools, PermissionMicrophone, PermissionCamera, PermissionCalendars,
-		PermissionReminders, PermissionBluetooth, PermissionMediaLibrary}
+		PermissionReminders, PermissionBluetooth, PermissionMediaLibrary, PermissionLocation, PermissionBackgroundLocation, PermissionMotion}
 }
 
 // PermissionStatus is whether the app has a Permission.
@@ -114,6 +120,13 @@ func answerPermission(done func(PermissionStatus), s PermissionStatus) {
 // permission sends command about p and hands its answer to answered, or calls refused at once, sending nothing, for a key that names no permission or one the current owner's Access refuses.
 func (cx *Scope) permission(p Permission, command driver.PermissionCommand, answered func(driver.Event), refused func()) {
 	t := cx.tree()
+	// A sensor's permission is the sensor service's to tell and ask, held to the sensor's capability; only its settings open as the others' do.
+	if kind, ok := sensorPermissions[p]; ok && command != driver.PermissionOpenSettings {
+		if t == nil || !cx.sensorPermission(kind, command == driver.PermissionAsk, func(s PermissionStatus) { answered(driver.Event{Index: int(s)}) }) {
+			refused()
+		}
+		return
+	}
 	if t == nil || !p.known() || cx.denied(servicePermissions, string(p)) {
 		refused()
 		return

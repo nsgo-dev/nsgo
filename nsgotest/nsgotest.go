@@ -194,11 +194,9 @@ const AuthLoopback = "http://127.0.0.1:49152"
 // goroutine; the app's goroutines reach it through Scope.Post, which App
 // runs when it settles.
 type App struct {
-	// SensorPermissions are read without prompting; SensorAnswers supply explicit prompt answers.
-	SensorPermissions, SensorAnswers map[core.SensorKind]core.SensorGrant
-	SensorPrompts                    []core.SensorKind
-	LocationCache                    *core.LocationFix
-	sensorRuns                       map[uint32]*sensorRun
+	// LocationCache is the last fix the platform keeps, which Locate takes when its MaxAge allows; the location and motion permissions are in Permissions, and the fixes and samples come from FeedLocation and FeedMotion.
+	LocationCache *core.LocationFix
+	sensorRuns    map[uint32]*sensorRun
 
 	t    testing.TB
 	size driver.Size

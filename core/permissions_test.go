@@ -172,7 +172,7 @@ func TestPermissionStatusStrings(t *testing.T) {
 			t.Errorf("%d: %q allowed %v, want %q %v", c.s, c.s.String(), c.s.Allowed(), c.name, c.allowed)
 		}
 	}
-	if len(core.Permissions()) != 12 {
+	if len(core.Permissions()) != 15 {
 		t.Errorf("%d permissions", len(core.Permissions()))
 	}
 }

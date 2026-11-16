@@ -14,7 +14,6 @@ func sensorsCard(cx *core.Scope) core.Node {
 	colors := ui.ColorsOf(cx)
 	location := core.NewSignal(cx, tr.SystemSensorsIdle())
 	motion := core.NewSignal(cx, tr.SystemSensorsIdle())
-	permission := core.NewSignal(cx, "—")
 	var tracking, moving *core.SensorStream
 	fail := func(err error) {
 		if err != nil {
@@ -23,10 +22,6 @@ func sensorsCard(cx *core.Scope) core.Node {
 	}
 	fix := func(f core.LocationFix) {
 		location.Set(fmt.Sprintf("%.5f, %.5f · ±%.0f m · %d", f.Latitude, f.Longitude, f.HorizontalAccuracy.Value, f.Dropped))
-	}
-	grant := func(g core.SensorGrant) {
-		states := [...]string{"default", "granted", "denied", "restricted", "unavailable"}
-		permission.Set(tr.SystemSensorsAuthorization(states[g.Authorization]))
 	}
 	button := func(text, id string, fn func()) core.Node {
 		return ui.Button{Text: text, TestID: id, Size: ui.SizeSmall, Variant: ui.ButtonSecondary, OnPress: fn}
@@ -39,13 +34,6 @@ func sensorsCard(cx *core.Scope) core.Node {
 		fail(err)
 	}
 	return Card{Title: tr.SystemSensorsTitle(), Description: tr.SystemSensorsSummary(), Children: []core.Node{
-		Caption{Label: tr.SystemPermission(), Note: permission.Get},
-		ui.Wrap{Children: []core.Node{
-			button(tr.SystemCheck(), "sensor-permission", func() { _, err := cx.ReadSensorPermission(core.SensorLocation, grant); fail(err) }),
-			button(tr.SystemAskPermission(), "sensor-location-ask", func() { _, err := cx.RequestSensorPermission(core.SensorLocation, grant); fail(err) }),
-			button(tr.SystemSensorsBackgroundPermission(), "sensor-background-ask", func() { _, err := cx.RequestSensorPermission(core.SensorBackgroundLocation, grant); fail(err) }),
-			button(tr.SystemSensorsMotionPermission(), "sensor-motion-ask", func() { _, err := cx.RequestSensorPermission(core.SensorMotion, grant); fail(err) }),
-		}},
 		ui.Wrap{Children: []core.Node{
 			button(tr.SystemSensorsLocate(), "sensor-locate", func() {
 				_, err := cx.Locate(core.LocationOptions{}, func(f core.LocationFix, err error) {

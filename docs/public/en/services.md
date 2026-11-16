@@ -315,26 +315,37 @@ mobile.RequestOverlayPermission(cx, func(p core.OverlayPermission) {
 
 ## Location and motion
 
-Read a system grant with `cx.ReadSensorPermission(core.SensorLocation, done)`, and explicitly ask with `RequestSensorPermission`. Motion and background location have separate `SensorMotion` and `SensorBackgroundLocation` grants. Starting a stream never prompts.
+`cx.Locate` gets one fix, `cx.WatchLocation` streams fixes and `cx.WatchMotion` streams accelerometer, gyroscope, magnetometer and fused device-motion samples. Each returns a `*core.SensorStream` whose `Stop` cancels it, as the scope that started it ending does; callbacks run on the engine goroutine. The permissions are `core.PermissionLocation`, `PermissionBackgroundLocation` and `PermissionMotion` ([permissions](permissions.md)): starting a stream never asks, and one without its permission fails with `core.SensorNotAllowed`.
 
 ```go
-pending, err := cx.Locate(core.LocationOptions{}, func(f core.LocationFix, err error) {
-    if err == nil { showPosition(f.Latitude, f.Longitude) }
+cx.RequestPermission(core.PermissionLocation, func(s core.PermissionStatus) {
+	if !s.Allowed() {
+		return
+	}
+	cx.Locate(core.LocationOptions{}, func(f core.LocationFix, err error) {
+		if err == nil {
+			showPosition(f.Latitude, f.Longitude, f.Approximate)
+		}
+	})
 })
-// pending.Stop() cancels; its owning scope ending also cancels.
-_ = pending
-_ = err
 ```
 
-`Locate` waits for a new fix by default; only an explicit `MaxAge` permits cached positions, identified by `Cached` and `Age`. `WatchLocation` streams fixes; `WatchMotion` streams a chosen set of accelerometer, gyro, magnetometer and fused device-motion readings. Both return `SensorStream`, whose `Stop` cancels. Callbacks stay on the engine goroutine. Foreground providers pause in background, preserve a pending one-shot's timeout and mark the first resumed sample with `Gap`.
+`Locate` waits for a new fix, 30 seconds by default (`Timeout`); only `MaxAge` lets it take a cached one, which says so with `Cached` and `Age`. `Approximate` tells a fix the user allowed only approximately. Coordinates are WGS 84; a measurement the provider lacks has `Valid` false, and `Altitude` is ellipsoidal where `MSLAltitude` is above mean sea level. Motion uses the device's natural axes, acceleration in m/s² (+9.81 on z lying face up), rotation in rad/s and the magnetic field in µT, every 20 ms by default, held to 10 ms–1 s. Under load a stream keeps the newest sample per sensor and counts the ones it replaced in `Dropped`.
 
-Location uses WGS 84 coordinates. Optional measurements have `Valid`; altitudes distinguish ellipsoidal from mean-sea-level height. Motion uses natural device axes, acceleration in m/s² (+9.81 on z face-up), rotation in rad/s and magnetic field in µT. The default interval is 20 ms, bounded to 10 ms–1 s before hardware limits. High-rate delivery retains the latest sample per sensor and reports `Dropped` replacements.
+Streams go on while the app is inactive and pause in the background, marking the first sample after it with `Gap`; a pending `Locate` keeps the rest of its timeout. `LocationOptions.Background` keeps a location stream going in the background under `PermissionBackgroundLocation`: Apple apps add the `location` background mode, and on Android a foreground service shows a notification with `NotificationTitle` and `NotificationBody` and keeps the app running after its activity ends. Nothing starts a process the system ended.
 
-Apple apps declare location and motion usage descriptions in `apple.info`; background location additionally declares `UIBackgroundModes: [location]`. Android apps declare coarse/fine permissions and, for background streams, foreground-service/location permissions plus an explicit notification title and body. Background-start restrictions still apply. A standalone Android app keeps its engine through Activity destruction while a location service owns its streams and reattaches when reopened. No killed process restarts automatically.
+```yaml
+apple:
+  info:
+    NSLocationWhenInUseUsageDescription: Shows where you are on the map.
+    NSLocationUsageDescription: Shows where you are on the map.  # macOS
+    NSMotionUsageDescription: Counts your reps.
+    UIBackgroundModes: [location]                                # background streams
+android:
+  permissions: [ACCESS_COARSE_LOCATION, ACCESS_FINE_LOCATION, FOREGROUND_SERVICE, FOREGROUND_SERVICE_LOCATION]
+```
 
-TSX imports `Sensors` from `nsgo`, with `permission`, `requestPermission`, `locate`, `watchLocation` and `watchMotion`; its package capabilities are independently `location`, `backgroundLocation` and `motion`. JS durations and timestamps use milliseconds. Go uses `time.Duration` and provider timestamps.
-
-Apple and Android supply the providers; macOS has location only, tvOS one-shot location only, and web, Windows, Linux and mini programs explicitly report unavailable. Geofencing, steps, barometer and activity recognition are later APIs. See the Gallery System page for permission, fresh-location, tracking and motion controls.
+iOS and watchOS give location and motion, macOS location, tvOS one fix at a time and Android both through the framework's own providers, without Google Play services. The web, Windows, Linux and mini programs answer unavailable. In TSX, `Sensors` has `permission`, `requestPermission`, `locate`, `watchLocation` and `watchMotion`, under the package capabilities `location`, `backgroundLocation` and `motion`, in milliseconds.
 
 ## Next
 

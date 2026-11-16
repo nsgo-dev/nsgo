@@ -79,7 +79,7 @@ const (
 	AccessAuthSession = "authSession"
 	// AccessHost is the host's handlers, by name (CallHost, PostHost).
 	AccessHost = "host"
-	// AccessLocation, AccessBackgroundLocation and AccessMotion are independent sensor grants.
+	// AccessLocation is the location fixes Locate and WatchLocation give and PermissionLocation, AccessBackgroundLocation a stream that goes on in the background and PermissionBackgroundLocation, and AccessMotion the motion samples WatchMotion gives and PermissionMotion: three independent grants.
 	AccessLocation           = "location"
 	AccessBackgroundLocation = "backgroundLocation"
 	AccessMotion             = "motion"
@@ -169,6 +169,9 @@ const (
 	serviceOverlay         service = "overlay"
 	serviceAudio           service = "audio"
 	serviceAuthSession     service = "authSession"
+	serviceLocation           service = "location"
+	serviceBackgroundLocation service = "backgroundLocation"
+	serviceMotion             service = "motion"
 )
 
 // serviceRule is how core holds a kind of service to Access.
@@ -199,6 +202,9 @@ var services = map[service]serviceRule{
 	serviceOverlay:         {permission: AccessOverlay},
 	serviceAudio:           {permission: AccessAudio},
 	serviceAuthSession:     {permission: AccessAuthSession},
+	serviceLocation:           {permission: AccessLocation},
+	serviceBackgroundLocation: {permission: AccessBackgroundLocation},
+	serviceMotion:             {permission: AccessMotion},
 }
 
 // gate is the refusal of a service of kind for resource by the current owner's Access, as services holds it; a kind services lacks is refused.

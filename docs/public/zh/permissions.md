@@ -7,7 +7,7 @@ order: 49
 
 ## 检查和请求
 
-系统替用户保管着应用的一些能力，由用户授予：手机和 Mac 上的麦克风、相机、日历、提醒事项、蓝牙和媒体资料库，以及 macOS 上的辅助功能、录屏、输入监控、完全磁盘访问权限、App 管理和开发者工具。`core.Permissions()` 以 `core.Permission` 键列出它们。`cx.PermissionStatus` 不打扰用户地回答应用是否已有某项权限，`cx.RequestPermission` 在系统有弹窗且尚未询问过时用系统弹窗请求。请在用户做需要该权限的操作时再请求。面容 ID 和触控 ID 不在其中：`cx.BiometricAvailability` 回答它们是否可用，`cx.AuthenticateBiometric` 用它们自己的弹窗请求。
+系统替用户保管着应用的一些能力，由用户授予：手机和 Mac 上的麦克风、相机、日历、提醒事项、蓝牙、媒体资料库和定位，手机上的运动与后台定位，以及 macOS 上的辅助功能、录屏、输入监控、完全磁盘访问权限、App 管理和开发者工具。`core.Permissions()` 以 `core.Permission` 键列出它们。`cx.PermissionStatus` 不打扰用户地回答应用是否已有某项权限，`cx.RequestPermission` 在系统有弹窗且尚未询问过时用系统弹窗请求。请在用户做需要该权限的操作时再请求。面容 ID 和触控 ID 不在其中：`cx.BiometricAvailability` 回答它们是否可用，`cx.AuthenticateBiometric` 用它们自己的弹窗请求。
 
 ```go
 cx.RequestPermission(core.PermissionCamera, func(s core.PermissionStatus) {
@@ -73,6 +73,8 @@ stop := desktop.GuidePermission(cx, core.PermissionAccessibility, desktop.GuideO
 | Linux | 不受限；在 Flatpak 和 Snap 中麦克风和相机为未知 |
 | Web | 麦克风和相机，在 Firefox 中为未知 |
 | Android、Apple Watch、小程序 | 目前为未知 |
+
+定位和运动权限在有对应传感器的平台上都能读取和请求，包括 Android 和 Apple Watch，其他平台为不可用。
 
 ## 测试
 

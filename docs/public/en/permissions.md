@@ -7,7 +7,7 @@ order: 49
 
 ## Checking and asking
 
-The system keeps some of what an app may do for the user to give: the microphone, the camera, calendars, reminders, Bluetooth and the media library on phones and Macs, and on macOS also Accessibility, Screen Recording, Input Monitoring, Full Disk Access, App Management and Developer Tools. `core.Permissions()` lists them as `core.Permission` keys. `cx.PermissionStatus` answers whether the app has one without asking, and `cx.RequestPermission` asks with the system's prompt where it has one and has not asked yet. Ask as the user does something that needs the permission. Face ID and Touch ID are not among them: `cx.BiometricAvailability` tells them and `cx.AuthenticateBiometric` asks with their own prompt ([biometrics](services.md#biometrics)).
+The system keeps some of what an app may do for the user to give: the microphone, the camera, calendars, reminders, Bluetooth, the media library and location on phones and Macs, motion and location in the background on phones, and on macOS also Accessibility, Screen Recording, Input Monitoring, Full Disk Access, App Management and Developer Tools ([location and motion](services.md#location-and-motion)). `core.Permissions()` lists them as `core.Permission` keys. `cx.PermissionStatus` answers whether the app has one without asking, and `cx.RequestPermission` asks with the system's prompt where it has one and has not asked yet. Ask as the user does something that needs the permission. Face ID and Touch ID are not among them: `cx.BiometricAvailability` tells them and `cx.AuthenticateBiometric` asks with their own prompt ([biometrics](services.md#biometrics)).
 
 ```go
 cx.RequestPermission(core.PermissionCamera, func(s core.PermissionStatus) {
@@ -73,6 +73,8 @@ The app held out is its bundle, else its executable; `GuideOptions.App` names an
 | Linux | Not gated; the microphone and the camera are unknown in Flatpak and Snap |
 | Web | The microphone and the camera, unknown in Firefox |
 | Android, Apple Watch, mini programs | Unknown for now |
+
+Location and motion are told and asked wherever their sensors are, Android and Apple Watch included, and unavailable elsewhere ([location and motion](services.md#location-and-motion)).
 
 ## Testing
 

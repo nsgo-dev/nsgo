@@ -14,6 +14,10 @@ const (
 	PermissionReminders       = "reminders"
 	PermissionBluetooth       = "bluetooth"
 	PermissionMediaLibrary    = "media-library"
+	// The sensors' permissions, which core asks the sensor service for (ItemSensor) rather than sending ItemPermission, except to open their settings.
+	PermissionLocation           = "location"
+	PermissionBackgroundLocation = "background-location"
+	PermissionMotion             = "motion"
 )
 
 // The statuses EventPermission answers with (Index), as core.PermissionStatus.
@@ -65,7 +69,8 @@ func AnswerPermission(id uint32, r PermissionRequest, status func(name string) i
 // PhonePermission is whether a phone's or a watch's system keeps the permission name, PermissionUnknown for one it keeps, for the backends that cannot tell it yet: the six only Macs keep are PermissionUnavailable.
 func PhonePermission(name string) int {
 	switch name {
-	case PermissionMicrophone, PermissionCamera, PermissionCalendars, PermissionReminders, PermissionBluetooth, PermissionMediaLibrary:
+	case PermissionMicrophone, PermissionCamera, PermissionCalendars, PermissionReminders, PermissionBluetooth, PermissionMediaLibrary,
+		PermissionLocation, PermissionBackgroundLocation, PermissionMotion:
 		return PermissionUnknown
 	}
 	return PermissionUnavailable

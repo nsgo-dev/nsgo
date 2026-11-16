@@ -10,33 +10,26 @@ import (
 
 func (r *runtime) sensors() js.Value {
 	o := r.vm.NewObject()
+	// permission tells, or with ask asks for, a sensor's core.Permission, resolving with its status's name; a sensor the package's capabilities leave out is "unavailable".
 	permission := func(ask bool) func(js.FunctionCall) js.Value {
 		return func(call js.FunctionCall) js.Value {
-			kind := core.SensorLocation
+			var key core.Permission
 			switch arg(call, 0).String() {
 			case "location":
+				key = core.PermissionLocation
 			case "backgroundLocation":
-				kind = core.SensorBackgroundLocation
+				key = core.PermissionBackgroundLocation
 			case "motion":
-				kind = core.SensorMotion
+				key = core.PermissionMotion
 			default:
 				panic(r.vm.NewTypeError("Sensors: unknown permission"))
 			}
-			p, resolve, reject := r.vm.NewPromise()
-			done := func(g core.SensorGrant) {
-				r.inJS(func() {
-					states := [...]string{"default", "granted", "denied", "restricted", "unavailable"}
-					_ = resolve(map[string]any{"authorization": states[g.Authorization], "precise": g.Precise})
-				})
-			}
-			var err error
+			p, resolve, _ := r.vm.NewPromise()
+			done := func(s core.PermissionStatus) { r.inJS(func() { _ = resolve(s.String()) }) }
 			if ask {
-				_, err = r.cx.RequestSensorPermission(kind, done)
+				r.cx.RequestPermission(key, done)
 			} else {
-				_, err = r.cx.ReadSensorPermission(kind, done)
-			}
-			if err != nil {
-				_ = reject(r.sensorError(err))
+				r.cx.PermissionStatus(key, done)
 			}
 			return r.vm.ToValue(p)
 		}
@@ -126,7 +119,7 @@ func locationValue(f core.LocationFix) map[string]any {
 		"monotonic": monotonic, "altitude": sensorNumberValue(f.Altitude), "mslAltitude": sensorNumberValue(f.MSLAltitude),
 		"horizontalAccuracy": sensorNumberValue(f.HorizontalAccuracy), "verticalAccuracy": sensorNumberValue(f.VerticalAccuracy),
 		"speed": sensorNumberValue(f.Speed), "course": sensorNumberValue(f.Course), "age": float64(f.Age) / 1e6,
-		"cached": f.Cached, "gap": f.Gap, "dropped": float64(f.Dropped)}
+		"cached": f.Cached, "approximate": f.Approximate, "gap": f.Gap, "dropped": float64(f.Dropped)}
 }
 
 func motionValue(m core.MotionSample) map[string]any {

@@ -1,6 +1,7 @@
 package nsgotest
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -11,18 +12,23 @@ func TestSensorModelPermissionsCachingAndDisposal(t *testing.T) {
 	var cx *core.Scope
 	app := Start(t, func(c *core.Scope) core.Node { cx = c; return core.View{} })
 	app.requireSensorModel()
-	app.SensorPermissions = map[core.SensorKind]core.SensorGrant{core.SensorLocation: {Authorization: core.SensorNotAsked}}
-	app.SensorAnswers = map[core.SensorKind]core.SensorGrant{core.SensorLocation: {Authorization: core.SensorGranted, Precise: false}}
-	var grant core.SensorGrant
-	app.Post(func() { _, _ = cx.ReadSensorPermission(core.SensorLocation, func(g core.SensorGrant) { grant = g }) })
+	app.PermissionAnswers[core.PermissionLocation] = core.PermissionGranted
+	var status core.PermissionStatus
+	app.Post(func() { cx.PermissionStatus(core.PermissionLocation, func(s core.PermissionStatus) { status = s }) })
 	app.Settle()
-	if grant.Authorization != core.SensorNotAsked || len(app.SensorPrompts) != 0 {
-		t.Fatal("read prompted")
+	if status != core.PermissionNotAsked || app.Permissions[core.PermissionLocation] != core.PermissionNotAsked {
+		t.Fatal("checking asked")
 	}
-	app.Post(func() { _, _ = cx.RequestSensorPermission(core.SensorLocation, func(g core.SensorGrant) { grant = g }) })
+	var refused error
+	app.Post(func() { _, _ = cx.Locate(core.LocationOptions{}, func(_ core.LocationFix, err error) { refused = err }) })
 	app.Settle()
-	if grant.Authorization != core.SensorGranted || grant.Precise || len(app.SensorPrompts) != 1 {
-		t.Fatalf("grant %+v", grant)
+	if !errors.Is(refused, core.SensorNotAllowed) || app.Permissions[core.PermissionLocation] != core.PermissionNotAsked {
+		t.Fatalf("locating without the permission: %v, and it asked: %v", refused, app.Permissions[core.PermissionLocation])
+	}
+	app.Post(func() { cx.RequestPermission(core.PermissionLocation, func(s core.PermissionStatus) { status = s }) })
+	app.Settle()
+	if status != core.PermissionGranted || app.Permissions[core.PermissionLocation] != core.PermissionGranted {
+		t.Fatalf("asking answered %v", status)
 	}
 	app.LocationCache = &core.LocationFix{Latitude: 5, Timestamp: app.Clock.Now().Add(-time.Minute)}
 	var fixes []core.LocationFix
@@ -51,7 +57,7 @@ func TestSensorModelPermissionsCachingAndDisposal(t *testing.T) {
 	if len(fixes) != 2 || !fixes[1].Cached || fixes[1].Age != time.Minute {
 		t.Fatalf("cache %+v", fixes)
 	}
-	app.SensorPermissions[core.SensorMotion] = core.SensorGrant{Authorization: core.SensorGranted}
+	app.Permissions[core.PermissionMotion] = core.PermissionGranted
 	var samples []core.MotionSample
 	child := cx.Child()
 	app.Post(func() {

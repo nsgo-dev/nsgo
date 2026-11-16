@@ -232,7 +232,6 @@ var Parameters = map[string][]string{
 	"WidgetsHours":                 {"count"},
 	"WidgetsOfGoal":                {"goal"},
 	"SystemPermissionsUnavailable": {"permissions"},
-	"SystemSensorsAuthorization":   {"state"},
 }
 
 // Translation is a language's messages another package supplies:
@@ -429,7 +428,6 @@ type Translation struct {
 	WidgetsHours                 func(count int) string
 	WidgetsOfGoal                func(goal int) string
 	SystemPermissionsUnavailable func(permissions string) string
-	SystemSensorsAuthorization   func(state string) string
 }
 
 var supplied = map[string]Translation{}
@@ -2708,6 +2706,9 @@ const (
 	textPermissionReminders
 	textPermissionBluetooth
 	textPermissionMediaLibrary
+	textPermissionLocation
+	textPermissionBackgroundLocation
+	textPermissionMotion
 	textDemoCamera
 	textDemoCameraDetail
 	textCameraLabel
@@ -2733,8 +2734,6 @@ const (
 	textSystemSensorsSummary
 	textSystemSensorsIdle
 	textSystemSensorsTracking
-	textSystemSensorsBackgroundPermission
-	textSystemSensorsMotionPermission
 	textSystemSensorsLocate
 	textSystemSensorsTrack
 	textSystemSensorsBackground
@@ -5019,6 +5018,9 @@ var keyOfText = [numTexts]string{
 	"permissionReminders",
 	"permissionBluetooth",
 	"permissionMediaLibrary",
+	"permissionLocation",
+	"permissionBackgroundLocation",
+	"permissionMotion",
 	"demoCamera",
 	"demoCameraDetail",
 	"cameraLabel",
@@ -5044,8 +5046,6 @@ var keyOfText = [numTexts]string{
 	"systemSensorsSummary",
 	"systemSensorsIdle",
 	"systemSensorsTracking",
-	"systemSensorsBackgroundPermission",
-	"systemSensorsMotionPermission",
 	"systemSensorsLocate",
 	"systemSensorsTrack",
 	"systemSensorsBackground",
@@ -7328,6 +7328,9 @@ var textsEn = i18n.NewTexts(""+
 	"Reminders"+
 	"Bluetooth"+
 	"Media & Apple Music"+
+	"Location"+
+	"Background location"+
+	"Motion"+
 	"Camera"+
 	"A board the page lays out itself, panned and zoomed on a camera, with its own toolbar and a flow diagram among its screens"+
 	"A board of screens and the checkout flow. Drag to pan, and use the wheel or pinch to zoom."+
@@ -7350,11 +7353,9 @@ var textsEn = i18n.NewTexts(""+
 	"Collect at the counter"+
 	"declined"+
 	"Location and motion"+
-	"Explicit permissions, fresh fixes and scoped sensor streams."+
+	"Locate · WatchLocation · WatchMotion"+
 	"Not started"+
 	"Location tracking is active"+
-	"Background permission"+
-	"Motion permission"+
 	"Fresh location"+
 	"Track location"+
 	"Track in background"+
@@ -9634,6 +9635,9 @@ var textsEn = i18n.NewTexts(""+
 		9,
 		9,
 		19,
+		8,
+		19,
+		6,
 		6,
 		122,
 		90,
@@ -9656,11 +9660,9 @@ var textsEn = i18n.NewTexts(""+
 		22,
 		8,
 		19,
-		60,
+		38,
 		11,
 		27,
-		21,
-		17,
 		14,
 		14,
 		19,
@@ -11943,6 +11945,9 @@ var textsZhHans = i18n.NewTexts(""+
 	"提醒事项"+
 	"蓝牙"+
 	"媒体与Apple Music"+
+	"定位"+
+	"后台定位"+
+	"运动"+
 	"画布"+
 	"页面自己排布的画板，放在可平移缩放的相机上，带自己的工具栏，界面之间还有一张流程图"+
 	"包含几个界面和结账流程的画板。拖动平移，滚轮或捏合缩放。"+
@@ -11965,11 +11970,9 @@ var textsZhHans = i18n.NewTexts(""+
 	"到柜台取餐"+
 	"被拒"+
 	"定位与运动"+
-	"显式授权、新定位与随作用域停止的传感器采样。"+
+	"Locate · WatchLocation · WatchMotion"+
 	"未开始"+
 	"正在持续定位"+
-	"后台定位授权"+
-	"运动传感器授权"+
 	"获取新定位"+
 	"持续定位"+
 	"后台持续定位"+
@@ -14250,6 +14253,9 @@ var textsZhHans = i18n.NewTexts(""+
 		6,
 		20,
 		6,
+		12,
+		6,
+		6,
 		123,
 		84,
 		6,
@@ -14271,11 +14277,9 @@ var textsZhHans = i18n.NewTexts(""+
 		15,
 		6,
 		15,
-		66,
+		38,
 		9,
 		18,
-		18,
-		21,
 		15,
 		12,
 		18,
@@ -14901,9 +14905,6 @@ func Supply(lang string, t Translation) {
 	}
 	if t.SystemPermissionsUnavailable != nil {
 		s.SystemPermissionsUnavailable = t.SystemPermissionsUnavailable
-	}
-	if t.SystemSensorsAuthorization != nil {
-		s.SystemSensorsAuthorization = t.SystemSensorsAuthorization
 	}
 	supplied[lang] = s
 	Catalog.Add(lang)
@@ -36450,6 +36451,31 @@ func PermissionMediaLibrary(cx *core.Scope) string { return For(cx).PermissionMe
 // PermissionMediaLibrary is the package's PermissionMediaLibrary in the language of msgs.
 func (msgs Messages) PermissionMediaLibrary() string { return msgs.text(textPermissionMediaLibrary) }
 
+// PermissionLocation says "Location"
+// in the language the app shows under cx.
+func PermissionLocation(cx *core.Scope) string { return For(cx).PermissionLocation() }
+
+// PermissionLocation is the package's PermissionLocation in the language of msgs.
+func (msgs Messages) PermissionLocation() string { return msgs.text(textPermissionLocation) }
+
+// PermissionBackgroundLocation says "Background location"
+// in the language the app shows under cx.
+func PermissionBackgroundLocation(cx *core.Scope) string {
+	return For(cx).PermissionBackgroundLocation()
+}
+
+// PermissionBackgroundLocation is the package's PermissionBackgroundLocation in the language of msgs.
+func (msgs Messages) PermissionBackgroundLocation() string {
+	return msgs.text(textPermissionBackgroundLocation)
+}
+
+// PermissionMotion says "Motion"
+// in the language the app shows under cx.
+func PermissionMotion(cx *core.Scope) string { return For(cx).PermissionMotion() }
+
+// PermissionMotion is the package's PermissionMotion in the language of msgs.
+func (msgs Messages) PermissionMotion() string { return msgs.text(textPermissionMotion) }
+
 // DemoCamera says "Camera"
 // in the language the app shows under cx.
 func DemoCamera(cx *core.Scope) string { return For(cx).DemoCamera() }
@@ -36604,7 +36630,7 @@ func SystemSensorsTitle(cx *core.Scope) string { return For(cx).SystemSensorsTit
 // SystemSensorsTitle is the package's SystemSensorsTitle in the language of msgs.
 func (msgs Messages) SystemSensorsTitle() string { return msgs.text(textSystemSensorsTitle) }
 
-// SystemSensorsSummary says "Explicit permissions, fresh fixes and scoped sensor streams."
+// SystemSensorsSummary says "Locate · WatchLocation · WatchMotion"
 // in the language the app shows under cx.
 func SystemSensorsSummary(cx *core.Scope) string { return For(cx).SystemSensorsSummary() }
 
@@ -36624,28 +36650,6 @@ func SystemSensorsTracking(cx *core.Scope) string { return For(cx).SystemSensors
 
 // SystemSensorsTracking is the package's SystemSensorsTracking in the language of msgs.
 func (msgs Messages) SystemSensorsTracking() string { return msgs.text(textSystemSensorsTracking) }
-
-// SystemSensorsBackgroundPermission says "Background permission"
-// in the language the app shows under cx.
-func SystemSensorsBackgroundPermission(cx *core.Scope) string {
-	return For(cx).SystemSensorsBackgroundPermission()
-}
-
-// SystemSensorsBackgroundPermission is the package's SystemSensorsBackgroundPermission in the language of msgs.
-func (msgs Messages) SystemSensorsBackgroundPermission() string {
-	return msgs.text(textSystemSensorsBackgroundPermission)
-}
-
-// SystemSensorsMotionPermission says "Motion permission"
-// in the language the app shows under cx.
-func SystemSensorsMotionPermission(cx *core.Scope) string {
-	return For(cx).SystemSensorsMotionPermission()
-}
-
-// SystemSensorsMotionPermission is the package's SystemSensorsMotionPermission in the language of msgs.
-func (msgs Messages) SystemSensorsMotionPermission() string {
-	return msgs.text(textSystemSensorsMotionPermission)
-}
 
 // SystemSensorsLocate says "Fresh location"
 // in the language the app shows under cx.
@@ -36690,53 +36694,3 @@ func SystemSensorsFused(cx *core.Scope) string { return For(cx).SystemSensorsFus
 
 // SystemSensorsFused is the package's SystemSensorsFused in the language of msgs.
 func (msgs Messages) SystemSensorsFused() string { return msgs.text(textSystemSensorsFused) }
-
-// SystemSensorsAuthorization says "{state, select, granted {Granted} denied {Denied} restricted {Restricted} unavailable {Unavailable} other {Not asked}}"
-// in the language the app shows under cx.
-func SystemSensorsAuthorization(cx *core.Scope, state string) string {
-	return For(cx).SystemSensorsAuthorization(state)
-}
-
-// SystemSensorsAuthorization is the package's SystemSensorsAuthorization in the language of msgs.
-func (msgs Messages) SystemSensorsAuthorization(state string) string {
-	if i18n.IsPseudo(msgs.lang) {
-		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemSensorsAuthorization(state))
-	}
-	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
-		if f := supplied[lang].SystemSensorsAuthorization; f != nil {
-			return f(state)
-		}
-		switch lang {
-		case "", "en":
-			var b strings.Builder
-			switch state {
-			case "granted":
-				b.WriteString("Granted")
-			case "denied":
-				b.WriteString("Denied")
-			case "restricted":
-				b.WriteString("Restricted")
-			case "unavailable":
-				b.WriteString("Unavailable")
-			default:
-				b.WriteString("Not asked")
-			}
-			return b.String()
-		case "zh-Hans":
-			var b strings.Builder
-			switch state {
-			case "granted":
-				b.WriteString("已授权")
-			case "denied":
-				b.WriteString("已拒绝")
-			case "restricted":
-				b.WriteString("受限制")
-			case "unavailable":
-				b.WriteString("不可用")
-			default:
-				b.WriteString("未请求")
-			}
-			return b.String()
-		}
-	}
-}

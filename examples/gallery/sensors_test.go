@@ -10,14 +10,18 @@ import (
 func TestSystemSensors(t *testing.T) {
 	headless(t)
 	app := startDesktop(t)
-	app.SensorPermissions = map[core.SensorKind]core.SensorGrant{
-		core.SensorLocation: {Authorization: core.SensorNotAsked}, core.SensorMotion: {Authorization: core.SensorGranted},
-	}
-	app.SensorAnswers = map[core.SensorKind]core.SensorGrant{core.SensorLocation: {Authorization: core.SensorGranted, Precise: true}}
+	app.Permissions[core.PermissionMotion] = core.PermissionGranted
 	open(app, "System")
-	app.Press("id:sensor-location-ask")
-	if len(app.SensorPrompts) != 1 {
-		t.Fatal("location permission did not use explicit prompt")
+	app.Press("id:sensor-locate")
+	if got := app.Find("id:sensor-location").Text; !strings.Contains(got, string(core.SensorNotAllowed)) {
+		t.Fatalf("a fix without the permission showed %q", got)
+	}
+	if app.Permissions[core.PermissionLocation] != core.PermissionNotAsked {
+		t.Fatal("locating asked for the permission")
+	}
+	app.Press("id:request-" + string(core.PermissionLocation))
+	if app.Permissions[core.PermissionLocation] != core.PermissionGranted {
+		t.Fatal("the Permissions card did not ask for location")
 	}
 	app.Press("id:sensor-locate")
 	app.FeedLocation(core.LocationFix{Latitude: 51.5, Longitude: -0.12, Timestamp: app.Clock.Now(), HorizontalAccuracy: core.SensorNumber{Value: 5, Valid: true}})

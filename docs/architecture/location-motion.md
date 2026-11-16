@@ -4,11 +4,11 @@
 
 ## API and ownership
 
-- `ReadSensorPermission(kind, done)` reads without prompting; `RequestSensorPermission` explicitly requests location, background-location or motion authorization. Both return a cancelable `SensorStream`.
+- The permissions are `core.PermissionLocation`, `PermissionBackgroundLocation` and `PermissionMotion` ([permissions](services.md#permissions)), so the service adds no permission API of its own: `PermissionStatus` reads one without prompting and `RequestPermission` asks for it. Core carries both as the sensor service's `ItemSensor` read and request, which the backends answer from the providers' own authorization, and ends a request with the scope that made it; only `OpenPermissionSettings` goes out as `ItemPermission`. Restricted answers `PermissionDenied`.
 - `Locate(options, done)` waits for a new fix unless `MaxAge` explicitly allows a cached one, then stops. Its foreground timeout defaults to 30 seconds. `Stop` cancels silently.
 - `WatchLocation(options, sample, failed)` and `WatchMotion(options, sample, failed)` return streams owned by their requesting scope. Disposal stops providers and suppresses pending callbacks, including permission answers.
 - Callbacks run on the engine goroutine. Failures are stable `SensorError` codes: `not-allowed`, `unavailable`, `not-configured`, `timeout` or `failed`; none contains coordinates.
-- TSX's `Sensors` exposes permission promises, `locate`, `watchLocation` and `watchMotion`; subscriptions return a stop function. TSX durations and timestamps use milliseconds.
+- TSX's `Sensors` exposes `permission` and `requestPermission`, which resolve with the permission's status name, `locate`, `watchLocation` and `watchMotion`; subscriptions return a stop function. TSX durations and timestamps use milliseconds.
 
 Foreground streams keep running while inactive and pause in background. A paused one-shot waits with its remaining timeout. Resuming increments its generation, rejects queued samples from before the pause and marks the next delivered sample `Gap`. Explicit background location keeps running; motion always pauses. No service restores a killed process.
 
@@ -28,6 +28,8 @@ Foreground streams keep running while inactive and pause in background. A paused
 
 `LocationFix` uses WGS 84 coordinates, meters, m/s and course in degrees. `SensorNumber.Valid` distinguishes a missing field from zero. `Altitude` is ellipsoidal; `MSLAltitude` is above mean sea level, available from Apple's altitude and Android API 34's MSL altitude where supplied. Older Apple versions without ellipsoidal altitude leave it absent.
 
+`Approximate` says the user allowed only an approximate location as the fix came: Apple's reduced accuracy, or Android's coarse location without the fine one; it is how the app learns the precise or approximate answer.
+
 `Timestamp` is provider wall time. Android additionally supplies monotonic time since boot with `HasMonotonic`; Apple supplies none. Cache decisions use monotonic time on Android and provider wall time on Apple. `Cached` identifies a fix predating the request and `Age` reports its delivery age. A future cached monotonic timestamp is rejected. Updates preserve provider ordering except samples explicitly replaced under back-pressure.
 
 ## Motion values
@@ -44,16 +46,16 @@ A `driver.SensorPacket` holds the latest copied sample per stream/sensor under a
 
 ## Permissions and packaging
 
-`AccessLocation`, `AccessBackgroundLocation` and `AccessMotion` are separate capabilities, mirrored by TSX package grants `location`, `backgroundLocation` and `motion`. Background sampling also needs foreground location access. Starting a stream never requests a grant implicitly.
+`AccessLocation`, `AccessBackgroundLocation` and `AccessMotion` are separate capabilities, mirrored by TSX package grants `location`, `backgroundLocation` and `motion`; they hold the sensors' permissions too, in place of `AccessPermissions`, so a package granted location may read and ask for it. Background sampling also needs foreground location access. Starting a stream never requests a grant implicitly: one without the permission fails with `not-allowed`.
 
 Apple declarations live in `apple.info`: `NSLocationWhenInUseUsageDescription`, macOS's `NSLocationUsageDescription` where needed, and `NSMotionUsageDescription`. Hardened-runtime and store signing add the location entitlement only with a nonempty location usage description. Arrays and dictionaries encode as native plist values, including `UIBackgroundModes: [location]` and temporary-accuracy purpose dictionaries; requesting temporary full accuracy is a later API. Background updates need the declared mode and a manager supporting background delivery; When In Use may continue with the native indicator. This service provides no region-monitoring relaunch guarantee.
 
 Android declares `ACCESS_COARSE_LOCATION`, optional `ACCESS_FINE_LOCATION`, and for background streams `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_LOCATION` on API 34+. A location foreground service continues an explicitly started foreground grant. Apps additionally declaring `ACCESS_BACKGROUND_LOCATION` request it separately, after foreground authorization; Android 11+ opens the app's settings only on that explicit request. A background stream requires the app's notification title, with an optional body. Starting its foreground service can still be refused by the system's background-start rules.
 
-`LocationService` is non-exported and non-sticky. It owns the visible notification while background streams exist. A standalone Activity destroyed during tracking retains its engine's one view with an application context, and reattaches that same view when reopened; the final stopped stream releases a retained engine. Embedded hosts keep ownership of their engines. The prebuilt runtime's dex and jar ship with the Java sources and `runtime/build.sh` that rebuilds them.
+`LocationService` is non-exported and non-sticky. It owns the visible notification while background streams exist. A standalone Activity destroyed during tracking keeps its engine's one view off screen, as it does for overlays over other apps (`NsgoView.keepOffScreen`), and the next Activity shows that same view again; the last stopped stream, or the last closed overlay, ends a process nothing else keeps. Embedded hosts keep ownership of their engines. The prebuilt runtime's dex and jar ship with the Java sources and `runtime/build.sh` that rebuilds them.
 
 ## Verification and remaining acceptance
 
-Core tests cover separate grants, scope cancellation, one-shot completion, inactive/background transitions, generation rejection, resume gaps, timeout pause and rate validation. Driver tests exercise concurrent latest-value delivery and drop accounting; Android tests cover wire values, per-sensor coalescing and JVM provider/cache/rate fixtures. Apple tests use constructed CLLocation fixtures, never live positions, and check struct returns, cache rejection, missing values, acceleration units and frame conversion. TSX and the gallery use `nsgotest.SensorPermissions`, `SensorAnswers`, `LocationCache`, `FeedLocation` and `FeedMotion`.
+Core tests cover separate grants, scope cancellation, one-shot completion, inactive/background transitions, generation rejection, resume gaps, timeout pause and rate validation. Driver tests exercise concurrent latest-value delivery and drop accounting; Android tests cover wire values, per-sensor coalescing and JVM provider/cache/rate fixtures. Apple tests use constructed CLLocation fixtures, never live positions, and check struct returns, cache rejection, missing values, acceleration units and frame conversion. TSX and the gallery keep the permissions in `nsgotest`'s `Permissions` and `PermissionAnswers`, as every permission's, with `LocationCache`, `FeedLocation` and `FeedMotion`.
 
 Device acceptance remains necessary for native authorization changes, reduced accuracy, service notifications, Activity destruction/reopening, suspended Apple delivery and sensor calibration/rates on actual hardware. Tests must use injected simulator locations or recorded fixtures, never a user's live location. Other providers, geofencing, steps, barometer, activity recognition and bounded background motion remain in the roadmap.

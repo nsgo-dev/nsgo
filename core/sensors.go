@@ -8,29 +8,6 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// SensorKind identifies a provider's separately requested permission.
-type SensorKind = driver.SensorKind
-
-const (
-	SensorLocation           = driver.SensorLocation
-	SensorBackgroundLocation = driver.SensorBackgroundLocation
-	SensorMotion             = driver.SensorMotion
-)
-
-// SensorAuthorization is a provider's current system authorization.
-type SensorAuthorization = driver.SensorAuthorization
-
-const (
-	SensorNotAsked    = driver.SensorNotAsked
-	SensorGranted     = driver.SensorGranted
-	SensorDenied      = driver.SensorDenied
-	SensorRestricted  = driver.SensorRestricted
-	SensorUnavailable = driver.SensorUnavailable
-)
-
-// SensorGrant reports authorization and whether location is precise.
-type SensorGrant = driver.SensorGrant
-
 // SensorNumber is a measurement with an explicit availability flag.
 type SensorNumber = driver.SensorNumber
 
@@ -75,8 +52,7 @@ const (
 
 func (e SensorError) Error() string { return "nsgo: sensor: " + string(e) }
 
-// SensorStream owns a pending location, permission request or live stream.
-// Its callbacks run on the engine goroutine only while its scope is alive.
+// SensorStream owns a pending location or a live stream. Its callbacks run on the engine goroutine only while its scope is alive.
 type SensorStream struct {
 	tree                 *Tree
 	owner                *Scope
@@ -84,7 +60,7 @@ type SensorStream struct {
 	request              driver.SensorRequest
 	location             func(LocationFix)
 	motion               func(MotionSample)
-	permission           func(SensorGrant)
+	permission           func(driver.SensorGrant)
 	onError              func(error)
 	stopped, paused, gap bool
 	stopEffect           func()
@@ -93,48 +69,53 @@ type SensorStream struct {
 	started              time.Time
 }
 
-func sensorCapability(kind SensorKind) string {
+// sensorPermissions are the sensors' kinds by their permissions, which PermissionStatus and RequestPermission ask the sensor service for.
+var sensorPermissions = map[Permission]driver.SensorKind{
+	PermissionLocation:           driver.SensorLocation,
+	PermissionBackgroundLocation: driver.SensorBackgroundLocation,
+	PermissionMotion:             driver.SensorMotion,
+}
+
+// sensorGate is gate's refusal of the sensor of kind, held to AccessLocation, AccessBackgroundLocation or AccessMotion.
+func (cx *Scope) sensorGate(kind driver.SensorKind) error {
 	switch kind {
-	case SensorLocation:
-		return AccessLocation
-	case SensorBackgroundLocation:
-		return AccessBackgroundLocation
-	case SensorMotion:
-		return AccessMotion
+	case driver.SensorBackgroundLocation:
+		return cx.gate(serviceBackgroundLocation, "")
+	case driver.SensorMotion:
+		return cx.gate(serviceMotion, "")
 	}
-	return ""
+	return cx.gate(serviceLocation, "")
 }
 
-// ReadSensorPermission reads the current grant without showing a prompt.
-// Stop cancels the answer, as does disposal of the requesting scope.
-func (cx *Scope) ReadSensorPermission(kind SensorKind, done func(SensorGrant)) (*SensorStream, error) {
-	return cx.sensorPermission(kind, driver.SensorReadPermission, done)
+// sensorStatus is the PermissionStatus of a sensor's authorization: a restricted one is denied, as an administrator refused it.
+func sensorStatus(a driver.SensorAuthorization) PermissionStatus {
+	switch a {
+	case driver.SensorNotAsked:
+		return PermissionNotAsked
+	case driver.SensorGranted:
+		return PermissionGranted
+	case driver.SensorDenied, driver.SensorRestricted:
+		return PermissionDenied
+	}
+	return PermissionUnavailable
 }
 
-// RequestSensorPermission explicitly asks the system for this grant.
-// Android background permission is requested separately after foreground
-// permission; on Android 11+ the system settings page supplies that grant.
-// Starting a stream never requests permission implicitly.
-func (cx *Scope) RequestSensorPermission(kind SensorKind, done func(SensorGrant)) (*SensorStream, error) {
-	return cx.sensorPermission(kind, driver.SensorRequestPermission, done)
-}
-
-func (cx *Scope) sensorPermission(kind SensorKind, command driver.SensorCommand, done func(SensorGrant)) (*SensorStream, error) {
-	if kind > SensorMotion {
-		return nil, fmt.Errorf("nsgo: invalid sensor kind")
+// sensorPermission reads, or with ask asks for, the sensor permission of kind through the sensor service, and answers done with its status; it reports false, sending nothing, where the current owner's Access refuses the sensor or no tree serves it. The request ends with the requesting owner.
+func (cx *Scope) sensorPermission(kind driver.SensorKind, ask bool, done func(PermissionStatus)) bool {
+	command := driver.SensorReadPermission
+	if ask {
+		command = driver.SensorRequestPermission
 	}
 	s, err := cx.newSensor(driver.SensorRequest{Kind: kind, Command: command})
 	if err != nil {
-		return nil, err
+		return false
 	}
-	s.permission = done
+	s.permission = func(g driver.SensorGrant) { done(sensorStatus(g.Authorization)) }
 	s.send()
-	return s, nil
+	return true
 }
 
-// Locate waits for a new provider fix unless MaxAge explicitly allows a
-// cached one. It waits through background pauses and stops after one fix.
-// The default foreground timeout is 30 seconds; Stop cancels silently.
+// Locate waits for a new provider fix unless MaxAge explicitly allows a cached one, under PermissionLocation, which it never asks for. It waits through background pauses and stops after one fix. The default foreground timeout is 30 seconds; Stop cancels silently.
 func (cx *Scope) Locate(opts LocationOptions, done func(LocationFix, error)) (*SensorStream, error) {
 	s, err := cx.locationSensor(opts, driver.SensorLocate)
 	if err != nil {
@@ -158,10 +139,7 @@ func (cx *Scope) Locate(opts LocationOptions, done func(LocationFix, error)) (*S
 	return s, nil
 }
 
-// WatchLocation starts an explicitly authorized stream. Foreground streams
-// pause in background and mark their first resumed fix with Gap. Background
-// streams require AccessLocation and AccessBackgroundLocation plus the
-// platform declaration and grant; they never restart a killed process.
+// WatchLocation starts a stream under PermissionLocation, which it never asks for. Foreground streams pause in background and mark their first resumed fix with Gap. Background streams require AccessLocation and AccessBackgroundLocation, the platform's declaration and PermissionBackgroundLocation; they never restart a killed process.
 func (cx *Scope) WatchLocation(opts LocationOptions, sample func(LocationFix), failed func(error)) (*SensorStream, error) {
 	s, err := cx.locationSensor(opts, driver.SensorWatchLocation)
 	if err != nil {
@@ -179,17 +157,14 @@ func (cx *Scope) locationSensor(opts LocationOptions, command driver.SensorComma
 		return nil, fmt.Errorf("nsgo: invalid location options")
 	}
 	if opts.Background {
-		if err := cx.CheckAccess(AccessRequest{Permission: AccessBackgroundLocation}); err != nil {
+		if err := cx.sensorGate(driver.SensorBackgroundLocation); err != nil {
 			return nil, err
 		}
 	}
-	return cx.newSensor(driver.SensorRequest{Kind: SensorLocation, Command: command, Location: opts})
+	return cx.newSensor(driver.SensorRequest{Kind: driver.SensorLocation, Command: command, Location: opts})
 }
 
-// WatchMotion starts raw or fused sensors at the requested interval,
-// clamped to 10 ms–1 s. Zero requests accelerometer at 20 ms. Samples use
-// natural device axes, with +9.80665 m/s² on z face-up, and report dropped
-// samples. Motion always pauses in background; it never keeps a process alive.
+// WatchMotion starts raw or fused sensors at the requested interval, clamped to 10 ms–1 s, under PermissionMotion, which it never asks for. Zero requests accelerometer at 20 ms. Samples use natural device axes, with +9.80665 m/s² on z face-up, and report dropped samples. Motion always pauses in background; it never keeps a process alive.
 func (cx *Scope) WatchMotion(opts MotionOptions, sample func(MotionSample), failed func(error)) (*SensorStream, error) {
 	if opts.Sensors == 0 {
 		opts.Sensors = SensorAccelerometer
@@ -201,7 +176,7 @@ func (cx *Scope) WatchMotion(opts MotionOptions, sample func(MotionSample), fail
 		opts.Interval = 20 * time.Millisecond
 	}
 	opts.Interval = min(max(opts.Interval, 10*time.Millisecond), time.Second)
-	s, err := cx.newSensor(driver.SensorRequest{Kind: SensorMotion, Command: driver.SensorWatchMotion, Motion: opts})
+	s, err := cx.newSensor(driver.SensorRequest{Kind: driver.SensorMotion, Command: driver.SensorWatchMotion, Motion: opts})
 	if err != nil {
 		return nil, err
 	}
@@ -210,8 +185,9 @@ func (cx *Scope) WatchMotion(opts MotionOptions, sample func(MotionSample), fail
 	return s, nil
 }
 
+// newSensor makes the stream of r, held to its sensor's capability.
 func (cx *Scope) newSensor(r driver.SensorRequest) (*SensorStream, error) {
-	if err := cx.CheckAccess(AccessRequest{Permission: sensorCapability(r.Kind)}); err != nil {
+	if err := cx.sensorGate(r.Kind); err != nil {
 		return nil, err
 	}
 	t := cx.tree()

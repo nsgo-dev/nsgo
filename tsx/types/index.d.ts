@@ -555,7 +555,8 @@ export type { Bounds, Point, Size, Edges };
 
 /** Location and motion streams are scoped; stopping or disposing suppresses late callbacks. Durations and timestamps use milliseconds. */
 export type SensorPermissionKind = "location" | "backgroundLocation" | "motion";
-export interface SensorGrant { authorization: "default" | "granted" | "denied" | "restricted" | "unavailable"; precise: boolean }
+/** A permission's status, as core.PermissionStatus names it. */
+export type SensorPermissionStatus = "prompt" | "granted" | "denied" | "unknown" | "not-gated" | "unavailable";
 export interface SensorVector { x: number; y: number; z: number }
 export interface SensorQuaternion { x: number; y: number; z: number; w: number }
 export interface LocationOptions {
@@ -566,7 +567,7 @@ export interface LocationFix {
   latitude: number; longitude: number; timestamp: number; monotonic: number | null;
   altitude: number | null; mslAltitude: number | null; horizontalAccuracy: number | null;
   verticalAccuracy: number | null; speed: number | null; course: number | null;
-  age: number; cached: boolean; gap: boolean; dropped: number;
+  age: number; cached: boolean; approximate: boolean; gap: boolean; dropped: number;
 }
 /** Sensor bits: accelerometer=1, gyroscope=2, magnetometer=4, fused device motion=8. */
 export interface MotionOptions { sensors?: number; interval?: number }
@@ -576,8 +577,8 @@ export interface MotionSample {
   gap: boolean; dropped: number;
 }
 export declare const Sensors: {
-  permission(kind: SensorPermissionKind): Promise<SensorGrant>;
-  requestPermission(kind: SensorPermissionKind): Promise<SensorGrant>;
+  permission(kind: SensorPermissionKind): Promise<SensorPermissionStatus>;
+  requestPermission(kind: SensorPermissionKind): Promise<SensorPermissionStatus>;
   locate(options?: LocationOptions): Promise<LocationFix>;
   watchLocation(options: LocationOptions, sample: (fix: LocationFix) => void, failed?: (error: Error) => void): () => void;
   watchMotion(options: MotionOptions, sample: (motion: MotionSample) => void, failed?: (error: Error) => void): () => void;

@@ -16,23 +16,25 @@ func TestSensorsTSXSubscriptionsAndPermissionPromises(t *testing.T) {
 function App() {
  const state = signal("idle"); let stop = () => {};
  return <View>
-  <View testID="permission" style={{height:20}} onPress={() => Sensors.permission("location").then(g => state.set(g.authorization + " " + g.precise))} />
-  <View testID="locate" style={{height:20}} onPress={() => Sensors.locate().then(f => state.set("fix " + f.latitude + " " + f.altitude + " " + f.cached))} />
+  <View testID="permission" style={{height:20}} onPress={() => Sensors.permission("location").then(s => state.set("permission " + s))} />
+  <View testID="ask" style={{height:20}} onPress={() => Sensors.requestPermission("motion").then(s => state.set("asked " + s))} />
+  <View testID="locate" style={{height:20}} onPress={() => Sensors.locate().then(f => state.set("fix " + f.latitude + " " + f.altitude + " " + f.cached + " " + f.approximate))} />
   <View testID="motion" style={{height:20}} onPress={() => stop = Sensors.watchMotion({sensors:1, interval:1}, m => state.set("motion " + m.vector.z + " " + m.interval + " " + m.dropped))} />
   <View testID="stop" style={{height:20}} onPress={() => stop()} />
   <Text testID="state">{state}</Text>
  </View>;
 }
 mount(App);`)
-	app.SensorPermissions = map[core.SensorKind]core.SensorGrant{
-		core.SensorLocation: {Authorization: core.SensorGranted}, core.SensorMotion: {Authorization: core.SensorGranted},
-	}
+	app.Permissions[core.PermissionLocation] = core.PermissionGranted
+	app.PermissionAnswers[core.PermissionMotion] = core.PermissionGranted
 	app.Press("id:permission")
-	app.WaitFor("text:granted false", time.Second)
+	app.WaitFor("text:permission granted", time.Second)
+	app.Press("id:ask")
+	app.WaitFor("text:asked granted", time.Second)
 	app.Press("id:locate")
-	app.FeedLocation(core.LocationFix{Latitude: 42, Timestamp: app.Clock.Now()})
+	app.FeedLocation(core.LocationFix{Latitude: 42, Timestamp: app.Clock.Now(), Approximate: true})
 	app.Settle()
-	app.WaitFor("text:fix 42 null false", time.Second)
+	app.WaitFor("text:fix 42 null false true", time.Second)
 	app.Press("id:motion")
 	app.FeedMotion(core.MotionSample{Sensor: core.SensorAccelerometer, Vector: core.SensorVector{Z: 9.81}})
 	app.Settle()

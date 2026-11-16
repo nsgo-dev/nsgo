@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// SensorKind identifies a provider and its separately requested authorization.
+// SensorKind identifies a provider and its separately requested authorization: core.PermissionLocation, PermissionBackgroundLocation and PermissionMotion.
 type SensorKind uint8
 
 const (
@@ -14,7 +14,7 @@ const (
 	SensorMotion
 )
 
-// SensorAuthorization is a provider's current authorization, without prompting.
+// SensorAuthorization is a provider's current authorization, without prompting, which core answers as a core.PermissionStatus.
 type SensorAuthorization uint8
 
 const (
@@ -25,10 +25,9 @@ const (
 	SensorUnavailable
 )
 
-// SensorGrant keeps approximate location distinct from precise location.
+// SensorGrant answers SensorReadPermission and SensorRequestPermission.
 type SensorGrant struct {
 	Authorization SensorAuthorization
-	Precise       bool
 }
 
 // SensorNumber distinguishes a missing measurement from a measured zero.
@@ -37,9 +36,7 @@ type SensorNumber struct {
 	Valid bool
 }
 
-// LocationFix is a copied WGS 84 fix. Timestamp is wall time; Monotonic is
-// time since boot where available. Altitude is ellipsoidal, MSLAltitude is
-// above mean sea level. Distances are meters, speed m/s and course degrees.
+// LocationFix is a copied WGS 84 fix. Timestamp is wall time; Monotonic is time since boot where available. Altitude is ellipsoidal, MSLAltitude is above mean sea level. Distances are meters, speed m/s and course degrees. Approximate says the user allowed the app only an approximate location as the fix came: Apple's reduced accuracy, or Android's coarse location without the fine one.
 type LocationFix struct {
 	Latitude, Longitude                                         float64
 	Altitude, MSLAltitude, HorizontalAccuracy, VerticalAccuracy SensorNumber
@@ -48,6 +45,7 @@ type LocationFix struct {
 	Monotonic                                                   time.Duration
 	HasMonotonic                                                bool
 	Cached                                                      bool
+	Approximate                                                 bool
 	Age                                                         time.Duration
 	Gap                                                         bool
 	Dropped                                                     uint64

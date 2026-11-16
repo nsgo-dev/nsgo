@@ -277,7 +277,7 @@ sign:
   notarize: hello   # 上面的钥匙串配置；也可用 -notarize hello
 ```
 
-之后 `build` 会以强化运行时签名，提交磁盘映像，等待 Apple 的结果（通常几分钟），并把公证票据装订到磁盘映像和应用上；被拒时会打印 Apple 的日志。在 CI 中可用 `NSGO_NOTARY_KEY`、`NSGO_NOTARY_KEY_ID` 和 `NSGO_NOTARY_ISSUER`（App Store Connect API 密钥的 `.p8` 文件、ID 和 issuer）代替钥匙串配置。强化运行时默认禁止使用麦克风、摄像头和日历，`apple.info` 含 `NSMicrophoneUsageDescription`、`NSCameraUsageDescription`，或日历、提醒事项的用途说明时，`build` 会为应用声明相应权限。
+之后 `build` 会以强化运行时签名，提交磁盘映像，等待 Apple 的结果（通常几分钟），并把公证票据装订到磁盘映像和应用上；被拒时会打印 Apple 的日志。在 CI 中可用 `NSGO_NOTARY_KEY`、`NSGO_NOTARY_KEY_ID` 和 `NSGO_NOTARY_ISSUER`（App Store Connect API 密钥的 `.p8` 文件、ID 和 issuer）代替钥匙串配置。强化运行时默认禁止使用麦克风、摄像头、日历和定位，`apple.info` 含 `NSMicrophoneUsageDescription`、`NSCameraUsageDescription`，或日历、提醒事项、定位的用途说明时，`build` 会为应用声明相应权限。
 
 ## 小组件与实时活动
 

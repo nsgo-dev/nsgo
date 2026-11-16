@@ -34,6 +34,12 @@ func permissionTitle(tr locales.Messages, p core.Permission) string {
 		return tr.PermissionReminders()
 	case core.PermissionBluetooth:
 		return tr.PermissionBluetooth()
+	case core.PermissionLocation:
+		return tr.PermissionLocation()
+	case core.PermissionBackgroundLocation:
+		return tr.PermissionBackgroundLocation()
+	case core.PermissionMotion:
+		return tr.PermissionMotion()
 	}
 	return tr.PermissionMediaLibrary()
 }

@@ -164,7 +164,7 @@ final class Sensors {
 
     private JSONObject report(Run r) { return object("id", r.id, "Generation", r.generation); }
     private void grant(Run r) {
-        JSONObject g = object("Authorization", authorization(r.kind), "Precise", r.kind != MOTION && allowed(Manifest.permission.ACCESS_FINE_LOCATION));
+        JSONObject g = object("Authorization", authorization(r.kind));
         send(objectWith(report(r), "Grant", g, "End", true), null);
         stopProvider(r);
     }
@@ -239,7 +239,7 @@ final class Sensors {
         long age = Math.max(0, android.os.SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos());
         JSONObject f = object("Latitude", l.getLatitude(), "Longitude", l.getLongitude(),
             "Timestamp", Instant.ofEpochMilli(l.getTime()).toString(), "Monotonic", l.getElapsedRealtimeNanos(), "HasMonotonic", true,
-            "Age", age, "Cached", l.getElapsedRealtimeNanos() < r.startedNanos,
+            "Age", age, "Cached", l.getElapsedRealtimeNanos() < r.startedNanos, "Approximate", !allowed(Manifest.permission.ACCESS_FINE_LOCATION),
             "HorizontalAccuracy", number(l.getAccuracy(), l.hasAccuracy()), "Altitude", number(l.getAltitude(), l.hasAltitude()),
             "VerticalAccuracy", number(l.hasVerticalAccuracy() ? l.getVerticalAccuracyMeters() : 0, l.hasVerticalAccuracy()),
             "Speed", number(l.getSpeed(), l.hasSpeed()), "Course", number(l.getBearing(), l.hasBearing()));

@@ -2558,6 +2558,9 @@ permissionCalendars: "Calendars"
 permissionReminders: "Reminders"
 permissionBluetooth: "Bluetooth"
 permissionMediaLibrary: "Media & Apple Music"
+permissionLocation: "Location"
+permissionBackgroundLocation: "Background location"
+permissionMotion: "Motion"
 demoCamera: "Camera"
 demoCameraDetail: "A board the page lays out itself, panned and zoomed on a camera, with its own toolbar and a flow diagram among its screens"
 cameraLabel: "A board of screens and the checkout flow. Drag to pan, and use the wheel or pinch to zoom."
@@ -2581,15 +2584,12 @@ cameraReady: "Collect at the counter"
 cameraDeclined: "declined"
 
 systemSensorsTitle: Location and motion
-systemSensorsSummary: Explicit permissions, fresh fixes and scoped sensor streams.
+systemSensorsSummary: "Locate · WatchLocation · WatchMotion"
 systemSensorsIdle: Not started
 systemSensorsTracking: Location tracking is active
-systemSensorsBackgroundPermission: Background permission
-systemSensorsMotionPermission: Motion permission
 systemSensorsLocate: Fresh location
 systemSensorsTrack: Track location
 systemSensorsBackground: Track in background
 systemSensorsStop: Stop sensors
 systemSensorsAccelerometer: Accelerometer
 systemSensorsFused: Fused motion
-systemSensorsAuthorization: "{state, select, granted {Granted} denied {Denied} restricted {Restricted} unavailable {Unavailable} other {Not asked}}"

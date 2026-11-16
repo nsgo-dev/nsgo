@@ -1,6 +1,8 @@
 package nsgotest
 
 import (
+	"cmp"
+
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -10,6 +12,34 @@ type sensorRun struct {
 	packets map[driver.MotionSensors]*driver.SensorPacket
 }
 
+// sensorPermission are the sensors' permissions, which the model keeps in Permissions as it does every permission.
+var sensorPermission = [...]core.Permission{driver.SensorLocation: core.PermissionLocation, driver.SensorBackgroundLocation: core.PermissionBackgroundLocation, driver.SensorMotion: core.PermissionMotion}
+
+// sensorAuthorization is how a platform's sensor service tells the permission status s.
+func sensorAuthorization(s core.PermissionStatus) driver.SensorAuthorization {
+	switch s {
+	case core.PermissionNotAsked:
+		return driver.SensorNotAsked
+	case core.PermissionGranted, core.PermissionNotGated:
+		return driver.SensorGranted
+	case core.PermissionDenied:
+		return driver.SensorDenied
+	}
+	return driver.SensorUnavailable
+}
+
+// sensorRefusal is the error a provider fails with for want of permission p, "" when the app has it: a stream never asks.
+func (a *App) sensorRefusal(p core.Permission) string {
+	switch s := a.Permissions[p]; {
+	case s.Allowed():
+		return ""
+	case s == core.PermissionUnavailable:
+		return string(core.SensorNotAvailable)
+	}
+	return string(core.SensorNotAllowed)
+}
+
+// sensor answers an ItemSensor from Permissions, LocationCache and the fixes and samples a test feeds.
 func (a *App) sensor(id uint32, r driver.SensorRequest) {
 	if r.Command == driver.SensorStop {
 		delete(a.sensorRuns, id)
@@ -19,35 +49,23 @@ func (a *App) sensor(id uint32, r driver.SensorRequest) {
 		e.Generation = r.Generation
 		a.post(driver.Event{Kind: driver.EventSensor, Count: id, Data: &e})
 	}
-	grant, exists := a.SensorPermissions[r.Kind]
-	if !exists {
-		grant.Authorization = core.SensorUnavailable
-	}
+	p := sensorPermission[r.Kind]
 	if r.Command <= driver.SensorRequestPermission {
-		if r.Command == driver.SensorRequestPermission {
-			a.SensorPrompts = append(a.SensorPrompts, r.Kind)
-			if answer, ok := a.SensorAnswers[r.Kind]; ok {
-				grant = answer
-				if a.SensorPermissions == nil {
-					a.SensorPermissions = map[core.SensorKind]core.SensorGrant{}
-				}
-				a.SensorPermissions[r.Kind] = grant
-			}
+		if r.Command == driver.SensorRequestPermission && a.Permissions[p] == core.PermissionNotAsked {
+			a.Permissions[p] = cmp.Or(a.PermissionAnswers[p], core.PermissionGranted)
 		}
-		report(driver.SensorReport{Grant: &grant})
+		report(driver.SensorReport{Grant: &driver.SensorGrant{Authorization: sensorAuthorization(a.Permissions[p])}, End: true})
 		return
 	}
-	if grant.Authorization != core.SensorGranted {
-		code := "not-allowed"
-		if grant.Authorization == core.SensorUnavailable {
-			code = "unavailable"
-		}
+	if code := a.sensorRefusal(p); code != "" {
 		report(driver.SensorReport{Error: code, End: true})
 		return
 	}
-	if r.Location.Background && a.SensorPermissions[core.SensorBackgroundLocation].Authorization != core.SensorGranted {
-		report(driver.SensorReport{Error: "not-allowed", End: true})
-		return
+	if r.Location.Background {
+		if code := a.sensorRefusal(core.PermissionBackgroundLocation); code != "" {
+			report(driver.SensorReport{Error: code, End: true})
+			return
+		}
 	}
 	if r.Command == driver.SensorLocate && r.Location.MaxAge > 0 && a.LocationCache != nil {
 		f := *a.LocationCache

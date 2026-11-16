@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"math"
+	"slices"
 	"testing"
 	"time"
 
@@ -22,31 +23,80 @@ func sensorAnswer(h *host, it *driver.MountItem, report driver.SensorReport) {
 	h.tree.Dispatch(driver.Event{Kind: driver.EventSensor, Count: it.Count, Data: &report})
 }
 
-func TestSensorPermissionIsExplicitAndScoped(t *testing.T) {
+func TestSensorPermissionsAreCorePermissions(t *testing.T) {
 	h, cx := sensorHost(t)
-	var grants []SensorGrant
-	s, err := cx.ReadSensorPermission(SensorLocation, func(g SensorGrant) { grants = append(grants, g) })
-	if err != nil {
-		t.Fatal(err)
+	var got []PermissionStatus
+	answer := func(s PermissionStatus) { got = append(got, s) }
+	cx.PermissionStatus(PermissionLocation, answer)
+	b := h.commit()
+	if command(b, driver.ItemPermission) != nil {
+		t.Fatal("a sensor's permission went to ItemPermission")
 	}
-	it := command(h.commit(), driver.ItemSensor)
-	if it.Sensor.Command != driver.SensorReadPermission {
-		t.Fatal("read prompted")
+	it := command(b, driver.ItemSensor)
+	if it == nil || it.Sensor.Command != driver.SensorReadPermission || it.Sensor.Kind != driver.SensorLocation {
+		t.Fatalf("check sent %+v", it)
 	}
-	sensorAnswer(h, it, driver.SensorReport{Grant: &SensorGrant{Authorization: SensorGranted, Precise: false}})
-	if len(grants) != 1 || grants[0].Precise || !s.Stopped() {
-		t.Fatalf("grants %v, stopped %v", grants, s.Stopped())
-	}
-	h.commit()
-	pending, _ := cx.RequestSensorPermission(SensorMotion, func(g SensorGrant) { grants = append(grants, g) })
+	sensorAnswer(h, it, driver.SensorReport{Grant: &driver.SensorGrant{Authorization: driver.SensorGranted}, End: true})
+	cx.RequestPermission(PermissionMotion, answer)
 	it = command(h.commit(), driver.ItemSensor)
-	if it.Sensor.Command != driver.SensorRequestPermission {
-		t.Fatal("request did not ask")
+	if it == nil || it.Sensor.Command != driver.SensorRequestPermission || it.Sensor.Kind != driver.SensorMotion {
+		t.Fatalf("request sent %+v", it)
 	}
-	pending.Stop()
-	sensorAnswer(h, it, driver.SensorReport{Grant: &SensorGrant{Authorization: SensorGranted}})
-	if len(grants) != 1 {
-		t.Fatal("canceled permission reached user code")
+	sensorAnswer(h, it, driver.SensorReport{Grant: &driver.SensorGrant{Authorization: driver.SensorRestricted}, End: true})
+	cx.RequestPermission(PermissionBackgroundLocation, answer)
+	it = command(h.commit(), driver.ItemSensor)
+	if it == nil || it.Sensor.Kind != driver.SensorBackgroundLocation {
+		t.Fatalf("background request sent %+v", it)
+	}
+	sensorAnswer(h, it, driver.SensorReport{Grant: &driver.SensorGrant{Authorization: driver.SensorNotAsked}, End: true})
+	if want := []PermissionStatus{PermissionGranted, PermissionDenied, PermissionNotAsked}; !slices.Equal(got, want) {
+		t.Fatalf("answered %v, want %v", got, want)
+	}
+	// The settings open as every permission's do.
+	cx.OpenPermissionSettings(PermissionLocation, nil)
+	if it := command(h.commit(), driver.ItemPermission); it == nil || it.Permission.Name != driver.PermissionLocation || it.Permission.Command != driver.PermissionOpenSettings {
+		t.Fatalf("settings sent %+v", it)
+	}
+}
+
+func TestSensorPermissionEndsWithItsOwner(t *testing.T) {
+	h, cx := sensorHost(t)
+	child := cx.Child()
+	var got []PermissionStatus
+	child.RequestPermission(PermissionLocation, func(s PermissionStatus) { got = append(got, s) })
+	it := command(h.commit(), driver.ItemSensor)
+	child.Dispose()
+	if stop := command(h.commit(), driver.ItemSensor); stop == nil || stop.Sensor.Command != driver.SensorStop {
+		t.Fatal("a disposed owner left its request with the provider")
+	}
+	sensorAnswer(h, it, driver.SensorReport{Grant: &driver.SensorGrant{Authorization: driver.SensorGranted}, End: true})
+	if len(got) != 0 {
+		t.Fatal("a disposed owner heard its answer")
+	}
+}
+
+func TestSensorPermissionsHeldToTheSensorsCapabilities(t *testing.T) {
+	h, cx := sensorHost(t)
+	cx.ProvideAccess(sensorAccess{AccessLocation: true})
+	got := map[Permission]PermissionStatus{}
+	for _, p := range []Permission{PermissionLocation, PermissionBackgroundLocation, PermissionMotion} {
+		cx.PermissionStatus(p, func(s PermissionStatus) { got[p] = s })
+	}
+	b := h.commit()
+	if got[PermissionBackgroundLocation] != PermissionUnavailable || got[PermissionMotion] != PermissionUnavailable {
+		t.Fatalf("refused sensors answered %v", got)
+	}
+	n := 0
+	for _, it := range b.Items {
+		if it.Kind == driver.ItemSensor {
+			n++
+			if it.Sensor.Kind != driver.SensorLocation {
+				t.Fatalf("a refused sensor reached the provider: %+v", it.Sensor)
+			}
+		}
+	}
+	if n != 1 {
+		t.Fatalf("sent %d sensor requests, want the location's alone", n)
 	}
 }
 

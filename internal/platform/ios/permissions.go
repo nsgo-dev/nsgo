@@ -20,7 +20,9 @@ func (s *surface) permission(id uint32, r driver.PermissionRequest) {
 	case driver.PermissionOpenSettings:
 		opened := func(ok bool) { e.Dispatch(driver.Event{Kind: driver.EventPermission, Count: id, Finished: ok}) }
 		settings := apple.GoString(apple.Global(uikitPath, "UIApplicationOpenSettingsURLString"))
-		if settings == "" || privacy.Status(r.Name) == driver.PermissionUnavailable {
+		// The app's page in Settings also holds its location and motion, which privacy does not tell.
+		sensor := r.Name == driver.PermissionLocation || r.Name == driver.PermissionBackgroundLocation || r.Name == driver.PermissionMotion
+		if settings == "" || !sensor && privacy.Status(r.Name) == driver.PermissionUnavailable {
 			opened(false)
 			return
 		}

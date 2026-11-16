@@ -72,7 +72,7 @@ var locationDelegate = sync.OnceValue(func() objc.Class {
 })
 
 func locationGrant(manager objc.ID, background bool) driver.SensorGrant {
-	g := driver.SensorGrant{Authorization: driver.SensorNotAsked, Precise: true}
+	g := driver.SensorGrant{Authorization: driver.SensorNotAsked}
 	status := objc.Send[int](manager, sel("authorizationStatus"))
 	switch status {
 	case 1:
@@ -84,9 +84,6 @@ func locationGrant(manager objc.ID, background bool) driver.SensorGrant {
 	}
 	if !objc.Send[bool](objc.ID(Class("CLLocationManager")), sel("locationServicesEnabled")) {
 		g.Authorization = driver.SensorUnavailable
-	}
-	if responds(manager, "accuracyAuthorization") {
-		g.Precise = objc.Send[int](manager, sel("accuracyAuthorization")) == 0
 	}
 	if background && !backgroundLocationDeclared() {
 		g.Authorization = driver.SensorUnavailable
@@ -288,6 +285,8 @@ func (r *appleSensorRun) location(location objc.ID) (driver.LocationFix, bool) {
 	f.Speed.Valid = f.Speed.Valid && f.Speed.Value >= 0
 	f.Course = sensorNumber(objc.Send[float64](location, sel("course")), true)
 	f.Course.Valid = f.Course.Valid && f.Course.Value >= 0
+	// CLAccuracyAuthorizationReducedAccuracy is 1; before macOS 11 and iOS 14 every fix is precise.
+	f.Approximate = responds(r.manager, "accuracyAuthorization") && objc.Send[int](r.manager, sel("accuracyAuthorization")) == 1
 	return f, true
 }
 
@@ -466,8 +465,9 @@ func (r *appleSensorRun) pollMotionGrant() {
 		r.grant(g)
 		return
 	}
+	// Core Motion tells no answer: a prompt still unanswered after 30 seconds answers as it stands, not asked, rather than as a refusal the user never gave.
 	if time.Since(r.started) > 30*time.Second {
-		r.grant(driver.SensorGrant{Authorization: driver.SensorDenied})
+		r.grant(g)
 		return
 	}
 	time.AfterFunc(100*time.Millisecond, func() { OnMain(r.pollMotionGrant) })

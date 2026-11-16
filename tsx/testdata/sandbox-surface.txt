@@ -89,6 +89,12 @@ nsgo.Secrets
 nsgo.Secrets.delete
 nsgo.Secrets.get
 nsgo.Secrets.set
+nsgo.Sensors
+nsgo.Sensors.locate
+nsgo.Sensors.permission
+nsgo.Sensors.requestPermission
+nsgo.Sensors.watchLocation
+nsgo.Sensors.watchMotion
 nsgo.Shader
 nsgo.ShaderEffect
 nsgo.ShaderTransition
