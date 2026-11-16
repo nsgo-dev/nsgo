@@ -84,3 +84,31 @@ func TestReadSize(t *testing.T) {
 		t.Errorf("read %v %+v without folds", size, folds)
 	}
 }
+
+func TestReadResize(t *testing.T) {
+	// A rotation's RESIZE, as NsgoView.sendSize writes it: the size, no folds, then the environment that changed with it as ENVIRONMENT carries it.
+	var w writer
+	w.floats(846, 411)
+	w.u32(0)
+	if size, _, env := readResize(&reader{w.buf}); size != (driver.Size{Width: 846, Height: 411}) || env != nil {
+		t.Fatalf("read %v %+v, want the size alone", size, env)
+	}
+	w.floats(0, 48, 0, 48, 0, 1, 2.625)
+	w.byte(1)
+	w.byte(1) // the device can speak
+	w.byte(byte(driver.IdiomPhone))
+	w.str("en-US")
+	w.floats(56, 56)
+	w.u32(31)
+	r := reader{w.buf}
+	size, g, env := readResize(&r)
+	if len(r.buf) != 0 {
+		t.Errorf("%d bytes left unread", len(r.buf))
+	}
+	if size != (driver.Size{Width: 846, Height: 411}) || len(g.Obstructions) != 0 || env == nil {
+		t.Fatalf("read %v %+v %+v, want the size with an environment", size, g, env)
+	}
+	if env.SafeArea != (driver.Edges{Right: 48, Left: 48}) || !env.Dark || !env.Speak || env.Idiom != driver.IdiomPhone || env.PixelRatio != 2.625 || env.Locale != "en-US" || env.OSVersion.Major != 31 {
+		t.Errorf("read the environment %+v", *env)
+	}
+}

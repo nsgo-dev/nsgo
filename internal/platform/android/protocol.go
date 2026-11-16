@@ -337,3 +337,50 @@ func (r *reader) str() string {
 	r.buf = r.buf[n:]
 	return s
 }
+
+// readResize reads a msgResize: the size and the geometry measured at it, then the environment that changed with them, nil if none did.
+func readResize(r *reader) (driver.Size, driver.Geometry, *driver.Environment) {
+	size, folds := readSize(r)
+	g := foldGeometry(size, folds)
+	if len(r.buf) == 0 {
+		return size, g, nil
+	}
+	env := readEnvironment(r)
+	return size, g, &env
+}
+
+// readEnvironment reads the environment NsgoView.environment writes.
+func readEnvironment(r *reader) driver.Environment {
+	env := driver.Environment{
+		OS:             driver.OSAndroid,
+		HasWebView:     true,
+		SafeArea:       driver.Edges{Top: r.points(), Right: r.points(), Bottom: r.points(), Left: r.points()},
+		KeyboardHeight: r.points(),
+		FontScale:      r.float(),
+		PixelRatio:     r.float(),
+
+		// The runtime's alarms show them, its receiver setting them again after a reboot.
+		ScheduledNotifications: true,
+	}
+	flags := r.byte()
+	env.Dark = flags&1 != 0
+	env.ReduceMotion = flags&2 != 0
+	env.IncreaseContrast = flags&128 != 0
+	env.ScreenReader = flags&4 != 0
+	env.RTL = flags&8 != 0
+	env.Camera = flags&64 != 0
+	switch {
+	case flags&32 != 0:
+		env.Lifecycle = driver.LifecycleBackground
+	case flags&16 != 0:
+		env.Lifecycle = driver.LifecycleInactive
+	}
+	// The first byte's bits are all taken; a second holds what else the device can do.
+	env.Speak = r.byte()&1 != 0
+	env.Idiom = driver.Idiom(r.byte())
+	env.Locale = r.str()
+	// The toolbar's heights, without and with a large title.
+	env.HeaderHeight, env.LargeHeaderHeight = r.points(), r.points()
+	env.OSVersion.Major = int(r.u32()) // the API level
+	return env
+}

@@ -556,11 +556,14 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 					delete(surfaces, m.surface)
 				}
 			case m.resize != nil:
-				t.Resize(*m.resize, m.geometry)
+				// One batch, so no effect sees the new size with the old environment it came with.
+				root.Batch(func() {
+					t.Resize(*m.resize, m.geometry)
+					if m.env != nil {
+						t.SetEnvironment(*m.env)
+					}
+				})
 				resized = append(resized, m.resized...)
-				if m.env != nil {
-					t.SetEnvironment(*m.env)
-				}
 			case m.env != nil:
 				t.SetEnvironment(*m.env)
 			case m.at != nil:
@@ -585,7 +588,7 @@ func (e *Engine) push(m message) {
 	}
 }
 
-// enqueue queues m for the engine's next pass. A mergeable event replaces one of the same kind for the same view still queued, a resize the last resize of the same surface with the geometry it carries and its environment, and a frame request the one still queued, so bursts cost one update each. A wheel's turns add up into the one queued.
+// enqueue queues m for the engine's next pass. A mergeable event replaces one of the same kind for the same view still queued, a resize the last resize of the same surface with the geometry it carries, and a frame request the one still queued, so bursts cost one update each. A wheel's turns add up into the one queued. A surface's resize and environment still queued become one message, applied in one batch.
 func (e *Engine) enqueue(m message) {
 	e.mu.Lock()
 	merged := false
@@ -602,15 +605,14 @@ func (e *Engine) enqueue(m message) {
 			*q = m
 			merged = true
 		case m.resize != nil && q.env != nil && same:
-			// Android reports the new environment before the size measured with
-			// it. Keep both in the resize message so one commit observes them
-			// together, even when the engine has not taken the queue yet.
-			m.env = q.env
+			// A size and the environment queued before it describe one change, as a rotation's safe area and size: the resize takes the environment's slot and carries it, unless it brings a newer one.
+			if m.env == nil {
+				m.env = q.env
+			}
 			*q = m
 			merged = true
 		case m.env != nil && q.resize != nil && same:
-			// Apply the same rule when a backend reports the two in the other
-			// order: a size and its environment describe one change.
+			// The same when the environment comes after the size.
 			q.env = m.env
 			merged = true
 		case same && m.event.Kind == driver.EventWheel && q.event.Kind == driver.EventWheel && q.event.ID == m.event.ID &&
@@ -737,16 +739,26 @@ func (e *Engine) ResizeAndWait(size driver.Size, g driver.Geometry) <-chan struc
 	return done
 }
 
-// SetEnvironment reports what the platform knows about where the app
-// runs; only the latest report queued is applied.
+// SetEnvironment reports what the platform knows about where the app runs; only the latest report queued is applied.
 func (e *Engine) SetEnvironment(env driver.Environment) {
+	env = e.reported(env)
+	e.push(message{surface: e.surface, env: &env})
+}
+
+// ResizeWithEnvironment sets the surface size and geometry as Resize does and reports the environment that changed with them, as a rotation's safe area, as SetEnvironment does: the app sees both in one batch, never one without the other.
+func (e *Engine) ResizeWithEnvironment(size driver.Size, g driver.Geometry, env driver.Environment) {
+	env = e.reported(env)
+	e.push(message{surface: e.surface, resize: &size, geometry: g, env: &env})
+}
+
+// reported records env as the platform's last report for the first surface and returns what the app sees of it.
+func (e *Engine) reported(env driver.Environment) driver.Environment {
 	if e.surface == 0 {
 		e.mu.Lock()
 		e.raw = env
 		e.mu.Unlock()
 	}
-	env = e.effective(env)
-	e.push(message{surface: e.surface, env: &env})
+	return e.effective(env)
 }
 
 // effective is the environment the app sees for the platform's env: the

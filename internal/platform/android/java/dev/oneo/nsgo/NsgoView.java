@@ -187,6 +187,15 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     };
     private int safeTop, safeRight, safeBottom, safeLeft, keyboard;
     private byte[] environment;
+    /** Whether new insets wait for the layout of their traversal, which sends them with a new size if they bring one (sendSize), else alone as the frame draws. */
+    private boolean environmentHeld;
+    private final ViewTreeObserver.OnPreDrawListener heldEnvironment = new ViewTreeObserver.OnPreDrawListener() {
+        @Override
+        public boolean onPreDraw() {
+            releaseEnvironment();
+            return true;
+        }
+    };
     private ConnectivityManager.NetworkCallback network;
     /**
      * The predictive back gesture, on the UI thread: whether one runs, its
@@ -321,7 +330,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             insets(insets);
             // An overlay's usable area changes with the system bars and the cutout.
             if (primary != null) primary.overlays.fit(this);
-            environment();
+            // A rotation's insets come before the size they go with, in the same traversal.
+            holdEnvironment();
             updateAccessory();
             return insets;
         });
@@ -381,7 +391,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 attachRunningEngine();
             }
         }
-        environment();
+        // A RESIZE carries the environment that changed with the size.
+        if (first) environment();
         foldsPending = false;
         sendSize(first ? Protocol.START : Protocol.RESIZE);
     }
@@ -441,6 +452,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     @Override
     protected void onDetachedFromWindow() {
+        releaseEnvironment();
         // An app waiting for the folds starts as the view leaves its window, as it would have without them.
         releaseStart();
         accessibility.removeTouchExplorationStateChangeListener(screenReader);
@@ -851,10 +863,50 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /**
-     * Sends the environment if it changed: before START, then whenever the insets, the configuration, an accessibility setting or the window's focus and visibility change. The keyboard takes the system's default duration. An overlay's view sends it with its size and place (SURFACE_STATE), the first of which attaches its tree, and takes the host's settings from the first view.
+     * Sends the environment if it changed: before START, then whenever the insets, the configuration, an accessibility setting or the window's focus and visibility change. New insets wait for the layout of their traversal (holdEnvironment), and a RESIZE carries what changed with the size, so the app never sees a safe area with a size it was not measured at. The keyboard takes the system's default duration. An overlay's view sends it with its size and place (SURFACE_STATE), the first of which attaches its tree, and takes the host's settings from the first view.
      */
     void environment() {
-        if (engine == null || !engine.isAlive()) return;
+        byte[] payload = environmentPayload();
+        if (payload == null) return;
+        if (primary != null) {
+            byte[] state = primary.overlays.state(this, payload);
+            if (state == null || Arrays.equals(state, environment)) return;
+            environment = state;
+            write(Protocol.SURFACE, state);
+            return;
+        }
+        payload = environmentChange(payload);
+        if (payload == null) return;
+        write(Protocol.ENVIRONMENT, payload);
+        // The app's forced appearance and the host's settings reach its overlays.
+        overlays.environment();
+    }
+
+    /** The first view's environment payload if it differs from the one last sent, which it then counts as sent; null if it does not. */
+    private byte[] environmentChange(byte[] payload) {
+        if (payload == null || Arrays.equals(payload, environment)) return null;
+        environment = payload;
+        return payload;
+    }
+
+    /** Holds the environment until the traversal that applied new insets has laid the view out: a rotation's safe area comes before its size, and the two reach the app together. */
+    private void holdEnvironment() {
+        if (environmentHeld) return;
+        environmentHeld = true;
+        getViewTreeObserver().addOnPreDrawListener(heldEnvironment);
+    }
+
+    /** Sends the environment holdEnvironment held, if the layout's RESIZE did not carry it. */
+    private void releaseEnvironment() {
+        if (!environmentHeld) return;
+        environmentHeld = false;
+        getViewTreeObserver().removeOnPreDrawListener(heldEnvironment);
+        environment();
+    }
+
+    /** The environment as ENVIRONMENT carries it, or null while no app runs. */
+    private byte[] environmentPayload() {
+        if (engine == null || !engine.isAlive()) return null;
         NsgoView first = primary != null ? primary : this;
         float hostFontScale = first.hostFontScale;
         java.util.Locale hostLocale = first.hostLocale;
@@ -901,19 +953,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
         }
-        byte[] payload = bytes.toByteArray();
-        if (primary != null) {
-            byte[] state = primary.overlays.state(this, payload);
-            if (state == null || Arrays.equals(state, environment)) return;
-            environment = state;
-            write(Protocol.SURFACE, state);
-            return;
-        }
-        if (Arrays.equals(payload, environment)) return;
-        environment = payload;
-        write(Protocol.ENVIRONMENT, payload);
-        // The app's forced appearance and the host's settings reach its overlays.
-        overlays.environment();
+        return bytes.toByteArray();
     }
 
     /** The appearance the app forces, as driver.Appearance; 0 follows the system's. */
@@ -1510,9 +1550,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /**
-     * Sends START or RESIZE: the view's size in points, then the folds and hinges measured at it (Folds), each a frame in the view's points, the extensions' type and state; none while the window has other bounds than the latest report was measured at. Frames are clipped to the view in pixels, so an edge the view cuts a feature at is the view's own edge in points to the bit, and one outside the view is left out.
+     * Sends START or RESIZE: the view's size in points, then the folds and hinges measured at it (Folds), each a frame in the view's points, the extensions' type and state; none while the window has other bounds than the latest report was measured at. Frames are clipped to the view in pixels, so an edge the view cuts a feature at is the view's own edge in points to the bit, and one outside the view is left out. A RESIZE then carries the environment as ENVIRONMENT does if it changed, as a rotation's safe area does, so the app sees both in one change.
      */
     private void sendSize(int kind) {
+        byte[] env = kind == Protocol.RESIZE ? environmentChange(environmentPayload()) : null;
         int[] f = folds != null ? folds.current() : new int[0];
         int[] at = new int[2];
         getLocationInWindow(at);
@@ -1543,10 +1584,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 d.writeByte(in[i + 4]);
                 d.writeByte(in[i + 5]);
             }
+            if (env != null) d.write(env);
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
         }
         write(kind, bytes.toByteArray());
+        if (env != null) overlays.environment();
     }
 
     private void send(int kind, float a, float b) {

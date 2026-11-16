@@ -531,9 +531,7 @@ func TestTraceHearsTheAppsTimeBeforeACommit(t *testing.T) {
 }
 
 func TestResizeMergesWithItsGeometry(t *testing.T) {
-	// A fold opening while a resize waits: the newer resize takes the older
-	// one's slot, carrying an environment pushed between them, with the
-	// geometry measured at its own size.
+	// A fold opening while a resize waits: the newer resize takes the older one's slot with the geometry measured at its own size, and carries an environment pushed between them, so the tree never applies the older geometry at the newer size.
 	e := &Engine{runner: &runner{wake: make(chan struct{}, 1)}}
 	folded := driver.Size{Width: 400, Height: 600}
 	open := driver.Size{Width: 800, Height: 600}
@@ -550,7 +548,7 @@ func TestResizeMergesWithItsGeometry(t *testing.T) {
 		t.Fatalf("merged resize at %v with %+v, want %v with the hinge", *q[0].resize, q[0].geometry, open)
 	}
 
-	// Applied in that order, what reads the size and the geometry sees them together.
+	// Applied in one batch, as the engine applies a message, what reads the size and the geometry sees them together.
 	root := core.NewRoot(core.RootOptions{Post: func(func()) {}, Clock: core.NewManualClock(time.Unix(0, 0))})
 	defer root.Dispose()
 	tree := core.NewTree(root, core.ApproxTextEngine{})
@@ -579,47 +577,76 @@ func TestResizeMergesWithItsGeometry(t *testing.T) {
 }
 
 func TestEnvironmentMergesWithFollowingResize(t *testing.T) {
-	// Android reports the new safe area before the new view size. The two
-	// messages describe one change and must reach the tree in one commit.
-	env := driver.Environment{SafeArea: driver.Edges{Top: 48, Bottom: 48}}
-	// Put the messages in the order Android uses, rather than relying on the
-	// resize helper to do it for us.
+	// Android reports a rotation's safe area before the size it goes with: the two still queued become one message, as do a resize and the environment after it, and a resize that brings its own environment keeps it over an older one queued.
+	wide := driver.Environment{SafeArea: driver.Edges{Top: 28, Right: 48, Left: 48}}
+	landscape := driver.Size{Width: 846, Height: 411}
 	e := &Engine{runner: &runner{wake: make(chan struct{}, 1)}}
-	e.SetEnvironment(env)
-	done := e.ResizeAndWait(driver.Size{Width: 846, Height: 411}, driver.Geometry{})
+	e.SetEnvironment(wide)
+	done := e.ResizeAndWait(landscape, driver.Geometry{})
 	q := e.take()
-	if len(q) != 1 || q[0].resize == nil || q[0].env == nil {
-		t.Fatalf("queue %+v, want one resize carrying its environment", q)
+	if len(q) != 1 || q[0].resize == nil || q[0].env == nil || *q[0].resize != landscape || !q[0].env.Equal(wide) || len(q[0].resized) != 1 {
+		t.Fatalf("queue %+v, want one resize to %v carrying %+v", q, landscape, wide)
 	}
-	if *q[0].resize != (driver.Size{Width: 846, Height: 411}) || !q[0].env.Equal(env) {
-		t.Fatalf("merged message has size %v and environment %+v, want %v and %+v", *q[0].resize, *q[0].env, driver.Size{Width: 846, Height: 411}, env)
+	select {
+	case <-done:
+		t.Error("the wait ended before a commit")
+	default:
 	}
 
-	root := core.NewRoot(core.RootOptions{Post: func(func()) {}, Clock: core.NewManualClock(time.Unix(0, 0))})
-	defer root.Dispose()
-	tree := core.NewTree(root, core.ApproxTextEngine{})
-	tree.Resize(driver.Size{Width: 411, Height: 846}, driver.Geometry{})
-	tree.SetEnvironment(driver.Environment{})
+	e.Resize(landscape, driver.Geometry{})
+	e.SetEnvironment(wide)
+	if q := e.take(); len(q) != 1 || q[0].resize == nil || q[0].env == nil || !q[0].env.Equal(wide) {
+		t.Fatalf("queue %+v, want the resize carrying the environment after it", q)
+	}
+
+	e.SetEnvironment(driver.Environment{Dark: true})
+	e.ResizeWithEnvironment(landscape, driver.Geometry{}, wide)
+	if q := e.take(); len(q) != 1 || q[0].resize == nil || q[0].env == nil || !q[0].env.Equal(wide) {
+		t.Fatalf("queue %+v, want the resize with its own environment, not the older one", q)
+	}
+}
+
+func TestRotationShowsItsSafeAreaWithItsSize(t *testing.T) {
+	// A rotation reaches the engine as a safe area and a size: queued together, or reported as one, no effect sees one orientation's safe area with the other's size.
+	portrait, landscape := driver.Size{Width: 411, Height: 846}, driver.Size{Width: 846, Height: 411}
+	tall := driver.Environment{SafeArea: driver.Edges{Top: 28}}
+	wide := driver.Environment{SafeArea: driver.Edges{Top: 28, Right: 48, Left: 48}}
 	type seen struct {
 		size driver.Size
 		safe driver.Edges
 	}
+	var mu sync.Mutex
 	var runs []seen
-	tree.Mount(func(cx *core.Scope) core.Node {
-		cx.Effect(func() { runs = append(runs, seen{cx.Env().Window(), cx.Env().SafeArea()}) })
+	p := &recorder{mounted: make(chan struct{}, 1)}
+	e := Start(p, func(cx *core.Scope) core.Node {
+		cx.Effect(func() {
+			s := seen{cx.Env().Window(), cx.Env().SafeArea()}
+			mu.Lock()
+			runs = append(runs, s)
+			mu.Unlock()
+		})
 		return core.View{}
-	})
-	root.Batch(func() {
-		tree.Resize(*q[0].resize, q[0].geometry)
-		tree.SetEnvironment(*q[0].env)
-	})
-	if len(runs) != 2 || runs[1] != (seen{driver.Size{Width: 846, Height: 411}, driver.Edges{Top: 48, Bottom: 48}}) {
-		t.Fatalf("runs %+v, want one new run with the landscape size and safe area", runs)
-	}
-	select {
-	case <-done:
-		t.Error("the wait ended before the resize was mounted")
-	default:
+	}, Options{Size: portrait, Environment: tall})
+	defer e.Close()
+	<-p.mounted
+
+	// The engine is busy as Android sends the safe area, then the size.
+	hold, held := make(chan struct{}), make(chan struct{})
+	e.push(message{fn: func() { close(held); <-hold }})
+	<-held
+	e.SetEnvironment(wide)
+	done := e.ResizeAndWait(landscape, driver.Geometry{})
+	close(hold)
+	<-done
+	// Back, as one report.
+	e.ResizeWithEnvironment(portrait, driver.Geometry{}, tall)
+	e.Sync()
+
+	mu.Lock()
+	defer mu.Unlock()
+	want := []seen{{portrait, tall.SafeArea}, {landscape, wide.SafeArea}, {portrait, tall.SafeArea}}
+	if !slices.Equal(runs, want) {
+		t.Errorf("runs %+v, want %+v", runs, want)
 	}
 }
 
