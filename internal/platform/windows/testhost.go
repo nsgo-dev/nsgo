@@ -460,11 +460,19 @@ func (t *testSurface) ChooseMenu(id uint32) error {
 	return err
 }
 
-// ChooseDockMenu implements testhost.Surface: a test can activate a task
-// through the same engine event the taskbar backend uses.
+// ChooseDockMenu implements testhost.Surface: the running app hears the launch item id's Jump List task makes, as choosing the task does; an item that is no task, as one in a submenu, is not in the list.
 func (t *testSurface) ChooseDockMenu(id uint32) error {
-	t.w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: id})
-	return nil
+	var err error
+	t.onMain(func() {
+		for _, e := range jumpTasks {
+			if e.ID == id && jumpTask(e) {
+				t.w.launched([]string{dockTaskArgument + e.Label})
+				return
+			}
+		}
+		err = fmt.Errorf("the Jump List has no task %d", id)
+	})
+	return err
 }
 
 // ChoosePopup implements testhost.Surface: the context menu tracking

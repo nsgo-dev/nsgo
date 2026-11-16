@@ -28,9 +28,9 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -547,11 +547,33 @@ func wide(s string) *uint16 {
 	return p
 }
 
+// launched hands the running app what a second launch asked of it (launchArguments): a Jump List task chooses its item, any other launch reopens the app, and the files it names open.
+func (w *window) launched(args []string) {
+	var files []string
+	label, task := dockTask(args)
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, dockTaskArgument) {
+			files = append(files, arg)
+		}
+	}
+	if task {
+		// As choosing a Dock menu item on macOS, it does not reopen the app.
+		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: label})
+	} else {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventReopen})
+	}
+	if len(files) > 0 {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: files})
+	}
+}
+
 // Run opens a window showing app and runs the message loop. Call it from
 // main; it does not return until the window closes.
 func Run(app engine.App, opts Options) {
 	comApartment()
-	setProcessAppUserModelID(opts.ID)
+	if opts.test == nil {
+		setProcessAppUserModelID(opts.ID)
+	}
 	// The installer's and uninstaller's runs come first: handed off to a running copy, they would never stamp the shortcut or remove the registration.
 	if opts.RegisterToast != "" {
 		setToastActivatorShortcut(opts.RegisterToast, opts.ID)
@@ -640,28 +662,7 @@ func Run(app engine.App, opts Options) {
 	size := w.point(client.Right, client.Bottom)
 	w.startEngine(app, opts, driver.Size{Width: size.X, Height: size.Y})
 	if single != nil {
-		single.setDelivery(func(paths []string) {
-			w.post(func() {
-				var files []string
-				dock := false
-				for _, path := range paths {
-					if strings.HasPrefix(path, dockMenuArgument) {
-						dock = true
-						if n, err := strconv.ParseUint(strings.TrimPrefix(path, dockMenuArgument), 10, 32); err == nil && n != 0 {
-							w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: uint32(n)})
-						}
-					} else {
-						files = append(files, path)
-					}
-				}
-				if !dock {
-					w.engine.Dispatch(driver.Event{Kind: driver.EventReopen})
-				}
-				if len(files) > 0 {
-					w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: files})
-				}
-			})
-		})
+		single.setDelivery(func(args []string) { w.post(func() { w.launched(args) }) })
 	}
 	attachToastActivation(w, w.engine)
 	if !opts.Hidden {
@@ -669,9 +670,9 @@ func Run(app engine.App, opts Options) {
 	}
 	if opts.test != nil {
 		opts.test.ready <- w
-	} else if id, ok := dockMenuLaunchID(); ok {
-		w.engine.Sync()
-		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: id})
+	} else if label, ok := dockTask(os.Args[1:]); ok {
+		// The core keeps it until the app sets its menu.
+		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: label})
 	} else if paths := engine.LaunchFiles(); len(paths) > 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
 	}
@@ -1039,7 +1040,7 @@ func (w *window) chromeItem(it *driver.MountItem) {
 	case driver.ItemDockMenu:
 		w.setDockMenu(it.Menu)
 	case driver.ItemRecentFile:
-		recentFile(it.Value, it.On)
+		w.recentFile(it.Value, it.On)
 	}
 }
 
