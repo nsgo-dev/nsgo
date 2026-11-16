@@ -54,11 +54,16 @@ func drawMetal(t *testing.T, ir *shaderir.Program, lanes []float64, textures []o
 	if state == 0 {
 		t.Fatal(msg)
 	}
+	defer state.Send(selRelease)
 	desc := objc.ID(objc.GetClass("MTLTextureDescriptor")).Send(
 		sel("texture2DDescriptorWithPixelFormat:width:height:mipmapped:"), uint(mtlPixelFormatBGRA8Unorm), uint(w), uint(h), false)
 	const usageRenderTarget, usageShaderRead = 4, 1
 	desc.Send(sel("setUsage:"), uint(usageRenderTarget|usageShaderRead))
 	target := mtlDevice.Send(sel("newTextureWithDescriptor:"), desc)
+	if target == 0 {
+		t.Fatal("no render target")
+	}
+	defer target.Send(selRelease)
 	offsets, size := msl.UniformLanes(ir)
 	buf := make([]byte, max(size, 16))
 	shaderir.PutLanes(buf, offsets, ir.LaneTypes(), lanes, 1)
@@ -76,8 +81,21 @@ func drawMetal(t *testing.T, ir *shaderir.Program, lanes []float64, textures []o
 	}
 	enc.Send(sel("drawPrimitives:vertexStart:vertexCount:"), uint(mtlPrimitiveTypeTriangle), uint(0), uint(3))
 	enc.Send(sel("endEncoding"))
+	// Intel textures default to managed storage, whose CPU copy remains
+	// stale after a GPU write until a blit synchronizes it. Apple silicon
+	// uses shared storage, so only waiting for completion is needed there.
+	const mtlStorageModeManaged = 1
+	if objc.Send[uint](target, sel("storageMode")) == mtlStorageModeManaged {
+		blit := cb.Send(sel("blitCommandEncoder"))
+		blit.Send(sel("synchronizeResource:"), target)
+		blit.Send(sel("endEncoding"))
+	}
 	cb.Send(sel("commit"))
 	cb.Send(sel("waitUntilCompleted"))
+	const mtlCommandBufferStatusCompleted = 4
+	if status := objc.Send[uint](cb, sel("status")); status != mtlCommandBufferStatusCompleted {
+		t.Fatalf("Metal command status %d: %s", status, GoString(cb.Send(sel("error")).Send(sel("localizedDescription"))))
+	}
 	pix := make([]byte, w*h*4)
 	target.Send(sel("getBytes:bytesPerRow:fromRegion:mipmapLevel:"), unsafe.Pointer(&pix[0]), uint(w*4),
 		mtlRegion{W: uint(w), H: uint(h), D: 1}, uint(0))

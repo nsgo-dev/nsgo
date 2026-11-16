@@ -9,13 +9,10 @@ import (
 	"image/color"
 	"image/png"
 	"testing"
-	"unsafe"
 
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/shader"
-	"github.com/nsgo-dev/nsgo/internal/shaderir"
-	"github.com/nsgo-dev/nsgo/internal/shaderir/msl"
 )
 
 // TestShadersReadImages draws a shader that reads an image into a texture
@@ -35,10 +32,6 @@ func Fragment(dst vec4, pos vec2) vec4 {
 `))
 	if err != nil {
 		t.Fatal(err)
-	}
-	state, msg := metalPipelineState(msl.Fragment(ir, "nsgoShader") + metalStage(ir.TextureCount))
-	if state == 0 {
-		t.Fatal(msg)
 	}
 	// A 4 by 2 image: red on the left, blue on the right.
 	src := image.NewRGBA(image.Rect(0, 0, 4, 2))
@@ -61,34 +54,10 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	if tex == 0 {
 		t.Fatal("no texture")
 	}
+	defer tex.Send(selRelease)
 	const w, h = 8, 4
-	desc := objc.ID(objc.GetClass("MTLTextureDescriptor")).Send(
-		sel("texture2DDescriptorWithPixelFormat:width:height:mipmapped:"), uint(mtlPixelFormatBGRA8Unorm), uint(w), uint(h), false)
-	const usageRenderTarget, usageShaderRead = 4, 1
-	desc.Send(sel("setUsage:"), uint(usageRenderTarget|usageShaderRead))
-	target := mtlDevice.Send(sel("newTextureWithDescriptor:"), desc)
 	lanes := []float64{w, h, 1, 4, 2, 0.5}
-	offsets, size := msl.UniformLanes(ir)
-	buf := make([]byte, size)
-	shaderir.PutLanes(buf, offsets, ir.LaneTypes(), lanes, 1)
-
-	pass := objc.ID(objc.GetClass("MTLRenderPassDescriptor")).Send(sel("renderPassDescriptor"))
-	att := pass.Send(selColorAttachments).Send(selObjectAtIndexedSubscript, uint(0))
-	att.Send(sel("setTexture:"), target)
-	att.Send(sel("setLoadAction:"), uint(mtlLoadActionClear))
-	att.Send(sel("setStoreAction:"), uint(mtlStoreActionStore))
-	cb := mtlQueue.Send(sel("commandBuffer"))
-	enc := cb.Send(sel("renderCommandEncoderWithDescriptor:"), pass)
-	enc.Send(sel("setRenderPipelineState:"), state)
-	enc.Send(sel("setFragmentBytes:length:atIndex:"), unsafe.Pointer(&buf[0]), uint(len(buf)), uint(0))
-	enc.Send(sel("setFragmentTexture:atIndex:"), tex, uint(0))
-	enc.Send(sel("drawPrimitives:vertexStart:vertexCount:"), uint(mtlPrimitiveTypeTriangle), uint(0), uint(3))
-	enc.Send(sel("endEncoding"))
-	cb.Send(sel("commit"))
-	cb.Send(sel("waitUntilCompleted"))
-	pix := make([]byte, w*h*4)
-	target.Send(sel("getBytes:bytesPerRow:fromRegion:mipmapLevel:"), unsafe.Pointer(&pix[0]), uint(w*4),
-		mtlRegion{W: w, H: h, D: 1}, uint(0))
+	pix := drawMetal(t, ir, lanes, []objc.ID{tex}, w, h)
 	// BGRA, premultiplied, at half alpha.
 	left, right := pix[(1*w+1)*4:], pix[(1*w+6)*4:]
 	if left[2] < 120 || left[0] > 10 || left[3] < 120 || left[3] > 135 {

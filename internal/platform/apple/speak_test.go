@@ -31,8 +31,8 @@ func TestSpeakVoices(t *testing.T) {
 	if v, code := speakVoice("", voices[i].ID); v == 0 || GoString(v.Send(sel("identifier"))) != voices[i].ID || code != "" {
 		t.Errorf("speakVoice of ID %q = %v, %q", voices[i].ID, v, code)
 	}
-	if _, code := speakVoice("", "dev.nsgo.no-such-voice"); code != driver.SpeakVoiceUnavailable {
-		t.Errorf("an unknown ID gives %q", code)
+	if v, code := speakVoice("", "dev.nsgo.no-such-voice"); v != 0 || code != driver.SpeakVoiceUnavailable {
+		t.Errorf("an unknown ID gives %v, %q", v, code)
 	}
 	if _, code := speakVoice("x-none", ""); code != driver.SpeakLanguageUnavailable {
 		t.Errorf("an unknown language gives %q", code)
