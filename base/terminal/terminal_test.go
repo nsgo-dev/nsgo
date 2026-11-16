@@ -30,6 +30,11 @@ func newTerminal(t *testing.T, opts Options) *Terminal {
 
 func TestViewRunsShell(t *testing.T) {
 	term := newTerminal(t, Options{Command: []string{"/bin/sh"}, Env: []string{"PS1=$ "}})
+	defer func() {
+		if t.Failed() {
+			t.Logf("terminal output: %q", term.Text())
+		}
+	}()
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		return View{Terminal: term, Label: "Terminal", AutoFocus: true, Style: core.Style{Width: core.Pct(100), Height: core.Pct(100)}}
 	}, nsgotest.Size(640, 400))
@@ -43,11 +48,13 @@ func TestViewRunsShell(t *testing.T) {
 	app.WaitUntil(5*time.Second, func() bool { return strings.Contains(term.Text(), "\nhello") })
 
 	// Control keys reach the program as their control characters.
-	app.Type("label:Terminal", "sleep 30")
+	// The child reports that it has the foreground terminal before we
+	// interrupt it. A fixed sleep races a busy runner starting the job.
+	app.Type("label:Terminal", `sh -c 'printf "\nready\n"; exec sleep 30'`)
 	app.Key("enter")
-	time.Sleep(500 * time.Millisecond) // for sh to start sleep
-	app.Settle()
+	app.WaitUntil(5*time.Second, func() bool { return strings.Contains(term.Text(), "\nready") })
 	app.Key("ctrl+c")
+	app.WaitUntil(5*time.Second, func() bool { return strings.Count(term.Text(), "$") >= 3 })
 	app.Type("label:Terminal", "echo done")
 	app.Key("enter")
 	app.WaitUntil(5*time.Second, func() bool { return strings.Contains(term.Text(), "\ndone") })
