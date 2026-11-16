@@ -423,6 +423,13 @@ func loadAppKit() {
 	// pass: macOS 27's AppKit puts them back whenever it lays the title
 	// bar out, which no notification tells.
 	classWindow = register("NsgoWindow", apple.Class("NSWindow"), nil, []objc.MethodDef{{
+		Cmd: sel("sendEvent:"),
+		Fn: func(self objc.ID, cmd objc.SEL, event objc.ID) {
+			if inputAllowed(event) {
+				apple.Super(self, cmd, event)
+			}
+		},
+	}, {
 		Cmd: sel("layoutIfNeeded"),
 		Fn: func(self objc.ID, cmd objc.SEL) {
 			apple.Super(self, cmd)
@@ -1230,6 +1237,9 @@ func (s *surface) filter(event objc.ID) objc.ID {
 }
 
 func (s *surface) filterEvent(event objc.ID) objc.ID {
+	if !inputAllowed(event) {
+		return 0
+	}
 	if s.window == 0 || event.Send(selWindow) != s.window || s.engine == nil {
 		return event
 	}
@@ -2740,7 +2750,7 @@ func invisibleCursor() objc.ID {
 // under the views it enters.
 func mouseEntered(self objc.ID, _ objc.SEL, event objc.ID) {
 	v := views[self]
-	if v == nil {
+	if v == nil || !inputAllowed(event) {
 		return
 	}
 	defer v.surface.measuring(false)()
@@ -2779,7 +2789,7 @@ func (s *surface) modifiersChanged(event objc.ID) {
 // up the responder chain, since the views around follow their own areas.
 func mouseMoved(self objc.ID, _ objc.SEL, event objc.ID) {
 	v := views[self]
-	if v == nil || v.native != self {
+	if v == nil || v.native != self || !inputAllowed(event) {
 		return
 	}
 	defer v.surface.measuring(false)()
@@ -2834,7 +2844,7 @@ func (s *surface) dragMoved(event objc.ID) {
 
 func mouseExited(self objc.ID, _ objc.SEL, event objc.ID) {
 	v := views[self]
-	if v == nil {
+	if v == nil || !inputAllowed(event) {
 		return
 	}
 	defer v.surface.measuring(false)()

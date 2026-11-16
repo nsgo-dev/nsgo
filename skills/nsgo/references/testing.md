@@ -52,6 +52,8 @@ go tool nsgo test -target macos            # windows, linux, web, ios (a connect
 go tool nsgo test -target macos -run TestAdd
 ```
 
+On macOS, test windows accept only the test host's input, so the developer's mouse, keyboard and trackpad cannot change their scenes while the suite runs.
+
 `app.Screenshot("en/library")` saves `.nsgo/test/screenshots/<target>/en/library.png`, `app.Capture()` returns the pixels, and both skip headless. `-trace` prints each step's commits, `-junit report.xml` writes a report, `-bench` runs benchmarks, `-env KEY=VALUE` reaches a phone's tests, and flags after `--` go to `go test`. `test` takes one directory, every package under it, and errors on a second.
 
 DevTools' Recorder (`go tool nsgo dev -devtools`) writes what you do in the running app as an `nsgotest` test to start from.

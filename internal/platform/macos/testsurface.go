@@ -78,6 +78,7 @@ func (t *testSurface) mouse(kind uint, p driver.Point, clicks int) {
 		ev := objc.ID(apple.Class("NSEvent")).Send(
 			sel("mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:"),
 			kind, t.windowPoint(p), uint(0), uptime(), objc.Send[int](w, sel("windowNumber")), objc.ID(0), 0, clicks, float32(1))
+		rememberTestInput(ev)
 		nsApp().Send(sel("postEvent:atStart:"), ev, false)
 	})
 }
@@ -170,6 +171,7 @@ func (t *testSurface) Scroll(at driver.Point, delta driver.Point) error {
 			cgEventSetIntegerValueField(ev, continuous, 1)
 			cgEventSetLocation(ev, t.screenPoint(at))
 			ns := objc.ID(apple.Class("NSEvent")).Send(sel("eventWithCGEvent:"), ev)
+			rememberTestInput(ns)
 			// AppKit hands wheels to the window under the system's pointer,
 			// which a test leaves where the user has it: the view under at
 			// takes it, and passes it up as a real one.
@@ -244,6 +246,7 @@ func (t *testSurface) Hover(at driver.Point) error {
 			ev := objc.ID(apple.Class("NSEvent")).Send(
 				sel("mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:"),
 				uint(evMoved), t.windowPoint(at), uint(0), uptime(), objc.Send[int](t.s.window, sel("windowNumber")), objc.ID(0), 0, 0, float32(0))
+			rememberTestInput(ev)
 			for _, n := range under {
 				n.Send(sel("mouseMoved:"), ev)
 			}
@@ -270,6 +273,7 @@ func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 				sel("keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:"),
 				kind, apple.CGPoint{}, flags, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), objc.ID(0),
 				apple.NSString(chars), apple.NSString(ignoring), stacked)
+			rememberTestInput(ev)
 			nsApp().Send(sel("postEvent:atStart:"), ev, false)
 		})
 	}

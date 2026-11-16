@@ -19,6 +19,7 @@ type host struct{}
 
 func (host) Main(run func() int) {
 	nsApp := startApp(Options{Title: "NSGo test"}, nil)
+	testInputFilter = scripted.contains
 	go func() {
 		code := run()
 		os.Exit(code)
