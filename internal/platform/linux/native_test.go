@@ -323,9 +323,25 @@ func TestTextDrawsBackgroundsAndAttachments(t *testing.T) {
 // TestWebViewTalksToThePage opens a window with a web view showing
 // inline HTML, receives the message the page posts and posts one back,
 // which the page answers. It skips where WebKitGTK 6.0 is missing.
+// WebKit keeps the GTK thread that creates its first view, so this test
+// runs in its own process, as the other WebKit tests do.
 func TestWebViewTalksToThePage(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
+	}
+	if os.Getenv("NSGO_TEST_WEBKIT_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		dir := t.TempDir()
+		cmd.Env = append(os.Environ(), "NSGO_TEST_WEBKIT_PROCESS="+t.Name(),
+			"XDG_DATA_HOME="+filepath.Join(dir, "data"), "XDG_CACHE_HOME="+filepath.Join(dir, "cache"))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
 	}
 	if err := openWebKit(); err != nil {
 		t.Skip(err)
