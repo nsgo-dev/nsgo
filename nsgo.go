@@ -100,6 +100,11 @@ func WindowSize(width, height core.Points) Option {
 	return func(o *options) { o.platform.Width, o.platform.Height = width, height }
 }
 
+// InstanceKey scopes the single-instance lock on Windows and Linux. Runs with the same app ID and key hand their launches to one another; a different key has its own process and handoff channel. An empty key keeps the default one instance for the app ID. macOS and other targets ignore it.
+func InstanceKey(key string) Option {
+	return func(o *options) { o.platform.InstanceKey = key }
+}
+
 // WindowFrame opens the main window with frame f, as desktop.Frame
 // reported it, instead of centered at WindowSize: an app restores its
 // window with it. A window no screen would show, as on a screen that

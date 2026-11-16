@@ -65,8 +65,8 @@ func launchArguments(task string) []string {
 	return args
 }
 
-func claimInstance(id string, args []string) (*instance, bool) {
-	mutexName, pipeName := instanceNames(id)
+func claimInstance(id, key string, args []string) (*instance, bool) {
+	mutexName, pipeName := instanceNames(id, key)
 	h, _, err := createMutexW.Call(0, 1, uintptr(unsafe.Pointer(mutexName)))
 	if h == 0 {
 		log.Printf("nsgo: single-instance mutex: %v", err)
@@ -84,13 +84,17 @@ func claimInstance(id string, args []string) (*instance, bool) {
 	return i, false
 }
 
-// instanceNames are the mutex and pipe of app id in this logon session. Local\ mutexes are per session already; pipe names are machine-wide, so the pipe's carries the session too, or a second user's launch would reach the first user's app.
-func instanceNames(id string) (*uint16, *uint16) {
-	digest := sha256.Sum256([]byte(id))
+// instanceNames are the mutex and pipe of app id and key in this logon session. Local\ mutexes are per session already; pipe names are machine-wide, so the pipe's carries the session too, or a second user's launch would reach the first user's app.
+func instanceNames(id, key string) (*uint16, *uint16) {
+	identity := id
+	if key != "" {
+		identity += "\x00" + key
+	}
+	digest := sha256.Sum256([]byte(identity))
 	var session uint32
 	processIDToSession.Call(uintptr(syscall.Getpid()), uintptr(unsafe.Pointer(&session)))
-	key := fmt.Sprintf("NSGo-%x", digest[:12])
-	return wide("Local\\" + key), wide(fmt.Sprintf("\\\\.\\pipe\\%s-%d", key, session))
+	name := fmt.Sprintf("NSGo-%x", digest[:12])
+	return wide("Local\\" + name), wide(fmt.Sprintf("\\\\.\\pipe\\%s-%d", name, session))
 }
 
 func sendInstance(name *uint16, args []string) bool {

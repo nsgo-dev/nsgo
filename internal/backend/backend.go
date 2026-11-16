@@ -36,6 +36,8 @@ type Options struct {
 	Constraints core.WindowConstraints
 	// Appearance is the appearance the app starts in.
 	Appearance core.Appearance
+	// InstanceKey scopes the Windows and Linux instance lock; empty keeps one per app ID.
+	InstanceKey string
 	// HideDock starts the app out of the Dock (macOS).
 	HideDock bool
 	// Parent is the window NewView's view is made in (Windows).

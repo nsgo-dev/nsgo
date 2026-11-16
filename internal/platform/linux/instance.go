@@ -29,9 +29,9 @@ type instance struct {
 	pending [][]string
 }
 
-// claimInstance makes this process the owner, or hands its launch to the owner and reports that the caller should exit. The lock decides, as Windows' mutex does: whoever holds it owns the app ID, so two launches at once never both start an engine, and a socket a dead process left behind is replaced without asking it.
-func claimInstance(id string, args []string) (*instance, bool) {
-	path, err := instancePath(id)
+// claimInstance makes this process the owner, or hands its launch to the owner and reports that the caller should exit. The lock decides, as Windows' mutex does: whoever holds it owns the app ID and key, so two launches at once never both start an engine, and a socket a dead process left behind is replaced without asking it.
+func claimInstance(id, key string, args []string) (*instance, bool) {
+	path, err := instancePath(id, key)
 	if err != nil {
 		log.Printf("nsgo: single-instance setup: %v", err)
 		return nil, false
@@ -66,11 +66,15 @@ func claimInstance(id string, args []string) (*instance, bool) {
 	return i, false
 }
 
-// instancePath is the socket of app id, beside its lock (the path with ".lock"), in a directory only this user may write and only this host sees: $XDG_RUNTIME_DIR, or a private directory in the temporary one. A directory another user could write would let them take the launches, and one on a network share, as a home directory can be, would let a copy on another host hold the lock. The name is a digest of id, as Linux limits a Unix socket's address to 108 bytes.
+// instancePath is the socket of app id and key, beside its lock (the path with ".lock"), in a directory only this user may write and only this host sees: $XDG_RUNTIME_DIR, or a private directory in the temporary one. A directory another user could write would let them take the launches, and one on a network share, as a home directory can be, would let a copy on another host hold the lock. The name is a digest of both, as Linux limits a Unix socket's address to 108 bytes.
 //
 // In a Flatpak sandbox it is $XDG_RUNTIME_DIR/app/$FLATPAK_ID, the directory Flatpak shares between the app's instances: before Flatpak 1.11.1 each instance has an empty $XDG_RUNTIME_DIR of its own, so every launch there would own the app. Where that directory is missing, or too deep for the address, as a long app ID can make it, $XDG_RUNTIME_DIR is used, which Flatpak 1.11.1 and later share between the app's instances too.
-func instancePath(id string) (string, error) {
-	digest := sha256.Sum256([]byte(id))
+func instancePath(id, key string) (string, error) {
+	identity := id
+	if key != "" {
+		identity += "\x00" + key
+	}
+	digest := sha256.Sum256([]byte(identity))
 	name := fmt.Sprintf("nsgo-%x.sock", digest[:12])
 	dir := os.Getenv("XDG_RUNTIME_DIR")
 	if app := os.Getenv("FLATPAK_ID"); dir != "" && app != "" {

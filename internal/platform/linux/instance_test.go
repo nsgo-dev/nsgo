@@ -3,6 +3,7 @@
 package linux
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,14 +14,14 @@ import (
 
 func TestInstanceHandsOffReopenAndFiles(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", privateTempDir(t))
-	first, already := claimInstance("dev.nsgo.instance-test", nil)
+	first, already := claimInstance("dev.nsgo.instance-test", "", nil)
 	if already || first == nil {
 		t.Fatalf("first claim = (%v, %v), want owner", first, already)
 	}
 	defer first.close()
 
 	got := make(chan []string, 1)
-	second, already := claimInstance("dev.nsgo.instance-test", []string{"/tmp/example.txt"})
+	second, already := claimInstance("dev.nsgo.instance-test", "", []string{"/tmp/example.txt"})
 	if !already || second != nil {
 		t.Fatalf("second claim = (%v, %v), want handoff", second, already)
 	}
@@ -33,6 +34,48 @@ func TestInstanceHandsOffReopenAndFiles(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for handoff")
+	}
+}
+
+func TestInstanceKeySeparatesOwners(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", privateTempDir(t))
+	const id = "dev.nsgo.instance-key-test"
+	owners := map[string]chan []string{}
+	for _, key := range []string{"", "one", "two"} {
+		owner, already := claimInstance(id, key, nil)
+		if already || owner == nil {
+			t.Fatalf("key %q claim = (%v, %v), want an independent owner", key, owner, already)
+		}
+		t.Cleanup(owner.close)
+		got := make(chan []string, 1)
+		owners[key] = got
+		owner.setDelivery(func(paths []string) { got <- paths })
+	}
+	for key, got := range owners {
+		other, already := claimInstance(id, key, []string{"/tmp/" + key + ".txt"})
+		if !already || other != nil {
+			other.close()
+			t.Fatalf("same key %q claim = (%v, %v), want handoff", key, other, already)
+		}
+		select {
+		case paths := <-got:
+			if len(paths) != 1 || paths[0] != "/tmp/"+key+".txt" {
+				t.Fatalf("key %q received %v", key, paths)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("key %q did not receive its files", key)
+		}
+	}
+}
+
+func TestInstanceDefaultPathStaysCompatible(t *testing.T) {
+	dir := privateTempDir(t)
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+	const id = "dev.nsgo.compatible-instance"
+	digest := sha256.Sum256([]byte(id))
+	want := filepath.Join(dir, fmt.Sprintf("nsgo-%x.sock", digest[:12]))
+	if got, err := instancePath(id, ""); err != nil || got != want {
+		t.Fatalf("default path = %q, %v; want legacy path %q", got, err, want)
 	}
 }
 
@@ -65,7 +108,7 @@ func TestInstanceHandsOffInAFlatpak(t *testing.T) {
 	}
 
 	t.Setenv("XDG_RUNTIME_DIR", runtime())
-	first, already := claimInstance(id, nil)
+	first, already := claimInstance(id, "", nil)
 	if already || first == nil {
 		t.Fatalf("first claim = (%v, %v), want owner", first, already)
 	}
@@ -77,7 +120,7 @@ func TestInstanceHandsOffInAFlatpak(t *testing.T) {
 	got := make(chan []string, 1)
 	first.setDelivery(func(paths []string) { got <- paths })
 	t.Setenv("XDG_RUNTIME_DIR", runtime())
-	second, already := claimInstance(id, []string{"/tmp/example.txt"})
+	second, already := claimInstance(id, "", []string{"/tmp/example.txt"})
 	if !already || second != nil {
 		second.close()
 		t.Fatalf("a second instance's claim = (%v, %v), want handoff", second, already)
@@ -98,7 +141,7 @@ func TestInstanceHandsOffInAFlatpak(t *testing.T) {
 	}
 	for _, app := range []string{"dev.nsgo.Missing", long} {
 		t.Setenv("FLATPAK_ID", app)
-		if path, err := instancePath(app); err != nil || filepath.Dir(path) != os.Getenv("XDG_RUNTIME_DIR") {
+		if path, err := instancePath(app, ""); err != nil || filepath.Dir(path) != os.Getenv("XDG_RUNTIME_DIR") {
 			t.Fatalf("with FLATPAK_ID %s, instancePath = %q, %v, want one in $XDG_RUNTIME_DIR", app, path, err)
 		}
 	}
@@ -107,19 +150,19 @@ func TestInstanceHandsOffInAFlatpak(t *testing.T) {
 // TestInstanceReplacesAStaleSocket starts as the owner where a process that died left its socket, and where the owner before it closed.
 func TestInstanceReplacesAStaleSocket(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", privateTempDir(t))
-	path, err := instancePath("dev.nsgo.stale-test")
+	path, err := instancePath("dev.nsgo.stale-test", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	first, already := claimInstance("dev.nsgo.stale-test", nil)
+	first, already := claimInstance("dev.nsgo.stale-test", "", nil)
 	if already || first == nil || first.listener == nil {
 		t.Fatalf("claim over a stale socket = (%v, %v), want a listening owner", first, already)
 	}
 	first.close()
-	second, already := claimInstance("dev.nsgo.stale-test", nil)
+	second, already := claimInstance("dev.nsgo.stale-test", "", nil)
 	if already || second == nil {
 		t.Fatalf("claim after the owner closed = (%v, %v), want owner", second, already)
 	}
@@ -130,7 +173,7 @@ func TestInstanceReplacesAStaleSocket(t *testing.T) {
 func TestInstancePathIsPrivate(t *testing.T) {
 	runtime := privateTempDir(t)
 	t.Setenv("XDG_RUNTIME_DIR", runtime)
-	path, err := instancePath("dev.nsgo.private-test")
+	path, err := instancePath("dev.nsgo.private-test", "")
 	if err != nil || filepath.Dir(path) != runtime {
 		t.Fatalf("instancePath = %q, %v, want one in %s", path, err, runtime)
 	}
@@ -141,7 +184,7 @@ func TestInstancePathIsPrivate(t *testing.T) {
 		t.Fatal(err)
 	}
 	private := filepath.Join(tmp, fmt.Sprintf("nsgo-%d", os.Getuid()))
-	path, err = instancePath("dev.nsgo.private-test")
+	path, err = instancePath("dev.nsgo.private-test", "")
 	if err != nil || filepath.Dir(path) != private {
 		t.Fatalf("with a shared runtime directory, instancePath = %q, %v, want one in %s", path, err, private)
 	}
@@ -153,7 +196,7 @@ func TestInstancePathIsPrivate(t *testing.T) {
 	if err := os.Chmod(private, 0o777); err != nil {
 		t.Fatal(err)
 	}
-	if path, err := instancePath("dev.nsgo.private-test"); err == nil {
+	if path, err := instancePath("dev.nsgo.private-test", ""); err == nil {
 		t.Fatalf("a directory open to others gave %q", path)
 	}
 	if err := os.Remove(private); err != nil {
@@ -162,7 +205,7 @@ func TestInstancePathIsPrivate(t *testing.T) {
 	if err := os.Symlink(t.TempDir(), private); err != nil {
 		t.Fatal(err)
 	}
-	if path, err := instancePath("dev.nsgo.private-test"); err == nil {
+	if path, err := instancePath("dev.nsgo.private-test", ""); err == nil {
 		t.Fatalf("a link gave %q", path)
 	}
 }

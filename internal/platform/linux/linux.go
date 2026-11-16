@@ -61,6 +61,8 @@ type Options struct {
 	ID string
 	// Name is the app's name, nsgo.yaml's (core.App().Name), "" where the tool set none; unlike Title, a surface's windows keep it.
 	Name string
+	// InstanceKey scopes the single-instance lock; empty keeps one lock per ID.
+	InstanceKey string
 	// Components are the native components Native elements name.
 	Components driver.NativeComponents
 	// Fonts are font files under the app's resources, registered before
@@ -271,7 +273,7 @@ func Run(app engine.App, opts Options) {
 	var instance *instance
 	if opts.ID != "" && opts.test == nil {
 		var alreadyRunning bool
-		if instance, alreadyRunning = claimInstance(opts.ID, engine.LaunchFiles()); alreadyRunning {
+		if instance, alreadyRunning = claimInstance(opts.ID, opts.InstanceKey, engine.LaunchFiles()); alreadyRunning {
 			return
 		}
 		defer instance.close()
