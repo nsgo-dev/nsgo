@@ -81,12 +81,24 @@ func postOut(t *testing.T, h *automationHub, token string, lines ...string) {
 
 // fakeApp follows h's server's events with the run's token as an app's DevTools stream does, and answers each automation request with answer over /_nsgo/devtools/out, until ctx ends; it reports once it is connected.
 func fakeApp(ctx context.Context, t *testing.T, h *automationHub, answer func(automation.Request) automation.Answer) (connected chan int) {
+	ctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	t.Cleanup(func() {
+		cancel()
+		// The hub can receive an answer before its HTTP response reaches
+		// postOut. Finish that request before startHub closes the server.
+		<-done
+	})
 	connected = make(chan int, 1)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, h.srv.url()+"/_nsgo/events?devtools", nil)
 	req.Header.Set(tokenHeader, h.srv.token)
 	go func() {
+		defer close(done)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
+			if ctx.Err() == nil {
+				t.Errorf("connect the fake app: %v", err)
+			}
 			connected <- 0
 			return
 		}

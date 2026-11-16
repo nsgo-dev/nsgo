@@ -27,7 +27,14 @@ func TestTokens(t *testing.T) {
 }
 
 func TestNewLexesUnmeasuredLanguagesOffTheEngine(t *testing.T) {
+	// Keep the language cold even when this test repeats in one process.
+	speeds.Delete("python")
+	cache.Lock()
+	clear(cache.entries)
+	cache.order = nil
+	cache.Unlock()
 	var last []textview.Highlight
+	var first []textview.Highlight
 	calls := 0
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		h := New(cx)
@@ -35,10 +42,15 @@ func TestNewLexesUnmeasuredLanguagesOffTheEngine(t *testing.T) {
 			Highlighter: func(c textview.CodeBlock) []textview.Highlight {
 				calls++
 				last = h(c)
+				if calls == 1 {
+					first = last
+				}
 				return last
 			}}
 	})
-	if len(last) != 0 {
+	// Start settles the app and may already apply the background result.
+	// Only the first call must leave the unmeasured block plain.
+	if calls == 0 || len(first) != 0 {
 		t.Fatal("a language never measured was lexed on the engine goroutine")
 	}
 	for i := 0; i < 200 && len(last) == 0; i++ {
