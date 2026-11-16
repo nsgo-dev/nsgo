@@ -51,8 +51,12 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private String source;
     private boolean prepared;
     private boolean paused, muted, repeat;
-    /** The player stopped by the system or native controls while the app still wanted it to play. */
-    private boolean systemPaused, pauseReported;
+    /**
+     * Whether the player plays or not is the controls' or the system's, not paused, until paused changes: each
+     * such play or pause is reported once. resumable is a pause for a transient loss of the audio focus, which
+     * plays on when the focus comes back.
+     */
+    private boolean held, resumable;
     private float volume = 1, rate = 1;
     private int resizeMode = Protocol.RESIZE_CONTAIN;
     private long progressInterval = 250;
@@ -63,7 +67,16 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private boolean hasFocus;
     private int videoWidth, videoHeight;
     private MediaController controller;
-    private final BroadcastReceiver noisyReceiver;
+    /** Hears the sound's output go away, such as headphones unplugged, while the video plays. */
+    private final BroadcastReceiver noisy = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context ignored, Intent intent) {
+            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
+                platformPause(Protocol.VIDEO_PAUSE_ROUTE_LOST, false);
+            }
+        }
+    };
+    private boolean hearsNoisy;
     private final Runnable progress = this::progress;
 
     VideoNode(Context context, Reporter reporter) {
@@ -71,24 +84,6 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         this.context = context.getApplicationContext();
         this.reporter = reporter;
         setSurfaceTextureListener(this);
-        noisyReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context ignored, Intent intent) {
-                if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
-                    systemPause(Protocol.VIDEO_PAUSE_ROUTE_LOST);
-                }
-            }
-        };
-        IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
-        try {
-            if (Build.VERSION.SDK_INT >= 33) {
-                this.context.registerReceiver(noisyReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-            } else {
-                this.context.registerReceiver(noisyReceiver, filter);
-            }
-        } catch (RuntimeException ignored) {
-            // A host may refuse dynamic receivers; audio focus still reports interruptions.
-        }
     }
 
     /** Applies an ItemVideo's fields, in the order android.go writes them. */
@@ -99,12 +94,12 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         int resizeMode = in.readUnsignedByte();
         long interval = in.readInt() & 0xffffffffL;
         int audioSession = in.readUnsignedByte();
-        boolean oldPaused = paused;
+        boolean wasPaused = paused;
         paused = Protocol.flag(flags, 0);
-        if (paused || oldPaused != paused) {
-            // An app configuration is the explicit answer to a system pause.
-            systemPaused = false;
-            pauseReported = false;
+        if (paused != wasPaused) {
+            // The app decides again.
+            held = false;
+            resumable = false;
         }
         muted = Protocol.flag(flags, 1);
         repeat = Protocol.flag(flags, 2);
@@ -164,12 +159,15 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         });
         p.setOnCompletionListener(mp -> {
             if (mp != player) return;
+            // It stopped at its end: the play state is paused's again.
+            held = false;
+            resumable = false;
             report(Protocol.EVENT_END, "", 0, 0, 0, 0, false);
             if (repeat) {
                 mp.seekTo(0);
                 mp.start();
             }
-            updateFocus();
+            followPlaying();
         });
         p.setOnInfoListener((mp, what, extra) -> {
             if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START || what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
@@ -240,19 +238,20 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         if (p == null || !prepared) return;
         float v = muted ? 0 : Math.max(0, Math.min(1, volume));
         p.setVolume(v, v);
-        if (paused) {
-            if (p.isPlaying()) p.pause();
-        } else {
-            if (systemPaused) return;
-            // Setting a speed starts playback, so only while playing.
-            if (!p.isPlaying()) p.start();
-            if (rate > 0 && p.getPlaybackParams().getSpeed() != rate) {
-                p.setPlaybackParams(p.getPlaybackParams().setSpeed(rate));
+        if (!held) {
+            if (paused) {
+                if (p.isPlaying()) p.pause();
+            } else if (!p.isPlaying()) {
+                p.start();
             }
         }
+        // Setting a speed starts playback, so only while playing.
+        if (p.isPlaying() && rate > 0 && p.getPlaybackParams().getSpeed() != rate) {
+            p.setPlaybackParams(p.getPlaybackParams().setSpeed(rate));
+        }
         removeCallbacks(progress);
-        if (!paused) postDelayed(progress, progressInterval);
-        updateFocus();
+        if (p.isPlaying()) postDelayed(progress, progressInterval);
+        followPlaying();
     }
 
     /** The sound of a playback or mix-with-others video is speech; a default one keeps the player's own. */
@@ -264,14 +263,35 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
                 .build();
     }
 
+    /** Holds the audio focus and hears the output go away while the video plays. */
+    private void followPlaying() {
+        MediaPlayer p = player;
+        boolean playing = p != null && prepared && p.isPlaying();
+        if (playing != hearsNoisy) {
+            hearsNoisy = playing;
+            if (playing) {
+                IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+                // A system broadcast reaches a receiver that is not exported.
+                if (Build.VERSION.SDK_INT >= 33) {
+                    context.registerReceiver(noisy, filter, Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    context.registerReceiver(noisy, filter);
+                }
+            } else {
+                context.unregisterReceiver(noisy);
+            }
+        }
+        updateFocus();
+    }
+
     /**
      * Holds audio focus while a playback video plays, and only then: other apps pause while it plays and
      * resume once it pauses, ends or goes. Speech pauses rather than ducks when another app takes the focus,
-     * and plays on when it comes back.
+     * and plays on when it comes back unless the app changed paused meanwhile; the focus is kept for that.
      */
     private void updateFocus() {
         MediaPlayer p = player;
-        boolean wanted = audioSession == 1 && p != null && prepared && p.isPlaying();
+        boolean wanted = audioSession == 1 && p != null && prepared && (p.isPlaying() || resumable);
         if (wanted == hasFocus) return;
         if (!wanted) {
             abandonFocus();
@@ -290,30 +310,48 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     }
 
     private void focusChanged(int change) {
-        MediaPlayer p = player;
         if (change == AudioManager.AUDIOFOCUS_GAIN) {
             hasFocus = true;
-            // Keep a system pause visible to the app. It can resume by changing
-            // Paused or by using the native controls.
+            boolean resume = resumable && held;
+            resumable = false;
+            if (resume) platformPlay();
+            updateFocus();
         } else if (change == AudioManager.AUDIOFOCUS_LOSS) {
+            // Gone for good: it stays paused.
             hasFocus = false;
-            systemPause(Protocol.VIDEO_PAUSE_INTERRUPTION);
+            platformPause(Protocol.VIDEO_PAUSE_INTERRUPTION, false);
         } else {
-            // Lost for a while (a call, a navigation prompt).
-            systemPause(Protocol.VIDEO_PAUSE_INTERRUPTION);
+            // Lost for a while (a call, a navigation prompt): it plays on when the focus is back.
+            platformPause(Protocol.VIDEO_PAUSE_INTERRUPTION, true);
         }
     }
 
-    /** Reports and holds a pause the app did not request. */
-    private void systemPause(int reason) {
+    /** Pauses a playing player that the app did not pause, and reports it. */
+    private void platformPause(int reason, boolean transientLoss) {
         MediaPlayer p = player;
-        if (p == null || !prepared || paused || !p.isPlaying() || pauseReported) return;
-        systemPaused = true;
-        pauseReported = true;
+        if (p == null || !prepared || !p.isPlaying()) return;
         p.pause();
+        held = !paused;
+        resumable = held && transientLoss;
         removeCallbacks(progress);
         report(Protocol.EVENT_VIDEO_PAUSE, "", 0, 0, 0, 0, reason, false);
-        updateFocus();
+        followPlaying();
+    }
+
+    /** Plays a paused player that the app did not play, and reports it. */
+    private void platformPlay() {
+        MediaPlayer p = player;
+        if (p == null || !prepared || p.isPlaying()) return;
+        p.start();
+        held = paused;
+        resumable = false;
+        if (rate > 0 && p.getPlaybackParams().getSpeed() != rate) {
+            p.setPlaybackParams(p.getPlaybackParams().setSpeed(rate));
+        }
+        removeCallbacks(progress);
+        post(progress);
+        report(Protocol.EVENT_VIDEO_PLAY, "", 0, 0, 0, 0, false);
+        followPlaying();
     }
 
     private void abandonFocus() {
@@ -325,7 +363,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
 
     private void progress() {
         MediaPlayer p = player;
-        if (p == null || !prepared || paused || systemPaused || !p.isPlaying()) return;
+        if (p == null || !prepared || !p.isPlaying()) return;
         report(Protocol.EVENT_PROGRESS, "", p.getCurrentPosition(), p.getDuration(), 0, 0, false);
         postDelayed(progress, Math.max(16, progressInterval));
     }
@@ -375,20 +413,16 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
             player.release();
             player = null;
         }
+        held = false;
+        resumable = false;
+        followPlaying();
         abandonFocus();
-        systemPaused = false;
-        pauseReported = false;
     }
 
     /** Stops the player and frees it and the surface. */
     void destroy() {
         if (controller != null) controller.hide();
         release();
-        try {
-            context.unregisterReceiver(noisyReceiver);
-        } catch (RuntimeException ignored) {
-            // Registration may have been refused by the host.
-        }
         if (surface != null) {
             surface.release();
             surface = null;
@@ -423,33 +457,17 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     public void onSurfaceTextureUpdated(SurfaceTexture st) {}
 
     // MediaController.MediaPlayerControl: the controller plays and pauses
-    // the player directly; the app learns of it only through progress, as
-    // with the native controls on Apple platforms.
+    // the player directly, which holds until the app changes paused and is
+    // reported as the native controls are on Apple platforms.
 
     @Override
     public void start() {
-        if (player != null && prepared) {
-            boolean wasSystemPaused = systemPaused || pauseReported;
-            player.start();
-            paused = false;
-            systemPaused = false;
-            pauseReported = false;
-            removeCallbacks(progress);
-            post(progress);
-            updateFocus();
-            if (wasSystemPaused) report(Protocol.EVENT_VIDEO_PLAY, "", 0, 0, 0, 0, false);
-        }
+        platformPlay();
     }
 
     @Override
     public void pause() {
-        boolean wasPlaying = player != null && prepared && player.isPlaying();
-        if (wasPlaying) player.pause();
-        paused = true;
-        systemPaused = false;
-        pauseReported = false;
-        if (wasPlaying) report(Protocol.EVENT_VIDEO_PAUSE, "", 0, 0, 0, 0, Protocol.VIDEO_PAUSE_CONTROLS, false);
-        updateFocus();
+        platformPause(Protocol.VIDEO_PAUSE_CONTROLS, false);
     }
 
     @Override
