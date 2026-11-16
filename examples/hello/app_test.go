@@ -28,12 +28,7 @@ func TestGreets(t *testing.T) {
 	}
 }
 
-// TestNotificationServicesAnswer asks whether the app may show
-// notifications, which every platform answers without asking the user,
-// sets and clears the badge and plays a haptic, where each does nothing
-// or what the platform does. Where the app may show notifications it
-// shows one, which the system takes, and closes it. Presses ask, as the
-// services are the engine's to call.
+// TestNotificationServicesAnswer asks whether the app may show notifications, which every platform answers without asking the user, sets and clears the badge and plays a haptic, where each does nothing or what the platform does. Where the app may show notifications it shows one, which the system takes, and closes it; where notifications are unavailable, as on Apple Watch, showing one answers that it was not shown. Presses ask, as the services are the engine's to call.
 func TestNotificationServicesAnswer(t *testing.T) {
 	permission := make(chan core.NotificationPermission, 1)
 	shown := make(chan bool, 1)
@@ -84,6 +79,12 @@ func TestNotificationServicesAnswer(t *testing.T) {
 	app.Press("id:ask")
 	p := receive(permission).(core.NotificationPermission)
 	if p != core.NotificationsGranted {
+		if p == core.NotificationsUnavailable {
+			app.Press("id:show")
+			if receive(shown).(bool) {
+				t.Error("a platform without notifications took one")
+			}
+		}
 		app.Press("id:close")
 		t.Logf("notification permission: %v; nothing shown", p)
 		return
