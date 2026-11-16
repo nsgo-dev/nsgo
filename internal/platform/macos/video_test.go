@@ -54,7 +54,7 @@ func videoPlayer(t *testing.T) objc.ID {
 	return 0
 }
 
-// TestVideoReportsWhatItsPlayerDidByItself pauses and plays a playing video's AVPlayer as its controls do: each is reported once, the pause holds through a config that changes only the volume, the app's own pause and play are not reported, and the end is EventEnd's alone. Run ends a process's app for good, so the test runs in a process of its own.
+// TestVideoReportsWhatItsPlayerDidByItself pauses and plays a playing video's AVPlayer as its controls do: each is reported once, the pause holds through a config that changes only the volume, the controls play at the app's Rate, the app's own pause and play are not reported, and the end is EventEnd's alone. Run ends a process's app for good, so the test runs in a process of its own.
 func TestVideoReportsWhatItsPlayerDidByItself(t *testing.T) {
 	if os.Getenv("NSGO_TEST_VIDEO_PROCESS") != t.Name() {
 		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
@@ -67,6 +67,8 @@ func TestVideoReportsWhatItsPlayerDidByItself(t *testing.T) {
 	source := silence(t, 2*time.Second)
 	var mu sync.Mutex
 	var heard []string
+	// replayed is the rate the controls' play gave the player.
+	var replayed float32
 	hear := func(s string) {
 		mu.Lock()
 		heard = append(heard, s)
@@ -77,7 +79,7 @@ func TestVideoReportsWhatItsPlayerDidByItself(t *testing.T) {
 	app := func(cx *core.Scope) core.Node {
 		paused, volume := core.NewSignal(cx, false), core.NewSignal(cx, float32(0.5))
 		pauses := 0
-		return core.Video{Source: source, PausedFunc: paused.Get, VolumeFunc: volume.Get,
+		return core.Video{Source: source, PausedFunc: paused.Get, VolumeFunc: volume.Get, Rate: 1.5,
 			Style: core.Style{Width: core.Pt(160), Height: core.Pt(90)},
 			OnLoad: func(core.VideoInfo) {
 				hear("load")
@@ -94,6 +96,9 @@ func TestVideoReportsWhatItsPlayerDidByItself(t *testing.T) {
 						hear("held")
 					}
 					videoPlayer(t).Send(sel("play"))
+					mu.Lock()
+					replayed = objc.Send[float32](videoPlayer(t), sel("rate"))
+					mu.Unlock()
 				})
 			},
 			OnPlay: func() {
@@ -120,5 +125,8 @@ func TestVideoReportsWhatItsPlayerDidByItself(t *testing.T) {
 	defer mu.Unlock()
 	if want := []string{"load", "pause controls", "held", "play", "end"}; !slices.Equal(heard, want) {
 		t.Errorf("heard %q, want %q", heard, want)
+	}
+	if replayed != 1.5 {
+		t.Errorf("the controls played at %v, want the app's 1.5", replayed)
 	}
 }

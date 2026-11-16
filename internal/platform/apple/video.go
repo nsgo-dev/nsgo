@@ -141,6 +141,10 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 		play := &v.status.play
 		v.player.Send(sel("setMuted:"), c.Muted)
 		v.player.Send(sel("setVolume:"), c.Volume)
+		// The controls, the PiP window and Control Center play at the player's default rate (macOS 13, iOS 16), which is the app's Rate: a play the app does not make keeps it.
+		if objc.Send[bool](v.player, sel("respondsToSelector:"), sel("setDefaultRate:")) {
+			v.player.Send(sel("setDefaultRate:"), c.Rate)
+		}
 		// What the controls or the system did holds until Paused changes (videoPlayback). The player posts its rate change before it returns, so the state it reaches is recorded first.
 		switch {
 		case !play.configure(reopened || c.Paused != old.Paused):
