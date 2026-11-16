@@ -75,6 +75,8 @@ On `web` the tests run in a headless Chrome, Chromium or Edge the tool finds, or
 
 Each step, and `app.Settle()`, waits for the engine's pending commit before counting 100 ms without batches or finite animations. The whole wait stops after five seconds even if the app keeps changing; a slow first dialog needs no extra post or sleep in the test.
 
+On Android, the tool wakes a sleeping screen and dismisses a lock screen without a credential before building and before each test. A device locked with a PIN, password or pattern must be unlocked before the run can continue; the error names the device.
+
 To measure rather than check, start with `nsgotest.Measure()`: the app runs on the system's clock, `Advance` waits as long as it moves, and steps wait only for what animates to rest. `app.Mark("name")` names what the readings from there on measure, and `app.Mark("-")` ends it; the marks print with or without `-fps`.
 
 ## TSX tests

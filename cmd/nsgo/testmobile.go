@@ -136,6 +136,9 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 	if err != nil {
 		return targetRunner{}, err
 	}
+	if err := d.prepareTestScreen(ctx); err != nil {
+		return targetRunner{}, err
+	}
 	goarch, err := d.goarch(ctx)
 	if err != nil {
 		return targetRunner{}, err
@@ -150,6 +153,9 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 	stop := func() { d.run(context.Background(), "shell", "am", "force-stop", p.ID) }
 	return targetRunner{
 		run: func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
+			if err := d.prepareTestScreen(ctx); err != nil {
+				return -1, err
+			}
 			stop()
 			d.run(ctx, "logcat", "-c")
 			token := strconv.FormatInt(time.Now().UnixNano(), 36)
