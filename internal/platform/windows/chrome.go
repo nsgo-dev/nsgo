@@ -899,20 +899,16 @@ func (w *window) appendMenu(menu uintptr, entries []driver.MenuEntry) {
 	w.appendMenuTo(menu, entries, &w.chrome.entries)
 }
 
-// appendMenuTo appends entries to menu, numbering their commands by
-// their index in refs plus one.
-func (w *window) appendMenuTo(menu uintptr, entries []driver.MenuEntry, refs *[]menuRef) {
-	lastSeparator := true
+// appendMenuTo appends entries to menu, numbering their commands by their index in refs plus one, and returns how many items it appended. A separator goes between items only, so the roles Windows leaves out leave no separator at either end, and a submenu left with no items is left out too.
+func (w *window) appendMenuTo(menu uintptr, entries []driver.MenuEntry, refs *[]menuRef) int {
+	n, separate := 0, false
 	for i := range entries {
 		e := &entries[i]
 		switch {
 		case e.Separator:
-			if !lastSeparator {
-				appendMenuW.Call(menu, mfSeparator, 0, 0)
-				lastSeparator = true
-			}
+			separate = n > 0
 			continue
-		case unsupported(e.Role):
+		case unsupported(e.Role), e.Role.HoldsMenu() && len(e.Items) == 0:
 			continue
 		}
 		label := strings.ReplaceAll(menutext.Label(w.language, e, ""), "&", "&&")
@@ -920,12 +916,22 @@ func (w *window) appendMenuTo(menu uintptr, entries []driver.MenuEntry, refs *[]
 		if e.Disabled {
 			flags |= mfGrayed
 		}
+		var sub uintptr
 		if len(e.Items) > 0 {
-			sub, _, _ := createPopupMenu.Call()
+			sub, _, _ = createPopupMenu.Call()
 			if sub == 0 {
 				continue
 			}
-			w.appendMenuTo(sub, e.Items, refs)
+			if w.appendMenuTo(sub, e.Items, refs) == 0 {
+				destroyMenu.Call(sub)
+				continue
+			}
+		}
+		if separate {
+			appendMenuW.Call(menu, mfSeparator, 0, 0)
+			separate = false
+		}
+		if sub != 0 {
 			appendMenuW.Call(menu, flags|mfPopup, sub, uintptr(unsafe.Pointer(wide(label))))
 		} else {
 			if k := shortcutOf(e); k != "" {
@@ -940,8 +946,9 @@ func (w *window) appendMenuTo(menu uintptr, entries []driver.MenuEntry, refs *[]
 			*refs = append(*refs, menuRef{e.ID, e.Role, e.NotInText})
 			appendMenuW.Call(menu, flags, uintptr(len(*refs)), uintptr(unsafe.Pointer(wide(label))))
 		}
-		lastSeparator = false
+		n++
 	}
+	return n
 }
 
 // shortcutLabel shows a normalized shortcut as Windows' menus do, such
@@ -1018,7 +1025,10 @@ func (w *window) chooseMenu(ref menuRef) {
 				w.paste(in)
 			}
 		} else if ref.role == driver.MenuDelete {
-			w.editKey(vkDelete, false, false, false)
+			// Delete removes the selection alone, as the field's context menu does; with none it would remove the character after the caret.
+			if in := w.focusedField(); in != nil && in.model.hasSelection() {
+				w.editKey(vkDelete, false, false, false)
+			}
 		} else {
 			vk := map[driver.MenuRole]uintptr{driver.MenuUndo: 'Z', driver.MenuRedo: 'Y', driver.MenuCut: 'X',
 				driver.MenuCopy: 'C', driver.MenuPaste: 'V', driver.MenuSelectAll: 'A'}[ref.role]

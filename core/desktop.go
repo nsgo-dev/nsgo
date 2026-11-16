@@ -80,6 +80,7 @@ type MenuItem struct {
 	Disabled  bool
 	Checkable bool
 	Checked   bool
+	// Radio makes the item checkable and shows it as one of a group of choices, a radio on Windows and Linux; the app still says which item is Checked.
 	Radio     bool
 	Separator bool
 	Items     []MenuItem
@@ -275,7 +276,7 @@ func (t *Tree) menuEntries(items []MenuItem, owner *Scope, actions map[uint32]me
 		if shortcut == "" && it.Role != MenuRoleNone {
 			shortcut = driver.NormalizeKey(it.Role.Shortcut(false))
 		}
-		e.NotInText = it.When == MenuNotEditing || it.When == MenuAuto && (it.Role.EditsText() || shortcut != "" && EditsText(shortcut))
+		e.NotInText = it.When == MenuNotEditing || it.When == MenuAuto && shortcut != "" && EditsText(shortcut)
 		if len(it.Items) > 0 {
 			e.Items = t.menuEntries(it.Items, owner, actions)
 		}

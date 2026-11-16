@@ -59,13 +59,13 @@ func (w *window) buildMenu(entries []driver.MenuEntry) uintptr {
 	menu := gMenuNew()
 	for i := range entries {
 		e := &entries[i]
-		if e.Separator {
+		if e.Separator || !shown(e) {
 			continue
 		}
 		if len(e.Items) > 0 {
 			sub := w.buildSubmenu(e.Items)
 			if sub != 0 {
-				gMenuAppendSubmenu(menu, cstr(e.Label), sub)
+				gMenuAppendSubmenu(menu, cstr(menutext.Label(w.language, e, "")), sub)
 				gObjectUnref(sub)
 			}
 			continue
@@ -98,10 +98,13 @@ func (w *window) buildSubmenu(entries []driver.MenuEntry) uintptr {
 			section = gMenuNew()
 			continue
 		}
+		if !shown(e) {
+			continue
+		}
 		if len(e.Items) > 0 {
 			child := w.buildSubmenu(e.Items)
 			if child != 0 {
-				gMenuAppendSubmenu(section, cstr(e.Label), child)
+				gMenuAppendSubmenu(section, cstr(menutext.Label(w.language, e, "")), child)
 				gObjectUnref(child)
 			}
 			continue
@@ -115,16 +118,29 @@ func (w *window) buildSubmenu(entries []driver.MenuEntry) uintptr {
 	return sub
 }
 
+// shown reports whether the menu shows e: not a role GTK has no use for, nor a submenu none of whose items it shows, such as a Help holder with no items or a Speech submenu of macOS's roles.
+func shown(e *driver.MenuEntry) bool {
+	if unsupported(e.Role) {
+		return false
+	}
+	if len(e.Items) == 0 {
+		return !e.Role.HoldsMenu()
+	}
+	for i := range e.Items {
+		if !e.Items[i].Separator && shown(&e.Items[i]) {
+			return true
+		}
+	}
+	return false
+}
+
 // buildItem returns a GMenuItem of e with an action when it has one.
 func (w *window) buildItem(e *driver.MenuEntry) uintptr {
-	if unsupported(e.Role) {
-		return 0
-	}
 	label := menutext.Label(w.language, e, "")
 	action := ""
-	if e.ID != 0 && !unsupported(e.Role) {
+	if e.ID != 0 {
 		action = w.addAction(e.ID, e.Role, e.Disabled, e.Checkable, e.Checked, e.Radio)
-	} else if e.Role != driver.MenuRoleNone && !unsupported(e.Role) {
+	} else if e.Role != driver.MenuRoleNone {
 		action = w.addAction(0, e.Role, e.Disabled, false, false, false)
 	}
 	if action == "" {
@@ -135,11 +151,15 @@ func (w *window) buildItem(e *driver.MenuEntry) uintptr {
 		prefix = w.building.prefix
 	}
 	item := gMenuItemNew(cstr(label), cstr(prefix+action))
-	if item != 0 && e.Radio {
-		gMenuItemSetAttributeValue(item, cstr("target"), gVariantNewString(cstr("selected")))
+	if item != 0 && e.Radio && e.ID != 0 {
+		// A target its action's state may equal makes GTK draw a radio, checked while it does.
+		gMenuItemSetAttributeValue(item, cstr("target"), gVariantNewString(cstr(radioTarget)))
 	}
 	return item
 }
+
+// radioTarget is the target of a radio item, and its action's state while it is checked.
+const radioTarget = "selected"
 
 // addAction registers a menu item's action on the window and returns its
 // name; "" when the item does nothing.
@@ -147,16 +167,20 @@ func (w *window) addAction(id uint32, role driver.MenuRole, disabled, checkable,
 	w.menuCounter++
 	name := fmt.Sprintf("nsgo.item-%d", w.menuCounter)
 	var action uintptr
-	if checkable && !radio {
+	switch {
+	case radio:
+		// A radio's action takes its target as a string parameter, which GTK requires to activate it, and its string state says whether the item is checked. The action sinks the floating variant and owns it.
+		state := ""
+		if checked {
+			state = radioTarget
+		}
+		action = gSimpleActionNewStateful(cstr(name), cstr("s"), gVariantNewString(cstr(state)))
+	case checkable:
 		// The action sinks the floating variant and owns it.
 		state := gVariantNewBoolean(boolInt(checked))
-		action = gSimpleActionNewStateful(cstr(name), 0, state)
-	} else {
-		if radio {
-			action = gSimpleActionNewStateful(cstr(name), 0, gVariantNewString(cstr(map[bool]string{true: "selected", false: ""}[checked])))
-		} else {
-			action = gSimpleActionNew(cstr(name), 0)
-		}
+		action = gSimpleActionNewStateful(cstr(name), nil, state)
+	default:
+		action = gSimpleActionNew(cstr(name), 0)
 	}
 	if action == 0 {
 		return ""

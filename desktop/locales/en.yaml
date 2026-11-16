@@ -79,5 +79,9 @@ pasteAndMatchStyle: "Paste and Match Style"
 startSpeaking: "Start Speaking"
 stopSpeaking: "Stop Speaking"
 bringAllToFront: "Bring All to Front"
-services: "Services"
-help: "Help"
+services:
+  message: "Services"
+  description: The title of the macOS app menu's submenu the system fills with other apps' services.
+help:
+  message: "Help"
+  description: The title of the menu of the help items.

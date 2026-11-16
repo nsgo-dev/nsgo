@@ -384,6 +384,19 @@ func TestMenuShortcutsLeaveFieldsTheirKeys(t *testing.T) {
 	}
 }
 
+// TestMenuKeysOfTheNewEditingRoles checks that Paste and Match Style, which no field handles the key of, takes its shortcut from the menu, Delete leaves its own to the field, and neither has a shortcut of its own off macOS.
+func TestMenuKeysOfTheNewEditingRoles(t *testing.T) {
+	w := &window{chrome: chrome{keys: map[string]menuRef{}}}
+	w.menuKeys([]driver.MenuEntry{{Role: driver.MenuPasteAndMatchStyle}, {Role: driver.MenuDelete},
+		{Role: driver.MenuPasteAndMatchStyle, Shortcut: "ctrl+shift+v"}, {Role: driver.MenuDelete, Shortcut: "delete"}})
+	if ref, ok := w.chrome.keys["ctrl+shift+v"]; !ok || ref.role != driver.MenuPasteAndMatchStyle {
+		t.Errorf("ctrl+shift+v = %+v, %v; want Paste and Match Style", ref, ok)
+	}
+	if len(w.chrome.keys) != 1 {
+		t.Errorf("keys = %+v, want ctrl+shift+v alone", w.chrome.keys)
+	}
+}
+
 func TestMenuHelpers(t *testing.T) {
 	for _, r := range []driver.MenuRole{driver.MenuAbout, driver.MenuHide, driver.MenuHideOthers, driver.MenuShowAll,
 		driver.MenuServices, driver.MenuStartSpeaking, driver.MenuStopSpeaking, driver.MenuBringAllToFront} {
@@ -476,5 +489,25 @@ func TestAStatusReadsItsWholeText(t *testing.T) {
 	}
 	if got := statusText(text("1 item")); got != "1 item" {
 		t.Errorf("a status text reads %q", got)
+	}
+}
+
+// TestMenuShowsNoMacRolesNorEmptySubmenus checks which entries the GTK menu shows: neither macOS's roles, nor a Help holder with no items, nor a submenu none of whose items it shows.
+func TestMenuShowsNoMacRolesNorEmptySubmenus(t *testing.T) {
+	for _, c := range []struct {
+		e    driver.MenuEntry
+		want bool
+	}{
+		{driver.MenuEntry{Label: "Copy", Role: driver.MenuCopy}, true},
+		{driver.MenuEntry{Role: driver.MenuStartSpeaking}, false},
+		{driver.MenuEntry{Role: driver.MenuServices, Items: []driver.MenuEntry{{Label: "Mine", ID: 1}}}, false},
+		{driver.MenuEntry{Label: "Help", Role: driver.MenuHelpMenu}, false},
+		{driver.MenuEntry{Label: "Help", Role: driver.MenuHelpMenu, Items: []driver.MenuEntry{{Label: "Docs", ID: 1}}}, true},
+		{driver.MenuEntry{Label: "Speech", Items: []driver.MenuEntry{{Role: driver.MenuStartSpeaking}, {Separator: true}, {Role: driver.MenuStopSpeaking}}}, false},
+		{driver.MenuEntry{Label: "Empty"}, true},
+	} {
+		if got := shown(&c.e); got != c.want {
+			t.Errorf("shown(%+v) = %v, want %v", c.e, got, c.want)
+		}
 	}
 }

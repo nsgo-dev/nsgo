@@ -3,8 +3,11 @@
 package windows
 
 import (
+	"strings"
+	"syscall"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -141,4 +144,64 @@ func TestHiddenTitleBarMenuPopsUp(t *testing.T) {
 			t.Error("releasing Alt after a click opened the menu")
 		}
 	})
+}
+
+// TestMenuLeavesOutMacRolesAndDrawsRadios builds a menu with the roles only macOS has, which leave no separator at either end of their group nor an empty submenu, a Help holder with no items, which is left out, and radio items, which take MFT_RADIOCHECK.
+func TestMenuLeavesOutMacRolesAndDrawsRadios(t *testing.T) {
+	getItem := user32.NewProc("GetMenuItemInfoW")
+	getString := user32.NewProc("GetMenuStringW")
+	count := user32.NewProc("GetMenuItemCount")
+	type menuItemInfo struct {
+		cbSize, fMask, fType, fState, wID    uint32
+		hSubMenu, hbmpChecked, hbmpUnchecked uintptr
+		dwItemData, dwTypeData               uintptr
+		cch                                  uint32
+		hbmpItem                             uintptr
+	}
+	// items returns menu's items as labels, "-" for a separator, with "(o)" for a radio and "*" when checked, and their submenus.
+	var items func(menu uintptr) []string
+	items = func(menu uintptr) []string {
+		var out []string
+		n, _, _ := count.Call(menu)
+		for i := range n {
+			mi := menuItemInfo{fMask: 0x100 | 0x1 | 0x4} // MIIM_FTYPE, MIIM_STATE, MIIM_SUBMENU
+			mi.cbSize = uint32(unsafe.Sizeof(mi))
+			getItem.Call(menu, i, 1, uintptr(unsafe.Pointer(&mi)))
+			if mi.fType&mfSeparator != 0 {
+				out = append(out, "-")
+				continue
+			}
+			buf := make([]uint16, 128)
+			getString.Call(menu, i, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)), 0x400)
+			s := syscall.UTF16ToString(buf)
+			if mi.fType&mfRadioCheck != 0 {
+				s += "(o)"
+			}
+			if mi.fState&mfChecked != 0 {
+				s += "*"
+			}
+			out = append(out, s)
+			if mi.hSubMenu != 0 {
+				out = append(out, "["+strings.Join(items(mi.hSubMenu), " ")+"]")
+			}
+		}
+		return out
+	}
+	menu, _, _ := createPopupMenu.Call()
+	defer destroyMenu.Call(menu)
+	w := &window{}
+	var refs []menuRef
+	w.appendMenuTo(menu, []driver.MenuEntry{
+		{Label: "App", Items: []driver.MenuEntry{{Role: driver.MenuAbout}, {Separator: true}, {Role: driver.MenuServices, Items: []driver.MenuEntry{{Label: "Mine", ID: 1}}},
+			{Separator: true}, {Role: driver.MenuQuit, Label: "Quit"}}},
+		{Label: "Edit", Items: []driver.MenuEntry{{Role: driver.MenuDelete, Label: "Delete"}, {Separator: true},
+			{Label: "Speech", Items: []driver.MenuEntry{{Role: driver.MenuStartSpeaking}, {Role: driver.MenuStopSpeaking}}}}},
+		{Label: "Library", Items: []driver.MenuEntry{{Label: "Movies", ID: 2, Radio: true, Checkable: true, Checked: true}, {Label: "Courses", ID: 3, Radio: true, Checkable: true}}},
+		{Label: "Window", Role: driver.MenuWindowMenu, Items: []driver.MenuEntry{{Role: driver.MenuMinimize, Label: "Minimize"}, {Separator: true}, {Role: driver.MenuBringAllToFront}}},
+		{Label: "Help", Role: driver.MenuHelpMenu},
+	}, &refs)
+	got := strings.Join(items(menu), " ")
+	if want := "App [Quit\tAlt+F4] Edit [Delete] Library [Movies(o)* Courses(o)] Window [Minimize]"; got != want {
+		t.Errorf("the menu is %q, want %q", got, want)
+	}
 }

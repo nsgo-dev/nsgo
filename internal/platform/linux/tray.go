@@ -170,6 +170,9 @@ func itemProperty(entry *driver.MenuEntry, parent bool, name string) uintptr {
 	case "visible":
 		return gVariantNewBoolean(1)
 	case "toggle-type":
+		if entry.Radio {
+			return gVariantNewString(cstr("radio"))
+		}
 		if entry.Checkable {
 			return gVariantNewString(cstr("checkmark"))
 		}

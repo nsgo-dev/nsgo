@@ -230,7 +230,7 @@ var (
 	gMenuItemNew               func(*byte, *byte) uintptr
 	gMenuItemSetAttributeValue func(uintptr, *byte, uintptr)
 	gSimpleActionNew           func(*byte, uintptr) uintptr
-	gSimpleActionNewStateful   func(*byte, uintptr, uintptr) uintptr
+	gSimpleActionNewStateful   func(name, parameterType *byte, state uintptr) uintptr
 	gSimpleActionSetEnabled    func(uintptr, int32)
 	gActionMapAddAction        func(uintptr, uintptr)
 	gSimpleActionGroupNew      func() uintptr

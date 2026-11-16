@@ -510,11 +510,14 @@ const (
 	MenuZoom
 	MenuToggleFullScreen
 	MenuClose
+	// MenuPasteAndMatchStyle pastes the clipboard's text without its style, and MenuDelete removes the selection, in the focused text field or web view.
 	MenuPasteAndMatchStyle
 	MenuDelete
+	// MenuStartSpeaking, MenuStopSpeaking and MenuBringAllToFront are macOS's.
 	MenuStartSpeaking
 	MenuStopSpeaking
 	MenuBringAllToFront
+	// MenuServices, MenuWindowMenu and MenuHelpMenu mark an item holding a submenu as macOS's Services menu, which AppKit fills, its Window menu, which lists the app's windows, and its Help menu, which gets the help search field, whatever their titles. MenuServices is macOS's; elsewhere the other two hold ordinary submenus, and are left out with no items.
 	MenuServices
 	MenuWindowMenu
 	MenuHelpMenu
@@ -567,15 +570,19 @@ func (r MenuRole) Shortcut(mac bool) string {
 	case MenuClose:
 		return "mod+w"
 	case MenuPasteAndMatchStyle:
-		return "alt+shift+meta+v"
+		return pick("alt+shift+meta+v", "")
 	}
 	return ""
 }
 
-// EditsText reports whether r acts on the focused text field, whose own
-// shortcut it then is.
+// EditsText reports whether r is an editing action whose key the focused text field handles itself, which it then leaves to the field. MenuPasteAndMatchStyle is not: no field handles its key, so the menu does.
 func (r MenuRole) EditsText() bool {
-	return r >= MenuUndo && r <= MenuSelectAll || r == MenuPasteAndMatchStyle || r == MenuDelete
+	return r >= MenuUndo && r <= MenuSelectAll || r == MenuDelete
+}
+
+// HoldsMenu reports whether r marks an item holding a submenu (MenuServices, MenuWindowMenu, MenuHelpMenu), which it is even with no items.
+func (r MenuRole) HoldsMenu() bool {
+	return r == MenuServices || r == MenuWindowMenu || r == MenuHelpMenu
 }
 
 // MenuEntry is a MenuItem as an ItemMenu carries it: the item's handler

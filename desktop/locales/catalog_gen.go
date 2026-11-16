@@ -260,9 +260,9 @@ var textsZhHans = i18n.NewTexts(""+
 	"媒体与Apple Music"+
 	"现在可以关闭此页面并返回应用。"+
 	"粘贴并匹配样式"+
-	"开始朗读"+
-	"停止朗读"+
-	"将全部窗口置于最前"+
+	"开始讲话"+
+	"停止讲话"+
+	"前置全部窗口"+
 	"服务"+
 	"帮助",
 	[]uint16{
@@ -301,7 +301,7 @@ var textsZhHans = i18n.NewTexts(""+
 		21,
 		12,
 		12,
-		27,
+		18,
 		6,
 		6,
 	})
@@ -779,6 +779,8 @@ func (msgs Messages) BringAllToFront() string { return msgs.text(textBringAllToF
 
 // Services says "Services"
 // in the language the app shows under cx.
+//
+// The title of the macOS app menu's submenu the system fills with other apps' services.
 func Services(cx *core.Scope) string { return For(cx).Services() }
 
 // Services is the package's Services in the language of msgs.
@@ -786,6 +788,8 @@ func (msgs Messages) Services() string { return msgs.text(textServices) }
 
 // Help says "Help"
 // in the language the app shows under cx.
+//
+// The title of the menu of the help items.
 func Help(cx *core.Scope) string { return For(cx).Help() }
 
 // Help is the package's Help in the language of msgs.

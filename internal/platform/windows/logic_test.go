@@ -430,6 +430,19 @@ func TestMenuShortcutsLeaveFieldsTheirKeys(t *testing.T) {
 	}
 }
 
+// TestMenuKeysOfTheNewEditingRoles checks that Paste and Match Style, which no field handles the key of, takes its shortcut from the menu, Delete leaves its own to the field, and neither has a shortcut of its own off macOS.
+func TestMenuKeysOfTheNewEditingRoles(t *testing.T) {
+	w := &window{chrome: chrome{keys: map[string]menuRef{}}}
+	w.menuKeys([]driver.MenuEntry{{Role: driver.MenuPasteAndMatchStyle}, {Role: driver.MenuDelete},
+		{Role: driver.MenuPasteAndMatchStyle, Shortcut: "ctrl+shift+v"}, {Role: driver.MenuDelete, Shortcut: "delete"}})
+	if ref, ok := w.chrome.keys["ctrl+shift+v"]; !ok || ref.role != driver.MenuPasteAndMatchStyle {
+		t.Errorf("ctrl+shift+v = %+v, %v; want Paste and Match Style", ref, ok)
+	}
+	if len(w.chrome.keys) != 1 {
+		t.Errorf("keys = %+v, want ctrl+shift+v alone", w.chrome.keys)
+	}
+}
+
 func TestMenuHelpers(t *testing.T) {
 	for _, r := range []driver.MenuRole{driver.MenuAbout, driver.MenuHide, driver.MenuHideOthers, driver.MenuShowAll,
 		driver.MenuServices, driver.MenuStartSpeaking, driver.MenuStopSpeaking, driver.MenuBringAllToFront} {

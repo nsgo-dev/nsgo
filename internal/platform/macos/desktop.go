@@ -482,6 +482,7 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 			s.menu = 0
 		}
 		nsApp.Send(sel("setMainMenu:"), defaultMenu)
+		s.registerMenus(0)
 		return
 	}
 	s.ensureMenuTarget()
@@ -492,7 +493,7 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 			continue
 		}
 		items := e.Items
-		if len(items) == 0 && !submenuRole(e.Role) {
+		if len(items) == 0 && !e.Role.HoldsMenu() {
 			// A top-level action gets a menu of its own.
 			items = []driver.MenuEntry{e}
 		}
@@ -507,10 +508,12 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 		syncMenu(s.menu, bar)
 		bar.Send(selRelease)
 		s.directMenu(s.menu)
+		s.registerMenus(s.menu)
 		return
 	}
 	s.directMenu(bar)
 	nsApp.Send(sel("setMainMenu:"), bar)
+	s.registerMenus(bar)
 	if s.menu != 0 {
 		s.menu.Send(selRelease)
 	}
@@ -645,8 +648,10 @@ var selItemAtIndex = sel("itemAtIndex:")
 // submenus or both are actions.
 func sameMenuKind(a, b objc.ID) bool {
 	sep := sel("isSeparatorItem")
-	return objc.Send[bool](a, sep) == objc.Send[bool](b, sep) &&
-		(a.Send(sel("submenu")) == 0) == (b.Send(sel("submenu")) == 0)
+	sub := a.Send(sel("submenu")) != 0
+	return objc.Send[bool](a, sep) == objc.Send[bool](b, sep) && sub == (b.Send(sel("submenu")) != 0) &&
+		// A holder's tag is the role that registers its menu with AppKit, which fills it, so a menu of another role is a new one.
+		(!sub || objc.Send[int](a, sel("tag")) == objc.Send[int](b, sel("tag")))
 }
 
 // syncMenuItem gives item it what next has, setting only what changed.
@@ -707,21 +712,70 @@ func (s *surface) holder(role driver.MenuRole, label string, disabled bool, item
 	it := objc.ID(apple.Class("NSMenuItem")).Send(selAlloc).Send(sel("initWithTitle:action:keyEquivalent:"),
 		apple.NSString(label), action, apple.NSString(""))
 	it.Send(selSetIdentifier, ownItem())
+	if role.HoldsMenu() {
+		// The tag marks the role, which registerMenus finds in the bar shown; a holder's tag is otherwise unused.
+		it.Send(sel("setTag:"), -int(role))
+	}
 	sub := s.submenu(label, items)
 	it.Send(sel("setSubmenu:"), sub)
-	if role != driver.MenuRoleNone {
-		nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
-		switch role {
-		case driver.MenuServices:
-			nsApp.Send(sel("setServicesMenu:"), sub)
-		case driver.MenuWindowMenu:
-			nsApp.Send(sel("setWindowsMenu:"), sub)
-		case driver.MenuHelpMenu:
-			nsApp.Send(sel("setHelpMenu:"), sub)
-		}
-	}
 	sub.Send(selRelease)
 	return it
+}
+
+// registeredHelp is the Help menu registerMenus last gave AppKit.
+var registeredHelp objc.ID
+
+// registerMenus tells AppKit which of bar's submenus are the Services, Window and Help menus, the first each role marks. It runs on the bar shown, as syncMenu keeps that bar's submenus, which AppKit fills, rather than the new bar's, and AppKit takes a Window menu only from the main menu. AppKit keeps the first Services menu it is given, ignoring any other and nil, so a later Services holder takes that menu over with its own items, and it ignores nil for the Window menu too, which then stays a menu no bar shows; a Help menu given before and no longer marked is taken back, leaving AppKit to find one by its title.
+func (s *surface) registerMenus(bar objc.ID) {
+	holders := map[driver.MenuRole]objc.ID{}
+	var walk func(m objc.ID)
+	walk = func(m objc.ID) {
+		for i := range objc.Send[int](m, sel("numberOfItems")) {
+			it := m.Send(selItemAtIndex, i)
+			sub := it.Send(sel("submenu"))
+			if sub == 0 || !isOwnItem(it) {
+				continue
+			}
+			if tag := objc.Send[int](it, sel("tag")); tag < 0 {
+				if r := driver.MenuRole(-tag); r.HoldsMenu() && holders[r] == 0 {
+					holders[r] = it
+				}
+			}
+			walk(sub)
+		}
+	}
+	if bar != 0 {
+		walk(bar)
+	}
+	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+	if it := holders[driver.MenuServices]; it != 0 {
+		if cur := nsApp.Send(sel("servicesMenu")); cur == 0 {
+			nsApp.Send(sel("setServicesMenu:"), it.Send(sel("submenu")))
+		} else if sub := it.Send(sel("submenu")); cur != sub {
+			if super := cur.Send(sel("supermenu")); super != 0 {
+				// A menu is in one menu at a time: the bar it leaves is being replaced or no longer shown.
+				if i := objc.Send[int](super, sel("indexOfItemWithSubmenu:"), cur); i >= 0 {
+					super.Send(selItemAtIndex, i).Send(sel("setSubmenu:"), objc.ID(0))
+				}
+			}
+			syncMenu(cur, sub)
+			it.Send(sel("setSubmenu:"), cur)
+			s.directMenu(cur)
+		}
+	}
+	if it := holders[driver.MenuWindowMenu]; it != 0 {
+		if sub := it.Send(sel("submenu")); nsApp.Send(sel("windowsMenu")) != sub {
+			nsApp.Send(sel("setWindowsMenu:"), sub)
+		}
+	}
+	help := objc.ID(0)
+	if it := holders[driver.MenuHelpMenu]; it != 0 {
+		help = it.Send(sel("submenu"))
+	}
+	if cur := nsApp.Send(sel("helpMenu")); cur != help && (help != 0 || cur == registeredHelp) {
+		nsApp.Send(sel("setHelpMenu:"), help)
+	}
+	registeredHelp = help
 }
 
 // submenu returns a new menu of items.
@@ -738,7 +792,7 @@ func (s *surface) submenu(title string, items []driver.MenuEntry) objc.ID {
 				lastSeparator = true
 			}
 			continue
-		case len(e.Items) > 0 || submenuRole(e.Role):
+		case len(e.Items) > 0 || e.Role.HoldsMenu():
 			holder := s.holder(e.Role, menutext.Label(s.language, &e, s.name()), e.Disabled, e.Items)
 			m.Send(sel("addItem:"), holder)
 			holder.Send(selRelease)
@@ -753,10 +807,6 @@ func (s *surface) submenu(title string, items []driver.MenuEntry) objc.ID {
 		m.Send(sel("removeItemAtIndex:"), n-1)
 	}
 	return m
-}
-
-func submenuRole(role driver.MenuRole) bool {
-	return role == driver.MenuServices || role == driver.MenuWindowMenu || role == driver.MenuHelpMenu
 }
 
 // The standard actions of the menu roles, sent down the responder chain.

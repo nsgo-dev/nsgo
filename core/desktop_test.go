@@ -347,13 +347,13 @@ func TestApplicationMenuSetAgainKeepsTheBar(t *testing.T) {
 func TestApplicationMenuStandardRolesAndRadios(t *testing.T) {
 	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
 		cx.SetApplicationMenu([]MenuItem{
-			{Role: MenuServices},
-			{Role: MenuWindowMenu},
+			{Label: "App", Items: []MenuItem{{Role: MenuServices}}},
+			{Role: MenuWindowMenu, Items: []MenuItem{{Role: MenuBringAllToFront}}},
 			{Role: MenuHelpMenu},
 			{Label: "Edit", Items: []MenuItem{
-				{Role: MenuPasteAndMatchStyle, When: MenuAuto}, {Role: MenuDelete, When: MenuAuto},
-				{Role: MenuStartSpeaking}, {Role: MenuStopSpeaking}, {Role: MenuBringAllToFront},
-				{Label: "One", Radio: true, Checked: true}, {Label: "Two", Radio: true},
+				{Role: MenuPasteAndMatchStyle, When: MenuAuto}, {Role: MenuDelete, Shortcut: "delete", When: MenuAuto},
+				{Role: MenuStartSpeaking}, {Role: MenuStopSpeaking},
+				{Label: "One", Radio: true, Checked: true, OnSelect: func() {}}, {Label: "Two", Radio: true, OnSelect: func() {}},
 			}},
 		})
 		return View{}
@@ -364,15 +364,18 @@ func TestApplicationMenuStandardRolesAndRadios(t *testing.T) {
 			menu = it.Menu
 		}
 	}
-	if len(menu) != 4 || menu[0].Role != MenuServices || menu[1].Role != MenuWindowMenu || menu[2].Role != MenuHelpMenu {
-		t.Fatalf("roles = %+v", menu)
+	if len(menu) != 4 || menu[0].Items[0].Role != MenuServices || menu[0].Items[0].Label != "Services" ||
+		menu[1].Role != MenuWindowMenu || menu[1].Label != "Window" || menu[1].Items[0].Role != MenuBringAllToFront ||
+		menu[2].Role != MenuHelpMenu || menu[2].Label != "Help" || len(menu[2].Items) != 0 {
+		t.Fatalf("menus = %+v", menu)
 	}
 	items := menu[3].Items
-	if len(items) != 7 || items[0].Role != MenuPasteAndMatchStyle || !items[0].NotInText || items[1].Role != MenuDelete || !items[1].NotInText {
+	// No text field handles Paste and Match Style's key, so its shortcut stays the menu's; Delete's key is the field's.
+	if len(items) != 6 || items[0].Role != MenuPasteAndMatchStyle || items[0].NotInText || items[1].Role != MenuDelete || !items[1].NotInText {
 		t.Fatalf("editing roles = %+v", items)
 	}
-	if !items[5].Radio || !items[5].Checkable || !items[5].Checked || !items[6].Radio || items[6].Checked {
-		t.Fatalf("radios = %+v", items[5:])
+	if !items[4].Radio || !items[4].Checkable || !items[4].Checked || items[4].ID == 0 || !items[5].Radio || !items[5].Checkable || items[5].Checked {
+		t.Fatalf("radios = %+v", items[4:])
 	}
 }
 
