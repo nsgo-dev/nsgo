@@ -30,16 +30,22 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install GTK 4 and a virtual display
+      - name: Install native test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libsoup-3.0-0 xvfb
+          sudo apt-get install -y libgtk-4-dev libgtk-4-media-gstreamer libsoup-3.0-0 xvfb pulseaudio gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-pulseaudio
+      - name: Start a virtual audio output
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=nsgo_test
+          pactl set-default-sink nsgo_test
       - name: Vet
         run: go tool nsgo check
       - name: Test
         env:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
+          PULSE_SINK: nsgo_test
         run: xvfb-run -a go tool nsgo test
 
   apple:

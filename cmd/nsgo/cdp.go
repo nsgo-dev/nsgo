@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,7 @@ type cdp struct {
 	on func(cdpMessage)
 	// browser is the browser's process.
 	browser *exec.Cmd
+	done    <-chan error
 	profile string
 }
 
@@ -88,32 +90,73 @@ func startBrowser(ctx context.Context) (*cdp, error) {
 		// no input device and would measure as a touch screen.
 		"--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
 		"about:blank")
+	logPath := filepath.Join(profile, "browser.log")
+	log, err := os.Create(logPath)
+	if err != nil {
+		os.RemoveAll(profile)
+		return nil, err
+	}
+	cmd.Stderr = log
 	if err := cmd.Start(); err != nil {
+		log.Close()
+		os.RemoveAll(profile)
+		return nil, err
+	}
+	log.Close()
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait(); close(done) }()
+	failed := func(err error) (*cdp, error) {
+		cmd.Process.Kill()
+		<-done
+		// Read only after Wait, when the child has stopped writing.
+		if log, readErr := os.Open(logPath); readErr == nil {
+			if info, statErr := log.Stat(); statErr == nil {
+				log.Seek(max(info.Size()-8192, 0), 0)
+			}
+			data, _ := io.ReadAll(log)
+			log.Close()
+			if text := strings.TrimSpace(string(data)); text != "" {
+				err = fmt.Errorf("%w\nbrowser stderr: %s", err, text)
+			}
+		}
 		os.RemoveAll(profile)
 		return nil, err
 	}
 	var url string
-	for range 100 {
-		time.Sleep(100 * time.Millisecond)
+	// A cold browser competes with the package tests on hosted runners.
+	// Wait for readiness, cancellation or exit, rather than hiding a crash
+	// behind the same short timeout as a slow launch.
+	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	poll := time.NewTicker(100 * time.Millisecond)
+	defer poll.Stop()
+	for url == "" {
+		select {
+		case <-startup.Done():
+			return failed(fmt.Errorf("waiting for the browser's DevTools port: %w", startup.Err()))
+		case err := <-done:
+			if ctx.Err() != nil {
+				return failed(fmt.Errorf("waiting for the browser's DevTools port: %w", ctx.Err()))
+			}
+			return failed(fmt.Errorf("the browser exited before opening its DevTools port: %v", err))
+		case <-poll.C:
+		}
 		data, err := os.ReadFile(filepath.Join(profile, "DevToolsActivePort"))
 		if lines := strings.Split(strings.TrimSpace(string(data)), "\n"); err == nil && len(lines) == 2 {
 			url = "ws://127.0.0.1:" + lines[0] + lines[1]
 			break
 		}
 	}
-	if url == "" {
-		cmd.Process.Kill()
-		os.RemoveAll(profile)
-		return nil, errors.New("the browser did not open its DevTools port")
-	}
-	ws, err := websocket.Dial(url, "", cdpOrigin)
+	config, err := websocket.NewConfig(url, cdpOrigin)
 	if err != nil {
-		cmd.Process.Kill()
-		os.RemoveAll(profile)
-		return nil, err
+		return failed(err)
+	}
+	ws, err := config.DialContext(startup)
+	if err != nil {
+		return failed(err)
 	}
 	ws.MaxPayloadBytes = 256 << 20
-	c := &cdp{ws: ws, pending: map[int64]chan cdpMessage{}, browser: cmd, profile: profile}
+	c := &cdp{ws: ws, pending: map[int64]chan cdpMessage{}, browser: cmd, done: done, profile: profile}
 	go c.read()
 	return c, nil
 }
@@ -185,12 +228,11 @@ func (c *cdp) call(session, method string, params any) (json.RawMessage, error) 
 func (c *cdp) close() {
 	c.call("", "Browser.close", nil)
 	c.ws.Close()
-	done := make(chan struct{})
-	go func() { c.browser.Wait(); close(done) }()
 	select {
-	case <-done:
+	case <-c.done:
 	case <-time.After(3 * time.Second):
 		c.browser.Process.Kill()
+		<-c.done
 	}
 	os.RemoveAll(c.profile)
 }
