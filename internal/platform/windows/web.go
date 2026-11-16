@@ -294,6 +294,9 @@ func (wv *webView) controllerReady(comp *comObject) {
 	// The root visual target shows once the composition commits: the
 	// next frame does.
 	wv.w.redrawAll()
+	if !wv.config.Incognito {
+		wv.w.closeCookieViewWhenUnneeded()
+	}
 }
 
 func (wv *webView) listenDownloads() {

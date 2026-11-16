@@ -68,6 +68,7 @@ var gated = map[string]service{
 	"Locate":                        serviceLocation,
 	"WatchLocation":                 serviceLocation,
 	"WatchMotion":                   serviceMotion,
+	"SetWebCookies":                 serviceWebCookies,
 }
 
 // exempt are the exported Scope methods that do not ask gate, by why.

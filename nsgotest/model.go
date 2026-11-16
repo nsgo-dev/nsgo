@@ -697,6 +697,8 @@ func (a *App) apply(b *driver.MountBatch) {
 				a.OverlayPermission = a.OverlayAnswer
 			}
 			a.post(driver.Event{Kind: driver.EventOverlayPermission, Count: it.Count, Index: int(a.OverlayPermission)})
+		case driver.ItemWebCookies:
+			a.setWebCookies(it.Count, it.Cookies.Cookies)
 		case driver.ItemAnnounce:
 			a.Announced = append(a.Announced, it.Value)
 		case driver.ItemInputSource:
@@ -817,6 +819,25 @@ func (a *App) signInWithApple(it *driver.MountItem) {
 		default:
 			ev.Text = driver.AppleSignInFailed
 		}
+	}
+	a.post(ev)
+}
+
+// setWebCookies answers an ItemWebCookies as a platform with a web view cookie store does, keeping the cookies in WebCookies unless SetWebCookies refuses them.
+func (a *App) setWebCookies(id uint32, cookies []core.WebCookie) {
+	ev := driver.Event{Kind: driver.EventWebCookies, Count: id}
+	if a.SetWebCookies != nil {
+		if err := a.SetWebCookies(slices.Clone(cookies)); err != nil {
+			ev.Text = err.Error()
+			a.post(ev)
+			return
+		}
+	}
+	for _, c := range cookies {
+		a.WebCookies = slices.DeleteFunc(a.WebCookies, func(o core.WebCookie) bool {
+			return o.Name == c.Name && strings.EqualFold(o.Domain, c.Domain) && o.CookiePath() == c.CookiePath()
+		})
+		a.WebCookies = append(a.WebCookies, c)
 	}
 	a.post(ev)
 }

@@ -358,10 +358,7 @@ const (
 )
 
 // Allows reports whether c grants permission, a capability's key, for
-// resource: a URL, or a host handler's name. method is a network
-// request's HTTP method, "input" for a web view's trusted input, or
-// "media" for a device its pages capture, resource. It is core.Access's
-// Allows.
+// resource: a URL, or a host handler's name. method is a network request's HTTP method, "input" for a web view's trusted input, "media" for a device its pages capture, resource, or "cookies" for a cookie of the web views' store, which none grants. It is core.Access's Allows.
 func (c *Capabilities) Allows(permission, resource, method string) bool {
 	switch permission {
 	case capNetwork:
@@ -375,6 +372,9 @@ func (c *Capabilities) Allows(permission, resource, method string) bool {
 			return c.WebView.Input
 		case "media":
 			return slices.Contains(c.WebView.Media, resource)
+		case "cookies":
+			// Writing the store every web view of the host app shares reaches past the package's own pages, and no capability grants it.
+			return false
 		}
 		u, ok := webURL(resource)
 		return ok && hostAllowed(c.WebView.Hosts, u.Hostname())

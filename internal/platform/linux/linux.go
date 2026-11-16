@@ -824,6 +824,9 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemSpeak:
 			speechd.Handle(it.Count, *it.Speak, w.engine.Dispatch)
 			continue
+		case driver.ItemWebCookies:
+			w.setWebCookies(it.Count, *it.Cookies)
+			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge, driver.ItemTaskProgress:
 			w.notify(it)
 			continue

@@ -906,6 +906,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemSpeak:
 			apple.HandleSpeak(it.Count, *it.Speak, s.engine.Dispatch)
 			continue
+		case driver.ItemWebCookies:
+			apple.SetWebCookies(it.Count, *it.Cookies, s.engine.Dispatch)
+			continue
 		case driver.ItemSetClipboard:
 			objc.ID(apple.Class("UIPasteboard")).Send(sel("generalPasteboard")).Send(sel("setString:"), apple.NSString(it.Value))
 			continue

@@ -275,6 +275,8 @@ const (
 	EventPurchase
 	// EventPurchaseUpdate reports a transaction the store made or changed outside a purchase the app asked for (Data, a *Transaction): a renewal, a purchase approved after Ask to Buy, one made on another device or a refund, and at launch those the app has not finished.
 	EventPurchaseUpdate
+	// EventWebCookies answers ItemWebCookies Count, Text why it failed (NoWebCookieStore where the platform has no store).
+	EventWebCookies
 )
 
 // What EventInputModality reports.

@@ -35,8 +35,7 @@ type AccessRequest struct {
 	// with AccessMedia "microphone" or "camera"; "" for a capability
 	// with none.
 	Resource string
-	// Method is a network request's HTTP method, AccessInput for a web
-	// view's trusted input, or AccessMedia for what its pages capture.
+	// Method is a network request's HTTP method, AccessInput for a web view's trusted input, AccessMedia for what its pages capture, or AccessCookies for a cookie the web views' store takes.
 	Method string
 }
 
@@ -45,9 +44,7 @@ const (
 	// AccessNetwork is fetch and the images and videos loaded from the
 	// network, by URL.
 	AccessNetwork = "network"
-	// AccessWebView is the pages a web view shows, by URL, with
-	// AccessInput the trusted input Ref.SendInput gives them, and with
-	// AccessMedia the devices WebView.Media lets them capture.
+	// AccessWebView is the pages a web view shows, by URL, with AccessInput the trusted input Ref.SendInput gives them, with AccessMedia the devices WebView.Media lets them capture, and with AccessCookies the cookies SetWebCookies writes, by a URL each goes to.
 	AccessWebView = "webview"
 	// AccessOpenURL is OpenURL, by URL.
 	AccessOpenURL = "openUrl"
@@ -87,11 +84,11 @@ const (
 	AccessMotion             = "motion"
 )
 
-// AccessInput is AccessRequest.Method for a web view's trusted input,
-// and AccessMedia for the devices its pages capture.
+// AccessInput is AccessRequest.Method for a web view's trusted input, AccessMedia for the devices its pages capture, and AccessCookies for a cookie written to the store every web view of the app shares, which no TSX capability grants.
 const (
-	AccessInput = "input"
-	AccessMedia = "media"
+	AccessInput   = "input"
+	AccessMedia   = "media"
+	AccessCookies = "cookies"
 )
 
 // accessKey is where ProvideAccess keeps an owner's Access.
@@ -175,6 +172,7 @@ const (
 	serviceLocation           service = "location"
 	serviceBackgroundLocation service = "backgroundLocation"
 	serviceMotion             service = "motion"
+	serviceWebCookies         service = "webCookies"
 )
 
 // serviceRule is how core holds a kind of service to Access.
@@ -183,6 +181,8 @@ type serviceRule struct {
 	permission string
 	// source says the resource is a URL the service loads, held as an element's source is (sourceRefusal).
 	source bool
+	// method is the request's Method, with the request's resource.
+	method string
 	// runtimeOnly says core lets the service through and only TSX's runtime asks Access for it, as a Go component's copy, paste, pickers and microphone act on the user's own input (docs/architecture/tsx.md).
 	runtimeOnly bool
 }
@@ -209,6 +209,7 @@ var services = map[service]serviceRule{
 	serviceLocation:           {permission: AccessLocation},
 	serviceBackgroundLocation: {permission: AccessBackgroundLocation},
 	serviceMotion:             {permission: AccessMotion},
+	serviceWebCookies:         {permission: AccessWebView, method: AccessCookies},
 }
 
 // gate is the refusal of a service of kind for resource by the current owner's Access, as services holds it; a kind services lacks is refused.
@@ -230,7 +231,7 @@ func (cx *Scope) gate(kind service, resource string) error {
 	case rule.source:
 		return sourceRefusal(o, rule.permission, resource)
 	}
-	return refusal(a, AccessRequest{Permission: rule.permission, Resource: resource})
+	return refusal(a, AccessRequest{Permission: rule.permission, Resource: resource, Method: rule.method})
 }
 
 // denied reports whether gate refuses a service of kind for resource, logging the first refusal of each kind.

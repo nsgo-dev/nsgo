@@ -240,6 +240,18 @@ cx.AuthSession(func(redirect string) string {
 
 系统会话能捕获 scheme 的平台上，重定向地址是 `com.example.app:/oauth2redirect`，应用不必声明这个 scheme；桌面的回环地址上是 `http://127.0.0.1:<端口>/oauth2redirect`，所以两者都要在服务方登记，通常各是一个客户端。`Scheme` 留空则只用回环地址；设为 `https` 并给出 `Host` 则用应用的关联域名，iOS 17.4 和 macOS 14.4 起能捕获。浏览器标签页被关闭时回环会话无从得知，所以要给它 `Timeout` 或一个取消按钮。`Ephemeral` 让 macOS 和 iOS 不共享浏览器的 Cookie。Android、tvOS、watchOS 和小程序目前回答 `core.AuthUnavailable`。在 TSX 中，`AuthSession.start(url, options)` 需要 `auth_session` 能力，返回的会话的 `result` 解析为回调地址，取消时为 null。
 
+应用的 web view 要以用户在别处（例如自己的浏览器里）已有的登录状态打开页面时，用 `cx.SetWebCookies` 写入这次登录的 Cookie，包括页面脚本写不了的 HttpOnly Cookie，再加载页面：存储收下它们后 done 才会运行。写入的是应用所有 web view 共用的持久存储，带 `Expires` 的 Cookie 在应用退出后仍然保留；无痕（Incognito）web view 看不到它们，但 Android 每个应用只有一个存储，那里也看得到。Web、tvOS 和 watchOS 回答 `Unavailable`。
+
+```go
+cx.SetWebCookies([]core.WebCookie{
+	{Name: "SID", Value: sid, Domain: ".example.com", Expires: expires, Secure: true, HTTPOnly: true},
+}, func(err error) {
+	if err == nil {
+		page.Set(core.WebSrc("https://www.example.com/"))
+	}
+})
+```
+
 ## 通过 Apple 登录
 
 `cx.SignInWithApple` 在 macOS、iOS 和 tvOS 上从应用自己的按钮弹出系统的「通过 Apple 登录」面板，这些平台上 `cx.Env().CanSignInWithApple()` 为 true。它只回答一次：给出凭据，或给出错误。用户关闭面板时是 `core.AppleSignInCancelled`，这不算失败；其余是 `AppleSignInFailed`，其他平台上是 `AppleSignInUnavailable`。Apple 只在用户第一次登录这个应用时给出邮箱和姓名，要在那时保存。`Nonce` 以其 SHA-256 的小写十六进制放进请求，身份令牌的 `nonce` 声明里就是这个值：服务器对它交给应用的 nonce 做哈希后比较。`cx.AppleCredentialState` 告诉你用户之后是否撤销了授权。

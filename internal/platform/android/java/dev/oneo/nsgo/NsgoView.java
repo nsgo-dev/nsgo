@@ -67,6 +67,7 @@ import android.view.animation.LinearInterpolator;
 import android.view.animation.PathInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.webkit.CookieManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -803,6 +804,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                     break;
                 case Protocol.RECORDING:
                     recording(payload);
+                    break;
+                case Protocol.COOKIES:
+                    cookies(message);
                     break;
                 case Protocol.WANT_FRAME:
                     ui.post(() -> {
@@ -3445,6 +3449,56 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final ArrayList<Long> recordingAsks = new ArrayList<>();
     private boolean recordingAsking;
     private String recordingSent;
+
+    /**
+     * Takes a COOKIES message on the engine's reader thread and sets its cookies in CookieManager on the UI thread, whose looper its callbacks need, then flushes them to disk and answers with COOKIES_SET: the request's surface and count, then an error, "" for none. CookieManager is the store every WebView of the app reads, so it needs no web view.
+     */
+    private void cookies(DataInputStream in) throws IOException {
+        int surface = in.readInt(), count = in.readInt();
+        String[] urls = new String[in.readInt()], values = new String[urls.length];
+        for (int i = 0; i < urls.length; i++) {
+            urls[i] = Protocol.readString(in);
+            values[i] = Protocol.readString(in);
+        }
+        ui.post(() -> {
+            CookieManager manager;
+            try {
+                manager = CookieManager.getInstance();
+            } catch (RuntimeException e) {
+                // Without a WebView provider, getInstance throws.
+                cookiesSet(surface, count, "Android has no WebView: " + e.getMessage());
+                return;
+            }
+            int[] pending = {urls.length};
+            String[] failure = {""};
+            for (int i = 0; i < urls.length; i++) {
+                String value = values[i];
+                manager.setCookie(urls[i], value, ok -> {
+                    if (!Boolean.TRUE.equals(ok) && failure[0].isEmpty()) {
+                        // The name alone: the value may be a credential.
+                        failure[0] = "Android's CookieManager refused the cookie " + value.substring(0, value.indexOf('='));
+                    }
+                    if (--pending[0] == 0) {
+                        manager.flush();
+                        cookiesSet(surface, count, failure[0]);
+                    }
+                });
+            }
+        });
+    }
+
+    private void cookiesSet(int surface, int count, String error) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        try {
+            out.writeInt(surface);
+            out.writeInt(count);
+            Protocol.writeString(out, error);
+        } catch (IOException impossible) {
+            throw new AssertionError(impossible);
+        }
+        write(Protocol.COOKIES_SET, bytes.toByteArray());
+    }
 
     /** Takes a RECORDING message, on the engine's reader thread: a stop and the app's taking of an earlier recording go to the service at once, a start and an authorize to the UI thread. */
     private void recording(byte[] payload) {

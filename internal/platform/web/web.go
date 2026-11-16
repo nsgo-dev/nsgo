@@ -1366,6 +1366,10 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemSpeak:
 			speak(it.Count, *it.Speak, s.engine.Dispatch)
 			continue
+		case driver.ItemWebCookies:
+			// A page reaches no frame's cookie store, and none of another origin's or an HttpOnly one at all.
+			s.engine.Dispatch(driver.NoWebCookies(it))
+			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge, driver.ItemTaskProgress:
 			s.notify(it)
 			continue

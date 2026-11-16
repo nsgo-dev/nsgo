@@ -198,6 +198,7 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitPolicyDecisionIgnore, "webkit_policy_decision_ignore")
 	purego.RegisterLibFunc(&webkitMessageHeadersAppend, soup, "soup_message_headers_append")
 	purego.RegisterLibFunc(&jscValueToString, jsc, "jsc_value_to_string")
+	bindWebCookies(webkit, soup)
 }
 
 // WebKit's enums.

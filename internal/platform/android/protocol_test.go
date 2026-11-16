@@ -131,7 +131,7 @@ func TestOverlayItemsEncode(t *testing.T) {
 	}
 }
 
-// TestJavaMessagesMatchTheBackend holds Protocol.java's message types for package microphone's recordings to android.go's, which carry them both ways.
+// TestJavaMessagesMatchTheBackend holds Protocol.java's message types for package microphone's recordings and the web views' cookies to android.go's, which carry them both ways.
 func TestJavaMessagesMatchTheBackend(t *testing.T) {
 	read := func(path ...string) string {
 		data, err := os.ReadFile(filepath.Join(path...))
@@ -141,7 +141,7 @@ func TestJavaMessagesMatchTheBackend(t *testing.T) {
 		return string(data)
 	}
 	goSource, java := read("android.go"), read("java", "dev", "oneo", "nsgo", "Protocol.java")
-	for goName, javaName := range map[string]string{"msgRecording": "RECORDING", "msgRecordingReport": "RECORDING_REPORT"} {
+	for goName, javaName := range map[string]string{"msgRecording": "RECORDING", "msgRecordingReport": "RECORDING_REPORT", "msgCookies": "COOKIES", "msgCookiesSet": "COOKIES_SET"} {
 		g := regexp.MustCompile(`\b` + goName + ` += (\d+)`).FindStringSubmatch(goSource)
 		j := regexp.MustCompile(`static final int ` + javaName + ` = (\d+);`).FindStringSubmatch(java)
 		if g == nil || j == nil || g[1] != j[1] {

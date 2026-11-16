@@ -4,6 +4,7 @@
 
 - Add in-app purchases on macOS, iOS and tvOS through StoreKit 2: the store's products and prices, purchases answering cancelled and pending apart from failed with the signed transaction, updates made outside the app, finishing, current entitlements and restoring, in Go, TSX and `nsgotest`, when `nsgo.yaml` sets `apple.purchases` (#353 by @houko).
 - Add `SidebarShell.Fixed`, a sidebar the user cannot resize.
+- Add `Scope.SetWebCookies`, which writes cookies, HttpOnly ones included, to the persistent store the app's web views share on Apple platforms, Windows, Linux and Android, so they can carry the sign-in of the user's own browser (#387 by @houko).
 - Add `WebView.PinchZoom`, `Ref.Load` and the platform's `Domain` and `Code` on `WebError`; on Windows, Ctrl with the wheel or with + and - zooms a web view only with `PinchZoom` (#233 by @houko).
 - Stop reporting a web view load that was stopped, replaced or turned into a download to `OnError` on Apple platforms and Windows (#233 by @houko).
 - Keep a view's own outer shadows and outline outside its `Overflow: Hidden` clip on Apple for views, images and macOS scroll views, as CSS does (#238 by @houko).
