@@ -28,8 +28,8 @@ func (f Input) Render(cx *core.Scope) core.Node {
 	}
 	shape := core.Style{Height: core.Pt(ButtonHeight), Padding: core.Symmetric(0, 10), FontSize: 13}
 	if in.Multiline {
-		shape = core.Style{MinHeight: core.Pt(ButtonHeight + 2*TypeBody.LineHeight), Padding: core.Symmetric(6, 10),
-			TextAlignVertical: core.TextAlignVerticalTop, FontSize: 13}
+		// A multiline field's three-line floor is in the look below, where the caller's height can drop it: a minimum would outgrow a smaller height.
+		shape = core.Style{Padding: core.Symmetric(6, 10), TextAlignVertical: core.TextAlignVerticalTop, FontSize: 13}
 	}
 	// The caller's style goes over the look's colors as well as its shape: the core merges a dynamic style over a static one, so a static color would otherwise lose to the look's.
 	static, own := in.Style, in.StyleFunc
@@ -45,6 +45,9 @@ func (f Input) Render(cx *core.Scope) core.Node {
 		s = s.Merge(static)
 		if own != nil {
 			s = s.Merge(own())
+		}
+		if in.Multiline && s.Height == (core.Length{}) && s.MinHeight == (core.Length{}) {
+			s.MinHeight = core.Pt(ButtonHeight + 2*TypeBody.LineHeight)
 		}
 		return s
 	}

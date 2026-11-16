@@ -29,7 +29,7 @@ ui.Input{Value: draft.Get, OnChange: draft.Set, Placeholder: "新任务",
 
 ## 字段
 
-`Multiline` 让文本换行并随之增长，除非样式指定了尺寸。`Masked` 隐藏字符，`Readonly` 和 `Disabled` 阻止编辑，`MaxLength` 限制用户输入的 UTF-16 单元数。`Placeholder` 可以用 `PlaceholderFunc` 跟随变化。
+`Multiline` 让文本换行，初始高度为三行并随文本增长，除非样式设置了 `Height` 或 `MinHeight`。`Masked` 隐藏字符，`Readonly` 和 `Disabled` 阻止编辑，`MaxLength` 限制用户输入的 UTF-16 单元数。`Placeholder` 可以用 `PlaceholderFunc` 跟随变化。
 
 ```go
 ui.Input{Masked: true, Value: password.Get, OnChange: password.Set,

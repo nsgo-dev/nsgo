@@ -34,7 +34,7 @@ func TestInput(t *testing.T) {
 	})
 }
 
-// TestInputMergesCallerStyle sizes a field with its Style, colors one with its Style and gives one a StyleFunc, and checks each keeps the rest of ui's look: the focus rim and the hover rim stay while the caller's style sets neither.
+// TestInputMergesCallerStyle sizes a field with its Style, colors one with its Style, gives one a StyleFunc and sizes multiline fields below their three lines, and checks each keeps the rest of ui's look: the focus rim and the hover rim stay while the caller's style sets neither.
 func TestInputMergesCallerStyle(t *testing.T) {
 	ink, paper := core.RGB(0x112233), core.RGB(0xfedcba)
 	each(t, func(t *testing.T, e core.Environment) {
@@ -45,6 +45,9 @@ func TestInputMergesCallerStyle(t *testing.T) {
 				}, StyleFunc: func() core.Style { return core.Style{FontFamily: "Menlo"} }},
 				Input{TestID: "colored", Style: core.Style{Color: ink, Background: paper}},
 				Input{TestID: "plain"},
+				Input{TestID: "short", Multiline: true, Style: core.Style{Height: core.Pt(40)}},
+				Input{TestID: "lower", Multiline: true, StyleFunc: func() core.Style { return core.Style{MinHeight: core.Pt(40)} }},
+				Input{TestID: "notes", Multiline: true},
 			}}
 		})
 		f := app.Find("styled")
@@ -69,6 +72,15 @@ func TestInputMergesCallerStyle(t *testing.T) {
 		if f := app.Find("plain"); f.Frame.Size.Height != ButtonHeight || f.Input.Style.Font.Size != 13 {
 			t.Fatalf("plain field: %v tall, %v pt text; want %v and 13", f.Frame.Size.Height, f.Input.Style.Font.Size, ButtonHeight)
 		}
+		if h := app.Find("short").Frame.Size.Height; h != 40 {
+			t.Fatalf("multiline field with a 40 pt height = %v tall", h)
+		}
+		if h := app.Find("lower").Frame.Size.Height; h != 40 {
+			t.Fatalf("multiline field with a 40 pt minimum = %v tall", h)
+		}
+		if h := app.Find("notes").Frame.Size.Height; h != ButtonHeight+2*TypeBody.LineHeight {
+			t.Fatalf("plain multiline field = %v tall, want three lines (%v)", h, ButtonHeight+2*TypeBody.LineHeight)
+		}
 		if e.Idiom == core.IdiomDesktop {
 			app.Hover("styled")
 			if got := app.Find("styled").Style.BorderColor; got == p.FieldBorder {
@@ -83,6 +95,7 @@ func TestInputMergesCallerStyle(t *testing.T) {
 	})
 }
 
+// TestComboboxKeepsChevronInset checks that a combobox's text stops before its chevron.
 func TestComboboxKeepsChevronInset(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		app, _ := start(t, e, func(cx *core.Scope) core.Node {
@@ -94,6 +107,9 @@ func TestComboboxKeepsChevronInset(t *testing.T) {
 		var walk func(*nsgotest.View)
 		walk = func(v *nsgotest.View) {
 			for _, child := range v.Children {
+				if field != nil {
+					return
+				}
 				if child.Kind == driver.KindInput {
 					field = child
 					return
