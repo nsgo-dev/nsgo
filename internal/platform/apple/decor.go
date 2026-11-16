@@ -12,16 +12,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// What a CALayer's own properties cannot draw goes into sublayers made on
-// demand, as NSH's decor does: corners of different radii take a shape
-// layer for the fill and a mask for clipping, while one radius, circular
-// or continuous, is the layer's own corner radius and curve; dashed
-// borders and outlines a stroked shape; each shadow a layer of its own
-// with a shadow path; each gradient a CAGradientLayer. Fills, gradients
-// and inset shadows sit below the view's content (a content layer's
-// zPosition is -1) and its children, outer shadows below them, borders
-// above the content and outlines above everything. A layer that clips its
-// children clips these too, as it clips its own shadow.
+// What a CALayer's own properties cannot draw goes into sublayers made on demand, as NSH's decor does: corners of different radii take a shape layer for the fill and a mask for clipping, while one radius, circular or continuous, is the layer's own corner radius and curve; dashed borders and outlines a stroked shape; each shadow a layer of its own with a shadow path; each gradient a CAGradientLayer. Fills, gradients and inset shadows sit below the view's content (a content layer's zPosition is -1) and its children, outer shadows below them, borders above the content and outlines above everything. A layer that clips its children clips these too, as it clips its own shadow, so a view that draws them outside its box clips its children in a holder (clip.go).
 //
 // Masks are what the window server pays for on every frame a view moves,
 // as NSH found: masked shadows on the gallery's cards and tiles dropped

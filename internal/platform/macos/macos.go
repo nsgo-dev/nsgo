@@ -73,8 +73,10 @@ type view struct {
 	id      driver.NodeID
 	kind    driver.ViewKind
 	native  objc.ID
-	content objc.ID // where children go: native, or a scroll view's container
-	events  driver.EventMask
+	content objc.ID // where children go: native, or a holder or a scroll view's container
+	// clipHeld says content clips the children in place of the view's own layer, which keeps its shadow and outline (clipsInHolder).
+	clipHeld bool
+	events   driver.EventMask
 	// over says the view reported the mouse over it: in its tracking
 	// area, and no view above covers it there.
 	over bool
@@ -381,7 +383,7 @@ func loadAppKit() {
 	common := []objc.MethodDef{
 		{Cmd: sel("makeBackingLayer"), Fn: makeBackingLayer},
 		{Cmd: sel("isFlipped"), Fn: func(self objc.ID, _ objc.SEL) bool { return true }},
-		{Cmd: sel("clipsToBounds"), Fn: func(self objc.ID, _ objc.SEL) bool { return clipsBounds(views[self]) }},
+		{Cmd: sel("clipsToBounds"), Fn: func(self objc.ID, _ objc.SEL) bool { return clipsBounds(views[self], self) }},
 		{Cmd: sel("hitTest:"), Fn: hitTest},
 		{Cmd: sel("mouseDown:"), Fn: mouseDown},
 		{Cmd: sel("mouseUp:"), Fn: mouseUp},
@@ -512,12 +514,12 @@ var (
 // makeBackingLayer gives a view AppKit's own backing layer, which takes
 // a subclass that keeps the transform a style gives it once it has one
 // (holdTransforms).
-// clipsBounds answers AppKit, which clips views to their bounds as their
-// frames change, and with them the shadows and outlines drawn outside: a
-// view clips as its style says. AppKit asks before the view is registered
-// too, when v is nil, masking the layer of a view no style ever reaches.
-func clipsBounds(v *view) bool {
-	return v != nil && (v.style.Clip || v.kind == driver.KindScroll)
+// clipsBounds answers AppKit for self, v's view or its holder, as AppKit clips views to their bounds as their frames change, and with them the shadows and outlines drawn outside: a view clips as its style says, unless its holder clips its children for it. AppKit asks before the view is registered too, when v is nil, masking the layer of a view no style ever reaches.
+func clipsBounds(v *view, self objc.ID) bool {
+	if v == nil || self == v.native && v.clipHeld {
+		return false
+	}
+	return v.style.Clip || v.kind == driver.KindScroll
 }
 
 func makeBackingLayer(self objc.ID, cmd objc.SEL) objc.ID {
@@ -1905,8 +1907,11 @@ func (s *surface) delete(v *view, kept bool) {
 		v.shader.Release()
 	}
 	s.endEffect(v)
-	if v.content != v.native && v.sc == nil {
-		delete(views, v.content)
+	if v.content != v.native {
+		apple.ForgetHolder(v.content.Send(selLayer))
+		if v.sc == nil {
+			delete(views, v.content)
+		}
 	}
 	v.layout.Release()
 	if v.image != nil {

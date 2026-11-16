@@ -82,7 +82,8 @@ type view struct {
 	played     []driver.DrawOp    // the ops it last drew, its bound arguments' values in place
 	shader     *apple.ShaderLayer // a shader view's (shader.go)
 	fx         *effect            // its effect, transition or navigation shader (effect.go)
-	container  objc.ID            // what holds its children under an effect, once it has one
+	container  objc.ID            // what holds its children under an effect or for its clip, once it has one
+	clipHeld   bool               // whether container clips the children in place of the view's own layer, which keeps its shadow and outline (clipsInHolder)
 	web        *apple.Web         // a web view's
 	video      *apple.Video       // a video's
 
@@ -1368,6 +1369,7 @@ func (s *surface) delete(v *view, kept bool) {
 	}
 	s.endEffect(v)
 	if v.container != 0 {
+		apple.ForgetHolder(v.container.Send(selLayer))
 		delete(views, v.container)
 	}
 	if v.shader != nil {

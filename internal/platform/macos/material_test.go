@@ -41,16 +41,24 @@ func TestMaterialCode(t *testing.T) {
 }
 
 func TestViewsClipAsTheirStyleSays(t *testing.T) {
-	if clipsBounds(nil) {
+	if clipsBounds(nil, 1) {
 		t.Fatal("a view not yet registered clips, masking its layer for good")
 	}
-	plain := &view{}
-	if clipsBounds(plain) {
+	plain := &view{native: 1, content: 1}
+	if clipsBounds(plain, 1) {
 		t.Fatal("a view whose style does not clip clips")
 	}
 	plain.style.Clip = true
-	if !clipsBounds(plain) {
+	if !clipsBounds(plain, 1) {
 		t.Fatal("a view whose style clips does not")
+	}
+	// A holder clips the children of a view with a shadow, whose own layer would clip the shadow.
+	plain.content, plain.clipHeld = 2, true
+	if clipsBounds(plain, 1) {
+		t.Fatal("a view whose holder clips its children clips its own shadow")
+	}
+	if !clipsBounds(plain, 2) {
+		t.Fatal("the holder of a view that clips does not")
 	}
 }
 
@@ -58,4 +66,32 @@ func TestViewsClipAsTheirStyleSays(t *testing.T) {
 // it waited on the main thread.
 func TestApplyAfterClose(t *testing.T) {
 	surfaceApply(0, 0, 0)
+}
+
+// A view clips what it holds without its own layer only where that layer would clip its shadow or outline with it, and only where a holder or its image layer clips all it holds.
+func TestViewsClipInAHolderToKeepTheirShadow(t *testing.T) {
+	shadow := &driver.Effects{Shadows: []driver.BoxShadow{{Blur: 24, Color: driver.RGBA(0, 0x59)}}}
+	card := driver.ViewStyle{Clip: true, CornerRadius: 16, Effects: shadow}
+	shaped := card
+	shaped.Corners = driver.Corners{TopLeft: 16, TopRight: 4, BottomRight: 4, BottomLeft: 4}
+	for _, c := range []struct {
+		name string
+		v    *view
+		vs   driver.ViewStyle
+		want bool
+	}{
+		{"a card", &view{kind: driver.KindView}, card, true},
+		{"a card of corners that differ", &view{kind: driver.KindView}, shaped, true},
+		{"a card that does not clip", &view{kind: driver.KindView}, driver.ViewStyle{CornerRadius: 16, Effects: shadow}, false},
+		{"a clip with no shadow", &view{kind: driver.KindView}, driver.ViewStyle{Clip: true, CornerRadius: 16}, false},
+		{"a canvas", &view{kind: driver.KindCanvas}, card, false},
+		{"an image, which clips to one radius itself", &view{kind: driver.KindImage}, card, true},
+		{"an image of corners that differ", &view{kind: driver.KindImage}, shaped, false},
+		{"a scroll view", &view{kind: driver.KindScroll, sc: &scrollState{}}, card, true},
+		{"a scroll view of corners that differ", &view{kind: driver.KindScroll, sc: &scrollState{}}, shaped, false},
+	} {
+		if got := c.v.clipsInHolder(&c.vs); got != c.want {
+			t.Errorf("%s: clipsInHolder = %v, want %v", c.name, got, c.want)
+		}
+	}
 }

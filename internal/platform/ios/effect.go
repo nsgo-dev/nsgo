@@ -143,6 +143,7 @@ func (s *surface) container(host *view) objc.ID {
 		sub.Send(selRelease)
 	}
 	host.native.Send(selAddSubview, c)
+	c.Send(selRelease)
 	host.container = c
 	views[c] = host
 	return c
@@ -185,7 +186,7 @@ func (s *surface) mask(fx *effect, on bool) {
 			}
 			layer.Send(sel("setMask:"), emptyMask)
 		} else {
-			layer.Send(sel("setMask:"), objc.ID(0))
+			layer.Send(sel("setMask:"), apple.HolderMask(layer))
 		}
 		fx.layer.Layer.Send(selSetHidden, !on)
 	})
@@ -310,23 +311,36 @@ func (s *surface) endEffect(v *view) {
 	fx.before.Release()
 }
 
-// prepareClipHolder keeps a view's own Apple decoration outside the child
-// clipping layer. The holder is also reused by effects and scroll views.
-func (v *view) prepareClipHolder(vs *driver.ViewStyle) {
-	if (apple.NeedsClipHolder(vs) || v.sc != nil) && v.container == 0 {
+// clipsInHolder reports whether v clips what it holds without its own layer, which would clip its own shadow and outline too (apple.NeedsClipHolder): a plain view in a holder it takes for its children, or an image in its image layer where one radius draws the corners. Other views draw what they show on their own layer, which clips it as before, and a scroll view's children scroll in it, where a holder would hold them still.
+func (v *view) clipsInHolder(vs *driver.ViewStyle) bool {
+	switch {
+	case !apple.NeedsClipHolder(vs) || v.sc != nil:
+		return false
+	case v.kind == driver.KindImage:
+		return !apple.ShapedCorners(vs)
+	}
+	return v.kind == driver.KindView
+}
+
+// holdClip clips v's children as vs says, in a holder it makes the first time a plain view needs one, and reports whether v's own layer leaves them to it (clipHeld). A holder an effect made clips as before otherwise.
+func (v *view) holdClip(vs *driver.ViewStyle) bool {
+	held := v.clipsInHolder(vs)
+	if held && v.kind == driver.KindView && v.container == 0 {
 		v.surface.container(v)
 	}
-	if v.container == 0 {
-		return
+	if (held || v.clipHeld) && v.container != 0 {
+		var clip *driver.ViewStyle
+		if held {
+			clip = vs
+		}
+		v.fitHolder(clip)
 	}
-	b := objc.Send[apple.CGRect](v.native, selBounds)
-	v.container.Send(selSetFrame, b)
-	holderStyle := *vs
-	if v.sc != nil {
-		holderStyle.Clip = true
-	}
-	apple.SetClipLayer(v.container.Send(selLayer), &holderStyle)
-	// The styled layer must stay unclipped whenever children live in a
-	// holder; otherwise its shadow and outline would still be cut off.
-	v.native.Send(selLayer).Send(sel("setMasksToBounds:"), false)
+	v.clipHeld = held
+	return held
+}
+
+// fitHolder fits v's holder to v's bounds and clips it as vs says, nil for not at all.
+func (v *view) fitHolder(vs *driver.ViewStyle) {
+	v.container.Send(selSetFrame, objc.Send[apple.CGRect](v.native, selBounds))
+	apple.ClipHolder(v.container.Send(selLayer), vs, false)
 }
