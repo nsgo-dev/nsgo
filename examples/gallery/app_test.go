@@ -523,6 +523,7 @@ func TestStocks(t *testing.T) {
 	app := startDesktop(t)
 	open(app, "Stocks")
 	price := app.Find("id:stock-price").Text
+	// A random walk can return to its initial price. Check each market tick; waiting in real time cannot move the app's manual clock.
 	changed := false
 	for range 10 {
 		app.Advance(time.Second)
@@ -1691,8 +1692,9 @@ func TestTerminal(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("runs a Unix shell")
 	}
-	// A plain sh rather than the user's shell, whose prompt may set a title of its own over the test's.
+	// A plain sh rather than the user's shell, whose prompt may set a title of its own over the test's, and with no ENV startup file to run.
 	t.Setenv("SHELL", "/bin/sh")
+	t.Setenv("ENV", "")
 	app := startDesktop(t)
 	open(app, "Terminal")
 	app.Find("id:terminal")
