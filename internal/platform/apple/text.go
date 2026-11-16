@@ -741,8 +741,15 @@ func (p *prepared) fitsOneLine(width float64) bool {
 		p.line = ctLineCreateWithAttrString(p.str)
 		// As a frame measures it, without its trailing spaces.
 		p.lineWidth = ctLineGetTypographicBounds(p.line, &p.ascent, &descent, &leading) - ctLineTrailingWhitespace(p.line)
+		// A frame leaves a font's typographic leading out of its last line, or some of it, where the line's bounds add all of it: Hiragino Sans GB at 12 points is 19 points tall as a line and 13 in a frame. A text in such a font stays on the framesetter, for measuring and drawing alike.
+		if leading != 0 {
+			p.oneLine = false
+			Release(p.line)
+			p.line = 0
+			return false
+		}
 		// A frame puts a line's baseline on a whole point.
-		p.lineHeight = framedHeight(math.Round(p.ascent) + descent + leading)
+		p.lineHeight = framedHeight(math.Round(p.ascent) + descent)
 	}
 	return p.lineWidth <= width
 }

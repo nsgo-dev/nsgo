@@ -91,6 +91,20 @@ func TestALimitedTextIsAsTallAsItsLinesUncut(t *testing.T) {
 	}
 }
 
+// TestOneLineWithLeadingMatchesTheFramesetter checks texts in fonts with typographic leading, which a frame leaves out of its last line where CTLineGetTypographicBounds counts it: named fonts, so the test does not depend on the fallback a machine picks for Menlo. The ASCII texts are the ones that could take the one-line shortcut.
+func TestOneLineWithLeadingMatchesTheFramesetter(t *testing.T) {
+	defer func() { oneLineFast = true }()
+	for _, family := range []string{"Hiragino Sans GB", "Heiti SC", "Thonburi", "Devanagari Sangam MN"} {
+		for _, text := range []string{"abc", "Hello world ", "日本語のテキスト", "ภาษาไทย", "हिन्दी"} {
+			for _, lines := range []int{0, 1} {
+				at := driver.AttributedText{Text: text, MaxLines: lines,
+					Style: driver.TextStyle{Font: driver.Font{Family: family, Size: 12, Weight: 400}, Color: driver.RGB(0)}}
+				compareOneLine(t, fmt.Sprintf("%s/%q/%d", family, text, lines), &at)
+			}
+		}
+	}
+}
+
 func compareOneLine(t *testing.T, name string, at *driver.AttributedText) {
 	t.Helper()
 	type result struct {
