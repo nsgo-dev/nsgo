@@ -326,7 +326,7 @@ What the desktop installers ([tool](architecture/tool.md#installers)) and the st
 | --- | --- | --- |
 | Notarization checked | — | A Developer ID build is accepted by the notary service and opens from a download without Gatekeeper's warning; so far the hardened runtime's signature was checked with a development identity, and the submission as far as notarytool's credentials (2026-11-10) |
 | Windows installers with Go and Xcode | — | `build` makes the Windows installer without makensis, which a Mac needs from Homebrew |
-| Signed Windows installers | `signtool`, NSIS's `!uninstfinalize` | A certificate in `sign` signs the executable and the installer |
+| Signed Windows installers | `signtool`, NSIS's `!uninstfinalize` | A certificate in `sign` signs the executable and the installer, as `sign.certificate` and `sign.sign_command` now do in Go (`winsign.go`, `authenticode/`), and the result verifies with `osslsigncode` (2026-11-16); Windows checks that the signature satisfies SmartScreen on a download, and a timestamped signature lasts past the certificate's expiration |
 | Checked Linux packages | `pacman -U`, `dpkg -i` | The Debian package installs on Debian and Ubuntu and the Arch one with `pacman -U`, as `install.sh` runs them, which so far were only read by `bsdtar` and `pacman -Qip` (2026-11-10), and the Arch package carries `.MTREE` for `pacman -Qk` |
 | Install scripts from GitHub | — | `install.sh` and `install.ps1` install from a published release; so far they installed from the releases directory served on each machine (2026-11-10) |
 | The Windows installer's pages | — | Its directory, progress and finish pages, in Chinese among others, are checked on a screen; so far the installer ran silently alone (2026-11-10) |

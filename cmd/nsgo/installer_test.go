@@ -68,7 +68,7 @@ func TestNSISScript(t *testing.T) {
 	})
 	p := &project{Dir: dir, Name: "MyApp", ID: "dev.example.app", Version: "1.2.0-beta.1"}
 	p.I18n.Dir, p.I18n.Source = filepath.Join(dir, "locales"), "en"
-	d, err := nsisScript(p, pkg, "arm64")
+	d, err := nsisScript(t.Context(), p, pkg, "arm64")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestNSISScript(t *testing.T) {
 	// A command-line package adds and removes its install folder from the
 	// user's Path, while preserving the existing toast registration.
 	p.Windows.CommandLine = true
-	d, err = nsisScript(p, pkg, "arm64")
+	d, err = nsisScript(t.Context(), p, pkg, "arm64")
 	if err != nil {
 		t.Fatal(err)
 	}

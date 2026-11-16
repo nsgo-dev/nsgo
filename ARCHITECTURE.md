@@ -62,7 +62,7 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `examples/widgets` | — | A counter whose macOS and iOS widgets show its count in each family, and whose Live Activity changes it, with tests |
 | `examples/appclip` | — | A café whose iOS App Clip, a package of its own, orders at the table its link names, with tests |
 | `examples/hello` | — | A greeting in English and Chinese, small enough for every target, mini programs included, and an App Clip greeting the name its link gives, to try the packages and installers, with tests |
-| `cmd/nsgo` | `nsh-cli` | The `nsgo` tool, run on an app's `nsgo.yaml` ([tool](docs/architecture/tool.md)), with `nsgo mcp` serving agents MCP; `apk` signs Android packages in Go, and `install` holds the scripts installing a release from GitHub |
+| `cmd/nsgo` | `nsh-cli` | The `nsgo` tool, run on an app's `nsgo.yaml` ([tool](docs/architecture/tool.md)), with `nsgo mcp` serving agents MCP; `apk` signs Android packages in Go, `authenticode` signs Windows images in Go, and `install` holds the scripts installing a release from GitHub |
 
 ## Platforms
 

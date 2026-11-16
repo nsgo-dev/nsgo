@@ -406,7 +406,7 @@ func load(dir string) (*project, error) {
 	if err := p.validateLinuxDeps(); err != nil {
 		return nil, fmt.Errorf("nsgo.yaml: %w", err)
 	}
-	for _, path := range []*string{&p.Sign.Profile, &p.Sign.WidgetsProfile, &p.Sign.ClipProfile, &p.Sign.MacOSProfile, &p.Sign.Keystore} {
+	for _, path := range []*string{&p.Sign.Profile, &p.Sign.WidgetsProfile, &p.Sign.ClipProfile, &p.Sign.MacOSProfile, &p.Sign.Keystore, &p.Sign.Certificate} {
 		if *path != "" {
 			*path = p.resolve(*path)
 		}

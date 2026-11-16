@@ -57,6 +57,9 @@ func buildAll(ctx context.Context, p *project) error {
 	if err := p.checkNotarizing(); err != nil {
 		return err
 	}
+	if err := p.checkSigningWindows(); err != nil {
+		return err
+	}
 	if err := p.prepareCatalogs(ctx, ".", false); err != nil {
 		return err
 	}
@@ -368,16 +371,33 @@ func buildTarget(ctx context.Context, p *project, target, dir string) error {
 		if err := buildWindows(ctx, p, dir, goArch(arch)); err != nil || !p.installers() {
 			return err
 		}
+		signer := windowsSignerOf(p)
+		if signer != nil {
+			if err := signer.signWindowsPackage(ctx, p, dir); err != nil {
+				return err
+			}
+		}
 		if p.channel() == channelStore {
 			msix, err := buildMSIX(ctx, p, dir, goArch(arch))
 			if err != nil {
 				return err
+			}
+			if signer != nil {
+				if err := signer.signFile(ctx, msix, false); err != nil {
+					return err
+				}
 			}
 			return p.releaseAssets(msix)
 		}
 		setup, err := buildNSIS(ctx, p, dir, arch)
 		if err != nil {
 			return err
+		}
+		if signer != nil && setup != "" {
+			if err := signer.signFile(ctx, setup, true); err != nil {
+				return err
+			}
+			detailIn(ctx, "signed %s", filepath.Base(setup))
 		}
 		return p.releaseInstaller(target, setup)
 	case "watchos":

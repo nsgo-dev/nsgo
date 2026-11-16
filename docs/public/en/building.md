@@ -82,7 +82,7 @@ For the desktop targets, `build` writes what users install the app from into `di
 | Target | Installer |
 | --- | --- |
 | macOS | `<name>-<version>-macos-<arch>.dmg`, a disk image showing the app, an arrow and a link to Applications to drag it to, signed with `sign.identity` and [notarized](#notarize) |
-| Windows | `<name>-<version>-windows-<arch>-setup.exe`, an [NSIS](https://nsis.sourceforge.io) installer that installs for the user, again in the folder the user chose before, closing the app if it runs, with a Start menu shortcut, an optional desktop one and an uninstaller that removes only what it installed; `windows.command_line` also installs the `.com` companion and puts the app's folder on the user's `Path`, so consoles opened after installing run the app's command, while Win+R, which finds the companion too, starts the app and closes the console it opened |
+| Windows | `<name>-<version>-windows-<arch>-setup.exe`, an [NSIS](https://nsis.sourceforge.io) installer that installs for the user, again in the folder the user chose before, closing the app if it runs, with a Start menu shortcut, an optional desktop one and an uninstaller that removes only what it installed, [signed with `sign.certificate`](#sign-windows-packages) where the app signs Windows packages; `windows.command_line` also installs the `.com` companion and puts the app's folder on the user's `Path`, so consoles opened after installing run the app's command, while Win+R, which finds the companion too, starts the app and closes the console it opened |
 | Linux | `<name>-<version>-linux-<arch>.deb` for Debian and Ubuntu, and `<name>-<version>-linux-<arch>.pkg.tar.gz` for Arch Linux, which install the app in `/opt/<name>` with a command, its desktop entry and icon, and `<name>-<version>-linux-<arch>.AppImage`, which runs on any distribution without installing |
 
 The Windows installer needs NSIS's compiler, on a Mac `brew install makensis`, so a Mac builds every installer; without it `build` leaves the script, `<name>.nsi`, in the package, which compiles anywhere as it is. The installer speaks the languages of the app's catalogs that NSIS translates, Simplified and Traditional Chinese included, picking the system's. `-installers=false` or `build.installers: false` builds the packages alone.
@@ -258,11 +258,31 @@ sign:
   identity: "Apple Development: you@example.com (ABCDE12345)"  # signs the macOS app, else ad hoc
   profile: assets/AppStore.mobileprovision  # signs the IPA
   keystore: assets/release.p12              # signs APKs, with key_alias
+  certificate: assets/codesign.pfx          # signs the Windows app and its installer
   # widgets_profile: assets/Widgets.mobileprovision  # signs the IPA's widget extension
   # clip_profile: assets/Clip.mobileprovision        # signs the IPA's App Clip
 ```
 
 The keystore's passwords come from `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD`. `-team` signs the iPhone's package.
+
+### Sign Windows packages
+
+A Windows download that carries no Authenticode signature or one from a certificate SmartScreen does not know shows a warning before it opens. `sign.certificate`, a `.pfx`, signs the executable, the command companion, the programs and libraries the app's resources bring, and the installer with its uninstaller; its password comes from `NSGO_CERTIFICATE_PASSWORD`. The signatures are made in Go, as `signtool` makes them, so a Mac signs them without the Windows SDK:
+
+```yaml
+sign:
+  certificate: assets/codesign.pfx
+  timestamp_url: http://timestamp.digicert.com  # the RFC 3161 server that timestamps them
+```
+
+`sign.timestamp_url` defaults to DigiCert's, and `none` leaves the signatures untimestamped, which they lose at the certificate's expiration. A certificate on a hardware token or in a cloud service signs through a command of its own instead, in which `%1` is the file to sign and which the build runs for every file above:
+
+```yaml
+sign:
+  sign_command: "signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a %1"
+```
+
+Signing the uninstaller inside the installer needs NSIS 3.08 or later, and a certificate that is not a `.pfx` cannot sign it through `sign.certificate`. `-certificate`, `-sign-command` and `-timestamp-url` set these from the command line.
 
 ### Notarize
 

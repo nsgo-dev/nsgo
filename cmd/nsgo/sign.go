@@ -57,11 +57,25 @@ type signing struct {
 	// NSGO_NOTARY_ISSUER, an App Store Connect API key, notarize without
 	// one, as CI does.
 	Notarize string `yaml:"notarize"`
+	// Certificate is a Windows code signing certificate: the .pfx (PKCS
+	// #12) whose key and chain sign the executable, the command companion,
+	// the resources' programs and libraries, and the installer and its
+	// uninstaller, which keeps SmartScreen from warning users.
+	// NSGO_CERTIFICATE_PASSWORD gives its password. SignCommand signs a
+	// file instead, for a certificate on a hardware token or in a cloud
+	// service, %1 standing for the file's path.
+	Certificate string `yaml:"certificate"`
+	SignCommand string `yaml:"sign_command"`
+	// TimestampURL is the RFC 3161 server that timestamps what
+	// Certificate signs, so that the signatures last past the
+	// certificate's expiration.
+	TimestampURL string `yaml:"timestamp_url"`
 }
 
 // signFlags are nsgo build's flags that replace nsgo.yaml's sign values.
 type signFlags struct {
 	identity, profile, keystore, alias, notarize *override[string]
+	certificate, signCommand, timestamp          *override[string]
 }
 
 func (f *signFlags) bind(fs *flag.FlagSet) {
@@ -70,6 +84,9 @@ func (f *signFlags) bind(fs *flag.FlagSet) {
 	f.keystore = stringFlag(fs, "keystore", "the Android `keystore`, PKCS#12 or JKS; NSGO_KEYSTORE_PASSWORD and NSGO_KEY_PASSWORD give its passwords (default: nsgo.yaml's sign.keystore)")
 	f.alias = stringFlag(fs, "key-alias", "the `alias` of the keystore's key (default: nsgo.yaml's sign.key_alias, else its only key)")
 	f.notarize = stringFlag(fs, "notarize", "the notarytool keychain `profile` the macOS package is notarized with (default: nsgo.yaml's sign.notarize)")
+	f.certificate = stringFlag(fs, "certificate", "the Windows code signing `certificate`, a .pfx; NSGO_CERTIFICATE_PASSWORD gives its password (default: nsgo.yaml's sign.certificate)")
+	f.signCommand = stringFlag(fs, "sign-command", "the `command` that signs a Windows file in place of -certificate, %1 standing for its path (default: nsgo.yaml's sign.sign_command)")
+	f.timestamp = stringFlag(fs, "timestamp-url", "the RFC 3161 `server` that timestamps Windows signatures (default: nsgo.yaml's sign.timestamp_url, else http://timestamp.digicert.com)")
 }
 
 func (f *signFlags) apply(p *project) {
@@ -80,8 +97,13 @@ func (f *signFlags) apply(p *project) {
 	if f.keystore.set {
 		p.Sign.Keystore = p.resolve(f.keystore.value)
 	}
+	if f.certificate.set {
+		p.Sign.Certificate = p.resolve(f.certificate.value)
+	}
 	f.alias.replace(&p.Sign.KeyAlias)
 	f.notarize.replace(&p.Sign.Notarize)
+	f.signCommand.replace(&p.Sign.SignCommand)
+	f.timestamp.replace(&p.Sign.TimestampURL)
 }
 
 // releaseKey is the key release APKs are signed with: the keystore's, or

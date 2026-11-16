@@ -42,7 +42,7 @@ func nsisSetupName(p *project, arch string) string {
 // it when makensis is installed, returning the installer's path.
 func buildNSIS(ctx context.Context, p *project, dir, arch string) (string, error) {
 	stage(ctx, "writing the installer")
-	script, err := nsisScript(p, dir, arch)
+	script, err := nsisScript(ctx, p, dir, arch)
 	if err != nil {
 		return "", err
 	}
@@ -78,6 +78,7 @@ func buildNSIS(ctx context.Context, p *project, dir, arch string) (string, error
 	stage(ctx, "compiling the installer")
 	cmd := exec.CommandContext(ctx, compiler, "-V2", "-INPUTCHARSET", "UTF8", filepath.Base(nsi))
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), script.env...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("makensis failed: %w\n%s", err, out)
 	}
@@ -172,7 +173,13 @@ type nsisData struct {
 	// ARM64 has the installer refuse other systems.
 	ARM64 bool
 	// Command has the installer put its folder on the user's Path, for the command companion, and the uninstaller take it off.
-	Command   bool
+	Command bool
+	// SignUninstaller is the command that signs the uninstaller makensis
+	// writes, which a signed app needs signed too; empty when the app
+	// signs none.
+	SignUninstaller string
+	// env is what makensis needs to run SignUninstaller.
+	env       []string
 	Languages []nsisLanguage
 	// Files and Dirs are what the package holds, relative to it, which
 	// the uninstaller removes; Excludes what is beside them but the
@@ -180,7 +187,7 @@ type nsisData struct {
 	Files, Dirs, Excludes []string
 }
 
-func nsisScript(p *project, dir, arch string) (*nsisData, error) {
+func nsisScript(ctx context.Context, p *project, dir, arch string) (*nsisData, error) {
 	name, err := p.displayName()
 	if err != nil {
 		return nil, err
@@ -193,6 +200,13 @@ func nsisScript(p *project, dir, arch string) (*nsisData, error) {
 		ARM64:        arch == "arm64",
 		Command:      p.windowsCommandLine(),
 		Excludes:     []string{p.Name + ".nsi", "*-setup.exe"},
+	}
+	if p.signingWindows() && p.Release {
+		command, env, err := uninstallerSignCommand(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		d.SignUninstaller, d.env = command, env
 	}
 	img, err := p.iconImage()
 	if err != nil {
@@ -341,6 +355,11 @@ VIAddVersionKey /LANG=${LANG_ENGLISH} "CompanyName" {{q .Publisher}}
 {{- end}}
 {{- if .Copyright}}
 VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalCopyright" {{q .Copyright}}
+{{- end}}
+{{- if .SignUninstaller}}
+; Sign the uninstaller makensis writes before the installer embeds it:
+; "= 0" stops the build when it fails.
+!uninstfinalize '{{.SignUninstaller}}' = 0
 {{- end}}
 
 Function .onInit

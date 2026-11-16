@@ -30,7 +30,7 @@ NSGo 在 UI 框架中的位置来自三个选择：应用用 Go 编写（也可�
 - **包最小，启动最快。** 在[基准测试](https://nsgo.dev/zh/benchmarks/)中，同一个计数器应用在 macOS、Windows 和 Linux 上打出的包都在 8 MB 左右，比 MyGo、GPUI 和 NSH 都小（NSH 为 33 到 45 MB）；启动也最快，内存比 MyGo、GPUI 这类在 GPU 上自绘的框架更低。
 - **只有 Go。** 引擎、布局和后端都是 Go，Go 应用不需要 C、cgo 或 JavaScript 引擎。
 - **在一台 Mac 上构建所有平台。** 装有 Go 和 Xcode 的 Mac 能交叉编译每个目标：不需要 NDK、Android SDK、JDK、GTK 或 Windows 工具链。
-- **一条命令生成全部发布文件。** `nsgo build` 写出 macOS 的签名并公证的磁盘映像、Windows 安装程序、deb、Arch 软件包和 AppImage，Mac App Store、Microsoft Store、Google Play 和 Flathub 的商店包，以及从 GitHub Releases 安装的脚本（[构建与发布](building.md)）。
+- **一条命令生成全部发布文件。** `nsgo build` 写出 macOS 的签名并公证的磁盘映像、签名的 Windows 安装程序、deb、Arch 软件包和 AppImage，Mac App Store、Microsoft Store、Google Play 和 Flathub 的商店包，以及从 GitHub Releases 安装的脚本（[构建与发布](building.md)）。
 - **每个平台原生的更新。** macOS 用 Sparkle、Windows 用 WinSparkle 下载、校验签名并安装新版本；Linux 和 Android 检查到新版本后打开它的发布页；iOS 交给 App Store。从商店安装的应用由商店更新（[自动更新](building.md#自动更新)）。
 - **覆盖所有平台。** 手机、平板、电视、手表、桌面和 Web 共用一个引擎和一套 API，还能做 iOS 轻 App、iPhone 和 Mac 的小组件，以及试验性的微信、QQ、支付宝和抖音小程序。
 - **嵌入已有应用。** NSGo 应用可以作为一个视图放进已有的 iOS、Android、Go 桌面和 Web 应用，逐步迁移（[嵌入](embedding.md)）。
