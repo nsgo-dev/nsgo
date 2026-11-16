@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,7 +49,20 @@ func nativeApp(title string) engine.App {
 	}
 }
 
-// startTestWindow opens the window on a GTK thread of its own and returns
+// testWindowCalls keeps consecutive windows on GTK's initialization
+// thread. The native tests open one primary window at a time.
+var testWindowCalls = sync.OnceValue(func() chan func() {
+	calls := make(chan func())
+	go func() {
+		runtime.LockOSThread()
+		for fn := range calls {
+			fn()
+		}
+	}()
+	return calls
+})
+
+// startTestWindow opens the window on the shared GTK thread and returns
 // it once its engine runs. The test skips where no display can open one.
 func startTestWindow(t *testing.T, app engine.App, opts Options) *window {
 	t.Helper()
@@ -58,9 +72,8 @@ func startTestWindow(t *testing.T, app engine.App, opts Options) *window {
 	}
 	ready := make(chan result, 1)
 	done := make(chan struct{})
-	go func() {
+	open := func() {
 		defer close(done)
-		runtime.LockOSThread()
 		w, err := start(app, opts)
 		ready <- result{w, err}
 		if err != nil {
@@ -74,7 +87,12 @@ func startTestWindow(t *testing.T, app engine.App, opts Options) *window {
 		gtkWindowDestroy(w.win)
 		for gMainContextIteration(0, 0) != 0 {
 		}
-	}()
+	}
+	select {
+	case testWindowCalls() <- open:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the previous GTK window did not stop")
+	}
 	var r result
 	select {
 	case r = <-ready:
