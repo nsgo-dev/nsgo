@@ -141,18 +141,18 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 		play := &v.status.play
 		v.player.Send(sel("setMuted:"), c.Muted)
 		v.player.Send(sel("setVolume:"), c.Volume)
-		// What the controls or the system did holds until Paused changes (videoPlayback).
+		// What the controls or the system did holds until Paused changes (videoPlayback). The player posts its rate change before it returns, so the state it reaches is recorded first.
 		switch {
 		case !play.configure(reopened || c.Paused != old.Paused):
 			if play.playing && c.Rate != old.Rate {
 				v.player.Send(sel("setRate:"), c.Rate)
 			}
 		case c.Paused:
-			v.player.Send(sel("pause"))
 			play.applied(false)
+			v.player.Send(sel("pause"))
 		default:
-			v.player.Send(sel("setRate:"), c.Rate)
 			play.applied(true)
+			v.player.Send(sel("setRate:"), c.Rate)
 		}
 	}
 	v.followAudio()
@@ -249,8 +249,8 @@ func (v *Video) open() {
 		v.Dispatch(driver.Event{Kind: driver.EventEnd})
 		if v.config.Repeat {
 			v.player.Send(sel("seekToTime:"), cmTimeOf(0))
-			v.player.Send(sel("play"))
 			st.play.applied(true)
+			v.player.Send(sel("play"))
 		}
 		// Stopped, the other apps' audio may play again.
 		v.followAudio()

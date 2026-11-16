@@ -24,7 +24,7 @@ func (p *videoPlayback) configure(pausedChanged bool) bool {
 	return !p.held
 }
 
-// applied records the play state the backend itself just gave the player, which is not reported.
+// applied records the play state the backend is about to give the player, which is not reported.
 func (p *videoPlayback) applied(playing bool) { p.playing = playing }
 
 // ended records that the player stopped at its end, which EventEnd reports, and leaves the play state to Paused again.
