@@ -1,6 +1,6 @@
 name: Test
 
-# Vets and tests every package on Linux under a virtual display, and Apple's shared platform code on macOS. release.yml calls it before publishing a release.
+# Vets and tests every package on Linux under a virtual display, and Apple's shared code and macOS backend on macOS. release.yml calls it before publishing a release.
 on:
   push:
     branches:
@@ -80,3 +80,7 @@ jobs:
         run: go tool nsgo test ./internal/platform/apple
       - name: Test main-thread failure propagation
         run: go tool nsgo test -run '^TestOnMainExitPropagation$' ./internal/platform/macos -- -race
+      - name: Test macOS backend
+        run: go tool nsgo test ./internal/platform/macos
+      - name: Test native input isolation
+        run: go tool nsgo test -target macos ./testdata/inputisolation

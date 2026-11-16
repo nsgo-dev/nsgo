@@ -259,8 +259,8 @@ func (t *testSurface) Hover(at driver.Point) error {
 // presses.
 var editActions = map[string]string{"a": "selectAll:", "c": "copy:", "v": "paste:", "x": "cut:", "z": "undo:"}
 
-// key posts a key down and up with chars, ignoring is what it types
-// without modifiers.
+// key sends a key down and up with chars, ignoring is what it types
+// without modifiers. A background window receives its keys directly.
 func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 	for _, kind := range []uint{evKeyDown, evKeyUp} {
 		onMainSync(func() {
@@ -274,7 +274,24 @@ func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 				kind, apple.CGPoint{}, flags, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), objc.ID(0),
 				apple.NSString(chars), apple.NSString(ignoring), stacked)
 			rememberTestInput(ev)
-			nsApp().Send(sel("postEvent:atStart:"), ev, false)
+			if objc.Send[bool](t.s.window, sel("isKeyWindow")) {
+				nsApp().Send(sel("postEvent:atStart:"), ev, false)
+			} else if ev = t.s.filter(ev); ev != 0 {
+				// A background app can have no key window. Its monitors
+				// still see queued keys, but AppKit never hands them to
+				// the responder: run the same filter and deliver to that
+				// responder, without activating the app.
+				r := t.s.window.Send(sel("firstResponder"))
+				if code == 48 && kind == evKeyDown && (r == t.s.window || r == t.s.native || r == 0) {
+					t.s.tabFromSurface(flags&flagShift != 0)
+				} else {
+					action := "keyDown:"
+					if kind == evKeyUp {
+						action = "keyUp:"
+					}
+					r.Send(sel(action), ev)
+				}
+			}
 		})
 	}
 	time.Sleep(10 * time.Millisecond)

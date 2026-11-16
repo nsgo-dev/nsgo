@@ -462,18 +462,11 @@ func loadAppKit() {
 		// Keys reach the surface only while it holds a selection; it
 		// takes them, as a text view would, rather than beep.
 		objc.MethodDef{Cmd: sel("keyDown:"), Fn: func(self objc.ID, _ objc.SEL, event objc.ID) {
-			// Tab still moves the keyboard focus. The surface is in no key
-			// view loop, so the window starts it from its first key view.
+			// The content view is outside AppKit's key view loop; enter
+			// through the app's root instead.
 			const tab, shift = 48, 1 << 17
 			if v := views[self]; v != nil && objc.Send[uint16](event, sel("keyCode")) == tab {
-				w := v.surface.window
-				w.Send(sel("makeFirstResponder:"), objc.ID(0))
-
-				if objc.Send[uint](event, sel("modifierFlags"))&shift != 0 {
-					w.Send(sel("selectPreviousKeyView:"), objc.ID(0))
-				} else {
-					w.Send(sel("selectNextKeyView:"), objc.ID(0))
-				}
+				v.surface.tabFromSurface(objc.Send[uint](event, sel("modifierFlags"))&shift != 0)
 			}
 		}},
 		objc.MethodDef{Cmd: sel("copy:"), Fn: surfaceCopy},

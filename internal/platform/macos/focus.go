@@ -96,6 +96,27 @@ func (v *view) focusable() bool {
 	return true
 }
 
+// tabFromSurface enters AppKit's key view loop from the app's root. The
+// content view can hold a text selection but is no Tab stop; clearing it
+// to the window and selecting next would select that content view again.
+func (s *surface) tabFromSurface(backward bool) {
+	root := s.views[s.root]
+	if root == nil {
+		return
+	}
+	// AppKit may not yet have recalculated a background window's loop.
+	s.window.Send(sel("recalculateKeyViewLoop"))
+	if !backward && root.focusable() {
+		s.window.Send(sel("makeFirstResponder:"), root.native)
+		return
+	}
+	action := "selectKeyViewFollowingView:"
+	if backward {
+		action = "selectKeyViewPrecedingView:"
+	}
+	s.window.Send(sel(action), root.native)
+}
+
 // clicking reports whether the window is handling a mouse press, which
 // presses a view without focusing it.
 func (s *surface) clicking() bool {
