@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -191,20 +193,104 @@ func TestDockMenuFollowsItsOwner(t *testing.T) {
 	}
 }
 
+// dockMenus are the app icon menus a batch sends, in order.
+func dockMenus(b *driver.MountBatch) [][]MenuEntry {
+	var menus [][]MenuEntry
+	for _, it := range b.Items {
+		if it.Kind == driver.ItemDockMenu {
+			menus = append(menus, it.Menu)
+		}
+	}
+	return menus
+}
+
+// TestDockMenuTasksByLabel runs a Windows Jump List's tasks, which name the item by its label, as the app starts with one before it set its menu and later: an enabled top-level action runs once, anything else does nothing.
+func TestDockMenuTasksByLabel(t *testing.T) {
+	var log []string
+	var ready *Signal[bool]
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		ready = NewSignal(cx, false)
+		cx.Effect(func() {
+			if !ready.Get() {
+				return
+			}
+			cx.SetDockMenu([]MenuItem{
+				{Label: "New Window", OnSelect: func() { log = append(log, "new") }},
+				{Label: "Paused", Disabled: true, OnSelect: func() { log = append(log, "paused") }},
+				{Label: "More", Items: []MenuItem{{Label: "Open", OnSelect: func() { log = append(log, "open") }}}},
+			})
+		})
+		return View{}
+	})
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: "New Window"})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: "Missing"})
+	h.drain()
+	if len(log) != 0 {
+		t.Fatalf("before the menu: log = %q", log)
+	}
+	ready.Set(true)
+	h.commit()
+	h.drain()
+	if !slices.Equal(log, []string{"new"}) {
+		t.Fatalf("once the menu is set: log = %q", log)
+	}
+	for _, label := range []string{"New Window", "Paused", "More", "Open", "Missing"} {
+		h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: label})
+	}
+	h.drain()
+	if !slices.Equal(log, []string{"new", "new"}) {
+		t.Fatalf("log = %q", log)
+	}
+}
+
+// TestDockMenuSetAgainForgetsTheItemsBefore: an effect setting the menu again sends it in place of the one before, without removing it between, and an item of the menu before, chosen as its menu was replaced, does nothing.
+func TestDockMenuSetAgainForgetsTheItemsBefore(t *testing.T) {
+	var log []string
+	var version *Signal[int]
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		version = NewSignal(cx, 0)
+		cx.Effect(func() {
+			v := version.Get()
+			cx.SetDockMenu([]MenuItem{{Label: "Library", OnSelect: func() { log = append(log, fmt.Sprint("library ", v)) }}})
+		})
+		return View{}
+	})
+	first := dockMenus(h.commit())
+	if len(first) != 1 || len(first[0]) != 1 || first[0][0].ID == 0 {
+		t.Fatalf("dock menus = %+v", first)
+	}
+	version.Set(1)
+	second := dockMenus(h.commit())
+	if len(second) != 1 || len(second[0]) != 1 || second[0][0].ID == first[0][0].ID {
+		t.Fatalf("dock menus set again = %+v", second)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: first[0][0].ID})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: second[0][0].ID})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: "Library"})
+	if !slices.Equal(log, []string{"library 1", "library 1"}) {
+		t.Fatalf("log = %q", log)
+	}
+}
+
 func TestRecentFilesCommands(t *testing.T) {
 	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
-		cx.AddRecentFile("/tmp/example.nsgo")
+		cx.AddRecentFile("example.nsgo")
+		cx.AddRecentFile("")
 		cx.ClearRecentFiles()
 		return View{}
 	})
-	items := h.commit().Items
 	var recent []driver.MountItem
-	for _, item := range items {
+	for _, item := range h.commit().Items {
 		if item.Kind == driver.ItemRecentFile {
 			recent = append(recent, item)
 		}
 	}
-	if len(recent) != 2 || recent[0].Value != "/tmp/example.nsgo" || !recent[1].On {
+	abs, err := filepath.Abs("example.nsgo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recent) != 2 || recent[0].Value != abs || recent[0].On || !recent[1].On {
 		t.Fatalf("recent file commands = %+v", recent)
 	}
 }

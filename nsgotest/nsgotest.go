@@ -370,9 +370,10 @@ type App struct {
 	// responseTree is the surface whose batch is being applied, which the platform's answers to what it asked go back to; guideTree the one that asked for the permission guide shown.
 	responseTree *core.Tree
 	guideTree    *core.Tree
-	// menus are the application menus the surfaces set, by tree, nil under a target; menuTree is the one Menu came from and popupTree the one that shows PopupMenu, where choosing their items goes.
+	// menus are the application menus the surfaces set, by tree, nil under a target; menuTree is the one Menu came from, dockTree the one that set DockMenu and popupTree the one that shows PopupMenu, where choosing their items goes.
 	menus     map[*core.Tree][]driver.MenuEntry
 	menuTree  *core.Tree
+	dockTree  *core.Tree
 	popupTree *core.Tree
 
 	// StatusBar is the status bar the app last set.

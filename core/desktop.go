@@ -1,6 +1,7 @@
 package core
 
 import (
+	"path/filepath"
 	"slices"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -135,56 +136,68 @@ func (cx *Scope) SetApplicationMenu(items []MenuItem) {
 	t.changed = true
 }
 
-// SetDockMenu is the core's part of desktop.SetDockMenu, which apps use. It
-// sets the app icon's menu on macOS and the taskbar Jump List tasks on
-// Windows. Other platforms ignore it. The menu belongs to the current owner.
+// dockMenu is the app icon's menu (SetDockMenu). It belongs to the app rather than a surface, as the platform has one, so it is the one a surface set last, and its tasks, named by their labels, reach it from any surface.
+type dockMenu struct {
+	tree    *Tree
+	gen     uint32
+	entries []MenuEntry
+	// actions are nil while no menu is set.
+	actions map[uint32]menuAction
+	// pending are the labels of tasks chosen before the app set a menu, as the one a Windows Jump List started the app with.
+	pending []string
+}
+
+// SetDockMenu is the core's part of desktop.SetDockMenu, which apps use. The menu belongs to the current owner, and replaces the one any surface set before.
 func (cx *Scope) SetDockMenu(items []MenuItem) {
 	t := cx.tree()
 	if t == nil {
 		return
 	}
-	t.dockMenuGen++
-	gen := t.dockMenuGen
-	t.dockActions = map[uint32]menuAction{}
+	d := &cx.rt.dock
+	d.gen++
+	gen := d.gen
+	d.tree, d.entries, d.actions = t, nil, nil
 	owner := cx.current()
-	var entries []MenuEntry
 	if items != nil {
-		entries = t.menuEntries(items, owner, t.dockActions)
+		d.actions = map[uint32]menuAction{}
+		d.entries = t.menuEntries(items, owner, d.actions)
 		owner.addCleanup(func() {
-			if t.dockMenuGen == gen {
-				t.dockActions = nil
+			if d.gen == gen {
+				d.entries, d.actions = nil, nil
 				t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemDockMenu})
 				t.changed = true
 			}
 		})
 	}
+	// It replaces a menu not sent yet, as SetApplicationMenu's does.
 	t.commands = slices.DeleteFunc(t.commands, func(it driver.MountItem) bool { return it.Kind == driver.ItemDockMenu })
-	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemDockMenu, Menu: entries})
+	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemDockMenu, Menu: d.entries})
 	t.changed = true
-	if len(entries) > 0 && len(t.pendingDock) > 0 {
-		pending := t.pendingDock
-		t.pendingDock = nil
-		for _, id := range pending {
-			if _, ok := t.dockActions[id]; ok {
-				t.chooseDockMenu(id)
-			} else {
-				t.pendingDock = append(t.pendingDock, id)
+	if pending := d.pending; d.actions != nil && len(pending) > 0 {
+		d.pending = nil
+		// Not while the caller builds its menu: the item may well change what it lists.
+		owner.Post(func() {
+			for _, label := range pending {
+				t.chooseDockTask(label)
 			}
-		}
+		})
 	}
 }
 
-// AddRecentFile records path in the platform's recent documents. The file
-// must exist and be one the app can open. Platforms without a recent-documents
-// service ignore it.
+// AddRecentFile is the core's part of desktop.AddRecentFile, which apps use. A relative path is taken from the working directory.
 func (cx *Scope) AddRecentFile(path string) {
-	if t := cx.tree(); t != nil && path != "" {
-		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemRecentFile, Value: path})
-		t.changed = true
+	t := cx.tree()
+	if t == nil || path == "" {
+		return
 	}
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemRecentFile, Value: path})
+	t.changed = true
 }
 
-// ClearRecentFiles removes the app's recent documents from the platform.
+// ClearRecentFiles is the core's part of desktop.ClearRecentFiles, which apps use.
 func (cx *Scope) ClearRecentFiles() {
 	if t := cx.tree(); t != nil {
 		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemRecentFile, On: true})
@@ -285,13 +298,37 @@ func (t *Tree) chooseMenu(id uint32) {
 	}
 }
 
-func (t *Tree) chooseDockMenu(id uint32) {
-	a, ok := t.dockActions[id]
-	if !ok {
-		t.pendingDock = append(t.pendingDock, id)
+// chooseDockMenu runs the app icon menu's item ev names: by its ID (Count) on the surface that set the menu, as macOS's Dock menu reports it, or, for a task the platform keeps apart from the app, as a Windows Jump List's, by its label (Text) on any surface.
+func (t *Tree) chooseDockMenu(ev driver.Event) {
+	if ev.Text != "" {
+		t.chooseDockTask(ev.Text)
 		return
 	}
-	if !a.owner.disposed {
-		t.within(a.owner, a.fn)
+	d := &t.rt.dock
+	if d.tree != t {
+		return
+	}
+	if a, ok := d.actions[ev.Count]; ok && !a.owner.disposed {
+		d.tree.activated = a.owner
+		d.tree.within(a.owner, a.fn)
+	}
+}
+
+// chooseDockTask runs the first enabled top-level action labeled label of the app icon's menu, or keeps the label for the first menu the app sets when it has set none. A label the menu lacks does nothing.
+func (t *Tree) chooseDockTask(label string) {
+	d := &t.rt.dock
+	if d.actions == nil {
+		d.pending = append(d.pending, label)
+		return
+	}
+	for _, e := range d.entries {
+		if e.Label != label || e.ID == 0 || e.Disabled || len(e.Items) > 0 {
+			continue
+		}
+		if a, ok := d.actions[e.ID]; ok && !a.owner.disposed {
+			d.tree.activated = a.owner
+			d.tree.within(a.owner, a.fn)
+		}
+		return
 	}
 }

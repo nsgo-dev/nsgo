@@ -481,6 +481,45 @@ func TestOtherWindowsKeepTheirShortcutsAndMenus(t *testing.T) {
 	}
 }
 
+// The app icon's menu is the app's, the one a surface set last: ChooseDockMenu chooses on that surface, though the surfaces number their items alike, and the menu goes with the window that set it.
+func TestDockMenuIsTheApps(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var got []string
+	var other *desktop.Window
+	var open func()
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.SetDockMenu(cx, []desktop.MenuItem{{Label: "New Window", OnSelect: func() { got = append(got, "app") }}})
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{{Label: "New", OnSelect: func() { got = append(got, "menu") }}}}})
+			return core.Text{Content: "main", TestID: "main"}
+		})
+		open = func() {
+			other = desktop.OpenWindow(cx, desktop.WindowOptions{Width: 200, Height: 100, Title: "Library"}, func(cx *core.Scope) core.Node {
+				desktop.SetDockMenu(cx, []desktop.MenuItem{{Label: "Next Library", OnSelect: func() { got = append(got, "library") }}})
+				return core.Text{Content: "library"}
+			})
+		}
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	app.Find("id:main")
+	app.ChooseDockMenu("New Window")
+	app.Post(open)
+	app.Settle()
+	if len(app.DockMenu) != 1 || app.DockMenu[0].Label != "Next Library" {
+		t.Fatalf("dock menu %+v, want the library window's", app.DockMenu)
+	}
+	app.ChooseDockMenu("Next Library")
+	app.Post(other.Close)
+	app.Settle()
+	if app.DockMenu != nil {
+		t.Fatalf("dock menu %+v after its window closed", app.DockMenu)
+	}
+	if want := "app library"; strings.Join(got, " ") != want {
+		t.Fatalf("got %q, want %q", strings.Join(got, " "), want)
+	}
+}
+
 // Answering an alert by its place, as the automation does, answers it to the surface that showed it, though the surfaces number their alerts alike.
 func TestAnswerAtReachesTheAlertsSurface(t *testing.T) {
 	if Target() != "" {

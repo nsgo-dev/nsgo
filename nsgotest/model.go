@@ -296,6 +296,9 @@ func (a *App) showMenu() {
 // closed forgets what a surface that closed left in the model: a context menu it showed, its menu, and for the main window its views and keyboard shortcuts, as nothing is left there for steps to reach.
 func (a *App) closed(surface *core.Tree) {
 	delete(a.menus, surface)
+	if a.dockTree == surface && surface != nil {
+		a.DockMenu, a.dockTree = nil, nil
+	}
 	if a.popupTree == surface {
 		a.PopupMenu, a.popupID, a.popupTree = nil, 0, nil
 	}
@@ -671,7 +674,8 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemMenu:
 			a.setMenu(a.responseTree, it.Menu)
 		case driver.ItemDockMenu:
-			a.DockMenu = it.Menu
+			// The app has one, whichever surface set it last.
+			a.DockMenu, a.dockTree = it.Menu, a.responseTree
 		case driver.ItemWindow:
 			a.Window = append(a.Window, *it.Window)
 		case driver.ItemOpenSurface:

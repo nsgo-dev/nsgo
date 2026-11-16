@@ -186,8 +186,7 @@ func (a *App) ChooseMenu(path ...string) {
 	}
 }
 
-// ChooseDockMenu chooses the app icon menu item at path, such as "New
-// Window". It is the Dock menu on macOS and a Jump List task on Windows.
+// ChooseDockMenu chooses the item at path in the app icon's menu (desktop.SetDockMenu), its labels from the menu down, as the Dock menu on macOS and a Jump List task on Windows do.
 func (a *App) ChooseDockMenu(path ...string) {
 	a.t.Helper()
 	items := a.DockMenu
@@ -214,7 +213,7 @@ func (a *App) ChooseDockMenu(path ...string) {
 				a.done()
 				return
 			}
-			a.dispatch(driver.Event{Kind: driver.EventDockMenu, Count: found.ID})
+			a.dispatchOn(a.dockTree, driver.Event{Kind: driver.EventDockMenu, Count: found.ID})
 			return
 		}
 		items = found.Items
