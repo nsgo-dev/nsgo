@@ -232,6 +232,26 @@ func TestViewsTakeClassesUnderTheirStyle(t *testing.T) {
 	}
 }
 
+func TestContrastMoreFollowsTheEnvironment(t *testing.T) {
+	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {
+		return View{TestID: "box", Class: "bg-white/50 contrast-more:bg-white"}
+	})
+	h.commit()
+	if got := h.find("box").style.Background; got != withAlpha(RGB(0xffffff), 0.5) {
+		t.Errorf("without more contrast the box is %#x", got)
+	}
+	h.tree.SetEnvironment(driver.Environment{IncreaseContrast: true})
+	h.commit()
+	if got := h.find("box").style.Background; got != RGB(0xffffff) {
+		t.Errorf("with more contrast the box is %#x", got)
+	}
+	h.tree.SetEnvironment(driver.Environment{})
+	h.commit()
+	if got := h.find("box").style.Background; got != withAlpha(RGB(0xffffff), 0.5) {
+		t.Errorf("after more contrast the box is %#x", got)
+	}
+}
+
 func TestClassFuncFollowsClassAndChanges(t *testing.T) {
 	var on *Signal[bool]
 	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {

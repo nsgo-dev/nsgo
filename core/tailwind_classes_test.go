@@ -471,7 +471,7 @@ func TestGridUtilitiesFollowTailwindCSS(t *testing.T) {
 }
 
 func TestVariants(t *testing.T) {
-	l := defaultTailwind.parse("bg-white dark:bg-black contrast-more:bg-black md:p-8 hover:opacity-80 group-active:scale-95 ios:pt-1 android:pt-2 rtl:ml-2")
+	l := defaultTailwind.parse("bg-white dark:bg-black contrast-more:bg-black motion-safe:p-1 motion-reduce:p-2 md:p-8 hover:opacity-80 group-active:scale-95 ios:pt-1 android:pt-2 rtl:ml-2")
 	if len(l.unknown) > 0 || !l.env {
 		t.Errorf("unknown %q, env %v", l.unknown, l.env)
 	}
@@ -482,6 +482,13 @@ func TestVariants(t *testing.T) {
 	want(t, "contrast-more off", styled(t, "bg-white contrast-more:bg-black", contrast).Background, RGB(0xffffff))
 	contrast.contrast = true
 	want(t, "contrast-more on", styled(t, "bg-white contrast-more:bg-black", contrast).Background, RGB(0))
+	reduce := twEnv()
+	want(t, "motion-reduce off", styled(t, "p-1 motion-reduce:p-2 motion-safe:p-3", reduce).Padding.Top, 12)
+	reduce.reduce = true
+	want(t, "motion-reduce on", styled(t, "p-1 motion-reduce:p-2 motion-safe:p-3", reduce).Padding.Top, 8)
+	// Tailwind sorts contrast-more: after motion-reduce:, so it wins where both hold.
+	reduce.contrast = true
+	want(t, "contrast-more after motion-reduce", styled(t, "contrast-more:p-4 motion-reduce:p-2", reduce).Padding.Top, 16)
 	want(t, "md: narrow", styled(t, "p-2 md:p-8").Padding.Top, 8)
 	want(t, "md: wide", styled(t, "p-2 md:p-8", twWide(1024)).Padding.Top, 32)
 	want(t, "max-md:", styled(t, "p-2 max-md:p-1").Padding.Top, 4)

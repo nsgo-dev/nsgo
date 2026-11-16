@@ -694,6 +694,7 @@ func (t *tailwindTheme) variant(v string, c *classCond) (classKey, bool) {
 		return key(rankMotionSafe)
 	case "motion-reduce":
 		c.reduceMotion = yes
+		return key(rankMotionReduce)
 	case "contrast-more":
 		c.increaseContrast = yes
 		return key(rankContrastMore)
