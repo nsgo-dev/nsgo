@@ -33,6 +33,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      pull-requests: read
       security-events: write
     strategy:
       fail-fast: false
@@ -59,6 +60,27 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+      - name: Check whether the pull request still accepts results
+        if: github.event_name == 'pull_request'
+        id: upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Queued scans can start after merge. Keep analyzing, but GitHub no longer accepts their PR results.
+          state=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .state)
+          case "$state" in
+            open) echo 'mode=always' >> "$GITHUB_OUTPUT" ;;
+            closed)
+              echo 'mode=never' >> "$GITHUB_OUTPUT"
+              echo '::notice::Pull request is closed; analyze without uploading its results.'
+              ;;
+            *) echo "::error::Unexpected pull request state: $state"; exit 1 ;;
+          esac
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         with:
           category: "/language:${{ matrix.language }}"
+          upload: ${{ steps.upload.outputs.mode || 'always' }}
+          upload-database: ${{ steps.upload.outputs.mode != 'never' }}
