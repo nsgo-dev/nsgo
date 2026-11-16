@@ -535,8 +535,8 @@ func targetFor(ctx context.Context, p *project, opts testOptions) (targetRunner,
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return targetRunner{}, err
 	}
-	// Another run may still serve or execute its build. Keep this run's
-	// files until its runner closes, without replacing anyone else's.
+	sweepTargetBuilds(base, time.Now())
+	// Another run may still serve or execute its build. Keep this run's files until its runner closes, without replacing anyone else's.
 	dir, err := os.MkdirTemp(base, "run-")
 	if err != nil {
 		return targetRunner{}, err
@@ -546,12 +546,38 @@ func targetFor(ctx context.Context, p *project, opts testOptions) (targetRunner,
 		os.RemoveAll(dir)
 		return targetRunner{}, err
 	}
-	close := runner.close
+	run, stop := runner.run, runner.close
+	runner.run = func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
+		// A live run's directory stays fresh, so another run's sweep never takes it.
+		now := time.Now()
+		os.Chtimes(dir, now, now)
+		return run(ctx, args, env, out)
+	}
 	runner.close = func() {
-		close()
+		stop()
 		os.RemoveAll(dir)
 	}
 	return runner, nil
+}
+
+// staleTargetBuild is how long a run's build directory stays untouched before a later run takes it for a crashed run's.
+const staleTargetBuild = 24 * time.Hour
+
+// sweepTargetBuilds removes from base what no live run uses: the builds of runs that ended without closing their runner, as a killed tool's, once untouched for staleTargetBuild, and anything not a run's directory, as the single build earlier versions kept there.
+func sweepTargetBuilds(base string, now time.Time) {
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() && strings.HasPrefix(e.Name(), "run-") {
+			info, err := e.Info()
+			if err != nil || now.Sub(info.ModTime()) < staleTargetBuild {
+				continue
+			}
+		}
+		os.RemoveAll(filepath.Join(base, e.Name()))
+	}
 }
 
 // buildTargetRunner builds into the run's own directory.

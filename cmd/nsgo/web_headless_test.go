@@ -12,8 +12,7 @@ import (
 	"time"
 )
 
-// Library tests run the headless model inside the browser, without the
-// platform host. Exercise both the model and a control through that path.
+// Library tests run the headless model inside the browser, without the platform host. Exercise both the model and a control through that path.
 func TestWebHeadlessLibrary(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and runs library tests in a browser")
@@ -63,8 +62,7 @@ func TestWebHeadlessLibrary(t *testing.T) {
 	}
 }
 
-// Rebuilding a package must not replace the files a live browser runner
-// serves. Each runner keeps its own build until it closes.
+// Rebuilding a package must not replace the files a live browser runner serves. Each runner keeps its own build until it closes.
 func TestWebTestBuildsAreIsolated(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and runs two web test binaries")
@@ -128,4 +126,41 @@ func TestRevision(t *testing.T) {
 	run(second, "second")
 	second.close()
 	checkBuilds(0)
+}
+
+// A run sweeps the builds of runs that never closed their runner once they are stale, and what earlier versions left, but never a live run's.
+func TestSweepTargetBuilds(t *testing.T) {
+	base := t.TempDir()
+	now := time.Now()
+	for _, name := range []string{"run-live", "run-crashed", "run-old-live"} {
+		if err := os.Mkdir(filepath.Join(base, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(base, "app.wasm"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(base, "Fixture.app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := now.Add(-staleTargetBuild - time.Minute)
+	if err := os.Chtimes(filepath.Join(base, "run-crashed"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	recent := now.Add(-staleTargetBuild + time.Hour)
+	if err := os.Chtimes(filepath.Join(base, "run-old-live"), recent, recent); err != nil {
+		t.Fatal(err)
+	}
+	sweepTargetBuilds(base, now)
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, e := range entries {
+		got = append(got, e.Name())
+	}
+	if want := []string{"run-live", "run-old-live"}; !slices.Equal(got, want) {
+		t.Fatalf("after the sweep = %v, want %v", got, want)
+	}
 }
