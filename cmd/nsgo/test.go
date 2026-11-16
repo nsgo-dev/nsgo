@@ -80,8 +80,10 @@ type testRun struct {
 	packages map[string]*testResult
 	// builds hold the compiler's output by import path.
 	builds map[string]string
-	trace  bool
-	out    io.Writer
+	// unbuilt are the packages whose tests did not build.
+	unbuilt map[string]bool
+	trace   bool
+	out     io.Writer
 }
 
 // runTests runs the app's tests headless, or on a target, printing a line
@@ -271,25 +273,14 @@ func (r *testRun) event(ev testEvent) {
 		case "fail":
 			pkg.Status = "fail"
 			// A package that did not build shows why.
-			pkg.Output += r.builds[ev.FailedBuild]
-			// A panic on another goroutine can end the process without
-			// closing the tests it interrupted. Their output includes the
-			// panic and stack, which a package's output does not.
-			var interrupted []string
-			for key, t := range r.running {
-				// Benchmarks finish through result lines, not closing events.
-				if t.Package == ev.Package && !strings.HasPrefix(t.Name, "Benchmark") {
-					interrupted = append(interrupted, key)
+			if ev.FailedBuild != "" {
+				pkg.Output += r.builds[ev.FailedBuild]
+				if r.unbuilt == nil {
+					r.unbuilt = map[string]bool{}
 				}
+				r.unbuilt[ev.Package] = true
 			}
-			sort.Strings(interrupted)
-			for _, key := range interrupted {
-				t := r.running[key]
-				delete(r.running, key)
-				t.failFor("the test process exited before reporting an outcome")
-				r.results = append(r.results, t)
-				r.print(t)
-			}
+			r.interrupted(ev.Package)
 		case "pass", "skip":
 			pkg.Status = ev.Action
 		}
@@ -313,6 +304,28 @@ func (r *testRun) event(ev testEvent) {
 	case "pass", "fail", "skip":
 		t.Status, t.Elapsed = ev.Action, time.Duration(ev.Elapsed*float64(time.Second))
 		delete(r.running, key)
+		r.results = append(r.results, t)
+		r.print(t)
+	}
+}
+
+// interrupted ends the tests of pkg still running when its process ended, as a panic on another goroutine or a timeout ends it, with no closing event for the tests it cut short. Each fails with its output, which holds the panic and stack the package's output does not; a benchmark, which ends with no event of its own, hands its output to the package's.
+func (r *testRun) interrupted(pkg string) {
+	var keys []string
+	for key, t := range r.running {
+		if t.Package == pkg {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		t := r.running[key]
+		delete(r.running, key)
+		if strings.HasPrefix(t.Name, "Benchmark") {
+			r.packages[pkg].Output += t.Output
+			continue
+		}
+		t.failFor("the test process exited before reporting an outcome")
 		r.results = append(r.results, t)
 		r.print(t)
 	}
@@ -369,7 +382,7 @@ func (r *testRun) finish(opts testOptions, waitErr error) error {
 			skipped++
 		}
 	}
-	pkgFailed := false
+	pkgFailed, unbuilt := false, false
 	names := make([]string, 0, len(r.packages))
 	for name := range r.packages {
 		names = append(names, name)
@@ -381,6 +394,7 @@ func (r *testRun) finish(opts testOptions, waitErr error) error {
 		// crashed outside a test.
 		if pkg.Status == "fail" && !r.anyFailed(name) {
 			pkgFailed = true
+			unbuilt = unbuilt || r.unbuilt[name]
 			fmt.Fprintf(r.out, "%s✗ %s\n%s", margin, name, indent(pkg.Output))
 		}
 	}
@@ -397,8 +411,10 @@ func (r *testRun) finish(opts testOptions, waitErr error) error {
 			return errors.New("1 test failed")
 		}
 		return fmt.Errorf("%d tests failed", failed)
-	case pkgFailed:
+	case unbuilt:
 		return errors.New("tests did not build")
+	case pkgFailed:
+		return errors.New("a test process failed outside its tests")
 	case waitErr != nil && passed+skipped == 0:
 		return waitErr
 	}

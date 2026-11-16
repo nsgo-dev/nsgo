@@ -184,12 +184,13 @@ func TestBenchmarkResults(t *testing.T) {
 	}
 }
 
-// A process panic can end the package without any closing test event.
-// Keep its last test's output and leave another package's tests alone.
+// A process panic can end the package without any closing test event. Keep its last test's output, fail the tests it cut short, a paused parallel one included, and leave another package's tests alone.
 func TestInterruptedTestsKeepTheirOutput(t *testing.T) {
 	var out bytes.Buffer
 	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, out: &out}
-	r.read(strings.NewReader(`{"Action":"run","Package":"p","Test":"TestCrash"}
+	r.read(strings.NewReader(`{"Action":"run","Package":"p","Test":"TestParallel"}
+{"Action":"pause","Package":"p","Test":"TestParallel"}
+{"Action":"run","Package":"p","Test":"TestCrash"}
 {"Action":"run","Package":"q","Test":"TestOther"}
 {"Action":"output","Package":"p","Test":"TestCrash","Output":"panic: native callback failed\nstack trace\n"}
 {"Action":"output","Package":"p","Output":"FAIL\tp\t0.1s\n"}
@@ -198,10 +199,10 @@ func TestInterruptedTestsKeepTheirOutput(t *testing.T) {
 {"Action":"pass","Package":"q","Elapsed":0.2}
 `))
 	err := r.finish(testOptions{}, nil)
-	if err == nil || err.Error() != "1 test failed" {
-		t.Errorf("finish = %v, want the interrupted test to fail", err)
+	if err == nil || err.Error() != "2 tests failed" {
+		t.Errorf("finish = %v, want the interrupted tests to fail", err)
 	}
-	for _, want := range []string{"✗ TestCrash", "panic: native callback failed", "stack trace", "✓ TestOther", "1 passed, 1 failed, 0 skipped"} {
+	for _, want := range []string{"✗ TestCrash", "panic: native callback failed", "stack trace", "✗ TestParallel", "✓ TestOther", "1 passed, 2 failed, 0 skipped"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("console misses %q:\n%s", want, out.String())
 		}
@@ -211,8 +212,50 @@ func TestInterruptedTestsKeepTheirOutput(t *testing.T) {
 	}
 }
 
-// Exercise the real go test event stream, including a panic on another
-// goroutine during a subtest, and the JUnit artifact CI consumers read.
+// A process that crashes outside a test, in an init function or a benchmark, which ends with no event of its own, shows the crash under its package and is not called a build failure; a package that did not build still is.
+func TestProcessCrashOutsideTests(t *testing.T) {
+	var out bytes.Buffer
+	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, out: &out}
+	r.read(strings.NewReader(`{"Action":"output","Package":"i","Output":"panic: init failed\n"}
+{"Action":"output","Package":"i","Output":"FAIL\ti\t0.1s\n"}
+{"Action":"fail","Package":"i","Elapsed":0.1}
+{"Action":"run","Package":"b","Test":"BenchmarkTick"}
+{"Action":"output","Package":"b","Test":"BenchmarkTick","Output":"BenchmarkTick-10 \t 100\t 77375 ns/op\n"}
+{"Action":"output","Package":"b","Test":"BenchmarkTick","Output":"panic: benchmark failed\n"}
+{"Action":"output","Package":"b","Output":"FAIL\tb\t0.1s\n"}
+{"Action":"fail","Package":"b","Elapsed":0.1}
+`))
+	err := r.finish(testOptions{}, nil)
+	if err == nil || err.Error() != "a test process failed outside its tests" {
+		t.Errorf("finish = %v, want a crash outside the tests", err)
+	}
+	for _, want := range []string{"✗ i", "panic: init failed", "✗ b", "panic: benchmark failed", "1 passed, 0 failed, 0 skipped"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("console misses %q:\n%s", want, out.String())
+		}
+	}
+	if len(r.running) != 0 {
+		t.Errorf("unfinished tests = %v", r.running)
+	}
+
+	out.Reset()
+	r = &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, out: &out}
+	r.read(strings.NewReader(`{"ImportPath":"c [c.test]","Action":"build-output","Output":"c_test.go:5:30: undefined: undefined\n"}
+{"ImportPath":"c [c.test]","Action":"build-fail"}
+{"Action":"output","Package":"c","Output":"FAIL\tc [build failed]\n"}
+{"Action":"fail","Package":"c","Elapsed":0,"FailedBuild":"c [c.test]"}
+{"Action":"output","Package":"i","Output":"panic: init failed\n"}
+{"Action":"fail","Package":"i","Elapsed":0.1}
+`))
+	if err := r.finish(testOptions{}, nil); err == nil || err.Error() != "tests did not build" {
+		t.Errorf("finish = %v, want the build failure", err)
+	}
+	if !strings.Contains(out.String(), "undefined: undefined") {
+		t.Errorf("console misses the compiler's output:\n%s", out.String())
+	}
+}
+
+// Exercise the real go test event stream, including a panic on another goroutine during a subtest and a test the timeout ends, and the JUnit artifact CI consumers read.
 func TestRunTestsReportsProcessPanic(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs a test process that panics")
@@ -229,14 +272,18 @@ func TestCrash(t *testing.T) {
     })
 }
 `,
+		"slow/slow_test.go": `package slow
+import "testing"
+func TestSlow(t *testing.T) { <-make(chan struct{}) }
+`,
 	})
 	p, err := loadForTest(dir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	report := filepath.Join(dir, "report.xml")
-	if err := runTests(t.Context(), p, testOptions{junit: report, args: []string{"-count=1"}}); err == nil || err.Error() != "1 test failed" {
-		t.Fatalf("runTests = %v, want a failed test rather than a build failure", err)
+	if err := runTests(t.Context(), p, testOptions{junit: report, args: []string{"-count=1", "-timeout=3s"}}); err == nil || err.Error() != "2 tests failed" {
+		t.Fatalf("runTests = %v, want failed tests rather than a build failure", err)
 	}
 	data, err := os.ReadFile(report)
 	if err != nil {
@@ -246,14 +293,17 @@ func TestCrash(t *testing.T) {
 	if err := xml.Unmarshal(data, &suites); err != nil {
 		t.Fatal(err)
 	}
+	want := map[string]string{"TestCrash/worker": "panic: nsgo process panic fixture", "TestSlow": "panic: test timed out after 3s"}
 	for _, s := range suites.Suites {
 		for _, c := range s.Cases {
-			if c.Name == "TestCrash/worker" && c.Failure != nil && strings.Contains(c.Failure.Body, "panic: nsgo process panic fixture") {
-				return
+			if w, ok := want[c.Name]; ok && c.Failure != nil && strings.Contains(c.Failure.Body, w) {
+				delete(want, c.Name)
 			}
 		}
 	}
-	t.Fatalf("JUnit lost the interrupted subtest or its panic:\n%s", data)
+	if len(want) != 0 {
+		t.Fatalf("JUnit lost the interrupted tests %v or their panics:\n%s", want, data)
+	}
 }
 
 func TestTSXTestsSkipOwnTrees(t *testing.T) {
