@@ -68,6 +68,10 @@ var (
 	webkitWebViewGetTitle                func(uintptr) uintptr
 	webkitWebViewCanGoBack               func(uintptr) int32
 	webkitWebViewCanGoForward            func(uintptr) int32
+	webkitWebViewGetBackForwardList      func(uintptr) uintptr
+	webkitBackForwardListGetBackItem     func(uintptr) uintptr
+	webkitBackForwardListGetForwardItem  func(uintptr) uintptr
+	webkitBackForwardListItemGetURI      func(uintptr) uintptr
 	webkitSettingsSetEnableJSMarkup      func(uintptr, int32)
 	webkitSettingsSetUserAgent           func(uintptr, *byte)
 	webkitSettingsSetBackForwardGestures func(uintptr, int32)
@@ -171,6 +175,10 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitWebViewGetTitle, "webkit_web_view_get_title")
 	reg(&webkitWebViewCanGoBack, "webkit_web_view_can_go_back")
 	reg(&webkitWebViewCanGoForward, "webkit_web_view_can_go_forward")
+	reg(&webkitWebViewGetBackForwardList, "webkit_web_view_get_back_forward_list")
+	reg(&webkitBackForwardListGetBackItem, "webkit_back_forward_list_get_back_item")
+	reg(&webkitBackForwardListGetForwardItem, "webkit_back_forward_list_get_forward_item")
+	reg(&webkitBackForwardListItemGetURI, "webkit_back_forward_list_item_get_uri")
 	reg(&webkitSettingsSetEnableJSMarkup, "webkit_settings_set_enable_javascript_markup")
 	reg(&webkitSettingsSetUserAgent, "webkit_settings_set_user_agent")
 	reg(&webkitSettingsSetBackForwardGestures, "webkit_settings_set_enable_back_forward_navigation_gestures")
@@ -253,7 +261,10 @@ type web struct {
 	failed        bool             // the navigation failed; WebKit still finishes it
 	pending       bool             // a load waits for the page to be mapped
 	ownNavigation bool             // loadWeb started the app's source, until it commits or fails
-	about         string           // the about: URL the last navigation action went to, which the top level's next start is held to (webPolicyCallback)
+	ownPage       bool             // the page last committed is the app's source (loadWeb's)
+	refused       bool             // the top level committed an about: page the config refuses, which restore leaves; until the next commit it reports no load and posts nothing
+	restoring     bool             // restore started a navigation back to the page before a refused one, until a page commits
+	restored      time.Time        // when the page last committed did, if restore brought it back; zero for another
 	source        driver.WebSource // what the pending or last load shows: the config's, or Ref.Load's
 	background    [4]float32       // WebKit's own, for views without an opaque one
 	pointer       driver.Point     // where the pointer is in the page
@@ -800,22 +811,26 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 	switch event {
 	case webkitLoadStarted:
 		v.web.failed = false
-		// An about: page loads with no response for webPolicyCallback to hold, and only the top level's load starts here. The URI of a load from the network is already the new one; one still showing the committed page's is the about: page the last action went to.
-		about := v.web.about
-		v.web.about = ""
-		if about != "" && !v.web.ownNavigation && goString(webkitWebViewGetURI(page)) == v.web.page && !v.web.config.Navigable(about) {
-			v.web.failed = true
-			webkitWebViewStopLoading(page)
-			w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: driver.RefusedNavigation(about), Navigation: &driver.WebNavigation{URL: about}})
-			return
-		}
 		w.navigated(v, true, driver.EventLoadStart)
 	case webkitLoadCommitted:
-		v.web.ownNavigation = false
+		own, restoring := v.web.ownNavigation, v.web.restoring
+		v.web.ownNavigation, v.web.refused, v.web.restoring = false, false, false
+		uri := goString(webkitWebViewGetURI(page))
+		// An about: page has no response for webPolicyCallback to hold, and WebKit has made its document by the time the top level's load starts, so the top level's is held as it commits, load-changed being only the top level's: it posts nothing and reports no load, and the view goes back to the page before it.
+		if v.web.config.Restricted && !own && aboutScheme(uri) && !v.web.config.Navigable(uri) {
+			v.web.failed, v.web.refused = true, true
+			w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: driver.RefusedNavigation(uri), Navigation: &driver.WebNavigation{URL: uri}})
+			w.restore(v)
+			return
+		}
+		v.web.ownPage, v.web.restored = own, time.Time{}
+		if restoring {
+			v.web.restored = time.Now()
+		}
 		// From here the view's URI is the page that posts; until a load commits, the page before it still does.
-		v.web.page = goString(webkitWebViewGetURI(page))
+		v.web.page = uri
 	case webkitLoadFinished:
-		// A failed navigation finishes too; it was reported as an error.
+		// A failed or refused navigation finishes too; it was reported as an error.
 		if !v.web.failed {
 			w.navigated(v, false, driver.EventLoad)
 		}
@@ -853,7 +868,32 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 	return 1 // the app shows failures itself, without WebKit's error page
 }
 
-// webPolicyCallback refuses the navigations a restricted view's config does not allow: the top level's and new windows'. WebKitGTK asks about every frame's navigation actions without saying which frame's an action is, so a page of the page's own making (driver.PageSchemes), which a frame within the page may load too, is held where the top level's can be told: a data: or blob: page at its response, and an about: page, which has none, as the top level starts to load it (webLoadChangedCallback).
+// restore takes the top level of v back from the about: page it was refused to the page it showed before: through the history, which keeps a page WebKit cached as it was, or by loading it again where the about: page replaced it in the history, and always for the app's HTML, which WebKit's history does not keep. A page restore brought back that leaves for such a page again within a second is not brought back again, so a page that leaves as it loads cannot have the view load it over and over; the view keeps the blank about: page, which posts nothing.
+func (w *window) restore(v *view) {
+	page, prev := v.web.widget, v.web.page
+	if prev == "" || !v.web.restored.IsZero() && time.Since(v.web.restored) < time.Second {
+		return
+	}
+	v.web.restoring = true
+	// The page before is the app's source again, which the restoring navigation may show as loadWeb's could.
+	v.web.ownNavigation = v.web.ownPage
+	list := webkitWebViewGetBackForwardList(page)
+	is := func(item uintptr) bool { return item != 0 && goString(webkitBackForwardListItemGetURI(item)) == prev }
+	switch {
+	case v.web.ownPage && v.web.source.HTML != "":
+		w.loadWeb(v)
+	case is(webkitBackForwardListGetBackItem(list)):
+		webkitWebViewGoBack(page)
+	case is(webkitBackForwardListGetForwardItem(list)):
+		webkitWebViewGoForward(page)
+	case v.web.ownPage:
+		w.loadWeb(v)
+	default:
+		webkitWebViewLoadURI(page, cstr(prev))
+	}
+}
+
+// webPolicyCallback refuses the navigations a restricted view's config does not allow: the top level's and new windows'. WebKitGTK asks about every frame's navigation actions without saying which frame's an action is, so a page of the page's own making (driver.PageSchemes), which a frame within the page may load too, is held where the top level's can be told: a data: or blob: page at its main-frame response, and an about: page, which has none, as the top level commits it (webLoadChangedCallback).
 func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 {
 	w, v := webOf(data, page)
 	if v == nil || !v.web.config.Restricted || kind > webkitResponse {
@@ -877,16 +917,16 @@ func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 
 		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
 	default:
 		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
-		v.web.about = ""
 		if pageScheme(url) {
-			if scheme, _, _ := strings.Cut(url, ":"); strings.EqualFold(scheme, "about") {
-				v.web.about = url
-			}
 			return 0
 		}
 	}
 	if allowed(url) {
 		return 0
+	}
+	if kind != webkitNewWindowAction {
+		// A refused load of the app's source neither commits nor fails, so the next navigation is not its.
+		v.web.ownNavigation = false
 	}
 	webkitPolicyDecisionIgnore(decision)
 	w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: driver.RefusedNavigation(url),
@@ -898,6 +938,12 @@ func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 
 func pageScheme(url string) bool {
 	scheme, _, ok := strings.Cut(url, ":")
 	return ok && slices.ContainsFunc(driver.PageSchemes, func(s string) bool { return strings.EqualFold(s, scheme) })
+}
+
+// aboutScheme reports whether url is an about: page.
+func aboutScheme(url string) bool {
+	scheme, _, ok := strings.Cut(url, ":")
+	return ok && strings.EqualFold(scheme, "about")
 }
 
 // webPermissionCallback answers getUserMedia with what the config's
@@ -934,7 +980,7 @@ func webMessageCallback(content, value uintptr, data uintptr) {
 		gFree(p)
 	}
 	text, ok := strings.CutPrefix(text, v.web.token)
-	if !ok {
+	if !ok || v.web.refused {
 		return
 	}
 	// The page's top frame posted it: the page last committed, not one the view only started to load.

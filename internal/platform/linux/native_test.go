@@ -437,6 +437,65 @@ window.nsgo.postMessage('main');
 	return page, other
 }
 
+// webSchemesAccess lets a web view reach every host and none of the pages a page makes itself.
+type webSchemesAccess struct{}
+
+func (webSchemesAccess) Allows(core.AccessRequest) bool { return true }
+func (webSchemesAccess) WebHosts() []string             { return []string{"*"} }
+func (webSchemesAccess) WebSchemes() []string           { return nil }
+
+// TestWebPagesAboutPageIsRefusedAtTheTopLevel has the app's page, under an Access whose WebSchemes allow none, send itself to about:blank once its srcdoc frame has loaded. WebKitGTK shows an about: page as soon as its navigation action is used and says no action's frame, so the view refuses it as it commits: the about: page posts nothing and reports no load, the refusal reaches OnError once, and the app's page loads again with its frame. It skips where WebKitGTK 6.0 is missing, in a process of its own as WebKit takes the first thread that uses it.
+func TestWebPagesAboutPageIsRefusedAtTheTopLevel(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("NSGO_TEST_WEBKIT_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		dir := t.TempDir()
+		cmd.Env = append(os.Environ(), "NSGO_TEST_WEBKIT_PROCESS="+t.Name(),
+			"XDG_DATA_HOME="+filepath.Join(dir, "data"), "XDG_CACHE_HOME="+filepath.Join(dir, "cache"))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
+	}
+	if err := openWebKit(); err != nil {
+		t.Skip(err)
+	}
+	const page = `<!doctype html><iframe id="f" srcdoc="<p>frame</p>"></iframe><script>
+onload = () => {
+  const frame = document.getElementById('f').contentDocument.body.innerHTML;
+  if (sessionStorage.left) return window.nsgo.postMessage('again ' + frame);
+  sessionStorage.left = '1';
+  window.nsgo.postMessage('first ' + frame);
+  location.href = 'about:blank';
+};
+</script>`
+	title := "nsgo-native-" + t.Name()
+	app := func(cx *core.Scope) core.Node {
+		heard, errs, loads := core.NewSignal(cx, ""), core.NewSignal(cx, ""), core.NewSignal(cx, "")
+		cx.Effect(func() { cx.SetTitle(title + "|" + heard.Get() + "|" + errs.Get() + "|" + loads.Get()) })
+		cx.ProvideAccess(webSchemesAccess{})
+		add := func(s *core.Signal[string], text string) { s.Update(func(v string) string { return v + text + ";" }) }
+		return core.WebView{Source: core.WebHTML(page, "https://localhost/"), MessageOrigins: []string{"*"},
+			InjectedJavaScript: "if (location.protocol === 'about:') window.nsgo.postMessage('about');",
+			Style:              core.Style{Width: driver.Pt(200), Height: driver.Pt(120)},
+			OnMessage:          func(data string) { add(heard, data) },
+			OnError: func(err error) {
+				if e, ok := err.(*core.WebError); ok {
+					add(errs, e.URL)
+				}
+			},
+			OnLoad: func(n core.WebNavigation) { add(loads, n.URL) }}
+	}
+	w := startTestWindow(t, app, Options{ID: "nsgo-test-web-schemes", Title: title, Width: 200, Height: 120})
+	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;|https://localhost/;https://localhost/;")
+}
+
 // TestWebViewsOutliveEachOther opens an Incognito web view and one in the app's session, both serving an app-owned scheme, and one that serves none. Each page keeps its scheme and downloads as the others unmount and mount again, the page without a handler gets an error rather than a load that never ends, and a view that unmounts mid-download cancels it. It skips where WebKitGTK 6.0 is missing. WebKit takes the thread that first uses it for its main one, and each test runs GTK on a thread of its own, so the test runs in a process of its own.
 func TestWebViewsOutliveEachOther(t *testing.T) {
 	if testing.Short() {
