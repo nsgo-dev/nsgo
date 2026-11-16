@@ -12,7 +12,11 @@ import (
 	"github.com/ebitengine/purego"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/speechd"
 )
+
+// speakAvailable is Environment.Speak, read once: speech-dispatcher listens or is installed.
+var speakAvailable = sync.OnceValue(speechd.Available)
 
 const (
 	gtkTextDirLTR = 1
@@ -96,6 +100,7 @@ func (w *window) environment() driver.Environment {
 		Minimized:        minimized,
 		WindowFrame:      frame,
 		Lifecycle:        w.lifecycle(),
+		Speak:            speakAvailable(),
 	}
 }
 

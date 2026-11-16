@@ -44,6 +44,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/loopback"
 	"github.com/nsgo-dev/nsgo/internal/platform/queue"
 	"github.com/nsgo-dev/nsgo/internal/platform/scrollbar"
+	"github.com/nsgo-dev/nsgo/internal/platform/speechd"
 	"github.com/nsgo-dev/nsgo/internal/platform/textselect"
 	"github.com/nsgo-dev/nsgo/internal/platform/updates"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
@@ -814,6 +815,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemAuthSession:
 			w.authSession(it.Count, *it.Auth)
+			continue
+		case driver.ItemSpeak:
+			speechd.Handle(it.Count, *it.Speak, w.engine.Dispatch)
 			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge, driver.ItemTaskProgress:
 			w.notify(it)

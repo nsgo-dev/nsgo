@@ -60,6 +60,7 @@ var layers = []struct {
 	{"internal/platform/privacy", []string{"internal/driver"}},
 	{"internal/platform/queue", []string{"internal/driver"}},
 	{"internal/platform/scrollbar", []string{"internal/driver"}},
+	{"internal/platform/speechd", []string{"internal/driver"}},
 	{"internal/platform/textselect", []string{"internal/driver"}},
 	{"internal/platform/updates", []string{"internal/driver", "internal/platform/imageload"}},
 	{"internal/platform/webstyle", []string{"internal/driver"}},
@@ -113,7 +114,7 @@ var layers = []struct {
 // writers but not the compiler, which only the core links.
 var platformShared = []string{
 	"internal/audiosession", "internal/platform/apple", "internal/platform/canvas2d", "internal/platform/canvastest", "internal/platform/field", "internal/platform/finger",
-	"internal/platform/fontfile", "internal/platform/hover", "internal/platform/imagedecode", "internal/platform/imageload", "internal/platform/loopback", "internal/platform/menutext", "internal/platform/perfhud", "internal/platform/picked", "internal/platform/privacy", "internal/platform/queue", "internal/platform/scrollbar",
+	"internal/platform/fontfile", "internal/platform/hover", "internal/platform/imagedecode", "internal/platform/imageload", "internal/platform/loopback", "internal/platform/menutext", "internal/platform/perfhud", "internal/platform/picked", "internal/platform/privacy", "internal/platform/queue", "internal/platform/scrollbar", "internal/platform/speechd",
 	"internal/platform/textselect", "internal/platform/updates", "internal/platform/webstyle", "internal/shaderir/",
 }
 
