@@ -3,6 +3,9 @@
 package macos
 
 import (
+	"bytes"
+	"os"
+	"os/exec"
 	"slices"
 	"testing"
 
@@ -33,6 +36,118 @@ func axList(list objc.ID) []string {
 		out = append(out, apple.GoString(list.Send(sel("objectAtIndex:"), i)))
 	}
 	return out
+}
+
+// TestInputAccessibilityLabel checks, by walking a window's accessibility tree as VoiceOver does, that a field, a masked field and a text view are found by their native role and label, that the label follows updates and clearing, and that each editor answers the input's placeholder through accessibilityPlaceholderValue and AXPlaceholderValue while a text view's drawn placeholder is no element of its own (#371).
+func TestInputAccessibilityLabel(t *testing.T) {
+	// Native accessibility initializes process-wide AppKit state, so the window-tree inspection runs apart from the suite's application run loop.
+	if os.Getenv("NSGO_TEST_INPUT_ACCESS_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v", "-test.timeout=30s")
+		cmd.Env = append(os.Environ(), "NSGO_TEST_INPUT_ACCESS_PROCESS="+t.Name())
+		if out, err := cmd.CombinedOutput(); err != nil || !bytes.Contains(out, []byte("\nPASS\n")) {
+			t.Fatalf("native accessibility test did not pass (%v):\n%s", err, out)
+		}
+		return
+	}
+	onMain(func() {
+		loadAppKit()
+		for _, c := range []struct {
+			name              string
+			multiline, masked bool
+			role              string
+		}{
+			{"field", false, false, "AXTextField"},
+			{"secure field", false, true, "AXTextField"},
+			{"text view", true, false, "AXTextArea"},
+		} {
+			window := objc.ID(apple.Class("NSWindow")).Send(selAlloc).Send(sel("initWithContentRect:styleMask:backing:defer:"),
+				apple.Rect(0, 0, 300, 120), uint(0), uint(2), false)
+			window.Send(sel("setReleasedWhenClosed:"), false)
+			v := &view{id: 1, kind: driver.KindInput, native: objc.ID(classInput).Send(selNew), input: &input{}}
+			views[v.native] = v
+			v.setEditor(c.multiline, c.masked)
+			v.native.Send(sel("setFrame:"), apple.Rect(0, 0, 280, 100))
+			v.input.host.Send(sel("setFrame:"), apple.Rect(0, 0, 280, 100))
+			window.Send(sel("contentView")).Send(selAddSubview, v.native)
+			v.setProps(&driver.ViewProps{Role: driver.RoleTextField, Label: "Search", TestID: "search"})
+			config := driver.InputConfig{Multiline: c.multiline, Masked: c.masked, Placeholder: "Search messages",
+				Style: driver.TextStyle{Font: driver.Font{Size: 14}, Color: core.RGB(0)}}
+			v.configure(&config)
+			if got := findInputAX(window, c.role, "Search"); got == 0 {
+				t.Errorf("%s: no native accessibility element with role %s and label Search", c.name, c.role)
+			}
+			field := v.input.field
+			if !c.multiline {
+				field = field.Send(sel("cell"))
+			}
+			if got := apple.GoString(field.Send(sel("accessibilityRole"))); got != c.role {
+				t.Errorf("%s: native role = %q, want %q", c.name, got, c.role)
+			}
+			if got := apple.GoString(field.Send(sel("accessibilityLabel"))); got != "Search" {
+				t.Errorf("%s: native label = %q, want Search", c.name, got)
+			}
+			if got := apple.GoString(field.Send(sel("accessibilityPlaceholderValue"))); got != "Search messages" {
+				t.Errorf("%s: native placeholder = %q", c.name, got)
+			}
+			if got := axAttr(field, "AXPlaceholderValue"); got != "Search messages" {
+				t.Errorf("%s: AXPlaceholderValue = %q", c.name, got)
+			}
+			if !slices.Contains(axAttrNames(field), "AXPlaceholderValue") {
+				t.Errorf("%s: native attributes lack AXPlaceholderValue", c.name)
+			}
+			if c.multiline && !objc.Send[bool](v.input.label, sel("isAccessibilityHidden")) {
+				t.Error("text view: visual placeholder is a separate accessibility element")
+			}
+			v.setLabel("Find messages")
+			if got := apple.GoString(field.Send(sel("accessibilityLabel"))); got != "Find messages" {
+				t.Errorf("%s: updated native label = %q", c.name, got)
+			}
+			if findInputAX(window, c.role, "Find messages") == 0 {
+				t.Errorf("%s: updated label is absent from the window's accessibility tree", c.name)
+			}
+			for _, placeholder := range []string{"Type a query", ""} {
+				config.Placeholder = placeholder
+				v.configure(&config)
+				if got := apple.GoString(field.Send(sel("accessibilityPlaceholderValue"))); got != placeholder {
+					t.Errorf("%s: updated native placeholder = %q, want %q", c.name, got, placeholder)
+				}
+				if got := axAttr(field, "AXPlaceholderValue"); got != placeholder {
+					t.Errorf("%s: updated AXPlaceholderValue = %q, want %q", c.name, got, placeholder)
+				}
+			}
+			v.setLabel("")
+			if got := apple.GoString(field.Send(sel("accessibilityLabel"))); got != "" {
+				t.Errorf("%s: cleared native label = %q", c.name, got)
+			}
+			delete(views, v.native)
+			delete(views, v.input.field)
+			delete(views, v.input.host)
+			v.native.Send(selRelease)
+			window.Send(selRelease)
+		}
+	})
+}
+
+func findInputAX(root objc.ID, role, label string) objc.ID {
+	seen := make(map[objc.ID]bool)
+	var find func(objc.ID) objc.ID
+	find = func(e objc.ID) objc.ID {
+		if e == 0 || seen[e] {
+			return 0
+		}
+		seen[e] = true
+		if apple.GoString(e.Send(sel("accessibilityRole"))) == role && apple.GoString(e.Send(sel("accessibilityLabel"))) == label {
+			return e
+		}
+		children := e.Send(sel("accessibilityChildren"))
+		for i := range objc.Send[int](children, sel("count")) {
+			if found := find(children.Send(sel("objectAtIndex:"), i)); found != 0 {
+				return found
+			}
+		}
+		return 0
+	}
+	return find(root)
 }
 
 // TestEditableCombobox checks, through accessibilityAttributeValue: as VoiceOver reads them, that an input with RoleCombobox is an editable combobox on its editor, the field's cell or the text view, with its text, label, value text and the popup's state, its view no element; that a plain input's editor, masked too, takes its label; and that a view with RoleCombobox stays a pop-up button (#246).

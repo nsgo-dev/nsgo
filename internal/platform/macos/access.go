@@ -294,6 +294,12 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 		return nil
 	}
 	return []objc.MethodDef{
+		{Cmd: sel("accessibilityPlaceholderValue"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
+			if v := owner(self); v != nil {
+				return nsOrNil(v.input.fs.Config.Placeholder)
+			}
+			return apple.SendSuper[objc.ID](self, cmd)
+		}},
 		{Cmd: sel("accessibilityAttributeValue:"), Fn: func(self objc.ID, cmd objc.SEL, name objc.ID) objc.ID {
 			if v := owner(self); v != nil {
 				if value, ok := v.editorAttribute(apple.GoString(name)); ok {
@@ -308,7 +314,7 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 			if v == nil || names == 0 {
 				return names
 			}
-			for _, name := range []string{"AXSubrole", "AXDescription", "AXIdentifier", "AXExpanded", "AXValueDescription"} {
+			for _, name := range []string{"AXSubrole", "AXDescription", "AXIdentifier", "AXExpanded", "AXValueDescription", "AXPlaceholderValue"} {
 				if _, ok := v.editorAttribute(name); !ok {
 					continue
 				}
@@ -380,6 +386,8 @@ func (v *view) editorAttribute(name string) (objc.ID, bool) {
 		if p.Label != "" {
 			return apple.NSString(p.Label), true
 		}
+	case "AXPlaceholderValue":
+		return nsOrNil(v.input.fs.Config.Placeholder), true
 	case "AXHelp":
 		if help := p.HelpText(); help != "" {
 			return apple.NSString(help), true

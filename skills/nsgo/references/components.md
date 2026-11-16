@@ -28,6 +28,6 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 - Controlled controls take a getter and a setter: `Value: name.Get, OnChange: name.Set`, `Checked: on.Get`, `Open: dialog.Get, OnOpenChange: ...`.
 - Use `ui.Slider.MinFunc`, `MaxFunc` and `StepFunc` for changing ranges and steps; `base.Slider.Min`, `Max` and `Step` already take getters. This keeps focus and an active drag mounted.
 - `ui.Dialog` and `ui.AlertDialog` take `Style` and `StyleFunc` for their surface; use `StyleFunc` for colors that follow the theme or other signals, merged after `Style` on both centered dialogs and sheets.
-- Give each control a label screen readers hear (`Label`, or the button's text); icon-only buttons need one.
+- Give each control a label screen readers hear (`Label`, or the button's text); icon-only buttons need one. An input's `Placeholder` is a separate hint, exposed on macOS for single-line, masked and multiline fields; keep its `Label` meaningful when that hint changes or clears.
 - `ui.NavPage` and `ui.NavHeader` draw the system's own header and back gesture on phones; do not build a header of views there.
 - `ui.Menu` and `ui.Select` open beside their trigger on any device, or as a sheet when their `Presentation` asks; choose it explicitly instead of switching by device.
