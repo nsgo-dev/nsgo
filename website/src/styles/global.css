@@ -487,11 +487,27 @@ html[data-theme='dark'] .theme-switch__sun {
   color: var(--faint);
 }
 
-.header__stars {
+.header__github {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  color: var(--faint);
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.header__github:hover {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.header__stars {
   font-variant-numeric: tabular-nums;
 }
 
@@ -555,7 +571,8 @@ html[data-theme='dark'] .theme-switch__sun {
 }
 
 @media (max-width: 480px) {
-  .menu__trigger-label span {
+  .menu__trigger-label span,
+  .header__stars {
     display: none;
   }
 }
