@@ -283,6 +283,24 @@ cx.Speak("おはようございます", core.Voice{Lang: "ja-JP", Rate: 0.8}, fu
 
 `Rate` 和 `Pitch` 的范围是 0.5 到 2，1 为语音本身的语速和音高。`cx.Voices("ja", ...)` 列出某种语言已安装的语音，应用可以提示用户安装缺少的语音，或让用户挑选，把选中语音的 `ID` 填进 `core.Voice`。浏览器要等用户在页面上按过某个控件后才会朗读，在此之前返回 `core.SpeakNotAllowed`。TSX 包里的 Go 组件需要 `text_to_speech` 能力才能朗读。
 
+## 生物识别
+
+`cx.BiometricAvailability` 回答设备是否录入了面容 ID、触控 ID 或指纹；Android 不说明录入的是哪一种，所以在 Android 上录入了指纹时回答指纹，否则在设备有面部识别硬件时回答面部。`cx.AuthenticateBiometric` 带着一个不能为空的原因请系统确认用户身份，回答成功、失败、取消或不可用。它不会替应用选择密码作为后备方式。
+
+```go
+cx.BiometricAvailability(func(kind core.BiometricKind) {
+	if kind != core.BiometricNone {
+		cx.AuthenticateBiometric("确认删除这个账户", func(result core.BiometricResult) {
+			if result == core.BiometricSuccess {
+				deleteAccount()
+			}
+		})
+	}
+})
+```
+
+使用面容 ID 的应用要在 `apple.info` 下声明 `NSFaceIDUsageDescription`；Android 应用要在 `android.permissions` 中列出 `USE_BIOMETRIC`。
+
 ## Android 上的悬浮窗
 
 `mobile.OpenOverlay` 在 Android 上把应用的一个视图显示在其他应用之上：它是一棵独立的树，与应用共享信号，显示期间由前台服务让应用保持运行。应用要在 `android.permissions` 中列出 `SYSTEM_ALERT_WINDOW`，并由用户在系统设置中授权，`mobile.RequestOverlayPermission` 会打开这个设置；没有授权时悬浮窗立即结束，`OnEnd` 会得知原因。它接收触摸，但按键和窗口以外的触摸仍交给前台应用，除非设为 `Focusable` 或 `Passive`；在内容里用 `desktop.SetWindowFrame` 移动它。其他平台不会打开悬浮窗。
