@@ -101,12 +101,11 @@ func (s *surface) setMaterial(m driver.WindowMaterial) {
 	s.material = m
 }
 
-// A view's backdrop blur is an NSVisualEffectView under its children that
-// blends with what is behind it in the window, or Liquid Glass on macOS 26
-// and later. AppKit sets the blur's strength by material, not by radius:
-// the radius only turns it on. The material is opaque enough to hide the
-// view's own layer, so a view inside it shows the background over the blur,
-// where CSS has it.
+// A view's backdrop blur is a CABackdropLayer under its children whose
+// gaussian filter follows the CSS radius. A non-zero BackdropMaterial keeps
+// the system NSVisualEffectView look; Liquid Glass takes precedence on macOS
+// 26 and later. The tint is a separate view above either blur, so the view's
+// own background is composited over it as CSS does.
 
 const blendingWithinWindow = 1
 
@@ -144,6 +143,9 @@ func (s *surface) keepGlassActive() {
 func (v *view) fitBackdrop(vs *driver.ViewStyle) {
 	b := objc.Send[apple.CGRect](v.native, selBounds)
 	apple.FitBackdrop(v.backdrop, vs, b.Size.Width, b.Size.Height)
+	if v.backdropLayer != 0 {
+		v.backdropLayer.Send(selSetFrame, objc.Send[apple.CGRect](v.backdrop, selBounds))
+	}
 	if v.tint != 0 {
 		v.tint.Send(selSetFrame, objc.Send[apple.CGRect](v.backdrop, selBounds))
 	}
@@ -152,26 +154,42 @@ func (v *view) fitBackdrop(vs *driver.ViewStyle) {
 // setBackdrop gives v the backdrop its style asks for, or takes it away.
 func (v *view) setBackdrop(vs *driver.ViewStyle) {
 	glass := vs.Glass != driver.GlassNone && apple.Class("NSGlassEffectView") != 0
-	want := vs.Effects.BackdropBlur() > 0 || glass
-	if !want || glass != v.glass {
+	blur := vs.Effects.BackdropBlur()
+	// BackdropMaterial's zero value is the CSS-like Gaussian blur. A named
+	// material is any non-zero value; this keeps existing iOS props source
+	// compatible while giving macOS's bare Blur its radius semantics.
+	gaussian := blur > 0 && !glass && vs.Material == driver.BackdropUltraThin
+	want := blur > 0 || glass
+	if !want || glass != v.glass || gaussian != v.gaussian {
 		if v.backdrop != 0 {
 			v.backdrop.Send(sel("removeFromSuperview"))
-			v.backdrop, v.tint = 0, 0
+			v.backdrop, v.backdropLayer, v.tint = 0, 0, 0
 		}
 		if !want {
+			v.glass, v.gaussian = false, false
 			return
 		}
 	}
 	if v.backdrop == 0 {
 		class := classMaterial
+		if gaussian {
+			class = apple.Class("NSView")
+		}
 		if glass {
 			class = apple.Class("NSGlassEffectView")
 		}
 		v.backdrop = objc.ID(class).Send(selAlloc).Send(sel("initWithFrame:"), objc.Send[apple.CGRect](v.native, selBounds))
 		v.backdrop.Send(selSetAutoresizingMask, widthHeightSizable)
+		if gaussian {
+			v.backdrop.Send(selSetWantsLayer, true)
+			v.backdropLayer = objc.ID(apple.Class("CABackdropLayer")).Send(selNew)
+			v.backdrop.Send(selLayer).Send(sel("addSublayer:"), v.backdropLayer)
+			v.backdropLayer.Send(selRelease)
+		}
 		v.native.Send(selAddSubviewPositioned, v.backdrop, viewBelow, objc.ID(0))
 		v.backdrop.Send(selRelease)
 		v.glass = glass
+		v.gaussian = gaussian
 	}
 	if glass {
 		v.surface.keepGlassActive()
@@ -179,11 +197,17 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		v.backdrop.Send(sel("setCornerRadius:"), float64(max(vs.CornerRadius, vs.Corners.TopLeft)))
 		return
 	}
-	v.backdrop.Send(selSetMaterial, backdropMaterial(vs.Material))
-	v.backdrop.Send(selSetBlendingMode, blendingWithinWindow)
-	v.backdrop.Send(selSetState, effectStateActive)
-	v.backdrop.Send(sel("setWantsLayer:"), true)
-	v.fitBackdrop(vs)
+	if gaussian {
+		v.backdropLayer.Send(sel("setFilters:"), apple.GaussianBackdrop(float64(blur)))
+		v.backdrop.Send(selSetWantsLayer, true)
+		v.fitBackdrop(vs)
+	} else {
+		v.backdrop.Send(selSetMaterial, backdropMaterial(vs.Material))
+		v.backdrop.Send(selSetBlendingMode, blendingWithinWindow)
+		v.backdrop.Send(selSetState, effectStateActive)
+		v.backdrop.Send(sel("setWantsLayer:"), true)
+		v.fitBackdrop(vs)
+	}
 	if v.tint == 0 {
 		v.tint = objc.ID(apple.Class("NSView")).Send(selAlloc).Send(sel("initWithFrame:"), objc.Send[apple.CGRect](v.backdrop, selBounds))
 		v.tint.Send(selSetAutoresizingMask, widthHeightSizable)

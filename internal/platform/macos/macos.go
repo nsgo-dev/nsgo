@@ -84,11 +84,13 @@ type view struct {
 	// over says the view reported the mouse over it: in its tracking
 	// area, and no view above covers it there.
 	over bool
-	// backdrop is the view's backdrop blur, Liquid Glass when glass.
-	backdrop objc.ID
+	// backdrop is the view's backdrop blur, Liquid Glass when glass. A
+	// gaussian backdrop is an ordinary holder view whose layer contains a
+	// CABackdropLayer; a material backdrop is an NSVisualEffectView.
+	backdrop, backdropLayer objc.ID
 	// tint is the view's background over its backdrop blur.
-	tint  objc.ID
-	glass bool
+	tint            objc.ID
+	glass, gaussian bool
 
 	pressing  atomic.Bool
 	longFired atomic.Bool

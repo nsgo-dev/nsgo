@@ -142,9 +142,11 @@ type Style struct {
 	// Filters change what the node and its children draw, in order.
 	Filters []Filter
 	// BackdropFilters change what is behind the node, seen through its
-	// background: Blur frosts it, with a view's IOS.BackdropMaterial on
-	// iOS. GlassEffect draws Liquid Glass in its place on iOS and macOS
-	// 26; give a glass view a blur to fall back to.
+	// background: Blur frosts it by its radius on macOS, iOS and the web,
+	// with a view's IOS.BackdropMaterial selecting iOS's system material and
+	// a non-zero value selecting macOS's material. GlassEffect draws Liquid
+	// Glass in its place on iOS and macOS 26; give a glass view a blur to
+	// fall back to.
 	BackdropFilters []Filter
 	GlassEffect     GlassEffect
 	// Mask draws the node, backdrop included, as much as the gradient's

@@ -72,6 +72,9 @@ func EdgeBlur(s driver.Side, d driver.EdgeEffect) objc.ID {
 	set := func(f objc.ID, key string, value objc.ID) {
 		f.Send(sel("setValue:forKey:"), value, NSString(key))
 	}
+	if d == driver.EdgeEffectHard {
+		return GaussianBackdrop(float64(driver.HardEdgeBlur))
+	}
 	var f objc.ID
 	if d == driver.EdgeEffectSoft {
 		f = filter.Send(sel("filterWithType:"), NSString("variableBlur"))
@@ -85,6 +88,21 @@ func EdgeBlur(s driver.Side, d driver.EdgeEffect) objc.ID {
 	// AppKit's edges have it, rather than as clear.
 	set(f, "inputNormalizeEdges", objc.ID(Class("NSNumber")).Send(sel("numberWithBool:"), true))
 	return objc.ID(Class("NSArray")).Send(sel("arrayWithObject:"), f)
+}
+
+// GaussianBackdrop returns the private Core Animation filter array that
+// makes a CABackdropLayer blur what is behind it by radius points. NSGo uses
+// the same filter for macOS's CSS-like backdrop blur and for hard scroll
+// edges. The array is autoreleased and can be passed directly to
+// setFilters:.
+func GaussianBackdrop(radius float64) objc.ID {
+	number := func(f float64) objc.ID {
+		return objc.ID(Class("NSNumber")).Send(sel("numberWithDouble:"), f)
+	}
+	filter := objc.ID(Class("CAFilter")).Send(sel("filterWithType:"), NSString("gaussianBlur"))
+	filter.Send(sel("setValue:forKey:"), number(radius), NSString("inputRadius"))
+	filter.Send(sel("setValue:forKey:"), objc.ID(Class("NSNumber")).Send(sel("numberWithBool:"), true), NSString("inputNormalizeEdges"))
+	return objc.ID(Class("NSArray")).Send(sel("arrayWithObject:"), filter)
 }
 
 // fadeImages are the soft edges' masks, by side, made on first use.
