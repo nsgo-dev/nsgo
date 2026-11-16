@@ -172,8 +172,16 @@ func TestBuildTagsReachEveryGoCommand(t *testing.T) {
 		t.Errorf("vet for a mini program with build.tags: %v", err)
 	}
 
-	if dir, err := linkedDir(ctx, p, nil, "app/extra"); err != nil || dir != filepath.Join(p.Dir, "extra") {
-		t.Errorf("linkedDir = %q, %v; want the extra package's directory", dir, err)
+	dir, err := linkedDir(ctx, p, nil, "app/extra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// go list may resolve the temporary directory's symlinks, such as
+	// /var to /private/var on macOS. Compare the directories themselves.
+	got, statErr := os.Stat(dir)
+	want, wantErr := os.Stat(filepath.Join(p.Dir, "extra"))
+	if statErr != nil || wantErr != nil || !os.SameFile(got, want) {
+		t.Errorf("linkedDir = %q, stat errors %v, %v; want the extra package's directory", dir, statErr, wantErr)
 	}
 	pkgs, err := p.appPackages(ctx, ".")
 	if err != nil {
