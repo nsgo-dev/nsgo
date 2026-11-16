@@ -627,6 +627,7 @@ final class WebNode {
         boolean noScroll = Protocol.flag(flags, 0), noJavaScript = Protocol.flag(flags, 1);
         restricted = Protocol.flag(flags, 2);
         boolean incognito = Protocol.flag(flags, 3);
+        boolean pinchZoom = Protocol.flag(flags, 6);
         media = (Protocol.flag(flags, 4) ? MICROPHONE : 0) | (Protocol.flag(flags, 5) ? CAMERA : 0);
         String hosts = Protocol.readString(in).trim();
         this.hosts = hosts.isEmpty() ? new String[0] : hosts.split(" +");
@@ -660,14 +661,18 @@ final class WebNode {
             settings.setDomStorageEnabled(!incognito);
         }
         settings.setJavaScriptEnabled(!noJavaScript);
+        // The built-in zoom is the pinch; its on-screen buttons stay hidden.
+        settings.setBuiltInZoomControls(pinchZoom);
+        settings.setDisplayZoomControls(false);
         if (!userAgent.equals(this.userAgent)) {
             this.userAgent = userAgent;
             settings.setUserAgentString(userAgent.isEmpty() ? null : userAgent); // null: the default
         }
-        if (reload) load();
+        if (reload) load(src, html, baseURL);
     }
 
-    private void load() {
+    /** Loads a source, the config's or Ref.Load's, which leaves the config's alone. */
+    private void load(String src, String html, String baseURL) {
         // Apps load their own files; pages from elsewhere may not.
         WebSettings settings = view.getSettings();
         if (!html.isEmpty()) {
@@ -681,7 +686,7 @@ final class WebNode {
         }
     }
 
-    /** Does a core.WebCommand, with value for messages and scripts. */
+    /** Does a core.WebCommand, with value for messages and scripts, and for WebLoad the source's URL, with its HTML and base URL. */
     void command(int command, String value, String loadHTML, String loadBaseURL) {
         switch (command) {
             case Protocol.WEB_RELOAD: view.reload(); break;
@@ -694,10 +699,7 @@ final class WebNode {
                 view.evaluateJavascript(value, null);
                 break;
             case Protocol.WEB_LOAD:
-                src = value != null ? value : "";
-                html = loadHTML != null ? loadHTML : "";
-                baseURL = loadBaseURL != null ? loadBaseURL : "";
-                load();
+                load(value, loadHTML, loadBaseURL);
                 break;
             default:
         }

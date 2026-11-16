@@ -149,3 +149,24 @@ func TestJavaMessagesMatchTheBackend(t *testing.T) {
 		}
 	}
 }
+
+// TestWebCommandsMatchJava holds Protocol.java's web commands to the driver's, which WebNode.command switches on: WebSendInput, which Android does without, sits between them.
+func TestWebCommandsMatchJava(t *testing.T) {
+	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := map[string]int{}
+	for _, m := range regexp.MustCompile(`static final int (WEB_\w+) = (\d+);`).FindAllStringSubmatch(string(java), -1) {
+		values[m[1]], _ = strconv.Atoi(m[2])
+	}
+	for name, want := range map[string]driver.WebCommand{
+		"WEB_RELOAD": driver.WebReload, "WEB_GO_BACK": driver.WebGoBack, "WEB_GO_FORWARD": driver.WebGoForward,
+		"WEB_STOP_LOADING": driver.WebStopLoading, "WEB_POST_MESSAGE": driver.WebPostMessage,
+		"WEB_INJECT_JAVASCRIPT": driver.WebInjectJavaScript, "WEB_LOAD": driver.WebLoad,
+	} {
+		if got, ok := values[name]; !ok || got != int(want) {
+			t.Errorf("Protocol.java's %s is %d (found %v), the driver's %d", name, got, ok, want)
+		}
+	}
+}

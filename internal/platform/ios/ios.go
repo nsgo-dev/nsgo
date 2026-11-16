@@ -1091,7 +1091,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemWeb:
 			v.web.Configure(it.Web)
 		case driver.ItemWebCommand:
-				v.web.Command(it.WebCommand, it.Value, it.Data)
+			v.web.Command(it.WebCommand, it.Value, it.Data)
 		case driver.ItemVideo:
 			v.video.Configure(it.Video)
 		case driver.ItemVideoSeek:

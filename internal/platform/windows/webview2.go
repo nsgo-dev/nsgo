@@ -156,6 +156,7 @@ const (
 	// ICoreWebView2Settings, then ICoreWebView2Settings2 and 6
 	settingsPutIsScriptEnabled          = 4
 	settingsPutIsStatusBarEnabled       = 10
+	settingsPutIsZoomControlEnabled     = 18
 	settingsGetUserAgent                = 21
 	settingsPutUserAgent                = 22
 	settingsPutIsPinchZoomEnabled       = 30

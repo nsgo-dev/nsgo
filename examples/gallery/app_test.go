@@ -749,6 +749,11 @@ func TestMedia(t *testing.T) {
 	}
 	app.Emit("id:native-slider", "change", 0.25)
 	app.Find("text:0.25")
+	app.Press("role:button Home")
+	cmds := app.Find("id:site").WebCommands
+	if len(cmds) == 0 || cmds[len(cmds)-1].Command != nsgotest.WebLoad || *cmds[len(cmds)-1].Data.(*nsgotest.WebSource) != core.WebSrc("https://nsgo.dev/docs/") {
+		t.Fatalf("site commands %+v, want Home to load the docs", cmds)
+	}
 	open(app, "Video")
 	app.Play("id:player", core.VideoInfo{Duration: 5 * time.Second, Size: core.Size{Width: 640, Height: 360}})
 	app.Press("role:button Play")

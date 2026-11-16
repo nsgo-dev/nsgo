@@ -1679,7 +1679,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 				}
 				break
 			}
-				v.web.Command(it.WebCommand, it.Value, it.Data)
+			v.web.Command(it.WebCommand, it.Value, it.Data)
 		case driver.ItemVideo:
 			delete(views, v.video.View())
 			v.video.Configure(it.Video)

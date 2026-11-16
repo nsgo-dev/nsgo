@@ -16,7 +16,8 @@ import (
 type webFrame struct {
 	frame  js.Value
 	config driver.WebConfig
-	loaded bool // configured at least once
+	source driver.WebSource // what the frame loaded last: the config's, or Ref.Load's
+	loaded bool             // configured at least once
 	token  string
 	port   js.Value // the app's end of the bridge of the source's page, while that page shows
 	portFn js.Func
@@ -68,7 +69,7 @@ func (s *surface) webBridged(v *view, e js.Value) {
 	w.closePort()
 	w.port = port
 	// The page is the srcdoc, at its base URL when it has one.
-	origin, page := w.config.Source.Origin(), cmp.Or(w.config.Source.BaseURL, "about:srcdoc")
+	origin, page := w.source.Origin(), cmp.Or(w.source.BaseURL, "about:srcdoc")
 	w.portFn = js.FuncOf(func(_ js.Value, args []js.Value) any {
 		data := args[0].Get("data")
 		if data.Type() != js.TypeString {
@@ -102,9 +103,22 @@ func (s *surface) setWeb(v *view, c *driver.WebConfig) {
 	if w.loaded && sameFrame(c, &w.config) {
 		return
 	}
-	w.loaded, w.config = true, *c
-	w.token = ""
 	src := c.Source
+	if w.loaded && c.Source == w.config.Source && c.InjectedJavaScript == w.config.InjectedJavaScript &&
+		c.InjectedJavaScriptBeforeContent == w.config.InjectedJavaScriptBeforeContent {
+		// Only the frame's settings changed, which other platforms apply to the live page: the page Ref.Load showed stays.
+		src = w.source
+	}
+	w.loaded, w.config = true, *c
+	s.loadFrame(v, src)
+}
+
+// loadFrame loads src in v's frame with the config's settings.
+func (s *surface) loadFrame(v *view, src driver.WebSource) {
+	w := v.web
+	c := &w.config
+	w.source = src
+	w.token = ""
 	if src.HTML != "" && !c.NoJavaScript {
 		w.token = strconv.FormatUint(rand.Uint64(), 36)
 	}
@@ -308,12 +322,8 @@ func (s *surface) webCommand(v *view, c driver.WebCommand, value string, data an
 			warn("GoForward")
 		}
 	case driver.WebLoad:
-		if src, ok := data.(*driver.WebSource); ok && src != nil {
-			// setWeb compares configuration to avoid duplicate loads; this
-			// command is deliberately unconditional.
-			w.config.Source = *src
-			w.loaded = false
-			s.setWeb(v, &w.config)
+		if src, ok := data.(*driver.WebSource); ok && src != nil && w.loaded {
+			s.loadFrame(v, *src)
 		}
 	}
 	// StopLoading does nothing, as in NSH: the frame is another origin.

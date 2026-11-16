@@ -351,7 +351,7 @@ func (w *Web) Configure(c *driver.WebConfig) {
 		w.web.Send(sel("scrollView")).Send(sel("setScrollEnabled:"), !c.NoScroll)
 	}
 	if first || scripts || c.Source != old.Source || !maps.Equal(c.Headers, old.Headers) {
-		w.load()
+		w.load(c.Source)
 	}
 }
 
@@ -413,8 +413,7 @@ func (w *Web) addScripts() {
 	add(w.config.InjectedJavaScript, atEnd)
 }
 
-func (w *Web) load() {
-	src := w.config.Source
+func (w *Web) load(src driver.WebSource) {
 	w.fileDir = ""
 	switch {
 	case src.HTML != "":
@@ -548,8 +547,7 @@ func (w *Web) Command(c driver.WebCommand, value string, data any) {
 		w.evaluate(value)
 	case driver.WebLoad:
 		if src, ok := data.(*driver.WebSource); ok && src != nil {
-			w.config.Source = *src
-			w.load()
+			w.load(*src)
 		}
 	}
 }

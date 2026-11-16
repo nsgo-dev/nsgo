@@ -95,7 +95,8 @@ type webView struct {
 	scriptGen, scrollGen  int
 	adding                int
 	navigatePending       bool
-	html, base            string // the HTML served at its base URL
+	source                driver.WebSource // what the pending or last navigation loads: the config's, or Ref.Load's
+	html, base            string           // the HTML served at its base URL
 	serving               bool
 	at                    *placement // where the last frame put it
 	bounds                rect       // the controller's, when shown
@@ -606,6 +607,8 @@ func (wv *webView) apply() {
 			s5.call(settingsPutIsPinchZoomEnabled, boolArg(c.PinchZoom))
 			s5.release()
 		}
+		// A precision touchpad's pinch reaches a window as Ctrl with the wheel, which WebView2 zooms by unless its zoom control is off.
+		s.call(settingsPutIsZoomControlEnabled, boolArg(c.PinchZoom))
 	}
 	scripts := first || c.InjectedJavaScript != old.InjectedJavaScript ||
 		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent
@@ -634,6 +637,7 @@ func (wv *webView) apply() {
 		wv.setScrolls(!c.NoScroll)
 	}
 	if scripts || c.Source != old.Source || !maps.Equal(c.Headers, old.Headers) {
+		wv.source = c.Source
 		wv.navigatePending = true
 		wv.navigateIfReady()
 	}
@@ -723,7 +727,7 @@ func (wv *webView) setScrolls(enabled bool) {
 }
 
 func (wv *webView) navigate() {
-	src := wv.config.Source
+	src := wv.source
 	wv.html, wv.base = "", ""
 	var hr uintptr
 	switch {
@@ -924,7 +928,7 @@ func (wv *webView) command(c driver.WebCommand, value string, data any) {
 		wv.execute(value)
 	case driver.WebLoad:
 		if src, ok := data.(*driver.WebSource); ok && src != nil {
-			wv.config.Source = *src
+			wv.source = *src
 			wv.navigatePending = true
 			wv.navigateIfReady()
 		}

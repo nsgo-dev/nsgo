@@ -243,10 +243,11 @@ type web struct {
 	page       string  // the URI of the page last committed, which its messages report
 	config     driver.WebConfig
 	made       bool
-	failed     bool         // the navigation failed; WebKit still finishes it
-	pending    bool         // a load waits for the page to be mapped
-	background [4]float32   // WebKit's own, for views without an opaque one
-	pointer    driver.Point // where the pointer is in the page
+	failed     bool             // the navigation failed; WebKit still finishes it
+	pending    bool             // a load waits for the page to be mapped
+	source     driver.WebSource // what the pending or last load shows: the config's, or Ref.Load's
+	background [4]float32       // WebKit's own, for views without an opaque one
+	pointer    driver.Point     // where the pointer is in the page
 }
 
 // webPage is the window and view a WebKitWebView belongs to.
@@ -338,13 +339,13 @@ func (w *window) configureWeb(v *view, c *driver.WebConfig) {
 		webkitSettingsSetUserAgent(settings, cstr(c.UserAgent))
 	}
 	webkitSettingsSetBackForwardGestures(settings, boolInt(c.BackForwardGestures))
-	// WebKitGTK exposes page zoom, but no setting that enables or disables
-	// pinch gestures. PinchZoom therefore keeps WebKitGTK's native behavior.
+	// WebKitGTK has no setting for pinches, so PinchZoom keeps its own handling.
 	// Pages see no media devices unless they may capture one.
 	webkitSettingsSetEnableMediaStream(settings, boolInt(c.Media != 0))
 	w.webBackground(v)
 	// Scripts apply to pages loaded from now on: load again.
 	if first || scripts || c.Source != old.Source || !maps.Equal(c.Headers, old.Headers) {
+		v.web.source = c.Source
 		w.loadWeb(v)
 	}
 }
@@ -648,7 +649,7 @@ func (w *window) loadWeb(v *view) {
 		return
 	}
 	wv.pending = false
-	src := wv.config.Source
+	src := wv.source
 	switch {
 	case src.HTML != "":
 		var base *byte
@@ -698,7 +699,7 @@ func (w *window) webCommand(v *view, c driver.WebCommand, value string, data any
 		evaluate(page, value)
 	case driver.WebLoad:
 		if src, ok := data.(*driver.WebSource); ok && src != nil {
-			v.web.config.Source = *src
+			v.web.source = *src
 			w.loadWeb(v)
 		}
 	}

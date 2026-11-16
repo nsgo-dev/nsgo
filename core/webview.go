@@ -33,9 +33,7 @@ type WebView struct {
 	// pages from running scripts.
 	NoScroll     bool
 	NoJavaScript bool
-	// PinchZoom lets the user magnify the page with a pinch where the
-	// platform exposes that setting. It has no effect on iOS, whose page
-	// viewport controls zoom behavior.
+	// PinchZoom lets the user magnify the page with a pinch: a trackpad's on macOS, a touchpad's or a touch screen's on Windows, where it also allows Ctrl with the wheel or with + and -, as a touchpad's pinch reaches the page as Ctrl with the wheel, and a touch screen's on Android. Without it the page keeps its size on those platforms. iOS zooms as the page's viewport says, and WebKitGTK on Linux and the browser on the web keep their own handling, having no switch for it.
 	PinchZoom bool
 	// BackForwardGestures lets swipes go back and forward where the
 	// platform has them (iOS, macOS trackpads).
@@ -59,7 +57,7 @@ type WebView struct {
 	OnLoadStart             func(WebNavigation)
 	OnLoad                  func(WebNavigation)
 	OnNavigationStateChange func(WebNavigation)
-	// OnError receives a *WebError.
+	// OnError receives a *WebError. A load the view or the app cut short, such as by StopLoading or a new source, is no error.
 	OnError func(err error)
 	// MessageOrigins are the origins whose pages reach OnMessage and OnMessageFrom, written as WebMessage.Origin is ("https://example.com"), or "*" for any. Without them only pages of the source's own origin do: Src's, or for HTML BaseURL's, and "null" for HTML without one. "null" is the origin of every page without one of its own, a data: URL a frame sent the view to as much as the source's HTML, so "null", by default or listed, lets in only the source's page; "*" lets in every page. Only the page posts, never a frame in it, on every platform; a frame reaches the app through the page, with window.parent.postMessage, whose event tells the page the frame's origin.
 	MessageOrigins []string
@@ -100,8 +98,9 @@ type WebMessage struct {
 type WebError struct {
 	URL     string
 	Message string
-	Domain  string
-	Code    int
+	// Domain and Code are the platform's: NSError's domain and code on Apple platforms, the GError domain's name and its code on Linux, COREWEBVIEW2_WEB_ERROR_STATUS and its value, or HRESULT and the HRESULT of a navigation WebView2 refused, on Windows. Both are empty for a source Access refused and on Android, whose WebView reports its errors without them (the web reports none).
+	Domain string
+	Code   int
 }
 
 func (e *WebError) Error() string { return e.Message }
@@ -342,23 +341,24 @@ func (r *Ref) webCommand(c driver.WebCommand, value string) {
 	r.t.changed = true
 }
 
-// Load loads src in the web view, even when it is equal to the source it
-// already shows. Access restrictions are applied in the same way as the
-// WebView.Source field.
+// Load loads src in the web view, as a new Source would, even when it is the source the view already shows: the page loads with the view's Headers, and a source Access refuses reaches OnError and loads nothing. It navigates the view, as a link does, and leaves the source alone: Source or SourceFunc's next change loads again, a change to the scripts or headers loads the source again, and messages come by default from the source's origin, not src's.
 func (r *Ref) Load(src WebSource) {
 	if r.n == nil || r.n.deleted || r.n.web == nil {
 		return
 	}
 	wn := r.n.web
-	originalURL := src.Src
-	report := func(err error) {
-		if wn.loadError != nil {
-			r.t.within(r.n.owner, func() { wn.loadError(&WebError{URL: originalURL, Message: err.Error()}) })
-		}
-	}
 	if r.t.rt.restricted {
+		url := src.Src
+		report := func(err error) {
+			if wn.loadError != nil {
+				wn.loadError(&WebError{URL: url, Message: err.Error()})
+			}
+		}
 		var refused string
 		r.t.refuseSource(r.n, AccessWebView, &src.Src, &refused, report)
+		if refused != "" {
+			return
+		}
 		if src.BaseURL != "" && sourceRefusal(r.n.owner, AccessWebView, src.BaseURL) != nil {
 			src.BaseURL = ""
 		}

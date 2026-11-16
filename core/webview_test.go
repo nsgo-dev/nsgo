@@ -151,6 +151,7 @@ func TestWebMessagesComeFromTheSourcesOrigin(t *testing.T) {
 	}
 }
 
+// TestWebLoadUsesAccessRefusal loads a source Access refuses, twice, which reaches OnError each time and sends nothing, and HTML whose base URL it refuses, which loads without the base.
 func TestWebLoadUsesAccessRefusal(t *testing.T) {
 	var ref Ref
 	var errors []error
@@ -159,28 +160,62 @@ func TestWebLoadUsesAccessRefusal(t *testing.T) {
 		return WebView{Ref: &ref, Source: WebSrc("https://ok.com/"), OnError: func(err error) { errors = append(errors, err) }}
 	})
 	h.commit()
-	ref.Load(WebSrc("https://evil.io/"))
-	b := h.commit()
-	if len(b.Items) != 1 || b.Items[0].WebCommand != driver.WebLoad {
-		t.Fatalf("load refusal command %v", b.Items)
-	}
-	src := b.Items[0].Data.(*driver.WebSource)
-	if src.Src != "" {
-		t.Fatalf("refused source reached backend: %#v", src)
+	for range 2 {
+		ref.Load(WebSrc("https://evil.io/"))
+		if b := h.commit(); len(b.Items) != 0 {
+			t.Fatalf("a refused load sent %v", b.Items)
+		}
 	}
 	h.drain()
-	if len(errors) != 1 {
+	if len(errors) != 2 {
 		t.Fatalf("refusal errors %v", errors)
 	}
 	if webErr, ok := errors[0].(*WebError); !ok || webErr.Domain != "" || webErr.Code != 0 || webErr.URL != "https://evil.io/" {
 		t.Fatalf("refusal error %#v", errors[0])
+	}
+	ref.Load(WebHTML("<p>", "https://evil.io/"))
+	b := h.commit()
+	if len(b.Items) != 1 || b.Items[0].WebCommand != driver.WebLoad {
+		t.Fatalf("html load %v", b.Items)
+	}
+	if src := b.Items[0].Data.(*driver.WebSource); *src != (driver.WebSource{HTML: "<p>"}) {
+		t.Fatalf("html load sent %#v, want it without the refused base", src)
+	}
+	ref.Load(WebSrc("https://ok.com/next"))
+	if b := h.commit(); len(b.Items) != 1 || b.Items[0].Data.(*driver.WebSource).Src != "https://ok.com/next" {
+		t.Fatalf("allowed load %v", b.Items)
+	}
+}
+
+// TestWebLoadLeavesTheSource loads another page, which navigates the view and leaves its source alone: nothing but the command is sent, and messages still come from the source's origin by default.
+func TestWebLoadLeavesTheSource(t *testing.T) {
+	var ref Ref
+	var heard []string
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		return WebView{Ref: &ref, Source: WebSrc("https://app.example/"), TestID: "web",
+			OnMessage: func(d string) { heard = append(heard, d) }}
+	})
+	h.commit()
+	ref.Load(WebSrc("https://other.example/"))
+	if b := h.commit(); len(b.Items) != 1 || b.Items[0].Kind != driver.ItemWebCommand {
+		t.Fatalf("load sent %v", b.Items)
+	}
+	n := h.find("web")
+	if n.web.config.Source.Src != "https://app.example/" || n.web.sent.Source.Src != "https://app.example/" {
+		t.Fatalf("Load changed the source: %v, sent %v", n.web.config.Source, n.web.sent.Source)
+	}
+	for _, url := range []string{"https://other.example/", "https://app.example/"} {
+		h.tree.Dispatch(driver.Event{Kind: driver.EventMessage, ID: n.id, Text: url, Origin: driver.WebOrigin(url), URL: url, MainFrame: true})
+	}
+	if !slices.Equal(heard, []string{"https://app.example/"}) {
+		t.Errorf("heard %q, want only the source's origin", heard)
 	}
 }
 
 func TestWebErrorCarriesFailure(t *testing.T) {
 	var got *WebError
 	h := newHost(t, Size{Width: 100, Height: 100}, func(*Scope) Node {
-		return WebView{Ref: &Ref{}, OnError: func(err error) { got = err.(*WebError)}, TestID: "web"}
+		return WebView{Ref: &Ref{}, OnError: func(err error) { got = err.(*WebError) }, TestID: "web"}
 	})
 	h.commit()
 	id := h.find("web").id

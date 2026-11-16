@@ -188,4 +188,5 @@ const (
 	WebStopLoading      = driver.WebStopLoading
 	WebPostMessage      = driver.WebPostMessage
 	WebInjectJavaScript = driver.WebInjectJavaScript
+	WebLoad             = driver.WebLoad
 )
