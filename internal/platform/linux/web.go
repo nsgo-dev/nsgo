@@ -261,6 +261,8 @@ type web struct {
 	failed        bool             // the navigation failed; WebKit still finishes it
 	pending       bool             // a load waits for the page to be mapped
 	ownNavigation bool             // loadWeb started the app's source, until it commits or fails
+	aboutPending  bool             // a refused about: action, possibly a frame's, may start the next top-level load
+	startPending  bool             // hold that load's start until its top-level URI commits
 	ownPage       bool             // the page last committed is the app's source (loadWeb's)
 	refused       bool             // the top level committed an about: page the config refuses, which restore leaves; until the next commit it reports no load and posts nothing
 	restoring     bool             // restore started a navigation back to the page before a refused one, until a page commits
@@ -789,9 +791,14 @@ func webOf(data, p uintptr) (*window, *view) {
 // navigated reports the page's state as kind and as a navigation state
 // change.
 func (w *window) navigated(v *view, loading bool, kind driver.EventKind) {
+	w.navigatedTo(v, goString(webkitWebViewGetURI(v.web.widget)), loading, kind)
+}
+
+// navigatedTo also reports provisional loads that failed before their URI committed.
+func (w *window) navigatedTo(v *view, uri string, loading bool, kind driver.EventKind) {
 	page := v.web.widget
 	nav := driver.WebNavigation{
-		URL:          goString(webkitWebViewGetURI(page)),
+		URL:          uri,
 		Title:        goString(webkitWebViewGetTitle(page)),
 		Loading:      loading,
 		CanGoBack:    webkitWebViewCanGoBack(page) != 0,
@@ -811,9 +818,18 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 	switch event {
 	case webkitLoadStarted:
 		v.web.failed = false
-		w.navigated(v, true, driver.EventLoadStart)
+		uri := goString(webkitWebViewGetURI(page))
+		// At load start the URI can still be the previous page's. An about: action says no frame, so hold its start until the top level commits.
+		v.web.startPending = v.web.config.Restricted && !v.web.ownNavigation &&
+			(v.web.aboutPending || aboutScheme(uri) && !v.web.config.Navigable(uri))
+		v.web.aboutPending = false
+		if !v.web.startPending {
+			w.navigated(v, true, driver.EventLoadStart)
+		}
 	case webkitLoadCommitted:
 		own, restoring := v.web.ownNavigation, v.web.restoring
+		start := v.web.startPending
+		v.web.aboutPending, v.web.startPending = false, false
 		v.web.ownNavigation, v.web.refused, v.web.restoring = false, false, false
 		uri := goString(webkitWebViewGetURI(page))
 		// An about: page has no response for webPolicyCallback to hold, and WebKit has made its document by the time the top level's load starts, so the top level's is held as it commits, load-changed being only the top level's: it posts nothing and reports no load, and the view goes back to the page before it.
@@ -822,6 +838,9 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 			w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: driver.RefusedNavigation(uri), Navigation: &driver.WebNavigation{URL: uri}})
 			w.restore(v)
 			return
+		}
+		if start {
+			w.navigated(v, true, driver.EventLoadStart)
 		}
 		v.web.ownPage, v.web.restored = own, time.Time{}
 		if restoring {
@@ -849,8 +868,13 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 	if v == nil {
 		return 0
 	}
+	// A frame's about: action may have held an unrelated top-level start. Keep that start before its failure, but never publish a refused page.
+	if v.web.startPending && v.web.config.Navigable(goString(uri)) {
+		w.navigatedTo(v, goString(uri), true, driver.EventLoadStart)
+	}
 	v.web.failed = true
 	v.web.ownNavigation = false
+	v.web.aboutPending, v.web.startPending = false, false
 	if gerr != 0 {
 		e := (*gError)(cPointer(gerr))
 		// Stopped or replaced by another navigation: not errors.
@@ -918,6 +942,9 @@ func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 
 	default:
 		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
 		if pageScheme(url) {
+			if aboutScheme(url) && !allowed(url) {
+				v.web.aboutPending = true
+			}
 			return 0
 		}
 	}

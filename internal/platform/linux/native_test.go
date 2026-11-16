@@ -487,25 +487,80 @@ onload = () => {
   location.href = 'about:blank';
 };
 </script>`
+	next := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/fail" {
+			conn, _, err := rw.(http.Hijacker).Hijack()
+			if err == nil {
+				conn.Close() // no response: the provisional load fails before commit
+			}
+			return
+		}
+		rw.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(rw, "<p>next</p>")
+	}))
+	defer next.Close()
 	title := "nsgo-native-" + t.Name()
+	var root *core.Scope
+	var ref core.Ref
 	app := func(cx *core.Scope) core.Node {
+		root = cx
 		heard, errs, loads := core.NewSignal(cx, ""), core.NewSignal(cx, ""), core.NewSignal(cx, "")
-		cx.Effect(func() { cx.SetTitle(title + "|" + heard.Get() + "|" + errs.Get() + "|" + loads.Get()) })
+		starts, states, own := core.NewSignal(cx, ""), core.NewSignal(cx, ""), core.NewSignal(cx, "")
+		cx.Effect(func() {
+			cx.SetTitle(title + "|" + heard.Get() + "|" + errs.Get() + "|" + loads.Get() + "|" + starts.Get() + "|" + states.Get() + "|" + own.Get())
+		})
 		cx.ProvideAccess(webSchemesAccess{})
 		add := func(s *core.Signal[string], text string) { s.Update(func(v string) string { return v + text + ";" }) }
-		return core.WebView{Source: core.WebHTML(page, "https://localhost/"), MessageOrigins: []string{"*"},
-			InjectedJavaScript: "if (location.protocol === 'about:') window.nsgo.postMessage('about');",
-			Style:              core.Style{Width: driver.Pt(200), Height: driver.Pt(120)},
-			OnMessage:          func(data string) { add(heard, data) },
-			OnError: func(err error) {
-				if e, ok := err.(*core.WebError); ok {
-					add(errs, e.URL)
-				}
-			},
-			OnLoad: func(n core.WebNavigation) { add(loads, n.URL) }}
+		return core.View{Style: core.Style{Direction: core.Row}, Children: []core.Node{
+			core.WebView{Source: core.WebHTML(page, "https://localhost/"), Ref: &ref, MessageOrigins: []string{"*"},
+				InjectedJavaScript: "if (location.protocol === 'about:') window.nsgo.postMessage('about');",
+				Style:              core.Style{Width: driver.Pt(200), Height: driver.Pt(120)},
+				OnMessage:          func(data string) { add(heard, data) },
+				OnError: func(err error) {
+					if e, ok := err.(*core.WebError); ok {
+						add(errs, e.URL)
+					}
+				},
+				OnLoad:                  func(n core.WebNavigation) { add(loads, n.URL) },
+				OnLoadStart:             func(n core.WebNavigation) { add(starts, n.URL) },
+				OnNavigationStateChange: func(n core.WebNavigation) { add(states, fmt.Sprintf("%s %t", n.URL, n.Loading)) }},
+			// The app's own baseless HTML must still report its about:blank load.
+			core.WebView{Source: core.WebHTML("<p>own</p>", ""),
+				Style:                   core.Style{Width: driver.Pt(100), Height: driver.Pt(120)},
+				OnLoadStart:             func(n core.WebNavigation) { add(own, "start "+n.URL) },
+				OnLoad:                  func(n core.WebNavigation) { add(own, "load "+n.URL) },
+				OnNavigationStateChange: func(n core.WebNavigation) { add(own, fmt.Sprintf("state %s %t", n.URL, n.Loading)) },
+				OnError:                 func(err error) { add(own, "error "+err.Error()) }},
+		}}
 	}
 	w := startTestWindow(t, app, Options{ID: "nsgo-test-web-schemes", Title: title, Width: 200, Height: 120})
-	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;|https://localhost/;https://localhost/;")
+	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;|https://localhost/;https://localhost/;"+
+		"|https://localhost/;https://localhost/;|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;"+
+		"|start about:blank;state about:blank true;load about:blank;state about:blank false;")
+	// A frame's about: navigation may leave a hint for the next top-level load. An allowed page must still report its start and state, in order.
+	root.Post(func() {
+		ref.InjectJavaScript(fmt.Sprintf(`{
+const f = document.createElement('iframe');
+f.src = 'about:blank';
+f.onload = () => { location.href = %q; };
+document.body.append(f);
+}`, next.URL+"/next"))
+	})
+	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;|https://localhost/;https://localhost/;"+next.URL+"/next;"+
+		"|https://localhost/;https://localhost/;"+next.URL+"/next;|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;"+
+		next.URL+"/next true;"+next.URL+"/next false;|start about:blank;state about:blank true;load about:blank;state about:blank false;")
+	// The same frame hint must not swallow the start of a load that fails before commit; its events name the failed URL rather than the old page.
+	root.Post(func() {
+		ref.InjectJavaScript(fmt.Sprintf(`{
+const f = document.createElement('iframe');
+f.src = 'about:blank';
+f.onload = () => { location.href = %q; };
+document.body.append(f);
+}`, next.URL+"/fail"))
+	})
+	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;"+next.URL+"/fail;|https://localhost/;https://localhost/;"+next.URL+"/next;"+
+		"|https://localhost/;https://localhost/;"+next.URL+"/next;"+next.URL+"/fail;|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;"+
+		next.URL+"/next true;"+next.URL+"/next false;"+next.URL+"/fail true;|start about:blank;state about:blank true;load about:blank;state about:blank false;")
 }
 
 // TestWebViewsOutliveEachOther opens an Incognito web view and one in the app's session, both serving an app-owned scheme, and one that serves none. Each page keeps its scheme and downloads as the others unmount and mount again, the page without a handler gets an error rather than a load that never ends, and a view that unmounts mid-download cancels it. It skips where WebKitGTK 6.0 is missing. WebKit takes the thread that first uses it for its main one, and each test runs GTK on a thread of its own, so the test runs in a process of its own.
