@@ -487,6 +487,9 @@ func (a *App) Focus(selector string) {
 			a.setFocus(v, true)
 			a.Settle()
 		}
+	} else if a.target != nil {
+		// The model still names the focused view after the app lost its activation: with the run's opt-in, an explicit focus step takes the keyboard back.
+		a.target.prepareKeyboard()
 	}
 	a.done()
 }
