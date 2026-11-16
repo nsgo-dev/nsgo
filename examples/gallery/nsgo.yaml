@@ -29,6 +29,7 @@ apple:
     NSSpeechRecognitionUsageDescription: The System page turns what you say into text.
     NSCameraUsageDescription: The System page takes a photo with the camera.
     NSLocationWhenInUseUsageDescription: The System page shows location fixes when you request them.
+    NSLocationUsageDescription: The System page shows location fixes when you request them.
     NSMotionUsageDescription: The System page shows motion samples when you start a sensor.
     UIBackgroundModes: [location]
     NSFaceIDUsageDescription: The System page asks for Face ID to show the prompt.

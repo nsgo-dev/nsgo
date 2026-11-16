@@ -104,7 +104,8 @@ final class Sensors {
         if (kind == MOTION) return context.getSystemService(SensorManager.class) == null ? UNAVAILABLE : GRANTED;
         if (context.getSystemService(LocationManager.class) == null) return UNAVAILABLE;
         if (kind == BACKGROUND) {
-            if (!declared(Manifest.permission.FOREGROUND_SERVICE) || (Build.VERSION.SDK_INT >= 34 && !declared(Manifest.permission.FOREGROUND_SERVICE_LOCATION))) return UNAVAILABLE;
+            // nsgo build declares LocationService only for an app that lists FOREGROUND_SERVICE_LOCATION, on every API level.
+            if (!declared(Manifest.permission.FOREGROUND_SERVICE) || !declared(Manifest.permission.FOREGROUND_SERVICE_LOCATION)) return UNAVAILABLE;
             // An explicitly started location foreground service continues a
             // foreground grant. ACCESS_BACKGROUND_LOCATION is for starting
             // location while already in background and is requested separately.

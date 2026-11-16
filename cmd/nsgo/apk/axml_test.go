@@ -480,9 +480,10 @@ func TestEncodeManifestRecording(t *testing.T) {
 func TestEncodeManifestServices(t *testing.T) {
 	data, err := EncodeManifest(androidruntime.Manifest, Manifest{
 		Package:     "dev.oneo.nsgo.test",
-		Permissions: []string{"android.permission.SYSTEM_ALERT_WINDOW", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"},
+		Permissions: []string{"android.permission.SYSTEM_ALERT_WINDOW", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_SPECIAL_USE", "android.permission.FOREGROUND_SERVICE_LOCATION"},
 		Overlay:     true,
 		Recording:   true,
+		Location:    true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -505,7 +506,7 @@ func TestEncodeManifestServices(t *testing.T) {
 			types[kid.string(t, "name")] = kid.value(t, "foregroundServiceType")
 		}
 	}
-	if len(types) != 2 || types[RecordingService] != 0x80 || types[OverlayService] != 0x40000000 {
-		t.Errorf("services %#x, want %s of microphone (0x80) and %s of specialUse (0x40000000)", types, RecordingService, OverlayService)
+	if len(types) != 3 || types[RecordingService] != 0x80 || types[OverlayService] != 0x40000000 || types[LocationService] != 0x8 {
+		t.Errorf("services %#x, want %s of microphone (0x80), %s of specialUse (0x40000000) and %s of location (0x8)", types, RecordingService, OverlayService, LocationService)
 	}
 }

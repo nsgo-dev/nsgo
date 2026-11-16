@@ -40,6 +40,8 @@ type Manifest struct {
 	Overlay bool
 	// Recording declares the runtime's RecordingService, the microphone foreground service microphone.RecordWAV records in, with the permissions it needs. An app without it declares no such service, as Google Play asks an app to justify each foreground-service type its manifest has.
 	Recording bool
+	// Location declares the runtime's LocationService, the location foreground service a background location stream runs in (core.LocationOptions.Background), for an app whose Permissions name FOREGROUND_SERVICE_LOCATION; an app without it declares no such service, which Google Play would ask it to justify.
+	Location bool
 	// Libraries are the shared libraries of the device the app uses where it has them, by name, as uses-library elements that do not require them.
 	Libraries []string
 }
@@ -125,10 +127,11 @@ var foregroundServiceTypes = map[string]uint32{
 	"specialUse":      0x40000000,
 }
 
-// The runtime's foreground services: RecordingService is the one microphone.RecordWAV records in (Manifest.Recording), of the microphone type, OverlayService the one overlays over other apps take (Manifest.Overlay), of the specialUse type, and OverlaySubtype the subtype of its specialUse type, which stores read.
+// The runtime's foreground services: RecordingService is the one microphone.RecordWAV records in (Manifest.Recording), of the microphone type, OverlayService the one overlays over other apps take (Manifest.Overlay), of the specialUse type, LocationService the one background location streams run in (Manifest.Location), of the location type, and OverlaySubtype the subtype of its specialUse type, which stores read.
 const (
 	RecordingService = "dev.oneo.nsgo.RecordingService"
 	OverlayService   = "dev.oneo.nsgo.OverlayService"
+	LocationService  = "dev.oneo.nsgo.LocationService"
 	OverlaySubtype   = "Keeps a window the user opened over other apps showing"
 )
 
@@ -272,6 +275,9 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 	}
 	if m.Recording {
 		app.kids = append(app.kids, foregroundService(RecordingService, "microphone"))
+	}
+	if m.Location {
+		app.kids = append(app.kids, foregroundService(LocationService, "location"))
 	}
 	if m.Overlay {
 		service := foregroundService(OverlayService, "specialUse")

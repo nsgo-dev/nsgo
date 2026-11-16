@@ -98,6 +98,11 @@ func (p *project) androidOverlay() bool {
 	return slices.Contains(p.Android.Permissions, "android.permission.SYSTEM_ALERT_WINDOW")
 }
 
+// androidLocation reports whether the Android app runs location streams in the background (core.LocationOptions.Background): it lists FOREGROUND_SERVICE_LOCATION in android.permissions, and its APK's manifest declares the runtime's location service, which no other app does; an -embed library leaves the service to the host's manifest.
+func (p *project) androidLocation() bool {
+	return slices.Contains(p.Android.Permissions, "android.permission.FOREGROUND_SERVICE_LOCATION")
+}
+
 // widgetKind is a kind of the app's widgets in nsgo.yaml.
 type widgetKind struct {
 	// Kind names it for widget.Update; Name and Description show in the
