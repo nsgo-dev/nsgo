@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/xml"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -122,6 +123,111 @@ func TestRunTestsKeepsTheTreeWithFlags(t *testing.T) {
 		if _, err := os.Stat(mark); err != nil {
 			t.Errorf("%d: runTests with %q did not run sub's test: %v", i, args, err)
 		}
+	}
+}
+
+// Repository tests must exercise the dev-only code as well as the normal
+// build, and a dev-only failure must fail the command and its combined report.
+func TestRunTestsIncludesTheDevClient(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs the test command")
+	}
+	dir := t.TempDir()
+	for name, content := range map[string]string{
+		"go.mod": "module " + nsgoModule + "\n\ngo 1.26\n",
+		"root_test.go": `package nsgo
+import ("flag"; "os"; "testing")
+var tags = flag.String("tags", "", "")
+func TestFixtureRoot(t *testing.T) {
+	if *tags != os.Getenv("NSGO_FIXTURE_ARG") { t.Fatalf("binary flag = %q", *tags) }
+}
+`,
+		"internal/dev/base_test.go": `package dev
+import ("flag"; "os"; "testing")
+var tags = flag.String("tags", "", "")
+func TestFixtureBase(t *testing.T) {
+	if *tags != os.Getenv("NSGO_FIXTURE_ARG") { t.Fatalf("binary flag = %q", *tags) }
+}
+`,
+		"internal/dev/client_test.go": `//go:build nsgodev
+
+package dev
+import ("os"; "testing")
+func TestFixtureDev(t *testing.T) {
+	if os.Getenv("NSGO_FIXTURE_FAIL") == "1" { t.Fatal("dev assertion failed") }
+}
+`,
+		// A command-line build tag must reach the dev run too.
+		"internal/dev/tagged_test.go": `//go:build nsgodev && fixture
+
+package dev
+import "testing"
+func TestFixtureTagged(t *testing.T) {}
+`,
+	} {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p, err := loadForTest(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name, tags, run string
+		args            []string
+		fail            bool
+		want            map[string]int
+	}{
+		{"normal", "", "", nil, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1}},
+		{"dev failure", "", "", nil, true, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1}},
+		{"normal build failure", "", "", []string{"-args", "-tags", "wrong"}, true, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 1}},
+		{"filtered", "", "^TestFixtureRoot$", nil, true, map[string]int{"TestFixtureRoot": 1}},
+		{"environment tag", "fixture", "", nil, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1, "TestFixtureTagged": 1}},
+		{"command-line tag", "", "", []string{"-tags", "fixture"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1, "TestFixtureTagged": 1}},
+		{"override dev tag", "nsgodev", "", []string{"-tags=fixture"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1, "TestFixtureTagged": 1}},
+		{"test binary tags", "", "", []string{"-args", "-tags", "literal"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1}},
+		{"already dev", "nsgodev", "", nil, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 1, "TestFixtureDev": 1}},
+		{"already dev on command line", "", "", []string{"--tags=nsgodev"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 1, "TestFixtureDev": 1}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			report := filepath.Join(t.TempDir(), "tests.xml")
+			binaryTag := ""
+			if slices.Contains(c.args, "-args") {
+				binaryTag = "literal"
+			}
+			err := runTests(t.Context(), p, testOptions{run: c.run, junit: report,
+				env:  []string{"GOWORK=off", "GOFLAGS=-tags=" + c.tags, "NSGO_FIXTURE_ARG=" + binaryTag, "NSGO_FIXTURE_FAIL=" + map[bool]string{false: "0", true: "1"}[c.fail]},
+				args: append([]string{"-count=1"}, c.args...)})
+			wantFail := c.fail && c.run == ""
+			if (err != nil) != wantFail {
+				t.Errorf("runTests = %v, want failure %v", err, wantFail)
+			}
+			data, err := os.ReadFile(report)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var suites junitSuites
+			if err := xml.Unmarshal(data, &suites); err != nil {
+				t.Fatal(err)
+			}
+			got := map[string]int{}
+			for _, suite := range suites.Suites {
+				for _, test := range suite.Cases {
+					got[test.Name]++
+				}
+			}
+			if !maps.Equal(got, c.want) {
+				t.Errorf("reported tests = %v, want %v", got, c.want)
+			}
+			if (suites.Failures > 0) != wantFail {
+				t.Errorf("report has %d failures, want failure %v", suites.Failures, wantFail)
+			}
+		})
 	}
 }
 

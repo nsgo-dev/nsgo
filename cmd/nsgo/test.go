@@ -123,7 +123,6 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 	if err != nil {
 		return err
 	}
-	args = append(args, tagsArgs(tags)...)
 	if opts.run != "" {
 		args = append(args, "-run", opts.run)
 	}
@@ -142,16 +141,58 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 		}
 		args = append(args, "-overlay", ov)
 	}
-	// The packages go before the flags, which would otherwise take ./... as the value of a test binary's flag, or pass it to the binary after -args.
-	args = append(args, "./...")
-	args = append(args, opts.args...)
-	cmd := exec.CommandContext(ctx, "go", args...)
-	cmd.Dir = p.Dir
-	cmd.Env = append(os.Environ(), opts.env...)
-	if opts.trace {
-		cmd.Env = append(cmd.Env, "NSGO_TEST_TRACE=1")
+	command := func(pattern string, tags, flags []string) *exec.Cmd {
+		a := append(slices.Clone(args), tagsArgs(tags)...)
+		// Packages precede flags a test binary may take, including -args.
+		a = append(append(a, pattern), flags...)
+		cmd := exec.CommandContext(ctx, "go", a...)
+		cmd.Dir = p.Dir
+		cmd.Env = append(os.Environ(), opts.env...)
+		if opts.trace {
+			cmd.Env = append(cmd.Env, "NSGO_TEST_TRACE=1")
+		}
+		return cmd
 	}
-	return reportTests(cmd, opts)
+	cmd := command("./...", tags, opts.args)
+	var extra []*exec.Cmd
+	// As check does, exercise the repository's dev-only code as well as
+	// the ordinary build. There are no automation-only dev tests.
+	if path, err := importPathOf(p.Dir); err == nil && path == nsgoModule {
+		devTags, flags := testBuildTags(tags, opts.args)
+		if !slices.Contains(devTags, "nsgodev") {
+			extra = append(extra, command("./internal/dev", append(devTags, "nsgodev"), flags))
+		}
+	}
+	return reportTests(cmd, opts, extra...)
+}
+
+// testBuildTags reads command-line -tags as Go does, replacing earlier
+// tags. Return the remaining flags so adding nsgodev cannot be undone by
+// a later -tags, and leave the test binary's own arguments intact.
+func testBuildTags(tags, args []string) ([]string, []string) {
+	var flags []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "-args" || a == "--args" || a == "--" {
+			flags = append(flags, args[i:]...)
+			break
+		}
+		name, value, hasValue := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		if name == "tags" {
+			if !hasValue && i+1 < len(args) {
+				i++
+				value = args[i]
+			}
+			tags = strings.Fields(strings.ReplaceAll(value, ",", " "))
+			continue
+		}
+		flags = append(flags, a)
+		if strings.HasPrefix(a, "-") && !hasValue && !goTestBoolFlags[name] && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			i++
+			flags = append(flags, args[i])
+		}
+	}
+	return uniqueTags(tags), flags
 }
 
 // loadForTest reads the app's nsgo.yaml; a directory without one still
@@ -223,21 +264,31 @@ func packageArgs(args []string) []string {
 	return packages
 }
 
-// reportTests runs cmd, which prints go test -json, and reports its
-// tests.
-func reportTests(cmd *exec.Cmd, opts testOptions) error {
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return err
-	}
+// reportTests runs the commands, which print go test -json, and reports
+// their tests together. A failed command stops the remaining runs.
+func reportTests(cmd *exec.Cmd, opts testOptions, extra ...*exec.Cmd) error {
 	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, trace: opts.trace, out: os.Stderr}
-	r.read(stdout)
-	waitErr := cmd.Wait()
-	return r.finish(opts, waitErr)
+	var waitErr error
+	for _, cmd := range append([]*exec.Cmd{cmd}, extra...) {
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			waitErr = err
+			break
+		}
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			waitErr = err
+			break
+		}
+		r.read(stdout)
+		if waitErr = cmd.Wait(); waitErr != nil {
+			break
+		}
+	}
+	if err := r.finish(opts, waitErr); err != nil {
+		return err
+	}
+	return waitErr
 }
 
 func (r *testRun) read(in io.Reader) {

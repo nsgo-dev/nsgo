@@ -40,6 +40,8 @@ go tool nsgo test -bench . ./core  # core's benchmarks
 (cd benchmark && go run ./runner)  # measure against other frameworks
 ```
 
+At NSGo's repository root, the headless command also runs `internal/dev` with the `nsgodev` build tag, so dev client assertions run locally and in CI. The same filters and flags apply to both builds, whose results share one tally and JUnit report.
+
 ## NSH
 
 NSGo reads [Native Shell](https://github.com/longbridge/nsh) as a design reference; none of its tests need it. To read it, clone it beside the repository and check out its latest release tag, never `main`:

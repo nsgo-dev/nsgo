@@ -40,6 +40,8 @@ go tool nsgo test -bench . ./core  # core 的基准测试
 (cd benchmark && go run ./runner)  # 与其他框架对比测量
 ```
 
+在 NSGo 仓库根目录，无头测试命令还会带上 `nsgodev` 构建标签运行 `internal/dev`，让本地和 CI 都执行 dev client 的断言。两种构建使用相同的筛选条件和参数，结果合并到同一份统计和 JUnit 报告中。
+
 ## NSH
 
 NSGo 把 [Native Shell](https://github.com/longbridge/nsh) 作为设计参考，测试都不依赖它。需要阅读时，将它克隆到仓库旁边，并检出它的最新发行版标签，不要用 `main`：
