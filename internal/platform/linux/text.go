@@ -135,10 +135,38 @@ func (w *window) measureContext(rtl bool) uintptr {
 		i = 1
 	}
 	if w.measureMap[i] == 0 {
-		w.measureMap[i] = pangoFontMapCreateContext(pangoCairoFontMapNew())
-		pangoContextSetBaseDir(w.measureMap[i], textDirection(rtl))
+		w.measureMap[i] = newTextContext(rtl)
 	}
 	return w.measureMap[i]
+}
+
+// newTextContext gives the context a font map of its own. The context
+// retains the map, so the map's initial reference belongs here only.
+func newTextContext(rtl bool) uintptr {
+	fontMap := pangoCairoFontMapNew()
+	context := pangoFontMapCreateContext(fontMap)
+	gObjectUnref(fontMap)
+	pangoContextSetBaseDir(context, textDirection(rtl))
+	return context
+}
+
+// releaseTextContexts drops both threads' contexts once their users
+// have stopped, or before they prepare text again with new fonts.
+func (w *window) releaseTextContexts() {
+	for i, context := range w.measureMap {
+		if context != 0 {
+			gObjectUnref(context)
+			w.measureMap[i] = 0
+		}
+	}
+	w.hitMu.Lock()
+	for i, context := range w.hitMap {
+		if context != 0 {
+			gObjectUnref(context)
+			w.hitMap[i] = 0
+		}
+	}
+	w.hitMu.Unlock()
 }
 
 // textDirection is the PangoDirection of a base direction.
@@ -448,8 +476,7 @@ func (l *textLayout) caretLines(w *window) driver.CaretLayout {
 		i = 1
 	}
 	if w.hitMap[i] == 0 {
-		w.hitMap[i] = pangoFontMapCreateContext(pangoCairoFontMapNew())
-		pangoContextSetBaseDir(w.hitMap[i], textDirection(l.style.RTL))
+		w.hitMap[i] = newTextContext(l.style.RTL)
 	}
 	pl := pangoLayoutNew(w.hitMap[i])
 	defer gObjectUnref(pl)

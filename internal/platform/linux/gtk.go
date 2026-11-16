@@ -101,6 +101,7 @@ var (
 	gTypeIsA           func(uintptr, uintptr) int32
 	gObjectRefSink     func(uintptr) uintptr
 	gSignalConnectData func(uintptr, *byte, uintptr, uintptr, uintptr, uint32) uint64
+	gSignalConnectObj  func(uintptr, *byte, uintptr, uintptr, uint32) uint64
 	gSignalEmitByName  func(uintptr, *byte, ...any)
 	gObjectGet         func(uintptr, ...any)
 	gStrfreev          func(uintptr)
@@ -455,6 +456,7 @@ func bind() {
 	purego.RegisterLibFunc(&gTypeIsA, gobjectLib, "g_type_check_instance_is_a")
 	purego.RegisterLibFunc(&gObjectRefSink, gobjectLib, "g_object_ref_sink")
 	purego.RegisterLibFunc(&gSignalConnectData, gobjectLib, "g_signal_connect_data")
+	purego.RegisterLibFunc(&gSignalConnectObj, gobjectLib, "g_signal_connect_object")
 	purego.RegisterLibFunc(&gSignalEmitByName, gobjectLib, "g_signal_emit_by_name")
 	purego.RegisterLibFunc(&gObjectGet, gobjectLib, "g_object_get")
 

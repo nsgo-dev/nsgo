@@ -485,10 +485,12 @@ func (v *View) SetTokens(t engine.Tokens) { v.w.opts.Host.Settings.SetTokens(t) 
 // widget go, which the host removes from its parent.
 func (v *View) Close() {
 	w := v.w
+	if w.surface == 0 {
+		return
+	}
 	w.scopeAppearance(driver.AppearanceSystem)
 	w.close()
-	w.closeNatives()
-	gObjectUnref(w.surface)
+	w.releaseSurface()
 }
 
 // closeNatives destroys the native components still showing, once the
@@ -523,20 +525,7 @@ func (w *window) stop() {
 	w.engine.Close()
 	w.closeNatives()
 	engine.SyncStorage()
-	for i, m := range w.measureMap {
-		if m != 0 {
-			gObjectUnref(m)
-			w.measureMap[i] = 0
-		}
-	}
-	w.hitMu.Lock()
-	for i, m := range w.hitMap {
-		if m != 0 {
-			gObjectUnref(m)
-			w.hitMap[i] = 0
-		}
-	}
-	w.hitMu.Unlock()
+	w.releaseTextContexts()
 	if w.loop != 0 {
 		gMainLoopUnref(w.loop)
 		w.loop = 0
@@ -729,6 +718,13 @@ func (w *window) destroy() {
 		return
 	}
 	w.close()
+	w.releaseSurface()
+}
+
+// releaseSurface releases a stopped surface's tree, process-wide
+// registrations and native references. An embedded surface leaves its
+// parent widget and the host's window to the host.
+func (w *window) releaseSurface() {
 	for _, v := range w.views {
 		if v != nil {
 			w.delete(v)
@@ -744,15 +740,10 @@ func (w *window) destroy() {
 		gSignalHandlerDisconnect(gnomeA11ySettingsForWatch(), w.contrastHandler)
 		w.contrastHandler = 0
 	}
-	w.hitMu.Lock()
-	for i, m := range w.hitMap {
-		if m != 0 {
-			gObjectUnref(m)
-			w.hitMap[i] = 0
-		}
+	w.releaseTextContexts()
+	if w.win != 0 {
+		gtkWindowDestroy(w.win)
 	}
-	w.hitMu.Unlock()
-	gtkWindowDestroy(w.win)
 	forgetWidget(w.surface)
 	gObjectUnref(w.surface)
 	w.win, w.surface = 0, 0

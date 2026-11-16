@@ -274,9 +274,11 @@ func mappedCallback(widget, data uintptr) {
 	if gtkWidgetGetMapped(w.surface) != 0 && w.watchedRoot == 0 {
 		if root := w.rootWindow(); root != 0 {
 			w.watchedRoot = root
-			gSignalConnect(root, "notify::is-active", cbActivity, w.handle)
+			// The host's window may outlive this surface. GTK disconnects
+			// these broadcasts when either endpoint goes.
+			gSignalConnectObj(root, cstr("notify::is-active"), cbActivity, w.surface, 0)
 			if top := gtkNativeGetSurface(gtkWidgetGetNative(w.surface)); top != 0 {
-				gSignalConnect(top, "notify::state", cbActivity, w.handle)
+				gSignalConnectObj(top, cstr("notify::state"), cbActivity, w.surface, 0)
 			}
 		}
 	}

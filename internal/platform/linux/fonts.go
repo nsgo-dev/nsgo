@@ -87,20 +87,7 @@ func (w *window) RegisterFont(data []byte) error {
 	if fontconfig.addFile(0, cstr(file)) == 0 {
 		return errors.New("fontconfig cannot read it")
 	}
-	for i, m := range w.measureMap {
-		if m != 0 {
-			gObjectUnref(m)
-			w.measureMap[i] = 0
-		}
-	}
-	w.hitMu.Lock()
-	for i, m := range w.hitMap {
-		if m != 0 {
-			gObjectUnref(m)
-			w.hitMap[i] = 0
-		}
-	}
-	w.hitMu.Unlock()
+	w.releaseTextContexts()
 	if pangoFcFontMapConfigChanged == nil {
 		return nil
 	}
