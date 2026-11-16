@@ -874,6 +874,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             d.writeByte((dark ? 1 : 0) | (reduceMotion ? 2 : 0) | (reader ? 4 : 0) | (rtl ? 8 : 0)
                     | (increaseContrast ? 128 : 0)
                     | (inactive ? 16 : 0) | (background ? 32 : 0) | (Services.hasCamera(getContext()) ? 64 : 0));
+            // The first byte's eight bits are taken: what else the device can do follows in a second.
+            d.writeByte(Speaker.available(getContext()) ? 1 : 0);
             int idiom = config.smallestScreenWidthDp >= 600 ? Protocol.IDIOM_TABLET : Protocol.IDIOM_PHONE;
             if ((config.uiMode & Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION) {
                 idiom = Protocol.IDIOM_TV;
@@ -1314,6 +1316,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 overlays.redrawCanvases();
             });
         });
+    }
+
+    /** Answers ITEM_SPEAK count of this view's tree: an utterance's end, stopped or with error, one of driver's Speak errors, or the voices as JSON. */
+    void answerSpeak(long count, boolean stopped, String error, String voices) {
+        event(Protocol.EVENT_SPEAK, 0, count, 0, 0, error, 0, 0, stopped ? 1 : 0, 0, 0, 0, 0, null, 0, 0, false, voices, false);
     }
 
     /** Answers ITEM_OVERLAY_PERMISSION count of this view's tree with permission, an OVERLAY_* of Protocol's. */
@@ -2493,6 +2500,14 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.ITEM_BIOMETRIC_AVAILABILITY: {
                 long count = in.readInt() & 0xffffffffL;
                 event(Protocol.EVENT_BIOMETRIC, 0, count, 0, 0, "", 0, 0, biometricAvailability());
+                break;
+            }
+            case Protocol.ITEM_SPEAK: {
+                long count = in.readInt() & 0xffffffffL;
+                int command = in.readUnsignedByte();
+                String text = Protocol.readString(in), lang = Protocol.readString(in), voice = Protocol.readString(in);
+                float rate = in.readFloat(), pitch = in.readFloat();
+                Speaker.handle(this, count, command, text, lang, voice, rate, pitch);
                 break;
             }
             case Protocol.ITEM_BIOMETRIC_AUTHENTICATE: {

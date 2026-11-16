@@ -313,6 +313,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 				readClipboard(&ev, data)
 			case driver.EventPick:
 				ev.Data = readPicked(data)
+			case driver.EventSpeak:
+				ev.Data, ev.Text, ev.Index = readSpeak(ev, data), "", 0
 			case driver.EventFiles:
 				if s.pickedFolders(answerKey(from, ev.Count)) {
 					ev.Data = s.readFolders(data)
@@ -501,6 +503,15 @@ func readClipboard(ev *driver.Event, data string) {
 	}
 }
 
+// readSpeak reads what Speaker.java's EventSpeak reports: its error as the text, whether it stopped as the index, and the voices it lists as JSON in its data.
+func readSpeak(ev driver.Event, data string) *driver.SpeakEvent {
+	e := &driver.SpeakEvent{Error: ev.Text, Stopped: ev.Index != 0}
+	if data != "" {
+		json.Unmarshal([]byte(data), &e.Voices)
+	}
+	return e
+}
+
 // readPicked reads the files an EventPick carries in its data, one per
 // line: the name, the MIME type, the width, the height, the time it was
 // last changed in milliseconds and the bytes in base64.
@@ -602,6 +613,8 @@ func readEnvironment(r *reader) driver.Environment {
 	case flags&16 != 0:
 		env.Lifecycle = driver.LifecycleInactive
 	}
+	// The first byte's bits are all taken; a second holds what else the device can do.
+	env.Speak = r.byte()&1 != 0
 	env.Idiom = driver.Idiom(r.byte())
 	env.Locale = r.str()
 	// The toolbar's heights, without and with a large title.
@@ -1313,6 +1326,15 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.str(it.Value)
 		case driver.ItemHaptic, driver.ItemBadge:
 			w.u32(it.Count)
+		case driver.ItemSpeak:
+			r := it.Speak
+			w.u32(it.Count)
+			w.byte(byte(r.Command))
+			w.str(r.Text)
+			w.str(r.Lang)
+			w.str(r.Voice)
+			w.float(r.Rate)
+			w.float(r.Pitch)
 		case driver.ItemBiometricAvailability:
 			w.u32(it.Count)
 		case driver.ItemBiometricAuthenticate:

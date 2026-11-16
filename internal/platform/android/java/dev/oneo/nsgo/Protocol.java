@@ -180,6 +180,7 @@ final class Protocol {
     static final int ITEM_BIOMETRIC_AUTHENTICATE = 87;
     static final int ITEM_OPEN_SURFACE = 68;
     static final int ITEM_OVERLAY_PERMISSION = 89;
+    static final int ITEM_SPEAK = 102;
 
     // What EVENT_OVERLAY_PERMISSION answers ITEM_OVERLAY_PERMISSION with, and why an overlay ends, as the driver's.
     static final int OVERLAY_DENIED = 0;
@@ -274,6 +275,7 @@ final class Protocol {
     static final int EVENT_NOTIFICATION_PRESS = 77;
     static final int EVENT_BIOMETRIC = 78;
     static final int EVENT_OVERLAY_PERMISSION = 80;
+    static final int EVENT_SPEAK = 90;
 
     static final int BIOMETRIC_NONE = 0;
     static final int BIOMETRIC_FACE = 1;
