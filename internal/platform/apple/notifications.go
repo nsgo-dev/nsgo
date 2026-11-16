@@ -46,10 +46,10 @@ var notificationCenter = sync.OnceValue(func() objc.ID {
 	return objc.ID(c).Send(sel("currentNotificationCenter"))
 })
 
-// notificationsUsedKey is the defaults key NSGo sets once the app asks for the notification permission or shows a notification, so later launches set the delegate before launching ends and hear a press on a notification an earlier run showed.
+// notificationsUsedKey is the defaults key NSGo sets once the app checks or asks for the notification permission or shows a notification, so later launches set the delegate before launching ends and hear a press on a notification an earlier run showed.
 const notificationsUsedKey = "NSGoNotifications"
 
-// NotificationsUsed reports whether the app asked for the notification permission or showed a notification, in this run or an earlier one, without touching the center: a bundled macOS app whose process touched it has its Dock badge shown only while the user allows its badges.
+// NotificationsUsed reports whether the app checked or asked for the notification permission or showed a notification, in this run or an earlier one, without touching the center: a bundled macOS app whose process touched it has its Dock badge shown only while the user allows its badges.
 func NotificationsUsed() bool {
 	defaults := objc.ID(Class("NSUserDefaults")).Send(sel("standardUserDefaults"))
 	return MsgBool(defaults, sel("boolForKey:"), uintptr(NSString(notificationsUsedKey)))

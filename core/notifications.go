@@ -56,13 +56,12 @@ type Notification struct {
 // without an ID or a title.
 var ErrNotification = errors.New("nsgo: a notification needs an ID and a title")
 
-// NotificationPermission answers done with whether the app may show
-// notifications, without asking the user.
+// NotificationPermission answers done with whether the app may show notifications, without asking the user. On macOS checking uses the notification center as asking does, so from then on the app's Dock badge shows only while the user allows its badges.
 func (cx *Scope) NotificationPermission(done func(NotificationPermission)) {
 	cx.notificationPermission(false, done)
 }
 
-// RequestNotificationPermission asks the user to let the app show notifications, with the system's prompt the first time, and answers done with the permission. Ask as the user does something that needs them: browsers refuse a prompt the user did not cause, and iOS and Android ask only once. An iOS app's badge needs it too, as does a macOS app's once it asks for the permission or shows a notification.
+// RequestNotificationPermission asks the user to let the app show notifications, with the system's prompt the first time, and answers done with the permission. Ask as the user does something that needs them: browsers refuse a prompt the user did not cause, and iOS and Android ask only once. An iOS app's badge needs it too, as does a macOS app's once it checks or asks for the permission or shows a notification.
 func (cx *Scope) RequestNotificationPermission(done func(NotificationPermission)) {
 	cx.notificationPermission(true, done)
 }
@@ -124,7 +123,7 @@ func (cx *Scope) CloseNotifications() {
 	}
 }
 
-// SetBadge shows count on the app's icon, and 0 or less clears it: the Dock's on macOS, which needs the user to allow the app's badges once it asks for the notification permission or shows a notification, the Home Screen's on iOS, which needs the notification permission, the taskbar button's on Windows, the launcher's on Linux where it follows Unity's LauncherEntry API, such as Ubuntu's dock, Plasma and Dash to Dock, and an installed web app's. Android has no count to set: launchers mark an app whose notifications show, and count goes with those shown after it. Elsewhere nothing happens.
+// SetBadge shows count on the app's icon, and 0 or less clears it: the Dock's on macOS, which needs the user to allow the app's badges once it checks or asks for the notification permission or shows a notification, the Home Screen's on iOS, which needs the notification permission, the taskbar button's on Windows, the launcher's on Linux where it follows Unity's LauncherEntry API, such as Ubuntu's dock, Plasma and Dash to Dock, and an installed web app's. Android has no count to set: launchers mark an app whose notifications show, and count goes with those shown after it. Elsewhere nothing happens.
 func (cx *Scope) SetBadge(count int) {
 	t := cx.tree()
 	if t == nil || cx.denied(serviceNotifications, "") {
