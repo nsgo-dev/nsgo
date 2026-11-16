@@ -94,8 +94,13 @@ type testRun struct {
 // per test and failing when any failed.
 func runTests(ctx context.Context, p *project, opts testOptions) error {
 	// go test would take another package inside the app's directory, and a target never reads it.
-	if packages := packageArgs(opts.args); len(packages) > 0 {
-		return fmt.Errorf("test: takes one directory, not %q as well; test their common parent or one directory at a time, and pass only go test flags after --", packages[0])
+	if err := testPathError(opts.args); err != nil {
+		return err
+	}
+	if opts.target != "" {
+		if _, err := parseTargetTestFlags(opts.args); err != nil {
+			return err
+		}
 	}
 	if err := p.prepareCatalogs(ctx, "./...", false); err != nil {
 		return err

@@ -39,6 +39,14 @@ type targetRunner struct {
 // process of its own, as the platform shows one app at a time: the test
 // binary, built with the backend's test host, is the target's package.
 func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
+	flags, err := parseTargetTestFlags(opts.args)
+	if err != nil {
+		return err
+	}
+	if flags.count <= 0 {
+		plain("no tests run (-count=%d)", flags.count)
+		return (&testRun{out: os.Stderr}).finish(opts, nil)
+	}
 	// A package that builds only for its target, as a backend's, is
 	// listed as the target sees it.
 	here, err := buildsHere(ctx, p)
@@ -49,7 +57,7 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	if here {
 		seen = ""
 	}
-	names, err := listTests(ctx, p, seen, opts.run)
+	names, err := listTests(ctx, p, seen, opts.run, flags.args...)
 	if err != nil {
 		return err
 	}
@@ -93,6 +101,7 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	}
 	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, trace: opts.trace, out: os.Stderr}
 	savedPaths := map[string]bool{}
+	repeated := hosted && (flags.count > 1 || len(flags.cpus) > 1)
 	// A package that links no platform, as a library's, runs headless in the target's runtime, the web's engine say, but for the targets needsTestHost names, which refused it above.
 	env := slices.Clone(opts.env)
 	if hosted {
@@ -104,31 +113,47 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	if opts.fps {
 		env = append(env, "NSGO_TEST_FPS=1")
 	}
+tests:
 	for _, name := range names {
-		var out bytes.Buffer
-		w := io.MultiWriter(&out, traceWriter{r.out, opts.trace, opts.fps})
-		tctx, cancel := context.WithCancel(ctx)
-		if opts.timeout > 0 {
-			tctx, cancel = context.WithTimeout(ctx, opts.timeout)
-		}
-		started := time.Now()
-		code, err := runner.run(tctx, targetTestArgs(name, opts.run, opts.timeout), env, w)
-		timedOut := errors.Is(tctx.Err(), context.DeadlineExceeded)
-		cancel()
-		if timedOut {
-			code, err = -1, timeoutError(opts.timeout)
-		} else if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		t, saved := targetResult(name, out.String(), code, err, shots, savedPaths)
-		if t.Elapsed == 0 {
-			t.Elapsed = time.Since(started)
-		}
-		t.Package = p.ID
-		r.results = append(r.results, t)
-		r.print(t)
-		for _, s := range saved {
-			fmt.Fprintf(r.out, "%s  → %s\n", margin, rel(s))
+		iteration := 0
+		for execution := range flags.executions(hosted) {
+			iteration++
+			var out bytes.Buffer
+			w := io.MultiWriter(&out, traceWriter{r.out, opts.trace, opts.fps})
+			tctx, cancel := context.WithCancel(ctx)
+			if opts.timeout > 0 {
+				tctx, cancel = context.WithTimeout(ctx, opts.timeout)
+			}
+			started := time.Now()
+			args := append(targetTestArgs(name, opts.run, opts.timeout), execution...)
+			code, err := runner.run(tctx, args, env, w)
+			timedOut := errors.Is(tctx.Err(), context.DeadlineExceeded)
+			cancel()
+			if timedOut {
+				code, err = -1, timeoutError(opts.timeout)
+			} else if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			dir := shots
+			if repeated {
+				dir = filepath.Join(shots, fmt.Sprintf("run-%d", iteration))
+			}
+			t, saved := targetResult(name, out.String(), code, err, dir, savedPaths)
+			if t.Elapsed == 0 {
+				t.Elapsed = time.Since(started)
+			}
+			t.Package = p.ID
+			if repeated {
+				t.Name = fmt.Sprintf("%s [run %d]", t.Name, iteration)
+			}
+			r.results = append(r.results, t)
+			r.print(t)
+			for _, s := range saved {
+				fmt.Fprintf(r.out, "%s  → %s\n", margin, rel(s))
+			}
+			if flags.failfast && t.Status == "fail" {
+				break tests
+			}
 		}
 	}
 	return r.finish(opts, nil)
@@ -223,19 +248,20 @@ func goListFor(ctx context.Context, p *project, target string, args ...string) (
 
 // listTests lists the package's tests that run matches, as go test -list
 // does on this machine, or from its sources as target sees them.
-func listTests(ctx context.Context, p *project, target, run string) ([]string, error) {
+func listTests(ctx context.Context, p *project, target, run string, extra ...string) ([]string, error) {
 	if run == "" {
 		run = "."
 	}
+	top, _ := splitTestRun(run)
 	if target != "" {
-		top, _ := splitTestRun(run)
 		return listTestSources(ctx, p, target, top)
 	}
 	tags, err := goTags(ctx, p, nil)
 	if err != nil {
 		return nil, err
 	}
-	args := append([]string{"test", "-list", run}, tagsArgs(tags)...)
+	args := append([]string{"test", "-list", top}, tagsArgs(tags)...)
+	args = append(args, extra...)
 	// The TSX tests are in a file the tool adds.
 	if tsxTest, err := p.tsxTestFile(); err != nil {
 		return nil, err
@@ -417,17 +443,23 @@ func parseTestOutput(name, out string, code int, runErr error) *testResult {
 	t := &testResult{Name: name, Output: out}
 	matched := ""
 	for _, line := range strings.Split(out, "\n") {
-		if m := testLine.FindStringSubmatch(line); m != nil && (m[2] == name || strings.HasPrefix(m[2], name+"/")) && len(m[2]) > len(matched) {
-			matched = m[2]
-			t.Status = strings.ToLower(m[1])
+		if m := testLine.FindStringSubmatch(strings.TrimLeft(line, " \t")); m != nil && (m[2] == name || strings.HasPrefix(m[2], name+"/")) && len(m[2]) >= len(matched) {
 			s, _ := strconv.ParseFloat(m[3], 64)
-			t.Elapsed = time.Duration(s * float64(time.Second))
+			status := strings.ToLower(m[1])
+			if len(m[2]) > len(matched) {
+				matched, t.Status, t.Elapsed = m[2], status, 0
+			} else if m[2] != matched {
+				continue
+			} else if status == "fail" || t.Status == "skip" {
+				t.Status = status
+			}
+			t.Elapsed += time.Duration(s * float64(time.Second))
 		}
 	}
 	if matched != "" {
 		t.Name = matched
 	}
-	if t.Status == "" || t.Status == "pass" && code != 0 {
+	if t.Status == "" || t.Status != "fail" && code != 0 {
 		why := fmt.Sprintf("the test process exited with %d", code)
 		if runErr != nil {
 			why = runErr.Error()

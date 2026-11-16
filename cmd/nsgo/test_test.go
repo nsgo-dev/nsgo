@@ -42,6 +42,31 @@ func TestParseTargetSubtestOutput(t *testing.T) {
 	}
 }
 
+func TestRepeatedTargetResults(t *testing.T) {
+	for _, tc := range []struct {
+		output, want string
+		code         int
+	}{
+		{"--- SKIP: TestOne (0.1s)\n--- PASS: TestOne (0.2s)\n", "pass", 0},
+		{"--- PASS: TestOne (0.1s)\n--- SKIP: TestOne (0.2s)\n", "pass", 0},
+		{"--- SKIP: TestOne (0.1s)\n--- FAIL: TestOne (0.2s)\n", "fail", 1},
+		{"--- FAIL: TestOne (0.1s)\n--- PASS: TestOne (0.2s)\n", "fail", 1},
+		{"--- SKIP: TestOne (0.1s)\nprocess failed during teardown\n", "fail", 1},
+	} {
+		got := parseTestOutput("TestOne", tc.output, tc.code, nil)
+		if got.Status != tc.want {
+			t.Errorf("%q (exit %d): %s, want %s", tc.output, tc.code, got.Status, tc.want)
+		}
+		if tc.code == 0 && got.Elapsed != 300*time.Millisecond {
+			t.Errorf("repeated elapsed=%v, want 300ms", got.Elapsed)
+		}
+	}
+	got := parseTestOutput("TestOne", "    --- PASS: TestOne/selected (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
+	if got.Name != "TestOne/selected" || got.Status != "pass" {
+		t.Fatalf("indented subtest=%+v", got)
+	}
+}
+
 func TestTreeOf(t *testing.T) {
 	for in, want := range map[string]string{
 		"":              "",

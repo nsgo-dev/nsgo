@@ -47,7 +47,7 @@ An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, is tested
 go tool nsgo test
 ```
 
-`test` prints a line per test. `-run` picks tests as `go test`'s does, including subtests such as `-run 'TestGallery/dark-home'`. On a target, `-timeout` sets the per-test deadline (three minutes by default; `0` disables it) and the result reports when that deadline is reached. `-junit report.xml` writes a JUnit report, `-trace` prints each step's mount items and commit times and `-bench` runs benchmarks instead, a line per result. Flags after `--` go to `go test`.
+`test` prints a line per test. `-run` picks tests as `go test`'s does, including subtests such as `-run 'TestGallery/dark-home'`. On a target, `-timeout` sets the per-test deadline (three minutes by default; `0` disables it) and the result reports when that deadline is reached. `-junit report.xml` writes a JUnit report, `-trace` prints each step's mount items and commit times and `-bench` runs benchmarks instead, a line per result. Headless runs forward flags after `--` to `go test`; target runs accept the runtime flags below.
 
 Given a directory without `nsgo.yaml`, such as a library or the module's root, `test` takes every package under it; a directory may also end in `/...`, as Go's patterns do. It takes one directory, and stops with an error at a second: to test several, give it a directory above them, or run it once for each. `go tool nsgo check` takes packages the same way and vets them.
 
@@ -78,6 +78,8 @@ Each step, and `app.Settle()`, waits for the engine's pending commit before coun
 On Android, the tool wakes a sleeping screen and dismisses a lock screen without a credential before building and before each test. A device locked with a PIN, password or pattern must be unlocked before the run can continue; the error names the device.
 
 To measure rather than check, start with `nsgotest.Measure()`: the app runs on the system's clock, `Advance` waits as long as it moves, and steps wait only for what animates to rest. `app.Mark("name")` names what the readings from there on measure, and `app.Mark("-")` ends it; the marks print with or without `-fps`.
+
+Put NSGo flags before the directory: `go tool nsgo test -target web ./app`, not after it. For headless runs, flags after `--` go to `go test`. Target runs support `-short`, `-count`, `-cpu`, `-parallel`, `-failfast` and `-fullpath` there, for example `go tool nsgo test -target web ./app -- -short -count=3`; they reject other Go test flags explicitly. Keep `-run` and `-timeout` before the directory on every target. `-count=0` runs no tests. Tests that link NSGo's native host repeat in fresh processes for each count and CPU setting, with `[run N]` in their results, screenshots in `run-N` subdirectories and a timeout per invocation; libraries keep Go's in-process repetitions.
 
 ## TSX tests
 

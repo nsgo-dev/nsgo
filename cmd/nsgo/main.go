@@ -28,6 +28,8 @@
 // patterns do. test and check also take a directory without nsgo.yaml,
 // such as a library or a module's root, and run on every package under
 // it. Flags replace the nsgo.yaml values they name; -h lists them.
+// Put flags before the path. test forwards go test flags after -- headless;
+// target runs accept short, count, cpu, parallel, failfast and fullpath only.
 package main
 
 import (
@@ -53,7 +55,9 @@ func main() {
 	case "dev":
 		fs := flag.NewFlagSet("dev", flag.ExitOnError)
 		f := bindDevFlags(fs)
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		var p *project
 		if p, err = load(fs.Arg(0)); err == nil {
 			f.apply(p)
@@ -62,7 +66,9 @@ func main() {
 	case "mcp":
 		fs := flag.NewFlagSet("mcp", flag.ExitOnError)
 		f := bindDevFlags(fs)
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		var p *project
 		if p, err = load(fs.Arg(0)); err == nil {
 			f.apply(p)
@@ -73,7 +79,9 @@ func main() {
 		name := fs.String("name", "", "the app's name (default: the directory's)")
 		module := fs.String("module", "", "write a go.mod for this module path")
 		kind := fs.String("template", "go", "the app to write: go, tsx (a TSX app) or mixed (a Go app with a TSX entry)")
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		dir := fs.Arg(0)
 		if dir == "" {
 			dir = "."
@@ -82,7 +90,9 @@ func main() {
 	case "build":
 		fs := flag.NewFlagSet("build", flag.ExitOnError)
 		f := bindBuildFlags(fs)
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		var p *project
 		if p, err = load(fs.Arg(0)); err == nil {
 			f.apply(p)
@@ -108,7 +118,9 @@ func main() {
 			o.env = append(o.env, kv)
 			return nil
 		})
-		fs.Parse(args)
+		if err = parseCommand(fs, args, -1); err != nil {
+			break
+		}
 		dir, forwarded := splitTestArgs(fs.Args())
 		o.args = forwarded
 		var p *project
@@ -118,7 +130,9 @@ func main() {
 	case "check":
 		fs := flag.NewFlagSet("check", flag.ExitOnError)
 		target := fs.String("target", "", "also vet for these comma-separated `targets` (all for available Go/Xcode targets)")
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		var p *project
 		if p, err = loadOrDir(treeOf(fs.Arg(0))); err == nil {
 			err = check(ctx, p, *target)
@@ -126,7 +140,9 @@ func main() {
 	case "i18n":
 		fs := flag.NewFlagSet("i18n", flag.ExitOnError)
 		source := fs.String("source", "", "the `language` a library's catalogs are written in (default: as their code says, else en)")
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		dir := fs.Arg(0)
 		if dir == "" {
 			dir = "."
@@ -141,13 +157,14 @@ func main() {
 		}
 	case "doctor":
 		fs := flag.NewFlagSet("doctor", flag.ExitOnError)
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 0); err != nil {
+			break
+		}
 		err = doctor(ctx)
 	case "keygen":
 		fs := flag.NewFlagSet("keygen", flag.ExitOnError)
-		fs.Parse(args)
-		if fs.NArg() != 0 {
-			usage()
+		if err = parseCommand(fs, args, 0); err != nil {
+			break
 		}
 		err = keygen()
 	case "certify":
@@ -157,7 +174,9 @@ func main() {
 		fs.StringVar(&o.apps, "apps", "", "the comma-separated app `IDs` it may sign: *, com.example.* or an ID")
 		fs.IntVar(&o.days, "days", 365, "how many `days` from now it may sign")
 		fs.StringVar(&o.out, "out", "", "the certificate's `file` (default: release.cert)")
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 0); err != nil {
+			break
+		}
 		err = certify(o)
 	case "publish":
 		fs := flag.NewFlagSet("publish", flag.ExitOnError)
@@ -166,14 +185,18 @@ func main() {
 		fs.StringVar(&o.entry, "entry", "", "the TSX `entry` to compile (default: the one the main package runs, else App.tsx)")
 		fs.StringVar(&o.minRuntime, "min-runtime", "", "the oldest runtime `version` the package runs on (default: this tool's)")
 		fs.StringVar(&o.out, "out", "", "the package's `file` (default: build.output's <name>-<version>.nsgopkg)")
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		err = publish(o, fs.Arg(0))
 	case "verify":
 		fs := flag.NewFlagSet("verify", flag.ExitOnError)
 		var o verifyOptions
 		fs.StringVar(&o.roots, "root", "", "the comma-separated public `keys` of the roots to trust (default: check the package against itself)")
 		fs.StringVar(&o.revocations, "revocations", "", "the comma-separated revocation list `files`, a root's newest each, to check it against")
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 1); err != nil {
+			break
+		}
 		if fs.NArg() != 1 {
 			usage()
 		}
@@ -186,7 +209,9 @@ func main() {
 		fs.StringVar(&o.keys, "keys", "", "the comma-separated `IDs` of the release keys to revoke")
 		fs.StringVar(&o.packages, "packages", "", "the comma-separated packages to revoke, by `SHA-256` or file")
 		fs.StringVar(&o.out, "out", "", "the list's `file`")
-		fs.Parse(args)
+		if err = parseCommand(fs, args, 0); err != nil {
+			break
+		}
 		err = revoke(o)
 	case signerCommand:
 		// NSIS runs it through the hook uninstallerSignCommand installs,
@@ -221,6 +246,8 @@ func usage() {
   nsgo revoke  -sequence N [-days N] [-keys IDs] [-packages H,...] -out F
 
 dev and build take -name, -id and -version, which replace nsgo.yaml's
-values, and -h lists every flag.`)
+values, and -h lists every flag. Put NSGo flags before the path.
+After --, headless tests accept go test flags; target tests accept
+-short, -count, -cpu, -parallel, -failfast and -fullpath.`)
 	os.Exit(2)
 }
