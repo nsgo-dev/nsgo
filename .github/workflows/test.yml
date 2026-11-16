@@ -78,3 +78,5 @@ jobs:
         run: go tool nsgo check ./internal/platform/apple
       - name: Test
         run: go tool nsgo test ./internal/platform/apple
+      - name: Test main-thread failure propagation
+        run: go tool nsgo test -run '^TestOnMainExitPropagation$' ./internal/platform/macos -- -race
