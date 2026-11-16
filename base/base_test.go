@@ -2,7 +2,9 @@ package base_test
 
 import (
 	"slices"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
@@ -114,6 +116,23 @@ func TestCalendarShortPageKeepsItsRows(t *testing.T) {
 	}
 	if got := app.Find("label:2000").Frame.Size.Height; got < 52 || got > 53 {
 		t.Fatalf("a year of four rows of 210 is %v high", got)
+	}
+}
+
+// A calendar's today is the day where the test set the wall time: 08:00 on Monday in Tokyo is still Sunday in UTC, the clock's own zone.
+func TestCalendarTodayIsTheWallTimesDay(t *testing.T) {
+	tokyo := time.FixedZone("JST", 9*60*60)
+	wall := func(a *nsgotest.App) { a.Clock.SetWallTime(time.Date(2026, 11, 16, 8, 0, 0, 0, tokyo)) }
+	app := nsgotest.Start(t, func(*core.Scope) core.Node {
+		return base.Calendar{CalendarConfig: base.CalendarConfig{RenderItem: func(e base.CalendarEntry) core.Node {
+			if e.Today {
+				return core.Text{Content: "today " + e.Date}
+			}
+			return core.Text{Content: strconv.Itoa(e.Value)}
+		}}}
+	}, wall)
+	if !app.Exists("text:today 2026-11-16") {
+		t.Fatalf("today is not 2026-11-16 (2026-11-15: %v)", app.Exists("text:today 2026-11-15"))
 	}
 }
 

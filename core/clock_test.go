@@ -22,4 +22,11 @@ func TestManualClockWallTimeKeepsSetLocation(t *testing.T) {
 	if !got.Equal(want) || got.Location() != tokyo {
 		t.Fatalf("WallTime() after Advance = %v (%v), want %v (%v)", got, got.Location(), want, want.Location())
 	}
+
+	clock.Jump(24 * time.Hour)
+	want = want.Add(24 * time.Hour)
+	got = clock.WallTime()
+	if !got.Equal(want) || got.Location() != tokyo {
+		t.Fatalf("WallTime() after Jump = %v (%v), want %v (%v)", got, got.Location(), want, want.Location())
+	}
 }

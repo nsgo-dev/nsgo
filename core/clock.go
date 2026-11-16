@@ -51,8 +51,7 @@ func (c *ManualClock) Now() time.Time {
 	return c.now
 }
 
-// SetWallTime sets the wall time the app reads (Scope.WallTime, a TSX
-// app's Date) to t, moving no timer: the clock's own time goes on.
+// SetWallTime sets the wall time the app reads (Scope.WallTime, a TSX app's Date) to t, in t's location, moving no timer: the clock's own time goes on.
 func (c *ManualClock) SetWallTime(t time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -60,8 +59,7 @@ func (c *ManualClock) SetWallTime(t time.Time) {
 	c.wallLoc = t.Location()
 }
 
-// WallTime is the wall time the app reads: Now, unless SetWallTime set
-// it apart. After SetWallTime, it uses the location passed to that call.
+// WallTime is the wall time the app reads: Now, unless SetWallTime set it apart, in the location of the time it was given.
 func (c *ManualClock) WallTime() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -155,9 +153,7 @@ func slicesDeleteStopped(ts []*manualTimer) []*manualTimer {
 // manual clock.
 func (cx *Scope) Now() time.Time { return cx.rt.clock.Now() }
 
-// WallTime returns the date and time the app shows: Now, unless a test's
-// manual clock set its wall time apart (ManualClock.SetWallTime). A manual
-// clock returns that wall time in the location passed to SetWallTime.
+// WallTime returns the date and time the app shows: Now, local time on the system's clock, unless a test's manual clock set its wall time apart (ManualClock.SetWallTime), in the location of the time it was given.
 func (cx *Scope) WallTime() time.Time {
 	if w, ok := cx.rt.clock.(interface{ WallTime() time.Time }); ok {
 		return w.WallTime()
