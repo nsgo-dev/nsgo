@@ -61,23 +61,79 @@ func TestTreeOf(t *testing.T) {
 	}
 }
 
-func TestExtraPackageArgs(t *testing.T) {
-	for name, args := range map[string][]string{
-		"second package": {"./other"},
-		"import path":    {"github.com/example/app"},
-		"run value":      {"-run", "TestOne"},
-		"run equals":     {"-run=TestOne"},
-		"test args":      {"-args", "./not-a-package"},
+func TestPackageArgs(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want []string
+	}{
+		{[]string{"./other"}, []string{"./other"}},
+		{[]string{"./a", "./b"}, []string{"./a", "./b"}},
+		{[]string{"github.com/example/app"}, []string{"github.com/example/app"}},
+		{[]string{"-run", "TestOne"}, nil},
+		{[]string{"-run=TestOne"}, nil},
+		{[]string{"--run", "TestOne"}, nil},
+		{[]string{"-count", "1"}, nil},
+		{[]string{"-shuffle", "on", "-cpuprofile", "cpu.out", "-exec", "wrapper", "-tags", "x"}, nil},
+		{[]string{"-test.count", "2", "-test.cpuprofile", "cpu.out"}, nil},
+		// A flag of the test binary's own takes the next argument, as go test assumes.
+		{[]string{"-update", "golden"}, nil},
+		{[]string{"-update=true", "./b"}, []string{"./b"}},
+		{[]string{"-v", "./b"}, []string{"./b"}},
+		{[]string{"-race", "-short", "-benchmem", "-test.v", "./b"}, []string{"./b"}},
+		{[]string{"-v", "-run", "X", "./b"}, []string{"./b"}},
+		{[]string{"-args", "./not-a-package"}, nil},
+		{[]string{"--args", "./not-a-package"}, nil},
+		{[]string{"-v", "--", "./not-a-package"}, nil},
 	} {
-		got := extraPackageArgs(args)
-		if name == "run value" || name == "run equals" || name == "test args" {
-			if len(got) != 0 {
-				t.Errorf("%s: extraPackageArgs(%q) = %q, want none", name, args, got)
-			}
-			continue
+		if got := packageArgs(tc.args); !slices.Equal(got, tc.want) {
+			t.Errorf("packageArgs(%q) = %q, want %q", tc.args, got, tc.want)
 		}
-		if len(got) != 1 || got[0] != args[0] {
-			t.Errorf("%s: extraPackageArgs(%q) = %q", name, args, got)
+	}
+}
+
+// TestRunTestsKeepsTheTreeWithFlags: go test flags after the directory, whose values are not packages, and a test binary's flags still run every package under it, the one in a subdirectory too.
+func TestRunTestsKeepsTheTreeWithFlags(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs go test")
+	}
+	dir := t.TempDir()
+	const update = "import (\n\t\"flag\"\n\t\"os\"\n\t\"testing\"\n)\n\nvar update = flag.String(\"update\", \"\", \"\")\n\n"
+	for name, content := range map[string]string{
+		"go.mod":          "module treetest\n\ngo 1.26\n",
+		"root_test.go":    "package root\n\n" + update + "func TestRoot(t *testing.T) { _ = os.Getenv }\n",
+		"sub/sub_test.go": "package sub\n\n" + update + "func TestSub(t *testing.T) {\n\tif err := os.WriteFile(os.Getenv(\"TREE_MARK\"), []byte(*update), 0o644); err != nil {\n\t\tt.Fatal(err)\n\t}\n}\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p, err := loadForTest(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, args := range [][]string{{"-count", "1"}, {"-count=1", "-update", "golden"}, {"-count=1", "-args", "-update=golden"}} {
+		mark := filepath.Join(t.TempDir(), "mark")
+		if err := runTests(t.Context(), p, testOptions{args: args, env: []string{"TREE_MARK=" + mark}}); err != nil {
+			t.Errorf("%d: runTests with %q: %v", i, args, err)
+		}
+		if _, err := os.Stat(mark); err != nil {
+			t.Errorf("%d: runTests with %q did not run sub's test: %v", i, args, err)
+		}
+	}
+}
+
+func TestRunTestsRejectsASecondPackage(t *testing.T) {
+	p, err := loadForTest(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"", "web"} {
+		err := runTests(t.Context(), p, testOptions{target: target, args: []string{"-v", "./b"}})
+		if err == nil || !strings.Contains(err.Error(), `takes one directory, not "./b"`) {
+			t.Errorf("target %q: runTests = %v, want an error naming ./b", target, err)
 		}
 	}
 }

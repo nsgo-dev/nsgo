@@ -86,8 +86,9 @@ type testRun struct {
 // runTests runs the app's tests headless, or on a target, printing a line
 // per test and failing when any failed.
 func runTests(ctx context.Context, p *project, opts testOptions) error {
-	if packages := extraPackageArgs(opts.args); len(packages) > 0 {
-		return fmt.Errorf("test: accepts one package directory; extra package %q (put only go test flags after --)", packages[0])
+	// go test would take another package inside the app's directory, and a target never reads it.
+	if packages := packageArgs(opts.args); len(packages) > 0 {
+		return fmt.Errorf("test: takes one directory, not %q as well; test their common parent or one directory at a time, and pass only go test flags after --", packages[0])
 	}
 	if err := p.prepareCatalogs(ctx, "./...", false); err != nil {
 		return err
@@ -138,10 +139,9 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 		}
 		args = append(args, "-overlay", ov)
 	}
+	// The packages go before the flags, which would otherwise take ./... as the value of a test binary's flag, or pass it to the binary after -args.
+	args = append(args, "./...")
 	args = append(args, opts.args...)
-	if !hasPackage(opts.args) {
-		args = append(args, "./...")
-	}
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = p.Dir
 	cmd.Env = append(os.Environ(), opts.env...)
@@ -193,51 +193,31 @@ func treeOf(dir string) string {
 	return dir
 }
 
-// extraPackageArgs reports positional package arguments after the one
-// directory nsgo test accepts. Values of go test flags are skipped so
-// `-- -run TestName` is not mistaken for a package.
-func extraPackageArgs(args []string) []string {
-	valueFlags := map[string]bool{
-		"-bench": true, "-benchtime": true, "-blockprofile": true, "-blockprofilerate": true,
-		"-covermode": true, "-coverpkg": true, "-coverprofile": true, "-cpu": true,
-		"-fuzz": true, "-fuzzminimizetime": true, "-fuzztime": true, "-gcflags": true,
-		"-gccgoflags": true, "-ldflags": true, "-list": true, "-memprofile": true,
-		"-memprofilerate": true, "-mutexprofile": true, "-mutexprofilefraction": true,
-		"-outputdir": true, "-o": true, "-p": true, "-parallel": true, "-run": true,
-		"-skip": true, "-test.bench": true, "-test.benchtime": true, "-test.cpu": true,
-		"-test.fuzz": true, "-test.fuzzminimizetime": true, "-test.fuzztime": true,
-		"-test.list": true, "-test.memprofile": true, "-test.memprofilerate": true,
-		"-test.mutexprofile": true, "-test.mutexprofilefraction": true, "-test.outputdir": true,
-		"-test.parallel": true, "-test.run": true,
-		"-test.skip": true, "-test.timeout": true, "-timeout": true,
-		"-trace": true, "-vet": true,
-	}
+// goTestBoolFlags are go test's flags that take no value, its build flags' and the test binary's it forwards, with or without the test. prefix.
+var goTestBoolFlags = map[string]bool{
+	"a": true, "n": true, "x": true, "asan": true, "msan": true, "race": true, "linkshared": true, "trimpath": true, "work": true, "modcacherw": true, "buildvcs": true, "cover": true,
+	"c": true, "json": true, "artifacts": true, "benchmem": true, "failfast": true, "fullpath": true, "short": true, "v": true,
+	"test.artifacts": true, "test.benchmem": true, "test.failfast": true, "test.fullpath": true, "test.short": true, "test.v": true,
+}
+
+// packageArgs reports the arguments among go test's that it would take as packages: those that are neither flags nor their values, before -args or --. As go test does, it takes a flag it does not know, one of the test binary's own, to have a value unless the flag is written -name=value.
+func packageArgs(args []string) []string {
 	var packages []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
-		if a == "--" || a == "-args" {
+		if a == "--" || a == "-args" || a == "--args" {
 			break
 		}
-		if strings.HasPrefix(a, "-") {
-			name, _, hasValue := strings.Cut(a, "=")
-			if !hasValue && valueFlags[name] && i+1 < len(args) {
-				i++
-			}
+		if len(a) < 2 || a[0] != '-' {
+			packages = append(packages, a)
 			continue
 		}
-		packages = append(packages, a)
-	}
-	return packages
-}
-
-// hasPackage reports whether go test's arguments name packages.
-func hasPackage(args []string) bool {
-	for _, a := range args {
-		if !strings.HasPrefix(a, "-") {
-			return true
+		name, _, hasValue := strings.Cut(strings.TrimPrefix(a[1:], "-"), "=")
+		if !hasValue && !goTestBoolFlags[name] && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			i++
 		}
 	}
-	return false
+	return packages
 }
 
 // reportTests runs cmd, which prints go test -json, and reports its
