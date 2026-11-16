@@ -596,6 +596,15 @@ final class Scrolling {
         }
 
         @Override
+        public boolean dispatchTouchEvent(MotionEvent e) {
+            // A consuming child can keep DOWN out of onTouchEvent, so stop our own glide and remember the drag's origin before dispatching it. A view that does not scroll leaves the touch alone, as its onTouchEvent does.
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN && !d.config.noScroll) d.before(e);
+            boolean handled = super.dispatchTouchEvent(e);
+            if (e.getActionMasked() == MotionEvent.ACTION_UP || e.getActionMasked() == MotionEvent.ACTION_CANCEL) d.touching = false;
+            return handled;
+        }
+
+        @Override
         public boolean onInterceptTouchEvent(MotionEvent e) {
             if (d.config.noScroll) return false;
             boolean pull = d.intercept(e);
@@ -654,6 +663,14 @@ final class Scrolling {
         HScroll(Context context, Host host, float density, View content, ViewGroup frame) {
             super(context);
             d = new Driver(this, true, host, density, content, frame);
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(MotionEvent e) {
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN && !d.config.noScroll) d.before(e);
+            boolean handled = super.dispatchTouchEvent(e);
+            if (e.getActionMasked() == MotionEvent.ACTION_UP || e.getActionMasked() == MotionEvent.ACTION_CANCEL) d.touching = false;
+            return handled;
         }
 
         @Override

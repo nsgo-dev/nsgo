@@ -119,14 +119,44 @@ final class TestAgent {
                 }, hold);
                 return;
             }
-            case "drag": {
+            case "drag":
+            case "swipe": {
                 JSONArray path = op.getJSONArray("path");
                 List<float[]> points = new ArrayList<>();
                 for (int i = 0; i < path.length(); i++) {
                     JSONObject p = path.getJSONObject(i);
                     points.add(window(p.getDouble("X"), p.getDouble("Y")));
                 }
-                finger(id, points);
+                finger(id, points, op.getString("op").equals("drag"));
+                return;
+            }
+            case "scroll-ready": {
+                View scroll = scrollAt(view, window(op.getDouble("x"), op.getDouble("y")));
+                view.testReply(id, "", Boolean.toString(scroll != null &&
+                        (scroll.canScrollHorizontally(1) || scroll.canScrollVertically(1))));
+                return;
+            }
+            case "hold-scroll": {
+                float[] p = window(op.getDouble("x"), op.getDouble("y"));
+                View scroll = scrollAt(view, p);
+                if (scroll == null) throw new IllegalArgumentException("no scroll view under the finger");
+                long down = SystemClock.uptimeMillis();
+                touch(down, MotionEvent.ACTION_DOWN, p);
+                int x = scroll.getScrollX(), y = scroll.getScrollY();
+                scroll.postOnAnimation(new Runnable() {
+                    int frames, drift;
+
+                    @Override
+                    public void run() {
+                        drift = Math.max(drift, Math.max(Math.abs(scroll.getScrollX() - x), Math.abs(scroll.getScrollY() - y)));
+                        if (++frames < 20) {
+                            scroll.postOnAnimation(this);
+                            return;
+                        }
+                        touch(down, MotionEvent.ACTION_CANCEL, p);
+                        view.testReply(id, "", Integer.toString(drift));
+                    }
+                });
                 return;
             }
             case "scroll": {
@@ -136,7 +166,7 @@ final class TestAgent {
                 List<float[]> points = new ArrayList<>();
                 points.add(from);
                 points.add(to);
-                finger(id, points);
+                finger(id, points, true);
                 return;
             }
             case "type":
@@ -184,18 +214,21 @@ final class TestAgent {
     }
 
     private void touch(long down, int action, float[] p) {
-        MotionEvent e = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, p[0], p[1], 0);
+        touch(down, SystemClock.uptimeMillis(), action, p);
+    }
+
+    /** A touch stamped at time, so a velocity read from it does not depend on when a loaded device runs the post that sends it. */
+    private void touch(long down, long time, int action, float[] p) {
+        MotionEvent e = MotionEvent.obtain(down, time, action, p[0], p[1], 0);
         e.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         activity().dispatchTouchEvent(e);
         e.recycle();
     }
 
     /**
-     * A finger along points: it rests where it lands, moves 10 points a
-     * frame, and rests still reporting where it is before it lifts, so it
-     * ends without a fling.
+     * A finger along points: it rests where it lands, moves 10 points a frame, and rests still before it lifts when rest is set. Drags rest, so they end without a fling; swipes lift while moving, so they fling.
      */
-    private void finger(int id, List<float[]> points) {
+    private void finger(int id, List<float[]> points, boolean rest) {
         if (points.isEmpty()) {
             view.testReply(id, "an empty drag", "");
             return;
@@ -212,17 +245,35 @@ final class TestAgent {
             }
         }
         float[] last = points.get(points.size() - 1);
-        for (int i = 0; i < 6; i++) moves.add(last);
+        if (rest) for (int i = 0; i < 6; i++) moves.add(last);
         touch(down, MotionEvent.ACTION_DOWN, points.get(0));
         long at = 100;
         for (float[] p : moves) {
-            ui.postDelayed(() -> touch(down, MotionEvent.ACTION_MOVE, p), at);
+            long time = down + at;
+            ui.postDelayed(() -> touch(down, time, MotionEvent.ACTION_MOVE, p), at);
             at += 16;
         }
+        long up = down + at;
         ui.postDelayed(() -> {
-            touch(down, MotionEvent.ACTION_UP, last);
+            touch(down, up, MotionEvent.ACTION_UP, last);
             view.testReply(id, "", "");
         }, at);
+    }
+
+    /** The innermost native scroll view containing a point in the window. */
+    private static View scrollAt(View v, float[] p) {
+        if (v.getVisibility() != View.VISIBLE) return null;
+        int[] at = new int[2];
+        v.getLocationInWindow(at);
+        if (p[0] < at[0] || p[1] < at[1] || p[0] >= at[0] + v.getWidth() || p[1] >= at[1] + v.getHeight()) return null;
+        if (v instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) v;
+            for (int i = group.getChildCount() - 1; i >= 0; i--) {
+                View scroll = scrollAt(group.getChildAt(i), p);
+                if (scroll != null) return scroll;
+            }
+        }
+        return v instanceof Scrolling.Scroller ? v : null;
     }
 
     /** Types text as a keyboard's keys, or commits what no key types. */
