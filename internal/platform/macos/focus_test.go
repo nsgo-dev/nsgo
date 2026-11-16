@@ -11,8 +11,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// WebKit can make its content view the first responder. Observe the host
-// window, including one belonging to another app, rather than subclassing it.
+// WebKit can make its content view the first responder. Observe the host window, including one belonging to another app, rather than subclassing it.
 func TestWebFocusFollowsTheHostWindow(t *testing.T) {
 	onMain(func() {
 		loadAppKit()

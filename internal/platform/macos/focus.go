@@ -120,8 +120,7 @@ func (s *surface) focusKeyUse() driver.KeyUse {
 	return driver.FocusKeyUse(v.kind, v.props.Role, v.pressable())
 }
 
-// observeWebFocus follows NSWindow's KVO-compliant firstResponder, including
-// WebKit's descendants and windows belonging to an embedding host.
+// observeWebFocus follows NSWindow's KVO-compliant firstResponder, including WebKit's descendants and windows belonging to an embedding host.
 func (s *surface) observeWebFocus() {
 	if s.stopWebFocus != nil {
 		s.stopWebFocus()

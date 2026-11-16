@@ -109,8 +109,7 @@ func TestMenuYieldFollowsNativeWebFocus(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
 	}
-	// WebKit retains its initialization thread; isolate it from tests
-	// whose GTK windows use other threads.
+	// WebKit retains its initialization thread; isolate it from tests whose GTK windows use other threads.
 	if os.Getenv("NSGO_TEST_MENU_WEB") != t.Name() {
 		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
 		cmd.Env = append(os.Environ(), "NSGO_TEST_MENU_WEB="+t.Name())

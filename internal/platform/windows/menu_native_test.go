@@ -3,6 +3,8 @@
 package windows
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -204,4 +206,91 @@ func TestMenuLeavesOutMacRolesAndDrawsRadios(t *testing.T) {
 	if want := "App [Quit\tAlt+F4] Edit [Delete] Library [Movies(o)* Courses(o)] Window [Minimize]"; got != want {
 		t.Errorf("the menu is %q, want %q", got, want)
 	}
+}
+
+// TestMenuYieldFollowsNativeFocus presses Control+R with a MenuNotEditing item and a binding that yields to it: the item takes the key outside any field, the binding in a field and in a page, whose focus WebView2's focus events report, and the item again once the focus leaves.
+func TestMenuYieldFollowsNativeFocus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if _, err := findWebView2(); err != nil {
+		t.Skip(err)
+	}
+	const title = "nsgo-menu-yield"
+	app := func(cx *core.Scope) core.Node {
+		menu, binding, loaded := core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, false)
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Actions", Items: []core.MenuItem{
+			{Label: "Refresh", Shortcut: "mod+r", When: core.MenuNotEditing, OnSelect: func() { menu.Update(func(n int) int { return n + 1 }) }},
+		}}})
+		cx.OnKeyWith("mod+r", core.KeyOptions{YieldsToMenu: true}, func() { binding.Update(func(n int) int { return n + 1 }) })
+		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%d|%d|%v|", title, menu.Get(), binding.Get(), loaded.Get())) })
+		return core.View{Style: core.Style{Padding: driver.All(10), Background: driver.RGB(0xffffff)}, Children: []core.Node{
+			core.Input{Style: core.Style{Width: driver.Pt(240), Height: driver.Pt(30)}},
+			core.WebView{Source: core.WebHTML("<!doctype html><input>", ""), OnLoad: func(core.WebNavigation) { loaded.Set(true) },
+				Style: core.Style{Width: driver.Pt(240), Height: driver.Pt(100)}},
+		}}
+	}
+	hwnd := startApp(t, title, app, 300, 220)
+	// The first start of the browser process can take a while.
+	waitForTitle(t, hwnd, title+"|0|0|true|", 30*time.Second)
+	getState, setState := user32.NewProc("GetKeyboardState"), user32.NewProc("SetKeyboardState")
+	press := func(want string) {
+		t.Helper()
+		onMain(t, hwnd, func(w *window) {
+			var saved [256]byte
+			getState.Call(uintptr(unsafe.Pointer(&saved)))
+			held := saved
+			held[vkControl] |= 0x80
+			setState.Call(uintptr(unsafe.Pointer(&held)))
+			defer setState.Call(uintptr(unsafe.Pointer(&saved)))
+			// What the message loop does with a WM_KEYDOWN of R.
+			if !w.shortcut('R', 1) {
+				t.Error("nothing took Control+R")
+			}
+		})
+		waitForTitle(t, hwnd, title+"|"+want+"|true|", 5*time.Second)
+	}
+	// waitFor waits until the keymap holds the binding as bound says and cond holds, on the main thread.
+	waitFor := func(what string, bound bool, cond func(w *window) bool) {
+		t.Helper()
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			ok := false
+			onMain(t, hwnd, func(w *window) {
+				ok = cond(w) && slices.ContainsFunc(w.keys, func(k driver.KeyBinding) bool { return k.Key == "mod+r" }) == bound
+			})
+			if ok {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatal(what)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	page := func(w *window) *webView {
+		for wv := range w.webs {
+			return wv
+		}
+		return nil
+	}
+	press("1|0")
+	onMain(t, hwnd, func(w *window) {
+		for _, v := range w.views {
+			if v != nil && v.field != nil {
+				w.setFocus(v.field)
+			}
+		}
+	})
+	waitFor("the keymap did not take the binding back in the field", true, func(w *window) bool { return w.focusedField() != nil })
+	press("1|1")
+	onMain(t, hwnd, func(w *window) { w.blurAll() })
+	waitFor("the keymap kept the binding outside the field", false, func(w *window) bool { return w.focusedField() == nil })
+	press("2|1")
+	onMain(t, hwnd, func(w *window) { page(w).takeFocus() })
+	waitFor("the keymap did not take the binding back in the page", true, func(w *window) bool { return page(w).focused })
+	press("2|2")
+	onMain(t, hwnd, func(w *window) { page(w).focusWindow() })
+	waitFor("the keymap kept the binding outside the page", false, func(w *window) bool { return !page(w).focused })
+	press("3|2")
 }

@@ -1129,8 +1129,7 @@ func (wv *webView) focusWindow() {
 	wv.setFocused(false)
 }
 
-// setFocused reports changes of the page's focus, including when focusWindow
-// moves it before WebView2 sends LostFocus.
+// setFocused reports changes of the page's focus, including when focusWindow moves it before WebView2 sends LostFocus.
 func (wv *webView) setFocused(focused bool) {
 	if wv.closed || wv.focused == focused {
 		return

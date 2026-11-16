@@ -452,8 +452,7 @@ func (w *window) makeWeb(v *view) {
 	w.connect(v, wv.widget, "permission-request", cbWebPermission)
 	w.connect(v, wv.widget, "map", cbWebMap)
 	w.connect(v, wv.content, "script-message-received::"+webHandler, cbWebMessage)
-	// Focus can belong to a widget inside WebKit's page, so follow the
-	// whole subtree rather than only the WebView's has-focus property.
+	// Focus can belong to a widget inside WebKit's page, so follow the whole subtree rather than only the WebView's has-focus property.
 	focus := gtkEventControllerFocusNew()
 	w.connect(v, focus, "enter", cbWebFocusIn)
 	w.connect(v, focus, "leave", cbWebFocusOut)
