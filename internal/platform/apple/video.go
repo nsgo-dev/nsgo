@@ -450,8 +450,7 @@ func (v *Video) observe() {
 	tick.Release()
 }
 
-// avName returns an Apple framework's exported NSString constant, falling
-// back to the constant's documented value on systems that do not export it.
+// avName returns an Apple framework's exported NSString constant, falling back to the constant's documented value on systems that do not export it.
 func avName(name string) objc.ID {
 	for _, path := range []string{
 		"/System/Library/Frameworks/AVFoundation.framework/AVFoundation",

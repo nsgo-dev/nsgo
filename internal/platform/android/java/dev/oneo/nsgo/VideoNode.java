@@ -51,11 +51,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private String source;
     private boolean prepared;
     private boolean paused, muted, repeat;
-    /**
-     * Whether the player plays or not is the controls' or the system's, not paused, until paused changes: each
-     * such play or pause is reported once. resumable is a pause for a transient loss of the audio focus, which
-     * plays on when the focus comes back.
-     */
+    /** Whether the player plays or not is the controls' or the system's, not paused, until paused changes: each such play or pause is reported once. resumable is a pause for a transient loss of the audio focus, which plays on when the focus comes back. */
     private boolean held, resumable;
     private float volume = 1, rate = 1;
     private int resizeMode = Protocol.RESIZE_CONTAIN;
@@ -284,11 +280,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         updateFocus();
     }
 
-    /**
-     * Holds audio focus while a playback video plays, and only then: other apps pause while it plays and
-     * resume once it pauses, ends or goes. Speech pauses rather than ducks when another app takes the focus,
-     * and plays on when it comes back unless the app changed paused meanwhile; the focus is kept for that.
-     */
+    /** Holds audio focus while a playback video plays, and only then: other apps pause while it plays and resume once it pauses, ends or goes. Speech pauses rather than ducks when another app takes the focus, and plays on when it comes back unless the app changed paused meanwhile; the focus is kept for that. */
     private void updateFocus() {
         MediaPlayer p = player;
         boolean wanted = audioSession == 1 && p != null && prepared && (p.isPlaying() || resumable);
@@ -456,9 +448,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture st) {}
 
-    // MediaController.MediaPlayerControl: the controller plays and pauses
-    // the player directly, which holds until the app changes paused and is
-    // reported as the native controls are on Apple platforms.
+    // MediaController.MediaPlayerControl: the controller plays and pauses the player directly, which holds until the app changes paused and is reported as the native controls are on Apple platforms.
 
     @Override
     public void start() {
