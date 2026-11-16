@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	goruntime "runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -418,6 +420,136 @@ func TestManualClockClearsStoppedTimerTail(t *testing.T) {
 	backing := c.timers[:cap(c.timers)]
 	if len(c.timers) != 0 || (len(backing) > 0 && backing[0] != nil) {
 		t.Fatalf("stopped timer remains in clock backing array: len=%d cap=%d", len(c.timers), cap(c.timers))
+	}
+}
+
+func timerCount(o *Scope) int {
+	o.timerMu.Lock()
+	defer o.timerMu.Unlock()
+	return len(o.timers)
+}
+
+func TestAfterFuncStopReturns(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node { return View{} })
+	called := 0
+	stop := h.root.AfterFunc(time.Second, func() { called++ })
+	h.clock.Advance(time.Second)
+	h.drain()
+	if stop() || stop() {
+		t.Fatal("stop after the call ran reported stopping it")
+	}
+
+	// The clock has fired and the call waits in the post queue: stopping now still keeps fn from running.
+	stop = h.root.AfterFunc(time.Second, func() { called++ })
+	h.clock.Advance(time.Second)
+	if !stop() {
+		t.Fatal("stop before the posted call ran reported nothing stopped")
+	}
+	if stop() {
+		t.Fatal("a second stop reported stopping the timer")
+	}
+	h.drain()
+	if called != 1 {
+		t.Fatalf("called %d times, want 1", called)
+	}
+	if got := timerCount(h.root); got != 0 {
+		t.Fatalf("pending timers = %d, want 0", got)
+	}
+}
+
+func TestAfterFuncReleasesFinishedTimers(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node { return View{} })
+	fired := func() weak.Pointer[[1 << 16]byte] {
+		buf := new([1 << 16]byte)
+		h.root.AfterFunc(time.Millisecond, func() { buf[0]++ })
+		return weak.Make(buf)
+	}()
+	stopped := func() weak.Pointer[[1 << 16]byte] {
+		buf := new([1 << 16]byte)
+		h.root.AfterFunc(time.Hour, func() { buf[0]++ })()
+		return weak.Make(buf)
+	}()
+	h.clock.Advance(time.Millisecond)
+	h.drain()
+	// Re-arm a timer under one owner as a repeating tick does, letting it fire or stopping it each time.
+	for i := range 1000 {
+		stop := h.root.AfterFunc(time.Millisecond, func() {})
+		if i%2 == 0 {
+			stop()
+		}
+		h.clock.Advance(time.Millisecond)
+		h.drain()
+		if got := timerCount(h.root); got != 0 {
+			t.Fatalf("pending timers after %d re-arms = %d, want 0", i+1, got)
+		}
+	}
+	goruntime.GC()
+	if fired.Value() != nil {
+		t.Error("a fired timer's callback is still reachable")
+	}
+	if stopped.Value() != nil {
+		t.Error("a stopped timer's callback is still reachable")
+	}
+}
+
+func TestAfterFuncStopsWithItsOwner(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node { return View{} })
+	called := 0
+	child := h.root.Child()
+	child.AfterFunc(time.Hour, func() { called++ })
+	child.AfterFunc(time.Second, func() { called++ })
+	// A cleanup that arms a timer as the owner goes does not leave it running.
+	child.Cleanup(func() { child.AfterFunc(time.Second, func() { called++ }) })
+	h.clock.Advance(time.Second)
+	child.Dispose()
+	if got := timerCount(child); got != 0 {
+		t.Fatalf("pending timers after dispose = %d, want 0", got)
+	}
+	h.clock.Advance(time.Hour)
+	h.drain()
+	if called != 0 {
+		t.Fatalf("a disposed owner's timers called fn %d times", called)
+	}
+
+	// Arming a timer on a disposed owner stops it before it starts, as a cleanup registered there runs at once.
+	stop := child.AfterFunc(time.Second, func() { called++ })
+	if stop() {
+		t.Fatal("stop of a timer armed on a disposed owner reported stopping it")
+	}
+	h.clock.Advance(time.Second)
+	h.drain()
+	if called != 0 || timerCount(child) != 0 {
+		t.Fatalf("timer armed on a disposed owner: called %d, pending %d", called, timerCount(child))
+	}
+}
+
+func TestAfterFuncStopsWhenItsComputationRunsAgain(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node { return View{} })
+	n := NewSignal(h.root, 0)
+	var calls []int
+	var owner *Scope
+	h.root.Effect(func() {
+		v := n.Get()
+		owner = h.root.current()
+		h.root.AfterFunc(time.Second, func() { calls = append(calls, v) })
+	})
+	if got := timerCount(owner); got != 1 {
+		t.Fatalf("pending timers = %d, want 1", got)
+	}
+	// The clock fires the first run's timer, then the effect runs again before the posted call does: the call belongs to the run that is gone.
+	h.clock.Advance(time.Second)
+	n.Set(1)
+	h.drain()
+	if len(calls) != 0 {
+		t.Fatalf("calls = %v, want none: the previous run's timer ran after the computation ran again", calls)
+	}
+	h.clock.Advance(time.Second)
+	h.drain()
+	if !slices.Equal(calls, []int{1}) {
+		t.Fatalf("calls = %v, want [1]", calls)
+	}
+	if got := timerCount(owner); got != 0 {
+		t.Fatalf("pending timers after fire = %d, want 0", got)
 	}
 }
 

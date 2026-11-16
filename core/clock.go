@@ -76,6 +76,10 @@ func (c *ManualClock) AfterFunc(d time.Duration, f func()) func() bool {
 		defer c.mu.Unlock()
 		was := t.stopped
 		t.stopped = true
+		if !was {
+			// The timer stays in c.timers until the clock next moves; it need not keep f alive until then. A timer that came due was stopped by the move that calls f.
+			t.f = nil
+		}
 		return !was
 	}
 }
