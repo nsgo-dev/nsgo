@@ -8,11 +8,29 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 )
+
+// publish writes the timeline where the widget extension reads it and asks WidgetKit to reload the kind.
+func publish(kind string, entries []Entry, now time.Time) error {
+	dir, err := containerDir()
+	if err != nil {
+		return err
+	}
+	if err := writeTimeline(filepath.Join(dir, kind), entries, now); err != nil {
+		return fmt.Errorf("widget: %w", err)
+	}
+	return reload(kind)
+}
+
+func available() bool {
+	_, err := containerDir()
+	return err == nil
+}
 
 // On macOS and iOS (the darwin build constraint holds for both), the
 // bundle's Info.plist, which nsgo build writes, says where the app and
