@@ -250,3 +250,24 @@ func TestAlertDefaultMayUpdateOpenItself(t *testing.T) {
 		}
 	})
 }
+
+// An alert whose app keeps Open true still closes once an action ran, and runs no other action as it goes.
+func TestAlertClosesItselfOnceAnswered(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var calls []string
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			return AlertDialog{TestID: "alert", Open: func() bool { return true }, Actions: []AlertAction{
+				{Text: "Cancel", Role: core.AlertCancel, TestID: "cancel", OnPress: func() { calls = append(calls, "cancel") }},
+				{Text: "Delete", Default: true, TestID: "delete", OnPress: func() { calls = append(calls, "delete") }},
+			}}
+		})
+		app.Press("id:delete")
+		app.Key("Escape")
+		app.Key("Return")
+		app.Advance(time.Second)
+		app.WaitForGone("id:alert", time.Second)
+		if !slices.Equal(calls, []string{"delete"}) {
+			t.Fatalf("calls %v, want [delete]", calls)
+		}
+	})
+}
