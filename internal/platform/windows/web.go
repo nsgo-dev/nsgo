@@ -577,14 +577,14 @@ func (wv *webView) listenInput() {
 		}
 	}))
 	wv.controller.subscribe(controllerAddGotFocus, newHandler(&iidFocusChanged, func(uintptr, unsafe.Pointer) {
-		wv.focused = true
 		// The page has the keyboard: the window's fields give it up.
 		if !wv.closed {
 			wv.w.blurAll()
+			wv.setFocused(true)
 		}
 	}))
 	wv.controller.subscribe(controllerAddLostFocus, newHandler(&iidFocusChanged, func(uintptr, unsafe.Pointer) {
-		wv.focused = false
+		wv.setFocused(false)
 	}))
 	wv.controller.subscribe(controllerAddMoveFocusRequested, newHandler(&iidMoveFocusRequested, func(_ uintptr, args unsafe.Pointer) {
 		if wv.closed {
@@ -1126,7 +1126,21 @@ func (wv *webView) focusWindow() {
 	if child, _, _ := isChild.Call(hwnd, focus); focus != hwnd && (focus == 0 || child != 0) {
 		setFocus.Call(hwnd)
 	}
-	wv.focused = false
+	wv.setFocused(false)
+}
+
+// setFocused reports changes of the page's focus, including when focusWindow
+// moves it before WebView2 sends LostFocus.
+func (wv *webView) setFocused(focused bool) {
+	if wv.closed || wv.focused == focused {
+		return
+	}
+	wv.focused = focused
+	kind := driver.EventBlur
+	if focused {
+		kind = driver.EventFocus
+	}
+	wv.w.report(wv.v, driver.Event{Kind: kind, ID: wv.v.id})
 }
 
 // close lets the page go, with its visuals.

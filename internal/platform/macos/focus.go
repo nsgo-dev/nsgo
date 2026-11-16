@@ -120,6 +120,49 @@ func (s *surface) focusKeyUse() driver.KeyUse {
 	return driver.FocusKeyUse(v.kind, v.props.Role, v.pressable())
 }
 
+// observeWebFocus follows NSWindow's KVO-compliant firstResponder, including
+// WebKit's descendants and windows belonging to an embedding host.
+func (s *surface) observeWebFocus() {
+	if s.stopWebFocus != nil {
+		s.stopWebFocus()
+		s.stopWebFocus = nil
+	}
+	w := s.window
+	if w == 0 {
+		s.reportWebFocus()
+		return
+	}
+	key := apple.NSString("firstResponder").Send(sel("retain"))
+	context := uintptr(s.native)
+	w.Send(sel("addObserver:forKeyPath:options:context:"), appObserver, key, uint(0), context)
+	s.stopWebFocus = func() {
+		w.Send(sel("removeObserver:forKeyPath:context:"), appObserver, key, context)
+		key.Send(selRelease)
+	}
+	s.reportWebFocus()
+}
+
+func (s *surface) reportWebFocus() {
+	var focused *view
+	for n := s.window.Send(sel("firstResponder")); n != 0 && objc.Send[bool](n, sel("isKindOfClass:"), apple.Class("NSView")); n = n.Send(selSuperview) {
+		if v := views[n]; v != nil && v.surface == s && v.kind == driver.KindWeb {
+			focused = v
+			break
+		}
+	}
+	if focused == s.webFocus {
+		return
+	}
+	old := s.webFocus
+	s.webFocus = focused
+	if old != nil {
+		old.dispatch(driver.EventBlur)
+	}
+	if focused != nil {
+		focused.dispatch(driver.EventFocus)
+	}
+}
+
 // modalCame remembers what had the focus as modal v came: a field's
 // NSTextField rather than the shared field editor it edits in.
 func (s *surface) modalCame(v *view) {

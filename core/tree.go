@@ -1254,8 +1254,8 @@ func (t *Tree) focusReported(n *node, focused bool) {
 		}
 		t.focus, t.focusMoved = n, true
 		t.changed = true
-		// The keymap holds the confined bindings only while the focus is within their owner.
-		if t.confinedKeys() {
+		// Confined bindings and those yielding to text-sensitive menu items follow the focus.
+		if t.focusKeys() {
 			t.keysChanged = true
 		}
 		if gone != nil && gone.deleted {
@@ -1395,7 +1395,7 @@ func (t *Tree) updateFocusWithin() {
 	if t.focus != nil && t.focus.deleted {
 		t.blurRemoved(t.focus, false)
 		t.focus = nil
-		if t.confinedKeys() {
+		if t.focusKeys() {
 			t.keysChanged = true
 		}
 	}
@@ -2217,7 +2217,7 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		// The user's own input on n lets its owner move the focus until the commit after it (mayMoveFocus).
 		t.activated = n.owner
 	}
-	if n.web != nil {
+	if n.web != nil && ev.Kind != driver.EventFocus && ev.Kind != driver.EventBlur {
 		t.dispatchWeb(n, ev)
 		return
 	}
@@ -2693,7 +2693,7 @@ func (n *node) events() driver.EventMask {
 	bit(driver.EventTouch, n.hearsTouches())
 	// The focus of any view that can take it is reported, for the core's
 	// own focus (focusReported).
-	focusable := n.kind == driver.KindInput || n.takesPresses() || n.props.Focusable
+	focusable := n.kind == driver.KindInput || n.kind == driver.KindWeb || n.takesPresses() || n.props.Focusable
 	focusStyled := s.Focus != nil || s.FocusVisible != nil
 	bit(driver.EventFocus, h.focus != nil || focusStyled || focusable)
 	bit(driver.EventBlur, h.blur != nil || focusStyled || focusable)

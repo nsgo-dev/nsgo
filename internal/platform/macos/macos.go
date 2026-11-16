@@ -243,9 +243,11 @@ type surface struct {
 	env driver.Environment
 	// material is the material behind the app's views, effect the view
 	// that shows it.
-	material driver.WindowMaterial
-	effect   objc.ID
-	keys     []driver.KeyBinding // the keymap's bindings
+	material     driver.WindowMaterial
+	effect       objc.ID
+	keys         []driver.KeyBinding // the keymap's bindings
+	webFocus     *view               // the page holding the window's first responder
+	stopWebFocus func()              // ends first-responder observation in the current window
 
 	// What a batch touched, finished once its frames are set.
 	images, presenting []*view
@@ -477,6 +479,12 @@ func loadAppKit() {
 	classObserver = register("NsgoObserver", apple.Class("NSObject"), nil, []objc.MethodDef{{
 		Cmd: sel("observeValueForKeyPath:ofObject:change:context:"),
 		Fn: func(self objc.ID, _ objc.SEL, path, object, change objc.ID, ctx uintptr) {
+			if apple.GoString(path) == "firstResponder" {
+				if v := views[objc.ID(ctx)]; v != nil {
+					v.surface.reportWebFocus()
+				}
+				return
+			}
 			apple.OnMain(func() {
 				for s := range surfaces {
 					s.refresh()
@@ -647,6 +655,9 @@ func surfaceMoved(self objc.ID, cmd objc.SEL) {
 	}
 	s := v.surface
 	s.window = self.Send(selWindow)
+	if s.engine != nil {
+		s.observeWebFocus()
+	}
 	if s.window == 0 {
 		return
 	}
@@ -1111,6 +1122,13 @@ func (s *surface) refresh() {
 // key and mouse events.
 func (s *surface) observe() {
 	observeApp()
+	s.observeWebFocus()
+	s.stops = append(s.stops, func() {
+		if s.stopWebFocus != nil {
+			s.stopWebFocus()
+			s.stopWebFocus = nil
+		}
+	})
 	center := objc.ID(apple.Class("NSNotificationCenter")).Send(sel("defaultCenter"))
 	for _, name := range []string{"NSWindowDidResizeNotification", "NSWindowDidMoveNotification",
 		"NSWindowDidEnterFullScreenNotification", "NSWindowDidExitFullScreenNotification",

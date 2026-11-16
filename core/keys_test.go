@@ -579,3 +579,83 @@ func TestBindingsYieldToTheMenuAsAsked(t *testing.T) {
 		}
 	}
 }
+
+func TestMenuYieldFollowsTextFocus(t *testing.T) {
+	for _, os := range []OS{OSMacOS, OSWindows, OSLinux} {
+		for _, web := range []bool{false, true} {
+			for _, c := range []struct {
+				name, key        string
+				menu             []MenuItem
+				outside, editing bool
+			}{
+				{"not editing", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}, false, true},
+				{"always", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAlways}}, false, false},
+				{"auto non-editing key", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAuto}}, false, false},
+				{"auto editing key", "mod+a", []MenuItem{{Label: "Action", Shortcut: "mod+a", When: MenuAuto}}, false, true},
+				{"submenu", "mod+r", []MenuItem{{Label: "Actions", Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}}}, false, true},
+				{"disabled submenu", "mod+r", []MenuItem{{Label: "Actions", Disabled: true, Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAlways}}}}, true, true},
+				{"another item takes the key", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}, {Label: "Run", Shortcut: "mod+r", When: MenuAlways}}, false, false},
+			} {
+				t.Run(string(os)+"/"+map[bool]string{false: "input", true: "web"}[web]+"/"+c.name, func(t *testing.T) {
+					var shown *Signal[bool]
+					ran := 0
+					h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+						shown = NewSignal(cx, true)
+						cx.SetApplicationMenu(c.menu)
+						cx.OnKeyWith(c.key, KeyOptions{When: KeyAlways, YieldsToMenu: true}, func() { ran++ })
+						return View{Children: []Node{Show{When: shown.Get, Then: func(*Scope) Node {
+							if web {
+								return View{Children: []Node{WebView{TestID: "first"}, WebView{TestID: "second"}}}
+							}
+							return View{Children: []Node{Input{TestID: "first"}, Input{TestID: "second"}}}
+						}}}}
+					})
+					h.tree.SetEnvironment(Environment{OS: os, Idiom: IdiomDesktop})
+					var keys []driver.KeyBinding
+					check := func(stage string, want bool, focus driver.KeyUse) {
+						t.Helper()
+						batch := h.commit()
+						for _, it := range batch.Items {
+							if it.Kind == driver.ItemKeymap {
+								keys = it.Keys
+							}
+						}
+						if got := slices.ContainsFunc(keys, func(k driver.KeyBinding) bool { return k.Key == c.key }); got != want {
+							t.Errorf("%s: mounted keymap = %v, want binding %v", stage, keys, want)
+						}
+						id, consumed := driver.FindKey(keys, []string{c.key}, focus, false)
+						before := ran
+						if id != 0 {
+							h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+						}
+						if consumed != want || (ran > before) != want {
+							t.Errorf("%s: consumed %v, fired %v, want %v", stage, consumed, ran > before, want)
+						}
+					}
+					check("outside", c.outside, 0)
+					first, second := h.find("first"), h.find("second")
+					for _, n := range []*node{first, second} {
+						if mask := n.events(); !mask.Has(driver.EventFocus) || !mask.Has(driver.EventBlur) {
+							t.Errorf("%s does not report focus and blur", n.props.TestID)
+						}
+					}
+					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: first.id})
+					check("focused", c.editing, driver.KeyUseText)
+					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: second.id})
+					h.tree.Dispatch(driver.Event{Kind: driver.EventBlur, ID: first.id})
+					check("new focus before old blur", c.editing, driver.KeyUseText)
+					h.tree.Dispatch(driver.Event{Kind: driver.EventBlur, ID: second.id})
+					check("blurred", c.outside, 0)
+					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: first.id})
+					check("refocused", c.editing, driver.KeyUseText)
+					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: h.tree.view.id})
+					check("root focused", c.outside, 0)
+					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: first.id})
+					check("focused before removal", c.editing, driver.KeyUseText)
+					shown.Set(false)
+					check("focused view removed", c.outside, 0)
+				})
+			}
+		}
+	}
+}

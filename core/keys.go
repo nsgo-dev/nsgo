@@ -41,7 +41,7 @@ type KeyOptions struct {
 	Repeat bool
 	// OverModals keeps it firing while a modal its owner's views are not in covers them, for an app-wide shortcut such as a menu's.
 	OverModals bool
-	// YieldsToMenu leaves the key to the application menu while it has an enabled item with the same shortcut on macOS, Windows and Linux, which show the menu, for a default shortcut an app's menu may take over. Else a binding takes its key before the menu does.
+	// YieldsToMenu leaves the key to the application menu while an enabled item takes the same shortcut where the focus is on macOS, Windows and Linux, which show the menu, for a default shortcut an app's menu may take over. An item that leaves its shortcut to a focused text input or web view does not suppress the binding. Else a binding takes its key before the menu does.
 	YieldsToMenu bool
 }
 
@@ -158,9 +158,9 @@ func (t *Tree) confinedMay(o *Scope, kind confinedRefusal, what string) bool {
 	return false
 }
 
-// confinedKeys reports whether a binding is confined, whose part in the keymap follows the focus.
-func (t *Tree) confinedKeys() bool {
-	return slices.ContainsFunc(t.keys, func(b *keyBinding) bool { return b.within != nil })
+// focusKeys reports whether a binding's part in the keymap follows the focus: one confined to its owner's views or yielding to a menu item that may leave its shortcut to text.
+func (t *Tree) focusKeys() bool {
+	return slices.ContainsFunc(t.keys, func(b *keyBinding) bool { return b.within != nil || b.yieldsToMenu })
 }
 
 // OnBackPress runs fn when back is pressed (Escape, the back button or gesture, the browser's back) while the current owner lives and the user can see what it shows, as for OnKey: after the overlays and modals, which take it first, and before the navigation stacks, the newest handler first. fn returns true to take it; when none does, the top stack pops, else the platform goes back itself.
@@ -199,13 +199,13 @@ func (t *Tree) keymap() []driver.KeyBinding {
 	return out
 }
 
-// keyActive reports whether binding b may fire: its owner lives and shows (keyPlaces.shows), above any modal unless it is OverModals, the focus is within what it is confined to, and unless it is YieldsToMenu, no enabled item of the application menu has its key (menuHasKey).
+// keyActive reports whether binding b may fire: its owner lives and shows (keyPlaces.shows), above any modal unless it is OverModals, the focus is within what it is confined to, and if it is YieldsToMenu, no enabled item of the application menu takes its key where the focus is (menuHasKey).
 func (t *Tree) keyActive(b *keyBinding, places *keyPlaces) bool {
 	return !b.owner.disposed && places.shows(b.owner, b.overModals) && t.focusWithin(b.within) &&
 		!(b.yieldsToMenu && t.menuHasKey(b.Key))
 }
 
-// menuHasKey reports whether an enabled item of the application menu has the normalized key as its shortcut (menuTakes), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.
+// menuHasKey reports whether an enabled item of the application menu takes the normalized key as its shortcut where the focus is (menuTakes), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.
 func (t *Tree) menuHasKey(key string) bool {
 	if len(t.menu) == 0 {
 		return false
@@ -228,7 +228,8 @@ func (t *Tree) menuHasKey(key string) bool {
 			names = append(names, driver.NormalizeKey(strings.Join(append(swapped, name), "+")))
 		}
 	}
-	return menuTakes(t.menu, names, env.os.GetUntracked() == OSMacOS)
+	editing := t.focus != nil && (t.focus.kind == driver.KindInput || t.focus.kind == driver.KindWeb)
+	return menuTakes(t.menu, names, env.os.GetUntracked() == OSMacOS, editing)
 }
 
 // keyPlaces is where the owners of views show, which decides the key bindings and back handlers that take part: read from the views each time a keymap, a key or a back press asks, so it follows a Holder's content in and out of its places, a modal shown or dismissed, and DisplayNone.

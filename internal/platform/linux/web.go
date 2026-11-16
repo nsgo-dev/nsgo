@@ -452,6 +452,12 @@ func (w *window) makeWeb(v *view) {
 	w.connect(v, wv.widget, "permission-request", cbWebPermission)
 	w.connect(v, wv.widget, "map", cbWebMap)
 	w.connect(v, wv.content, "script-message-received::"+webHandler, cbWebMessage)
+	// Focus can belong to a widget inside WebKit's page, so follow the
+	// whole subtree rather than only the WebView's has-focus property.
+	focus := gtkEventControllerFocusNew()
+	w.connect(v, focus, "enter", cbWebFocusIn)
+	w.connect(v, focus, "leave", cbWebFocusOut)
+	gtkWidgetAddController(wv.widget, focus)
 
 	// History keys and mouse buttons, before WebKit sees them: it keeps
 	// arrow keys, used or not, so Alt+Left would never reach the window.
@@ -1146,6 +1152,18 @@ func webMapCallback(page uintptr, data uintptr) {
 	w, v := webOf(data, page)
 	if v != nil && v.web.pending {
 		w.loadWeb(v)
+	}
+}
+
+func webFocusInCallback(controller, data uintptr) {
+	if w, v := webOf(data, controller); v != nil {
+		w.report(v, driver.Event{Kind: driver.EventFocus, ID: v.id})
+	}
+}
+
+func webFocusOutCallback(controller, data uintptr) {
+	if w, v := webOf(data, controller); v != nil {
+		w.report(v, driver.Event{Kind: driver.EventBlur, ID: v.id})
 	}
 }
 

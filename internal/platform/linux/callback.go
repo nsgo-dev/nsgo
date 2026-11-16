@@ -44,6 +44,8 @@ var (
 	cbWebPermission          uintptr
 	cbWebMessage             uintptr
 	cbWebMap                 uintptr
+	cbWebFocusIn             uintptr
+	cbWebFocusOut            uintptr
 	cbWebKey                 uintptr
 	cbWebButton              uintptr
 	cbWebMotion              uintptr
@@ -125,6 +127,8 @@ func init() {
 	cbWebPermission = newCallback(webPermissionCallback)
 	cbWebMessage = newCallback(webMessageCallback)
 	cbWebMap = newCallback(webMapCallback)
+	cbWebFocusIn = newCallback(webFocusInCallback)
+	cbWebFocusOut = newCallback(webFocusOutCallback)
 	cbWebKey = newCallback(webKeyCallback)
 	cbWebButton = newCallback(webButtonCallback)
 	cbWebMotion = newCallback(webMotionCallback)
