@@ -1358,6 +1358,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemAuthSession:
 			s.authSession(it.Count, *it.Auth)
 			continue
+		case driver.ItemSpeak:
+			speak(it.Count, *it.Speak, s.engine.Dispatch)
+			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge, driver.ItemTaskProgress:
 			s.notify(it)
 			continue
