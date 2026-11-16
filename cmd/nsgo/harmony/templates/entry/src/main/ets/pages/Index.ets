@@ -2669,6 +2669,8 @@ class Renderer {
   // zoomShown is the scale a zoomable scroll view's content was last
   // given.
   zoomShown: Map<number, number> = new Map();
+  // styled is what style last wrote to each view's node.
+  styled: Map<number, Styled> = new Map();
 
   attach(ui: UIContext, root: FrameNode): void {
     this.ui = ui;
@@ -2765,6 +2767,7 @@ class Renderer {
   // so an id the engine gives a new view next starts clean.
   forget(id: number): void {
     this.nodes.delete(id);
+    this.styled.delete(id);
     this.contents.delete(id);
     this.scrollers.delete(id);
     this.leaves.delete(id);
@@ -2896,6 +2899,9 @@ class Renderer {
         return;
       }
       this.nodes.set(id, made);
+      if (v.kind !== KIND_SCROLL && v.kind !== KIND_INPUT && v.kind !== KIND_IMAGE) {
+        this.styled.set(id, Styled.fresh(v, made));
+      }
       parent.appendChild(made);
       // The view is written below; a dirty flag left set would write it, and every view under it, again on the next batch that reaches its parent.
       v.dirty = false;
@@ -3057,36 +3063,90 @@ class Renderer {
     h.commonAttribute.width(v.w).height(v.scrHeight > 0 ? v.scrHeight : 44).position({ x: 0, y: 0 });
   }
 
-  // style writes what a view draws on any kind of node.
+  // style writes the view's frame and look, each attribute only when it differs from what the node was last given: every attribute write crosses into ArkUI and marks the node dirty, and writing all of them for each of a navigation's hundreds of views took most of its time on a phone.
   style(v: VNode, node: FrameNode): void {
     const c = node.commonAttribute;
-    c.width(v.w).height(v.h).position({ x: v.x, y: v.y })
-      .backgroundColor(v.bg === '' ? Color.Transparent : v.bg)
-      .borderRadius(v.radius)
-      .border({ width: v.bw, color: v.bc === '' ? Color.Transparent : v.bc })
-      .opacity(v.op)
-      .translate({ x: v.tx, y: v.ty })
-      .scale({ x: v.scx, y: v.scy })
-      .rotate({ angle: v.rot })
-      .visibility(v.hidden ? Visibility.Hidden : Visibility.Visible);
-    if (v.accLabel !== '' || v.label !== '') {
-      c.accessibilityText(v.accLabel !== '' ? v.accLabel : v.label);
+    let a = this.styled.get(v.id);
+    if (a === undefined || a.v !== v || a.node !== node) {
+      a = new Styled();
+      a.v = v;
+      a.node = node;
+      this.styled.set(v.id, a);
     }
-    c.id(v.testID !== '' ? v.testID : 'nsgo-' + v.id);
-    if (v.pointer === 1) {
-      c.hitTestBehavior(HitTestMode.None);
-    } else if (v.pointer === 2) {
-      c.hitTestBehavior(HitTestMode.Transparent);
-    } else if (v.pointer === 3) {
-      c.hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS);
+    if (a.w !== v.w || a.h !== v.h) {
+      c.width(v.w).height(v.h);
+      a.w = v.w;
+      a.h = v.h;
     }
-    if (v.press) {
+    if (a.x !== v.x || a.y !== v.y) {
+      c.position({ x: v.x, y: v.y });
+      a.x = v.x;
+      a.y = v.y;
+    }
+    if (a.bg !== v.bg) {
+      c.backgroundColor(v.bg === '' ? Color.Transparent : v.bg);
+      a.bg = v.bg;
+    }
+    if (a.radius !== v.radius) {
+      c.borderRadius(v.radius);
+      a.radius = v.radius;
+    }
+    if (a.bw !== v.bw || a.bc !== v.bc) {
+      c.border({ width: v.bw, color: v.bc === '' ? Color.Transparent : v.bc });
+      a.bw = v.bw;
+      a.bc = v.bc;
+    }
+    if (a.op !== v.op) {
+      c.opacity(v.op);
+      a.op = v.op;
+    }
+    if (a.tx !== v.tx || a.ty !== v.ty) {
+      c.translate({ x: v.tx, y: v.ty });
+      a.tx = v.tx;
+      a.ty = v.ty;
+    }
+    if (a.scx !== v.scx || a.scy !== v.scy) {
+      c.scale({ x: v.scx, y: v.scy });
+      a.scx = v.scx;
+      a.scy = v.scy;
+    }
+    if (a.rot !== v.rot) {
+      c.rotate({ angle: v.rot });
+      a.rot = v.rot;
+    }
+    if (a.hidden !== v.hidden) {
+      c.visibility(v.hidden ? Visibility.Hidden : Visibility.Visible);
+      a.hidden = v.hidden;
+    }
+    const acc = v.accLabel !== '' ? v.accLabel : v.label;
+    if (acc !== '' && a.acc !== acc) {
+      c.accessibilityText(acc);
+      a.acc = acc;
+    }
+    const key = v.testID !== '' ? v.testID : 'nsgo-' + v.id;
+    if (a.key !== key) {
+      c.id(key);
+      a.key = key;
+    }
+    if (a.pointer !== v.pointer) {
+      if (v.pointer === 1) {
+        c.hitTestBehavior(HitTestMode.None);
+      } else if (v.pointer === 2) {
+        c.hitTestBehavior(HitTestMode.Transparent);
+      } else if (v.pointer === 3) {
+        c.hitTestBehavior(HitTestMode.BLOCK_DESCENDANTS);
+      }
+      a.pointer = v.pointer;
+    }
+    // The handler reads the view when it fires, so it is set once per view.
+    if (v.press && !a.press) {
       c.onClick((e: ClickEvent) => {
         const host = this.host;
         if (host !== undefined) {
           host.send('tap', v.hit, v.ax + e.x, v.ay + e.y, '');
         }
       });
+      a.press = true;
     }
   }
 
@@ -3096,9 +3156,17 @@ class Renderer {
       t.initialize(v.text);
       this.shown.set(v.id, v.text);
     }
+    const font = v.fs + '|' + v.fw + '|' + v.color + '|' + v.align + '|' + v.maxLines;
+    const st = this.styled.get(v.id);
+    if (st !== undefined && st.node === node && st.font === font) {
+      return;
+    }
     const a = typeNode.getAttribute(node, 'Text');
     if (a === undefined) {
       return;
+    }
+    if (st !== undefined && st.node === node) {
+      st.font = font;
     }
     a.fontSize(v.fs).fontWeight(v.fw).fontColor(v.color)
       .textAlign(v.align === 1 ? TextAlign.Center :
@@ -3466,6 +3534,53 @@ class Renderer {
       }
     }
     return false;
+  }
+}
+
+// Styled is what style last wrote to a view's node. NaN and undefined differ from every value, so the first write of each attribute happens.
+class Styled {
+  v: VNode | undefined = undefined;
+  node: FrameNode | undefined = undefined;
+  w: number = NaN;
+  h: number = NaN;
+  x: number = NaN;
+  y: number = NaN;
+  bg: string | undefined = undefined;
+  radius: number = NaN;
+  bw: number = NaN;
+  bc: string | undefined = undefined;
+  op: number = NaN;
+  tx: number = NaN;
+  ty: number = NaN;
+  scx: number = NaN;
+  scy: number = NaN;
+  rot: number = NaN;
+  hidden: boolean | undefined = undefined;
+  acc: string | undefined = undefined;
+  key: string | undefined = undefined;
+  pointer: number = NaN;
+  press: boolean = false;
+  // font is the text attributes last written, as one key.
+  font: string = '';
+
+  // fresh is a node just made as a Stack or a Text, which holds ArkUI's defaults: no background, corners or border, opaque, untransformed and visible. Writing those again for every view a page creates was a third of its cost.
+  static fresh(v: VNode, node: FrameNode): Styled {
+    const a = new Styled();
+    a.v = v;
+    a.node = node;
+    a.bg = '';
+    a.radius = 0;
+    a.bw = 0;
+    a.bc = '';
+    a.op = 1;
+    a.tx = 0;
+    a.ty = 0;
+    a.scx = 1;
+    a.scy = 1;
+    a.rot = 0;
+    a.hidden = false;
+    a.pointer = 0;
+    return a;
   }
 }
 
