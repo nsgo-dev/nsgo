@@ -245,21 +245,15 @@ func (a *App) ClosePopup() {
 	a.Settle()
 }
 
-// CloseWindow asks the app's main window to close as its close button does.
-// OnClosing handlers run newest first; the return value is true when none
-// canceled and the window closed.
+// CloseWindow asks the main window to close, as its close button does, and reports whether it closed: its OnClosing handlers run newest first, and it closes unless one cancels. It needs a desktop environment (macOS, Windows or Linux), where the app shows in a window, and runs headless only.
 func (a *App) CloseWindow() bool {
 	a.t.Helper()
-	if a.target != nil {
-		a.t.Skip("nsgotest: CloseWindow is available in headless runs only")
+	if a.target == nil && (a.appTree == nil || a.tree == a.appTree) {
+		a.t.Fatal("nsgotest: no window to close: CloseWindow needs a desktop environment and a main window open")
 	}
-	w := a.root.MainWindow()
-	if w == nil {
-		a.t.Fatalf("nsgotest: the app has no main window")
-	}
-	closed := w.RequestClose()
-	a.Settle()
-	return closed
+	w := a.tree
+	a.dispatch(driver.Event{Kind: driver.EventWindowClose})
+	return w.Closed()
 }
 
 // HeaderBack presses the back button in the system header of the screen
@@ -343,15 +337,10 @@ func (a *App) Progress(selector string, position, duration time.Duration) {
 	}
 }
 
-// Navigate reports that the web view selector matches loaded the page
-// nav describes, as a platform does: it starts loading, then loads.
+// Navigate reports that the web view selector matches loaded the page nav describes, as a platform does: it starts loading, then loads. The web view need only be mounted, as a hidden one goes on loading.
 func (a *App) Navigate(selector string, nav driver.WebNavigation) {
 	a.t.Helper()
-	vs := a.QueryMounted(selector)
-	if len(vs) != 1 {
-		a.t.Fatalf("nsgotest: %d mounted views match %q\n%s", len(vs), selector, a.Dump())
-	}
-	v := vs[0]
+	v := a.FindMounted(selector)
 	for _, loading := range []bool{true, false} {
 		nav.Loading = loading
 		kind := driver.EventLoad
@@ -367,10 +356,10 @@ func (a *App) Navigate(selector string, nav driver.WebNavigation) {
 	}
 }
 
-// PostMessage reports that the page the web view selector matches loaded posted data, from its top frame: at its Src, its HTML's BaseURL, or about:blank for HTML without one.
+// PostMessage reports that the page the web view selector matches loaded posted data, from its top frame: at its Src, its HTML's BaseURL, or about:blank for HTML without one. The web view need only be mounted, as Navigate's.
 func (a *App) PostMessage(selector, data string) {
 	a.t.Helper()
-	src := a.Find(selector).Web.Source
+	src := a.FindMounted(selector).Web.Source
 	page := cmp.Or(src.BaseURL, "about:blank")
 	if src.HTML == "" {
 		page = src.Src
@@ -381,7 +370,7 @@ func (a *App) PostMessage(selector, data string) {
 // PostMessageFrom reports that a frame at url, the page's top one when mainFrame is set, posted data in the web view selector matches, as a page the view navigated to or a frame within it would, from url's origin.
 func (a *App) PostMessageFrom(selector, url string, mainFrame bool, data string) {
 	a.t.Helper()
-	v := a.Find(selector)
+	v := a.FindMounted(selector)
 	if v.Events.Has(driver.EventMessage) {
 		a.dispatch(driver.Event{Kind: driver.EventMessage, ID: v.ID, Text: data, Origin: driver.WebOrigin(url), URL: url, MainFrame: mainFrame})
 	}
@@ -479,23 +468,20 @@ func (a *App) scrollEvent(v *View, kind driver.EventKind) {
 	}
 }
 
-// DropFiles drops files on the view selector matches, as a desktop or
-// the web does: the nearest enabled ancestor that hears file drops takes it.
+// DropFiles drops files on the view selector matches, as a desktop or the web does: the drag enters, then the files drop, on the match or the nearest view around it with OnFileDrop, within the modal it is in. It fails when that view is disabled or there is none.
 func (a *App) DropFiles(selector string, uris ...string) {
 	a.t.Helper()
-	v := a.Find(selector)
-	for p := v; p != nil; p = p.Parent {
-		if p.disabled(nil) {
-			a.t.Fatalf("nsgotest: no enabled view hearing file drops matches %q\n%s", selector, a.Dump())
+	v := a.pick(selector, "view hearing file drops", func(m *View) (*View, bool) {
+		for p := m; p != nil; p = p.Parent {
+			if p.Events.Has(driver.EventFileDrop) {
+				return p, !p.disabled(nil)
+			}
+			if p.Kind == driver.KindModal {
+				break
+			}
 		}
-		if p.Events.Has(driver.EventFileDrop) {
-			v = p
-			break
-		}
-	}
-	if v == nil || !v.Events.Has(driver.EventFileDrop) || v.disabled(nil) {
-		a.t.Fatalf("nsgotest: no enabled view hearing file drops matches %q\n%s", selector, a.Dump())
-	}
+		return nil, false
+	})
 	if v.Events.Has(driver.EventFileDragEnter) {
 		a.dispatch(driver.Event{Kind: driver.EventFileDragEnter, ID: v.ID})
 	}

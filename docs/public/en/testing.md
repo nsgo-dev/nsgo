@@ -21,7 +21,7 @@ func TestPress(t *testing.T) {
 
 `TestMain` gives the platform the main thread when the tests run on a target.
 
-`DropFiles` may name a child of a drop zone; the nearest enabled ancestor with `OnFileDrop` receives it. `app.Find("id:child").Bounds()` returns the view's frame in surface points. `app.Emit("id:switch", "change", true)` reports a native system-switch value, and `app.Press` toggles a mounted system switch in headless tests. `app.Navigate` also reports loads for mounted web views hidden behind another view. `app.CloseWindow()` runs the main window's `OnClosing` handlers and returns whether it closed.
+With a desktop `nsgotest.Environment` (macOS, Windows or Linux) the app's main view shows in its main window, so `desktop.CurrentWindow` and `OnClosing` work; `app.CloseWindow()` sends the window's close button's request and reports whether it closed, and a handler alone is tested by calling it and reading `WindowClosing.Canceled()`, or `QuitRequest.Canceled()` for `OnQuitRequest`. Steps act on the main window only. `app.DropFiles` may name anything inside a drop zone: the nearest view around it with `OnFileDrop` takes the files. A view's `Bounds()` is its frame in the window's points, as `Ref.Bounds` reports it. Headless, `app.Press` flips the system switch (`ui.SwitchSystem`) as on a target, and `app.Emit("id:switch", "change", true)` reports a value directly. `app.Navigate` and `app.PostMessage` reach a web view that is mounted but hidden, as it goes on loading.
 
 ## Run the tests
 

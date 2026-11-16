@@ -21,7 +21,7 @@ func TestPress(t *testing.T) {
 
 当测试在某个目标上运行时，`TestMain` 会把主线程交给平台。
 
-`DropFiles` 可以指定放置区域中的子视图；最近的启用且带有 `OnFileDrop` 的祖先会接收文件。`app.Find("id:child").Bounds()` 返回视图在 surface 坐标中的框。`app.Emit("id:switch", "change", true)` 直接报告原生系统开关的值，无头测试中的 `app.Press` 也会切换已挂载的系统开关。`app.Navigate` 会向已挂载但隐藏的 Web 视图报告加载事件。`app.CloseWindow()` 会运行主窗口的 `OnClosing` 处理器，并返回窗口是否关闭。
+使用桌面环境的 `nsgotest.Environment`（macOS、Windows 或 Linux）时，应用的主视图显示在主窗口中，因此 `desktop.CurrentWindow` 和 `OnClosing` 都能工作；`app.CloseWindow()` 发出窗口关闭按钮的请求，并返回窗口是否关闭。单独测试一个处理器时，直接调用它并读取 `WindowClosing.Canceled()`，`OnQuitRequest` 的处理器则读取 `QuitRequest.Canceled()`。步骤只作用于主窗口。`app.DropFiles` 可以指定放置区域中的任意视图：外层最近的带 `OnFileDrop` 的视图接收文件。视图的 `Bounds()` 是它在窗口坐标（点）中的框，与 `Ref.Bounds` 报告的一致。无头运行时，`app.Press` 会像在目标上一样切换系统开关（`ui.SwitchSystem`），`app.Emit("id:switch", "change", true)` 则直接报告一个值。`app.Navigate` 和 `app.PostMessage` 能到达已挂载但隐藏的 Web 视图，因为它仍会继续加载。
 
 ## 运行测试
 

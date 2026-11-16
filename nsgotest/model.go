@@ -226,9 +226,7 @@ func (a *App) dispatch(ev driver.Event) {
 	a.dispatchOn(a.tree, ev)
 }
 
-// dispatchOn sends an event to the surface that owns its request. Most
-// input goes to the visible window; application alerts and services may be
-// owned by the app surface in a desktop run.
+// dispatchOn sends ev to tree, the surface steps act on when nil, and settles: an answer goes to the surface that asked.
 func (a *App) dispatchOn(tree *core.Tree, ev driver.Event) {
 	if a.target != nil {
 		// What the test makes up, a real platform reports itself.
@@ -258,6 +256,22 @@ func (a *App) send(v *View, ev driver.Event) {
 		ev.ID = v.ID
 		a.dispatch(ev)
 	}
+}
+
+// applyAside applies a batch of a surface steps do not act on, the app's own or a window other than the main one: what it asks of the platform, such as alerts and permissions, but not its views, title or window commands, which the model keeps for the main window.
+func (a *App) applyAside(b *driver.MountBatch) {
+	aside := *b
+	aside.LayoutAnimation = nil
+	aside.Items = slices.DeleteFunc(slices.Clone(b.Items), func(it driver.MountItem) bool {
+		switch it.Kind {
+		case driver.ItemAnimation, driver.ItemDismissKeyboard, driver.ItemBlockNative, driver.ItemAccessibilityFocus, driver.ItemTitle, driver.ItemWindow:
+			return true
+		}
+		return it.ID != 0
+	})
+	root := a.rootID
+	a.apply(&aside)
+	a.rootID = root
 }
 
 func (a *App) apply(b *driver.MountBatch) {
@@ -645,10 +659,9 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.audio(it.Count, *it.Audio)
 		case driver.ItemAlert:
 			a.alerts = append(a.alerts, *it.Alert)
-			if a.alertTrees == nil {
-				a.alertTrees = map[uint32]*core.Tree{}
+			if a.target == nil {
+				a.alertTrees = append(a.alertTrees, a.responseTree)
 			}
-			a.alertTrees[it.Alert.ID] = a.responseTree
 		case driver.ItemBlockNative:
 			// The touch responder keeps native drags from starting.
 			a.blocked = it.ID != 0
@@ -791,9 +804,7 @@ func (a *App) post(ev driver.Event) {
 	a.postTo(a.responseTree, ev)
 }
 
-// postTo delivers an answer to the surface that issued its request. A
-// desktop app has an application surface alongside its main window, and
-// platform services may keep waits on either one.
+// postTo posts ev for tree, the surface steps act on when nil: with a desktop environment the app's own surface and each window ask the platform for their own.
 func (a *App) postTo(tree *core.Tree, ev driver.Event) {
 	if a.target != nil {
 		// The platform answers itself.
@@ -892,7 +903,7 @@ func (v *View) center() (local, page driver.Point) {
 	return local, driver.Point{X: at.Origin.X + local.X, Y: at.Origin.Y + local.Y}
 }
 
-// Bounds returns v's frame in surface points, as Ref.Bounds reports.
+// Bounds is v's frame in surface points, as its ancestors and their scroll offsets place it: the frame Ref.Bounds reports and Press aims at.
 func (v *View) Bounds() core.Bounds { return v.surfaceFrame() }
 
 // surfaceFrame is v's frame in surface points, as its ancestors and their

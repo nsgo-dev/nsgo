@@ -11,7 +11,7 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 type SystemSwitch struct {
 	Checked  func() bool
 	Disabled func() bool
-	// OnChange receives the value the user chose.
+	// OnChange receives the value the user chose, which the native component reports as its "change" event with a bool: a test reports one with nsgotest's Emit(selector, "change", value), or flips the switch with Press.
 	OnChange func(checked bool)
 	// Size is macOS's control size, "small" or "large", else the regular
 	// one; UISwitch has one size.

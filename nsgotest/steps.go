@@ -29,6 +29,18 @@ func focusable(v *View) bool {
 		v.Kind != driver.KindInput && (pressable(v) || v.Props.Focusable)
 }
 
+// systemSwitch returns the system switch (core.SystemSwitch) selector matches headless, where it shows with no size as the platform sizes it, or nil.
+func (a *App) systemSwitch(selector string) *View {
+	sel, err := parseSelector(selector)
+	if a.target != nil || err != nil {
+		return nil
+	}
+	if m := a.resolveWith(sel, true); len(m) == 1 && m[0].Kind == driver.KindNative && m[0].Component == driver.SwitchComponent {
+		return m[0]
+	}
+	return nil
+}
+
 // pressTarget is the view a press on selector goes to: the match, or its
 // nearest pressable ancestor (a text inside a button); a canvas node's
 // press goes to the view under its middle. at is where it lands, in
@@ -36,16 +48,12 @@ func focusable(v *View) bool {
 // selector names in a text with pressable spans.
 func (a *App) pressTarget(selector string) (v *View, at driver.Point, index int) {
 	a.t.Helper()
-	if m := a.QueryMounted(selector); len(m) == 1 && m[0].Kind == driver.KindNative && m[0].Component == driver.SwitchComponent {
-		_, at = m[0].center()
-		if a.target != nil {
-			at = a.target.reveal(m[0])
-		}
-		return m[0], at, 0
-	}
-	if m := a.Query(selector); len(m) == 1 && m[0].Kind == driver.KindNative &&
-		(a.target != nil || m[0].Component == driver.SwitchComponent) {
+	if m := a.Query(selector); a.target != nil && len(m) == 1 && m[0].Kind == driver.KindNative {
 		return m[0], a.target.reveal(m[0]), 0
+	}
+	if v := a.systemSwitch(selector); v != nil {
+		_, at = v.center()
+		return v, at, 0
 	}
 	if m := a.Query(selector); len(m) == 1 && m[0].Node != nil {
 		_, at = m[0].center()
@@ -144,8 +152,9 @@ func (a *App) pressAt(v *View, at driver.Point, index int) {
 		return
 	}
 	if v.Kind == driver.KindNative && v.Component == driver.SwitchComponent {
-		if v.NativeProps["disabled"] == true {
-			a.t.Fatalf("nsgotest: %q is disabled", v.Props.TestID)
+		// The system switch takes the press itself, as on a target, and reports the value it flips to.
+		if v.NativeProps["disabled"] == true || v.disabled(nil) {
+			a.t.Fatalf("nsgotest: the system switch is disabled: a pressable view that takes no input\n%s", a.Dump())
 		}
 		checked, _ := v.NativeProps["checked"].(bool)
 		a.dispatch(driver.Event{Kind: driver.EventNative, ID: v.ID, Text: "change", Data: !checked})

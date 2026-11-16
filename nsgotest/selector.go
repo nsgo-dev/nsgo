@@ -187,8 +187,7 @@ func (c clip) within(b driver.Bounds) clip {
 // not hide.
 func (a *App) shown() []*View { return a.shownWith(false) }
 
-// shownWith is shown, with images of no size where they would show when
-// unsized: an image that sizes itself as it loads.
+// shownWith is shown, with images and native components of no size where they would show when unsized: an image that sizes itself as it loads, and a component the platform sizes, which has no size headless.
 func (a *App) shownWith(unsized bool) []*View {
 	var out []*View
 	window := clip{area: driver.Bounds{Size: a.size}}
@@ -209,7 +208,7 @@ func (a *App) shownWith(unsized bool) []*View {
 		b.Origin.Y += origin.Y
 		if placed || b.Size.Width > 0 && b.Size.Height > 0 && c.shows(b) {
 			out = append(out, v)
-		} else if unsized && v.Kind == driver.KindImage && c.shows(driver.Bounds{Origin: b.Origin, Size: driver.Size{Width: max(b.Size.Width, 1), Height: max(b.Size.Height, 1)}}) {
+		} else if unsized && (v.Kind == driver.KindImage || v.Kind == driver.KindNative) && c.shows(driver.Bounds{Origin: b.Origin, Size: driver.Size{Width: max(b.Size.Width, 1), Height: max(b.Size.Height, 1)}}) {
 			out = append(out, v)
 		}
 		inner := c

@@ -49,3 +49,19 @@ func TestSystemSwitchIsThePlatformsOnApple(t *testing.T) {
 		}
 	}
 }
+
+// Headless, Press flips the system switch and calls OnChange, as a press on the platform's does, so one test passes headless and on a target.
+func TestPressFlipsTheSystemSwitch(t *testing.T) {
+	headless(t)
+	for _, os := range []core.OS{core.OSMacOS, core.OSIOS} {
+		var on *core.Signal[bool]
+		app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+			on = core.NewSignal(cx, false)
+			return Switch{Checked: on.Get, OnChange: on.Set, Label: "Wi-Fi", Variant: SwitchSystem, TestID: "sw"}
+		}, nsgotest.Environment(core.Environment{OS: os}))
+		app.Press("id:sw")
+		if !on.Get() {
+			t.Fatalf("%v: a press left the system switch off", os)
+		}
+	}
+}

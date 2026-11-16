@@ -116,28 +116,35 @@ func TestWindowsShareSignals(t *testing.T) {
 	}
 }
 
-func TestWindowRequestCloseReportsCancellation(t *testing.T) {
+// A handler's decision reads back through Canceled, as the close button's request goes on to close the window or not.
+func TestWindowClosingReportsCanceled(t *testing.T) {
+	var seen []bool
+	cancel := true
 	w := newWindows(t, func(cx *Scope) {
 		cx.SetMainView(func(cx *Scope) Node {
 			win := cx.CurrentWindow()
-			win.OnClosing(cx, func(c *WindowClosing) { c.Cancel() })
+			win.OnClosing(cx, func(c *WindowClosing) {
+				seen = append(seen, c.Canceled())
+				if cancel {
+					c.Cancel()
+				}
+				seen = append(seen, c.Canceled())
+			})
 			return Text{Content: "main"}
 		})
 	})
 	main := w.root.MainWindow()
-	if main == nil {
-		t.Fatal("main window is nil")
+	w.dispatch(1, driver.Event{Kind: driver.EventWindowClose})
+	if len(seen) != 2 || seen[0] || !seen[1] || main.Closed() {
+		t.Fatalf("a canceling handler saw %v, closed %v", seen, main.Closed())
 	}
-	var closing WindowClosing
-	closing.Cancel()
-	if !closing.Canceled() || (&WindowClosing{}).Canceled() {
-		t.Fatal("WindowClosing.Canceled reports the wrong state")
+	cancel, seen = false, nil
+	w.dispatch(1, driver.Event{Kind: driver.EventWindowClose})
+	if len(seen) != 2 || seen[0] || seen[1] || !main.Closed() {
+		t.Fatalf("a passing handler saw %v, closed %v", seen, main.Closed())
 	}
-	if main.RequestClose() {
-		t.Fatal("a canceled close reported success")
-	}
-	if main.Closed() {
-		t.Fatal("a canceled close closed the window")
+	if (*WindowClosing)(nil).Canceled() {
+		t.Fatal("a nil request reports canceled")
 	}
 }
 

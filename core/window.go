@@ -105,7 +105,7 @@ type WindowClosing struct{ canceled bool }
 // Cancel keeps the window open, as an app that hides it instead does.
 func (c *WindowClosing) Cancel() { c.canceled = true }
 
-// Canceled reports whether a close handler kept the window open.
+// Canceled reports whether a handler canceled the close: what a test of a handler reads.
 func (c *WindowClosing) Canceled() bool { return c != nil && c.canceled }
 
 // OpenWindow is the core's part of desktop.OpenWindow, which apps use: it
@@ -337,16 +337,6 @@ func (w *Window) Close() {
 		return
 	}
 	w.scope.Dispose()
-}
-
-// RequestClose asks the window to close as its close button does. It runs
-// OnClosing handlers newest first and reports whether the window closed.
-func (w *Window) RequestClose() bool {
-	if w == nil || w.closed {
-		return false
-	}
-	w.requestClose()
-	return w.closed
 }
 
 // Visible reports whether the window shows, tracked: what the app's own Show, Hide and Focus calls, and a panel that hides as it loses the focus, made it. A window the user minimizes, or an app the user hides, stays visible here; desktop.Minimized and Env.Lifecycle in the window's content say so.

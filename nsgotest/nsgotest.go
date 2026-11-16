@@ -41,6 +41,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -337,19 +338,15 @@ type App struct {
 	// ImageSizes are the pixel sizes of the images the model's platform
 	// loads, by URI, which answer Scope.ImageSize; others fail to load.
 	ImageSizes map[string]driver.Size
-	// tree is the surface whose views the model exposes and receives input;
-	// appTree is the application's own surface, which owns desktop windows.
-	tree    *core.Tree
-	appTree *core.Tree
-	root    *core.Scope
-	store   *core.Store
-	Clock   *core.ManualClock
-	// envSurfaces records window trees that have received the environment
-	// supplied to Start; a newly opened window gets it once after opening.
-	envSurfaces map[uint32]bool
-	// responseTree is the surface whose mount batch produced the platform
-	// request currently being answered. Desktop-wide requests such as a
-	// permission guide belong to the app tree rather than the window.
+	// tree is the surface steps act on and the model shows: the app's only one, or with a desktop environment its main window (main) once it opened. appTree is the app's own surface with a desktop environment, which opens the windows, nil without one; surfaces are the windows that have opened.
+	tree     *core.Tree
+	appTree  *core.Tree
+	main     *core.Tree
+	surfaces map[uint32]bool
+	root     *core.Scope
+	store    *core.Store
+	Clock    *core.ManualClock
+	// responseTree is the surface whose batch is being applied, which the platform's answers to what it asked go back to; guideTree the one that asked for the permission guide shown.
 	responseTree *core.Tree
 	guideTree    *core.Tree
 
@@ -364,8 +361,9 @@ type App struct {
 	// frameWanted is set while the graph waits for a display frame.
 	frameWanted bool
 
-	views      map[driver.NodeID]*View
-	alertTrees map[uint32]*core.Tree
+	views map[driver.NodeID]*View
+	// alertTrees are the surfaces that showed alerts, alongside them.
+	alertTrees []*core.Tree
 	anim       *driver.Animator
 	start      time.Time
 	alerts     []driver.AlertConfig
@@ -412,18 +410,16 @@ type App struct {
 	clicks      uint32
 }
 
-// Start runs app and settles it; the test's cleanup disposes it. Under
-// `nsgo test -target` it opens the app on that platform instead.
+// Start runs app and settles it; the test's cleanup disposes it. Under `nsgo test -target` it opens the app on that platform instead. With a desktop Environment (macOS, Windows or Linux) app shows in the main window, as on a desktop, which steps act on.
 func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *App {
 	t.Helper()
 	a := &App{
-		t:           t,
-		size:        driver.Size{Width: 390, Height: 844},
-		Clock:       core.NewManualClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
-		views:       map[driver.NodeID]*View{},
-		alertTrees:  map[uint32]*core.Tree{},
-		edits:       map[driver.NodeID]uint32{},
-		envSurfaces: map[uint32]bool{},
+		t:        t,
+		size:     driver.Size{Width: 390, Height: 844},
+		Clock:    core.NewManualClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
+		views:    map[driver.NodeID]*View{},
+		edits:    map[driver.NodeID]uint32{},
+		surfaces: map[uint32]bool{},
 
 		Permissions:       map[core.Permission]core.PermissionStatus{},
 		PermissionAnswers: map[core.Permission]core.PermissionStatus{},
@@ -447,10 +443,11 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 		a.startTarget(app)
 		return a
 	}
+	// With a desktop environment the app opens windows, as on a desktop: its main view shows in the main window, where CurrentWindow, MainWindow and OnClosing work and CloseWindow closes it.
 	desktop := a.env != nil && (a.env.OS == driver.OSMacOS || a.env.OS == driver.OSWindows || a.env.OS == driver.OSLinux)
 	var windows *core.WindowOptions
 	if desktop {
-		windows = &core.WindowOptions{Width: core.Points(a.size.Width), Height: core.Points(a.size.Height)}
+		windows = &core.WindowOptions{Width: a.size.Width, Height: a.size.Height}
 	}
 	a.root = core.NewRoot(core.RootOptions{
 		Post: func(fn func()) {
@@ -489,7 +486,6 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 		engine = a.textEngine
 	}
 	a.tree = core.NewTree(a.root, engine)
-	a.appTree = a.tree
 	// Steps reach every view, not only those in sight.
 	a.tree.SetViewPacing(false)
 	a.tree.Resize(a.size, driver.Geometry{})
@@ -497,9 +493,7 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 		a.tree.SetEnvironment(*a.env)
 	}
 	if desktop {
-		// A desktop app's first tree owns application-wide services; its main
-		// view lives in the window surface that SetMainView opens. This keeps
-		// CurrentWindow and MainWindow observable in headless desktop tests.
+		a.appTree = a.tree
 		a.tree.Mount(core.AppRoot(func(cx *core.Scope) { cx.SetMainView(app) }))
 	} else {
 		a.tree.Mount(app)
@@ -534,54 +528,47 @@ func (a *App) Settle() {
 		}
 		began := time.Now()
 		var batches int
-		// The application surface opens and owns desktop windows. Commit it
-		// first so a SetMainView call exposes the main surface before its
-		// first batch is applied.
-		if a.appTree != nil {
-			if b := a.appTree.Commit(); b != nil {
-				batches++
-				a.traceBatch(b, time.Since(began))
-				a.responseTree = a.appTree
-				a.apply(b)
-				a.responseTree = nil
+		commit := func(t *core.Tree) {
+			b := t.Commit()
+			if b == nil {
+				return
 			}
+			batches++
+			a.traceBatch(b, time.Since(began))
+			a.responseTree = t
+			if t == a.tree {
+				a.apply(b)
+			} else {
+				a.applyAside(b)
+			}
+			a.responseTree = nil
 		}
-		if a.appTree != nil {
-			for _, surface := range append([]*core.Tree(nil), a.appTree.Surfaces()...) {
+		if a.appTree == nil {
+			commit(a.tree)
+		} else {
+			// The app's own surface first: it opens the windows, the main one among them, whose batches follow.
+			commit(a.appTree)
+			for _, surface := range slices.Clone(a.appTree.Surfaces()) {
 				if surface.Closed() {
 					if surface == a.tree {
-						a.views = map[driver.NodeID]*View{}
-						a.rootID = 0
-						a.tree = a.appTree
+						// The main window closed: nothing is left for steps to reach.
+						a.views, a.rootID, a.tree = map[driver.NodeID]*View{}, 0, a.appTree
 					}
 					surface.Forget()
 					continue
 				}
-				surface.SetViewPacing(false)
-				if a.env != nil && !a.envSurfaces[surface.ID()] {
-					surface.SetEnvironment(*a.env)
-					a.envSurfaces[surface.ID()] = true
+				if !a.surfaces[surface.ID()] {
+					a.surfaces[surface.ID()] = true
+					surface.SetViewPacing(false)
+					if a.env != nil {
+						surface.SetEnvironment(*a.env)
+					}
+					// The first window the app opens is its main one, which SetMainView opened: the one steps act on.
+					if a.main == nil {
+						a.main, a.tree = surface, surface
+					}
 				}
-				if b := surface.Commit(); b != nil {
-					batches++
-					a.traceBatch(b, time.Since(began))
-					a.responseTree = surface
-					a.apply(b)
-					a.responseTree = nil
-				}
-				// The first opened surface is the main window. It is the one
-				// nsgotest steps act on, just as a desktop's focused main window.
-				if a.tree == a.appTree {
-					a.tree = surface
-				}
-			}
-		} else if a.tree != nil {
-			if b := a.tree.Commit(); b != nil {
-				batches++
-				a.traceBatch(b, time.Since(began))
-				a.responseTree = a.tree
-				a.apply(b)
-				a.responseTree = nil
+				commit(surface)
 			}
 		}
 		overlaid := a.commitOverlay()
@@ -781,6 +768,7 @@ func (a *App) SetEnvironment(env driver.Environment) {
 		return
 	}
 	if a.appTree != nil {
+		// Every window shares the app's environment, and those it opens later start from it.
 		a.env = &env
 		a.appTree.SetEnvironment(env)
 		for _, surface := range a.appTree.Surfaces() {
@@ -802,16 +790,11 @@ func (a *App) Resize(width, height driver.Points) {
 		a.target.resize(a.size)
 		return
 	}
-	if a.appTree != nil {
+	// With a desktop environment the surface is the main window's; other windows keep their own sizes.
+	if a.appTree != nil && a.appTree != a.tree {
 		a.appTree.Resize(a.size, driver.Geometry{})
-		for _, surface := range a.appTree.Surfaces() {
-			if !surface.Closed() {
-				surface.Resize(a.size, driver.Geometry{})
-			}
-		}
-	} else {
-		a.tree.Resize(a.size, driver.Geometry{})
 	}
+	a.tree.Resize(a.size, driver.Geometry{})
 	a.Settle()
 }
 
@@ -971,7 +954,9 @@ func (a *App) Answer(index int) {
 		a.target.answer(alert, index)
 		return
 	}
-	tree := a.alertTrees[alert.ID]
-	delete(a.alertTrees, alert.ID)
+	var tree *core.Tree
+	if len(a.alertTrees) > 0 {
+		tree, a.alertTrees = a.alertTrees[0], a.alertTrees[1:]
+	}
 	a.dispatchOn(tree, driver.Event{Kind: driver.EventAlert, Count: alert.ID, Index: index})
 }

@@ -108,6 +108,7 @@ func TestCaptureSkipsHeadlessAndScreenshotNamesStayInside(t *testing.T) {
 	}
 }
 
+// A drop on a view inside a drop zone reaches the zone, as a platform's hit test walks up to it; one with no zone around it, a disabled zone, or a zone outside the modal the view is in fails the step.
 func TestDropFilesUsesTheNearestEnabledDropAncestor(t *testing.T) {
 	var got []string
 	app := Start(t, func(cx *core.Scope) core.Node {
@@ -119,41 +120,98 @@ func TestDropFilesUsesTheNearestEnabledDropAncestor(t *testing.T) {
 	if len(got) != 1 || got[0] != "file:///video.mp4" {
 		t.Fatalf("drop reached %q, want the ancestor", got)
 	}
+	if msg := fails(t, func(tb testing.TB) {
+		Start(tb, func(cx *core.Scope) core.Node { return core.Text{Content: "elsewhere", TestID: "outside"} }).DropFiles("id:outside", "file:///a.mp4")
+	}); !strings.Contains(msg, "no view hearing file drops matches") {
+		t.Errorf("a drop with no zone failed with %q", msg)
+	}
+	if msg := fails(t, func(tb testing.TB) {
+		app := Start(tb, func(cx *core.Scope) core.Node {
+			return core.View{Disabled: func() bool { return true }, OnFileDrop: func([]string) { t.Error("a disabled zone took the drop") },
+				Children: []core.Node{core.Text{Content: "drop here", TestID: "label"}}}
+		})
+		app.DropFiles("id:label", "file:///a.mp4")
+	}); !strings.Contains(msg, "is disabled") {
+		t.Errorf("a drop on a disabled zone failed with %q", msg)
+	}
+	if msg := fails(t, func(tb testing.TB) {
+		app := Start(tb, func(cx *core.Scope) core.Node {
+			return core.View{OnFileDrop: func([]string) { t.Error("a zone outside the modal took the drop") }, Children: []core.Node{
+				core.Modal{Children: []core.Node{core.Text{Content: "in the modal", TestID: "inmodal"}}}}}
+		})
+		app.DropFiles("id:inmodal", "file:///a.mp4")
+	}); !strings.Contains(msg, "no view hearing file drops matches") {
+		t.Errorf("a drop in a modal failed with %q", msg)
+	}
 }
 
+// Bounds is the frame Press aims at, in surface points: its ancestors' origins less the scroll offsets of the scroll views around it.
 func TestViewBoundsUsesSurfaceCoordinates(t *testing.T) {
 	app := Start(t, func(cx *core.Scope) core.Node {
 		return core.View{Style: core.Style{Padding: core.All(10)}, Children: []core.Node{
-			core.View{TestID: "child", Style: core.Style{Width: core.Pt(40), Height: core.Pt(20)}}}}
+			core.View{TestID: "child", Style: core.Style{Width: core.Pt(40), Height: core.Pt(20)}},
+			core.Scroll{TestID: "scroll", Style: core.Style{Height: core.Pt(100)}, Children: []core.Node{
+				core.View{Style: core.Style{Height: core.Pt(300)}},
+				core.View{TestID: "row", Style: core.Style{Height: core.Pt(30)}}}}}}
 	})
 	b := app.Find("id:child").Bounds()
 	if b.Origin != (core.Point{X: 10, Y: 10}) || b.Size != (core.Size{Width: 40, Height: 20}) {
 		t.Fatalf("bounds = %+v, want 10,10 40x20", b)
 	}
-}
-
-func TestPressTogglesSystemSwitchHeadless(t *testing.T) {
-	var checked bool
-	app := Start(t, func(cx *core.Scope) core.Node {
-		return core.SystemSwitch{Checked: func() bool { return checked }, OnChange: func(v bool) { checked = v }, TestID: "switch"}
-	}, Environment(core.Environment{OS: core.OSMacOS}))
-	app.Press("id:switch")
-	if !checked {
-		t.Fatal("system switch did not receive its change event")
+	app.ScrollTo("id:scroll", core.Point{Y: 250})
+	if b := app.Find("id:row").Bounds(); b.Origin.Y != 10+20+300-250 {
+		t.Fatalf("scrolled row bounds = %+v, want y %v", b, 10+20+300-250)
 	}
 }
 
+// Headless, the system switch takes a press itself, as on a target: it reports the value it flips to. A disabled one fails the press, and a hidden one matches nothing.
+func TestPressTogglesSystemSwitchHeadless(t *testing.T) {
+	for _, os := range []core.OS{core.OSMacOS, core.OSIOS} {
+		var changes []bool
+		checked := false
+		disabled := false
+		app := Start(t, func(cx *core.Scope) core.Node {
+			on := core.NewSignal(cx, false)
+			return core.SystemSwitch{Checked: func() bool { checked = on.Get(); return checked }, Disabled: func() bool { return disabled },
+				OnChange: func(v bool) { changes = append(changes, v); on.Set(v) }, TestID: "switch"}
+		}, Environment(core.Environment{OS: os}))
+		app.Press("id:switch")
+		app.Press("id:switch")
+		if len(changes) != 2 || !changes[0] || changes[1] || checked {
+			t.Fatalf("%v: presses reported %v, checked %v", os, changes, checked)
+		}
+	}
+	if msg := fails(t, func(tb testing.TB) {
+		Start(tb, func(cx *core.Scope) core.Node {
+			return core.SystemSwitch{Disabled: func() bool { return true }, OnChange: func(bool) { t.Error("a disabled switch changed") }, TestID: "switch"}
+		}, Environment(core.Environment{OS: core.OSMacOS})).Press("id:switch")
+	}); !strings.Contains(msg, "disabled") {
+		t.Errorf("a press on a disabled switch failed with %q", msg)
+	}
+	if msg := fails(t, func(tb testing.TB) {
+		Start(tb, func(cx *core.Scope) core.Node {
+			return core.View{Style: core.Style{Display: core.DisplayNone}, Children: []core.Node{
+				core.SystemSwitch{OnChange: func(bool) { t.Error("a hidden switch changed") }, TestID: "switch"}}}
+		}, Environment(core.Environment{OS: core.OSMacOS})).Press("id:switch")
+	}); msg == "" {
+		t.Error("a press on a hidden switch passed")
+	}
+}
+
+// A web view that is mounted but hidden goes on loading and posting messages, as a platform's does.
 func TestNavigateReportsToHiddenMountedWebView(t *testing.T) {
 	var loaded []string
 	app := Start(t, func(cx *core.Scope) core.Node {
 		return core.View{Style: core.Style{Display: core.DisplayNone}, Children: []core.Node{
 			core.WebView{TestID: "web", Source: core.WebSrc("https://example.com"),
 				OnLoadStart: func(n core.WebNavigation) { loaded = append(loaded, "start:"+n.URL) },
-				OnLoad:      func(n core.WebNavigation) { loaded = append(loaded, "load:"+n.URL) }}}}
+				OnLoad:      func(n core.WebNavigation) { loaded = append(loaded, "load:"+n.URL) },
+				OnMessage:   func(d string) { loaded = append(loaded, "message:"+d) }}}}
 	})
 	app.Navigate("id:web", core.WebNavigation{URL: "https://example.com/next"})
-	if len(loaded) != 2 || loaded[0] != "start:https://example.com/next" || loaded[1] != "load:https://example.com/next" {
-		t.Fatalf("navigation events = %v", loaded)
+	app.PostMessage("id:web", "hi")
+	if want := "start:https://example.com/next load:https://example.com/next message:hi"; strings.Join(loaded, " ") != want {
+		t.Fatalf("web view events = %v, want %s", loaded, want)
 	}
 }
 
@@ -197,45 +255,80 @@ func TestRevealAndTrashAnswerAsTheTestSays(t *testing.T) {
 	}
 }
 
-func TestHeadlessDesktopHasMainWindowAndCloseStep(t *testing.T) {
-	var current *desktop.Window
+// With a desktop environment the main view shows in the main window, whose close CloseWindow asks for: its handlers run newest first, and it closes unless one cancels.
+func TestCloseWindowRunsTheMainWindowsHandlers(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
 	var calls []string
+	var w *desktop.Window
+	cancel := true
 	app := Start(t, func(cx *core.Scope) core.Node {
-		current = desktop.CurrentWindow(cx)
-		if current == nil {
-			t.Fatal("the main view has no current window")
+		w = desktop.CurrentWindow(cx)
+		if w == nil {
+			t.Fatal("the main view is in no window")
 		}
-		current.OnClosing(cx, func(c *desktop.WindowClosing) {
+		w.OnClosing(cx, func(c *desktop.WindowClosing) {
 			calls = append(calls, "old")
-			c.Cancel()
+			if cancel {
+				c.Cancel()
+			}
 		})
-		current.OnClosing(cx, func(c *desktop.WindowClosing) {
-			calls = append(calls, "new")
-		})
+		w.OnClosing(cx, func(c *desktop.WindowClosing) { calls = append(calls, "new") })
 		return core.Text{Content: "main", TestID: "main"}
-	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	if app.root.MainWindow() != w {
+		t.Fatal("the main view's window is not the main window")
+	}
 	if app.CloseWindow() {
-		t.Fatal("a canceled close reported success")
+		t.Fatal("a canceled close closed the window")
 	}
 	if got, want := strings.Join(calls, ","), "new,old"; got != want {
 		t.Fatalf("closing handlers ran %q, want %q", got, want)
 	}
-	if app.root.MainWindow() == nil || app.root.MainWindow().Closed() {
-		t.Fatal("the canceled close lost the main window")
+	app.Find("id:main")
+	cancel, calls = false, nil
+	if !app.CloseWindow() || app.root.MainWindow() != nil {
+		t.Fatal("an accepted close left the window open")
+	}
+	if len(app.Query("id:main")) != 0 {
+		t.Fatal("steps still reach the closed window's views")
+	}
+	if msg := fails(t, func(tb testing.TB) { Start(tb, func(cx *core.Scope) core.Node { return core.View{} }).CloseWindow() }); !strings.Contains(msg, "no window to close") {
+		t.Errorf("CloseWindow without a desktop environment failed with %q", msg)
 	}
 }
 
-func TestHeadlessDesktopCloseWindowClosesWhenAccepted(t *testing.T) {
-	app := Start(t, func(cx *core.Scope) core.Node {
-		if desktop.CurrentWindow(cx) == nil {
-			t.Fatal("the main view has no current window")
-		}
-		return core.Text{Content: "main"}
-	}, Environment(core.Environment{OS: core.OSLinux, Idiom: core.IdiomDesktop}))
-	if !app.CloseWindow() {
-		t.Fatal("an accepted close reported cancellation")
+// Another window the app opens runs beside the main one without disturbing the views steps reach, and each window's alerts are answered to the window that showed them, though both number them alike.
+func TestOtherWindowsLeaveTheMainOnesViews(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
 	}
-	if app.root.MainWindow() != nil {
-		t.Fatal("the accepted close left a main window")
+	var answers []string
+	app := Start(t, func(cx *core.Scope) core.Node {
+		desktop.OpenWindow(cx, desktop.WindowOptions{Width: 200, Height: 100, Title: "Other"}, func(cx *core.Scope) core.Node {
+			cx.ShowAlert(core.AlertConfig{Title: "Other?", Actions: []core.AlertAction{{Label: "Yes"}}}, func(i int) { answers = append(answers, "other") })
+			return core.View{TestID: "other", Children: []core.Node{core.Text{Content: "other window"}}}
+		})
+		cx.ShowAlert(core.AlertConfig{Title: "Main?", Actions: []core.AlertAction{{Label: "Yes"}}}, func(i int) { answers = append(answers, "main") })
+		return core.View{TestID: "main", Children: []core.Node{core.Text{Content: "main window"}}}
+	}, Environment(core.Environment{OS: core.OSWindows}), PendingAlerts())
+	app.Find("id:main")
+	app.Find("text:main window")
+	if len(app.Query("id:other")) != 0 {
+		t.Fatal("steps reach another window's views")
+	}
+	if len(app.Alerts()) != 2 {
+		t.Fatalf("alerts %v, want both windows'", app.Alerts())
+	}
+	first := app.Alerts()[0].Title
+	app.Answer(0)
+	app.Answer(0)
+	want := "main other"
+	if first == "Other?" {
+		want = "other main"
+	}
+	if got := strings.Join(answers, " "); got != want {
+		t.Fatalf("answers reached %q, want %q", got, want)
 	}
 }
