@@ -107,6 +107,14 @@ type Surface interface {
 	Sync()
 }
 
+// KeyboardSurface is a surface whose window takes the keyboard only while its app is active, as macOS's does.
+type KeyboardSurface interface {
+	// PrepareKeyboard activates the app and waits for its window to take the keyboard when the run opted in to that (nsgo test -target macos -activate), and does nothing otherwise.
+	PrepareKeyboard() error
+	// FocusRefusal names the cause after a click left a field without the focus: an inactive app the run did not opt in to activating. It is nil otherwise.
+	FocusRefusal() error
+}
+
 var host Host
 
 // ErrNoMenu is a platform's answer to a menu step where it shows no

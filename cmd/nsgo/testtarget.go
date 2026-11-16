@@ -64,7 +64,7 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	if err != nil {
 		return err
 	}
-	if needsTestHost(opts.target) {
+	if needsTestHost(opts.target) || opts.activate {
 		funcs, err := testFuncs(ctx, p, opts.target)
 		if err != nil {
 			return err
@@ -98,6 +98,9 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	env := slices.Clone(opts.env)
 	if hosted {
 		env = append(env, "NSGO_TEST_TARGET="+opts.target)
+	}
+	if opts.activate {
+		env = append(env, "NSGO_TEST_ACTIVATE=1")
 	}
 	if opts.trace {
 		env = append(env, "NSGO_TEST_TRACE=1")
@@ -155,7 +158,7 @@ tests:
 // needsTestHost reports whether target runs a test only through the platform's test host, which nsgotest.Main starts: Android's runtime reads its protocol from the test process's standard output, where go test would otherwise write its own lines, and the tool reads the test's output and exit code on Android and an iPhone between the marks the host writes (readMarkedRun).
 func needsTestHost(target string) bool { return target == "android" || target == "ios" }
 
-// testHostError says why a package's tests cannot run on a target that needs the test host, before the tool builds them: they do not link it, through github.com/nsgo-dev/nsgo, or declare no TestMain to start it from.
+// testHostError says why a package's tests cannot run on a target that needs the test host, or with -activate, before the tool builds them: they do not link it, through github.com/nsgo-dev/nsgo, or declare no TestMain to start it from.
 func testHostError(target string, hosted, testMain bool) error {
 	switch {
 	case !hosted:

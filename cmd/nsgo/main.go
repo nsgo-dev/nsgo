@@ -106,6 +106,7 @@ func main() {
 		fs.StringVar(&o.bench, "bench", "", "run the benchmarks matching this `regexp`, as go test's -bench, and no tests unless -run names them")
 		fs.StringVar(&o.junit, "junit", "", "write a JUnit XML report to `file`")
 		fs.BoolVar(&o.trace, "trace", false, "print each step's mount items and commit times")
+		fs.BoolVar(&o.activate, "activate", false, "activate the test app for keyboard input (with -target macos)")
 		fs.StringVar(&o.target, "target", "", "run on a `platform`: macos, windows, linux, web, ios, ios_simulator, tvos_simulator, watchos_simulator or android (default: headless)")
 		fs.StringVar(&o.screenshots, "screenshots", "", "write target screenshots under this relative `directory` (default: .nsgo/test/screenshots/<target>)")
 		fs.StringVar(&o.device, "device", "", "the `device` the target runs on: an iPhone's name, UDID, serial or ECID, a simulator's name or UDID, or an adb serial (default: the only one connected, or the booted simulator)")

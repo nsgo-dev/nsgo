@@ -429,8 +429,7 @@ func (a *App) inputStep(selector, step string) *View {
 	})
 	if !v.Focused {
 		if a.target != nil {
-			a.target.press(a.target.reveal(v), 0, driver.Modifiers{})
-			a.target.settle()
+			a.target.focusField(v)
 		} else {
 			a.inputBy(driver.ModalityPointer)
 			for _, o := range a.views {
@@ -477,7 +476,7 @@ func (a *App) Focus(selector string) {
 		case v.Kind != driver.KindInput:
 			a.tabTo(selector, v)
 		case a.target != nil:
-			a.target.press(a.target.reveal(v), 0, driver.Modifiers{})
+			a.target.focusField(v)
 		default:
 			a.inputBy(driver.ModalityPointer)
 			for _, o := range a.views {

@@ -26,6 +26,7 @@ type testOptions struct {
 	bench       string        // the benchmarks to run, as go test's -bench
 	junit       string        // where to write a JUnit report
 	trace       bool          // print each step's batches and commit times
+	activate    bool          // explicitly activate macOS's test app for keyboard input
 	target      string        // the platform to run on; headless when ""
 	screenshots string        // screenshot output directory for target runs
 	fps         bool          // log the performance monitor's readings on target
@@ -95,6 +96,9 @@ type testRun struct {
 // runTests runs the app's tests headless, or on a target, printing a line
 // per test and failing when any failed.
 func runTests(ctx context.Context, p *project, opts testOptions) error {
+	if opts.activate && opts.target != "macos" {
+		return errors.New("test: -activate goes with -target macos")
+	}
 	// go test would take another package inside the app's directory, and a target never reads it.
 	if err := testPathError(opts.args); err != nil {
 		return err

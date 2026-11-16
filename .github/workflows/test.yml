@@ -101,6 +101,10 @@ jobs:
         run: go tool nsgo test ./internal/platform/macos
       - name: Test native input isolation
         run: go tool nsgo test -target macos ./testdata/inputisolation
+      - name: Test keyboard activation
+        env:
+          NSGO_TARGET_E2E: "1"
+        run: go tool nsgo test -run '^TestMacOSActivationEndToEnd$' ./cmd/nsgo
       - name: Stress Objective-C blocks under GC and the race detector
         env:
           GOGC: "1"

@@ -60,9 +60,12 @@ Test discovery follows the target's build tags, including target-only tests in p
 ```sh
 go tool nsgo test -target macos            # windows, linux, web, ios (a connected iPhone), ios_simulator, tvos_simulator, watchos_simulator, android or all
 go tool nsgo test -target macos -run TestAdd
+go tool nsgo test -target macos -activate  # allow the test app to take the keyboard
 ```
 
 On macOS, test windows accept only the test host's input, so the developer's mouse, keyboard and trackpad cannot change their scenes while the suite runs.
+
+Test windows take keys without activating the app, but while another app is active a click may not focus a text field, and the step fails saying so. `-activate` lets the test app take the keyboard on an unlocked desktop; it needs tests that import `github.com/nsgo-dev/nsgo` (a blank import is enough) and call `nsgotest.Main` in `TestMain`.
 
 `app.Screenshot("en/library")` saves `.nsgo/test/screenshots/<target>/en/library.png`, `app.Capture()` returns the pixels, and both skip headless. `-trace` prints each step's commits, `-junit report.xml` writes a report, `-bench` runs benchmarks, `-env KEY=VALUE` reaches a phone's tests, and headless flags after `--` go to `go test`. Target runs accept `-short`, `-count`, `-cpu`, `-parallel`, `-failfast` and `-fullpath` there and reject unsupported arguments. Host-linked tests repeat in fresh processes for each count and CPU setting, a timeout per invocation; libraries keep Go's in-process repetitions. Put NSGo flags before the directory; on a target that includes `-run` and `-timeout`, which headless runs hand to `go test` after it. `test` takes one directory, every package under it, and errors on a second.
 

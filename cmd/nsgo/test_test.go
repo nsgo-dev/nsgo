@@ -671,7 +671,7 @@ func TestIsTestName(t *testing.T) {
 	}
 }
 
-// TestTargetTestsNeedTheTestHost runs a library package's tests on Android and an iPhone, whose runs only the test host can carry: the tool refuses the package before it builds or looks for a device, with what to add, whether the tests link no host or start none from TestMain.
+// TestTargetTestsNeedTheTestHost runs a library package's tests on Android and an iPhone, and with macOS activation, which need the native host: the tool refuses the package before it builds or looks for a device, with what to add, whether the tests link no host or start none from TestMain.
 func TestTargetTestsNeedTheTestHost(t *testing.T) {
 	if testing.Short() {
 		t.Skip("lists a module's packages")
@@ -711,15 +711,29 @@ func TestTargetTestsNeedTheTestHost(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, target := range []string{"android", "ios"} {
+		targets := []string{"android", "ios", "macos"}
+		if tc.name == "target-only" {
+			// Its tests build only for a phone, so macOS has none to refuse: the run finds no tests match.
+			targets = targets[:2]
+		}
+		for _, target := range targets {
 			// A device would be looked for, and the tests built, only after the check: none is named, so any other error is the tool going on.
-			err := runTests(t.Context(), p, testOptions{target: target, device: "no-such-device"})
+			err := runTests(t.Context(), p, testOptions{target: target, activate: target == "macos", device: "no-such-device"})
 			if err == nil || !strings.Contains(err.Error(), "-target "+target+" runs the tests in NSGo's test host") || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("%s on %s: runTests = %v, want an error containing %q", tc.name, target, err, tc.want)
 			}
 		}
 		if _, err := os.Stat(filepath.Join(dir, ".nsgo", "test")); err == nil {
 			t.Errorf("%s: the tool started a build in .nsgo/test", tc.name)
+		}
+	}
+}
+
+func TestActivateNeedsMacOSTarget(t *testing.T) {
+	for _, target := range []string{"", "all", "windows", "linux", "web", "ios_simulator", "android"} {
+		err := runTests(t.Context(), nil, testOptions{target: target, activate: true})
+		if err == nil || !strings.Contains(err.Error(), "-activate goes with -target macos") {
+			t.Errorf("target %q: %v", target, err)
 		}
 	}
 }

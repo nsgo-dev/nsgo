@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -317,20 +318,70 @@ func (t *testSurface) keyEquivalent(ev objc.ID) bool {
 		objc.Send[bool](nsApp().Send(sel("mainMenu")), sel("performKeyEquivalent:"), ev)
 }
 
-// keyboard gives a live surface's window the keyboard, as the test host gives a test's window as it opens: key within the app, without activating it, so posted keys reach it.
-func (t *testSurface) keyboard() {
+// activates reports whether the run opted in to activating the test app for the keyboard (nsgo test -target macos -activate). Live surfaces never activate here.
+func (t *testSurface) activates() bool {
+	return t.test != nil && os.Getenv("NSGO_TEST_ACTIVATE") == "1"
+}
+
+// keyboard readies the window for a key step. A live surface's window becomes key within the app, without activating it, as the test host gives a test's window as it opens. A test's window is activated only with the run's opt-in; otherwise key delivers to it in the background.
+func (t *testSurface) keyboard() error {
 	if t.test != nil {
-		return
+		return t.PrepareKeyboard()
 	}
 	onMainSync(func() {
 		if w := t.s.window; w != 0 && !objc.Send[bool](w, sel("isKeyWindow")) {
 			w.Send(sel("makeKeyWindow"))
 		}
 	})
+	return nil
+}
+
+// PrepareKeyboard implements testhost.KeyboardSurface. With the run's opt-in it activates the app and waits up to 2 seconds for it to be active with its window key: AppKit activates asynchronously, so the wait polls from the test goroutine rather than blocking the main thread. Without the opt-in it leaves the user's active app alone and does nothing.
+func (t *testSurface) PrepareKeyboard() error {
+	if !t.activates() {
+		return nil
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		var active, key bool
+		onMainSync(func() {
+			active = objc.Send[bool](nsApp(), sel("isActive"))
+			if !active {
+				activateApp()
+			}
+			w := t.s.window
+			if !objc.Send[bool](w, sel("isKeyWindow")) {
+				w.Send(sel("makeKeyWindow"))
+			}
+			key = objc.Send[bool](w, sel("isKeyWindow"))
+		})
+		if active && key {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("the macOS test app could not activate and make its window key within 2s (active=%v, key=%v); -activate needs an unlocked graphical session", active, key)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+// FocusRefusal implements testhost.KeyboardSurface: after a click left a field without the focus, it names an inactive app as the cause when the run did not opt in to activating it.
+func (t *testSurface) FocusRefusal() error {
+	if t.test == nil || t.activates() {
+		return nil
+	}
+	var active bool
+	onMainSync(func() { active = objc.Send[bool](nsApp(), sel("isActive")) })
+	if active {
+		return nil
+	}
+	return errors.New("the macOS test app is not active, and AppKit gave the clicked field no keyboard focus: rerun with -target macos -activate to let the test app take the keyboard")
 }
 
 func (t *testSurface) Type(text string) error {
-	t.keyboard()
+	if err := t.keyboard(); err != nil {
+		return err
+	}
 	for _, r := range text {
 		name := strings.ToLower(string(r))
 		code, flags := keyCodes[name], uint(0)
@@ -349,7 +400,9 @@ func (t *testSurface) Type(text string) error {
 // through NSTextInputClient: the field's editor shows it marked and
 // reports it, as it does a keyboard's composition.
 func (t *testSurface) Compose(text string) error {
-	t.keyboard()
+	if err := t.keyboard(); err != nil {
+		return err
+	}
 	var err error
 	onMainSync(func() {
 		r := t.s.window.Send(sel("firstResponder"))
@@ -370,7 +423,9 @@ func (t *testSurface) Compose(text string) error {
 // Commit inserts text over what is marked, which ends the composition, as
 // an input method commits.
 func (t *testSurface) Commit(text string) error {
-	t.keyboard()
+	if err := t.keyboard(); err != nil {
+		return err
+	}
 	var err error
 	onMainSync(func() {
 		r := t.s.window.Send(sel("firstResponder"))
@@ -388,7 +443,9 @@ func (t *testSurface) Commit(text string) error {
 const nsNotFound = uint(1<<63 - 1)
 
 func (t *testSurface) Key(key string) error {
-	t.keyboard()
+	if err := t.keyboard(); err != nil {
+		return err
+	}
 	parts := strings.Split(strings.ToLower(key), "+")
 	name := parts[len(parts)-1]
 	var flags uint

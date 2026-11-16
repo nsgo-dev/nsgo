@@ -361,6 +361,23 @@ func (t *target) check(err error) {
 	}
 }
 
+// focusField clicks the field v, as a user focuses one. With the run's opt-in the platform first activates the app (macOS's -activate); a click that leaves the field without the focus then fails the step with the platform's reason, an inactive app on macOS, rather than leave a later step to find no focused field.
+func (t *target) focusField(v *View) {
+	t.prepareKeyboard()
+	t.press(t.reveal(v), 0, driver.Modifiers{})
+	t.settle()
+	if s, ok := t.surface.(testhost.KeyboardSurface); ok && !v.Focused {
+		t.check(s.FocusRefusal())
+	}
+}
+
+// prepareKeyboard lets the platform activate the app for the keyboard when the run opted in to that.
+func (t *target) prepareKeyboard() {
+	if s, ok := t.surface.(testhost.KeyboardSurface); ok {
+		t.check(s.PrepareKeyboard())
+	}
+}
+
 // reveal scrolls v into view, as a user does before acting on it: each
 // scroll view around it that hides its middle moves it to the middle, a
 // gesture at a time. It returns where v's middle is then.
