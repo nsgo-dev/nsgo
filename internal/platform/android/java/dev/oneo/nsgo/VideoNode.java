@@ -52,6 +52,8 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private boolean prepared;
     /** A non-repeating end stays stopped until an explicit replay, seek or source change. */
     private boolean completed;
+    /** A seek that moved a completed player back has not landed yet: it plays, if paused is false, once it does. */
+    private boolean replaying;
     private boolean paused, muted, repeat;
     /** Whether the player plays or not is the controls' or the system's, not paused, until paused changes: each such play or pause is reported once. resumable is a pause for a transient loss of the audio focus, which plays on when the focus comes back. */
     private boolean held, resumable;
@@ -171,6 +173,11 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
             }
             followPlaying();
         });
+        p.setOnSeekCompleteListener(mp -> {
+            if (mp != player || !replaying) return;
+            replaying = false;
+            apply();
+        });
         p.setOnInfoListener((mp, what, extra) -> {
             if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START || what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
                 report(Protocol.EVENT_BUFFER, "", 0, 0, 0, 0, what == MediaPlayer.MEDIA_INFO_BUFFERING_START);
@@ -243,7 +250,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         if (!held) {
             if (paused) {
                 if (p.isPlaying()) p.pause();
-            } else if (!completed && !p.isPlaying()) {
+            } else if (!completed && !replaying && !p.isPlaying()) {
                 p.start();
             }
         }
@@ -340,7 +347,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private void platformPlay() {
         MediaPlayer p = player;
         if (p == null || !prepared || p.isPlaying()) return;
-        completed = false;
+        completed = replaying = false;
         p.start();
         held = paused;
         resumable = false;
@@ -376,9 +383,10 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
             // Leave PlaybackCompleted before seeking: start() in that state restarts at zero instead of resuming at the requested time.
             p.pause();
             completed = false;
+            // The seek is asynchronous, and a start before it lands plays on from the end, which ends again at once: the seek's completion applies paused.
+            replaying = true;
         }
         p.seekTo(millis, MediaPlayer.SEEK_CLOSEST);
-        if (replay) apply();
     }
 
     /** Scales the picture inside the view by its resize mode. */
@@ -418,7 +426,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private void release() {
         removeCallbacks(progress);
         prepared = false;
-        completed = false;
+        completed = replaying = false;
         if (player != null) {
             player.release();
             player = null;
