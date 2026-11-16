@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -679,7 +680,15 @@ onload = () => {
   location.href = 'about:blank';
 };
 </script>`
+	// /next answers only once the test has seen its start, so a start held until the page commits fails the test rather than arriving late.
+	release := make(chan struct{})
 	next := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/next" {
+			select {
+			case <-release:
+			case <-time.After(20 * time.Second):
+			}
+		}
 		if r.URL.Path == "/fail" {
 			conn, _, err := rw.(http.Hijacker).Hijack()
 			if err == nil {
@@ -729,30 +738,39 @@ onload = () => {
 	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;|https://localhost/;https://localhost/;"+
 		"|https://localhost/;https://localhost/;|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;"+
 		"|start about:blank;state about:blank true;load about:blank;state about:blank false;")
-	// A frame's about: navigation may leave a hint for the next top-level load. An allowed page must still report its start and state, in order.
-	root.Post(func() {
-		ref.InjectJavaScript(fmt.Sprintf(`{
+	// A frame's about: action followed by the page's own top-level navigation must not hold that navigation's start: it is reported as it starts, before the response, and the load follows in order. WebKitGTK may still name the page shown as a page's own navigation starts, so its URL is any web page's, never about:.
+	q := regexp.QuoteMeta
+	const web = `https?://[^;|]+`
+	head := q(title + "|first <p>frame</p>;again <p>frame</p>;|about:blank;")
+	own := q("|start about:blank;state about:blank true;load about:blank;state about:blank false;")
+	waitMatch := func(pattern string) {
+		t.Helper()
+		re := regexp.MustCompile("^" + pattern + "$")
+		waitTitle(t, w, re.MatchString)
+	}
+	frameThen := func(url string) {
+		root.Post(func() {
+			ref.InjectJavaScript(fmt.Sprintf(`{
 const f = document.createElement('iframe');
 f.src = 'about:blank';
 f.onload = () => { location.href = %q; };
 document.body.append(f);
-}`, next.URL+"/next"))
-	})
-	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;|https://localhost/;https://localhost/;"+next.URL+"/next;"+
-		"|https://localhost/;https://localhost/;"+next.URL+"/next;|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;"+
-		next.URL+"/next true;"+next.URL+"/next false;|start about:blank;state about:blank true;load about:blank;state about:blank false;")
-	// The same frame hint must not swallow the start of a load that fails before commit; its events name the failed URL rather than the old page.
-	root.Post(func() {
-		ref.InjectJavaScript(fmt.Sprintf(`{
-const f = document.createElement('iframe');
-f.src = 'about:blank';
-f.onload = () => { location.href = %q; };
-document.body.append(f);
-}`, next.URL+"/fail"))
-	})
-	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;"+next.URL+"/fail;|https://localhost/;https://localhost/;"+next.URL+"/next;"+
-		"|https://localhost/;https://localhost/;"+next.URL+"/next;"+next.URL+"/fail;|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;"+
-		next.URL+"/next true;"+next.URL+"/next false;"+next.URL+"/fail true;|start about:blank;state about:blank true;load about:blank;state about:blank false;")
+}`, url))
+		})
+	}
+	frameThen(next.URL + "/next")
+	waitMatch(head + q("|https://localhost/;https://localhost/;") +
+		q("|https://localhost/;https://localhost/;") + web + ";" +
+		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + web + " true;" + own)
+	close(release)
+	waitMatch(head + q("|https://localhost/;https://localhost/;"+next.URL+"/next;") +
+		q("|https://localhost/;https://localhost/;") + web + ";" +
+		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + web + " true;" + q(next.URL+"/next false;") + own)
+	// Nor must it swallow the start of a load that fails before commit.
+	frameThen(next.URL + "/fail")
+	waitMatch(q(title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;"+next.URL+"/fail;") + q("|https://localhost/;https://localhost/;"+next.URL+"/next;") +
+		q("|https://localhost/;https://localhost/;") + web + ";" + web + ";" +
+		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + web + " true;" + q(next.URL+"/next false;") + web + " true;" + own)
 }
 
 // TestWebViewsOutliveEachOther opens an Incognito web view and one in the app's session, both serving an app-owned scheme, and one that serves none. Each page keeps its scheme and downloads as the others unmount and mount again, the page without a handler gets an error rather than a load that never ends, and a view that unmounts mid-download cancels it. It skips where WebKitGTK 6.0 is missing. It runs in a process of its own, as the other WebKit tests do.

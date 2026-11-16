@@ -928,7 +928,7 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 	case webkitLoadStarted:
 		v.web.failed = false
 		uri := goString(webkitWebViewGetURI(page))
-		// At load start the URI can still be the previous page's. An about: action says no frame, so hold its start until the top level commits.
+		// At load start the URI of a refused about: page can still name the page before it. The last navigation action being a refused about: one, a frame's perhaps, as WebKitGTK does not say, holds this start until the top level commits, so a refused page reports none.
 		v.web.startPending = v.web.config.Restricted && !v.web.ownNavigation &&
 			(v.web.aboutPending || aboutScheme(uri) && !v.web.config.Navigable(uri))
 		v.web.aboutPending = false
@@ -993,7 +993,7 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 	if v == nil {
 		return 0
 	}
-	// A frame's about: action may have held an unrelated top-level start. Keep that start before its failure, but never publish a refused page.
+	// A held start, one after a frame's about: action, is still reported before its failure, but never for a refused page.
 	if v.web.startPending && v.web.config.Navigable(goString(uri)) {
 		w.navigatedTo(v, goString(uri), true, driver.EventLoadStart)
 	}
@@ -1074,10 +1074,9 @@ func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 
 			}
 			v.web.ownStep = ""
 		}
+		// Only the last action can be the one the next top-level load starts for, so a frame's about: action followed by the top level's own navigation, which WebKitGTK checks as an action of its own, does not hold that navigation's start. A frame acting between the top level's refused about: action and its load start clears the hint, so that start is reported if its URI still names the page before.
+		v.web.aboutPending = aboutScheme(url) && !allowed(url)
 		if pageScheme(url) {
-			if aboutScheme(url) && !allowed(url) {
-				v.web.aboutPending = true
-			}
 			return 0
 		}
 	}
