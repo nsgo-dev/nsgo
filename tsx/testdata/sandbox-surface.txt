@@ -121,6 +121,7 @@ nsgo.host.call
 nsgo.host.on
 nsgo.host.params
 nsgo.host.post
+nsgo.increaseContrast
 nsgo.keyboardFrame
 nsgo.keymap
 nsgo.keymap.bind

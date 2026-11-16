@@ -27,6 +27,7 @@ export interface OpenOptions {
   colorScheme?: ColorScheme | null;
   locale?: string | null;
   reducedMotion?: boolean | null;
+  increaseContrast?: boolean | null;
   platform?: Platform | null;
   /** A manual clock: the app's time moves only as the test moves it (`app.clock`). Without one, its time passes as the test waits. */
   clock?: ClockOptions | null;

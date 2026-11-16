@@ -46,3 +46,8 @@ test("answers requests with the test's functions", async () => {
   await app.press("id:offline");
   await app.waitFor("offline");
 });
+
+test("opens with more contrast", async () => {
+  expect((await open("Services.tsx")).shows("standard contrast")).toBe(true);
+  expect((await open("Services.tsx", { increaseContrast: true })).shows("more contrast")).toBe(true);
+});

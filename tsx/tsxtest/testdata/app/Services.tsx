@@ -1,4 +1,4 @@
-import { Clipboard, mount, openUrl, Picker, signal, Text, View } from "nsgo";
+import { Clipboard, increaseContrast, mount, openUrl, Picker, signal, Text, View } from "nsgo";
 import { AlertDialog } from "nsgo/base";
 import { Menu } from "nsgo/desktop";
 
@@ -6,6 +6,7 @@ function Services() {
   const status = signal("idle");
   return <View>
     <Text testID="status">{status}</Text>
+    <Text testID="contrast">{() => increaseContrast() ? "more contrast" : "standard contrast"}</Text>
     <Text testID="fetch" onPress={async () => {
       try {
         const res = await fetch("https://api.example.com/todos?page=1", { method: "POST", body: "new" });
