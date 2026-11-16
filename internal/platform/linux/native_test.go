@@ -1002,6 +1002,25 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 		}}
 	}
 	w := startTestWindow(t, app, Options{Title: title, Width: 360, Height: 240})
+	// A timeout may precede every media callback. Keep the native state
+	// in the failure report so CI distinguishes that from a missed end.
+	t.Cleanup(func() {
+		if !t.Failed() {
+			return
+		}
+		w.onLoop(t, func() {
+			for _, v := range w.views {
+				if v == nil || v.video == nil || v.video.stream == 0 {
+					continue
+				}
+				s := v.video.stream
+				t.Logf("video: loaded=%t failed=%t requested=%t prepared=%d playing=%d ended=%d",
+					v.video.loaded, v.video.failed, v.video.playing, gtkMediaStreamIsPrepared(s), gtkMediaStreamGetPlaying(s), gtkMediaStreamGetEnded(s))
+				t.Logf("media: audio=%d video=%d duration=%d time=%d error=%#x",
+					gtkMediaStreamHasAudio(s), gtkMediaStreamHasVideo(s), gtkMediaStreamGetDuration(s), gtkMediaStreamGetTimestamp(s), gtkMediaStreamGetError(s))
+			}
+		})
+	})
 	got := waitTitle(t, w, func(s string) bool { return strings.HasSuffix(s, "|1") || strings.Contains(s, "|error ") })
 	if strings.Contains(got, "No installed GStreamer plug-in") {
 		// GTK plays sound through autoaudiosink, of gst-plugins-good.
