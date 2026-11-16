@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
  * internal/platform/android/android.go, whose writers define each payload.
  */
 final class Protocol {
-    /** Bounds an allocation before reading a frame, including images and font data. */
+    /** Bounds an allocation before reading a frame, including images and font data; Go refuses a longer message before writing it (maxMessage in protocol.go). */
     static final int MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
 
     static final class Message {

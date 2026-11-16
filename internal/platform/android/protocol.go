@@ -2,6 +2,7 @@ package android
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -10,6 +11,17 @@ import (
 // This file holds what builds on every system: the protocol's encoding and
 // the encoders of animations, so tests can check them against the Java
 // runtime on a machine with a JDK.
+
+// maxMessage is the largest payload Java's reader takes (Protocol.MAX_MESSAGE_SIZE); it ends the process on a longer one as on a corrupt pipe, so the writer refuses it instead.
+const maxMessage = 64 << 20
+
+// checkMessage reports an error for a message of kind whose payload is n bytes, more than Java reads.
+func checkMessage(kind byte, n int) error {
+	if n > maxMessage {
+		return fmt.Errorf("a message (kind %d) of %d bytes is over the %d MiB the Android runtime reads", kind, n, maxMessage>>20)
+	}
+	return nil
+}
 
 // Native components on Android depart from NSH's, whose components are
 // Java objects the embedding app registers: the Go process cannot make

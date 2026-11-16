@@ -1056,7 +1056,10 @@ func (s *surface) load(l imageLoad) {
 			s.report(l, driver.Event{Kind: driver.EventLoadEnd})
 			return
 		}
-		s.sendImage(l, imageSource, img)
+		if err := s.sendImage(l, imageSource, img); err != nil {
+			s.report(l, driver.Event{Kind: driver.EventError, Text: err.Error()})
+			s.report(l, driver.Event{Kind: driver.EventLoadEnd})
+		}
 	}
 }
 
@@ -1068,8 +1071,8 @@ func (s *surface) report(l imageLoad, ev driver.Event) {
 	}
 }
 
-func (s *surface) sendImage(l imageLoad, part byte, img decodedImage) {
-	s.send(msgImage, func(w *writer) {
+func (s *surface) sendImage(l imageLoad, part byte, img decodedImage) error {
+	return s.send(msgImage, func(w *writer) {
 		w.u32(l.surface)
 		w.u32(uint32(l.id))
 		w.u32(l.request)
@@ -1101,17 +1104,21 @@ func imageScale(uri string) float32 {
 	return float32(f)
 }
 
-// send writes one message whose payload body writes.
-func (s *surface) send(kind byte, body func(w *writer)) {
+// send writes one message whose payload body writes, or none and an error when the payload is longer than Java reads, as an image's or a font's bytes can be.
+func (s *surface) send(kind byte, body func(w *writer)) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	w := writer{append(s.buf[:0], kind, 0, 0, 0, 0)}
 	body(&w)
+	if err := checkMessage(kind, len(w.buf)-5); err != nil {
+		return err
+	}
 	binary.BigEndian.PutUint32(w.buf[1:], uint32(len(w.buf)-5))
 	s.out.Write(w.buf)
 	if cap(w.buf) <= 1<<20 { // let an image's buffer go
 		s.buf = w.buf
 	}
+	return nil
 }
 
 func readMessage(r *bufio.Reader) (byte, []byte, error) {
@@ -1751,14 +1758,13 @@ func (s *surface) RegisterFont(data []byte) error {
 	}
 	// Typeface reads a collection's first face.
 	f := faces[0]
-	s.send(msgFontData, func(w *writer) {
+	return s.send(msgFontData, func(w *writer) {
 		w.str(f.Family)
 		w.u16(uint16(f.Weight))
 		w.flags(f.Italic)
 		w.u32(uint32(len(data)))
 		w.buf = append(w.buf, data...)
 	})
-	return nil
 }
 
 // loadCanvasImages loads the images d draws that no canvas asked for
@@ -1799,12 +1805,14 @@ func (s *surface) loadImages(srcs []driver.ImageSource) {
 				log.Printf("nsgo: canvas: image %s: %v", key, err)
 				return
 			}
-			s.send(msgCanvasImage, func(w *writer) {
+			if err := s.send(msgCanvasImage, func(w *writer) {
 				w.str(key)
 				w.float(img.scale)
 				w.u32(uint32(len(img.data)))
 				w.buf = append(w.buf, img.data...)
-			})
+			}); err != nil {
+				log.Printf("nsgo: canvas: image %s: %v", key, err)
+			}
 		}()
 	}
 }
