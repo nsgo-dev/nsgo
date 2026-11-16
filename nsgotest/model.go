@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -1075,12 +1076,43 @@ func (a *App) Dump() string {
 
 // center returns the middle of v in its own and in surface points.
 func (v *View) center() (local, page driver.Point) {
-	at := v.surfaceFrame()
-	local = driver.Point{X: at.Size.Width / 2, Y: at.Size.Height / 2}
-	return local, driver.Point{X: at.Origin.X + local.X, Y: at.Origin.Y + local.Y}
+	local = driver.Point{X: v.Frame.Size.Width / 2, Y: v.Frame.Size.Height / 2}
+	return local, v.pagePoint(local)
 }
 
-// Bounds is v's frame in surface points, as its ancestors and their scroll offsets place it: the frame Ref.Bounds reports and Press aims at.
+// pointerMatrix is the transform the model draws, including animated
+// bindings and the parent's perspective, in the view's own coordinates.
+func (v *View) pointerMatrix() driver.Matrix3D {
+	s := v.Animated.Apply(v.Style)
+	m := s.Matrix(v.Frame.Size)
+	if p := v.Parent; p != nil {
+		ps := p.Animated.Apply(p.Style)
+		at := driver.Point{X: v.Frame.Origin.X - p.Offset.X, Y: v.Frame.Origin.Y - p.Offset.Y}
+		m = driver.ChildPerspective(ps.ChildPerspective, p.Frame.Size, at).Mul(m)
+	}
+	return m
+}
+
+func (v *View) pagePoint(p driver.Point) driver.Point {
+	x, y := v.pageMatrix().Apply(float64(p.X), float64(p.Y))
+	return driver.Point{X: driver.Points(x), Y: driver.Points(y)}
+}
+
+func (v *View) localPoint(p driver.Point) driver.Point {
+	if parent := v.Parent; parent != nil {
+		p = parent.localPoint(p)
+		p.X += parent.Offset.X
+		p.Y += parent.Offset.Y
+	}
+	local, ok := driver.IntoView(v.Frame, v.pointerMatrix(), p)
+	if !ok {
+		return driver.Point{X: driver.Points(math.Inf(1)), Y: driver.Points(math.Inf(1))}
+	}
+	return local
+}
+
+// Bounds is v's layout frame in surface points, as its ancestors and
+// their scroll offsets place it, before transforms: what Ref.Bounds reports.
 func (v *View) Bounds() core.Bounds { return v.surfaceFrame() }
 
 // surfaceFrame is v's frame in surface points, as its ancestors and their
@@ -1102,4 +1134,17 @@ func (v *View) within(o *View) bool {
 		}
 	}
 	return false
+}
+
+func (v *View) pageMatrix() driver.Matrix3D {
+	x, y := v.Frame.Origin.X, v.Frame.Origin.Y
+	if parent := v.Parent; parent != nil {
+		x -= parent.Offset.X
+		y -= parent.Offset.Y
+	}
+	m := driver.Translate3D(float64(x), float64(y), 0).Mul(v.pointerMatrix())
+	if parent := v.Parent; parent != nil {
+		m = parent.pageMatrix().Mul(m)
+	}
+	return m
 }

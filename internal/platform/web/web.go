@@ -2309,7 +2309,7 @@ func (s *surface) mouseEvent(v *view, kind driver.EventKind, e js.Value) driver.
 // pointerAt is pointer for the client point (x, y), with the modifier keys
 // e holds.
 func (s *surface) pointerAt(v *view, kind driver.EventKind, x, y float64, e js.Value) driver.Event {
-	r := v.el.Call("getBoundingClientRect")
+	lx, ly := v.localPoint(x, y)
 	root := s.host
 	for el := v.el; el.Truthy() && !el.Equal(s.host); el = el.Get("parentElement") {
 		if m := s.viewOf(el); m != nil && m.kind == driver.KindModal {
@@ -2317,11 +2317,11 @@ func (s *surface) pointerAt(v *view, kind driver.EventKind, x, y float64, e js.V
 			break
 		}
 	}
-	rr := root.Call("getBoundingClientRect")
+	px, py := clientPoint(root, x, y)
 	return driver.Event{Kind: kind,
-		Point: driver.Point{X: driver.Points(x - r.Get("left").Float()), Y: driver.Points(y - r.Get("top").Float())},
-		Page: driver.Point{X: driver.Points(x - rr.Get("left").Float() - root.Get("clientLeft").Float()),
-			Y: driver.Points(y - rr.Get("top").Float() - root.Get("clientTop").Float())},
+		Point: driver.Point{X: driver.Points(lx), Y: driver.Points(ly)},
+		Page: driver.Point{X: driver.Points(px - root.Get("clientLeft").Float()),
+			Y: driver.Points(py - root.Get("clientTop").Float())},
 		Modifiers: driver.Modifiers{Control: e.Get("ctrlKey").Bool(), Alt: e.Get("altKey").Bool(),
 			Shift: e.Get("shiftKey").Bool(), Platform: e.Get("metaKey").Bool()},
 	}

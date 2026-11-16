@@ -1400,7 +1400,7 @@ func (s *surface) pressOutside(event objc.ID) {
 				hit = s.native
 			}
 		}
-		p := objc.Send[apple.CGPoint](v.native, selConvertPoint, loc, objc.ID(0))
+		p := v.windowPoint(loc)
 		b := objc.Send[apple.CGRect](v.native, selBounds)
 		inside := p.X >= 0 && p.Y >= 0 && p.X < b.Size.Width && p.Y < b.Size.Height
 		if inside || objc.Send[bool](hit, sel("isDescendantOf:"), v.native) {
@@ -2089,7 +2089,7 @@ func (v *view) dispatch(kind driver.EventKind) {
 // mouseAt reports kind, a mouse event, with the mouse at loc in the window
 // and the keys and the button held now.
 func (v *view) mouseAt(kind driver.EventKind, loc apple.CGPoint) {
-	p := objc.Send[apple.CGPoint](v.native, selConvertPoint, loc, objc.ID(0))
+	p := v.windowPoint(loc)
 	flags := objc.Send[uint](objc.ID(apple.Class("NSEvent")), sel("modifierFlags"))
 	v.report(driver.Event{Kind: kind, Point: driver.Point{X: driver.Points(p.X), Y: driver.Points(p.Y)}, Page: v.page(loc),
 		Modifiers: apple.Modifiers(flags), Button: pressedButton()})
@@ -2122,7 +2122,7 @@ func pressedButton() driver.MouseButton {
 // modifier keys held, for an event of kind.
 func (v *view) pointer(kind driver.EventKind, event objc.ID) driver.Event {
 	loc := objc.Send[apple.CGPoint](event, selLocationInWindow)
-	p := objc.Send[apple.CGPoint](v.native, selConvertPoint, loc, objc.ID(0))
+	p := v.windowPoint(loc)
 	return driver.Event{Kind: kind, Point: driver.Point{X: driver.Points(p.X), Y: driver.Points(p.Y)}, Page: v.page(loc),
 		Modifiers: apple.Modifiers(objc.Send[uint](event, sel("modifierFlags")))}
 }
@@ -2201,25 +2201,34 @@ func reach(self objc.ID, cmd objc.SEL, p apple.CGPoint) objc.ID {
 	if v == nil || v.native != self {
 		return apple.SendSuperPoint(self, cmd, p)
 	}
-	frame := v.nativeFrame()
-	at := driver.Point{X: driver.Points(p.X), Y: driver.Points(p.Y)}
-	own, children := driver.Reach(frame, &v.props, v.overflow, at)
-	if !frame.Contains(at) {
-		if children {
-			local := objc.Send[apple.CGPoint](self, selConvertPoint, p, objc.ID(apple.Msg(self, selSuperview)))
-			subs := objc.ID(apple.Msg(self, selSubviews))
-			for i := apple.Msg(subs, selCount); i > 0; i-- {
-				if hit := objc.ID(apple.Msg(subs, selObjectAtIndex, i-1)).Send(cmd, local); hit != 0 {
-					return hit
-				}
-			}
-		}
-		if own {
-			return self
-		}
+	if apple.MsgBool(self, selIsHidden) {
 		return 0
 	}
-	hit := apple.SendSuperPoint(self, cmd, p)
+	frame := v.nativeFrame()
+	local, mapped := driver.IntoView(frame, v.pointerMatrix(), driver.Point{X: driver.Points(p.X), Y: driver.Points(p.Y)})
+	if !mapped {
+		return 0
+	}
+	own, children := driver.ReachView(frame.Size, &v.props, v.style.Clip || v.kind == driver.KindScroll, local)
+	at := apple.CGPoint{X: float64(local.X), Y: float64(local.Y)}
+	// Test native children ourselves: AppKit clips the search to layout
+	// frames and does not undo their layer transforms.
+	var hit objc.ID
+	if children {
+		b := objc.Send[apple.CGRect](self, selBounds)
+		at.X += b.Origin.X
+		at.Y += b.Origin.Y
+		subs := self.Send(selSubviews)
+		for i := apple.Msg(subs, selCount); i > 0; i-- {
+			sub := subs.Send(selObjectAtIndex, i-1)
+			if hit = sub.Send(cmd, at); hit != 0 {
+				break
+			}
+		}
+	}
+	if hit == 0 && own {
+		hit = self
+	}
 	if hit != 0 && hit != self && hit == v.content {
 		// The holder of v's children, hit where no child is, is v itself; an input's editor, also v's, takes its own clicks.
 		hit = self
@@ -2276,10 +2285,11 @@ func (v *view) misses(at driver.Point) bool {
 		return false
 	}
 	frame := v.nativeFrame()
-	if frame.Contains(at) {
-		return false
+	local, ok := driver.IntoView(frame, v.pointerMatrix(), at)
+	if !ok {
+		return true
 	}
-	own, children := driver.Reach(frame, &v.props, v.overflow, at)
+	own, children := driver.ReachView(frame.Size, &v.props, v.style.Clip || v.kind == driver.KindScroll, local)
 	return !own && !children
 }
 
@@ -2384,7 +2394,7 @@ func mouseDown(self objc.ID, cmd objc.SEL, event objc.ID) {
 	v.pressAt = v.pointer(driver.EventPressDown, event)
 	v.pressAt.Count = uint32(max(objc.Send[int](event, sel("clickCount")), 1))
 	// A long press on a text's span is the span's.
-	v.pressAt.Index = v.indexAt(objc.Send[apple.CGPoint](self, selConvertPoint, objc.Send[apple.CGPoint](event, selLocationInWindow), objc.ID(0)))
+	v.pressAt.Index = v.indexAt(v.windowPoint(objc.Send[apple.CGPoint](event, selLocationInWindow)))
 	v.pressed(driver.EventPressDown)
 	if v.events.Has(driver.EventLongPress) {
 		e, long := v.surface.engine, v.pressAt
@@ -2409,7 +2419,7 @@ func mouseUp(self objc.ID, cmd objc.SEL, event objc.ID) {
 		}
 		return
 	}
-	p := objc.Send[apple.CGPoint](self, selConvertPoint, objc.Send[apple.CGPoint](event, selLocationInWindow), objc.ID(0))
+	p := v.windowPoint(objc.Send[apple.CGPoint](event, selLocationInWindow))
 	b := objc.Send[apple.CGRect](self, selBounds)
 	pressed := v.pressing.Swap(false)
 	if !pressed {
@@ -2618,7 +2628,7 @@ func cursorAt(hit, up objc.ID, loc apple.CGPoint) (cursor driver.Cursor, own boo
 		v := views[n]
 		if v != nil && v.kind == driver.KindText && v.native == n {
 			// A span's cursor goes ahead of its text's own and the I-beam.
-			p := objc.Send[apple.CGPoint](n, selConvertPoint, loc, objc.ID(0))
+			p := v.windowPoint(loc)
 			if c, ok := driver.SpanCursor(v.spans, v.indexAt(p)); ok {
 				return c, true
 			}
@@ -2753,7 +2763,7 @@ func (s *surface) modifiersChanged(event objc.ID) {
 		if !v.over || !v.events.Has(driver.EventMouseMove) {
 			continue
 		}
-		p := objc.Send[apple.CGPoint](v.native, selConvertPoint, loc, objc.ID(0))
+		p := v.windowPoint(loc)
 		v.report(driver.Event{Kind: driver.EventMouseMove, Point: driver.Point{X: driver.Points(p.X), Y: driver.Points(p.Y)},
 			Page: v.page(loc), Modifiers: mods})
 	}
@@ -2797,7 +2807,7 @@ func (s *surface) dragMoved(event objc.ID) {
 			objc.Send[bool](v.native, sel("isHiddenOrHasHiddenAncestor")) {
 			continue
 		}
-		p := objc.Send[apple.CGPoint](v.native, selConvertPoint, loc, objc.ID(0))
+		p := v.windowPoint(loc)
 		b := objc.Send[apple.CGRect](v.native, selBounds)
 		if p.X < 0 || p.Y < 0 || p.X >= b.Size.Width || p.Y >= b.Size.Height {
 			continue

@@ -332,12 +332,11 @@ func (t *Tree) pathFrom(n *node) []*node {
 
 // localTouches returns e with its positions in n.
 func (t *Tree) localTouches(n *node, e *TouchEvent) TouchEvent {
-	o := t.surfaceBounds(n).Origin
 	local := *e
 	local.Touches = slices.Clone(e.Touches)
 	for i := range local.Touches {
 		p := &local.Touches[i]
-		p.Position = Point{X: p.PagePosition.X - o.X, Y: p.PagePosition.Y - o.Y}
+		p.Position = n.surfacePoint(p.PagePosition)
 	}
 	return local
 }
@@ -356,8 +355,7 @@ func (t *Tree) forgetLifted(e *TouchEvent) {
 
 // responderEvent returns what n hears about finger about.
 func (t *Tree) responderEvent(n *node, about Touch, e *TouchEvent) ResponderEvent {
-	o := t.surfaceBounds(n).Origin
-	return ResponderEvent{Position: Point{X: about.PagePosition.X - o.X, Y: about.PagePosition.Y - o.Y},
+	return ResponderEvent{Position: n.surfacePoint(about.PagePosition),
 		PagePosition: about.PagePosition, Time: e.Time, Gesture: t.touches.gesture}
 }
 

@@ -259,6 +259,26 @@ func SetTransform(layer objc.ID, t driver.Transform) {
 	setLayerTransform(layer, m)
 }
 
+// PointerMatrix returns the transform currently drawn by layer, around
+// its top left. Presentation values include style transitions and
+// additive keyframes, which a view's layout coordinates do not know.
+func PointerMatrix(layer objc.ID) driver.Matrix3D {
+	if layer == 0 {
+		return driver.Identity3D
+	}
+	shown := layer.Send(sel("presentationLayer"))
+	if shown == 0 {
+		shown = layer
+	}
+	t := objc.Send[transform3D](shown, sel("transform"))
+	m := driver.Matrix3D{t.M11, t.M12, t.M13, t.M14, t.M21, t.M22, t.M23, t.M24,
+		t.M31, t.M32, t.M33, t.M34, t.M41, t.M42, t.M43, t.M44}
+	b := objc.Send[CGRect](shown, selBounds)
+	a := objc.Send[CGPoint](shown, sel("anchorPoint"))
+	x, y := a.X*b.Size.Width, a.Y*b.Size.Height
+	return driver.Translate3D(x, y, 0).Mul(m).Mul(driver.Translate3D(-x, -y, 0))
+}
+
 // The messages that move a layer every frame of an animation, registered
 // once: objc.Send registers a function, checking a struct's fields, on
 // every call.

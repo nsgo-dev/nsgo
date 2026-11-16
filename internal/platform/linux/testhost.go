@@ -145,7 +145,10 @@ func (t *testSurface) Drag(path []driver.Point) error {
 	if len(path) == 0 {
 		return errors.New("an empty drag")
 	}
-	t.onLoop(func() { t.w.pointerDown(path[0], 1, 0, 0, 1) })
+	t.onLoop(func() {
+		t.w.pointerDown(path[0], 1, 0, 0, 1)
+		dragBeginCallback(0, 0, 0, t.w.handle)
+	})
 	time.Sleep(100 * time.Millisecond)
 	at := path[0]
 	for _, to := range path[1:] {
@@ -154,12 +157,18 @@ func (t *testSurface) Drag(path []driver.Point) error {
 		for i := 1; i <= n; i++ {
 			f := driver.Points(i) / driver.Points(n)
 			p := driver.Point{X: at.X + dx*f, Y: at.Y + dy*f}
-			t.onLoop(func() { t.w.movePointer(p, gdkButton1) })
+			t.onLoop(func() {
+				t.w.movePointer(p, gdkButton1)
+				dragUpdateCallback(0, float64(p.X-path[0].X), float64(p.Y-path[0].Y), t.w.handle)
+			})
 			time.Sleep(16 * time.Millisecond)
 		}
 		at = to
 	}
-	t.onLoop(func() { t.w.pointerUp(at) })
+	t.onLoop(func() {
+		t.w.pointerUp(at)
+		dragEndCallback(0, float64(at.X-path[0].X), float64(at.Y-path[0].Y), t.w.handle)
+	})
 	return nil
 }
 

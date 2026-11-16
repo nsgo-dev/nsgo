@@ -549,8 +549,7 @@ func (s *surface) setRefreshing(v *view, on bool) {
 
 // localPoint returns client point x, y in the view's viewport.
 func (v *view) localPoint(x, y float64) (float64, float64) {
-	r := v.el.Call("getBoundingClientRect")
-	return x - r.Get("left").Float(), y - r.Get("top").Float()
+	return clientPoint(v.el, x, y)
 }
 
 // contentPoint returns the content point (unzoomed) at viewport point

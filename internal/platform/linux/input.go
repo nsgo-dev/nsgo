@@ -165,8 +165,8 @@ func (w *window) pressEdge(kind driver.EventKind, at driver.Point) {
 	}
 	ev := w.down
 	ev.Kind, ev.ID, ev.Page = kind, v.id, at
-	if b, ok := w.surfaceBounds(v); ok {
-		ev.Point = driver.Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}
+	if _, ok := w.surfaceBounds(v); ok {
+		ev.Point = v.surfacePoint(at)
 	}
 	w.engine.Dispatch(ev)
 }
@@ -331,8 +331,8 @@ func (w *window) startLongPress(at driver.Point) {
 	}
 	seq, ev := w.longPress, w.down
 	ev.Kind, ev.ID, ev.Page = driver.EventLongPress, v.id, at
-	if b, ok := w.surfaceBounds(v); ok {
-		ev.Point = driver.Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}
+	if _, ok := w.surfaceBounds(v); ok {
+		ev.Point = v.surfacePoint(at)
 		// A long press on a text's span is the span's.
 		if l, ok := v.text.(*textLayout); ok && v.kind == driver.KindText {
 			ev.Index = l.indexAt(ev.Point.X-v.content.Origin.X, ev.Point.Y-v.content.Origin.Y)
@@ -463,8 +463,7 @@ func (w *window) wheelTaken(state uint32, p driver.Point, dx, dy float64, touchp
 
 // wheelEventAt is a wheel event at surface point p over v.
 func (w *window) wheelEventAt(v *view, p driver.Point, state uint32) driver.Event {
-	b, _ := w.surfaceBounds(v)
-	return driver.Event{Kind: driver.EventWheel, ID: v.id, Point: driver.Point{X: p.X - b.Origin.X, Y: p.Y - b.Origin.Y}, Page: p,
+	return driver.Event{Kind: driver.EventWheel, ID: v.id, Point: v.surfacePoint(p), Page: p,
 		Modifiers: modifiers(state)}
 }
 
@@ -678,8 +677,7 @@ func (w *window) pinchPoint(v *view, kind driver.EventKind, p driver.Point) driv
 	if kind != driver.EventPinch {
 		return driver.Point{}
 	}
-	b, _ := w.surfaceBounds(v)
-	return driver.Point{X: p.X - b.Origin.X, Y: p.Y - b.Origin.Y}
+	return v.surfacePoint(p)
 }
 
 // rest is a gesture's value when it begins.

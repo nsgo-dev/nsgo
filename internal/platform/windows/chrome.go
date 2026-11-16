@@ -718,7 +718,9 @@ func (w *window) windowDragAt(p driver.Point) bool {
 		if !children {
 			break
 		}
-		p = driver.Point{X: p.X - v.frame.Origin.X + v.offset.X, Y: p.Y - v.frame.Origin.Y + v.offset.Y}
+		p = v.local(p)
+		p.X += v.offset.X
+		p.Y += v.offset.Y
 		var next *view
 		for i := len(v.children) - 1; i >= 0; i-- {
 			if c := v.children[i]; c.under(p) {

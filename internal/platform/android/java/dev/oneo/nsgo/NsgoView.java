@@ -17,6 +17,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Insets;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
@@ -4658,7 +4659,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             if (node != null && node.pointerEvents == Protocol.POINTER_EVENTS_NONE) return false;
             if (action == MotionEvent.ACTION_DOWN) routed = route(e);
             if (routed != null) {
-                deliver(routed, e);
+                if (action != MotionEvent.ACTION_DOWN) deliver(routed, e);
                 if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) routed = null;
                 return true;
             }
@@ -4683,13 +4684,16 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             for (int i = getChildCount() - 1; i >= 0; i--) {
                 View child = getChildAt(i);
                 if (child.getVisibility() != VISIBLE) continue;
-                float x = e.getX() + getScrollX() - child.getLeft(), y = e.getY() + getScrollY() - child.getTop();
+                float[] point = intoChild(this, child, e.getX(), e.getY());
+                if (point == null) continue;
+                float x = point[0], y = point[1];
                 if (x >= 0 && y >= 0 && x < child.getWidth() && y < child.getHeight()) return null;
                 Node c = byView.get(child);
                 if (c == null) continue;
                 boolean slop = c.slop != null && x >= -c.slop[3] * density && y >= -c.slop[0] * density
                         && x < child.getWidth() + c.slop[1] * density && y < child.getHeight() + c.slop[2] * density;
-                boolean area = c.area != null && x >= c.area[0] * density && y >= c.area[1] * density
+                boolean area = child instanceof ViewGroup && !((ViewGroup) child).getClipChildren()
+                        || c.area != null && x >= c.area[0] * density && y >= c.area[1] * density
                         && x < (c.area[0] + c.area[2]) * density && y < (c.area[1] + c.area[3]) * density;
                 if (!slop && !area) continue;
                 if (child instanceof Group) ((Group) child).childrenOnly = !slop;
@@ -4702,6 +4706,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         private boolean deliver(View child, MotionEvent e) {
             MotionEvent local = MotionEvent.obtain(e);
             local.offsetLocation(getScrollX() - child.getLeft(), getScrollY() - child.getTop());
+            Matrix inverse = new Matrix();
+            if (!child.getMatrix().invert(inverse)) { local.recycle(); return false; }
+            local.transform(inverse);
             boolean taken = child.dispatchTouchEvent(local);
             local.recycle();
             return taken;
@@ -5131,10 +5138,29 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     /** Whether a shown view covers the raw screen point. */
     private static boolean under(View v, float rawX, float rawY) {
         if (!v.isShown()) return false;
+        float[] p = fromScreen(v, rawX, rawY);
+        return p != null && p[0] >= 0 && p[1] >= 0 && p[0] < v.getWidth() && p[1] < v.getHeight();
+    }
+
+    /** A point of the parent's content mapped through the child's native transform. */
+    private static float[] intoChild(ViewGroup parent, View child, float x, float y) {
+        float[] p = {x + parent.getScrollX() - child.getLeft(), y + parent.getScrollY() - child.getTop()};
+        Matrix inverse = new Matrix();
+        if (!child.getMatrix().invert(inverse)) return null;
+        inverse.mapPoints(p);
+        return p;
+    }
+
+    /** A raw screen point in v's viewport, with every ancestor's transform undone. */
+    private static float[] fromScreen(View v, float x, float y) {
+        if (v.getParent() instanceof ViewGroup) {
+            ViewGroup parent = (ViewGroup) v.getParent();
+            float[] p = fromScreen(parent, x, y);
+            return p == null ? null : intoChild(parent, v, p[0], p[1]);
+        }
         int[] at = new int[2];
         v.getLocationOnScreen(at);
-        return rawX >= at[0] && rawY >= at[1] && rawX < at[0] + v.getWidth() * v.getScaleX()
-                && rawY < at[1] + v.getHeight() * v.getScaleY();
+        return new float[] {x - at[0], y - at[1]};
     }
 
     private static boolean past(float v, float limit) {

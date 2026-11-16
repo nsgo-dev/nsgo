@@ -1,10 +1,65 @@
 package core
 
 import (
+	"math"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
+
+func TestHitTestsFollowNestedTransformsAndClips(t *testing.T) {
+	for _, clipped := range []bool{false, true} {
+		t.Run(map[bool]string{false: "overflow", true: "clipped"}[clipped], func(t *testing.T) {
+			var got []PressEvent
+			var touch, responder Point
+			style := Style{Position: Absolute, Left: Pt(100), Top: Pt(100), Width: Pt(40), Height: Pt(40),
+				Transform: Transform{Rotate: 90, Scale: 2}}
+			if clipped {
+				style.Overflow = Hidden
+			}
+			h := newHost(t, Size{Width: 400, Height: 400}, func(*Scope) Node {
+				return View{Children: []Node{View{TestID: "parent", Style: style, Children: []Node{
+					View{TestID: "button", Style: Style{Position: Absolute, Left: Pt(5), Top: Pt(5), Width: Pt(20), Height: Pt(20),
+						Transform: Transform{TranslateY: -100}}, OnPress: func(e PressEvent) { got = append(got, e) },
+						OnTouch:   func(e TouchEvent) { touch = e.Touches[0].Position },
+						Responder: &Responder{Claims: []TouchClaim{{}}, OnGrant: func(e ResponderEvent) { responder = e.Position }}},
+				}}}}
+			})
+			h.commit()
+			// Child (10, 10) is drawn at (330, 110): first translated
+			// above its parent, then rotated and scaled about its center.
+			at := Point{X: 330, Y: 110}
+			id := h.tree.HitTest(at)
+			if clipped {
+				if id != 0 {
+					t.Fatalf("clipped child hit = %d", id)
+				}
+				return
+			}
+			if id != h.find("button").id {
+				t.Fatalf("drawn child hit = %d, want button", id)
+			}
+			h.tree.PressAt(driver.Event{Page: at})
+			if len(got) != 1 || math.Abs(float64(got[0].Position.X-10)) > .001 || math.Abs(float64(got[0].Position.Y-10)) > .001 || got[0].PagePosition != at {
+				t.Fatalf("press = %+v, want local (10,10) at %+v", got, at)
+			}
+			if id := h.tree.HitTest(Point{X: 115, Y: 115}); id != 0 {
+				t.Fatalf("old layout position hit = %d", id)
+			}
+			h.find("parent").props.PointerEvents = PointerEventsBoxNone
+			if id := h.tree.HitTest(at); id != h.find("button").id {
+				t.Fatalf("box-none parent hid drawn child: hit = %d", id)
+			}
+			h.tree.Dispatch(finger(GestureBegan, at, 0))
+			for name, p := range map[string]Point{"touch": touch, "responder": responder} {
+				if math.Abs(float64(p.X-10)) > .001 || math.Abs(float64(p.Y-10)) > .001 {
+					t.Errorf("%s local = %+v, want (10,10)", name, p)
+				}
+			}
+			h.tree.Dispatch(finger(GestureEnded, at, 10))
+		})
+	}
+}
 
 func TestPointerEventsCarryPositionsAndModifiers(t *testing.T) {
 	var presses []PressEvent

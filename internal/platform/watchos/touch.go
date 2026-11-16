@@ -244,9 +244,14 @@ func hit(v *view, p driver.Point, match func(*view) bool) *view {
 		return nil
 	}
 	f := v.shownFrame()
-	self, children := driver.Reach(f, &v.props, v.overflow, p)
+	local, mapped := driver.IntoView(f, v.pointerMatrix(), p)
+	if !mapped {
+		return nil
+	}
+	self, children := driver.ReachView(f.Size, &v.props, v.shownStyle().Clip || v.kind == driver.KindScroll, local)
 	if children {
-		local := driver.Point{X: p.X - f.Origin.X + v.offset.X, Y: p.Y - f.Origin.Y + v.offset.Y}
+		local.X += v.offset.X
+		local.Y += v.offset.Y
 		for i := len(v.children) - 1; i >= 0; i-- {
 			if h := hit(v.children[i], local, match); h != nil {
 				return h
@@ -274,8 +279,13 @@ func (s *surface) surfaceBounds(v *view) (driver.Bounds, bool) {
 
 // local is surface point at in v's coordinates.
 func (s *surface) local(v *view, at driver.Point) driver.Point {
-	b, _ := s.surfaceBounds(v)
-	return driver.Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}
+	if parent := v.parent; parent != nil {
+		at = s.local(parent, at)
+		at.X += parent.offset.X
+		at.Y += parent.offset.Y
+	}
+	local, _ := driver.IntoView(v.shownFrame(), v.pointerMatrix(), at)
+	return local
 }
 
 // within reports whether p, in v's coordinates, is on v or in its hit
@@ -292,4 +302,19 @@ func (v *view) indexAt(p driver.Point) int {
 		return -1
 	}
 	return v.layout.IndexAt(cgPoint(p), cgRect(v.box))
+}
+
+// pointerMatrix uses exactly the affine transform sent to SwiftUI.
+func (v *view) pointerMatrix() driver.Matrix3D {
+	st, f := v.shownStyle(), v.shownFrame()
+	k, _ := v.keyframe()
+	m := k.Matrix(f.Size).Mul(st.Matrix(f.Size))
+	_, scale := v.layoutPart()
+	if scale != 1 {
+		m = driver.Transform{Scale: float32(scale)}.Matrix(driver.Point{X: f.Size.Width / 2, Y: f.Size.Height / 2}).Mul(m)
+	}
+	if _, _, _, _, _, _, ok := m.Affine(); !ok {
+		return driver.Identity3D
+	}
+	return m
 }

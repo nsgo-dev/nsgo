@@ -1,0 +1,45 @@
+package driver
+
+import "math"
+
+// Unproject returns the point of the plane z=0 that m draws at p. It
+// inverts the plane's homography, rather than applying the 4D inverse
+// to a screen point whose depth is unknown. A collapsed plane, a point
+// at infinity or behind the viewer has no hit.
+func (m Matrix3D) Unproject(p Point) (Point, bool) {
+	if m == Identity3D {
+		return p, true
+	}
+	x, y := float64(p.X), float64(p.Y)
+	a, b, c := m[0]-x*m[3], m[4]-x*m[7], x*m[15]-m[12]
+	d, e, f := m[1]-y*m[3], m[5]-y*m[7], y*m[15]-m[13]
+	det := a*e - b*d
+	if math.Abs(det) < 1e-12 || math.IsNaN(det) || math.IsInf(det, 0) {
+		return Point{}, false
+	}
+	u, v := (c*e-b*f)/det, (a*f-c*d)/det
+	w := m[3]*u + m[7]*v + m[15]
+	if w <= 1e-12 || math.IsNaN(u) || math.IsNaN(v) || math.IsInf(u, 0) || math.IsInf(v, 0) {
+		return Point{}, false
+	}
+	return Point{X: Points(u), Y: Points(v)}, true
+}
+
+// IntoView maps p in the parent's content into a view's viewport. m
+// acts about the view's top left, after its frame places it.
+func IntoView(frame Bounds, m Matrix3D, p Point) (Point, bool) {
+	return m.Unproject(Point{X: p.X - frame.Origin.X, Y: p.Y - frame.Origin.Y})
+}
+
+// ReachView reports what p in a view's viewport may reach. Visible
+// overflow cannot be pruned by ItemOverflow's layout bounds: a child
+// or an animation can transform into this point from outside them.
+// A clip and a scroll viewport still stop children at their bounds;
+// hit slop extends only the view itself, in its own coordinates.
+func ReachView(size Size, props *ViewProps, clip bool, p Point) (self, children bool) {
+	self, children = Reach(Bounds{Size: size}, props, Bounds{}, p)
+	if !clip && (props == nil || props.PointerEvents == PointerEventsAuto || props.PointerEvents == PointerEventsBoxNone) {
+		children = true
+	}
+	return self, children
+}

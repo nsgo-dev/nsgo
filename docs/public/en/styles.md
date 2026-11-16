@@ -22,6 +22,8 @@ card := core.Style{
 
 Styles take CSS's colors, corners, borders, outlines, shadows, gradients, filters, backdrop blurs, masks, blend modes, 3D transforms and transitions. `core.RGB`, `core.RGBA` and `core.ParseColor` make colors, `core.LinearGradient` and its kin make gradients, `core.Ring` makes Tailwind's ring, and `core.AllCorners` gives each corner its radius. `BorderCurveContinuous` rounds corners into their edges as iOS does. A box's shadows and outline stay outside its `Overflow` clip except where [Layout](layout.md#position) says.
 
+`Transform` moves the pointer target with the view: presses, hover and gestures begin where it is drawn, and reported pointer positions undo the transform. A transformed child outside its parent remains reachable unless a clip or scroll viewport hides it. Mini programs still report positions from layout frames ([roadmap](https://github.com/nsgo-dev/nsgo/blob/main/docs/roadmap.md#mini-programs)).
+
 ```go
 core.View{Style: core.Style{
 	CornerRadii: core.Corners{TopLeft: 28, BottomRight: 28},

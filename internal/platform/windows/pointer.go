@@ -54,7 +54,9 @@ func pick(v *view, p driver.Point) *view {
 	}
 	self, children := v.reach(p)
 	if children {
-		local := driver.Point{X: p.X - v.frame.Origin.X + v.offset.X, Y: p.Y - v.frame.Origin.Y + v.offset.Y}
+		local := v.local(p)
+		local.X += v.offset.X
+		local.Y += v.offset.Y
 		for i := len(v.children) - 1; i >= 0; i-- {
 			if h := pick(v.children[i], local); h != nil {
 				return h
@@ -104,9 +106,8 @@ func (w *window) barAt(x, y int32) (*video, float32, float32) {
 	if v == nil || v.video == nil {
 		return nil, 0, 0
 	}
-	b, _ := w.surfaceBounds(v)
-	at := w.point(x, y)
-	lx, ly := float32(at.X-b.Origin.X), float32(at.Y-b.Origin.Y)
+	at := v.surfacePoint(w.point(x, y))
+	lx, ly := float32(at.X), float32(at.Y)
 	if !v.video.barAt(lx, ly, float32(v.frame.Size.Width), float32(v.frame.Size.Height)) {
 		return nil, 0, 0
 	}
@@ -204,8 +205,7 @@ func (w *window) hostedMove(x, y int32, time uint32) bool {
 		return true
 	}
 	if vd := w.barVideo; vd != nil {
-		b, _ := w.surfaceBounds(vd.v)
-		vd.drag(float32(w.point(x, y).X-b.Origin.X), float32(vd.v.frame.Size.Width))
+		vd.drag(float32(vd.v.surfacePoint(w.point(x, y)).X), float32(vd.v.frame.Size.Width))
 		return true
 	}
 	wv, px, py := w.webAt(x, y)
@@ -316,8 +316,9 @@ func (w *window) cursorAt(p driver.Point) (driver.Cursor, bool) {
 	}
 	for v := pick(root, p); v != nil; v = v.parent {
 		if l, ok := textOf(v); ok {
-			if b, shown := w.surfaceBounds(v); shown {
-				i := l.indexAt(float32(p.X-b.Origin.X-v.content.Origin.X), float32(p.Y-b.Origin.Y-v.content.Origin.Y))
+			if _, shown := w.surfaceBounds(v); shown {
+				local := v.surfacePoint(p)
+				i := l.indexAt(float32(local.X-v.content.Origin.X), float32(local.Y-v.content.Origin.Y))
 				if c, ok := driver.SpanCursor(v.spans, i); ok {
 					return c, true
 				}

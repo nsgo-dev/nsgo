@@ -209,8 +209,8 @@ func (w *window) reportGesture(g *twoFinger, phase driver.GesturePhase, value fl
 	}
 	ev := driver.Event{Kind: g.kind, ID: g.v.id, Phase: phase, Value: value, Velocity: driver.Point{X: driver.Points(velocity)}}
 	if g.kind == driver.EventPinch {
-		if b, ok := w.surfaceBounds(g.v); ok {
-			ev.Point = driver.Point{X: g.at.X - b.Origin.X, Y: g.at.Y - b.Origin.Y}
+		if _, ok := w.surfaceBounds(g.v); ok {
+			ev.Point = g.v.surfacePoint(g.at)
 		}
 	}
 	w.gestured(ev)

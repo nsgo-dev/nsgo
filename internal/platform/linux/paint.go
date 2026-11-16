@@ -36,7 +36,7 @@ func (w *window) snapshotView(v *view, snap uintptr) {
 	if s.Hidden || opacity <= 0 {
 		return
 	}
-	if s.BackfaceHidden && v.parent != nil && facingAway(w.placement(v, 0, 0)) {
+	if s.BackfaceHidden && v.parent != nil && facingAway(v.placement(0, 0)) {
 		return
 	}
 	size := v.shownFrame().Size

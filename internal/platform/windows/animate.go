@@ -213,8 +213,13 @@ func (w *window) baseStyle(v *view) *driver.ViewStyle {
 
 // styleOf returns the style v shows now: mid transition, or its own,
 // with the animated values bound to it over it.
-func (w *window) styleOf(v *view) *driver.ViewStyle {
-	s := w.baseStyle(v)
+func (w *window) styleOf(v *view) *driver.ViewStyle { return v.shownStyle() }
+
+func (v *view) shownStyle() *driver.ViewStyle {
+	s := &v.style
+	if v.transition != nil {
+		s = &v.transition.shown
+	}
 	if v.animated.Set == 0 {
 		return s
 	}

@@ -365,7 +365,7 @@ func (w *window) place(v *view, ox, oy float32) {
 		return
 	}
 	f := v.shownFrame()
-	t := gskMatrixTransform(0, w.placement(v, ox, oy))
+	t := gskMatrixTransform(0, v.placement(ox, oy))
 	width := int32(math.Ceil(max(float64(f.Size.Width), 0)))
 	height := int32(math.Ceil(max(float64(f.Size.Height), 0)))
 	gtkWidgetAllocate(v.widget, width, height, -1, t)

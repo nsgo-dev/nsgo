@@ -134,8 +134,7 @@ func (a *App) PressAt(selector string, at driver.Point) {
 	a.t.Helper()
 	a.step("pressAt(%s, %v, %v)", selector, at.X, at.Y)
 	m := a.pick(selector, "view", func(m *View) (*View, bool) { return m, true })
-	o := m.surfaceFrame().Origin
-	page := driver.Point{X: o.X + at.X, Y: o.Y + at.Y}
+	page := m.pagePoint(at)
 	v := a.pressableAt(page)
 	if v == nil {
 		a.t.Fatalf("nsgotest: nothing pressable at %v in %q\n%s", at, selector, a.Dump())
@@ -184,8 +183,7 @@ func (a *App) pressAt(v *View, at driver.Point, index int) {
 // pressEvent is a press on v at the surface point at, one click with no
 // modifiers.
 func (a *App) pressEvent(v *View, at driver.Point) driver.Event {
-	o := v.surfaceFrame().Origin
-	return driver.Event{ID: v.ID, Point: driver.Point{X: at.X - o.X, Y: at.Y - o.Y}, Page: at, Count: 1}
+	return driver.Event{ID: v.ID, Point: v.localPoint(at), Page: at, Count: 1}
 }
 
 // clickInterval is how soon a press follows the last one to count up.
@@ -258,40 +256,34 @@ func (a *App) pressableAt(p driver.Point) *View {
 // viewAt returns the topmost visible view at the surface point p that ok
 // accepts, as a pointer there finds it.
 func (a *App) viewAt(p driver.Point, ok func(*View) bool) *View {
-	var found *View
-	var visit func(v *View, origin driver.Point, clip *driver.Bounds)
-	visit = func(v *View, origin driver.Point, clip *driver.Bounds) {
-		if v.Style.Hidden || v.Node != nil {
-			return
+	var visit func(*View, driver.Point) *View
+	visit = func(v *View, at driver.Point) *View {
+		s := v.Animated.Apply(v.Style)
+		if s.Hidden || v.Node != nil {
+			return nil
 		}
-		f := v.Frame
-		f.Origin.X += origin.X
-		f.Origin.Y += origin.Y
-		in := p.X >= f.Origin.X && p.Y >= f.Origin.Y && p.X < f.Origin.X+f.Size.Width && p.Y < f.Origin.Y+f.Size.Height
-		if clip != nil && !(p.X >= clip.Origin.X && p.Y >= clip.Origin.Y &&
-			p.X < clip.Origin.X+clip.Size.Width && p.Y < clip.Origin.Y+clip.Size.Height) {
-			return
+		local, mapped := driver.IntoView(v.Frame, v.pointerMatrix(), at)
+		if !mapped {
+			return nil
 		}
-		pe := v.Props.PointerEvents
-		if in && pe != driver.PointerEventsNone && pe != driver.PointerEventsBoxNone && ok(v) {
-			found = v
+		self, children := driver.ReachView(v.Frame.Size, &v.Props, s.Clip || v.Kind == driver.KindScroll, local)
+		if children {
+			inner := driver.Point{X: local.X + v.Offset.X, Y: local.Y + v.Offset.Y}
+			for i := len(v.Children) - 1; i >= 0; i-- {
+				if hit := visit(v.Children[i], inner); hit != nil {
+					return hit
+				}
+			}
 		}
-		if pe == driver.PointerEventsNone || pe == driver.PointerEventsBoxOnly {
-			return
+		if self && ok(v) {
+			return v
 		}
-		if v.Style.Clip {
-			c := f
-			clip = &c
-		}
-		inner := driver.Point{X: f.Origin.X - v.Offset.X, Y: f.Origin.Y - v.Offset.Y}
-		for _, c := range v.Children {
-			visit(c, inner, clip)
-		}
+		return nil
 	}
 	if r := a.views[a.rootID]; r != nil {
-		visit(r, driver.Point{}, nil)
+		return visit(r, p)
 	}
-	return found
+	return nil
 }
 
 // PressDown starts a press on the view selector matches, or the pressable

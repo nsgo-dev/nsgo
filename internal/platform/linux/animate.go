@@ -36,7 +36,9 @@ type scrolling struct {
 
 // styleOf returns the style v shows now: mid transition, or its own,
 // with the values the animator binds over it.
-func (w *window) styleOf(v *view) *driver.ViewStyle {
+func (w *window) styleOf(v *view) *driver.ViewStyle { return v.shownStyle() }
+
+func (v *view) shownStyle() *driver.ViewStyle {
 	s := &v.style
 	if v.transition != nil {
 		s = &v.transition.shown

@@ -95,3 +95,30 @@ func (n *node) overflowArea(kids []*node) Bounds {
 	}
 	return Bounds{Origin: Point{X: x0, Y: y0}, Size: Size{Width: x1 - x0, Height: y1 - y0}}
 }
+
+// pointerMatrix is the transform sent to the platform, with a parent's
+// perspective about the same viewport center the backend uses.
+func (n *node) pointerMatrix() driver.Matrix3D {
+	m := n.sent.viewStyle.Matrix(n.frame.Size)
+	if parent := n.nativeParent(); parent != nil {
+		at := n.frame.Origin
+		if parent.scroll != nil {
+			at.X -= parent.scroll.offset.X
+			at.Y -= parent.scroll.offset.Y
+		}
+		m = driver.ChildPerspective(parent.sent.viewStyle.ChildPerspective, parent.frame.Size, at).Mul(m)
+	}
+	return m
+}
+
+func (n *node) surfacePoint(p Point) Point {
+	if parent := n.nativeParent(); parent != nil {
+		p = parent.surfacePoint(p)
+		if parent.scroll != nil {
+			p.X += parent.scroll.offset.X
+			p.Y += parent.scroll.offset.Y
+		}
+	}
+	local, _ := driver.IntoView(n.frame, n.pointerMatrix(), p)
+	return local
+}

@@ -1674,9 +1674,8 @@ func (w *window) wheelTaken(p driver.Point, delta int16, tilt bool) bool {
 	if v.kind == driver.KindScroll {
 		return false
 	}
-	b, _ := w.surfaceBounds(v)
 	d := driver.Points(delta) / 120 * wheelNotch
-	ev := driver.Event{Kind: driver.EventWheel, ID: v.id, Phase: driver.GestureChanged, Point: driver.Point{X: p.X - b.Origin.X, Y: p.Y - b.Origin.Y},
+	ev := driver.Event{Kind: driver.EventWheel, ID: v.id, Phase: driver.GestureChanged, Point: v.surfacePoint(p),
 		Page: p, Modifiers: modifiers(), Precise: delta%120 != 0}
 	// A turn away from the user shows what is above; a tilt right, what
 	// is right.
@@ -1834,7 +1833,7 @@ func barIn(v *view, p driver.Point) (*view, driver.Point, bool) {
 	if !self && !children {
 		return nil, p, false
 	}
-	local := driver.Point{X: p.X - v.frame.Origin.X, Y: p.Y - v.frame.Origin.Y}
+	local := v.local(p)
 	took := self
 	if children {
 		inner := driver.Point{X: local.X + v.offset.X, Y: local.Y + v.offset.Y}
@@ -1882,7 +1881,9 @@ func viewsAt(v *view, p driver.Point, match func(*view) bool, out []*view) ([]*v
 	}
 	took := self
 	if children {
-		local := driver.Point{X: p.X - v.frame.Origin.X + v.offset.X, Y: p.Y - v.frame.Origin.Y + v.offset.Y}
+		local := v.local(p)
+		local.X += v.offset.X
+		local.Y += v.offset.Y
 		for i := len(v.children) - 1; i >= 0; i-- {
 			c := v.children[i]
 			if !c.under(local) {
@@ -1911,8 +1912,7 @@ func (w *window) hoverViews() {
 	mods, button := modifiers(), hover.Pressed(uint32(w.held), mouseButtons)
 	for _, e := range w.hovered.Move(under) {
 		if v := w.view(e.ID); v != nil {
-			b, _ := w.surfaceBounds(v)
-			e.Point = driver.Point{X: w.pointer.X - b.Origin.X, Y: w.pointer.Y - b.Origin.Y}
+			e.Point = v.surfacePoint(w.pointer)
 			e.Page, e.Modifiers, e.Button = w.pointer, mods, button
 		}
 		w.engine.Dispatch(e)
@@ -1973,8 +1973,7 @@ func (w *window) reportMouseMove() {
 	mods, button := modifiers(), hover.Pressed(uint32(w.held), mouseButtons)
 	for i := len(under) - 1; i >= 0; i-- {
 		v := under[i]
-		b, _ := w.surfaceBounds(v)
-		local := driver.Point{X: w.pointer.X - b.Origin.X, Y: w.pointer.Y - b.Origin.Y}
+		local := v.surfacePoint(w.pointer)
 		w.engine.Dispatch(driver.Event{Kind: driver.EventMouseMove, ID: v.id, Point: local, Page: w.pointer, Modifiers: mods, Button: button})
 	}
 }
@@ -2033,7 +2032,7 @@ func (w *window) pressOutside(x, y int32) {
 		if v == nil || !v.events.Has(driver.EventPressOutside) {
 			continue
 		}
-		if b, shown := w.surfaceBounds(v); shown && !b.Contains(at) {
+		if _, shown := w.surfaceBounds(v); shown && !(driver.Bounds{Size: v.frame.Size}).Contains(v.surfacePoint(at)) {
 			w.engine.Dispatch(driver.Event{Kind: driver.EventPressOutside, ID: v.id, Point: at})
 		}
 	}

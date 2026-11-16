@@ -308,19 +308,19 @@ func (v *view) keyframe() (driver.Keyframe, bool) {
 // parent: its frame's place less the parent's scroll offset ox, oy, the
 // parent's perspective, its keyframes, then its transform with a layout
 // animation's scale.
-func (w *window) placement(v *view, ox, oy float32) driver.Matrix3D {
+func (v *view) placement(ox, oy float32) driver.Matrix3D {
 	f := v.shownFrame()
 	at := driver.Point{X: f.Origin.X - driver.Points(ox), Y: f.Origin.Y - driver.Points(oy)}
 	m := driver.Translate3D(float64(at.X), float64(at.Y), 0)
 	if p := v.parent; p != nil {
-		if d := w.styleOf(p).ChildPerspective; d > 0 {
+		if d := p.shownStyle().ChildPerspective; d > 0 {
 			m = m.Mul(driver.ChildPerspective(d, p.shownFrame().Size, at))
 		}
 	}
 	if k, ok := v.keyframe(); ok {
 		m = m.Mul(k.Matrix(f.Size))
 	}
-	vs := *w.styleOf(v)
+	vs := *v.shownStyle()
 	if ls := v.layoutScale(); ls != 1 {
 		sx, sy := vs.Transform.Scales()
 		vs.Transform.Scale, vs.Transform.ScaleX, vs.Transform.ScaleY = 0, sx*ls, sy*ls

@@ -74,8 +74,7 @@ func (a *App) DragAt(selector string, at driver.Point, path ...driver.Point) {
 	if a.target != nil {
 		a.target.reveal(v)
 	}
-	o := v.surfaceFrame().Origin
-	a.drag(v, driver.Point{X: o.X + at.X, Y: o.Y + at.Y}, path)
+	a.drag(v, v.pagePoint(at), path)
 }
 
 // drag puts a finger on v at the surface point start and moves it
@@ -92,7 +91,7 @@ func (a *App) drag(v *View, start driver.Point, path []driver.Point) {
 		return
 	}
 	f := &finger{start: start, at: start, last: start, reporting: a.listensToTouches(), downAt: a.Clock.Now()}
-	for p := v; p != nil; p = p.Parent {
+	for p := a.viewAt(start, func(*View) bool { return true }); p != nil; p = p.Parent {
 		f.chain = append(f.chain, p)
 	}
 	// A finger going down ends what a responder held before.
@@ -136,8 +135,8 @@ type Finger struct {
 	a    *App
 	f    *finger
 	view *View
-	// origin is where the view's top left corner is on the surface.
-	origin driver.Point
+	// matrix keeps the coordinates of the view where the touch began.
+	matrix driver.Matrix3D
 }
 
 // Touch puts a finger down at at, in the coordinates of the view selector
@@ -146,11 +145,10 @@ func (a *App) Touch(selector string, at driver.Point) *Finger {
 	a.t.Helper()
 	a.step("touch(%s, %v)", selector, at)
 	v := a.pick(selector, "view", func(m *View) (*View, bool) { return m, true })
-	b := v.surfaceFrame()
-	start := driver.Point{X: b.Origin.X + at.X, Y: b.Origin.Y + at.Y}
+	start := v.pagePoint(at)
 	f := &finger{start: start, at: start, last: start, reporting: a.listensToTouches(), id: 1, downAt: a.Clock.Now(),
 		t0: a.Clock.Now().Sub(a.start)}
-	for p := v; p != nil; p = p.Parent {
+	for p := a.viewAt(start, func(*View) bool { return true }); p != nil; p = p.Parent {
 		f.chain = append(f.chain, p)
 	}
 	a.blocked = false
@@ -167,7 +165,7 @@ func (a *App) Touch(selector string, at driver.Point) *Finger {
 	a.pressOutside(v, start)
 	a.pressIn(f)
 	a.done()
-	return &Finger{a: a, f: f, view: v, origin: b.Origin}
+	return &Finger{a: a, f: f, view: v, matrix: v.pageMatrix()}
 }
 
 // Move moves the finger to at, in the coordinates of the view it went
@@ -176,7 +174,7 @@ func (g *Finger) Move(at driver.Point) {
 	g.a.t.Helper()
 	g.a.step("move(%v)", at)
 	g.a.frame(g.f)
-	g.a.fingerMoved(g.f, driver.Point{X: g.origin.X + at.X, Y: g.origin.Y + at.Y})
+	g.a.fingerMoved(g.f, g.pagePoint(at))
 	g.a.done()
 }
 
@@ -196,7 +194,7 @@ func (g *Finger) LiftAt(at driver.Point) {
 	g.a.step("lift(%v)", at)
 	g.a.frame(g.f)
 	f := g.f
-	f.last, f.at = f.at, driver.Point{X: g.origin.X + at.X, Y: g.origin.Y + at.Y}
+	f.last, f.at = f.at, g.pagePoint(at)
 	g.a.fingerLifted(f)
 	g.a.done()
 }
@@ -459,20 +457,17 @@ func (a *App) HoverAt(selector string, at driver.Point) {
 func (a *App) hoverAt(selector string, local *driver.Point) {
 	a.t.Helper()
 	v := a.pick(selector, "view", func(m *View) (*View, bool) { return m, true })
-	mid, at := v.center()
-	shift := driver.Point{}
+	at := a.reveal(v)
 	if local != nil {
-		shift = driver.Point{X: local.X - mid.X, Y: local.Y - mid.Y}
+		at = v.pagePoint(*local)
 	}
-	at = driver.Point{X: at.X + shift.X, Y: at.Y + shift.Y}
 	if a.target != nil {
-		c := a.target.reveal(v)
-		a.target.hover(driver.Point{X: c.X + shift.X, Y: c.Y + shift.Y})
+		a.target.hover(at)
 		a.done()
 		return
 	}
 	var next []*View
-	for p := v; p != nil; p = p.Parent {
+	for p := a.viewAt(at, func(*View) bool { return true }); p != nil; p = p.Parent {
 		if p.Events.Has(driver.EventMouseEnter) || p.Events.Has(driver.EventMouseLeave) || p.Events.Has(driver.EventMouseMove) {
 			next = append(next, p)
 		}
@@ -484,6 +479,43 @@ func (a *App) hoverAt(selector string, local *driver.Point) {
 		a.send(h, ev)
 	}
 	a.done()
+}
+
+// reveal brings the middle of a named view into its scroll viewports
+// before picking at it, as a target's native steps do.
+func (a *App) reveal(v *View) driver.Point {
+	if a.target != nil {
+		return a.target.reveal(v)
+	}
+	for range 30 {
+		_, at := v.center()
+		moved := false
+		for p := v.Parent; p != nil; p = p.Parent {
+			if p.Kind != driver.KindScroll || p.Scroll.Behavior.NoScroll {
+				continue
+			}
+			local := p.localPoint(at)
+			if (driver.Bounds{Size: p.Frame.Size}).Contains(local) {
+				continue
+			}
+			off := p.Offset
+			if p.Scroll.Horizontal {
+				off.X += local.X - p.Frame.Size.Width/2
+			} else {
+				off.Y += local.Y - p.Frame.Size.Height/2
+			}
+			if off = p.clamp(off); off != p.Offset {
+				a.scrollView(p, off)
+				moved = true
+				break
+			}
+		}
+		if !moved {
+			return at
+		}
+	}
+	_, at := v.center()
+	return at
 }
 
 // SelectText has the selection of the Selectable view selector names touch
@@ -599,4 +631,9 @@ func (a *App) ScrollTo(selector string, offset driver.Point) {
 	a.t.Helper()
 	v := a.Find(selector)
 	a.scrollView(v, offset)
+}
+
+func (g *Finger) pagePoint(at driver.Point) driver.Point {
+	x, y := g.matrix.Apply(float64(at.X), float64(at.Y))
+	return driver.Point{X: driver.Points(x), Y: driver.Points(y)}
 }

@@ -1462,7 +1462,7 @@ func hitTest(self objc.ID, cmd objc.SEL, p apple.CGPoint, event objc.ID) objc.ID
 	b := objc.Send[apple.CGRect](self, selBounds)
 	frame := driver.Bounds{Size: driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}}
 	at := driver.Point{X: driver.Points(p.X - b.Origin.X), Y: driver.Points(p.Y - b.Origin.Y)}
-	own, children := driver.Reach(frame, &v.props, v.overflow, at)
+	own, children := driver.ReachView(frame.Size, &v.props, v.style.Clip || v.kind == driver.KindScroll, at)
 	if !frame.Contains(at) {
 		if objc.Send[bool](self, sel("isHidden")) || !objc.Send[bool](self, sel("isUserInteractionEnabled")) {
 			return 0

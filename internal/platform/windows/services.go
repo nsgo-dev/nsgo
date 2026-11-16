@@ -3,6 +3,7 @@
 package windows
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"unicode"
@@ -205,7 +206,9 @@ func hit(v *view, p driver.Point, match func(*view) bool) *view {
 	}
 	self, children := v.reach(p)
 	if children {
-		local := driver.Point{X: p.X - v.frame.Origin.X + v.offset.X, Y: p.Y - v.frame.Origin.Y + v.offset.Y}
+		local := v.local(p)
+		local.X += v.offset.X
+		local.Y += v.offset.Y
 		for i := len(v.children) - 1; i >= 0; i-- {
 			if h := hit(v.children[i], local, match); h != nil {
 				return h
@@ -221,7 +224,11 @@ func hit(v *view, p driver.Point, match func(*view) bool) *view {
 // reach says what p, in the coordinates of v's parent's content, reaches
 // of v: v itself and its children, as core.Reach decides.
 func (v *view) reach(p driver.Point) (self, children bool) {
-	return driver.Reach(v.frame, &v.props, v.overflow, p)
+	local := v.local(p)
+	if math.IsInf(float64(local.X), 0) || math.IsInf(float64(local.Y), 0) {
+		return false, false
+	}
+	return driver.ReachView(frameOf(v).Size, &v.props, v.shownStyle().Clip || v.kind == driver.KindScroll, local)
 }
 
 // under reports whether p reaches v or its children.
@@ -234,22 +241,21 @@ func (v *view) under(p driver.Point) bool {
 // button's press: on text with links, with the offset of the character
 // under it; elsewhere the engine finds the view.
 func (w *window) press(at driver.Point) {
-	if root := w.view(w.root); root != nil {
-		v := hit(root, at, func(v *view) bool { return v.events.Has(driver.EventPress) || v.kind == driver.KindInput })
-		if l, ok := textOf(v); ok {
-			b, _ := w.surfaceBounds(v)
-			x := float32(at.X - b.Origin.X - v.content.Origin.X)
-			y := float32(at.Y - b.Origin.Y - v.content.Origin.Y)
-			ev := w.down
-			ev.Kind, ev.ID, ev.Index = driver.EventPress, v.id, l.indexAt(x, y)
-			ev.Point, ev.Page = driver.Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}, at
-			w.engine.Dispatch(ev)
-			return
-		}
+	root := w.view(w.root)
+	if root == nil {
+		return
 	}
+	v := hit(root, at, func(v *view) bool { return v.events.Has(driver.EventPress) || v.kind == driver.KindInput })
+	if v == nil {
+		return
+	}
+
 	ev := w.down
-	ev.Page = at
-	w.engine.PressAt(ev)
+	ev.Kind, ev.ID, ev.Point, ev.Page = driver.EventPress, v.id, v.surfacePoint(at), at
+	if l, ok := textOf(v); ok {
+		ev.Index = l.indexAt(float32(ev.Point.X-v.content.Origin.X), float32(ev.Point.Y-v.content.Origin.Y))
+	}
+	w.engine.Dispatch(ev)
 }
 
 func textOf(v *view) (*textLayout, bool) {
@@ -268,8 +274,7 @@ func (w *window) contextMenu(at driver.Point) {
 		return
 	}
 	if v := hit(root, at, func(v *view) bool { return v.events.Has(driver.EventContextMenu) }); v != nil {
-		b, _ := w.surfaceBounds(v)
 		w.engine.Dispatch(driver.Event{Kind: driver.EventContextMenu, ID: v.id,
-			Point: driver.Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}, Page: at, Modifiers: modifiers()})
+			Point: v.surfacePoint(at), Page: at, Modifiers: modifiers()})
 	}
 }

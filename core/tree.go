@@ -2539,12 +2539,17 @@ func hit(n *node, p Point) (NodeID, Point) {
 // hitWith returns the innermost view at p in n's parent that ok accepts,
 // and p in it.
 func hitWith(n *node, p Point, ok func(*node) bool) (NodeID, Point) {
-	self, inside := driver.Reach(n.frame, &n.props, n.sent.overflow, p)
+	vs := &n.sent.viewStyle
+	m := n.pointerMatrix()
+	local, mapped := driver.IntoView(n.frame, m, p)
+	if !mapped {
+		return 0, Point{}
+	}
+	self, inside := driver.ReachView(n.frame.Size, &n.props, vs.Clip || n.scroll != nil, local)
 	if n.style.Display == DisplayNone || n.style.Visibility == VisibilityHidden || n.hidden || !self && !inside ||
 		(n.attach != nil && n.attach.cut) {
 		return 0, Point{}
 	}
-	local := Point{X: p.X - n.frame.Origin.X, Y: p.Y - n.frame.Origin.Y}
 	at := local
 	if n.scroll != nil {
 		local.X += n.scroll.offset.X

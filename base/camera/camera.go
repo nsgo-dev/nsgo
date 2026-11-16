@@ -3,8 +3,8 @@
 // size on the plane, and the view shows it through a camera that moves
 // and scales it on the platform's frame clock. The view owns the camera
 // and its gestures; what the content holds and what pressing it means
-// stay the app's, which hears the pointer at points of the content since
-// platforms hit-test views without the camera's transform.
+// stay the app's. Content receives input where the camera draws it; the
+// app also hears presses on the plane at points of the content.
 package camera
 
 import (
@@ -219,7 +219,7 @@ func (spec View) Render(cx *core.Scope) core.Node {
 			return st
 		},
 		Children: []core.Node{content}}
-	children := append([]core.Node{plane, v.pointerLayer()}, spec.Children...)
+	children := append([]core.Node{v.pointerLayer(plane)}, spec.Children...)
 	return core.View{Role: core.RoleGroup, Label: spec.Label, LabelFunc: spec.LabelFunc, Class: spec.Class, TestID: spec.TestID,
 		Style:     core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), MinHeight: core.Pt(0), Overflow: core.Hidden}.Merge(spec.Style),
 		StyleFunc: spec.StyleFunc,
@@ -408,10 +408,10 @@ func (v *view) glide(vx, vy float64) {
 	v.run = v.cx.StartAnimation(core.Parallel(core.Decay(v.x, x), core.Decay(v.y, y)), nil)
 }
 
-// pointerLayer takes the pointer over the whole plane: it pans when
+// pointerLayer surrounds the content: it pans when
 // dragged, zooms on pinches and the wheel, and tells the app of presses
 // and hovers at points of the content.
-func (v *view) pointerLayer() core.Node {
+func (v *view) pointerLayer(content core.Node) core.Node {
 	press := func(e core.PressEvent) {
 		if v.spec.OnPress != nil && v.spec.OnPress(v.s.ToContent(e.Position), e) {
 			v.pressed = false
@@ -432,6 +432,7 @@ func (v *view) pointerLayer() core.Node {
 		testID = v.spec.TestID + "-pointer"
 	}
 	return core.View{NoFocus: true, ImportantForAccessibility: core.ImportantNo, TestID: testID,
+		Children: []core.Node{content},
 		OnPress: press,
 		OnMouseMove: func(e core.MouseEvent) {
 			if v.spec.OnHover != nil && e.PressedButton == core.MouseButtonNone {

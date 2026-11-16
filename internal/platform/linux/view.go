@@ -3,6 +3,7 @@
 package linux
 
 import (
+	"math"
 	"slices"
 	"time"
 
@@ -203,7 +204,9 @@ func hit(v *view, p driver.Point, match func(*view) bool) *view {
 	}
 	self, children := v.reach(p)
 	if children {
-		local := driver.Point{X: p.X - v.frame.Origin.X + v.offset.X, Y: p.Y - v.frame.Origin.Y + v.offset.Y}
+		local := v.local(p)
+		local.X += v.offset.X
+		local.Y += v.offset.Y
 		for i := len(v.children) - 1; i >= 0; i-- {
 			if h := hit(v.children[i], local, match); h != nil {
 				return h
@@ -219,7 +222,11 @@ func hit(v *view, p driver.Point, match func(*view) bool) *view {
 // reach says what p, in the coordinates of v's parent's content, reaches
 // of v: v itself and its children, as core.Reach decides.
 func (v *view) reach(p driver.Point) (self, children bool) {
-	return driver.Reach(v.frame, &v.props, v.overflow, p)
+	local := v.local(p)
+	if math.IsInf(float64(local.X), 0) || math.IsInf(float64(local.Y), 0) {
+		return false, false
+	}
+	return driver.ReachView(v.shownFrame().Size, &v.props, v.shownStyle().Clip || v.kind == driver.KindScroll, local)
 }
 
 // under reports whether p reaches v or its children.
@@ -251,7 +258,9 @@ func viewsAt(v *view, p driver.Point, match func(*view) bool, out []*view) ([]*v
 	}
 	took := self
 	if children {
-		local := driver.Point{X: p.X - v.frame.Origin.X + v.offset.X, Y: p.Y - v.frame.Origin.Y + v.offset.Y}
+		local := v.local(p)
+		local.X += v.offset.X
+		local.Y += v.offset.Y
 		for i := len(v.children) - 1; i >= 0; i-- {
 			c := v.children[i]
 			if !c.under(local) {
@@ -285,13 +294,28 @@ func (w *window) updatePointerCursor() {
 	if root := w.view(w.root); root != nil && w.pointerIn {
 		text = hit(root, w.lastPointer, func(v *view) bool { return v.kind == driver.KindText })
 	}
+	if root := w.view(w.root); root != nil && w.pointerIn {
+		cursor := driver.CursorAuto
+		for v := hit(root, w.lastPointer, func(*view) bool { return true }); v != nil; v = v.parent {
+			if c := v.shownStyle().Cursor; c != driver.CursorAuto {
+				cursor = c
+				break
+			}
+		}
+		if cursor == driver.CursorAuto {
+			gtkWidgetSetCursorFromName(w.surface, nil)
+		} else {
+			gtkWidgetSetCursorFromName(w.surface, cstr(cursor.Name()))
+		}
+	}
 	c, ok := driver.CursorAuto, false
 	// A text whose spans name no cursor keeps its layout untouched: glyphAt would make one it has not drawn.
 	if text != nil && driver.HasSpanCursor(text.spans) {
 		if l, isText := text.text.(*textLayout); isText {
-			if b, shown := w.surfaceBounds(text); shown {
-				c, ok = driver.SpanCursor(text.spans, l.glyphAt(w.lastPointer.X-b.Origin.X-text.content.Origin.X,
-					w.lastPointer.Y-b.Origin.Y-text.content.Origin.Y))
+			if _, shown := w.surfaceBounds(text); shown {
+				local := text.surfacePoint(w.lastPointer)
+				c, ok = driver.SpanCursor(text.spans, l.glyphAt(local.X-text.content.Origin.X,
+					local.Y-text.content.Origin.Y))
 			}
 		}
 	}
@@ -339,8 +363,7 @@ func (w *window) mouseMoved(state uint32) {
 	under, _ := viewsAt(root, w.lastPointer, func(v *view) bool { return v.events.Has(driver.EventMouseMove) }, nil)
 	for i := len(under) - 1; i >= 0; i-- {
 		v := under[i]
-		b, _ := w.surfaceBounds(v)
-		local := driver.Point{X: w.lastPointer.X - b.Origin.X, Y: w.lastPointer.Y - b.Origin.Y}
+		local := v.surfacePoint(w.lastPointer)
 		w.engine.Dispatch(driver.Event{Kind: driver.EventMouseMove, ID: v.id, Point: local, Page: w.lastPointer,
 			Modifiers: modifiers(state), Button: hover.Pressed(state, mouseButtons)})
 	}
@@ -358,8 +381,7 @@ func (w *window) hoverViews() {
 	}
 	for _, e := range w.hovered.Move(under) {
 		if v := w.view(e.ID); v != nil {
-			b, _ := w.surfaceBounds(v)
-			e.Point = driver.Point{X: w.lastPointer.X - b.Origin.X, Y: w.lastPointer.Y - b.Origin.Y}
+			e.Point = v.surfacePoint(w.lastPointer)
 			e.Page, e.Modifiers, e.Button = w.lastPointer, modifiers(w.pointerState), hover.Pressed(w.pointerState, mouseButtons)
 		}
 		w.engine.Dispatch(e)
@@ -444,7 +466,7 @@ func barIn(v *view, p driver.Point) (*view, driver.Point, bool) {
 	if !self && !children {
 		return nil, p, false
 	}
-	local := driver.Point{X: p.X - v.frame.Origin.X, Y: p.Y - v.frame.Origin.Y}
+	local := v.local(p)
 	took := self
 	if children {
 		inner := driver.Point{X: local.X + v.offset.X, Y: local.Y + v.offset.Y}
@@ -473,29 +495,27 @@ func barIn(v *view, p driver.Point) (*view, driver.Point, bool) {
 // count of its press: on text with links, with the offset of the
 // character under it; elsewhere the engine finds the view.
 func (w *window) press(at driver.Point) {
-	if root := w.view(w.root); root != nil {
-		v := hit(root, at, func(v *view) bool {
-			return v.events.Has(driver.EventPress) || v.kind == driver.KindInput || v.kind == driver.KindWeb
-		})
-		if v != nil && v.kind == driver.KindWeb {
-			return // the page's, even where it has not shown yet
-		}
-		if v != nil && v.kind == driver.KindText {
-			if l, ok := v.text.(*textLayout); ok {
-				b, _ := w.surfaceBounds(v)
-				x := at.X - b.Origin.X - v.content.Origin.X
-				y := at.Y - b.Origin.Y - v.content.Origin.Y
-				ev := w.down
-				ev.Kind, ev.ID, ev.Index = driver.EventPress, v.id, l.indexAt(x, y)
-				ev.Point, ev.Page = driver.Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}, at
-				w.engine.Dispatch(ev)
-				return
-			}
-		}
+	root := w.view(w.root)
+	if root == nil {
+		return
+	}
+	v := hit(root, at, func(v *view) bool {
+		return v.events.Has(driver.EventPress) || v.kind == driver.KindInput || v.kind == driver.KindWeb
+	})
+	if v == nil {
+		return
+	}
+	if v.kind == driver.KindWeb {
+		return
 	}
 	ev := w.down
-	ev.Page = at
-	w.engine.PressAt(ev)
+	ev.Kind, ev.ID, ev.Point, ev.Page = driver.EventPress, v.id, v.surfacePoint(at), at
+	if v.kind == driver.KindText {
+		if l, ok := v.text.(*textLayout); ok {
+			ev.Index = l.indexAt(ev.Point.X-v.content.Origin.X, ev.Point.Y-v.content.Origin.Y)
+		}
+	}
+	w.engine.Dispatch(ev)
 }
 
 // pressOutside reports a press at p to each view that asks for presses
@@ -505,7 +525,7 @@ func (w *window) pressOutside(at driver.Point) {
 		if v == nil || !v.events.Has(driver.EventPressOutside) {
 			continue
 		}
-		if b, shown := w.surfaceBounds(v); shown && !b.Contains(at) {
+		if _, shown := w.surfaceBounds(v); shown && !(driver.Bounds{Size: v.frame.Size}).Contains(v.surfacePoint(at)) {
 			w.engine.Dispatch(driver.Event{Kind: driver.EventPressOutside, ID: v.id, Point: at})
 		}
 	}
@@ -519,9 +539,8 @@ func (w *window) contextMenu(at driver.Point) {
 		return
 	}
 	if v := hit(root, at, func(v *view) bool { return v.events.Has(driver.EventContextMenu) }); v != nil {
-		b, _ := w.surfaceBounds(v)
 		w.engine.Dispatch(driver.Event{Kind: driver.EventContextMenu, ID: v.id,
-			Point: driver.Point{X: at.X - b.Origin.X, Y: at.Y - b.Origin.Y}, Page: at, Modifiers: w.down.Modifiers})
+			Point: v.surfacePoint(at), Page: at, Modifiers: w.down.Modifiers})
 	}
 }
 

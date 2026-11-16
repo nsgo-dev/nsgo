@@ -51,7 +51,9 @@ func TestViewFitsTheContent(t *testing.T) {
 		t.Fatal("a fit counts as a move")
 	}
 	// A part of it shows as the user moving there would.
-	h.app.Post(func() { h.state.FitBounds(core.Bounds{Origin: core.Point{X: 600, Y: 400}, Size: core.Size{Width: 200, Height: 100}}) })
+	h.app.Post(func() {
+		h.state.FitBounds(core.Bounds{Origin: core.Point{X: 600, Y: 400}, Size: core.Size{Width: 200, Height: 100}})
+	})
 	h.app.Settle()
 	if p := h.state.ToView(core.Point{X: 700, Y: 450}); !near(float64(p.X), 450) || !near(float64(p.Y), 350) || !near(h.state.Zoom(), 1) || !h.state.Moved() {
 		t.Fatalf("the part's middle shows at %v ×%v", p, h.state.Zoom())
@@ -96,6 +98,32 @@ func TestViewHandsOnThePointer(t *testing.T) {
 	}
 }
 
+func TestViewContentTakesThePointerThroughTheCamera(t *testing.T) {
+	var state State
+	var presses []core.PressEvent
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return View{TestID: "plane", State: &state, Style: core.Style{Width: core.Pt(400), Height: core.Pt(300)},
+			Content: core.View{Style: core.Style{Width: core.Pt(1000), Height: core.Pt(800)}, Children: []core.Node{
+				core.View{TestID: "button", Style: core.Style{Position: core.Absolute, Left: core.Pt(300), Top: core.Pt(200),
+					Width: core.Pt(40), Height: core.Pt(40)}, OnPress: func(e core.PressEvent) { presses = append(presses, e) }},
+			}}}
+	}, nsgotest.Size(400, 300), nsgotest.Environment(driver.Environment{ReduceMotion: true}))
+	press := func() {
+		t.Helper()
+		app.PressAt("id:plane", state.ToView(core.Point{X: 320, Y: 220}))
+		if len(presses) == 0 || !near(float64(presses[len(presses)-1].Position.X), 20) || !near(float64(presses[len(presses)-1].Position.Y), 20) {
+			t.Fatalf("content press = %+v, want local (20,20)", presses)
+		}
+	}
+	press()
+	app.Post(state.ZoomIn)
+	app.Settle()
+	press()
+	if len(presses) != 2 {
+		t.Fatalf("content presses = %d, want 2", len(presses))
+	}
+}
+
 func TestViewPansAndZooms(t *testing.T) {
 	h := newHarness(t)
 	x, y, zoom := h.state.Camera()
@@ -117,7 +145,9 @@ func TestViewPansAndZooms(t *testing.T) {
 		t.Fatalf("zoom out went to %v", h.state.Zoom())
 	}
 	// Center keeps the zoom.
-	h.app.Post(func() { h.state.Center(core.Bounds{Origin: core.Point{X: 1100, Y: 700}, Size: core.Size{Width: 100, Height: 100}}) })
+	h.app.Post(func() {
+		h.state.Center(core.Bounds{Origin: core.Point{X: 1100, Y: 700}, Size: core.Size{Width: 100, Height: 100}})
+	})
 	h.app.Settle()
 	if p := h.state.ToView(core.Point{X: 1150, Y: 750}); !near(float64(p.X), 450) || !near(float64(p.Y), 350) || !near(h.state.Zoom(), zoom) {
 		t.Fatalf("the centered part shows at %v", p)
