@@ -59,6 +59,8 @@ go tool nsgo test -target macos
 
 在 `android` 和 `ios` 上，测试只能在 NSGo 的测试宿主中运行：Android 运行时从测试进程的标准输出读取协议，工具也要靠宿主写下的标记才能拿到测试的输出和退出码。要在这两个目标上运行的包，其测试必须链接宿主，即在某个测试文件中导入 `github.com/nsgo-dev/nsgo`（空导入即可），并在 `TestMain` 中用 `nsgotest.Main` 或 `nsgotest.MainFunc` 启动它。缺少任一项时，`nsgo test` 会在构建或安装任何东西之前拒绝该包，并说明缺的是哪一项；像 `ui/chat` 这样的库包，在测试文件中补上这两项后即可在手机上运行，无头运行或在其他目标上运行则无需改动。
 
+没有链接平台后端的包会在目标的运行时中无头运行。使用 `-target web` 时，库中的控件测试可通过这种方式在浏览器中执行。存储保留在内存中；浏览器没有文件系统，因此 `DataDir`、`CacheDir` 和 `LogsDir` 均为空。`nsgotest.MicrophoneInput` 的模拟录音器需要写入真实 WAV 文件，所以会在浏览器中跳过测试。
+
 要测量而不是检查时，用 `nsgotest.Measure()` 启动：应用运行在系统时钟上，`Advance` 会真实等待相应时长，各步骤只等待正在进行的动画停下。`app.Mark("name")` 标出此后的读数测的是什么，`app.Mark("-")` 结束标记；无论是否加 `-fps`，标记都会打印出来。
 
 ## TSX 测试

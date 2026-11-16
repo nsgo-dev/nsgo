@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func TestFramesFollowTheClock(t *testing.T) {
 	}
 }
 
-// The app's directories are the test's own, made before the app starts, so a test never writes to the user's data, cache or logs.
+// The app's directories are the test's own, made before the app starts, so a test never writes to the user's data, cache or logs; in a browser they are empty, as the web backend's are.
 func TestAppDirectoriesAreTemporary(t *testing.T) {
 	if Target() == "web" {
 		t.Skip("the web has no app directories")
@@ -50,6 +51,14 @@ func TestAppDirectoriesAreTemporary(t *testing.T) {
 		dirs = []string{cx.DataDir(), cx.CacheDir(), cx.LogsDir()}
 		return core.View{}
 	})
+	if runtime.GOOS == "js" {
+		for _, dir := range dirs {
+			if dir != "" {
+				t.Fatalf("browser app directories = %q, want empty", dirs)
+			}
+		}
+		return
+	}
 	tmp, err := filepath.EvalSymlinks(os.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -244,6 +253,9 @@ func TestNavigateReportsToHiddenMountedWebView(t *testing.T) {
 
 // The model records reveals and trashes, answers them as the test says, and passes core.ErrNoTrash on as itself.
 func TestRevealAndTrashAnswerAsTheTestSays(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("revealing a file needs one on a filesystem, which a browser lacks")
+	}
 	var cx *core.Scope
 	app := Start(t, func(c *core.Scope) core.Node { cx = c; return core.View{} })
 	path := filepath.Join(t.TempDir(), "film.mp4")

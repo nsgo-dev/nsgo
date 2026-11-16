@@ -56,6 +56,8 @@ go tool nsgo test -target macos -run TestAdd
 
 DevTools' Recorder (`go tool nsgo dev -devtools`) writes what you do in the running app as an `nsgotest` test to start from.
 
+With `-target web`, libraries that do not link the backend run headless inside the browser. Storage stays in memory; `DataDir`, `CacheDir` and `LogsDir` are empty, and the file-backed `nsgotest.MicrophoneInput` fake skips.
+
 ## TSX
 
 A TSX app's `*.test.tsx` files, written with `nsgo/test`, run with its Go tests under `go tool nsgo test`.

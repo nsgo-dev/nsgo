@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -44,7 +45,7 @@ type fakeRecording struct {
 	silenced       bool
 }
 
-// MicrophoneInput records the app's RecordWAV with m. The recorder is one per process, as the runtime's is, so Start fails a test whose app would take the one another running test's app has. On a target the device records instead.
+// MicrophoneInput records the app's RecordWAV with m. The recorder is one per process, as the runtime's is, so Start fails a test whose app would take the one another running test's app has. On a target the device records instead. A headless test in a browser skips, since the fake writes real WAV files.
 func MicrophoneInput(m *Microphone) Option {
 	return func(a *App) { a.microphone = m }
 }
@@ -58,6 +59,9 @@ var microphones struct {
 // connect makes m the process's recorder for t's app.
 func (m *Microphone) connect(t testing.TB) {
 	t.Helper()
+	if runtime.GOOS == "js" {
+		t.Skip("nsgotest: MicrophoneInput needs a filesystem for its WAV files")
+	}
 	microphones.Lock()
 	if microphones.connected != nil {
 		microphones.Unlock()

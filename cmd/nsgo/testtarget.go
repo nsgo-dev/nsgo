@@ -531,11 +531,31 @@ func screenshotPathHasParent(name string) bool {
 // targetFor builds the tests as opts.target's package and returns how to
 // run them there.
 func targetFor(ctx context.Context, p *project, opts testOptions) (targetRunner, error) {
-	dir := p.cache("test", opts.target)
-	os.RemoveAll(dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	base := p.cache("test", opts.target)
+	if err := os.MkdirAll(base, 0o755); err != nil {
 		return targetRunner{}, err
 	}
+	// Another run may still serve or execute its build. Keep this run's
+	// files until its runner closes, without replacing anyone else's.
+	dir, err := os.MkdirTemp(base, "run-")
+	if err != nil {
+		return targetRunner{}, err
+	}
+	runner, err := buildTargetRunner(ctx, p, dir, opts)
+	if err != nil {
+		os.RemoveAll(dir)
+		return targetRunner{}, err
+	}
+	close := runner.close
+	runner.close = func() {
+		close()
+		os.RemoveAll(dir)
+	}
+	return runner, nil
+}
+
+// buildTargetRunner builds into the run's own directory.
+func buildTargetRunner(ctx context.Context, p *project, dir string, opts testOptions) (targetRunner, error) {
 	local := func(bin string) targetRunner {
 		return targetRunner{run: func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
 			return runLocal(ctx, bin, args, env, out)

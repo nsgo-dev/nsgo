@@ -59,6 +59,8 @@ The targets are `macos`, `windows`, `linux`, `web` (in Chrome, Chromium or Edge)
 
 On `android` and `ios` the tests run only in NSGo's test host: Android's runtime reads its protocol from the test process's standard output, and the tool learns a test's output and exit code there from the marks the host writes. A package whose tests run on them must link the host, by importing `github.com/nsgo-dev/nsgo` in a test file (a blank import is enough), and start it from `TestMain` with `nsgotest.Main` or `nsgotest.MainFunc`. `nsgo test` refuses a package that misses either before it builds or installs anything, saying which is missing; a library package such as `ui/chat` runs on a phone once a test file adds both, and headless or on the other targets as it is.
 
+Packages that do not link the platform backend run headless in the target's runtime. With `-target web`, library controls can be tested inside the browser this way. Storage stays in memory, and `DataDir`, `CacheDir` and `LogsDir` are empty because the browser has no filesystem. The file-backed `nsgotest.MicrophoneInput` fake skips there because it needs real WAV files.
+
 To measure rather than check, start with `nsgotest.Measure()`: the app runs on the system's clock, `Advance` waits as long as it moves, and steps wait only for what animates to rest. `app.Mark("name")` names what the readings from there on measure, and `app.Mark("-")` ends it; the marks print with or without `-fps`.
 
 ## TSX tests

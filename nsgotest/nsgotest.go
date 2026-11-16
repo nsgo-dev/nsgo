@@ -523,11 +523,15 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 	if desktop {
 		windows = &core.WindowOptions{Width: a.size.Width, Height: a.size.Height}
 	}
-	dir := t.TempDir()
-	data, cache, logs := filepath.Join(dir, "data"), filepath.Join(dir, "cache"), filepath.Join(dir, "logs")
-	for _, path := range []string{data, cache, logs} {
-		if err := os.MkdirAll(path, 0o755); err != nil {
-			t.Fatalf("nsgotest: cannot create app directory: %v", err)
+	// A library may run headless inside a browser, whose runtime has no filesystem. Its app directories are empty, as on the web backend.
+	var data, cache, logs string
+	if runtime.GOOS != "js" {
+		dir := t.TempDir()
+		data, cache, logs = filepath.Join(dir, "data"), filepath.Join(dir, "cache"), filepath.Join(dir, "logs")
+		for _, path := range []string{data, cache, logs} {
+			if err := os.MkdirAll(path, 0o755); err != nil {
+				t.Fatalf("nsgotest: cannot create app directory: %v", err)
+			}
 		}
 	}
 	a.root = core.NewRoot(core.RootOptions{
