@@ -36,6 +36,14 @@ ui.Slider{Value: speed.Get, OnChange: speed.Set, Min: 0.5, Max: 2, Step: 0.25, L
 	ValueText: func(v float64) string { return fmt.Sprintf("%g×", v) }}
 ```
 
+范围或步进会变化时（例如视频报告时长时）用 `MinFunc`、`MaxFunc` 和 `StepFunc`。它们优先于对应的静态字段，并就地更新已挂载的滑块，保留它的焦点和正在进行的拖动。显式的 `MaxFunc` 返回 0 时范围可以收拢为一点，直到时长到来；应用的值会保留，并在当前范围内显示。
+
+```go
+ui.Slider{Value: position.Get, OnChange: position.Set, MaxFunc: duration.Get, Label: "位置"}
+```
+
+在 TSX 中，`min={minimum()}`、`max={duration()}` 和 `step={step()}` 就地跟随它们的信号；`max={0}` 会让范围收拢，和 `MaxFunc` 返回 0 一样。
+
 ## 行为
 
 拖动跟随指针，并在移动时报告 `OnChange`。方向键按一步移动获得焦点的旋钮，Home 和 End 到两端，Page Up 和 Page Down 移动更远。`Step` 大于 0 时，`ui.Slider` 在轨道下标记最多 60 个刻度。

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"math"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/core"
@@ -50,6 +51,147 @@ func TestSlider(t *testing.T) {
 		}
 		if low.Get() != 50 || app.Find("price-low").Props.Value.Max != 50 {
 			t.Fatalf("the low knob reached %v, want it stopped at the high one's 50", low.Get())
+		}
+	})
+}
+
+// A duration can arrive while the slider is focused or being scrubbed. Updating it must keep the thumb and its responder mounted.
+func TestSliderReactiveBoundsPreserveFocusAndDrag(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var value, maximum *core.Signal[float64]
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			value, maximum = core.NewSignal(cx, 60.0), core.NewSignal(cx, 0.0)
+			return Slider{TestID: "position", Label: "Position", Value: value.Get, OnChange: value.Set,
+				Max: 1000, MaxFunc: maximum.Get, Style: core.Style{Width: core.Pt(220)}}
+		})
+		control, thumb := app.Find("position").ID, app.Find("position-thumb").ID
+		if v := app.Find("position-thumb").Props.Value; v.Max != 0 || v.Now != 0 || value.Get() != 60 {
+			t.Fatalf("unknown duration: accessibility %+v, app value %v", v, value.Get())
+		}
+		if e.Idiom == core.IdiomDesktop {
+			app.Focus("position-thumb")
+		}
+		app.Post(func() { maximum.Set(300) })
+		app.Settle()
+		if v := app.Find("position-thumb"); v.ID != thumb || app.Find("position").ID != control || v.Props.Value.Max != 300 || v.Props.Value.Now != 60 || value.Get() != 60 {
+			t.Fatalf("duration replaced the control or its value: thumb %+v, app value %v", v.Props.Value, value.Get())
+		}
+		if e.Idiom == core.IdiomDesktop && !app.Find("position-thumb").Focused {
+			t.Fatal("duration update lost the keyboard focus")
+		}
+		finger := app.Touch("position-thumb", core.Point{X: 10, Y: 8})
+		finger.Move(core.Point{X: 30, Y: 8})
+		before := value.Get()
+		if before <= 60 {
+			t.Fatalf("scrub did not start: %v", before)
+		}
+		app.Post(func() { maximum.Set(600) })
+		app.Settle()
+		if v := app.Find("position-thumb"); v.ID != thumb || v.Props.Value.Max != 600 || value.Get() != before {
+			t.Fatalf("bounds changed during scrub: %+v, app value %v (was %v)", v.Props.Value, value.Get(), before)
+		}
+		finger.Move(core.Point{X: 50, Y: 8})
+		if value.Get() <= before || value.Get() > 600 {
+			t.Fatalf("active scrub did not follow the new range: %v (was %v)", value.Get(), before)
+		}
+		finger.Lift()
+		if v := app.Find("position-thumb"); v.ID != thumb || v.Props.Value.Now != float32(value.Get()) || v.Props.Value.Max != 600 {
+			t.Fatalf("release lost the scrub's value: %+v, app value %v", v.Props.Value, value.Get())
+		}
+	})
+}
+
+func TestSliderReactiveStepsAndMinimum(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var value, minimum, maximum, step *core.Signal[float64]
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			value, minimum = core.NewSignal(cx, 20.0), core.NewSignal(cx, 10.0)
+			maximum, step = core.NewSignal(cx, 30.0), core.NewSignal(cx, 10.0)
+			slider := Slider{TestID: "level", Value: value.Get, OnChange: value.Set,
+				Min: -100, Max: 100, Step: 1, MinFunc: minimum.Get, MaxFunc: maximum.Get, StepFunc: step.Get,
+				Style: core.Style{Width: core.Pt(220)}}
+			fixed := slider
+			fixed.TestID, fixed.Style.Height = "fixed", core.Pt(40)
+			return core.Group([]core.Node{slider, fixed, Slider{TestID: "minimum-only", MinFunc: minimum.Get}})
+		})
+		thumb := app.Find("level-thumb").ID
+		checkMarks := func(want int, height core.Points) {
+			t.Helper()
+			n := 0
+			for _, v := range views(app.Find("level")) {
+				if v.Frame.Size.Width == 2 && v.Frame.Size.Height == 2 {
+					n++
+				}
+			}
+			if n != want || app.Find("level").Frame.Size.Height != height || app.Find("fixed").Frame.Size.Height != 40 {
+				t.Fatalf("ticks = %d, height = %v, custom height = %v; want %d, %v, 40", n, app.Find("level").Frame.Size.Height, app.Find("fixed").Frame.Size.Height, want, height)
+			}
+		}
+		checkMarks(3, 28)
+		app.Post(func() { minimum.Set(20); maximum.Set(80); step.Set(20) })
+		app.Settle()
+		checkMarks(4, 28)
+		if v := app.Find("minimum-only-thumb").Props.Value; v.Min != 20 || v.Max != 100 {
+			t.Fatalf("MinFunc lost the default maximum: %+v", v)
+		}
+		if v := app.Find("level-thumb"); v.ID != thumb || v.Props.Value.Min != 20 || v.Props.Value.Max != 80 {
+			t.Fatalf("range not updated in place: %+v", v.Props.Value)
+		}
+		app.AccessibilityAction("level-thumb", core.ActionIncrement)
+		if value.Get() != 40 {
+			t.Fatalf("increment ignored the new step: %v", value.Get())
+		}
+		if e.Idiom == core.IdiomDesktop {
+			app.Focus("level-thumb")
+			app.Key("right")
+			if value.Get() != 60 {
+				t.Fatalf("Right ignored the new step: %v", value.Get())
+			}
+			app.Key("end")
+			if value.Get() != 80 {
+				t.Fatalf("End ignored the new maximum: %v", value.Get())
+			}
+			app.Key("home")
+			if value.Get() != 20 {
+				t.Fatalf("Home ignored the new minimum: %v", value.Get())
+			}
+		}
+		app.Post(func() { value.Set(20); step.Set(0) })
+		app.Settle()
+		checkMarks(0, 20)
+		app.AccessibilityAction("level-thumb", core.ActionIncrement)
+		if math.Abs(value.Get()-20.6) > 1e-9 {
+			t.Fatalf("continuous increment = %v, want 20.6", value.Get())
+		}
+		app.Post(func() { step.Set(math.Inf(1)) })
+		app.Settle()
+		checkMarks(0, 20)
+		if app.Find("level-thumb").ID != thumb {
+			t.Fatal("changing steps replaced the thumb")
+		}
+	})
+}
+
+// A drag holds back both thumbs' accessible values until it ends, though a range's other thumb takes its bound from the one that moves.
+func TestSliderRangeDragHoldsAccessibleValues(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var low, high *core.Signal[float64]
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			low, high = core.NewSignal(cx, 20.0), core.NewSignal(cx, 60.0)
+			return Slider{TestID: "price", Label: "Price", LowLabel: "minimum", HighLabel: "maximum",
+				Value: low.Get, OnChange: low.Set, High: high.Get, OnHighChange: high.Set, Style: core.Style{Width: core.Pt(220)}}
+		})
+		finger := app.Touch("price-high", core.Point{X: 10, Y: 8})
+		finger.Move(core.Point{X: 40, Y: 8})
+		if high.Get() <= 60 {
+			t.Fatalf("drag did not move the high knob: %v", high.Get())
+		}
+		if lo, hi := app.Find("price-low").Props.Value, app.Find("price-high").Props.Value; lo.Max != 60 || hi.Now != 60 {
+			t.Fatalf("a drag updated accessible values before its end: low %+v, high %+v", lo, hi)
+		}
+		finger.Lift()
+		if lo, hi := app.Find("price-low").Props.Value, app.Find("price-high").Props.Value; lo.Max != float32(high.Get()) || hi.Now != float32(high.Get()) {
+			t.Fatalf("release did not report the drag's value: low %+v, high %+v, value %v", lo, hi, high.Get())
 		}
 	})
 }

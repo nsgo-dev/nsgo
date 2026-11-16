@@ -77,7 +77,7 @@ base.Slider{
 }
 ```
 
-`Axis` makes it vertical, `Marks` places your own ticks on the indicator, and `OnChangeEnd` reports the value once a drag stops.
+`Min`, `Max` and `Step` are reactive getters: changing their signals updates the mounted slider and its accessible range, including during a drag. `Axis` makes it vertical, `Marks` places your own ticks on the indicator, and `OnChangeEnd` reports the value once a drag stops.
 
 ## Select
 

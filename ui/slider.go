@@ -32,7 +32,9 @@ type Slider struct {
 	// Min and Max are the range, 0 to 100 when Max is not above Min.
 	Min, Max float64
 	Step     float64
-	Disabled func() bool
+	// MinFunc, MaxFunc and StepFunc follow changing bounds and steps in place, taking precedence over Min, Max and Step. Explicit bounds may be equal, for a range whose maximum is not known yet.
+	MinFunc, MaxFunc, StepFunc func() float64
+	Disabled                   func() bool
 	// Label names it for assistive technology; a range's knobs add
 	// LowLabel and HighLabel after it, such as "minimum" and "maximum".
 	Label               string
@@ -48,19 +50,33 @@ type Slider struct {
 
 // bounds are the slider's range.
 func (s Slider) bounds() (lo, hi float64) {
-	if s.Max > s.Min {
-		return s.Min, s.Max
+	lo, hi = s.Min, s.Max
+	if s.MaxFunc == nil && !(hi > lo) {
+		lo, hi = 0, 100
 	}
-	return 0, 100
+	if s.MinFunc != nil {
+		lo = s.MinFunc()
+	}
+	if s.MaxFunc != nil {
+		hi = s.MaxFunc()
+	}
+	return lo, hi
+}
+
+func (s Slider) step() float64 {
+	if s.StepFunc != nil {
+		return s.StepFunc()
+	}
+	return s.Step
 }
 
 // Render implements core.Node.
 func (s Slider) Render(cx *core.Scope) core.Node {
 	colors := ColorsOf(cx)
-	lo, hi := s.bounds()
 	ranged := s.High != nil
 	read := func(fn func() float64) float64 {
 		if fn == nil {
+			lo, _ := s.bounds()
 			return lo
 		}
 		return fn()
@@ -83,20 +99,31 @@ func (s Slider) Render(cx *core.Scope) core.Node {
 		}
 	}
 	const height = sliderKnobH + 4
-	tall := core.Points(height)
-	var marks []core.Node
-	if s.Step > 0 {
-		tall += 8
-		if n := int(math.Floor((hi - lo) / s.Step)); hi > lo && n <= sliderTicks {
-			for i := 0; i <= n; i++ {
-				f := float32(float64(i) * s.Step / (hi - lo))
+	sizeStyle := func() core.Style {
+		tall := core.Points(height)
+		if step := s.step(); step > 0 && !math.IsInf(step, 0) {
+			tall += 8
+		}
+		return core.Style{Height: core.Pt(tall)}.Merge(s.Style)
+	}
+	marks := core.Dynamic(func(*core.Scope) core.Node {
+		lo, hi := s.bounds()
+		step := s.step()
+		var marks []core.Node
+		// Check before converting to int: non-finite bounds and tiny steps must not overflow the number of marks.
+		n := math.Floor((hi - lo) / step)
+		if step > 0 && !math.IsInf(step, 0) && hi > lo && n >= 0 && n <= sliderTicks {
+			count := int(n)
+			for i := 0; i <= count; i++ {
+				f := float32(float64(i) * step / (hi - lo))
 				marks = append(marks, core.View{PointerEvents: core.PointerEventsNone,
 					Style: core.Style{Position: core.Absolute, Top: core.Pt(sliderTrack/2 + 10), Left: core.Pct(f * 100), Width: core.Pt(2), Height: core.Pt(2),
 						CornerRadius: 1, Margin: core.Edges{Left: -1}},
 					StyleFunc: Filled(colors.Track)})
 			}
 		}
-	}
+		return core.Group(marks)
+	})
 	label, startLabel := s.Label, ""
 	thumb, startThumb := "", ""
 	if ranged {
@@ -108,15 +135,16 @@ func (s Slider) Render(cx *core.Scope) core.Node {
 			thumb, startThumb = s.TestID+"-high", s.TestID+"-low"
 		}
 	}
-	number := func(p *float64) func() float64 { return func() float64 { return *p } }
 	valueText := s.ValueText
 	if valueText == nil {
 		valueText = func(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 	}
-	return base.Slider{Value: value, OnChange: change, Min: number(&lo), Max: number(&hi), Step: number(&s.Step), Disabled: s.Disabled,
-		Label: label, StartLabel: startLabel, ValueText: valueText, TestID: s.TestID, ThumbTestID: thumb, StartThumbTestID: startThumb, Marks: marks,
-		Style:              core.Style{Height: core.Pt(tall), MinWidth: core.Pt(80), Disabled: Dimmed()}.Merge(s.Style),
-		TrackStyle:         core.Style{Height: core.Pt(tall)},
+	return base.Slider{Value: value, OnChange: change,
+		Min: func() float64 { lo, _ := s.bounds(); return lo }, Max: func() float64 { _, hi := s.bounds(); return hi }, Step: s.step, Disabled: s.Disabled,
+		Label: label, StartLabel: startLabel, ValueText: valueText, TestID: s.TestID, ThumbTestID: thumb, StartThumbTestID: startThumb, Marks: []core.Node{marks},
+		Style:              core.Style{MinWidth: core.Pt(80), Disabled: Dimmed()}.Merge(s.Style),
+		StyleFunc:          sizeStyle,
+		TrackStyle:         core.Style{Height: core.Pct(100)},
 		IndicatorStyle:     core.Style{Height: core.Pt(sliderTrack), CornerRadius: sliderTrack / 2, Margin: core.Edges{Top: (height - sliderTrack) / 2, Left: sliderKnobW / 2, Right: sliderKnobW / 2}},
 		IndicatorStyleFunc: Filled(colors.Line),
 		RangeStyle:         core.Style{CornerRadius: sliderTrack / 2},

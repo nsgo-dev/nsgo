@@ -77,7 +77,7 @@ base.Slider{
 }
 ```
 
-`Axis` 让它垂直，`Marks` 在指示器上放置你自己的刻度，`OnChangeEnd` 在拖动停止时报告一次值。
+`Min`、`Max` 和 `Step` 是响应式的 getter：改变它们的信号会更新已挂载的滑块及其无障碍范围，拖动中也一样。`Axis` 让它垂直，`Marks` 在指示器上放置你自己的刻度，`OnChangeEnd` 在拖动停止时报告一次值。
 
 ## Select
 

@@ -36,6 +36,14 @@ ui.Slider{Value: speed.Get, OnChange: speed.Set, Min: 0.5, Max: 2, Step: 0.25, L
 	ValueText: func(v float64) string { return fmt.Sprintf("%g×", v) }}
 ```
 
+Use `MinFunc`, `MaxFunc` and `StepFunc` when the range or step changes, such as when a video reports its duration. They override their static fields and update the mounted slider, keeping its focus and any drag in progress. An explicit `MaxFunc` returning 0 allows a collapsed range until the duration arrives; the app's value is preserved and displayed within the current bounds.
+
+```go
+ui.Slider{Value: position.Get, OnChange: position.Set, MaxFunc: duration.Get, Label: "Position"}
+```
+
+In TSX, `min={minimum()}`, `max={duration()}` and `step={step()}` follow their signals in place; `max={0}` collapses the range, as a `MaxFunc` returning 0 does.
+
 ## Behavior
 
 A drag follows the pointer and reports `OnChange` while it moves. The arrow keys move a focused knob by a step, Home and End go to the ends, and Page Up and Page Down move further. `ui.Slider` marks the steps under the track when `Step` is above 0, up to 60 marks.

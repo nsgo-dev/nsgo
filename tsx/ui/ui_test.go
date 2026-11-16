@@ -52,3 +52,34 @@ mount(App);`)}}
 		})
 	}
 }
+
+func TestSliderBoundsFromTSXStayReactive(t *testing.T) {
+	files := fstest.MapFS{"App.tsx": {Data: []byte(`import { mount, signal, View } from "nsgo";
+import { Button, Slider } from "nsgo/ui";
+function App() {
+    const minimum = signal(0), maximum = signal(0), step = signal(0), value = signal(60);
+    return <View style={{width: 240}}>
+        <Button testID="load" onPress={() => setTimeout(() => {
+            minimum.set(10); maximum.set(300); step.set(5);
+        }, 1000)}>Load duration</Button>
+        <Slider testID="position" label="Position" min={minimum()} max={maximum()} step={step()}
+            value={value()} onChange={(event) => value.set(event.value)} />
+    </View>;
+}
+mount(App);`)}}
+	app := nsgotest.Start(t, compiler.App(files, "App.tsx"), nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	thumb := app.Find("position-thumb").ID
+	if v := app.Find("position-thumb").Props.Value; v.Min != 0 || v.Max != 0 || v.Now != 0 {
+		t.Fatalf("unknown duration: %+v", v)
+	}
+	app.Press("load")
+	app.Focus("position-thumb")
+	app.Advance(time.Second)
+	if v := app.Find("position-thumb"); v.ID != thumb || !v.Focused || v.Props.Value.Min != 10 || v.Props.Value.Max != 300 || v.Props.Value.Now != 60 {
+		t.Fatalf("TSX bounds lost the thumb, focus or value: %+v, focused %v", v.Props.Value, v.Focused)
+	}
+	app.Key("right")
+	if v := app.Find("position-thumb").Props.Value; v.Now != 65 {
+		t.Fatalf("TSX step did not change: %+v", v)
+	}
+}

@@ -70,8 +70,7 @@ type Slider struct {
 	// DefaultValue.
 	Value        func() SliderValue
 	DefaultValue SliderValue
-	// Min, Max and Step are what it takes, 0, 100 and 1 when MaxFunc and
-	// Max are unset; NoStep takes any value.
+	// Min, Max and Step follow the bounds and step as they change, defaulting to 0, 100 and 1. A step of 0 takes any value.
 	Min, Max func() float64
 	Step     func() float64
 	Scale    func() SliderScale
@@ -341,6 +340,7 @@ func (c *sliderCtl) thumb(start bool, focused *core.Signal[int]) core.Node {
 	}
 	env := c.cx.Env()
 	var said *core.AccessibilityValue
+	var saidRange numberRange
 	step := func(by float64) func() {
 		return func() {
 			c.nudge(start, func(r numberRange, v float64) float64 { return r.stepBy(v, by) })
@@ -363,14 +363,14 @@ func (c *sliderCtl) thumb(start bool, focused *core.Signal[int]) core.Node {
 			}
 			return look
 		},
-		// While a drag moves it and no screen reader runs, the value waits
-		// for the drag's end: no props item per move.
+		// While a drag moves it and no screen reader runs, the value waits for the drag's end unless the slider's own range has changed; a range's other thumb bounds this one and moves with the drag, so it does not count.
 		AccessibilityValue: func() core.AccessibilityValue {
-			if c.pending.Get() != nil && !env.ScreenReader() && said != nil {
+			r := c.rng()
+			v := c.a11yValue(start)
+			if c.pending.Get() != nil && !env.ScreenReader() && said != nil && r.min == saidRange.min && r.max == saidRange.max {
 				return *said
 			}
-			v := c.a11yValue(start)
-			said = &v
+			said, saidRange = &v, r
 			return v
 		},
 		AccessibilityActions: []core.AccessibilityAction{{Name: core.ActionIncrement}, {Name: core.ActionDecrement}},
