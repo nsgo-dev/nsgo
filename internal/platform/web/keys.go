@@ -104,14 +104,13 @@ func (s *surface) shortcut(e js.Value) {
 	case !apple && ctrl:
 		names = append([]string{join(true, false, alt, shift, meta)}, names...)
 	}
-	focus := s.focusKeyUse()
-	k, consumed := driver.FindKey(s.keys, names, focus, e.Get("repeat").Bool())
+	id, consumed := driver.FindKey(s.keys, names, s.focusKeyUse(), e.Get("repeat").Bool())
 	if !consumed {
 		return
 	}
 	e.Call("preventDefault")
 	e.Call("stopPropagation")
-	if k != "" {
-		s.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: k, Count: uint32(focus)})
+	if id != 0 {
+		s.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
 	}
 }

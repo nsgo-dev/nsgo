@@ -143,9 +143,9 @@ func (w *window) shortcut(vk, lParam uintptr) bool {
 	if w.editing() {
 		focus = driver.KeyUseText
 	}
-	if key, consumed := driver.FindKey(w.keys, names, focus, repeated(lParam)); consumed {
-		if key != "" {
-			w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: key, Count: uint32(focus)})
+	if id, consumed := driver.FindKey(w.keys, names, focus, repeated(lParam)); consumed {
+		if id != 0 {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
 		}
 		return true
 	}

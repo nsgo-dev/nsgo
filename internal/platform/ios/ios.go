@@ -187,9 +187,8 @@ type surface struct {
 	keyboardStart time.Duration
 
 	keys []driver.KeyBinding // the keymap's bindings
-	// held is the binding a held key fires again, on a timer of its own:
-	// UIKit reports a held key's press once.
-	held     string
+	// held is the ID of the binding a held key fires again, on a timer of its own: UIKit reports a held key's press once.
+	held     uint32
 	heldStop chan struct{}
 	// menuHeld: the remote's Menu button is down and went back.
 	menuHeld    bool
@@ -1592,9 +1591,10 @@ func pressesBegan(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 		app.menuHeld = true
 		return
 	}
-	binding, consumed, focus := "", false, driver.KeyUse(0)
+	var id uint32
+	consumed := false
 	if app != nil && app.engine != nil && len(app.keys) > 0 {
-		focus = app.focusKeyUse()
+		focus := app.focusKeyUse()
 		apple.ForEach(presses, func(press objc.ID) {
 			key := press.Send(sel("key"))
 			if key == 0 || consumed {
@@ -1605,7 +1605,7 @@ func pressesBegan(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 				name = strings.ToLower(apple.GoString(key.Send(sel("charactersIgnoringModifiers"))))
 			}
 			if name != "" {
-				binding, consumed = driver.FindKey(app.keys, apple.KeyNames(name, objc.Send[uint](key, sel("modifierFlags"))),
+				id, consumed = driver.FindKey(app.keys, apple.KeyNames(name, objc.Send[uint](key, sel("modifierFlags"))),
 					focus, false)
 			}
 		})
@@ -1614,9 +1614,9 @@ func pressesBegan(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 		apple.Super(self, cmd, presses, event)
 		return
 	}
-	app.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding, Count: uint32(focus)})
-	if i := slices.IndexFunc(app.keys, func(b driver.KeyBinding) bool { return b.Key == binding && b.FiresOver(focus) }); i >= 0 && app.keys[i].Repeat {
-		app.repeatKey(binding, focus)
+	app.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+	if i := slices.IndexFunc(app.keys, func(b driver.KeyBinding) bool { return b.ID == id }); i >= 0 && app.keys[i].Repeat {
+		app.repeatKey(id)
 	}
 }
 
@@ -1649,7 +1649,7 @@ func pressesEnded(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 	app := pressSurface(self)
 	if app != nil && app.heldStop != nil {
 		close(app.heldStop)
-		app.heldStop, app.held = nil, ""
+		app.heldStop, app.held = nil, 0
 	}
 	if app != nil && app.menuHeld && hasPress(presses, pressMenu) {
 		// The Menu press that went back ends here too, or UIKit would
@@ -1660,14 +1660,13 @@ func pressesEnded(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 	apple.Super(self, cmd, presses, event)
 }
 
-// repeatKey fires binding again while its key is held, as a hardware
-// keyboard's auto-repeat would: after 500 ms, then 30 times a second.
-func (s *surface) repeatKey(binding string, focus driver.KeyUse) {
+// repeatKey fires the binding with ID id again while its key is held, as a hardware keyboard's auto-repeat would: after 500 ms, then 30 times a second.
+func (s *surface) repeatKey(id uint32) {
 	if s.heldStop != nil {
 		close(s.heldStop)
 	}
 	stop := make(chan struct{})
-	s.held, s.heldStop = binding, stop
+	s.held, s.heldStop = id, stop
 	e := s.engine
 	go func() {
 		t := time.NewTimer(500 * time.Millisecond)
@@ -1677,7 +1676,7 @@ func (s *surface) repeatKey(binding string, focus driver.KeyUse) {
 			case <-stop:
 				return
 			case <-t.C:
-				e.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding, Count: uint32(focus)})
+				e.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
 				t.Reset(33 * time.Millisecond)
 			}
 		}

@@ -61,7 +61,7 @@ const (
 	// on ID at Point in the view's coordinates and Page in its root
 	// view's, with the Modifiers held.
 	EventContextMenu
-	// EventKey is a key press matching a binding of the keymap (Text), Count the keys the view with the keyboard focus used as the platform matched it (KeyUse): the engine runs the newest binding of Text that fires over them (KeyBinding.FiresOver), as FindKey chose.
+	// EventKey is a key press matching a binding of the keymap, Count the ID of the binding FindKey chose (KeyBinding.ID): the engine runs that binding if it still lives and may fire, and no other in its place.
 	EventKey
 	// EventPan follows an active pan: its phase (Phase), translation
 	// (Point) and velocity (Velocity).

@@ -8,9 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Keyboard shortcuts: the surface's table of bindings goes to the
-// platform, which matches each key press on the main thread, consumes
-// the presses that match and reports them with EventKey.
+// Keyboard shortcuts: the surface's table of bindings goes to the platform, which matches each key press on the main thread, consumes the presses that match and reports the binding each matched with EventKey, which runs it.
 
 type keyBinding struct {
 	driver.KeyBinding
@@ -43,7 +41,7 @@ type KeyOptions struct {
 	OverModals bool
 }
 
-// OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". The newest binding of a key wins. It fires once while the key is held, and not while the view with the keyboard focus uses the key itself, a text input its editing keys, a button Return and Space, a slider or a tab bar its arrows (KeyAuto); OnKeyWith says else. A control that binds its own keys while it has the focus binds them with KeyNotEditing, or the focus it holds would keep them from it.
+// OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". Of the bindings of a key that fire where the focus is, the newest wins, and only it runs. It fires once while the key is held, and not while the view with the keyboard focus uses the key itself, a text input its editing keys, a button Return and Space, a slider or a tab bar its arrows (KeyAuto); OnKeyWith says else. A control that binds its own keys while it has the focus binds them with KeyNotEditing, or the focus it holds would keep them from it.
 //
 // What the owner shows are the views of the nearest owner at or above it that has any. The binding rests while none of them shows: in a Holder's content no place shows, under a DisplayNone view such as a navigation stack's screen below the top, in a dismissed modal. While a modal is shown it rests too if any of them is outside the topmost modal, as the page under a dialog is, unless KeyOptions.OverModals. It fires again once they show, without binding it again.
 func (cx *Scope) OnKey(key string, fn func()) { cx.OnKeyWith(key, KeyOptions{}, fn) }
@@ -61,7 +59,12 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 		yields = driver.KeyUsedBy(k)
 	}
 	owner := cx.current()
-	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, Yields: yields}, owner: owner, within: confinement(owner), overModals: opts.OverModals, fn: fn}
+	// IDs are never reused, so a press the platform matched to a binding since removed runs nothing (pressKey).
+	t.keyID++
+	if t.keyID == 0 {
+		t.keyID++
+	}
+	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, fn: fn}
 	t.keys = append(t.keys, b)
 	t.keysChanged = true
 	t.changed = true
@@ -262,21 +265,17 @@ func (p *keyPlaces) shows(o *Scope, overModals bool) bool {
 	return true
 }
 
-func (t *Tree) pressKey(key string, focus driver.KeyUse) {
-	key = driver.NormalizeKey(key)
-	var places *keyPlaces
-	for i := len(t.keys) - 1; i >= 0; i-- {
-		// A binding is checked again, as the platform may have matched the press by a keymap the focus or the views have since left.
-		// The focus the platform matched by passes over the bindings it passed over, so the one it chose runs rather than a newer one of the key that yields to the focused control.
-		if b := t.keys[i]; b.Key == key && b.FiresOver(focus) {
-			if places == nil {
-				places = t.keyPlaces()
-			}
-			if t.keyActive(b, places) {
-				t.within(b.owner, b.fn)
-				return
-			}
-		}
+// pressKey runs the binding the platform matched a press to (EventKey), by its ID: never another in its place, though a binding of the same key may have come or gone since, as IDs are not reused. It is checked again, as the platform may have matched the press by a keymap the focus or the views have since left; then nothing runs.
+func (t *Tree) pressKey(id uint32) {
+	if id == 0 {
+		return
+	}
+	i := slices.IndexFunc(t.keys, func(b *keyBinding) bool { return b.ID == id })
+	if i < 0 {
+		return
+	}
+	if b := t.keys[i]; t.keyActive(b, t.keyPlaces()) {
+		t.within(b.owner, b.fn)
 	}
 }
 

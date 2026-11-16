@@ -198,6 +198,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     /** The keymap's bindings, oldest first: each key with its flags (1 fires in text, 2 repeats). */
     private String[] keys = new String[0];
     private int[] keyFlags = new int[0];
+    /** The keymap's binding IDs, which EventKey reports. */
+    private int[] keyIds = new int[0];
     private final Set<Integer> consumedKeys = new HashSet<>();
     private int statusBarStyle;
     private boolean statusBarHidden;
@@ -2594,12 +2596,15 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 int count = in.readInt();
                 String[] bindings = new String[count];
                 int[] flags = new int[count];
+                int[] ids = new int[count];
                 for (int i = 0; i < count; i++) {
                     bindings[i] = Protocol.readString(in);
                     flags[i] = in.readUnsignedByte();
+                    ids[i] = in.readInt();
                 }
                 keys = bindings;
                 keyFlags = flags;
+                keyIds = ids;
                 break;
             }
             case Protocol.ITEM_STATUS_BAR:
@@ -3548,8 +3553,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 if ((focus & Protocol.KEY_USE_TEXT) != 0 && (keyFlags[i] & 1) == 0) continue;
                 if ((focus & (keyFlags[i] >> 2)) != 0) continue;
                 consumedKeys.add(code);
-                // The count carries the focus matched by, as driver.EventKey's.
-                if (e.getRepeatCount() == 0 || (keyFlags[i] & 2) != 0) event(Protocol.EVENT_KEY, 0, focus, 0, 0, keys[i]);
+                // The count carries the binding's ID, as driver.EventKey's.
+                if (e.getRepeatCount() == 0 || (keyFlags[i] & 2) != 0) event(Protocol.EVENT_KEY, 0, keyIds[i], 0, 0, "");
                 return true;
             }
         }

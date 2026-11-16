@@ -235,6 +235,29 @@ func TestKeyAutoYieldsToFocusedControls(t *testing.T) {
 	}
 }
 
+// App.Key runs the binding a device matches, by the focus: in a focused field the KeyAlways binding of Down, not a newer KeyAuto one, which runs with no field focused (#204).
+func TestKeyRunsTheBindingTheFocusMatches(t *testing.T) {
+	for _, focused := range []bool{true, false} {
+		var ran []string
+		app := Start(t, func(cx *core.Scope) core.Node {
+			cx.OnKeyWith("down", core.KeyOptions{When: core.KeyAlways}, func() { ran = append(ran, "palette") })
+			cx.OnKey("down", func() { ran = append(ran, "volume") })
+			return core.Input{TestID: "search"}
+		})
+		if focused {
+			app.Focus("id:search")
+		}
+		app.Key("down")
+		want := "volume"
+		if focused {
+			want = "palette"
+		}
+		if !slices.Equal(ran, []string{want}) {
+			t.Errorf("field focused %v: ran %q, want %q", focused, ran, want)
+		}
+	}
+}
+
 func TestDragsGoToWhatAFingerMoves(t *testing.T) {
 	var log []string
 	app := Start(t, func(cx *core.Scope) core.Node {

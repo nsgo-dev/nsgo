@@ -76,6 +76,7 @@ type Tree struct {
 	auths       map[uint32]*authSession // the auth sessions waiting for the platform
 	imageInfos  map[uint32]imageInfoWait
 	keys        []*keyBinding
+	keyID       uint32
 	keysChanged bool
 	backs       []*backHandler
 	// regions are the live regions, which the views do not number: an owner may have no view but a region, as a Holder's content may (keyPlaces).
@@ -2171,7 +2172,7 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		t.answerImageInfo(ev)
 		return
 	case driver.EventKey:
-		t.pressKey(ev.Text, driver.KeyUse(ev.Count))
+		t.pressKey(ev.Count)
 		return
 	case driver.EventMenu:
 		t.chooseMenu(ev.Count)

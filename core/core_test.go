@@ -1513,14 +1513,14 @@ func TestKeyBindingsFollowOwners(t *testing.T) {
 			keys = it.Keys
 		}
 	}
-	if !slices.Equal(keys, []driver.KeyBinding{{Key: "meta+s", InText: true}, {Key: "mod+shift+s", InText: true}}) {
+	if !slices.Equal(withoutIDs(keys), []driver.KeyBinding{{Key: "meta+s", InText: true}, {Key: "mod+shift+s", InText: true}}) || keys[0].ID == 0 || keys[1].ID == 0 || keys[0].ID == keys[1].ID {
 		t.Fatalf("keymap = %+v", keys)
 	}
-	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+shift+s"})
+	h.pressKey("mod+shift+s", 0)
 	open.Set(false)
 	h.commit()
-	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+shift+s"})
-	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "meta+s"})
+	h.pressKey("mod+shift+s", 0)
+	h.pressKey("meta+s", 0)
 	if want := []string{"save as", "save"}; !slices.Equal(log, want) {
 		t.Fatalf("log = %q, want %q", log, want)
 	}
@@ -1554,8 +1554,8 @@ func TestConfinedKeysAndBacksFollowTheFocus(t *testing.T) {
 	press := func(want ...string) {
 		t.Helper()
 		log = nil
-		h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+s"})
-		h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "a"})
+		h.pressKey("mod+s", 0)
+		h.pressKey("a", 0)
 		h.tree.Dispatch(driver.Event{Kind: driver.EventBack})
 		if !slices.Equal(log, want) {
 			t.Errorf("log = %q, want %q", log, want)
@@ -1565,22 +1565,22 @@ func TestConfinedKeysAndBacksFollowTheFocus(t *testing.T) {
 		h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: h.find(id).id})
 	}
 	hostOnly := []driver.KeyBinding{{Key: "mod+s", InText: true}}
-	if got := keymap(); !slices.Equal(got, hostOnly) {
+	if got := withoutIDs(keymap()); !slices.Equal(got, hostOnly) {
 		t.Errorf("with no focus, keymap = %+v", got)
 	}
 	press("host save", "host back")
 	focus("host-field")
-	if got := keymap(); !slices.Equal(got, hostOnly) {
+	if got := withoutIDs(keymap()); !slices.Equal(got, hostOnly) {
 		t.Errorf("focused outside, keymap = %+v", got)
 	}
 	press("host save", "host back")
 	focus("plugin-field")
-	if got, want := keymap(), []driver.KeyBinding{{Key: "mod+s", InText: true}, {Key: "mod+s", InText: true}, {Key: "a", InText: true}}; !slices.Equal(got, want) {
+	if got, want := withoutIDs(keymap()), []driver.KeyBinding{{Key: "mod+s", InText: true}, {Key: "mod+s", InText: true}, {Key: "a", InText: true}}; !slices.Equal(got, want) {
 		t.Errorf("focused inside, keymap = %+v, want %+v", got, want)
 	}
 	press("plugin save", "plugin a", "plugin back")
 	focus("host-field")
-	if got := keymap(); !slices.Equal(got, hostOnly) {
+	if got := withoutIDs(keymap()); !slices.Equal(got, hostOnly) {
 		t.Errorf("focused outside again, keymap = %+v", got)
 	}
 	press("host save", "host back")

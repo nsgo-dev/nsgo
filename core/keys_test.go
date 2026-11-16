@@ -9,31 +9,31 @@ import (
 
 func TestKeyBindingsFireAsTheirOptionsSay(t *testing.T) {
 	keymap := []driver.KeyBinding{
-		{Key: "down", InText: !EditsText("down")},
-		{Key: "mod+k", InText: !EditsText("mod+k")},
-		{Key: "mod+z", InText: true, Repeat: true},
+		{Key: "down", InText: !EditsText("down"), ID: 1},
+		{Key: "mod+k", InText: !EditsText("mod+k"), ID: 2},
+		{Key: "mod+z", InText: true, Repeat: true, ID: 3},
 	}
 	for _, c := range []struct {
 		names           []string
 		editing, repeat bool
-		key             string
+		id              uint32
 		consumed        bool
 	}{
-		{[]string{"down"}, false, false, "down", true},
-		{[]string{"down"}, true, false, "", false}, // the field moves its caret
-		{[]string{"mod+k", "meta+k"}, true, false, "mod+k", true},
-		{[]string{"mod+k", "meta+k"}, false, true, "", true}, // held: consumed, fires once
-		{[]string{"mod+z"}, true, true, "mod+z", true},
-		{[]string{"x"}, false, false, "", false},
+		{[]string{"down"}, false, false, 1, true},
+		{[]string{"down"}, true, false, 0, false}, // the field moves its caret
+		{[]string{"mod+k", "meta+k"}, true, false, 2, true},
+		{[]string{"mod+k", "meta+k"}, false, true, 0, true}, // held: consumed, fires once
+		{[]string{"mod+z"}, true, true, 3, true},
+		{[]string{"x"}, false, false, 0, false},
 	} {
 		var focus driver.KeyUse
 		if c.editing {
 			focus = driver.KeyUseText
 		}
-		key, consumed := driver.FindKey(keymap, c.names, focus, c.repeat)
-		if key != c.key || consumed != c.consumed {
-			t.Errorf("FindKey(%v, editing %v, repeat %v) = %q, %v; want %q, %v", c.names, c.editing, c.repeat,
-				key, consumed, c.key, c.consumed)
+		id, consumed := driver.FindKey(keymap, c.names, focus, c.repeat)
+		if id != c.id || consumed != c.consumed {
+			t.Errorf("FindKey(%v, editing %v, repeat %v) = %d, %v; want %d, %v", c.names, c.editing, c.repeat,
+				id, consumed, c.id, c.consumed)
 		}
 	}
 }
@@ -81,9 +81,10 @@ func TestBindingsYieldToTheFocusedControl(t *testing.T) {
 		{"down", slider, true}, {"down", driver.KeyUseText, false},
 		{"home", slider, true}, {"home", driver.KeyUseText, true}, {"shift+space", button, true},
 	} {
-		key, consumed := driver.FindKey(keymap, []string{c.name}, c.focus, false)
-		if fired := key == c.name && consumed; fired != c.fires || !fired && consumed {
-			t.Errorf("%s with focus %b = %q, %v; want firing %v", c.name, c.focus, key, consumed, c.fires)
+		id, consumed := driver.FindKey(keymap, []string{c.name}, c.focus, false)
+		i := slices.IndexFunc(keymap, func(b driver.KeyBinding) bool { return b.ID == id })
+		if fired := i >= 0 && keymap[i].Key == c.name && consumed; fired != c.fires || !fired && consumed {
+			t.Errorf("%s with focus %b = %d, %v; want firing %v", c.name, c.focus, id, consumed, c.fires)
 		}
 	}
 	if got := driver.FocusKeyUse(driver.KindInput, driver.RoleNone, false); got != driver.KeyUseText {
@@ -105,10 +106,119 @@ func TestAKeyRunsTheBindingThePlatformChose(t *testing.T) {
 		want  string
 	}{{driver.KeyUseAdjust | driver.KeyUsePress, "slider"}, {driver.KeyUsePress, "app"}, {0, "app"}} {
 		log = nil
-		h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "right", Count: uint32(c.focus)})
+		h.pressKey("right", c.focus)
 		if !slices.Equal(log, []string{c.want}) {
 			t.Errorf("right over focus %b ran %q, want %q", c.focus, log, c.want)
 		}
+	}
+}
+
+// TestAKeyRunsTheBindingThePlatformMatched holds the engine to run the binding the platform matched in a focused text input, a KeyAlways one, not a newer KeyAuto or KeyNotEditing binding of the key that does not fire there, and the newest one with no field focused (#204).
+func TestAKeyRunsTheBindingThePlatformMatched(t *testing.T) {
+	for _, key := range []string{"down", "escape", "enter"} {
+		for _, when := range []KeyWhen{KeyAuto, KeyNotEditing} {
+			var ran []string
+			h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+				cx.OnKeyWith(key, KeyOptions{When: KeyAlways}, func() { ran = append(ran, "always") })
+				cx.OnKeyWith(key, KeyOptions{When: when}, func() { ran = append(ran, "newer") })
+				return View{}
+			})
+			h.commit()
+			if !h.pressKey(key, driver.KeyUseText) {
+				t.Errorf("%s (%d) in a field: not consumed", key, when)
+			}
+			h.pressKey(key, 0)
+			if want := []string{"always", "newer"}; !slices.Equal(ran, want) {
+				t.Errorf("%s (%d), in a field and then not: ran %q, want %q", key, when, ran, want)
+			}
+		}
+	}
+}
+
+// TestAStaleKeyPressRunsOnlyItsBinding holds the engine to run, for a press the platform matched by a keymap that has changed since, the binding it matched or none: never one bound since, nor an older one of the key in place of one removed or resting (#204).
+func TestAStaleKeyPressRunsOnlyItsBinding(t *testing.T) {
+	var ran []string
+	var newer, covered *Signal[bool]
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		newer, covered = NewSignal(cx, true), NewSignal(cx, false)
+		cx.OnKey("down", func() { ran = append(ran, "older") })
+		return View{Children: []Node{
+			Show{When: newer.Get, Then: func(cx *Scope) Node {
+				cx.OnKey("down", func() { ran = append(ran, "newer") })
+				return View{}
+			}},
+			Show{When: covered.Get, Then: func(cx *Scope) Node { return Modal{Children: []Node{Text{Content: "dialog"}}} }},
+		}}
+	})
+	h.commit()
+	match := func() uint32 {
+		id, _ := driver.FindKey(h.tree.keymap(), []string{"down"}, 0, false)
+		return id
+	}
+	// The newer binding is matched, then removed before the press arrives: nothing runs, not the older one.
+	id := match()
+	newer.Set(false)
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+	if len(ran) != 0 {
+		t.Fatalf("a press matched to a removed binding ran %q", ran)
+	}
+	// The older binding is matched, then a newer one of the key comes: the matched one runs.
+	id = match()
+	newer.Set(true)
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+	if want := []string{"older"}; !slices.Equal(ran, want) {
+		t.Fatalf("a press matched before a newer binding came ran %q, want %q", ran, want)
+	}
+	// The newer binding is matched, then a modal covers it: it rests, and nothing runs.
+	ran = nil
+	id = match()
+	covered.Set(true)
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Count: 0})
+	if len(ran) != 0 {
+		t.Fatalf("a press matched to a binding a modal has since covered ran %q", ran)
+	}
+}
+
+// TestKeyIDsAreNotReused holds every binding to a new ID, so a press matched to one gone cannot run one bound in its place.
+func TestKeyIDsAreNotReused(t *testing.T) {
+	var on *Signal[bool]
+	seen := map[uint32]bool{}
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		on = NewSignal(cx, true)
+		return Show{When: on.Get, Then: func(cx *Scope) Node {
+			cx.OnKey("down", func() {})
+			return View{}
+		}}
+	})
+	for range 3 {
+		keys := h.tree.keymap()
+		h.commit()
+		if len(keys) != 1 || keys[0].ID == 0 || seen[keys[0].ID] {
+			t.Fatalf("keymap %+v after IDs %v", keys, seen)
+		}
+		seen[keys[0].ID] = true
+		on.Set(false)
+		h.commit()
+		on.Set(true)
+		h.commit()
+	}
+}
+
+// A held key repeats as the binding the platform matched says, not as the newest of the key does (#204).
+func TestARepeatFollowsTheMatchedBinding(t *testing.T) {
+	keymap := []driver.KeyBinding{
+		{Key: "down", InText: true, Repeat: true, ID: 1},
+		{Key: "down", ID: 2},
+	}
+	if id, consumed := driver.FindKey(keymap, []string{"down"}, driver.KeyUseText, true); id != 1 || !consumed {
+		t.Errorf("held in a field = %d, %v; want the repeating binding 1", id, consumed)
+	}
+	if id, consumed := driver.FindKey(keymap, []string{"down"}, 0, true); id != 0 || !consumed {
+		t.Errorf("held with no field = %d, %v; want consumed without firing", id, consumed)
 	}
 }
 
@@ -152,6 +262,24 @@ func TestBackGoesToTheNewestHandlerThatTakesIt(t *testing.T) {
 	if want := []string{"inner passes", "outer", "outer"}; !slices.Equal(log, want) {
 		t.Fatalf("log = %q, want %q", log, want)
 	}
+}
+
+// pressKey is what a platform does with a press of the key name while the focused view uses focus: it matches the press by the keymap the core sends (driver.FindKey) and reports the binding that fires, if any, by its ID. It returns whether the press is consumed.
+func (h *host) pressKey(name string, focus driver.KeyUse) bool {
+	id, consumed := driver.FindKey(h.tree.keymap(), []string{name}, focus, false)
+	if id != 0 {
+		h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+	}
+	return consumed
+}
+
+// withoutIDs is keys with their IDs cleared, to compare the rest.
+func withoutIDs(keys []driver.KeyBinding) []driver.KeyBinding {
+	out := slices.Clone(keys)
+	for i := range out {
+		out[i].ID = 0
+	}
+	return out
 }
 
 // sentKeys returns the keys of the keymap batch b sends, and whether it sends one.
@@ -207,7 +335,7 @@ func TestKeysFollowVisibleModals(t *testing.T) {
 	press := func(keys ...string) {
 		t.Helper()
 		for _, k := range keys {
-			h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: k})
+			h.pressKey(k, 0)
 		}
 	}
 	keys, _ := sentKeys(h.commit())
@@ -259,7 +387,7 @@ func TestKeysAndBackFollowHolderPlacement(t *testing.T) {
 			t.Fatalf("pane %s shows, keymap = %q", name, keys)
 		}
 		ran = nil
-		h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "down"})
+		h.pressKey("down", 0)
 		h.tree.Dispatch(driver.Event{Kind: driver.EventBack})
 		want := []string{name + " down", name + " back"}
 		if !slices.Equal(ran, want) {
@@ -299,7 +427,7 @@ func TestRootKeysSurviveDeeperUnplacedContent(t *testing.T) {
 	if keys, _ := sentKeys(h.commit()); !slices.Equal(keys, []string{"x"}) {
 		t.Fatalf("keymap = %q, want the app's x", keys)
 	}
-	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "x"})
+	h.pressKey("x", 0)
 	if root != 1 {
 		t.Fatalf("root binding ran %d times with a deeper unplaced holder, want 1", root)
 	}
@@ -328,12 +456,12 @@ func TestKeysFollowDisplayNone(t *testing.T) {
 	if keys, sent := sentKeys(h.commit()); !sent || len(keys) != 0 {
 		t.Fatalf("hidden: keymap = %q (sent %v), want an empty one", keys, sent)
 	}
-	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "down"})
+	h.pressKey("down", 0)
 	hidden.Set(false)
 	if keys, _ := sentKeys(h.commit()); !slices.Equal(keys, []string{"down"}) {
 		t.Fatalf("shown again: keymap = %q", keys)
 	}
-	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "down"})
+	h.pressKey("down", 0)
 	if ran != 1 {
 		t.Fatalf("ran %d, want 1: only while shown", ran)
 	}
@@ -355,7 +483,7 @@ func TestKeysFollowTheTopScreen(t *testing.T) {
 		t.Helper()
 		log = nil
 		h.commit()
-		h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "down"})
+		h.pressKey("down", 0)
 		if !slices.Equal(log, want) {
 			t.Fatalf("log = %q, want %q", log, want)
 		}

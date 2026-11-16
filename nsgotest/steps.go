@@ -769,10 +769,9 @@ func (a *App) Key(key string) {
 	k := driver.NormalizeKey(key)
 	a.inputBy(driver.ModalityKeyboard)
 	names := a.keyNames(k)
-	focus := a.focusKeyUse()
-	if binding, consumed := driver.FindKey(a.keyBindings, names, focus, false); consumed {
-		if binding != "" {
-			a.dispatch(driver.Event{Kind: driver.EventKey, Text: binding, Count: uint32(focus)})
+	if id, consumed := driver.FindKey(a.keyBindings, names, a.focusKeyUse(), false); consumed {
+		if id != 0 {
+			a.dispatch(driver.Event{Kind: driver.EventKey, Count: id})
 		}
 		a.done()
 		return

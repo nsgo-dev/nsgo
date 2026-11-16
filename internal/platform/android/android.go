@@ -1390,6 +1390,8 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 					flags |= 2
 				}
 				w.byte(flags | byte(k.Yields)<<2)
+				// The ID EventKey reports when the binding fires.
+				w.u32(k.ID)
 			}
 		case driver.ItemStatusBar:
 			c := it.StatusBar

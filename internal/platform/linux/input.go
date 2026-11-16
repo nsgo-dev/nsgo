@@ -805,9 +805,9 @@ func (w *window) shortcut(keyval, state uint32, repeat bool) bool {
 	if editing {
 		focus = driver.KeyUseText
 	}
-	if key, consumed := driver.FindKey(w.keys, names, focus, repeat); consumed {
-		if key != "" {
-			w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: key, Count: uint32(focus)})
+	if id, consumed := driver.FindKey(w.keys, names, focus, repeat); consumed {
+		if id != 0 {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
 		}
 		return true
 	}

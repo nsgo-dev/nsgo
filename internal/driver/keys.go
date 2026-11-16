@@ -47,7 +47,7 @@ type KeyBinding struct {
 	Repeat bool
 	// Yields are the focused controls it gives its key to, a subset of what KeyUsedBy says for the key: it takes no press while such a control has the keyboard focus, which an older binding of the key or the control then takes.
 	Yields KeyUse
-	// ID is a global shortcut's (ItemHotKeys), which EventHotKey reports.
+	// ID names the binding: an in-app binding's (ItemKeymap), which EventKey reports when the platform matches it, or a global shortcut's (ItemHotKeys), which EventHotKey reports. The engine never gives an in-app ID to another binding, so a press matched by a keymap that has since changed runs the binding it matched or none.
 	ID uint32
 }
 
@@ -124,17 +124,17 @@ func (b KeyBinding) FiresOver(focus KeyUse) bool {
 	return (focus&KeyUseText == 0 || b.InText) && focus&b.Yields == 0
 }
 
-// FindKey says what a key press does with keymap: names are the press's normalized names (with "mod" and with the literal modifier), focus the keys the view with the keyboard focus uses itself (FocusKeyUse, KeyUseText alone for a backend that knows only whether a text input or web view has it), and repeat whether it is a held key's auto-repeat. A binding takes no press from a focused text input or web view unless InText, nor from a focused control whose keys it Yields. It returns the binding that fires, or "" and whether the press is consumed anyway: the repeat of a binding that fires once.
-func FindKey(keymap []KeyBinding, names []string, focus KeyUse, repeat bool) (key string, consumed bool) {
+// FindKey says what a key press does with keymap: names are the press's normalized names (with "mod" and with the literal modifier), focus the keys the view with the keyboard focus uses itself (FocusKeyUse, KeyUseText alone for a backend that knows only whether a text input or web view has it), and repeat whether it is a held key's auto-repeat. A binding takes no press from a focused text input or web view unless InText, nor from a focused control whose keys it Yields. It returns the ID of the binding that fires, or 0, and whether the press is consumed: a binding fires, or a held key's repeat is taken by a binding that fires once.
+func FindKey(keymap []KeyBinding, names []string, focus KeyUse, repeat bool) (id uint32, consumed bool) {
 	for i := len(keymap) - 1; i >= 0; i-- {
 		b := keymap[i]
 		if !slices.Contains(names, b.Key) || !b.FiresOver(focus) {
 			continue
 		}
 		if repeat && !b.Repeat {
-			return "", true
+			return 0, true
 		}
-		return b.Key, true
+		return b.ID, true
 	}
-	return "", false
+	return 0, false
 }
