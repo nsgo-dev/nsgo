@@ -137,12 +137,9 @@ func main() {
 		t.Error("upgrade kept a dropped extension")
 	}
 	uninstaller := filepath.Join(installed, "Uninstall.exe")
-	cmd := exec.CommandContext(t.Context(), uninstaller)
-	// Use the same silent invocation as the shipped install script. The
-	// private _?= mode is only needed when an uninstaller is launched from a
-	// temporary copy; with a spaced install directory it also makes NSIS
-	// parse the path as two arguments and return 0xffffffff.
-	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `"` + uninstaller + `" /S`}
+	// Use the same silent invocation as the shipped install script. Let Go
+	// quote the spaced executable path and pass /S as a real argument.
+	cmd := exec.CommandContext(t.Context(), uninstaller, "/S")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("uninstall: %v\n%s", err, out)
 	}
