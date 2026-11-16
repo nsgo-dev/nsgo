@@ -61,7 +61,7 @@ type Plugin struct {
 // export as a function.
 var ErrNoExport = errors.New("tsx: the plugin exports no such function")
 
-// Load runs package p as a plugin under cx, within s as View runs it, and returns it once its entry module ran, or what that threw, ErrUnisolated on the web as View panics with it. Call it on the engine's goroutine.
+// Load runs package p as a plugin under cx, within s as View runs it, and returns it once its entry module ran, or a nil Plugin and what that threw, which goes to no Catch above cx and not to the app's report, or ErrUnisolated on the web as View panics with it. Call it on the engine's goroutine.
 func Load(cx *core.Scope, p *pkg.Package, s Sandbox) (plugin *Plugin, err error) {
 	s = s.of(p)
 	// Refused before the scope runs it, which would send the panic to a Catch rather than to the caller.
@@ -69,18 +69,24 @@ func Load(cx *core.Scope, p *pkg.Package, s Sandbox) (plugin *Plugin, err error)
 		return nil, err
 	}
 	inner := cx.Child()
-	defer func() {
-		if x := recover(); x != nil {
-			inner.Dispose()
-			if e, ok := x.(error); ok {
-				err = e
-			} else {
-				err = fmt.Errorf("tsx: the plugin failed as it loaded: %v", x)
-			}
-		}
-	}()
 	var r *runtime
-	inner.Run(func() { r = s.start(inner, p.App.ID, p.Source()) })
+	inner.Run(func() {
+		// Recovered here, inside the scope's run: past it, core would send what the entry module threw to a Catch above cx or to the app's report, and Load would return nothing of it. Disposed before the run ends, so nothing the module set up runs after it failed.
+		defer func() {
+			if x := recover(); x != nil {
+				inner.Dispose()
+				if e, ok := x.(error); ok {
+					err = e
+				} else {
+					err = fmt.Errorf("tsx: the plugin failed as it loaded: %v", x)
+				}
+			}
+		}()
+		r = s.start(inner, p.App.ID, p.Source())
+	})
+	if err != nil {
+		return nil, err
+	}
 	plugin = &Plugin{r: r, cx: inner}
 	plugin.exports, _ = r.vm.Get(exportsGlobal).(*js.Object)
 	return plugin, nil

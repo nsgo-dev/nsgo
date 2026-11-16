@@ -590,3 +590,38 @@ export const notAFunction = 1;`, pkg.Capabilities{Network: &pkg.Network{Hosts: [
 		t.Fatal("a closed plugin was called")
 	}
 }
+
+// TestLoadReturnsEntryModuleError holds Load to returning what a package's entry module throws as it loads, to its caller alone: no Catch above the scope and no app report sees it, and nothing the module set up before it threw runs after.
+func TestLoadReturnsEntryModuleError(t *testing.T) {
+	for _, c := range []struct{ name, source, want string }{
+		{"an error", `setTimeout(() => { throw new Error("a timer of a failed plugin ran"); }, 10);
+export function add(a, b) { return a + b; }
+throw new Error("entry failed");`, "entry failed"},
+		{"a value", `throw "entry threw a string";`, "entry threw a string"},
+	} {
+		p := verified(t, c.source, pkg.Capabilities{})
+		var plugin *tsx.Plugin
+		var loadErr error
+		var caught []error
+		app := nsgotest.Start(t, tsx.WithFetcher(func(cx *core.Scope) core.Node {
+			return core.Catch{Try: func(cx *core.Scope) core.Node {
+				plugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{WebUnisolated: true})
+				return core.View{}
+			}, Fallback: func(cx *core.Scope, err error, _ func()) core.Node {
+				caught = append(caught, err)
+				return core.View{}
+			}}
+		}, network))
+		app.Advance(time.Second)
+		if plugin != nil {
+			t.Errorf("%s: Load returned a plugin for a throwing entry module", c.name)
+		}
+		var panicked *core.PanicError
+		if loadErr == nil || !strings.Contains(loadErr.Error(), c.want) || errors.As(loadErr, &panicked) {
+			t.Errorf("%s: Load returned %v, want what the module threw, %q", c.name, loadErr, c.want)
+		}
+		if len(caught) != 0 {
+			t.Errorf("%s: the Catch above the plugin caught %v", c.name, caught)
+		}
+	}
+}
