@@ -83,7 +83,7 @@ func (rt *runtime) unpark(p *parking) {
 
 // RootOptions connect a graph to its host, an engine or a test driver.
 type RootOptions struct {
-	// CheckCommits compares incremental commits with a full layout and panics on changes the incremental pass missed. Tests enable it; performance measurements leave it off for their own graph.
+	// CheckCommits compares incremental commits with a full layout and panics on changes the incremental pass missed. Tests enable it; performance measurements leave it off for their own graph. In a test build (nsgotest or nsgocheck) it also records the goroutine that calls NewRoot as the graph's owner and panics when another goroutine writes to the graph, commits it or runs code in it; a development build (nsgodev) checks every native graph whatever this says.
 	CheckCommits bool
 	// Post runs fn on the graph's goroutine later. It must be safe to
 	// call from any goroutine and must not block.
@@ -124,7 +124,7 @@ func NewRoot(opts RootOptions) *Scope {
 	if opts.Clock == nil {
 		opts.Clock = SystemClock{}
 	}
-	rt := &runtime{post: opts.Post, clock: opts.Clock, report: opts.Report, checkCommits: opts.CheckCommits,
+	rt := &runtime{graphOwner: newGraphOwner(opts.CheckCommits), post: opts.Post, clock: opts.Clock, report: opts.Report, checkCommits: opts.CheckCommits,
 		store: opts.Storage, secrets: opts.Secrets, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
 		requestFrame: opts.RequestFrame, windows: opts.Windows, takesHotKeys: opts.HotKeys, tray: opts.Tray}
 	rt.root = &Scope{rt: rt}
@@ -140,6 +140,8 @@ func NewRoot(opts RootOptions) *Scope {
 const maxRuns = 1_000_000
 
 type runtime struct {
+	graphOwner
+	aborted      bool // fault recovery must never schedule another computation
 	checkCommits bool
 	classCache   parseCache[classSource, *classList]
 	templates    parseCache[GridTracks, *gridTemplate]
@@ -293,6 +295,7 @@ func (cx *Scope) Child() *Scope {
 // Dispose disposes everything the scope owns, runs its cleanups and
 // cancels its Context.
 func (cx *Scope) Dispose() {
+	cx.rt.check()
 	if cx.disposed {
 		return
 	}
@@ -328,6 +331,18 @@ func (cx *Scope) Dispose() {
 		}
 		cx.prev, cx.next = nil, nil
 	}
+}
+
+// Abort implements internal/engine's fault shutdown: stop scheduling work, then dispose the graph and cancel its resources. Only a root may abort. Cleanups still run, but cannot restart effects on a partially committed tree.
+func (cx *Scope) Abort() {
+	cx.rt.check()
+	if cx != cx.rt.root {
+		panic("core: only the root scope can abort a graph")
+	}
+	cx.rt.aborted = true
+	// Detach before cleanups, even if a damaged graph cannot finish disposal.
+	cx.rt.detachHost()
+	cx.Dispose()
 }
 
 // Disposed reports whether the scope has been disposed.
@@ -492,6 +507,7 @@ func (cx *Scope) AfterFunc(d time.Duration, fn func()) (stop func() bool) {
 // Untrack runs fn without subscribing the running computation to what
 // it reads.
 func (cx *Scope) Untrack(fn func()) {
+	cx.rt.check()
 	rt := cx.rt
 	prev := rt.observer
 	rt.observer = nil
@@ -504,6 +520,7 @@ func (cx *Scope) Untrack(fn func()) {
 // without belonging to it, as a promise's continuation the tsx package's
 // VM runs as a JS call returns.
 func (cx *Scope) PauseTracking() (resume func()) {
+	cx.rt.check()
 	rt := cx.rt
 	prev := rt.observer
 	rt.observer = nil
@@ -519,6 +536,7 @@ func Untracked[T any](cx *Scope, fn func() T) (v T) {
 
 // Batch runs fn and then the effects its writes scheduled, once each.
 func (cx *Scope) Batch(fn func()) {
+	cx.rt.check()
 	rt := cx.rt
 	rt.batch++
 	defer func() {
@@ -551,6 +569,10 @@ func (cx *Scope) renderEffect(fn func()) {
 
 // run runs fn under owner o, untracked, in a batch, catching panics.
 func (rt *runtime) run(o *Scope, fn func()) {
+	rt.check()
+	if rt.aborted {
+		return
+	}
 	prevOwner, prevObs := rt.owner, rt.observer
 	rt.owner, rt.observer = o, nil
 	defer func() { rt.owner, rt.observer = prevOwner, prevObs }()
@@ -572,7 +594,7 @@ func (rt *runtime) guard(o *Scope, fn func()) {
 	fn()
 }
 
-// PanicError is a panic recovered from app code.
+// PanicError is a panic recovered from app code or an engine's fault boundary.
 type PanicError struct {
 	Value any
 	Stack []byte
@@ -671,6 +693,7 @@ type computation struct {
 }
 
 func newComputation(owner *Scope, kind compKind, fn func() bool) *computation {
+	owner.rt.check()
 	c := &computation{fn: fn, kind: kind}
 	c.comp = c
 	owner.adopt(&c.Scope)
@@ -748,6 +771,10 @@ func (s *Scope) heldBack() *parking {
 // run recomputes c. Writes during the run are batched, and a write to
 // something c already read makes it run again.
 func (c *computation) run() {
+	c.rt.check()
+	if c.rt.aborted {
+		return
+	}
 	if driver.TraceCauses {
 		c.rt.noteRun(c.kind)
 	}
@@ -786,6 +813,10 @@ func (c *computation) run() {
 }
 
 func (rt *runtime) enqueue(c *computation) {
+	rt.check()
+	if rt.aborted {
+		return
+	}
 	if c.queued {
 		return
 	}
@@ -804,6 +835,10 @@ func (rt *runtime) maybeFlush() {
 }
 
 func (rt *runtime) flush() {
+	rt.check()
+	if rt.aborted {
+		return
+	}
 	rt.flushing = true
 	defer func() { rt.flushing = false }()
 	for {
@@ -930,6 +965,7 @@ type Signal[T any] struct {
 // NewSignal returns a signal holding v. Setting an equal value does
 // nothing.
 func NewSignal[T comparable](cx *Scope, v T) *Signal[T] {
+	cx.rt.check()
 	s := &Signal[T]{rt: cx.rt, value: v, equal: func(a, b T) bool { return a == b }}
 	if cx.rt.dev != nil {
 		devSignal(cx.devOwner(), s)
@@ -940,6 +976,7 @@ func NewSignal[T comparable](cx *Scope, v T) *Signal[T] {
 // NewSignalFunc returns a signal holding v that compares values with
 // equal; with a nil equal every Set notifies, as slices and maps need.
 func NewSignalFunc[T any](cx *Scope, v T, equal func(a, b T) bool) *Signal[T] {
+	cx.rt.check()
 	s := &Signal[T]{rt: cx.rt, value: v, equal: equal}
 	if cx.rt.dev != nil {
 		devSignal(cx.devOwner(), s)
@@ -954,10 +991,11 @@ func (s *Signal[T]) Get() T {
 }
 
 // GetUntracked returns the value without subscribing.
-func (s *Signal[T]) GetUntracked() T { return s.value }
+func (s *Signal[T]) GetUntracked() T { s.rt.check(); return s.value }
 
 // Set stores v and schedules the computations that read the signal.
 func (s *Signal[T]) Set(v T) {
+	s.rt.check()
 	if s.equal != nil && s.equal(s.value, v) {
 		return
 	}
@@ -975,7 +1013,7 @@ func (s *Signal[T]) Set(v T) {
 }
 
 // Update sets the value fn returns for the current one.
-func (s *Signal[T]) Update(fn func(T) T) { s.Set(fn(s.value)) }
+func (s *Signal[T]) Update(fn func(T) T) { s.rt.check(); s.Set(fn(s.value)) }
 
 func (s *Signal[T]) readers() *subscribers { return &s.subs }
 func (s *Signal[T]) refresh()              {}

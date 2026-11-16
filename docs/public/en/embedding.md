@@ -175,6 +175,8 @@ Register the component in the host: `app.register(component:)` and an `NSGoCompo
 
 `tokens` overrides the app's theme by role name (`accent`, `inset`, `raised`), in both appearances or in one; `cx.Palette()` sees them. The host also sets the locale, the text size, the appearance and the data directory, and hears the app's failures. `nsgo build -embed` writes no windows, menus or tray icons: those belong to the host.
 
+An internal panic on a view's engine goroutine stops that engine, destroys its attached surfaces and reports the panic and stack to the host's error listener (`nsgo.OnError` in Go). Other engines keep running; create a new view to restart the failed app. Ordinary app callback panics still go to the nearest `core.Catch` first.
+
 `examples/embed-ios`, `examples/embed-android`, `examples/embed-desktop` and `examples/embed-web` are the same app with each kind of host.
 
 ## Next

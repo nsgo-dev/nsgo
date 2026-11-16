@@ -51,6 +51,8 @@ go tool nsgo test
 
 Given a directory without `nsgo.yaml`, such as a library or the module's root, `test` takes every package under it; a directory may also end in `/...`, as Go's patterns do. It takes one directory, and stops with an error at a second: to test several, give it a directory above them, or run it once for each. `go tool nsgo check` takes packages the same way and vets them.
 
+Tests check reactive graph ownership: access signals and scopes on the app's goroutine, and use `cx.Post` from workers. A wrong-goroutine call panics with a `Scope.Post` diagnostic. Internal engine panics still fail tests; in a shipped app they stop the affected engine and report its stack to the host. Development builds also check ownership; release builds omit the check; WebAssembly development builds also omit the goroutine-ID assertion because browser callbacks may resume on a browser-managed goroutine.
+
 ## Run on a platform
 
 The same tests run in a real window with the platform's own input:

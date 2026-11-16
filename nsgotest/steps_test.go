@@ -39,12 +39,14 @@ func fails(t *testing.T, body func(tb testing.TB)) string {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		defer func() {
+			for i := len(f.cleanups) - 1; i >= 0; i-- {
+				f.cleanups[i]()
+			}
+		}()
 		body(f)
 	}()
 	<-done
-	for i := len(f.cleanups) - 1; i >= 0; i-- {
-		f.cleanups[i]()
-	}
 	return f.failure
 }
 

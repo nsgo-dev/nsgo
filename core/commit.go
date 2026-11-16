@@ -40,6 +40,7 @@ func (t *Tree) CommitShared() *driver.MountBatch { return t.commit(true) }
 const hiddenInk = driver.Color(0xffffff00)
 
 func (t *Tree) commit(shared bool) *driver.MountBatch {
+	t.rt.check()
 	if !t.changed {
 		t.activated = nil
 		return nil

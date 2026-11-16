@@ -51,7 +51,7 @@ The loader keeps a bridge per app in the global `NSGO_HOST` names (`internal/pla
 
 `engine.HostEnvironment` (a locale, a text size, light or dark) stands in for the platform's values: the engine applies it over each environment the platform reports, before a test's pin. The layout direction stays the system's, and an appearance the app forces still wins. Android writes the three into the environment its runtime reports instead.
 
-The host's theme overrides are `core.Tokens`: CSS colors by role name, `Values` in both appearances and `Dark` over them, which go over every theme's palette ([themes](themes.md#hosts)). `OnError` hears each failure `RootOptions.Report` does, and `DataDir` moves the app's data, storage and logs.
+The host's theme overrides are `core.Tokens`: CSS colors by role name, `Values` in both appearances and `Dark` over them, which go over every theme's palette ([themes](themes.md#hosts)). `OnError` hears each failure `RootOptions.Report` does, and `DataDir` moves the app's data, storage and logs. An internal panic on the engine goroutine also reaches `OnError` as `core.PanicError`, with its original value and stack. That engine stops and destroys its attached surfaces; other engines keep running. Pending waits finish, later posts are dropped and a later attachment is destroyed immediately. The host creates a new view to restart the app. Fault cleanup runs without scheduling more computations; a cleanup or error listener that panics is logged without stopping the remaining surfaces from being destroyed. A test engine, started with `engine.Options.CheckCommits`, re-panics after this cleanup.
 
 ## iOS
 

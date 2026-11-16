@@ -389,19 +389,23 @@ func TestAgentFollowsTheRegistry(t *testing.T) {
 func TestAgentWaitsForTheFirstWindow(t *testing.T) {
 	g := newAgent()
 	t.Cleanup(g.close)
-	root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild})
-	t.Cleanup(root.Dispose)
-	tree := core.NewTree(root, core.ApproxTextEngine{})
-	tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
-	tree.Mount(fixture(new(int)))
 	own := register(g, 0)
 	opened := make(chan struct{})
+	finished, disposed := make(chan struct{}), make(chan struct{})
+	defer func() { close(finished); <-disposed }()
 	go func() {
-		defer close(opened)
+		defer close(disposed)
+		root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild})
+		defer root.Dispose()
+		tree := core.NewTree(root, core.ApproxTextEngine{})
+		tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
+		tree.Mount(fixture(new(int)))
 		time.Sleep(300 * time.Millisecond)
 		live := &fakeLive{surface: register(g, 1), tree: tree}
 		opens(own)
 		live.commit()
+		close(opened)
+		<-finished
 	}()
 	var ws automation.WindowsResult
 	result(t, g, automation.Windows, nil, &ws)

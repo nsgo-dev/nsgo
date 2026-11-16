@@ -175,6 +175,8 @@ core.Native{
 
 `tokens` 按角色名覆盖应用主题（`accent`、`inset`、`raised`），可以只覆盖一种外观；`cx.Palette()` 会看到它们。宿主还设置语言、文本大小、外观和数据目录，并听到应用的失败。`nsgo build -embed` 不生成窗口、菜单或托盘图标：这些属于宿主。
 
+视图的引擎 goroutine 发生内部 panic 时，该引擎会停止，销毁它连接的所有界面，并向宿主的错误监听器（Go 中的 `nsgo.OnError`）报告 panic 和堆栈。其他引擎继续运行；要重启失败的应用，创建新的视图。普通应用回调的 panic 仍优先交给最近的 `core.Catch`。
+
 `examples/embed-ios`、`examples/embed-android`、`examples/embed-desktop` 和 `examples/embed-web` 是同一个应用配四种宿主。
 
 ## 下一步

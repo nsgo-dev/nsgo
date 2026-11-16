@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -94,7 +95,7 @@ type App = func(cx *core.Scope) core.Node
 
 // Options configure an engine.
 type Options struct {
-	// CheckCommits enables full-layout diagnostics for this engine only.
+	// CheckCommits enables full-layout diagnostics for this engine only. In a test or development build it also checks that only the engine's goroutine touches its graph, and it re-panics an internal fault after the fault's cleanup, so a test fails rather than only reporting it.
 	CheckCommits bool
 	// Size is the surface's size at start.
 	Size driver.Size
@@ -242,15 +243,16 @@ type Engine struct {
 
 // runner is what an app's surfaces share.
 type runner struct {
-	mu     sync.Mutex
-	event  func(driver.Event)
-	pin    func(driver.Environment) driver.Environment
-	raw    driver.Environment // the first surface's last, before pinning
-	host   HostEnvironment
-	queue  []message
-	wake   chan struct{}
-	done   chan struct{}
-	exited chan struct{}
+	mu      sync.Mutex
+	event   func(driver.Event)
+	pin     func(driver.Environment) driver.Environment
+	raw     driver.Environment // the first surface's last, before pinning
+	host    HostEnvironment
+	queue   []message
+	stopped bool // protected by mu; stopped engines reject new messages
+	wake    chan struct{}
+	done    chan struct{}
+	exited  chan struct{}
 	// quitted is closed once the OnQuit handlers returned.
 	quitted chan struct{}
 	once    sync.Once
@@ -359,7 +361,45 @@ func destroyed() *driver.MountBatch {
 }
 
 func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
-	defer close(e.exited)
+	// Establish the boundary before thread setup and the initial mount too.
+	surfaces := map[uint32]*surface{0: {p: p}}
+	var root *core.Scope
+	var pending []chan struct{}
+	var taken []message
+	report := func(err error) {
+		log.Printf("nsgo: the app failed: %v", err)
+		if opts.Host.OnError != nil {
+			opts.Host.OnError(err)
+		}
+	}
+	defer func() {
+		fault := recover()
+		var err error
+		if fault != nil {
+			err = &core.PanicError{Value: fault, Stack: debug.Stack()}
+		}
+		// Stop accepting work before cleanup callbacks can post any more.
+		e.stop()
+		for _, done := range pending {
+			close(done)
+		}
+		for _, m := range taken {
+			discardMessage(m)
+		}
+		if fault != nil {
+			if root != nil {
+				faultCleanup(root.Abort)
+			}
+			for _, s := range surfaces {
+				faultCleanup(func() { s.p.Mount(destroyed()) })
+			}
+			faultCleanup(func() { report(err) })
+		}
+		close(e.exited)
+		if fault != nil && opts.CheckCommits {
+			panic(fault)
+		}
+	}()
 	// Text engines such as Android's need the same OS thread each call.
 	runtime.LockOSThread()
 	if opts.Thread != nil {
@@ -375,29 +415,24 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 	}
 	// surfaces are the attached ones by ID, the first's 0; frameAsked is
 	// set while a display frame was asked for.
-	surfaces := map[uint32]*surface{}
+
 	frameAsked := false
 	requestFrame := func() {
 		frameAsked = true
 		// A window's display ticks; the first surface may have none.
-		for _, s := range surfaces {
-			if s.tree.ID() != 0 {
+		for id, s := range surfaces {
+			if id != 0 {
 				s.p.RequestFrame()
 				return
 			}
 		}
 		p.RequestFrame()
 	}
-	root := core.NewRoot(core.RootOptions{
+	root = core.NewRoot(core.RootOptions{
 		CheckCommits: opts.CheckCommits,
 		Post:         func(fn func()) { e.push(message{fn: fn}) },
 		Clock:        opts.Clock,
-		Report: func(err error) {
-			log.Printf("nsgo: the app failed: %v", err)
-			if opts.Host.OnError != nil {
-				opts.Host.OnError(err)
-			}
-		},
+		Report:       report,
 		// The platform owns the display frame: the engine only asks.
 		RequestFrame: requestFrame,
 		Storage:      opts.Storage,
@@ -410,7 +445,6 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		HotKeys:      opts.HotKeys,
 		Tray:         opts.Tray,
 	})
-	defer root.Dispose()
 	tree := core.NewTree(root, p)
 	e.tree = tree
 	tree.Resize(opts.Size, opts.Geometry)
@@ -503,22 +537,29 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		case <-e.done:
 			root.Quitting()
 			close(e.quitted)
+			root.Dispose()
 			return
 		}
 		// A push between a wake and the take that drained its message
 		// leaves a second wake and nothing to do: no pass for it.
-		taken := e.take()
+		taken = e.take()
 		if len(taken) == 0 {
 			continue
 		}
 		if perf != nil || trace != nil {
 			start = time.Now()
 		}
-		var completed []chan struct{}
-		for _, m := range taken {
+		// Keep every resize and sync wait until this entire pass commits, including resizes for a surface that closed or has not attached yet. A fault closes them too.
+		for i := range taken {
+			pending = append(pending, taken[i].resized...)
+			taken[i].resized = nil
+			if taken[i].synced != nil {
+				pending = append(pending, taken[i].synced)
+			}
+		}
+		for i, m := range taken {
 			switch {
 			case m.synced != nil:
-				completed = append(completed, m.synced)
 				continue
 			case m.frame:
 				frameAsked = false
@@ -530,6 +571,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			case m.hidden != nil:
 				root.Hiding()
 				close(m.hidden)
+				taken[i].hidden = nil
 				continue
 			case m.tokens != nil:
 				tree.SetTokens(*m.tokens)
@@ -541,13 +583,15 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 				}
 				continue
 			case m.attach != nil:
-				i := slices.IndexFunc(tree.Surfaces(), func(t *core.Tree) bool { return t.ID() == m.surface })
-				if i < 0 || tree.Surfaces()[i].Closed() {
+				surfaceIndex := slices.IndexFunc(tree.Surfaces(), func(t *core.Tree) bool { return t.ID() == m.surface })
+				if surfaceIndex < 0 || tree.Surfaces()[surfaceIndex].Closed() {
 					// It closed before its platform attached it.
 					m.attach.Mount(destroyed())
+					taken[i].attach = nil
 					continue
 				}
-				attach(tree.Surfaces()[i], m.attach)
+				attach(tree.Surfaces()[surfaceIndex], m.attach)
+				taken[i].attach = nil
 				if frameAsked {
 					m.attach.RequestFrame()
 				}
@@ -571,7 +615,6 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 						t.SetEnvironment(*m.env)
 					}
 				})
-				completed = append(completed, m.resized...)
 			case m.env != nil:
 				t.SetEnvironment(*m.env)
 			case m.at != nil:
@@ -581,9 +624,45 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			}
 		}
 		commit(start)
-		for _, done := range completed {
+		for _, done := range pending {
 			close(done)
 		}
+		pending = nil
+		taken = nil
+	}
+}
+
+// faultCleanup lets a broken cleanup or platform fail without preventing the remaining surfaces from being destroyed or masking the original fault.
+func faultCleanup(fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("nsgo: fault cleanup failed: %v\n%s", r, debug.Stack())
+		}
+	}()
+	fn()
+}
+
+func discardMessage(m message) {
+	for _, done := range m.resized {
+		close(done)
+	}
+	if m.hidden != nil {
+		close(m.hidden)
+	}
+	if m.attach != nil {
+		faultCleanup(func() { m.attach.Mount(destroyed()) })
+	}
+}
+
+func (e *Engine) stop() {
+	e.mu.Lock()
+	e.stopped = true
+	queued := e.queue
+	e.queue = nil
+	e.mu.Unlock()
+	e.once.Do(func() { close(e.done) })
+	for _, m := range queued {
+		discardMessage(m)
 	}
 }
 
@@ -599,6 +678,11 @@ func (e *Engine) push(m message) {
 // enqueue queues m for the engine's next pass. A mergeable event replaces one of the same kind for the same view still queued, a resize the last resize of the same surface with the geometry it carries, and a frame request the one still queued, so bursts cost one update each. A wheel's turns add up into the one queued. A surface's resize and environment still queued become one message, applied in one batch.
 func (e *Engine) enqueue(m message) {
 	e.mu.Lock()
+	if e.stopped {
+		e.mu.Unlock()
+		discardMessage(m)
+		return
+	}
 	merged := false
 	for i := range e.queue {
 		q := &e.queue[i]
