@@ -1501,6 +1501,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemSpeak:
 			apple.HandleSpeak(it.Count, *it.Speak, s.engine.Dispatch)
 			continue
+		case driver.ItemWebCookies:
+			apple.SetWebCookies(it.Count, *it.Cookies, s.engine.Dispatch)
+			continue
 		case driver.ItemSetClipboard:
 			pb := objc.ID(apple.Class("NSPasteboard")).Send(sel("generalPasteboard"))
 			pb.Send(sel("clearContents"))

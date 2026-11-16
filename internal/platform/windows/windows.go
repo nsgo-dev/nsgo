@@ -446,6 +446,7 @@ type window struct {
 	frameWanted, clockOn atomic.Bool
 	chrome               chrome
 	webs                 map[*webView]bool
+	cookies              *cookieView            // the hidden web view of the cookie requests, nil for none
 	cacheDir             string                 // where web views keep their profile
 	frames               []func(time.Time) bool // frame clients (onFrame)
 	// animator runs the animated values on the frame clock, whose times
@@ -1169,6 +1170,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemSpeak:
 			w.speak(it.Count, *it.Speak)
+			continue
+		case driver.ItemWebCookies:
+			w.setWebCookies(it.Count, *it.Cookies)
 			continue
 		case driver.ItemOpenSurface:
 			if it.Surface != nil {
@@ -2468,6 +2472,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		for wv := range w.webs {
 			wv.close()
 		}
+		w.closeCookieView()
 		w.revokeDrop()
 		for c := range w.hosts {
 			w.closeComponent(c)

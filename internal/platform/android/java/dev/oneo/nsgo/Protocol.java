@@ -34,6 +34,8 @@ final class Protocol {
     static final int RECORDING = 18;
     /** Reads, writes or deletes a secret: its number, a SECRET_* op, the service, the account and the value (Secrets). */
     static final int SECRET = 19;
+    /** Sets cookies in CookieManager: the surface and the request's count, then each cookie's URL and Set-Cookie value (webcookie.go). */
+    static final int COOKIES = 20;
 
     // Java to Go.
     static final int START = 1;
@@ -62,6 +64,8 @@ final class Protocol {
     static final int SECRET_REPLY = 19;
     /** A sensor session's report or coalesced sample: JSON (sensors.go). */
     static final int SENSOR_REPORT = 20;
+    /** Answers COOKIES: its surface and count, then an error, "" for none. */
+    static final int COOKIES_SET = 21;
 
     // What a SECRET message asks, as secrets.go has them.
     static final int SECRET_READ = 0;

@@ -80,6 +80,8 @@ const (
 	msgRecording = 18
 	// msgSecret reads, writes or deletes a secret in the runtime's keystore (secrets.go).
 	msgSecret = 19
+	// msgCookies sets cookies in the web views' CookieManager (webcookie.go).
+	msgCookies = 20
 
 	// Java to Go.
 	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
@@ -109,6 +111,8 @@ const (
 	msgSecretReply = 19
 	// msgSensorReport is a sensor session's report or coalesced packet (sensors.go).
 	msgSensorReport = 20
+	// msgCookiesSet answers a msgCookies (webcookie.go).
+	msgCookiesSet = 21
 )
 
 // The parts of an image view's request msgImage carries.
@@ -408,6 +412,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			time.Local = readTimeZone(&r)
 		case msgRecordingReport:
 			driver.ReportRecording(slices.Clone(payload))
+		case msgCookiesSet:
+			s.webCookiesSet(&r)
 		case msgDNS:
 			servers := make([]string, r.u32())
 			for i := range servers {
@@ -880,7 +886,7 @@ func (s *surface) Mount(b *driver.MountBatch) {
 
 // mount sends the batch of v's tree to Java, which names its surface, and loads the image sources it changed.
 func (s *surface) mount(v *treeView, b *driver.MountBatch) {
-	b = s.withoutAuthSessions(v.id, s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutDesktopItems(withoutEffects(b)))))
+	b = s.withoutWebCookies(v.id, s.withoutAuthSessions(v.id, s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutDesktopItems(withoutEffects(b))))))
 	// Android has no file manager an app can reveal in or trash through. The batch may be the engine's own, which a test's observer holds, so the items are filtered from a copy.
 	fileManager := func(it driver.MountItem) bool {
 		return it.Kind == driver.ItemRevealFile || it.Kind == driver.ItemTrashFile

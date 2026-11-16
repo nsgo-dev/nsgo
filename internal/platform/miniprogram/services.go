@@ -88,6 +88,9 @@ func (s *surface) service(it *driver.MountItem) {
 		s.engine.Dispatch(driver.Event{Kind: driver.EventLaunchAtLogin, Count: it.Count})
 	case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 		s.engine.Dispatch(driver.NoBiometric(it))
+	case driver.ItemWebCookies:
+		// A mini program's web-view component keeps the platform's own cookies.
+		s.engine.Dispatch(driver.NoWebCookies(it))
 	case driver.ItemAuthSession:
 		// A mini program signs in through its platform's own login (docs/roadmap.md).
 		if ev, ok := driver.NoAuthSession(it); ok {

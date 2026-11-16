@@ -360,6 +360,8 @@ const (
 	ItemSensor
 	// ItemPurchase asks the platform's store what Purchase says; the platform answers with EventPurchase carrying Count and Data a *PurchaseAnswer. The core sends none where the environment says no Purchases.
 	ItemPurchase
+	// ItemWebCookies adds or replaces Cookies in the persistent store the app's web views share; the platform answers with EventWebCookies carrying Count, Text why it failed.
+	ItemWebCookies
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -545,6 +547,8 @@ type MountItem struct {
 	Audio  *AudioRequest
 	// Auth is an ItemAuthSession's request.
 	Auth *AuthRequest
+	// Cookies is an ItemWebCookies' request.
+	Cookies *WebCookiesRequest
 	// AppleSignIn is an ItemSignInWithApple's request.
 	AppleSignIn *AppleSignInRequest
 	// Speak is an ItemSpeak's request.

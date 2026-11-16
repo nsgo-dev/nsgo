@@ -459,6 +459,10 @@ func (s *surface) apply(b *driver.MountBatch) {
 			// LocalAuthentication's biometric policy is not on watchOS.
 			s.engine.Dispatch(driver.NoBiometric(it))
 			continue
+		case driver.ItemWebCookies:
+			// watchOS has no WebKit.
+			s.engine.Dispatch(driver.NoWebCookies(it))
+			continue
 		case driver.ItemAuthSession:
 			// The SwiftUI host starts no ASWebAuthenticationSession yet (docs/roadmap.md).
 			if ev, ok := driver.NoAuthSession(it); ok {

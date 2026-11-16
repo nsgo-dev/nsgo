@@ -270,6 +270,18 @@ cx.AuthSession(func(redirect string) string {
 
 The redirect is `com.example.app:/oauth2redirect` where the system's session catches the scheme, which the app need not declare, and `http://127.0.0.1:<port>/oauth2redirect` on the desktops' loopback, so register both with the provider, often as clients of their own. Leave `Scheme` empty for loopback alone, or set it to `https` with `Host` for the app's associated domain, which iOS 17.4 and macOS 14.4 catch. A closed browser tab tells a loopback session nothing, so give it a `Timeout` or a cancel button. `Ephemeral` asks macOS and iOS not to share the browser's cookies. Android, tvOS, watchOS and mini programs answer `core.AuthUnavailable` for now. In TSX, `AuthSession.start(url, options)` needs the `auth_session` capability and gives a session whose `result` resolves with the callback, or null once cancelled.
 
+An app whose web views should be signed in as the user already is elsewhere, such as in their own browser, writes the cookies of that sign-in with `cx.SetWebCookies`, HttpOnly ones included, which page scripts cannot set, then loads the pages: done runs once the store holds them. The store is the persistent one every web view of the app shares, so cookies with an `Expires` outlive the app; Incognito views do not see them, except on Android, which keeps one store per app. The web, tvOS and watchOS answer `Unavailable`.
+
+```go
+cx.SetWebCookies([]core.WebCookie{
+	{Name: "SID", Value: sid, Domain: ".example.com", Expires: expires, Secure: true, HTTPOnly: true},
+}, func(err error) {
+	if err == nil {
+		page.Set(core.WebSrc("https://www.example.com/"))
+	}
+})
+```
+
 ## Sign in with Apple
 
 `cx.SignInWithApple` shows the system's Sign in with Apple sheet from the app's own button on macOS, iOS and tvOS, where `cx.Env().CanSignInWithApple()` is true. It answers once with the credential, or with an error: `core.AppleSignInCancelled` when the user closes the sheet, which is not a failure, else `AppleSignInFailed` or, on other platforms, `AppleSignInUnavailable`. Apple gives the email and the name only on the user's first sign-in to the app, so keep them then. `Nonce` goes into the request as its SHA-256 in lowercase hex, which the identity token's `nonce` claim holds: the server hashes the nonce it gave the app and compares. `cx.AppleCredentialState` tells whether the user has since revoked it.
