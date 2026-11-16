@@ -505,6 +505,9 @@ func (a *App) apply(b *driver.MountBatch) {
 				}
 			}
 		case driver.ItemFocus:
+			if !a.canFocus(v) {
+				continue
+			}
 			for _, o := range a.views {
 				if o != v {
 					a.setFocus(o, false)
@@ -783,6 +786,32 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 		}
 	}
+}
+
+// canFocus follows the platform's imperative focus contract. A command
+// to a plain view, a hidden stop or a view below a modal changes nothing.
+func (a *App) canFocus(v *View) bool {
+	if v == nil || v.disabled(nil) {
+		return false
+	}
+	if v.Kind != driver.KindInput && (!a.tabs() || !v.Props.FocusStop(v.Events)) {
+		return false
+	}
+	for p := v; p != nil; p = p.Parent {
+		if p.Style.Hidden {
+			return false
+		}
+		if p.ID == a.rootID {
+			shown := a.shown()
+			for i := len(shown) - 1; i >= 0; i-- {
+				if shown[i].Kind == driver.KindModal {
+					return v.within(shown[i])
+				}
+			}
+			return true
+		}
+	}
+	return false
 }
 
 // post has ev reach the app when it next settles, as a platform's answer

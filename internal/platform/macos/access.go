@@ -545,15 +545,13 @@ func accessibilityCustom(self objc.ID, _ objc.SEL, action objc.ID) bool {
 	return false
 }
 
-// focusAccessibility moves VoiceOver to v, and keyboard focus to a field.
+// focusAccessibility moves VoiceOver to v, and keyboard focus to its stop.
 func (v *view) focusAccessibility() {
 	target := v.native
 	if v.input != nil {
 		target = v.input.field
-		if w := v.native.Send(selWindow); w != 0 {
-			w.Send(selMakeFirstResponer, v.input.field)
-		}
 	}
+	v.focus()
 	info := objc.ID(apple.Class("NSDictionary")).Send(sel("dictionaryWithObject:forKey:"),
 		nsArray([]objc.ID{target}), apple.Global(appKitPath, "NSAccessibilityUIElementsKey"))
 	axPost()(target, apple.Global(appKitPath, "NSAccessibilityLayoutChangedNotification"), info)

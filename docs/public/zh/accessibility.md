@@ -64,7 +64,7 @@ core.Text{ContentFunc: func() string { return fmt.Sprintf("购物车里有 %d �
 
 ## 焦点与键盘
 
-在 macOS、Web 和 Apple TV 上，可按压的视图和文本框一起成为 Tab 停靠点；`NoFocus` 让一个视图退出，`Focusable` 让没有按压的视图成为停靠点。`Style.FocusVisible` 只在键盘移动焦点时绘制焦点环（`focus-visible:`），`Style.Focus` 对应任何焦点，`Style.FocusWithin` 对应视图内的焦点，`OnFocus` 和 `OnBlur` 听到焦点变化（获得焦点的视图离开树时也会收到 `OnBlur`），`Ref.Focus()` 和 `Ref.SetAccessibilityFocus()` 移动焦点。Return 和空格按下获得焦点的视图，方向键在标签列表、单选组和菜单中移动。键盘把焦点移到视图上时，它的 `Tooltip` 立即显示，直到焦点离开或按下 Escape。弹出层的 `OnOpen` 在内容就绪后运行，在其中调用 `Focus` 就能把焦点移进去，非模态对话框应当这样做；popover 的内容在 Tab 顺序中紧跟触发器，弹出层关闭时焦点回到触发器。
+在桌面、Web 和 Apple TV 上，可按压的视图和文本框一起成为 Tab 停靠点；`NoFocus` 让一个视图退出，`Focusable` 让没有按压的视图成为停靠点。`Style.FocusVisible` 只在键盘移动焦点时绘制焦点环（`focus-visible:`），`Style.Focus` 对应任何焦点，`Style.FocusWithin` 对应视图内的焦点，`OnFocus` 和 `OnBlur` 听到焦点变化（获得焦点的视图离开树时也会收到 `OnBlur`），`Ref.Focus()` 和 `Ref.SetAccessibilityFocus()` 移动焦点。Return 和空格按下获得焦点的视图，方向键在标签列表、单选组和菜单中移动。键盘把焦点移到视图上时，它的 `Tooltip` 立即显示，直到焦点离开或按下 Escape。弹出层的 `OnOpen` 在内容就绪后运行，在其中调用 `Focus` 就能把焦点移进去，非模态对话框应当这样做；popover 的内容在 Tab 顺序中紧跟触发器，弹出层关闭时焦点回到触发器。
 
 `cx.Env().ScreenReader()` 说明是否有屏幕阅读器运行，`cx.Env().ReduceMotion()` 说明用户是否要求减少动态效果，`cx.Env().IncreaseContrast()` 说明用户是否要求增强对比度（macOS、iOS 和 watchOS 的“增强对比度”、Windows 的对比度主题、GNOME 的高对比度、GTK 4.20 的对比度设置或高对比度 GTK 主题、Android 14 高于标准的对比度设置，Web 上的 `prefers-contrast: more` 或 `forced-colors: active`），`cx.Env().FontScale()` 是文本大小，`cx.Env().RTL()` 是布局方向。除非设置 `NoFontScaling`，文本会跟随文本大小；从右到左的布局使用逻辑边时会镜像物理边。
 

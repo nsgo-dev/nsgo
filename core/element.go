@@ -66,10 +66,10 @@ type View struct {
 	OnTouchCapture func(TouchEvent)
 	Responder      *Responder
 	// NoFocus keeps a view that takes presses out of the keyboard
-	// focus's Tab stops on macOS and the web: a backdrop that closes a
+	// focus's Tab stops on desktops and the web: a backdrop that closes a
 	// popover, rows a list moves through with the arrow keys.
 	NoFocus bool
-	// Focusable, when set, says whether the view is a Tab stop on macOS and
+	// Focusable, when set, says whether the view is a Tab stop on desktops and
 	// the web, over NoFocus and whether it takes presses, following what
 	// it reads: a chart in a pressable card takes keys while focused
 	// without taking presses of its own, and a group of radios keeps one
@@ -92,7 +92,7 @@ type View struct {
 	// once, rather than appearing with Create. A thumbnail and the page
 	// it opens into share one, so the picture travels between them.
 	MatchID string
-	// OnFocus and OnBlur follow the keyboard focus to and from a view that takes presses or is Focusable, on macOS and the web; a click presses without focusing. A focused view that leaves the tree hears OnBlur once, after the commit that removed it, or before the next view's OnFocus when the platform reports that first.
+	// OnFocus and OnBlur follow the keyboard focus to and from a view that takes presses or is Focusable, on desktops and the web; a click presses without focusing. A focused view that leaves the tree hears OnBlur once, after the commit that removed it, or before the next view's OnFocus when the platform reports that first.
 	OnFocus func()
 	OnBlur  func()
 	// OnFocusIn and OnFocusOut hear the keyboard focus come to the view or a view inside it from elsewhere, and leave them: a move inside the view is neither, as CSS's :focus-within sees it. A view that stays hears OnFocusOut as the focused view inside it leaves the tree.
@@ -622,7 +622,10 @@ func (r *Ref) Frame() (Bounds, bool) {
 	return r.n.frame, true
 }
 
-// Focus moves keyboard focus to the element, a text field. Under a confined owner it does only as Scope.Confine allows. It does nothing in unplaced Holder content, with no focus deferred until it is placed again.
+// Focus moves keyboard focus to a text field or, on desktops, the web
+// and Apple TV, an enabled pressable or Focusable view. Plain, hidden and
+// NoFocus views and views below a modal do not take focus. Under a confined
+// owner it does only as Scope.Confine allows. It does nothing in unplaced Holder content, with no focus deferred until it is placed again.
 func (r *Ref) Focus() {
 	if r.placed() && r.t.mayMoveFocus(r.n.owner) {
 		r.t.command(driver.ItemFocus, r.n)

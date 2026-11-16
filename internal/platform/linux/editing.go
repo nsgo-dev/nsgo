@@ -510,6 +510,7 @@ func (w *window) focusedEntry() *view { return w.focus }
 // focusEntry moves keyboard focus to v's editor, or away from the
 // focused one when v is nil.
 func (w *window) focusEntry(v *view) {
+	w.setControlFocus(nil)
 	if v != nil && v.entry != 0 {
 		if v.textView != 0 {
 			gtkWidgetGrabFocus(v.textView)
@@ -665,6 +666,7 @@ func entryFocusCallback(entry uintptr, pspec uintptr, data uintptr) {
 		return
 	}
 	if gtkWidgetHasFocus(entry) != 0 {
+		w.setControlFocus(nil)
 		w.focus = v
 		if v.events.Has(driver.EventFocus) {
 			w.engine.Dispatch(driver.Event{Kind: driver.EventFocus, ID: v.id})

@@ -138,7 +138,7 @@ var (
 	gtkWidgetQueueDraw                     func(uintptr)
 	gtkWidgetQueueAllocate                 func(uintptr)
 	gtkWidgetGetMapped                     func(uintptr) int32
-	gtkWidgetGrabFocus                     func(uintptr)
+	gtkWidgetGrabFocus                     func(uintptr) int32
 	gtkWidgetGetRoot                       func(uintptr) uintptr
 	gtkWidgetSetFocusable                  func(uintptr, int32)
 	gtkWidgetGetWidth                      func(uintptr) int32

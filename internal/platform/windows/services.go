@@ -113,6 +113,9 @@ func (w *window) setKeymap(keys []driver.KeyBinding) { w.keys = keys }
 // the app's own first, as driver.FindKey decides for a focused field and a
 // held key (lParam's repeat bit), then the application menu's.
 func (w *window) shortcut(vk, lParam uintptr) bool {
+	if w.controlKey(vk, lParam) {
+		return true
+	}
 	if len(w.keys) == 0 && len(w.chrome.keys) == 0 {
 		return false
 	}

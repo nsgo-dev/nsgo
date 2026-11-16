@@ -1239,6 +1239,8 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemFocus:
 			if v.input != nil {
 				v.input.field.Send(selBecomeFirst)
+			} else if v.focusable() {
+				s.focusView(v)
 			}
 		case driver.ItemBlur:
 			if v.input != nil {

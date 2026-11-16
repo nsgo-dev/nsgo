@@ -25,7 +25,7 @@ func focusMethods() []objc.MethodDef {
 		// Only the view itself takes the focus: the holder of its children (an effect's or a clip's container) is no second Tab stop.
 		{Cmd: sel("acceptsFirstResponder"), Fn: func(self objc.ID, _ objc.SEL) bool {
 			v := views[self]
-			return v != nil && v.native == self && v.focusable() && !v.surface.clicking()
+			return v != nil && v.native == self && v.focusable() && (v.surface.focusRequest || !v.surface.clicking())
 		}},
 		{Cmd: sel("canBecomeKeyView"), Fn: func(self objc.ID, _ objc.SEL) bool {
 			v := views[self]
@@ -85,8 +85,11 @@ func activates(event objc.ID) bool {
 
 // focusable reports whether v may take the keyboard focus.
 func (v *view) focusable() bool {
-	if v.native == 0 || !v.pressable() && !v.props.Focusable || v.props.Disabled || v.props.NoFocus || v.kind == driver.KindInput ||
-		objc.Send[bool](v.native, sel("isHiddenOrHasHiddenAncestor")) || v.native.Send(selWindow) == 0 {
+	return v.kind != driver.KindInput && v.props.FocusStop(v.events) && v.inFocusScope()
+}
+
+func (v *view) inFocusScope() bool {
+	if v.native == 0 || objc.Send[bool](v.native, sel("isHiddenOrHasHiddenAncestor")) || v.native.Send(selWindow) == 0 {
 		return false
 	}
 	if n := len(v.surface.modals); n > 0 {
@@ -113,6 +116,41 @@ func (s *surface) tabFromSurface(backward bool) {
 		action = "selectKeyViewPrecedingView:"
 	}
 	s.window.Send(sel(action), root.native)
+}
+
+// focus moves the first responder to a field or a keyboard stop. Clearing
+// the field editor first also lets a command issued by a mouse press move
+// focus: acceptsFirstResponder otherwise keeps that click in the editor.
+func (v *view) focus() {
+	if !v.inFocusScope() {
+		return
+	}
+	if v.input != nil {
+		if !v.props.Disabled && !v.input.fs.Config.Disabled {
+			v.input.focus()
+		}
+		return
+	}
+	if !v.focusable() {
+		return
+	}
+	w := v.native.Send(selWindow)
+	if w.Send(sel("firstResponder")) == v.native {
+		return
+	}
+	w.Send(selMakeFirstResponer, objc.ID(0))
+	v.surface.focusRequest = true
+	defer func() { v.surface.focusRequest = false }()
+	w.Send(selMakeFirstResponer, v.native)
+}
+
+// blur takes focus only from this view, leaving another responder alone.
+func (v *view) blur() {
+	if v.input != nil {
+		v.input.unfocus()
+	} else if w := v.native.Send(selWindow); w != 0 && w.Send(sel("firstResponder")) == v.native {
+		w.Send(selMakeFirstResponer, objc.ID(0))
+	}
 }
 
 // clicking reports whether the window is handling a mouse press, which

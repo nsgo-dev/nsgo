@@ -259,6 +259,7 @@ type surface struct {
 	// What a batch touched, finished once its frames are set.
 	images, presenting []*view
 	modals             []*view // the modals shown, oldest first, for the keyboard focus
+	focusRequest       bool    // an explicit focus command may run during a click
 	fieldEditor        objc.ID // NSGo's field editor of the window, made as a field first edits
 	// stale are the views whose content changed out of sight.
 	stale []*view
@@ -1524,6 +1525,7 @@ func (s *surface) RequestFrame() {
 func (s *surface) apply(b *driver.MountBatch) {
 	defer func() { s.openFrame = driver.WindowFrame{} }()
 	s.batch++
+	var focus []driver.MountItem
 	var lb *layoutBatch
 	if b.LayoutAnimation != nil && !s.env.ReduceMotion {
 		lb = &layoutBatch{anim: b.LayoutAnimation, created: map[driver.NodeID]bool{}, deleted: map[objc.ID]bool{}}
@@ -1889,14 +1891,8 @@ func (s *surface) apply(b *driver.MountBatch) {
 			v.configureScroll(it.Scroll)
 		case driver.ItemScrollContent:
 			v.setContent(it.Size)
-		case driver.ItemFocus:
-			if v.input != nil {
-				v.input.focus()
-			}
-		case driver.ItemBlur:
-			if w := v.native.Send(selWindow); w != 0 {
-				w.Send(selMakeFirstResponer, objc.ID(0))
-			}
+		case driver.ItemFocus, driver.ItemBlur:
+			focus = append(focus, *it)
 		}
 	}
 	s.root = b.Root
@@ -1904,6 +1900,15 @@ func (s *surface) apply(b *driver.MountBatch) {
 		s.native.Send(selAddSubview, root.native)
 	}
 	s.finish()
+	for _, it := range focus {
+		if v := s.views[it.ID]; v != nil {
+			if it.Kind == driver.ItemFocus {
+				v.focus()
+			} else {
+				v.blur()
+			}
+		}
+	}
 	s.revisit()
 	s.refreshSelection()
 	if s.repick {

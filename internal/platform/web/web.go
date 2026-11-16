@@ -1699,10 +1699,14 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemFocus:
 			if v.kind == driver.KindInput {
 				v.inner.Call("focus")
+			} else if v.props.FocusStop(v.events) {
+				v.el.Call("focus")
 			}
 		case driver.ItemBlur:
 			if v.kind == driver.KindInput {
 				v.inner.Call("blur")
+			} else {
+				v.el.Call("blur")
 			}
 		}
 	}

@@ -558,8 +558,8 @@ func TestFocusFailsOnStopsThatTakeNoFocus(t *testing.T) {
 		{"id:disabledfield", []Option{mac}, "is disabled"},
 		{"id:disabled", []Option{mac}, "is disabled"},
 		{"id:nofocus", []Option{mac}, "NoFocus"},
-		{"id:save", nil, "macOS or web environment"},
-		{"id:save", []Option{Environment(driver.Environment{OS: driver.OSWindows})}, "macOS or web environment"},
+		{"id:save", nil, "desktop or web environment"},
+		{"id:save", []Option{Environment(driver.Environment{OS: driver.OSAndroid})}, "desktop or web environment"},
 	} {
 		msg := fails(t, func(tb testing.TB) { Start(tb, root, c.opts...).Focus(c.selector) })
 		if !strings.Contains(msg, c.selector) || !strings.Contains(msg, c.want) {

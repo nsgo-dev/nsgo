@@ -218,6 +218,9 @@ func (w *window) newViewWidget(v *view) uintptr {
 	widget := newAccessibleWidget(viewType, role)
 	gObjectRefSink(widget)
 	setWidget(widget, widgetRef{w, v})
+	if v != nil {
+		gSignalConnect(widget, "notify::has-focus", cbControlFocus, w.handle)
+	}
 	return widget
 }
 

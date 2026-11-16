@@ -148,7 +148,7 @@ func (v *view) beginPress() {
 
 // focusable reports whether v may take the focus.
 func (v *view) focusable() bool {
-	if !onTV() || v.native == 0 || !v.pressable() && !v.props.Focusable || v.props.Disabled || v.props.NoFocus ||
+	if !onTV() || v.native == 0 || !v.props.FocusStop(v.events) ||
 		v.kind == driver.KindInput || v.native.Send(sel("window")) == 0 || hiddenWithin(v.native) {
 		return false
 	}
@@ -156,6 +156,16 @@ func (v *view) focusable() bool {
 		return objc.Send[bool](v.native, sel("isDescendantOfView:"), top.native)
 	}
 	return true
+}
+
+// focusView asks tvOS's focus engine to move to this stop. Touch-only
+// UIKit continues to focus inputs, without opening a keyboard for views.
+func (s *surface) focusView(v *view) {
+	system := objc.ID(apple.Class("UIFocusSystem")).Send(sel("focusSystemForEnvironment:"), v.native)
+	if system != 0 {
+		system.Send(sel("requestFocusUpdateToEnvironment:"), v.native)
+		system.Send(sel("updateFocusIfNeeded"))
+	}
 }
 
 // hiddenWithin reports whether view or a view around it is hidden.

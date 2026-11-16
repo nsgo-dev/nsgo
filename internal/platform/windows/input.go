@@ -576,6 +576,7 @@ func (w *window) focusedField() *textInput {
 // setFocus moves the focus to in, or nowhere, reporting the blur of the
 // field that had it, then the focus of in.
 func (w *window) setFocus(in *textInput) {
+	w.blurControl()
 	old := w.focusedField()
 	if old == in {
 		return
@@ -636,35 +637,39 @@ func (w *window) tab(back bool) bool {
 	if scope == nil {
 		return false
 	}
-	var fields []*textInput
+	var stops []*view
 	var collect func(v *view)
 	collect = func(v *view) {
 		if v.style.Hidden {
 			return
 		}
-		if v.field != nil && v.field.focusable() {
-			fields = append(fields, v.field)
+		if w.focusableView(v) {
+			stops = append(stops, v)
 		}
 		for _, c := range v.children {
 			collect(c)
 		}
 	}
 	collect(scope)
-	if len(fields) == 0 {
+	if len(stops) == 0 {
 		return false
 	}
 	next := 0
 	if back {
-		next = len(fields) - 1
+		next = len(stops) - 1
 	}
-	if i := slices.Index(fields, w.focusedField()); i >= 0 {
+	if i := slices.Index(stops, w.focusedView()); i >= 0 {
 		if back {
-			next = (i + len(fields) - 1) % len(fields)
+			next = (i + len(stops) - 1) % len(stops)
 		} else {
-			next = (i + 1) % len(fields)
+			next = (i + 1) % len(stops)
 		}
 	}
-	w.tabTo(fields[next])
+	if in := stops[next].field; in != nil {
+		w.tabTo(in)
+	} else {
+		w.focusView(stops[next])
+	}
 	return true
 }
 

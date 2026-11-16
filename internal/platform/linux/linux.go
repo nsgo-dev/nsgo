@@ -233,6 +233,7 @@ type window struct {
 	roles        map[driver.NodeID]int32
 	longPress    uint64 // counts long presses waited for, to cancel the last
 	focus        *view  // the entry with keyboard focus
+	controlFocus *view  // the ordinary widget with keyboard focus
 	pinchTimeout uint32
 	alerts       []driver.AlertConfig
 	alerting     bool
@@ -947,7 +948,7 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemAccessibilityFocus:
 			if v := w.view(it.ID); v != nil && v.widget != 0 {
-				gtkWidgetGrabFocus(v.widget)
+				w.focusView(v)
 			}
 			continue
 		case driver.ItemStatusBar, driver.ItemBackUnhandled, driver.ItemBackPreview, driver.ItemHistory:
@@ -1137,18 +1138,19 @@ func (w *window) apply(b *driver.MountBatch) {
 	for _, f := range focus {
 		switch {
 		case f.v == nil:
-			if w.focusedEntry() != nil {
+			if w.focusedView() != nil {
 				w.focusEntry(nil)
 			}
-		case f.v.deleted || f.v.entry == 0:
+		case f.v.deleted:
 		case f.focus:
-			w.focusEntry(f.v)
+			w.focusView(f.v)
 		default:
-			if w.focusedEntry() == f.v {
+			if w.focusedView() == f.v {
 				w.focusEntry(nil)
 			}
 		}
 	}
+	w.checkControlFocus()
 	// Views that moved, appeared or went under a still pointer.
 	w.hoverViews()
 	w.updatePointerCursor()

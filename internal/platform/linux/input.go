@@ -118,7 +118,7 @@ func (w *window) pointerDown(at driver.Point, button uint32, device uintptr, sta
 		w.touch(w.mouse.Down(w.listensTouches(), at))
 	}
 	// A press on the surface leaves the focused field or page.
-	if w.focus != nil || w.focusedWeb() != nil {
+	if w.focusedView() != nil || w.focusedWeb() != nil {
 		w.focusEntry(nil)
 	}
 	w.pressOutside(at)
@@ -515,10 +515,16 @@ func keyPressedCallback(controller uintptr, keyval, keycode, state uint32, data 
 		w.engine.InputModality(driver.ModalityKeyboard)
 	}
 	w.menuBarKey(keyval, state, true)
+	if w.controlKey(keyval, state, repeat) {
+		return 1
+	}
 	if w.selectKey(keyval, state) {
 		return 1
 	}
 	if w.shortcut(keyval, state, repeat) {
+		return 1
+	}
+	if (keyval == 0xff09 || keyval == 0xfe20) && state&(gdkControl|gdkAlt|gdkSuper|gdkMeta) == 0 && w.focusedWeb() == nil && w.tab(state&gdkShift != 0 || keyval == 0xfe20) {
 		return 1
 	}
 	if state&(gdkControl|gdkAlt|gdkSuper|gdkMeta) == 0 && (w.focusedWeb() != nil || w.focus != nil && keyval != gdkEscape) {

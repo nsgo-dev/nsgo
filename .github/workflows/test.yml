@@ -1,6 +1,6 @@
 name: Test
 
-# Vets and tests every package on Linux under a virtual display, and Apple's shared code and macOS backend on macOS. release.yml calls it before publishing a release.
+# Vets and tests every package on Linux under a virtual display, and Apple's shared code and macOS backend on macOS, with native keyboard-focus regressions on macOS, Windows, Linux and the web. release.yml calls it before publishing a release.
 on:
   push:
     branches:
@@ -66,6 +66,15 @@ jobs:
           GSK_RENDERER: cairo
           PULSE_SINK: nsgo_test
         run: xvfb-run -a go tool nsgo test
+      - name: Test native radio and tab focus
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: xvfb-run -a go tool nsgo test -target linux -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
+      - name: Test browser focus, styles and activation
+        run: go tool nsgo test -target web -run '^TestRefFocusUsesNativeKeyboardStops$' ./internal/platform/web
+      - name: Test browser radio and tab focus
+        run: go tool nsgo test -target web -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
 
   apple:
     # Use the Intel pool while hosted arm64 capacity leaves jobs unallocated.
@@ -101,6 +110,8 @@ jobs:
         run: go tool nsgo test -run '^TestWindowObserversSurviveGC$' ./internal/platform/macos -- -race -timeout=180s
       - name: Test native modified presses
         run: go tool nsgo test -target macos -run '^TestPressModifiersReachTheApp$' ./internal/testhost/testdata/press
+      - name: Test native radio and tab focus
+        run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
 
   windows:
     runs-on: windows-latest
@@ -117,3 +128,7 @@ jobs:
           cache: true
       - name: Test native modified presses
         run: go tool nsgo test -target windows -run '^TestPressModifiersReachTheApp$' ./internal/testhost/testdata/press
+      - name: Test native focus, styles and activation
+        run: go tool nsgo test -run '^TestRefFocusUsesNativeKeyboardStops$' ./internal/platform/windows
+      - name: Test native radio and tab focus
+        run: go tool nsgo test -target windows -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base

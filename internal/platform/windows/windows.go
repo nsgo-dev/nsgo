@@ -511,7 +511,8 @@ type window struct {
 	// the one a press is selecting in, and whether the window lacks the
 	// keyboard. blinking is set while the caret's timer runs; surrogate
 	// holds the first half of a character typed in two WM_CHARs.
-	focus, restore, selecting *textInput
+	focus, restore, selecting    *textInput
+	controlFocus, restoreControl *view
 	// textSelection is the selection of an area, and selected the texts
 	// that highlight a part of it (selection.go).
 	textSelection *textselect.Selection
@@ -1494,16 +1495,15 @@ func (w *window) apply(b *driver.MountBatch) {
 		switch {
 		case f.v == nil:
 			w.blurAll()
-		case f.v.deleted || f.v.field == nil:
+		case f.v.deleted:
 		case f.focus:
-			if f.v.field.focusable() {
-				w.setFocus(f.v.field)
-			}
-		case w.focusedField() == f.v.field:
+			w.focusView(f.v)
+		case w.focusedView() == f.v:
 			w.setFocus(nil)
 		}
 	}
 	w.checkFocus()
+	w.checkControlFocus()
 	w.placeIME()
 	// Views that moved, appeared or went under a still pointer.
 	w.hoverViews()
@@ -2390,7 +2390,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		}
 		// The focused field first, then going back (Escape leaves the
 		// field instead), then Tab between the fields.
-		if w.fieldKey(wParam) || w.selectKey(wParam) {
+		if w.controlKey(wParam, lParam) || w.fieldKey(wParam) || w.selectKey(wParam) {
 			return 0
 		}
 		if wParam == vkEscape && !repeated(lParam) {
