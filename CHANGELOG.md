@@ -5,6 +5,7 @@
 - Add `WebView.PinchZoom`, `Ref.Load` and the platform's `Domain` and `Code` on `WebError`; on Windows, Ctrl with the wheel or with + and - zooms a web view only with `PinchZoom` (#233 by @houko).
 - Stop reporting a web view load that was stopped, replaced or turned into a download to `OnError` on Apple platforms and Windows (#233 by @houko).
 - Keep a view's own outer shadows and outline outside its `Overflow: Hidden` clip on Apple for views, images and macOS scroll views, as CSS does (#238 by @houko).
+- Show a bundled macOS app's Dock badge without the notification permission until the app uses notifications (#190 by @houko).
 
 ## [0.1.0] - 2026-11-16
 

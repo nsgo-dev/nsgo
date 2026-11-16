@@ -3,6 +3,7 @@
 package apple
 
 import (
+	"runtime"
 	"strings"
 	"sync"
 
@@ -45,31 +46,58 @@ var notificationCenter = sync.OnceValue(func() objc.ID {
 	return objc.ID(c).Send(sel("currentNotificationCenter"))
 })
 
-// WatchNotifications makes NSGo the center's delegate. Call it as the app
-// starts, before it finishes launching, so the press that launched it is
-// heard.
+// notificationsUsedKey is the defaults key NSGo sets once the app asks for the notification permission or shows a notification, so later launches set the delegate before launching ends and hear a press on a notification an earlier run showed.
+const notificationsUsedKey = "NSGoNotifications"
+
+// NotificationsUsed reports whether the app asked for the notification permission or showed a notification, in this run or an earlier one, without touching the center: a bundled macOS app whose process touched it has its Dock badge shown only while the user allows its badges.
+func NotificationsUsed() bool {
+	defaults := objc.ID(Class("NSUserDefaults")).Send(sel("standardUserDefaults"))
+	return MsgBool(defaults, sel("boolForKey:"), uintptr(NSString(notificationsUsedKey)))
+}
+
+// useNotifications returns the center for the app's use of notifications, or 0 where it has none, recording that use and making NSGo its delegate.
+func useNotifications() objc.ID {
+	center := notificationCenter()
+	if center == 0 {
+		return 0
+	}
+	if !NotificationsUsed() {
+		defaults := objc.ID(Class("NSUserDefaults")).Send(sel("standardUserDefaults"))
+		defaults.Send(sel("setBool:forKey:"), true, NSString(notificationsUsedKey))
+	}
+	WatchNotifications()
+	return center
+}
+
+// notificationDelegate is the one delegate WatchNotifications gives the center: its class can be registered only once.
+var notificationDelegate = sync.OnceValue(func() objc.ID {
+	// UNNotificationPresentationOptions: banner, list, sound and badge, as the notification asks.
+	const present = 1<<4 | 1<<3 | 1<<1 | 1<<0
+	var protocols []*objc.Protocol
+	if p := objc.GetProtocol("UNUserNotificationCenterDelegate"); p != nil {
+		protocols = append(protocols, p)
+	}
+	return objc.ID(RegisterClass("NsgoNotificationDelegate", Class("NSObject"), protocols, []objc.MethodDef{
+		{Cmd: sel("userNotificationCenter:willPresentNotification:withCompletionHandler:"),
+			Fn: func(_ objc.ID, _ objc.SEL, _, _, done objc.ID) { CallBlock(done, present) }},
+		{Cmd: sel("userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:"),
+			Fn: func(_ objc.ID, _ objc.SEL, _, response, done objc.ID) {
+				action := GoString(response.Send(sel("actionIdentifier")))
+				if action == "com.apple.UNNotificationDefaultActionIdentifier" {
+					notificationPressed(GoString(response.Send(sel("notification")).Send(sel("request")).Send(sel("identifier"))))
+				}
+				CallBlock(done)
+			}},
+	})).Send(sel("new"))
+})
+
+// WatchNotifications makes NSGo the center's delegate; calling it again changes nothing. Call it as the app starts, before it finishes launching, so the press that launched it is heard; macOS calls it then only for an app that used notifications before (NotificationsUsed), so one that only sets a Dock badge never touches the center.
 func WatchNotifications() {
 	center := notificationCenter()
 	if center == 0 {
 		return
 	}
-	// UNNotificationPresentationOptions: banner, list, sound and badge,
-	// as the notification asks.
-	const present = 1<<4 | 1<<3 | 1<<1 | 1<<0
-	delegate := objc.ID(RegisterClass("NsgoNotificationDelegate", Class("NSObject"),
-		[]*objc.Protocol{objc.GetProtocol("UNUserNotificationCenterDelegate")}, []objc.MethodDef{
-			{Cmd: sel("userNotificationCenter:willPresentNotification:withCompletionHandler:"),
-				Fn: func(_ objc.ID, _ objc.SEL, _, _, done objc.ID) { CallBlock(done, present) }},
-			{Cmd: sel("userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:"),
-				Fn: func(_ objc.ID, _ objc.SEL, _, response, done objc.ID) {
-					action := GoString(response.Send(sel("actionIdentifier")))
-					if action == "com.apple.UNNotificationDefaultActionIdentifier" {
-						notificationPressed(GoString(response.Send(sel("notification")).Send(sel("request")).Send(sel("identifier"))))
-					}
-					CallBlock(done)
-				}},
-		})).Send(sel("new"))
-	center.Send(sel("setDelegate:"), delegate)
+	center.Send(sel("setDelegate:"), notificationDelegate())
 }
 
 // SetNotificationPress sends the presses of notifications to press, those
@@ -102,8 +130,7 @@ func notificationPressed(id string) {
 // first when ask is set and the user was not asked yet. answer runs on
 // any goroutine.
 func NotificationPermission(ask bool, answer func(int)) {
-	WatchNotifications()
-	center := notificationCenter()
+	center := useNotifications()
 	if center == 0 {
 		answer(driver.NotificationsUnavailable)
 		return
@@ -139,8 +166,7 @@ func NotificationPermission(ask bool, answer func(int)) {
 // answers with whether the center took it: not without the permission.
 // answer runs on any goroutine.
 func ShowNotification(n driver.Notification, answer func(bool)) {
-	WatchNotifications()
-	center := notificationCenter()
+	center := useNotifications()
 	if center == 0 {
 		answer(false)
 		return
@@ -159,8 +185,11 @@ func ShowNotification(n driver.Notification, answer func(bool)) {
 	added.Release()
 }
 
-// CloseNotification removes the notification called id, shown or still to show, and every one the app's notification center holds when id is empty, those earlier runs left included.
+// CloseNotification removes the notification called id, shown or still to show, and every one the app's notification center holds when id is empty, those earlier runs left included. A macOS app that never used notifications has none to close, and closing leaves its center untouched, as an app clearing them each time it comes to the front would otherwise make its Dock badge wait for the user to allow badges.
 func CloseNotification(id string) {
+	if runtime.GOOS == "darwin" && !NotificationsUsed() {
+		return
+	}
 	center := notificationCenter()
 	if center == 0 {
 		return

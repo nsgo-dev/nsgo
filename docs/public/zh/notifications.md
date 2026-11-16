@@ -49,7 +49,7 @@ cx.OnNotificationPress(func(id string) { openChat(strings.TrimPrefix(id, "chat:"
 
 ## 图标角标
 
-`cx.SetBadge` 在应用图标上显示数字：macOS 是程序坞图标，iOS 是主屏幕图标（需要通知权限），Windows 是任务栏按钮，兼容 Unity 的 Linux 启动器，以及已安装的 Web 应用。0 或更小的数字会清除它。在 macOS 上，只设置 Dock 角标不会初始化通知中心，也不需要通知权限。没有 Linux 角标接口的启动器和 Android 没有可以设置的数字；Android 启动器会标记有通知显示的应用。
+`cx.SetBadge` 在应用图标上显示数字：macOS 是程序坞图标，iOS 是主屏幕图标（需要通知权限），Windows 是任务栏按钮，兼容 Unity 的 Linux 启动器，以及已安装的 Web 应用。0 或更小的数字会清除它。macOS 应用在请求通知权限或显示通知之前，程序坞角标不需要任何权限；此后，在当次及之后的运行中，只有用户在系统设置中允许该应用的标记时程序坞才显示角标，`cx.RequestNotificationPermission` 会连同提醒一起请求它。没有 Linux 角标接口的启动器和 Android 没有可以设置的数字；Android 启动器会标记有通知显示的应用。
 
 ```go
 cx.SetBadge(len(unread.Get()))

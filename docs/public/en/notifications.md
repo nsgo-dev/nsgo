@@ -49,7 +49,7 @@ An Android app asking from Android 13 lists `android.permission.POST_NOTIFICATIO
 
 ## Badge
 
-`cx.SetBadge` puts a count on the app's icon: the Dock's on macOS, the Home Screen's on iOS, which needs the notification permission, the taskbar button's on Windows, Unity-compatible Linux launchers and an installed web app's. A count of 0 or less clears it. On macOS, setting only a Dock badge does not initialize the notification center or need notification permission. Launchers without a Linux badge interface and Android have no count to set; Android launchers mark an app whose notifications show.
+`cx.SetBadge` puts a count on the app's icon: the Dock's on macOS, the Home Screen's on iOS, which needs the notification permission, the taskbar button's on Windows, Unity-compatible Linux launchers and an installed web app's. A count of 0 or less clears it. A macOS app needs no permission for its Dock badge until it asks for the notification permission or shows a notification; from then on, in that run and later ones, the Dock shows the badge only while the user allows the app's badges in System Settings, which `cx.RequestNotificationPermission` asks for with the alerts. Launchers without a Linux badge interface and Android have no count to set; Android launchers mark an app whose notifications show.
 
 ```go
 cx.SetBadge(len(unread.Get()))

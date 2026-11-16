@@ -88,9 +88,7 @@ func (s *surface) readClipboard(it *driver.MountItem) {
 	s.engine.Dispatch(ev)
 }
 
-// notify carries out a notification's item through the notification
-// center; the badge is the Dock tile's and does not initialize the
-// notification center or need notification permission.
+// notify carries out a notification's item through the notification center. The badge is the Dock tile's and never touches the center: it needs no permission until the app uses notifications (apple.NotificationsUsed), after which macOS shows it only while the user allows the app's badges.
 func (s *surface) notify(it *driver.MountItem) {
 	e, id := s.engine, it.Count
 	switch it.Kind {
