@@ -150,7 +150,7 @@ func TestNSISScript(t *testing.T) {
 	}
 	// The publisher and copyright the executable's version says are the setup's and the uninstall entry's.
 	p.Windows.Publisher, p.Copyright = "Example $Ltd", "© 2026 Example"
-	if d, err = nsisScript(p, pkg, "arm64"); err != nil {
+	if d, err = nsisScript(t.Context(), p, pkg, "arm64"); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()
