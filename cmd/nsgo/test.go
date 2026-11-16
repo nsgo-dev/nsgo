@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"encoding/xml"
@@ -82,8 +84,10 @@ type testRun struct {
 	builds map[string]string
 	// unbuilt are the packages whose tests did not build.
 	unbuilt map[string]bool
-	trace   bool
-	out     io.Writer
+	// label follows the names of the packages the current run tests (testCommand).
+	label string
+	trace bool
+	out   io.Writer
 }
 
 // runTests runs the app's tests headless, or on a target, printing a line
@@ -153,24 +157,60 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 		}
 		return cmd
 	}
-	cmd := command("./...", tags, opts.args)
-	var extra []*exec.Cmd
-	// As check does, exercise the repository's dev-only code as well as
-	// the ordinary build. There are no automation-only dev tests.
-	if path, err := importPathOf(p.Dir); err == nil && path == nsgoModule {
-		devTags, flags := testBuildTags(tags, opts.args)
+	runs := []testCommand{{cmd: command("./...", tags, opts.args)}}
+	// As check does, NSGo's own repository also tests the dev client, whose files build only with nsgodev, unless the run's tags already include it; there are no automation-only dev tests. Its coverage profile goes to a file of its own, appended to the run's once both have ended, since go test would overwrite the first run's.
+	var cover, devCover string
+	if dev, ok := devClientPattern(p.Dir); ok && p.steps == nil {
+		devTags, flags, profile := devTestArgs(p.Dir, tags, opts.args)
 		if !slices.Contains(devTags, "nsgodev") {
-			extra = append(extra, command("./internal/dev", append(devTags, "nsgodev"), flags))
+			if profile != "" {
+				f, err := os.CreateTemp("", "nsgo-dev-*.cover")
+				if err != nil {
+					return err
+				}
+				f.Close()
+				defer os.Remove(f.Name())
+				cover, devCover = profile, f.Name()
+				flags = append([]string{"-coverprofile=" + devCover}, flags...)
+			}
+			runs = append(runs, testCommand{cmd: command(dev, append(devTags, "nsgodev"), flags), label: devClientLabel, title: "testing the dev client with nsgodev"})
 		}
 	}
-	return reportTests(cmd, opts, extra...)
+	err = reportTests(opts, runs...)
+	if cover != "" {
+		if cerr := appendCoverProfile(cover, devCover); err == nil {
+			err = cerr
+		}
+	}
+	return err
 }
 
-// testBuildTags reads command-line -tags as Go does, replacing earlier
-// tags. Return the remaining flags so adding nsgodev cannot be undone by
-// a later -tags, and leave the test binary's own arguments intact.
-func testBuildTags(tags, args []string) ([]string, []string) {
-	var flags []string
+// devClientLabel follows the names of the dev client's packages tested with nsgodev, as go test names a test variant of a package, so the report sets them apart from the ordinary build's.
+const devClientLabel = " [nsgodev]"
+
+// devClientPattern is the pattern naming NSGo's dev client, internal/dev, from dir, when dir is the repository's root or a directory holding the dev client.
+func devClientPattern(dir string) (string, bool) {
+	path, err := importPathOf(dir)
+	if err != nil {
+		return "", false
+	}
+	dev := nsgoModule + "/internal/dev"
+	if path == dev {
+		return ".", true
+	}
+	sub, ok := strings.CutPrefix(dev, path+"/")
+	if !ok || (path != nsgoModule && !strings.HasPrefix(path, nsgoModule+"/")) {
+		return "", false
+	}
+	if fi, err := os.Stat(filepath.Join(dir, filepath.FromSlash(sub))); err != nil || !fi.IsDir() {
+		return "", false
+	}
+	return "./" + sub, true
+}
+
+// devTestArgs reads the command line's -tags as Go does, replacing the tags before it, and returns the other flags, so a later -tags cannot drop the nsgodev added to the tags, leaving the test binary's own arguments intact. It takes -coverprofile out as well, returning the file it names, resolved as go test does against -outputdir and dir, so the dev run can write its profile elsewhere.
+func devTestArgs(dir string, tags, args []string) (devTags, flags []string, cover string) {
+	var outputDir string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "-args" || a == "--args" || a == "--" {
@@ -178,21 +218,64 @@ func testBuildTags(tags, args []string) ([]string, []string) {
 			break
 		}
 		name, value, hasValue := strings.Cut(strings.TrimLeft(a, "-"), "=")
-		if name == "tags" {
+		name = strings.TrimPrefix(name, "test.")
+		if name == "tags" || name == "coverprofile" {
 			if !hasValue && i+1 < len(args) {
 				i++
 				value = args[i]
 			}
-			tags = strings.Fields(strings.ReplaceAll(value, ",", " "))
+			if name == "tags" {
+				tags = strings.Fields(strings.ReplaceAll(value, ",", " "))
+			} else {
+				cover = value
+			}
 			continue
 		}
 		flags = append(flags, a)
 		if strings.HasPrefix(a, "-") && !hasValue && !goTestBoolFlags[name] && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 			i++
 			flags = append(flags, args[i])
+			value = args[i]
+		}
+		if name == "outputdir" {
+			outputDir = value
 		}
 	}
-	return uniqueTags(tags), flags
+	if cover != "" {
+		if !filepath.IsAbs(cover) {
+			if !filepath.IsAbs(outputDir) {
+				outputDir = filepath.Join(dir, outputDir)
+			}
+			cover = filepath.Join(outputDir, cover)
+		}
+	}
+	return uniqueTags(tags), flags, cover
+}
+
+// appendCoverProfile adds the blocks of the coverage profile at from to the one at to, as go test joins its packages' profiles, or moves it there when the first run wrote none.
+func appendCoverProfile(to, from string) error {
+	data, err := os.ReadFile(from)
+	if errors.Is(err, os.ErrNotExist) || len(data) == 0 {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(to, os.O_WRONLY|os.O_APPEND, 0)
+	if errors.Is(err, os.ErrNotExist) {
+		return os.WriteFile(to, data, 0o644)
+	}
+	if err != nil {
+		return err
+	}
+	if strings.HasPrefix(string(data), "mode:") {
+		_, data, _ = bytes.Cut(data, []byte("\n"))
+	}
+	_, err = f.Write(data)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 // loadForTest reads the app's nsgo.yaml; a directory without one still
@@ -264,24 +347,35 @@ func packageArgs(args []string) []string {
 	return packages
 }
 
-// reportTests runs the commands, which print go test -json, and reports
-// their tests together. A failed command stops the remaining runs.
-func reportTests(cmd *exec.Cmd, opts testOptions, extra ...*exec.Cmd) error {
+// testCommand is a go test -json run. label, when set, follows the names of its packages, which another run tests too, with other tags, and title names the run on the console before it starts.
+type testCommand struct {
+	cmd          *exec.Cmd
+	label, title string
+}
+
+// reportTests runs the commands one after another, as go test goes on past a package's failures, and reports their tests together. A run that did not start or end by itself, as when the command is interrupted, stops the rest.
+func reportTests(opts testOptions, runs ...testCommand) error {
 	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, trace: opts.trace, out: os.Stderr}
 	var waitErr error
-	for _, cmd := range append([]*exec.Cmd{cmd}, extra...) {
-		stdout, err := cmd.StdoutPipe()
+	for _, run := range runs {
+		if run.title != "" {
+			event("%s", run.title)
+		}
+		stdout, err := run.cmd.StdoutPipe()
+		if err == nil {
+			run.cmd.Stderr = os.Stderr
+			err = run.cmd.Start()
+		}
 		if err != nil {
-			waitErr = err
+			waitErr = cmp.Or(waitErr, err)
 			break
 		}
-		cmd.Stderr = os.Stderr
-		if err := cmd.Start(); err != nil {
-			waitErr = err
-			break
-		}
+		r.label, r.builds = run.label, nil
 		r.read(stdout)
-		if waitErr = cmd.Wait(); waitErr != nil {
+		err = run.cmd.Wait()
+		waitErr = cmp.Or(waitErr, err)
+		var exit *exec.ExitError
+		if err != nil && (!errors.As(err, &exit) || !exit.Exited()) {
 			break
 		}
 	}
@@ -312,6 +406,7 @@ func (r *testRun) event(ev testEvent) {
 		r.builds[ev.ImportPath] += ev.Output
 		return
 	}
+	ev.Package += r.label
 	if ev.Test == "" {
 		pkg := r.packages[ev.Package]
 		if pkg == nil {

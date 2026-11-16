@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/xml"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -126,8 +125,7 @@ func TestRunTestsKeepsTheTreeWithFlags(t *testing.T) {
 	}
 }
 
-// Repository tests must exercise the dev-only code as well as the normal
-// build, and a dev-only failure must fail the command and its combined report.
+// Repository tests must exercise the dev-only code as well as the normal build, under their own suite, from the root and from the dev client's directory alike, and a dev-only failure must fail the command and its combined report.
 func TestRunTestsIncludesTheDevClient(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs the test command")
@@ -135,11 +133,15 @@ func TestRunTestsIncludesTheDevClient(t *testing.T) {
 	dir := t.TempDir()
 	for name, content := range map[string]string{
 		"go.mod": "module " + nsgoModule + "\n\ngo 1.26\n",
+		"root.go": `package nsgo
+func Root() int { return 1 }
+`,
 		"root_test.go": `package nsgo
 import ("flag"; "os"; "testing")
 var tags = flag.String("tags", "", "")
 func TestFixtureRoot(t *testing.T) {
 	if *tags != os.Getenv("NSGO_FIXTURE_ARG") { t.Fatalf("binary flag = %q", *tags) }
+	if Root() != 1 { t.Fatal("Root") }
 }
 `,
 		"internal/dev/base_test.go": `package dev
@@ -149,12 +151,17 @@ func TestFixtureBase(t *testing.T) {
 	if *tags != os.Getenv("NSGO_FIXTURE_ARG") { t.Fatalf("binary flag = %q", *tags) }
 }
 `,
+		"internal/dev/client.go": `//go:build nsgodev
+
+package dev
+func Client() int { return 1 }
+`,
 		"internal/dev/client_test.go": `//go:build nsgodev
 
 package dev
 import ("os"; "testing")
 func TestFixtureDev(t *testing.T) {
-	if os.Getenv("NSGO_FIXTURE_FAIL") == "1" { t.Fatal("dev assertion failed") }
+	if os.Getenv("NSGO_FIXTURE_FAIL") == "1" || Client() != 1 { t.Fatal("dev assertion failed") }
 }
 `,
 		// A command-line build tag must reach the dev run too.
@@ -173,61 +180,132 @@ func TestFixtureTagged(t *testing.T) {}
 			t.Fatal(err)
 		}
 	}
-	p, err := loadForTest(dir, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	const (
+		root      = "root TestFixtureRoot"
+		base      = "internal/dev TestFixtureBase"
+		devBase   = "internal/dev [nsgodev] TestFixtureBase"
+		dev       = "internal/dev [nsgodev] TestFixtureDev"
+		devTagged = "internal/dev [nsgodev] TestFixtureTagged"
+		plainDev  = "internal/dev TestFixtureDev"
+	)
+	both := []string{root, base, devBase, dev}
 	for _, c := range []struct {
-		name, tags, run string
-		args            []string
-		fail            bool
-		want            map[string]int
+		name, sub, tags, run string
+		args                 []string
+		fail                 bool
+		want                 []string
 	}{
-		{"normal", "", "", nil, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1}},
-		{"dev failure", "", "", nil, true, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1}},
-		{"normal build failure", "", "", []string{"-args", "-tags", "wrong"}, true, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 1}},
-		{"filtered", "", "^TestFixtureRoot$", nil, true, map[string]int{"TestFixtureRoot": 1}},
-		{"environment tag", "fixture", "", nil, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1, "TestFixtureTagged": 1}},
-		{"command-line tag", "", "", []string{"-tags", "fixture"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1, "TestFixtureTagged": 1}},
-		{"override dev tag", "nsgodev", "", []string{"-tags=fixture"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1, "TestFixtureTagged": 1}},
-		{"test binary tags", "", "", []string{"-args", "-tags", "literal"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 2, "TestFixtureDev": 1}},
-		{"already dev", "nsgodev", "", nil, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 1, "TestFixtureDev": 1}},
-		{"already dev on command line", "", "", []string{"--tags=nsgodev"}, false, map[string]int{"TestFixtureRoot": 1, "TestFixtureBase": 1, "TestFixtureDev": 1}},
+		{"normal", "", "", "", nil, false, both},
+		{"dev failure", "", "", "", nil, true, both},
+		// A failing ordinary run, as go test's failing package, does not keep the dev client's tests from running.
+		{"ordinary failure", "", "", "", []string{"-args", "-tags", "wrong"}, true, both},
+		{"filtered", "", "", "^TestFixtureRoot$", nil, true, []string{root}},
+		{"environment tag", "", "fixture", "", nil, false, append(both, devTagged)},
+		{"command-line tag", "", "", "", []string{"-tags", "fixture"}, false, append(both, devTagged)},
+		{"override dev tag", "", "nsgodev", "", []string{"-tags=fixture"}, false, append(both, devTagged)},
+		{"test binary tags", "", "", "", []string{"-args", "-tags", "literal"}, false, both},
+		{"already dev", "", "nsgodev", "", nil, false, []string{root, base, plainDev}},
+		{"already dev on command line", "", "", "", []string{"--tags=nsgodev"}, false, []string{root, base, plainDev}},
+		{"dev client directory", "internal/dev", "", "", nil, false, []string{base, devBase, dev}},
+		{"dev client directory failure", "internal/dev", "", "", nil, true, []string{base, devBase, dev}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			p, err := loadForTest(filepath.Join(dir, filepath.FromSlash(c.sub)), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 			report := filepath.Join(t.TempDir(), "tests.xml")
 			binaryTag := ""
 			if slices.Contains(c.args, "-args") {
 				binaryTag = "literal"
 			}
-			err := runTests(t.Context(), p, testOptions{run: c.run, junit: report,
+			err = runTests(t.Context(), p, testOptions{run: c.run, junit: report,
 				env:  []string{"GOWORK=off", "GOFLAGS=-tags=" + c.tags, "NSGO_FIXTURE_ARG=" + binaryTag, "NSGO_FIXTURE_FAIL=" + map[bool]string{false: "0", true: "1"}[c.fail]},
 				args: append([]string{"-count=1"}, c.args...)})
 			wantFail := c.fail && c.run == ""
 			if (err != nil) != wantFail {
 				t.Errorf("runTests = %v, want failure %v", err, wantFail)
 			}
-			data, err := os.ReadFile(report)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var suites junitSuites
-			if err := xml.Unmarshal(data, &suites); err != nil {
-				t.Fatal(err)
-			}
-			got := map[string]int{}
+			suites := readJUnitFixture(t, report)
+			var got []string
 			for _, suite := range suites.Suites {
+				pkg := strings.TrimPrefix(strings.TrimPrefix(suite.Name, nsgoModule), "/")
+				if pkg == "" {
+					pkg = "root"
+				}
 				for _, test := range suite.Cases {
-					got[test.Name]++
+					got = append(got, pkg+" "+test.Name)
 				}
 			}
-			if !maps.Equal(got, c.want) {
-				t.Errorf("reported tests = %v, want %v", got, c.want)
+			slices.Sort(got)
+			want := slices.Sorted(slices.Values(c.want))
+			if !slices.Equal(got, want) {
+				t.Errorf("reported tests = %q, want %q", got, want)
 			}
 			if (suites.Failures > 0) != wantFail {
 				t.Errorf("report has %d failures, want failure %v", suites.Failures, wantFail)
 			}
 		})
+	}
+
+	// Both runs' coverage reaches the profile -coverprofile names, read against -outputdir as go test reads it.
+	t.Run("coverage", func(t *testing.T) {
+		p, err := loadForTest(dir, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := t.TempDir()
+		if err := runTests(t.Context(), p, testOptions{env: []string{"GOWORK=off", "GOFLAGS=", "NSGO_FIXTURE_ARG=", "NSGO_FIXTURE_FAIL=0"},
+			args: []string{"-count=1", "-coverprofile", "cover.out", "-outputdir", out}}); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(filepath.Join(out, "cover.out"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		profile := string(data)
+		if n := strings.Count(profile, "mode: "); n != 1 || !strings.HasPrefix(profile, "mode: ") {
+			t.Errorf("profile has %d mode lines, want one at the start:\n%s", n, profile)
+		}
+		for _, file := range []string{nsgoModule + "/root.go:", nsgoModule + "/internal/dev/client.go:"} {
+			if !strings.Contains(profile, file) {
+				t.Errorf("profile lacks %s:\n%s", file, profile)
+			}
+		}
+	})
+}
+
+func readJUnitFixture(t *testing.T, path string) junitSuites {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var suites junitSuites
+	if err := xml.Unmarshal(data, &suites); err != nil {
+		t.Fatal(err)
+	}
+	return suites
+}
+
+func TestDevTestArgs(t *testing.T) {
+	dir, abs := filepath.FromSlash("/repo"), t.TempDir()
+	for _, c := range []struct {
+		tags, args, wantTags, wantFlags []string
+		wantCover                       string
+	}{
+		{[]string{"a"}, nil, []string{"a"}, nil, ""},
+		{[]string{"a"}, []string{"-tags", "b,c", "-v"}, []string{"b", "c"}, []string{"-v"}, ""},
+		{nil, []string{"-tags=b", "-count", "1", "--tags", "c d", "-race"}, []string{"c", "d"}, []string{"-count", "1", "-race"}, ""},
+		{nil, []string{"-run", "X", "-args", "-tags", "x"}, nil, []string{"-run", "X", "-args", "-tags", "x"}, ""},
+		{nil, []string{"-coverprofile", "c.out", "-v"}, nil, []string{"-v"}, filepath.Join(dir, "c.out")},
+		{nil, []string{"-test.coverprofile=c.out", "-outputdir", "out"}, nil, []string{"-outputdir", "out"}, filepath.Join(dir, "out", "c.out")},
+		{nil, []string{"-outputdir=" + abs, "-coverprofile=c.out"}, nil, []string{"-outputdir=" + abs}, filepath.Join(abs, "c.out")},
+	} {
+		tags, flags, cover := devTestArgs(dir, c.tags, c.args)
+		if !slices.Equal(tags, c.wantTags) || !slices.Equal(flags, c.wantFlags) || cover != c.wantCover {
+			t.Errorf("devTestArgs(%q, %q) = %q, %q, %q, want %q, %q, %q", c.tags, c.args, tags, flags, cover, c.wantTags, c.wantFlags, c.wantCover)
+		}
 	}
 }
 

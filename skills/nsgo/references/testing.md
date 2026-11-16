@@ -17,8 +17,6 @@ func TestAdd(t *testing.T) {
 
 An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, starts with `nsgotest.StartApp(t, fn)`, which runs it once in the app's own scope as `Run` does; never pass `core.AppRoot(fn)` to `Start`, which shows a root view as the main view, so the function's scope would not last.
 
-When changing NSGo itself, run `go tool nsgo test` at the repository root: it also tests the dev client with `nsgodev`, preserving the run filters and reporting both builds together.
-
 ## Selectors
 
 | Selector | Matches |

@@ -40,7 +40,7 @@ go tool nsgo test -bench . ./core  # core's benchmarks
 (cd benchmark && go run ./runner)  # measure against other frameworks
 ```
 
-At NSGo's repository root, the headless command also runs `internal/dev` with the `nsgodev` build tag, so dev client assertions run locally and in CI. The same filters and flags apply to both builds, whose results share one tally and JUnit report.
+Run at the repository root, or in `internal/dev`, the headless command tests `internal/dev` a second time with the `nsgodev` build tag, which the dev client's files need, so its tests run locally and in CI. Both runs take the same filters and flags and share one tally and JUnit report, where the second run's package is named `internal/dev [nsgodev]`.
 
 ## NSH
 

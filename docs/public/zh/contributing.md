@@ -40,7 +40,7 @@ go tool nsgo test -bench . ./core  # core 的基准测试
 (cd benchmark && go run ./runner)  # 与其他框架对比测量
 ```
 
-在 NSGo 仓库根目录，无头测试命令还会带上 `nsgodev` 构建标签运行 `internal/dev`，让本地和 CI 都执行 dev client 的断言。两种构建使用相同的筛选条件和参数，结果合并到同一份统计和 JUnit 报告中。
+在仓库根目录或 `internal/dev` 中运行无头测试命令时，它会带上 `nsgodev` 构建标签再测试一次 `internal/dev`（dev client 的文件需要这个标签），让本地和 CI 都运行 dev client 的测试。两次运行使用相同的筛选条件和参数，结果合并到同一份统计和 JUnit 报告中，第二次运行的包名为 `internal/dev [nsgodev]`。
 
 ## NSH
 
