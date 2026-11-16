@@ -218,7 +218,7 @@ export declare function setAccessibilityFocus(node: YNode): void;
 export declare function openUrl(url: string): Promise<boolean>;
 export interface KeyboardModule { dismiss(): void }
 export declare const Keyboard: KeyboardModule;
-export interface KeyBindingOptions { when?: "always" | "notEditing"; repeat?: boolean; overModals?: boolean }
+export interface KeyBindingOptions { when?: "always" | "notEditing"; repeat?: boolean; overModals?: boolean; yieldsToMenu?: boolean }
 export interface Keymap {
   bind(keystroke: string, handler: (e: { keystroke: string }) => void, options?: KeyBindingOptions): () => void;
   bind(bindings: Record<string, (e: { keystroke: string }) => void>, options?: KeyBindingOptions): () => void;

@@ -442,6 +442,31 @@ mount(App);`, nsgotest.Environment(core.Environment{OS: core.OSMacOS}))
 	}
 }
 
+// A binding bound with yieldsToMenu leaves its key to an enabled item of the application menu with the same shortcut, and takes it back once the item is disabled.
+func TestKeymapYieldsToMenu(t *testing.T) {
+	app := run(t, `import { mount, signal, effect, keymap, View, Text } from "nsgo";
+import { Menu } from "nsgo/desktop";
+function App() {
+	const log = signal(""), disabled = signal(false);
+	keymap.bind("mod+r", () => log.set(log() + "key;"), { yieldsToMenu: true });
+	keymap.bind("f2", () => disabled.set(true));
+	effect(() => Menu.setApplicationMenu([{ label: "File", submenu: [{ label: "Run", shortcut: "mod+r", disabled: disabled(), onSelect: () => log.set(log() + "menu;") }] }]));
+	return <View>
+		<Text testID="log">{() => "log " + log()}</Text>
+	</View>;
+}
+mount(App);`, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.Key("mod+r")
+	if got := app.Find("id:log").Text; got != "log " {
+		t.Errorf("with the menu's item: %q, want %q", got, "log ")
+	}
+	app.Key("f2")
+	app.Key("mod+r")
+	if got := app.Find("id:log").Text; got != "log key;" {
+		t.Errorf("with the item disabled: %q, want %q", got, "log key;")
+	}
+}
+
 func TestHostCallsPostsAndEvents(t *testing.T) {
 	h := core.NewHost()
 	_ = h.SetParams(map[string]any{"user": "ada"})

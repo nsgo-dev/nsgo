@@ -102,7 +102,7 @@ func (r *runtime) keymap() js.Value {
 			bindings[k], order = arg(call, 1), []string{k}
 		}
 		opt := r.options(options)
-		ko := core.KeyOptions{Repeat: opt.bool("repeat", false), OverModals: opt.bool("overModals", false),
+		ko := core.KeyOptions{Repeat: opt.bool("repeat", false), OverModals: opt.bool("overModals", false), YieldsToMenu: opt.bool("yieldsToMenu", false),
 			When: map[string]core.KeyWhen{"always": core.KeyAlways, "notEditing": core.KeyNotEditing}[opt.str("when", "")]}
 		owner := r.cx.Child()
 		owner.Run(func() {
