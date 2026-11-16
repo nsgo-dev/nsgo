@@ -5,7 +5,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 | Need | Use |
 | --- | --- |
 | Box, text, image, icon | `core.View`, `core.Text` with `core.Span` runs, `core.Image`, `core.Icon` with icons from `icons/lucide`; `ui.Textf` for text from a signal in a size, weight and color |
-| Buttons | `ui.Button` (`ButtonPrimary`, `ButtonSecondary`, `ButtonOutline`, `ButtonGhost`), `ui.IconButton` with a `Label` for screen readers, `ui.ToggleButton`, `ui.ToggleGroup`, `ui.HoldToConfirm`, `ui.Link` |
+| Buttons | `ui.Button` (`ButtonPrimary`, `ButtonSecondary`, `ButtonOutline`, `ButtonGhost`), `ui.IconButton` with a `Label` for screen readers, `ui.ToggleButton`, `ui.ToggleGroup`, `ui.HoldToConfirm`, `ui.Link` (`Style.Color` colors its text and hover underline) |
 | Text fields | `ui.Input` (controlled with `Value` and `OnChange`, `Multiline`, `Masked`), `ui.NumberInput`, `ui.OtpInput`, `ui.TagInput`, `ui.FormField` for a label and message |
 | Choices | `ui.Switch`, `ui.Checkbox`, `ui.Radio` in a `ui.RadioGroup`, `ui.Select[T]` with `ui.Option[T]`, `ui.Combobox`, `ui.Slider`, `ui.Rating` |
 | Dates, times and colors | `ui.DatePicker`, `ui.Calendar`, `ui.TimeField`, `ui.ColorPicker` |

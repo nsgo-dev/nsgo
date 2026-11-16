@@ -40,6 +40,10 @@ ui.Button{Text: "Saving…", Disabled: saving.Get, OnPress: save}
 
 `Disabled` takes a function, so the button follows a signal: a disabled button takes neither presses nor the keyboard focus, and its look is the disabled state, not a color the app picks.
 
+## Links
+
+`ui.Link{Text: "Docs", Href: "/docs"}` opens a destination with the link role. Its text and hover underline use the accent unless `Style.Color` sets another color; `Style.Hover.Color` sets the hover color.
+
 ## Accessibility
 
 The button reports `RoleButton`, its text as its name, and `Hint` as what pressing it does. `Label` replaces the text for assistive technology. An icon-only button without `Label` is unreadable, so name it.

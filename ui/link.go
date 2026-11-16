@@ -18,7 +18,8 @@ type Link struct {
 	// Label is what assistive technology reads, Text when empty.
 	Label  string
 	TestID string
-	Style  core.Style
+	// Style styles the link, including its text color; unset Color takes the accent.
+	Style core.Style
 }
 
 // Render implements core.Node.
@@ -36,11 +37,13 @@ func (l Link) Render(cx *core.Scope) core.Node {
 		},
 		Style: core.Style{Group: "link", AlignSelf: core.AlignStart, CornerRadius: RadiusSmall, Disabled: Dimmed()}.Merge(l.Style),
 		StyleFunc: func() core.Style {
-			return core.Style{FocusVisible: FocusRing(cx, 2)}
+			s := core.Style{FocusVisible: FocusRing(cx, 2)}
+			if l.Style.Color == 0 {
+				s.Color = colors.Accent()
+			}
+			return s
 		},
-		Children: []core.Node{core.Text{Content: l.Text, Style: TypeBody,
-			StyleFunc: func() core.Style {
-				return core.Style{Color: colors.Accent(), GroupStyle: &core.GroupStyle{Name: "link",
-					Hover: &core.Style{TextDecoration: core.TextDecorationUnderline}}}
-			}}}}
+		Children: []core.Node{core.Text{Content: l.Text, Style: TypeBody.Merge(core.Style{
+			GroupStyle: &core.GroupStyle{Name: "link", Hover: &core.Style{TextDecoration: core.TextDecorationUnderline}},
+		})}}}
 }

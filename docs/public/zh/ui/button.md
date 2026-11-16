@@ -40,6 +40,10 @@ ui.Button{Text: "正在保存…", Disabled: saving.Get, OnPress: save}
 
 `Disabled` 接受一个函数，所以按钮可以跟随 signal：禁用的按钮既不接受按压也不获得键盘焦点，它的外观是禁用状态，而不是应用挑选的颜色。
 
+## 链接
+
+`ui.Link{Text: "文档", Href: "/docs"}` 以链接角色打开目标。文字和悬停下划线默认使用强调色；`Style.Color` 可设置其他颜色，`Style.Hover.Color` 可设置悬停颜色。
+
 ## 无障碍
 
 按钮报告 `RoleButton`，以文字作为名称，以 `Hint` 说明按下后会发生什么。`Label` 为辅助技术替换文字。只有图标而没有 `Label` 的按钮无法被读出，请给它命名。

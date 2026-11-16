@@ -50,6 +50,63 @@ func TestLink(t *testing.T) {
 	})
 }
 
+func TestLinkTextColor(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		ink, hover := core.RGB(0xf2dcb5), core.RGB(0xffeedd)
+		app, p := start(t, e, func(cx *core.Scope) core.Node {
+			return core.View{Children: []core.Node{
+				Link{Text: "Default", TestID: "default"},
+				Link{Text: "Plain", TestID: "plain", Style: core.Style{Color: ink}},
+				Link{Text: "Custom", TestID: "custom", Style: core.Style{Color: ink, Hover: &core.Style{Color: hover}}},
+				Link{Text: "Transparent", TestID: "transparent", Style: core.Style{Color: core.Transparent}},
+			}}
+		})
+		if got := app.Find("default >> Default").TextStyle.Color; got != p.Accent {
+			t.Fatalf("default link color = %#x, want %#x", got, p.Accent)
+		}
+		if got := app.Find("transparent >> Transparent").TextStyle.Color; got != core.Transparent {
+			t.Fatalf("transparent link color = %#x", got)
+		}
+		text := app.Find("custom >> Custom")
+		if text.TextStyle.Color != ink {
+			t.Fatalf("custom link color = %#x, want %#x", text.TextStyle.Color, ink)
+		}
+		id := text.ID
+		app.Hover("plain")
+		text = app.Find("plain >> Plain")
+		// A zero decoration color uses the glyph color on every backend.
+		if text.TextStyle.Color != ink || text.TextStyle.Decoration != core.TextDecorationUnderline || text.TextStyle.DecorationColor != 0 {
+			t.Fatalf("custom link underline = %+v", text.TextStyle)
+		}
+		app.Hover("custom")
+		text = app.Find("custom >> Custom")
+		if text.TextStyle.Color != hover || text.TextStyle.Decoration != core.TextDecorationUnderline || text.TextStyle.DecorationColor != 0 {
+			t.Fatalf("hovered link style = %+v", text.TextStyle)
+		}
+		app.Hover("default")
+		text = app.Find("custom >> Custom")
+		if text.TextStyle.Color != ink || text.TextStyle.Decoration != 0 || text.ID != id {
+			t.Fatalf("link did not restore its custom color in place: %+v", text.TextStyle)
+		}
+		text = app.Find("default >> Default")
+		if text.TextStyle.Color != p.Accent || text.TextStyle.Decoration != core.TextDecorationUnderline || text.TextStyle.DecorationColor != 0 {
+			t.Fatalf("default link underline = %+v", text.TextStyle)
+		}
+		e.Dark = !e.Dark
+		app.SetEnvironment(e)
+		want := core.DefaultTheme().Light.Accent
+		if e.Dark {
+			want = core.DefaultTheme().Dark.Accent
+		}
+		if text = app.Find("default >> Default"); text.TextStyle.Color != want || text.TextStyle.Decoration != core.TextDecorationUnderline || text.TextStyle.DecorationColor != 0 {
+			t.Fatalf("default link did not follow the new appearance: %+v", text.TextStyle)
+		}
+		if text = app.Find("custom >> Custom"); text.TextStyle.Color != ink || text.ID != id {
+			t.Fatal("an appearance change replaced the custom color or rebuilt the link")
+		}
+	})
+}
+
 // TestPagination moves between pages, the current one selected.
 func TestPagination(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
