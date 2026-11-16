@@ -212,6 +212,8 @@ file_types:
 desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
 ```
 
+`desktop.AddRecentFile(cx, path)` 把用户打开过的文档列进 Dock 菜单和“文件 › 打开最近使用”，选中后同样交给这个处理函数；`desktop.ClearRecentFiles` 清除这些记录。
+
 ## 链接
 
 `url_schemes` 让 macOS 应用拥有自己的链接，例如 `myapp://settings`，可以从浏览器、其他应用或 `open` 命令打开它：

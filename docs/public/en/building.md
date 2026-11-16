@@ -212,6 +212,8 @@ The app hears the files with `desktop.OnOpenFiles`, which also takes those named
 desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
 ```
 
+`desktop.AddRecentFile(cx, path)` lists a document the user opened in the Dock menu and File › Open Recent, whose choice reaches the same handler, and `desktop.ClearRecentFiles` forgets them.
+
 ## Links
 
 `url_schemes` gives a macOS app links of its own, such as `myapp://settings`, which open it from a browser, another app or `open`:

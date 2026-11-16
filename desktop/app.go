@@ -126,11 +126,10 @@ func RegisterHotKey(cx *core.Scope, key string, fn func()) *HotKey { return cx.R
 // it hidden.
 func SetDockVisible(cx *core.Scope, on bool) { cx.SetDockVisible(on) }
 
-// AddRecentFile records path in the platform's recent documents, which the
-// user can open again from the app icon or launcher.
+// AddRecentFile records path as a document the user opened, which the system offers again: in the Dock menu and File › Open Recent on macOS, for the types nsgo.yaml's file_types declares, and in the Recent category of the Jump List on Windows, for the types the app is registered to open. Choosing one reaches OnOpenFiles. Elsewhere it does nothing.
 func AddRecentFile(cx *core.Scope, path string) { cx.AddRecentFile(path) }
 
-// ClearRecentFiles removes the app's recent documents from the platform.
+// ClearRecentFiles forgets the documents AddRecentFile recorded, the app's alone.
 func ClearRecentFiles(cx *core.Scope) { cx.ClearRecentFiles() }
 
 // Restart ends the app as core.Scope.Quit does, and nsgo.Run starts it
