@@ -96,7 +96,7 @@ type webView struct {
 	scriptGen, scrollGen  int
 	adding                int
 	navigatePending       bool
-	ownNavigation         bool             // the next top-level navigation is the app's source load
+	ownNavigation         bool             // navigate started the app's source, whose NavigationStarting comes next
 	starting              string           // the URL of the navigation started last, which a failure reports
 	started               uint64           // the NavigationId of the navigation started last
 	cut                   uint64           // the NavigationId of a navigation the view cut short (StopLoading, or a load that replaced it), whose failure is no error
@@ -417,11 +417,13 @@ func (wv *webView) listen() {
 		a := (*comObject)(args)
 		nav := wv.navigation(true)
 		nav.URL = a.getString(navigationStartingGetUri)
-		// A restricted view's page goes only where its config allows;
-		// NavigationStarting is the top level's.
-		own := wv.ownNavigation
+		// A restricted view's page goes only where its config allows; NavigationStarting is the top level's.
+		allowed := wv.config.Navigable
+		if wv.ownNavigation {
+			allowed = wv.config.SourceNavigable
+		}
 		wv.ownNavigation = false
-		if !own && !wv.config.Navigable(nav.URL) {
+		if !allowed(nav.URL) {
 			a.call(navigationStartingPutCancel, 1)
 			wv.report(driver.Event{Kind: driver.EventError, Text: driver.RefusedNavigation(nav.URL), Navigation: &nav})
 			return

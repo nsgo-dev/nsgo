@@ -7,33 +7,19 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Access says what code under a scope may reach (NSH's nsh_core::access):
-// a host gives it to code it did not write, such as a plugin, with
-// Scope.ProvideAccess. Without one, as for an app's own code, everything
-// is allowed. Core checks it where each request is made, whoever makes
-// it, so a Go component showing the code's data is held to it too:
-// images, videos and web views refused show nothing and report OnError,
-// and the services fail as AccessDenied or answer as the system would
-// with nothing there.
+// Access says what code under a scope may reach (NSH's nsh_core::access): a host gives it to code it did not write, such as a plugin, with Scope.ProvideAccess. Without one, as for an app's own code, everything is allowed. Core checks it where each request is made, whoever makes it, so a Go component showing the code's data is held to it too: images, videos and web views refused show nothing and report OnError, and the services fail as AccessDenied or answer as the system would with nothing there.
+//
+// Allows is asked about a web view's source, not about where its pages go: the platform decides those as they start, from WebHosts and, for the about:, blob: and data: pages a page makes itself, AccessWebSchemes.
 //
 // Elements are held by the Access of the owner that rendered them, services by the running owner's, the one whose render, effect, handler or Run is running, or outside one by that of the scope they are called on. A Host's handlers run outside the owner that called them, so they are held to the scope they call services on.
 type Access interface {
-	// Allows reports whether req is granted. It is called on the engine's
-	// goroutine, so it may read only what does not change.
+	// Allows reports whether req is granted. It is called on the engine's goroutine, so it may read only what does not change.
 	Allows(req AccessRequest) bool
-	// WebHosts are the hosts a web view's pages may navigate to at the
-	// top level: "*", "*.example.com" or a host. The platform refuses
-	// other http and https navigations as they start. AccessWebSchemes
-	// additionally controls pages of their own making.
+	// WebHosts are the hosts a web view's pages may navigate to at the top level: "*", "*.example.com" or a host. The platform refuses navigations to other http and https hosts, and to other schemes but the pages' own (AccessWebSchemes) and the app's (Scope.ServeScheme), as they start.
 	WebHosts() []string
 }
 
-// AccessWebSchemes is an Access that also says which pages made by a web
-// view's current page may navigate to at the top level. The schemes are
-// "about", "blob" and "data". An Access without WebSchemes allows all three
-// for compatibility; an implementation that has it and returns nil allows
-// none. The app's own source and schemes served by ServeScheme are not held
-// to this list.
+// AccessWebSchemes is an Access that also says which pages of their own making a web view's pages may navigate to at the top level, by scheme: "about", "blob" and "data"; other names are ignored. The platform refuses the rest as they start, as it refuses hosts WebHosts leaves out. An Access without WebSchemes allows all three; one whose WebSchemes returns nil allows none. The app's own source (WebView.Source) and the schemes it serves (Scope.ServeScheme) are not held to it, nor are a page's frames. On the web, where a web view is an iframe whose navigations the page cannot see, neither WebHosts nor WebSchemes holds its pages.
 type AccessWebSchemes interface {
 	Access
 	WebSchemes() []string
@@ -275,13 +261,12 @@ func (b bothAccess) WebSchemes() []string {
 	return driver.IntersectSchemes(webSchemes(b.outer), webSchemes(b.inner))
 }
 
-var allWebSchemes = []string{"about", "blob", "data"}
-
+// webSchemes are the page schemes a allows, in lower case and without names AccessWebSchemes does not know: all of them for an Access without WebSchemes.
 func webSchemes(a Access) []string {
 	if s, ok := a.(AccessWebSchemes); ok {
-		return s.WebSchemes()
+		return driver.IntersectSchemes(s.WebSchemes(), driver.PageSchemes)
 	}
-	return allWebSchemes
+	return driver.PageSchemes
 }
 
 // sourceRefusal is the refusal of what a node of owner o loads from uri:

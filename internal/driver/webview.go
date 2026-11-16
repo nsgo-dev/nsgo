@@ -152,8 +152,7 @@ type WebConfig struct {
 	// Hosts are the hosts Navigable allows, space-separated patterns:
 	// "*", "*.example.com" or a host.
 	Hosts string
-	// Schemes are the schemes of pages' own top-level navigations that are
-	// allowed, space-separated: "about", "blob" or "data".
+	// Schemes are the PageSchemes Navigable allows, space-separated in lower case.
 	Schemes string
 	// Media is what the pages may capture through getUserMedia; the
 	// platform refuses the rest as the page asks.
@@ -172,11 +171,20 @@ const (
 // for both gets neither unless both are allowed.
 func (m WebMedia) Allows(want WebMedia) bool { return want != 0 && m&want == want }
 
-// Navigable reports whether a restricted view's page may navigate to
-// rawURL at its top level: a page of its own (about:, data:, blob:) whose
-// scheme Schemes allows, or an http or https one of a host Hosts allows.
-// Other schemes, file: among them, are refused.
+// PageSchemes are the schemes of the pages a page makes itself, which Schemes holds: about:, blob: and data:.
+var PageSchemes = []string{"about", "blob", "data"}
+
+// Navigable reports whether a restricted view's page may navigate to rawURL at its top level: a page of its own making (PageSchemes) whose scheme Schemes allows, an http or https one of a host Hosts allows, or one of a scheme the app serves (SchemeHandlers). Other schemes, file: among them, are refused.
 func (c *WebConfig) Navigable(rawURL string) bool {
+	return c.navigable(rawURL, false)
+}
+
+// SourceNavigable reports whether a restricted view may start the app's own load of its Source, at rawURL: as Navigable, except that a page of PageSchemes is the app's and not held to Schemes. A backend asks it for the top-level navigation its own load starts, and Navigable for the rest.
+func (c *WebConfig) SourceNavigable(rawURL string) bool {
+	return c.navigable(rawURL, true)
+}
+
+func (c *WebConfig) navigable(rawURL string, source bool) bool {
 	if !c.Restricted {
 		return true
 	}
@@ -184,9 +192,9 @@ func (c *WebConfig) Navigable(rawURL string) bool {
 	if err != nil {
 		return false
 	}
-	switch strings.ToLower(u.Scheme) {
+	switch scheme := strings.ToLower(u.Scheme); scheme {
 	case "about", "data", "blob":
-		return slices.Contains(strings.Fields(c.Schemes), strings.ToLower(u.Scheme))
+		return source || slices.Contains(strings.Fields(c.Schemes), scheme)
 	case "http", "https":
 		return AllowsHost(strings.Fields(c.Hosts), u.Hostname())
 	}
@@ -196,8 +204,7 @@ func (c *WebConfig) Navigable(rawURL string) bool {
 	return false
 }
 
-// RefusedNavigation is the message of EventError for a navigation
-// Navigable refused.
+// RefusedNavigation is the message of EventError for a navigation Navigable refused.
 func RefusedNavigation(url string) string {
 	return "nsgo: the web view may not navigate to " + url + " (the webview capability's hosts or schemes)"
 }
@@ -214,11 +221,10 @@ func AllowsHost(patterns []string, host string) bool {
 	return false
 }
 
-// IntersectSchemes returns the supported page schemes both lists allow. An
-// empty list allows none; the result uses the stable about, blob, data order.
+// IntersectSchemes returns the PageSchemes both lists name, in any case, in PageSchemes' order; an empty list names none.
 func IntersectSchemes(a, b []string) []string {
 	var out []string
-	for _, scheme := range []string{"about", "blob", "data"} {
+	for _, scheme := range PageSchemes {
 		if slices.ContainsFunc(a, func(s string) bool { return strings.EqualFold(s, scheme) }) &&
 			slices.ContainsFunc(b, func(s string) bool { return strings.EqualFold(s, scheme) }) {
 			out = append(out, scheme)

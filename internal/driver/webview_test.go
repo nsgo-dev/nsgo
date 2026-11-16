@@ -1,6 +1,9 @@
 package driver
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestWebOrigin(t *testing.T) {
 	for raw, want := range map[string]string{
@@ -63,6 +66,59 @@ func TestWebEvaluateMarker(t *testing.T) {
 	for _, script := range []string{`window.nsgo.postMessage("nsgo-evaluate:ffff:")`, "", WebMessageScript("x")} {
 		if marker, ok := WebEvaluateMarker(script); ok {
 			t.Errorf("%q has a marker, %q", script, marker)
+		}
+	}
+}
+
+func TestNavigableHoldsPageSchemes(t *testing.T) {
+	base := WebConfig{Restricted: true, Hosts: "ok.com", SchemeHandlers: map[string]func(string) []byte{"app": nil}}
+	for _, c := range []struct {
+		schemes string
+		url     string
+		page    bool // Navigable: a page's own navigation
+		source  bool // SourceNavigable: the app's own load
+	}{
+		{"about blob data", "about:blank", true, true},
+		{"about blob data", "data:text/html,x", true, true},
+		{"blob", "blob:https://ok.com/id", true, true},
+		{"blob", "about:blank", false, true},
+		{"blob", "about:srcdoc", false, true},
+		{"blob", "data:text/html,x", false, true},
+		{"blob", "DATA:text/html,x", false, true},
+		{"", "blob:https://ok.com/id", false, true},
+		{"", "https://ok.com/", true, true},
+		{"", "https://evil.io/", false, false},
+		{"", "file:///etc/hosts", false, false},
+		{"", "javascript:alert(1)", false, false},
+		{"", "app://settings/index.html", true, true},
+	} {
+		cfg := base
+		cfg.Schemes = c.schemes
+		if got := cfg.Navigable(c.url); got != c.page {
+			t.Errorf("Schemes %q: Navigable(%q) = %v, want %v", c.schemes, c.url, got, c.page)
+		}
+		if got := cfg.SourceNavigable(c.url); got != c.source {
+			t.Errorf("Schemes %q: SourceNavigable(%q) = %v, want %v", c.schemes, c.url, got, c.source)
+		}
+	}
+	var open WebConfig
+	if !open.Navigable("data:text/html,x") || !open.SourceNavigable("https://evil.io/") {
+		t.Error("an unrestricted view refuses a navigation")
+	}
+}
+
+func TestIntersectSchemes(t *testing.T) {
+	for _, c := range []struct {
+		a, b []string
+		want string
+	}{
+		{[]string{"data", "blob"}, []string{"blob", "about"}, "blob"},
+		{[]string{"DATA", "Blob", "javascript"}, PageSchemes, "blob data"},
+		{nil, PageSchemes, ""},
+		{PageSchemes, PageSchemes, "about blob data"},
+	} {
+		if got := strings.Join(IntersectSchemes(c.a, c.b), " "); got != c.want {
+			t.Errorf("IntersectSchemes(%q, %q) = %q, want %q", c.a, c.b, got, c.want)
 		}
 	}
 }

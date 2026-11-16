@@ -34,7 +34,7 @@ type Web struct {
 	handler       objc.ID
 	config        driver.WebConfig
 	fileDir       string // the directory a file: page, or HTML with a file: base URL, may navigate in; "" for other sources
-	ownNavigation bool   // the next top-level navigation is the app's source load
+	ownNavigation bool   // load started the app's source, whose top-level navigation comes next
 	made          bool
 }
 
@@ -164,10 +164,15 @@ func loadWebKit() {
 					frame := action.Send(sel("targetFrame"))
 					if frame == 0 || objc.Send[bool](frame, sel("isMainFrame")) {
 						url := GoString(action.Send(sel("request")).Send(sel("URL")).Send(sel("absoluteString")))
-						own := w.ownNavigation
-						w.ownNavigation = false
+						// The app's source loads in the main frame, so a new window's action is the page's.
+						own := frame != 0 && w.ownNavigation
+						if frame != 0 {
+							w.ownNavigation = false
+						}
 						allowed := fileNavigable(url, w.fileDir, w.config.Restricted)
-						if allowed && w.config.Restricted && !own {
+						if allowed && own {
+							allowed = w.config.SourceNavigable(url)
+						} else if allowed {
 							allowed = w.config.Navigable(url)
 						}
 						if !allowed {
@@ -416,10 +421,11 @@ func (w *Web) addScripts() {
 }
 
 func (w *Web) load(src driver.WebSource) {
-	w.ownNavigation = true
+	w.ownNavigation = false
 	w.fileDir = ""
 	switch {
 	case src.HTML != "":
+		w.ownNavigation = true
 		base := objc.ID(0)
 		if src.BaseURL != "" {
 			base = nsURL(src.BaseURL)
@@ -435,6 +441,7 @@ func (w *Web) load(src driver.WebSource) {
 				w.web.Send(sel("loadFileURL:allowingReadAccessToURL:"), url, access)
 				return
 			}
+			w.ownNavigation = true
 			request := objc.ID(Class("NSMutableURLRequest")).Send(sel("requestWithURL:"), url)
 			for name, value := range w.config.Headers {
 				request.Send(sel("setValue:forHTTPHeaderField:"), NSString(value), NSString(name))

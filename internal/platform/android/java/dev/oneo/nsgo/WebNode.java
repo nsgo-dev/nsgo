@@ -145,7 +145,6 @@ final class WebNode {
     private boolean restricted;
     private String[] hosts = new String[0];
     private String[] schemes = new String[0];
-    private boolean ownNavigation;
 
     /** The theme the page's prefers-color-scheme follows from Android 13. */
     private final ContextThemeWrapper themed;
@@ -249,21 +248,16 @@ final class WebNode {
     private final class Client extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(WebView web, WebResourceRequest request) {
+            // WebView does not ask here about the app's own loads (loadUrl, loadDataWithBaseURL), so every navigation here is the page's, a redirect of the app's included.
             if (!request.isForMainFrame()) return false;
             String url = request.getUrl().toString();
-            if (ownNavigation) {
-                ownNavigation = false;
-                return false;
-            }
             if (navigable(url)) return false;
-            reporter.report(Protocol.EVENT_ERROR, "nsgo: the web view may not navigate to " + url
-                    + " (the webview capability's hosts or schemes)", new Navigation(url, "", false, false, false));
+            reporter.report(Protocol.EVENT_ERROR, "nsgo: the web view may not navigate to " + url + " (the webview capability's hosts or schemes)", new Navigation(url, "", false, false, false));
             return true;
         }
 
         @Override
         public void onPageStarted(WebView web, String url, Bitmap favicon) {
-            ownNavigation = false;
             // android.webkit cannot run a script at document start: only androidx's WebViewCompat.addDocumentStartJavaScript can, which the runtime does without. The bridge, then the app's script before content, run as the page starts instead, so a page's earliest scripts may run before them.
             // This runs after the page at url committed, and evaluateJavascript reaches the page committed last. The view shows url, or for HTML loadDataWithBaseURL loaded, whose commit is a data: URL, the history URL. Showing another URL, it has committed another page since, whose own start comes next, or the app started a load of the URL it shows, which the page here would report until it commits: so then no page gets a bridge.
             String shown = web.getUrl();
@@ -684,7 +678,6 @@ final class WebNode {
 
     /** Loads a source, the config's or Ref.Load's, which leaves the config's alone. */
     private void load(String src, String html, String baseURL) {
-        ownNavigation = true;
         // Apps load their own files; pages from elsewhere may not.
         WebSettings settings = view.getSettings();
         if (!html.isEmpty()) {

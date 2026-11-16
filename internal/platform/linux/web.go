@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -95,6 +96,8 @@ var (
 	webkitURIRequestGetHTTPHeaders       func(uintptr) uintptr
 	webkitURIRequestGetURI               func(uintptr) uintptr
 	webkitPolicyDecisionIgnore           func(uintptr)
+	webkitResponseDecisionGetRequest     func(uintptr) uintptr
+	webkitResponseDecisionIsMainFrame    func(uintptr) bool
 	webkitMessageHeadersAppend           func(uintptr, *byte, *byte)
 	jscValueToString                     func(uintptr) uintptr
 )
@@ -196,6 +199,8 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitURIRequestGetHTTPHeaders, "webkit_uri_request_get_http_headers")
 	reg(&webkitURIRequestGetURI, "webkit_uri_request_get_uri")
 	reg(&webkitPolicyDecisionIgnore, "webkit_policy_decision_ignore")
+	reg(&webkitResponseDecisionGetRequest, "webkit_response_policy_decision_get_request")
+	reg(&webkitResponseDecisionIsMainFrame, "webkit_response_policy_decision_is_main_frame_main_resource")
 	purego.RegisterLibFunc(&webkitMessageHeadersAppend, soup, "soup_message_headers_append")
 	purego.RegisterLibFunc(&jscValueToString, jsc, "jsc_value_to_string")
 	bindWebCookies(webkit, soup)
@@ -215,6 +220,7 @@ const (
 	webkitNetworkFailed    = 399 // WEBKIT_NETWORK_ERROR_FAILED
 	webkitPolicyInterrupt  = 102 // WEBKIT_POLICY_ERROR_FRAME_LOAD_INTERRUPTED_BY_POLICY_CHANGE
 	webkitNewWindowAction  = 1   // WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION
+	webkitResponse         = 2   // WEBKIT_POLICY_DECISION_TYPE_RESPONSE
 	webkitCookieSQLite     = 1   // WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE
 	gtkOverflowHidden      = 1
 )
@@ -246,7 +252,8 @@ type web struct {
 	made          bool
 	failed        bool             // the navigation failed; WebKit still finishes it
 	pending       bool             // a load waits for the page to be mapped
-	ownNavigation bool             // the next top-level navigation is the app's source load
+	ownNavigation bool             // loadWeb started the app's source, until it commits or fails
+	about         string           // the about: URL the last navigation action went to, which the top level's next start is held to (webPolicyCallback)
 	source        driver.WebSource // what the pending or last load shows: the config's, or Ref.Load's
 	background    [4]float32       // WebKit's own, for views without an opaque one
 	pointer       driver.Point     // where the pointer is in the page
@@ -793,9 +800,18 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 	switch event {
 	case webkitLoadStarted:
 		v.web.failed = false
-		v.web.ownNavigation = false
+		// An about: page loads with no response for webPolicyCallback to hold, and only the top level's load starts here. The URI of a load from the network is already the new one; one still showing the committed page's is the about: page the last action went to.
+		about := v.web.about
+		v.web.about = ""
+		if about != "" && !v.web.ownNavigation && goString(webkitWebViewGetURI(page)) == v.web.page && !v.web.config.Navigable(about) {
+			v.web.failed = true
+			webkitWebViewStopLoading(page)
+			w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: driver.RefusedNavigation(about), Navigation: &driver.WebNavigation{URL: about}})
+			return
+		}
 		w.navigated(v, true, driver.EventLoadStart)
 	case webkitLoadCommitted:
+		v.web.ownNavigation = false
 		// From here the view's URI is the page that posts; until a load commits, the page before it still does.
 		v.web.page = goString(webkitWebViewGetURI(page))
 	case webkitLoadFinished:
@@ -819,6 +835,7 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 		return 0
 	}
 	v.web.failed = true
+	v.web.ownNavigation = false
 	if gerr != 0 {
 		e := (*gError)(cPointer(gerr))
 		// Stopped or replaced by another navigation: not errors.
@@ -836,26 +853,51 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 	return 1 // the app shows failures itself, without WebKit's error page
 }
 
-// webPolicyCallback refuses the navigations a restricted view's config
-// does not allow: the top level's (decide-policy's navigation actions)
-// and new windows'.
+// webPolicyCallback refuses the navigations a restricted view's config does not allow: the top level's and new windows'. WebKitGTK asks about every frame's navigation actions without saying which frame's an action is, so a page of the page's own making (driver.PageSchemes), which a frame within the page may load too, is held where the top level's can be told: a data: or blob: page at its response, and an about: page, which has none, as the top level starts to load it (webLoadChangedCallback).
 func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 {
 	w, v := webOf(data, page)
-	if v == nil || !v.web.config.Restricted || kind > webkitNewWindowAction {
+	if v == nil || !v.web.config.Restricted || kind > webkitResponse {
 		return 0
 	}
-	url := goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
-	if v.web.ownNavigation {
-		v.web.ownNavigation = false
-		return 0
+	var url string
+	allowed := v.web.config.Navigable
+	switch kind {
+	case webkitResponse:
+		if !webkitResponseDecisionIsMainFrame(decision) {
+			return 0
+		}
+		url = goString(webkitURIRequestGetURI(webkitResponseDecisionGetRequest(decision)))
+		if !pageScheme(url) {
+			return 0
+		}
+		if v.web.ownNavigation {
+			allowed = v.web.config.SourceNavigable
+		}
+	case webkitNewWindowAction:
+		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
+	default:
+		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
+		v.web.about = ""
+		if pageScheme(url) {
+			if scheme, _, _ := strings.Cut(url, ":"); strings.EqualFold(scheme, "about") {
+				v.web.about = url
+			}
+			return 0
+		}
 	}
-	if v.web.config.Navigable(url) {
+	if allowed(url) {
 		return 0
 	}
 	webkitPolicyDecisionIgnore(decision)
 	w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: driver.RefusedNavigation(url),
 		Navigation: &driver.WebNavigation{URL: url}})
 	return 1
+}
+
+// pageScheme reports whether url is a page of a page's own making.
+func pageScheme(url string) bool {
+	scheme, _, ok := strings.Cut(url, ":")
+	return ok && slices.ContainsFunc(driver.PageSchemes, func(s string) bool { return strings.EqualFold(s, scheme) })
 }
 
 // webPermissionCallback answers getUserMedia with what the config's

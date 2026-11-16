@@ -139,27 +139,40 @@ func TestAccessAllowsRegisteredWebScheme(t *testing.T) {
 }
 
 func TestAccessWebSchemesRestrictPageOwnedNavigations(t *testing.T) {
-	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
-		outer := Func(func(cx *Scope) Node {
-			cx.ProvideAccess(schemesAccess{hostsAccess: hostsAccess{hosts: []string{"*"}}, schemes: []string{"about", "blob"}})
-			inner := Func(func(cx *Scope) Node {
-				cx.ProvideAccess(schemesAccess{hostsAccess: hostsAccess{hosts: []string{"*"}}, schemes: []string{"blob", "data"}})
-				return WebView{Source: WebSrc("https://example.com"), TestID: "web"}
+	web := hostsAccess{hosts: []string{"*"}}
+	for _, tc := range []struct {
+		name         string
+		outer, inner Access
+		want         string
+	}{
+		{"without WebSchemes", web, nil, "about blob data"},
+		{"nil", schemesAccess{web, nil}, nil, ""},
+		{"normalized", schemesAccess{web, []string{"DATA", "javascript", "file", "Blob"}}, nil, "blob data"},
+		{"nested", schemesAccess{web, []string{"about", "blob"}}, schemesAccess{web, []string{"blob", "data"}}, "blob"},
+		{"nested under one without", web, schemesAccess{web, []string{"data"}}, "data"},
+		{"nested over one without", schemesAccess{web, []string{"about"}}, web, "about"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+				cx.ProvideAccess(tc.outer)
+				return Func(func(cx *Scope) Node {
+					if tc.inner != nil {
+						cx.ProvideAccess(tc.inner)
+					}
+					return WebView{Source: WebSrc("https://example.com"), TestID: "web"}
+				})
 			})
-			return inner
-		})
-		return outer
-	})
-	b := h.commit()
-	for _, item := range b.Items {
-		if item.Kind == driver.ItemWeb {
-			if item.Web.Schemes != "blob" {
-				t.Fatalf("web schemes %q, want blob", item.Web.Schemes)
+			for _, item := range h.commit().Items {
+				if item.Kind == driver.ItemWeb {
+					if !item.Web.Restricted || item.Web.Schemes != tc.want {
+						t.Fatalf("web view restricted %v, schemes %q, want %q", item.Web.Restricted, item.Web.Schemes, tc.want)
+					}
+					return
+				}
 			}
-			return
-		}
+			t.Fatal("no web item")
+		})
 	}
-	t.Fatal("no web item")
 }
 
 // mediaAccess allows web views every page and the devices named.
@@ -303,16 +316,6 @@ func TestWebConfigNavigable(t *testing.T) {
 	}
 	if got := driver.IntersectHosts([]string{"*.example.com", "a.com"}, []string{"api.example.com", "*"}); !slices.Equal(got, []string{"api.example.com", "*.example.com", "a.com"}) {
 		t.Fatalf("IntersectHosts = %v", got)
-	}
-	if got := driver.IntersectSchemes([]string{"data", "blob"}, []string{"blob", "about"}); !slices.Equal(got, []string{"blob"}) {
-		t.Fatalf("IntersectSchemes = %v", got)
-	}
-	limited := c
-	limited.Schemes = "blob"
-	for raw, want := range map[string]bool{"about:blank": false, "blob:https://ok.com/id": true, "data:text/html,x": false} {
-		if got := limited.Navigable(raw); got != want {
-			t.Errorf("limited Navigable(%q) = %v, want %v", raw, got, want)
-		}
 	}
 }
 
