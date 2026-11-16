@@ -193,3 +193,33 @@ func TestGlobalShortcutTakenWithoutPortal(t *testing.T) {
 		}
 	}
 }
+
+// TestPortalShortcutTwiceIsTaken registers one combination twice where X11 grabs nothing, so both go to the portal path: the second is taken at once, as it is on X11 and the other desktops, rather than sent to the portal again.
+func TestPortalShortcutTwiceIsTaken(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("WAYLAND_DISPLAY") == "" && os.Getenv("DISPLAY") == "" {
+		t.Skip("needs a display")
+	}
+	bindX11HotKeys()
+	ready := x11HotKeysReady
+	x11HotKeysReady = false
+	t.Cleanup(func() { x11HotKeysReady = ready })
+	title := "nsgo-hotkey-portal-twice"
+	w := startTestWindow(t, hotKeyStatesApp(title, "ctrl+alt+k", "ctrl+alt+k"), Options{Title: title, Width: 200, Height: 100})
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		got := w.titleOf(t)
+		if first, second, ok := strings.Cut(strings.TrimPrefix(got, title+"|"), "|"); ok && strings.HasPrefix(got, title+"|") && second != "pending" {
+			if second != "taken" || first == "taken" {
+				t.Fatalf("the combination asked for twice answered %q, want the second taken and the first not", got)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("window title = %q, want the second shortcut answered", got)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}

@@ -392,12 +392,19 @@ func (w *window) applyHotKeys(keys []driver.KeyBinding) {
 		return
 	}
 	state := &globalHotKeys{ids: map[string]uint32{}, x11Taken: taken}
+	triggers := map[string]bool{}
 	for _, key := range keys {
 		trigger, ok := portalTrigger(key.Key)
 		if !ok {
 			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
+		// A combination the app asks for twice is taken, as it is on X11 and the other desktops, rather than sent to the portal again.
+		if triggers[trigger] {
+			w.hotKeyState(key.ID, driver.HotKeyTaken)
+			continue
+		}
+		triggers[trigger] = true
 		id := strconv.FormatUint(uint64(key.ID), 10)
 		state.specs = append(state.specs, globalHotKeySpec{id: id, key: key.ID, trigger: trigger})
 		state.ids[id] = key.ID
