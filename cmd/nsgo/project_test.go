@@ -3,9 +3,36 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"testing"
 )
+
+func TestBareID(t *testing.T) {
+	// Android's PackageParser takes segments of letters, digits and underscores that start with a letter; Apple's CFBundleIdentifier takes letters, digits, hyphens and dots.
+	android := regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$`)
+	apple := regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
+	for name, want := range map[string]string{
+		"formula": "dev.nsgo.formula",
+		"Chat":    "dev.nsgo.Chat",
+		"my-lib":  "dev.nsgo.mylib",
+		"ui_kit":  "dev.nsgo.uikit",
+		"v1.2":    "dev.nsgo.v12",
+		"2d":      "dev.nsgo.app2d",
+		"001":     "dev.nsgo.app001",
+		"café":    "dev.nsgo.caf",
+		"/":       "dev.nsgo.app",
+		"テスト":     "dev.nsgo.app",
+	} {
+		got := bareID(name)
+		if got != want {
+			t.Errorf("bareID(%q) = %q, want %q", name, got, want)
+		}
+		if !android.MatchString(got) || !apple.MatchString(got) {
+			t.Errorf("bareID(%q) = %q, not an Android package and an Apple bundle ID", name, got)
+		}
+	}
+}
 
 func TestHotReload(t *testing.T) {
 	for _, tt := range []struct {
