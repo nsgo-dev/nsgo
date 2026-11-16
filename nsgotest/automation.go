@@ -559,11 +559,12 @@ func menuItemAt(items []driver.MenuEntry, path []string) (*driver.MenuEntry, str
 	return nil, "no menu item"
 }
 
-// shownAlert is an alert showing and the surface showing it.
+// shownAlert is an alert showing, the surface showing it, and where it is among its model's alerts.
 type shownAlert struct {
 	surface uint32
 	f       *followed
 	alert   driver.AlertConfig
+	index   int
 }
 
 // alerts lists the alerts showing, the app's own first, then each window's, oldest first: window's alone when it names one.
@@ -576,8 +577,8 @@ func (g *agent) alerts(window *uint32) []shownAlert {
 			continue
 		}
 		f := g.surfaces[id]
-		for _, a := range f.app.alerts {
-			out = append(out, shownAlert{id, f, a})
+		for i, a := range f.app.alerts {
+			out = append(out, shownAlert{id, f, a, i})
 		}
 	}
 	return out
@@ -615,10 +616,8 @@ func (g *agent) alert(p *automation.AlertParams) (any, *automation.Error) {
 	}
 	a := s.f.app
 	if a.target == nil {
-		// App.Answer answers the oldest of a model's alerts.
-		i := slices.IndexFunc(a.alerts, func(c driver.AlertConfig) bool { return c.ID == s.alert.ID })
-		a.alerts = append([]driver.AlertConfig{a.alerts[i]}, slices.Delete(slices.Clone(a.alerts), i, i+1)...)
-		if err := g.tb.try(func() { a.Answer(index) }); err != nil {
+		// By its place, as a model's surfaces number their alerts alike, answered to the surface that showed it.
+		if err := g.tb.try(func() { a.answerAt(s.index, index) }); err != nil {
 			return nil, err
 		}
 		return list(), nil

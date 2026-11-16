@@ -152,9 +152,7 @@ func (a *App) gesture(v *View, kind driver.EventKind, n int, step func(*driver.E
 	send(driver.GestureEnded, n-1)
 }
 
-// ChooseMenu chooses the application menu item at path, its labels from
-// the menu bar down, such as "File", "New".
-// the menu bar down, such as "File", "New".
+// ChooseMenu chooses the application menu item at path, its labels from the menu bar down, such as "File", "New": of Menu, which with a desktop environment is the main window's, else the one the app's function set.
 func (a *App) ChooseMenu(path ...string) {
 	a.t.Helper()
 	items := a.Menu
@@ -181,7 +179,7 @@ func (a *App) ChooseMenu(path ...string) {
 				a.done()
 				return
 			}
-			a.dispatch(driver.Event{Kind: driver.EventMenu, Count: found.ID})
+			a.dispatchOn(a.menuTree, driver.Event{Kind: driver.EventMenu, Count: found.ID})
 			return
 		}
 		items = found.Items
@@ -218,7 +216,7 @@ func (a *App) ChoosePopup(path ...string) {
 				return
 			}
 			if found.ID != 0 {
-				a.post(driver.Event{Kind: driver.EventMenu, Count: found.ID})
+				a.postTo(a.popupTree, driver.Event{Kind: driver.EventMenu, Count: found.ID})
 			}
 			a.ClosePopup()
 			return
@@ -239,17 +237,17 @@ func (a *App) ClosePopup() {
 		return
 	}
 	if a.popupID != 0 {
-		a.post(driver.Event{Kind: driver.EventMenuClosed, Count: a.popupID})
-		a.PopupMenu, a.popupID = nil, 0
+		a.postTo(a.popupTree, driver.Event{Kind: driver.EventMenuClosed, Count: a.popupID})
+		a.PopupMenu, a.popupID, a.popupTree = nil, 0, nil
 	}
 	a.Settle()
 }
 
-// CloseWindow asks the main window to close, as its close button does, and reports whether it closed: its OnClosing handlers run newest first, and it closes unless one cancels. It needs a desktop environment (macOS, Windows or Linux), where the app shows in a window, and runs headless only.
+// CloseWindow asks the main window to close, as its close button does, and reports whether it closed: its OnClosing handlers run newest first, and it closes unless one cancels. It needs a main window open, which a macOS environment, or StartApp with a Windows or Linux one, opens, and runs headless only.
 func (a *App) CloseWindow() bool {
 	a.t.Helper()
 	if a.target == nil && (a.appTree == nil || a.tree == a.appTree) {
-		a.t.Fatal("nsgotest: no window to close: CloseWindow needs a desktop environment and a main window open")
+		a.t.Fatal("nsgotest: no window to close: CloseWindow needs a main window open: a macOS environment, or StartApp with a Windows or Linux one")
 	}
 	w := a.tree
 	a.dispatch(driver.Event{Kind: driver.EventWindowClose})

@@ -258,20 +258,51 @@ func (a *App) send(v *View, ev driver.Event) {
 	}
 }
 
-// applyAside applies a batch of a surface steps do not act on, the app's own or a window other than the main one: what it asks of the platform, such as alerts and permissions, but not its views, title or window commands, which the model keeps for the main window.
+// applyAside applies a batch of a surface steps do not act on, the app's own or a window other than the main one: what it asks of the platform, such as alerts, permissions and context menus, which are answered to it, and the app's own application menu, but not its views, keyboard shortcuts, title or window commands, nor another window's menu bar, which the model keeps for the main window.
 func (a *App) applyAside(b *driver.MountBatch) {
 	aside := *b
 	aside.LayoutAnimation = nil
 	aside.Items = slices.DeleteFunc(slices.Clone(b.Items), func(it driver.MountItem) bool {
 		switch it.Kind {
-		case driver.ItemAnimation, driver.ItemDismissKeyboard, driver.ItemBlockNative, driver.ItemAccessibilityFocus, driver.ItemTitle, driver.ItemWindow:
+		case driver.ItemAnimation, driver.ItemDismissKeyboard, driver.ItemBlockNative, driver.ItemAccessibilityFocus, driver.ItemTitle, driver.ItemWindow, driver.ItemKeymap:
 			return true
+		case driver.ItemMenu:
+			return a.responseTree != a.appTree
 		}
 		return it.ID != 0
 	})
 	root := a.rootID
 	a.apply(&aside)
 	a.rootID = root
+}
+
+// setMenu records the application menu tree set, nil restoring the platform's.
+func (a *App) setMenu(tree *core.Tree, menu []driver.MenuEntry) {
+	if a.menus == nil {
+		a.menus = map[*core.Tree][]driver.MenuEntry{}
+	}
+	a.menus[tree] = menu
+	a.showMenu()
+}
+
+// showMenu shows the main window's menu, else the one the app's own surface set, as a macOS app's application menu.
+func (a *App) showMenu() {
+	a.Menu, a.menuTree = a.menus[a.tree], a.tree
+	if a.Menu == nil && a.appTree != nil {
+		a.Menu, a.menuTree = a.menus[a.appTree], a.appTree
+	}
+}
+
+// closed forgets what a surface that closed left in the model: a context menu it showed, its menu, and for the main window its views and keyboard shortcuts, as nothing is left there for steps to reach.
+func (a *App) closed(surface *core.Tree) {
+	delete(a.menus, surface)
+	if a.popupTree == surface {
+		a.PopupMenu, a.popupID, a.popupTree = nil, 0, nil
+	}
+	if surface == a.tree {
+		a.views, a.rootID, a.tree, a.main, a.Keymap, a.keyBindings = map[driver.NodeID]*View{}, 0, a.appTree, nil, nil, nil
+	}
+	a.showMenu()
 }
 
 func (a *App) apply(b *driver.MountBatch) {
@@ -601,10 +632,11 @@ func (a *App) apply(b *driver.MountBatch) {
 				a.Restarts++
 			}
 		case driver.ItemPopupMenu:
+			// One context menu shows at a time, whichever surface asks.
 			if a.popupID != 0 {
-				a.post(driver.Event{Kind: driver.EventMenuClosed, Count: a.popupID})
+				a.postTo(a.popupTree, driver.Event{Kind: driver.EventMenuClosed, Count: a.popupID})
 			}
-			a.PopupMenu, a.PopupAt, a.popupID = it.Menu, it.Point, it.Count
+			a.PopupMenu, a.PopupAt, a.popupID, a.popupTree = it.Menu, it.Point, it.Count, a.responseTree
 		case driver.ItemImageInfo:
 			ev := driver.Event{Kind: driver.EventImageInfo, Count: it.Count}
 			if size, ok := a.ImageSizes[it.Image.Source.URI]; ok {
@@ -632,7 +664,7 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemDirection:
 			a.Language, a.LanguageForced = it.Language, it.Forced
 		case driver.ItemMenu:
-			a.Menu = it.Menu
+			a.setMenu(a.responseTree, it.Menu)
 		case driver.ItemWindow:
 			a.Window = append(a.Window, *it.Window)
 		case driver.ItemOpenSurface:

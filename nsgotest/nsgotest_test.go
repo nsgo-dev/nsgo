@@ -312,7 +312,7 @@ func TestOtherWindowsLeaveTheMainOnesViews(t *testing.T) {
 		})
 		cx.ShowAlert(core.AlertConfig{Title: "Main?", Actions: []core.AlertAction{{Label: "Yes"}}}, func(i int) { answers = append(answers, "main") })
 		return core.View{TestID: "main", Children: []core.Node{core.Text{Content: "main window"}}}
-	}, Environment(core.Environment{OS: core.OSWindows}), PendingAlerts())
+	}, Environment(core.Environment{OS: core.OSMacOS}), PendingAlerts())
 	app.Find("id:main")
 	app.Find("text:main window")
 	if len(app.Query("id:other")) != 0 {
@@ -330,5 +330,153 @@ func TestOtherWindowsLeaveTheMainOnesViews(t *testing.T) {
 	}
 	if got := strings.Join(answers, " "); got != want {
 		t.Fatalf("answers reached %q, want %q", got, want)
+	}
+}
+
+// StartApp runs the app's function once in the app's own scope, as nsgo.Run does: what it registers lives as long as the app, and with a desktop environment the view it sets shows in the main window, whose steps reach it, while its application menu chooses in that scope.
+func TestStartAppKeepsTheAppsScope(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux} {
+		var disposed bool
+		var chosen, quits int
+		var w *desktop.Window
+		app := StartApp(t, func(cx *core.Scope) {
+			cx.Cleanup(func() { disposed = true })
+			desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{{Label: "New", OnSelect: func() { chosen++ }}}}})
+			desktop.OnQuitRequest(cx, func(*desktop.QuitRequest) { quits++ })
+			cx.SetMainView(func(cx *core.Scope) core.Node {
+				w = desktop.CurrentWindow(cx)
+				return core.Text{Content: "main", TestID: "main"}
+			})
+		}, Environment(core.Environment{OS: os}))
+		if disposed {
+			t.Fatalf("%v: the app's scope was disposed as it started", os)
+		}
+		if w == nil || app.root.MainWindow() != w {
+			t.Fatalf("%v: the main view is not in the main window", os)
+		}
+		app.Find("id:main")
+		app.ChooseMenu("File", "New")
+		if chosen != 1 {
+			t.Fatalf("%v: the menu item ran %d times", os, chosen)
+		}
+		app.Report(driver.Event{Kind: driver.EventQuitRequest, Count: 1})
+		if quits != 1 {
+			t.Fatalf("%v: the quit handler ran %d times", os, quits)
+		}
+	}
+	// Elsewhere the main view fills the app's one surface.
+	app := StartApp(t, func(cx *core.Scope) {
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			if desktop.CurrentWindow(cx) != nil {
+				t.Error("a phone opened a window")
+			}
+			return core.Text{Content: "main", TestID: "main"}
+		})
+	}, Environment(core.Environment{OS: core.OSIOS}))
+	app.Find("id:main")
+}
+
+// Given a root view, Windows and Linux open no window, as nsgo.Run does there, and macOS shows it in the main window.
+func TestStartOpensWindowsWhereRunDoes(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	for os, want := range map[core.OS]bool{core.OSMacOS: true, core.OSWindows: false, core.OSLinux: false} {
+		var w *desktop.Window
+		app := Start(t, func(cx *core.Scope) core.Node {
+			w = desktop.CurrentWindow(cx)
+			return core.Text{Content: "main", TestID: "main"}
+		}, Environment(core.Environment{OS: os}))
+		app.Find("id:main")
+		if (w != nil) != want {
+			t.Errorf("%v: the root view's window is %v, want one %v", os, w, want)
+		}
+	}
+}
+
+// Steps act on the window SetMainView opens, not on one the app opened before it, and on the next one once it closes and the app shows its view again.
+func TestStepsFollowTheMainWindow(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var show func()
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.OpenWindow(cx, desktop.WindowOptions{Width: 200, Height: 100, Title: "Settings"}, func(cx *core.Scope) core.Node {
+			return core.Text{Content: "settings", TestID: "settings"}
+		})
+		show = func() {
+			cx.SetMainView(func(cx *core.Scope) core.Node { return core.Text{Content: "main", TestID: "main"} })
+		}
+		show()
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	app.Find("id:main")
+	if len(app.Query("id:settings")) != 0 {
+		t.Fatal("steps reach the window the app opened first")
+	}
+	if !app.CloseWindow() {
+		t.Fatal("the main window did not close")
+	}
+	app.Post(show)
+	app.Settle()
+	app.Find("id:main")
+}
+
+// Another window's shortcuts and menu bar leave the main window's, which Key and ChooseMenu reach, and a context menu any window shows chooses on that window.
+func TestOtherWindowsKeepTheirShortcutsAndMenus(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var got []string
+	app := StartApp(t, func(cx *core.Scope) {
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			cx.OnKey("mod+s", func() { got = append(got, "save") })
+			desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{{Label: "New", OnSelect: func() { got = append(got, "new") }}}}})
+			return core.Text{Content: "main", TestID: "main"}
+		})
+		desktop.OpenWindow(cx, desktop.WindowOptions{Width: 200, Height: 100, Title: "Other"}, func(cx *core.Scope) core.Node {
+			cx.OnKey("escape", func() { got = append(got, "escape") })
+			desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "Other"}})
+			desktop.PopupMenu(cx, []desktop.MenuItem{{Label: "Copy", OnSelect: func() { got = append(got, "copy") }}}, core.Point{}, func() { got = append(got, "closed") })
+			return core.Text{Content: "other"}
+		})
+	}, Environment(core.Environment{OS: core.OSWindows}))
+	if strings.Join(app.Keymap, " ") != "mod+s" {
+		t.Fatalf("keymap %v, want the main window's", app.Keymap)
+	}
+	app.Key("mod+s")
+	app.ChooseMenu("File", "New")
+	app.ChoosePopup("Copy")
+	if want := "save new copy closed"; strings.Join(got, " ") != want {
+		t.Fatalf("got %q, want %q", strings.Join(got, " "), want)
+	}
+}
+
+// Answering an alert by its place, as the automation does, answers it to the surface that showed it, though the surfaces number their alerts alike.
+func TestAnswerAtReachesTheAlertsSurface(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var answers []string
+	app := StartApp(t, func(cx *core.Scope) {
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			cx.ShowAlert(core.AlertConfig{Title: "Main?", Actions: []core.AlertAction{{Label: "Yes"}}}, func(int) { answers = append(answers, "main") })
+			return core.Text{Content: "main"}
+		})
+		desktop.OpenWindow(cx, desktop.WindowOptions{Width: 200, Height: 100}, func(cx *core.Scope) core.Node {
+			cx.ShowAlert(core.AlertConfig{Title: "Other?", Actions: []core.AlertAction{{Label: "Yes"}}}, func(int) { answers = append(answers, "other") })
+			return core.Text{Content: "other"}
+		})
+	}, Environment(core.Environment{OS: core.OSLinux}), PendingAlerts())
+	alerts := app.Alerts()
+	if len(alerts) != 2 || alerts[0].ID != alerts[1].ID {
+		t.Fatalf("alerts %+v, want two numbered alike", alerts)
+	}
+	want := map[string]string{"Main?": "main", "Other?": "other"}[alerts[1].Title]
+	app.answerAt(1, 0)
+	if len(answers) != 1 || answers[0] != want {
+		t.Fatalf("answering %q reached %v", alerts[1].Title, answers)
 	}
 }

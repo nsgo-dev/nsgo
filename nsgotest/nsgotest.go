@@ -323,7 +323,7 @@ type App struct {
 	// AccessibilityFocus is the view the app last moved the screen
 	// reader's focus to.
 	AccessibilityFocus *View
-	// Keymap is the keyboard shortcuts the app binds; Title its title.
+	// Keymap is the keyboard shortcuts the app binds, with a desktop environment in the main window; Title its title.
 	Keymap []string
 	Title  string
 	// Language is the language the platform labels its menus in, and
@@ -331,8 +331,7 @@ type App struct {
 	// which Apple platforms keep for the system's words in later launches.
 	Language       string
 	LanguageForced bool
-	// Menu is the application menu the app set; Window the window
-	// commands it sent, oldest first.
+	// Menu is the application menu the app set, with a desktop environment the main window's or else the app's own surface's; Window the window commands it sent, oldest first.
 	Menu   []driver.MenuEntry
 	Window []driver.WindowCommand
 	// ImageSizes are the pixel sizes of the images the model's platform
@@ -349,6 +348,10 @@ type App struct {
 	// responseTree is the surface whose batch is being applied, which the platform's answers to what it asked go back to; guideTree the one that asked for the permission guide shown.
 	responseTree *core.Tree
 	guideTree    *core.Tree
+	// menus are the application menus the surfaces set, by tree, nil under a target; menuTree is the one Menu came from and popupTree the one that shows PopupMenu, where choosing their items goes.
+	menus     map[*core.Tree][]driver.MenuEntry
+	menuTree  *core.Tree
+	popupTree *core.Tree
 
 	// StatusBar is the status bar the app last set.
 	StatusBar driver.StatusBarConfig
@@ -410,8 +413,20 @@ type App struct {
 	clicks      uint32
 }
 
-// Start runs app and settles it; the test's cleanup disposes it. Under `nsgo test -target` it opens the app on that platform instead. With a desktop Environment (macOS, Windows or Linux) app shows in the main window, as on a desktop, which steps act on.
+// Start runs app, a root view, and settles it; the test's cleanup disposes it. Under `nsgo test -target` it opens the app on that platform instead. With a macOS Environment app shows in the main window, as nsgo.Run shows a root view there, which steps act on; with any other, Windows and Linux included, it fills the app's one surface, as nsgo.Run's does. An app run with its function is tested with StartApp.
 func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *App {
+	t.Helper()
+	return start(t, app, nil, opts)
+}
+
+// StartApp runs the app's function app, as nsgo.Run(app) does, and settles it; the test's cleanup disposes it. app runs once in the app's own scope, where what it registers, such as its application menu, quit handlers and global shortcuts, lives. With a desktop Environment (macOS, Windows or Linux) it opens windows as on a desktop, and the view SetMainView sets shows in the main window, which steps act on; with any other that view fills the app's one surface. Under `nsgo test -target` it opens core.AppRoot(app) on that platform instead.
+func StartApp(t testing.TB, app func(app *core.Scope), opts ...Option) *App {
+	t.Helper()
+	return start(t, nil, app, opts)
+}
+
+// start starts a root view, view, or an app's function, fn.
+func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.Scope), opts []Option) *App {
 	t.Helper()
 	a := &App{
 		t:        t,
@@ -440,11 +455,22 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 		t.Skip("nsgotest: ManualFrames steps the clock, which runs headless only")
 	}
 	if onTarget() {
-		a.startTarget(app)
+		if view == nil {
+			view = core.AppRoot(fn)
+		}
+		a.startTarget(view)
 		return a
 	}
-	// With a desktop environment the app opens windows, as on a desktop: its main view shows in the main window, where CurrentWindow, MainWindow and OnClosing work and CloseWindow closes it.
-	desktop := a.env != nil && (a.env.OS == driver.OSMacOS || a.env.OS == driver.OSWindows || a.env.OS == driver.OSLinux)
+	// Where nsgo.Run opens windows the app does here: on macOS, and on Windows and Linux for an app's function. Its main view shows in the main window, where CurrentWindow, MainWindow and OnClosing work and CloseWindow closes it.
+	var desktop bool
+	if a.env != nil {
+		switch a.env.OS {
+		case driver.OSMacOS:
+			desktop = true
+		case driver.OSWindows, driver.OSLinux:
+			desktop = fn != nil
+		}
+	}
 	var windows *core.WindowOptions
 	if desktop {
 		windows = &core.WindowOptions{Width: a.size.Width, Height: a.size.Height}
@@ -493,11 +519,17 @@ func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *Ap
 		a.tree.SetEnvironment(*a.env)
 	}
 	if desktop {
+		// The app's own surface runs the app's function, as on a desktop; a root view is one showing it as the main view, as nsgo.Run makes it.
 		a.appTree = a.tree
-		a.tree.Mount(core.AppRoot(func(cx *core.Scope) { cx.SetMainView(app) }))
-	} else {
-		a.tree.Mount(app)
+		if fn == nil {
+			main := view
+			fn = func(cx *core.Scope) { cx.SetMainView(main) }
+		}
 	}
+	if fn != nil {
+		view = core.AppRoot(fn)
+	}
+	a.tree.Mount(view)
 	a.done()
 	return a
 }
@@ -550,10 +582,7 @@ func (a *App) Settle() {
 			commit(a.appTree)
 			for _, surface := range slices.Clone(a.appTree.Surfaces()) {
 				if surface.Closed() {
-					if surface == a.tree {
-						// The main window closed: nothing is left for steps to reach.
-						a.views, a.rootID, a.tree = map[driver.NodeID]*View{}, 0, a.appTree
-					}
+					a.closed(surface)
 					surface.Forget()
 					continue
 				}
@@ -563,9 +592,10 @@ func (a *App) Settle() {
 					if a.env != nil {
 						surface.SetEnvironment(*a.env)
 					}
-					// The first window the app opens is its main one, which SetMainView opened: the one steps act on.
-					if a.main == nil {
+					// The main window, which SetMainView opens, is the one steps act on, from its first batch: not a panel, a tray view or another window the app opened before it.
+					if a.main == nil && surface.Window() != nil && surface.Window() == a.root.MainWindow() {
 						a.main, a.tree = surface, surface
+						a.showMenu()
 					}
 				}
 				commit(surface)
@@ -948,15 +978,18 @@ func (a *App) Answer(index int) {
 	if len(a.alerts) == 0 {
 		a.t.Fatal("nsgotest: no alert to answer")
 	}
-	alert := a.alerts[0]
-	a.alerts = a.alerts[1:]
+	a.answerAt(0, index)
+}
+
+// answerAt chooses the button at index of the alert at i in Alerts, headless on the surface that showed it, as each numbers its alerts itself.
+func (a *App) answerAt(i, index int) {
+	alert := a.alerts[i]
+	a.alerts = slices.Delete(slices.Clone(a.alerts), i, i+1)
 	if a.target != nil {
 		a.target.answer(alert, index)
 		return
 	}
-	var tree *core.Tree
-	if len(a.alertTrees) > 0 {
-		tree, a.alertTrees = a.alertTrees[0], a.alertTrees[1:]
-	}
+	tree := a.alertTrees[i]
+	a.alertTrees = slices.Delete(slices.Clone(a.alertTrees), i, i+1)
 	a.dispatchOn(tree, driver.Event{Kind: driver.EventAlert, Count: alert.ID, Index: index})
 }

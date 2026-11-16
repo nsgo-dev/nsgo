@@ -847,6 +847,9 @@ func (t *Tree) Surfaces() []*Tree { return t.rt.surfaces }
 // its window, and the engine forgets it.
 func (t *Tree) Closed() bool { return t.closed }
 
+// Window returns the window, panel or tray view an opened surface's tree shows, nil for the first tree: what a host compares with Scope.MainWindow to find the main window's tree.
+func (t *Tree) Window() *Window { return t.window }
+
 // Forget drops a closed surface's tree.
 func (t *Tree) Forget() {
 	t.rt.surfaces = slices.DeleteFunc(t.rt.surfaces, func(o *Tree) bool { return o == t })
