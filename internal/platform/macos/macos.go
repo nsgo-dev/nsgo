@@ -1719,6 +1719,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemStatusBar, driver.ItemBackUnhandled, driver.ItemBackPreview, driver.ItemHistory:
 			continue
 		}
+		if int(it.ID) >= len(s.views) || s.views[it.ID] == nil {
+			continue
+		}
 		v := s.views[it.ID]
 		switch it.Kind {
 		case driver.ItemDelete:

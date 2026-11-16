@@ -328,9 +328,10 @@ type listCell struct {
 // listCommand is a scroll a Ref asked a list for, resolved with the
 // sizes known in the next update.
 type listCommand struct {
-	pin      *listPin // ScrollToIndex or ScrollToEnd; nil for to
-	to       Point
-	animated bool
+	pin       *listPin // ScrollToIndex or ScrollToEnd; nil for to
+	to        Point
+	animated  bool
+	transient bool // a Ref command, rather than the list's initial position
 }
 
 func (t *Tree) mountList(cx *Scope, parent *node, l List) {
@@ -1085,6 +1086,10 @@ func (t *Tree) updateLists() bool {
 			continue
 		}
 		live = append(live, l)
+		if t.detached(l) {
+			l.list.cmds = slices.DeleteFunc(l.list.cmds, func(c listCommand) bool { return c.transient })
+			continue
+		}
 		if l.list.st.parent {
 			_, l.list.depth = l.list.findOuter()
 			parents = append(parents, l)
@@ -1132,6 +1137,9 @@ func (t *Tree) sendSticky() {
 	}
 	t.stuckIn = t.stuckIn[:0]
 	for v := range views {
+		if t.detached(v) {
+			continue
+		}
 		sc := v.scroll
 		var cells []StickyCell
 		if v.list != nil {
@@ -1229,6 +1237,7 @@ func pinRange(n *node) (*node, StickyCell, bool) {
 
 // listCommand queues a scroll for list ln's next update.
 func (t *Tree) listCommand(ln *listNode, c listCommand) {
+	c.transient = true
 	ln.cmds = append(ln.cmds, c)
 	t.relayout(ln.view)
 }

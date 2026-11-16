@@ -23,7 +23,7 @@ const (
 
 // SetAccessibilityFocus moves the screen reader's focus to the element, as after a change the user should hear about first. The web and desktops move the keyboard focus with it, to a field at least, so under a confined owner it does only as Scope.Confine allows.
 func (r *Ref) SetAccessibilityFocus() {
-	if r.n != nil && !r.n.deleted && r.t.mayMoveFocus(r.n.owner) {
+	if r.placed() && r.t.mayMoveFocus(r.n.owner) {
 		r.t.command(driver.ItemAccessibilityFocus, r.n)
 	}
 }

@@ -2376,13 +2376,13 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 break;
             }
             case Protocol.ITEM_FOCUS:
-                if (n.field != null && n.field.requestFocus()) {
+                if (n != null && n.field != null && n.field.requestFocus()) {
                     EditText field = n.field;
                     field.post(() -> ime.showSoftInput(field, InputMethodManager.SHOW_IMPLICIT));
                 }
                 break;
             case Protocol.ITEM_BLUR:
-                if (n.field != null && n.field.hasFocus()) {
+                if (n != null && n.field != null && n.field.hasFocus()) {
                     n.field.clearFocus();
                     ime.hideSoftInputFromWindow(n.field.getWindowToken(), 0);
                 }
@@ -2416,6 +2416,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.ITEM_SCROLL_TO: {
                 float x = in.readFloat(), y = in.readFloat();
                 boolean animated = Protocol.flag(in.readUnsignedByte(), 0);
+                if (n == null || !(n.scroller instanceof Scrolling.Scroller)) break;
                 Scrolling.Scroller scroller = (Scrolling.Scroller) n.scroller;
                 // Scroll views clamp to their content, which takes its new
                 // size at the next layout. Counted as applied, the scroll
@@ -2428,6 +2429,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
             case Protocol.ITEM_SCROLL_BY: {
                 float x = in.readFloat(), y = in.readFloat();
+                if (n == null || !(n.scroller instanceof Scrolling.Scroller)) break;
                 Scrolling.Scroller scroller = (Scrolling.Scroller) n.scroller;
                 afterLayout(n.scroller, () -> {
                     n.applied++;
@@ -2460,7 +2462,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 boolean centered = Protocol.flag(in.readUnsignedByte(), 0);
                 float x = in.readFloat(), y = in.readFloat();
                 boolean animated = Protocol.flag(in.readUnsignedByte(), 0);
-                if (n.scroller instanceof Scrolling.ZoomScroll) {
+                if (n != null && n.scroller instanceof Scrolling.ZoomScroll) {
                     Scrolling.ZoomScroll z = (Scrolling.ZoomScroll) n.scroller;
                     afterLayout(z, () -> z.zoomTo(scale, centered, x, y, animated));
                 }

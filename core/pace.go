@@ -4,6 +4,8 @@ import (
 	"math"
 	"slices"
 	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
 // Views made over frames, as NSH's (performance.md): a list row bound in
@@ -186,31 +188,60 @@ func (t *Tree) makeNow(n *node) {
 	}
 }
 
-// makeCommanded makes the views the commit's commands name, which a
-// backend must have.
+// makeCommanded drops commands whose targets left the tree, then makes
+// the views the remaining commands name before a backend receives them.
 func (t *Tree) makeCommanded() {
-	if len(t.waiting) == 0 {
-		return
+	kept := t.commands[:0]
+	// Queued scrolls have already contributed to core's predicted offset.
+	// Cancel them in reverse order so no unsent offset or count survives.
+	for i := len(t.commands) - 1; i >= 0; i-- {
+		it := &t.commands[i]
+		if it.ID == 0 {
+			continue
+		}
+		n := t.nodes[it.ID]
+		if n != nil && (n.deleted || t.detached(n)) && n.scroll != nil &&
+			(it.Kind == driver.ItemScrollTo || it.Kind == driver.ItemScrollBy) {
+			sc := n.scroll
+			last := len(sc.pending) - 1
+			sc.offset = sc.pending[last].before
+			sc.pending = sc.pending[:last]
+			sc.issued--
+		}
 	}
-	at := func(id NodeID) {
-		if int(id) < len(t.nodes) {
-			if n := t.nodes[id]; n != nil && !n.created {
+	for _, it := range t.commands {
+		if it.ID != 0 {
+			n := t.nodes[it.ID]
+			if n == nil || n.deleted || t.detached(n) && (!n.created || commandNeedsPlacement(it.Kind)) {
+				continue
+			}
+			if !n.created {
 				t.makeNow(n)
 			}
 		}
-	}
-	for i := range t.commands {
-		it := &t.commands[i]
-		if it.ID != 0 {
-			at(it.ID)
-		}
 		for _, c := range it.Sticky {
-			at(c.Cell)
+			if n := t.nodes[c.Cell]; n != nil && !n.deleted && !t.detached(n) && !n.created {
+				t.makeNow(n)
+			}
 		}
+		kept = append(kept, it)
 	}
-	if t.focus != nil && !t.focus.created {
+	clear(t.commands[len(kept):])
+	t.commands = kept
+	if t.focus != nil && !t.focus.created && !t.detached(t.focus) {
 		t.makeNow(t.focus)
 	}
+}
+
+// Commands on retained web or native views may still run out of the tree;
+// moving focus or scrolling instead requires a place showing the content.
+func commandNeedsPlacement(kind driver.ItemKind) bool {
+	switch kind {
+	case driver.ItemFocus, driver.ItemBlur, driver.ItemAccessibilityFocus,
+		driver.ItemScrollTo, driver.ItemScrollBy, driver.ItemZoomTo:
+		return true
+	}
+	return false
 }
 
 // syncPaced makes the waiting views that show, down to their leaves, then

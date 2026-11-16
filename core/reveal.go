@@ -37,7 +37,7 @@ type reveal struct {
 // lands. The word is NSH's (`reveal`), as GPUI Kit's `reveal_item`; the
 // alignments are physical, as NSH's.
 func (r *Ref) Reveal(opts RevealOptions) {
-	if r == nil || r.n == nil || r.n.deleted {
+	if !r.placed() {
 		return
 	}
 	r.t.reveals = append(r.t.reveals, reveal{n: r.n, opts: opts})
@@ -46,7 +46,7 @@ func (r *Ref) Reveal(opts RevealOptions) {
 
 // RevealBox scrolls every scroll view around the element until box, in the element's frame as TextRangeBoxes gives a text's ranges, shows, as Reveal shows the whole element: a match in a long line of code reaches its column, not only the code's block.
 func (r *Ref) RevealBox(box Bounds, opts RevealOptions) {
-	if r == nil || r.n == nil || r.n.deleted {
+	if !r.placed() {
 		return
 	}
 	r.t.reveals = append(r.t.reveals, reveal{n: r.n, opts: opts, box: &box})
@@ -57,7 +57,7 @@ func (r *Ref) RevealBox(box Bounds, opts RevealOptions) {
 // views around each view, from this commit's layout.
 func (t *Tree) revealViews() {
 	for _, rv := range t.reveals {
-		if !rv.n.deleted {
+		if !rv.n.deleted && !t.detached(rv.n) {
 			box := Bounds{Size: rv.n.frame.Size}
 			if rv.box != nil {
 				box = *rv.box

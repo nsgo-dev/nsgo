@@ -46,7 +46,7 @@ A component is any type whose `Render(cx) Node` returns its nodes, like `http.Ha
 - Go methods cannot take type parameters, so `Each` is a generic function rather than a method or struct.
 - Region nodes are never laid out. Layout marks pass through them, so a change inside a branch or row still reaches the root.
 - A `Holder` is NSH's render keys as a value: content built once, owned by the scope given to `NewHolder` rather than the running owner, and shown in the newest place mounted with `Place`.
-- A held content moves to its place with its native views, keeping its state; with no place it stays built out of the tree, its overlays hidden.
+- A held content moves to its place with its native views, keeping its state; with no place it stays built out of the tree, its overlays hidden. Focus, blur and scroll requests made while unplaced, or queued for content that leaves before commit, are dropped rather than replayed when placed again. Unsent scrolls also leave no predicted offset or pending count.
 
 ## Layers and navigation
 
@@ -145,7 +145,7 @@ The protocol is defined in `mount.go` and `events.go`. Backends apply items in o
 - A view that changes parents, or comes back after `ItemRemove`, is inserted after the round's other inserts, once its new parent is in place.
 - Backends move such a view in one step, so scroll offsets and iframes' pages stay: the web with `moveBefore`, parking removed views in a hidden element.
 - Each round's deletes come last.
-- Commands, such as `Ref.Seek`'s `ItemVideoSeek`, follow the round's view items. A video's seeks go ahead of its `ItemVideo` in the update that changes its config and keeps its source, so a video at its end leaves it before an unpause in the same update plays it, where AVPlayer would reach the end again and stop; they stay after an `ItemVideo` that opens a source, which they apply to.
+- Commands whose targets are deleted or have no view in unplaced Holder content are dropped, with or without view pacing. Focus and scroll commands also require a place showing the content; other commands may reach retained native views while unplaced. Commands for placed content make their waiting views before delivery. Commands, such as `Ref.Seek`'s `ItemVideoSeek`, follow the round's view items. A video's seeks go ahead of its `ItemVideo` in the update that changes its config and keeps its source, so a video at its end leaves it before an unpause in the same update plays it, where AVPlayer would reach the end again and stop; they stay after an `ItemVideo` that opens a source, which they apply to.
 - A text field counts the user's edits. `ItemInputValue` carries the edit count the engine had seen, and the field ignores a value older than its last edit.
 - Platforms report only the events in a view's mask, and never wait for the engine. The engine queue is unbounded, merges scroll events per view and keeps only the last resize.
 

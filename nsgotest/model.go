@@ -309,6 +309,47 @@ func (a *App) closed(surface *core.Tree) {
 	a.showMenu()
 }
 
+// viewItemNames identifies items that require a view even when ID is zero.
+// Names also keep malformed batches useful as test failures.
+var viewItemNames = map[driver.ItemKind]string{
+	driver.ItemInsert:             "ItemInsert",
+	driver.ItemRemove:             "ItemRemove",
+	driver.ItemDelete:             "ItemDelete",
+	driver.ItemFrame:              "ItemFrame",
+	driver.ItemViewStyle:          "ItemViewStyle",
+	driver.ItemText:               "ItemText",
+	driver.ItemInput:              "ItemInput",
+	driver.ItemInputValue:         "ItemInputValue",
+	driver.ItemEvents:             "ItemEvents",
+	driver.ItemViewProps:          "ItemViewProps",
+	driver.ItemScrollConfig:       "ItemScrollConfig",
+	driver.ItemScrollContent:      "ItemScrollContent",
+	driver.ItemFocus:              "ItemFocus",
+	driver.ItemBlur:               "ItemBlur",
+	driver.ItemImage:              "ItemImage",
+	driver.ItemModal:              "ItemModal",
+	driver.ItemScrollTo:           "ItemScrollTo",
+	driver.ItemCanvas:             "ItemCanvas",
+	driver.ItemWeb:                "ItemWeb",
+	driver.ItemWebCommand:         "ItemWebCommand",
+	driver.ItemVideo:              "ItemVideo",
+	driver.ItemVideoSeek:          "ItemVideoSeek",
+	driver.ItemNative:             "ItemNative",
+	driver.ItemNativeCommand:      "ItemNativeCommand",
+	driver.ItemZoomTo:             "ItemZoomTo",
+	driver.ItemSelection:          "ItemSelection",
+	driver.ItemScrollBy:           "ItemScrollBy",
+	driver.ItemStickyCells:        "ItemStickyCells",
+	driver.ItemAccessibilityLabel: "ItemAccessibilityLabel",
+	driver.ItemAccessibilityFocus: "ItemAccessibilityFocus",
+	driver.ItemScreen:             "ItemScreen",
+	driver.ItemOverflow:           "ItemOverflow",
+	driver.ItemShader:             "ItemShader",
+	driver.ItemShaderTransition:   "ItemShaderTransition",
+	driver.ItemShaderInput:        "ItemShaderInput",
+	driver.ItemMatch:              "ItemMatch",
+}
+
 func (a *App) apply(b *driver.MountBatch) {
 	a.rootID = b.Root
 	if b.LayoutAnimation != nil {
@@ -316,6 +357,12 @@ func (a *App) apply(b *driver.MountBatch) {
 	}
 	for _, it := range b.Items {
 		v := a.views[it.ID]
+		if name := viewItemNames[it.Kind]; v == nil && (name != "" || it.ID != 0 && it.Kind != driver.ItemCreate) {
+			if name == "" {
+				name = fmt.Sprintf("item kind %d", it.Kind)
+			}
+			a.t.Fatalf("nsgotest: %s names unknown view %d", name, it.ID)
+		}
 		switch it.Kind {
 		case driver.ItemCreate:
 			a.views[it.ID] = &View{ID: it.ID, Kind: it.View, Style: driver.DefaultViewStyle, anim: a.anim}
@@ -331,6 +378,9 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemInsert:
 			v.detach()
 			p := a.views[it.Parent]
+			if p == nil {
+				a.t.Fatalf("nsgotest: ItemInsert for view %d names unknown parent %d", it.ID, it.Parent)
+			}
 			at := len(p.Children)
 			for i, c := range p.Children {
 				if c.ID == it.Before {

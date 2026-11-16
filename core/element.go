@@ -568,10 +568,16 @@ func (s Scroll) mountIn(t *Tree, cx *Scope, parent *node) { t.mountScroll(cx, pa
 
 // Ref refers to a mounted element: an overlay's anchor, focus, its
 // bounds. Its zero value is ready to use; pass its address in an
-// element's Ref field.
+// element's Ref field. Focus, blur and scroll requests are dropped in
+// unplaced Holder content; placing it again does not replay them.
 type Ref struct {
 	t *Tree
 	n *node
+}
+
+// placed reports whether a live element carries the ref in the tree.
+func (r *Ref) placed() bool {
+	return r != nil && r.n != nil && !r.n.deleted && !r.t.detached(r.n)
 }
 
 // Bounds returns the element's frame in surface points after the last
@@ -617,9 +623,9 @@ func (r *Ref) Frame() (Bounds, bool) {
 	return r.n.frame, true
 }
 
-// Focus moves keyboard focus to the element, a text field. Under a confined owner it does only as Scope.Confine allows.
+// Focus moves keyboard focus to the element, a text field. Under a confined owner it does only as Scope.Confine allows. It does nothing in unplaced Holder content, with no focus deferred until it is placed again.
 func (r *Ref) Focus() {
-	if r.n != nil && !r.n.deleted && r.t.mayMoveFocus(r.n.owner) {
+	if r.placed() && r.t.mayMoveFocus(r.n.owner) {
 		r.t.command(driver.ItemFocus, r.n)
 	}
 }
@@ -666,7 +672,7 @@ func (r *Ref) path() []int {
 // ScrollTo scrolls the element, a Scroll or List, so its content's
 // offset is at.
 func (r *Ref) ScrollTo(at Point, animated bool) {
-	if r.n == nil || r.n.deleted {
+	if !r.placed() {
 		return
 	}
 	if ln := r.n.list; ln != nil {
@@ -682,7 +688,7 @@ func (r *Ref) ScrollTo(at Point, animated bool) {
 // content. A list keeps following the end as the rows there are
 // measured, until the user scrolls away.
 func (r *Ref) ScrollToEnd(animated bool) {
-	if r.n == nil || r.n.deleted {
+	if !r.placed() {
 		return
 	}
 	if ln := r.n.list; ln != nil {
@@ -703,7 +709,7 @@ func (r *Ref) ScrollToEnd(animated bool) {
 // its limits), with content point center (unzoomed) in the middle of the
 // viewport, or keeping the middle when center is nil.
 func (r *Ref) ZoomTo(scale float32, center *Point, animated bool) {
-	if r.n == nil || r.n.deleted || r.n.scroll == nil {
+	if !r.placed() || r.n.scroll == nil {
 		return
 	}
 	z := &driver.ZoomRequest{Scale: r.n.scroll.config.ClampZoom(zoomOr(scale, 1))}
@@ -727,7 +733,7 @@ func (r *Ref) ScrollToIndex(index int, animated bool) {
 // list keeps following the row as the rows around it are measured, until
 // the user scrolls away or the rows change.
 func (r *Ref) ScrollToIndexAt(index int, viewPosition float32, viewOffset Points, animated bool) {
-	if r.n == nil || r.n.deleted || r.n.list == nil {
+	if !r.placed() || r.n.list == nil {
 		return
 	}
 	r.t.listCommand(r.n.list, listCommand{pin: &listPin{index: max(index, 0), viewPosition: viewPosition, viewOffset: viewOffset},
@@ -736,7 +742,7 @@ func (r *Ref) ScrollToIndexAt(index int, viewPosition float32, viewOffset Points
 
 // Blur takes keyboard focus away from the element.
 func (r *Ref) Blur() {
-	if r.n != nil && !r.n.deleted {
+	if r.placed() {
 		r.t.command(driver.ItemBlur, r.n)
 	}
 }

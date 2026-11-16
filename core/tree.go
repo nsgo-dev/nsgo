@@ -613,15 +613,16 @@ type scrollNode struct {
 // pendingScroll is a scroll the core sent and the platform has not shown
 // applied.
 type pendingScroll struct {
-	n  uint32
-	to bool // an ItemScrollTo; else an ItemScrollBy
-	p  Point
+	n      uint32
+	to     bool // an ItemScrollTo; else an ItemScrollBy
+	p      Point
+	before Point // predicted offset before this command, for cancellation
 }
 
 // issue records a scroll sent to the platform.
 func (sc *scrollNode) issue(to bool, p Point) {
 	sc.issued++
-	sc.pending = append(sc.pending, pendingScroll{sc.issued, to, p})
+	sc.pending = append(sc.pending, pendingScroll{n: sc.issued, to: to, p: p, before: sc.offset})
 	if to {
 		sc.offset = p
 	} else {
@@ -640,7 +641,9 @@ func (sc *scrollNode) report(p Point, applied uint32) {
 		k++
 	}
 	sc.pending = sc.pending[k:]
-	for _, s := range sc.pending {
+	for i := range sc.pending {
+		s := &sc.pending[i]
+		s.before = p
 		if s.to {
 			p = s.p
 		} else {
