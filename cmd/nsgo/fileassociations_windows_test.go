@@ -143,6 +143,26 @@ func main() {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("uninstall: %v\n%s", err, out)
 	}
+	// NSIS may finish deleting its self-copy just after the process that
+	// launched it exits. Wait briefly for the registry transaction to settle.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		metaKey, metaErr := registry.OpenKey(registry.CURRENT_USER, meta, registry.READ)
+		if metaErr == nil {
+			metaKey.Close()
+		}
+		progKey, progErr := registry.OpenKey(registry.CURRENT_USER, `Software\Classes\`+prog, registry.READ)
+		if progErr == nil {
+			progKey.Close()
+		}
+		if metaErr != nil && progErr != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
 	for _, key := range []string{meta, `Software\Classes\` + prog} {
 		if k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.READ); err == nil {
 			k.Close()
