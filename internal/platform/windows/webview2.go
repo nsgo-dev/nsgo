@@ -163,12 +163,14 @@ const (
 	settingsPutIsSwipeNavigationEnabled = 32
 
 	// ICoreWebView2NavigationStartingEventArgs
-	navigationStartingGetUri    = 3
-	navigationStartingPutCancel = 8
+	navigationStartingGetUri          = 3
+	navigationStartingPutCancel       = 8
+	navigationStartingGetNavigationId = 9
 
 	// ICoreWebView2NavigationCompletedEventArgs
 	navigationGetIsSuccess      = 3
 	navigationGetWebErrorStatus = 4
+	navigationGetNavigationId   = 5
 
 	// ICoreWebView2PermissionRequestedEventArgs, then 3 (after 2)
 	permissionGetKind           = 4

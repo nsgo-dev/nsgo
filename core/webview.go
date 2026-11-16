@@ -57,7 +57,7 @@ type WebView struct {
 	OnLoadStart             func(WebNavigation)
 	OnLoad                  func(WebNavigation)
 	OnNavigationStateChange func(WebNavigation)
-	// OnError receives a *WebError. A load the view or the app cut short, such as by StopLoading or a new source, is no error.
+	// OnError receives a *WebError. A load cut short, by StopLoading, a new source, another navigation or a download it turned into, is no error.
 	OnError func(err error)
 	// MessageOrigins are the origins whose pages reach OnMessage and OnMessageFrom, written as WebMessage.Origin is ("https://example.com"), or "*" for any. Without them only pages of the source's own origin do: Src's, or for HTML BaseURL's, and "null" for HTML without one. "null" is the origin of every page without one of its own, a data: URL a frame sent the view to as much as the source's HTML, so "null", by default or listed, lets in only the source's page; "*" lets in every page. Only the page posts, never a frame in it, on every platform; a frame reaches the app through the page, with window.parent.postMessage, whose event tells the page the frame's origin.
 	MessageOrigins []string

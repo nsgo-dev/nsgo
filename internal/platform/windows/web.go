@@ -97,7 +97,9 @@ type webView struct {
 	adding                int
 	navigatePending       bool
 	starting              string           // the URL of the navigation started last, which a failure reports
-	stopped               bool             // StopLoading cut that navigation short, whose failure is no error
+	started               uint64           // the NavigationId of the navigation started last
+	cut                   uint64           // the NavigationId of a navigation the view cut short (StopLoading, or a load that replaced it), whose failure is no error
+	aborted               uint64           // the NavigationId of a navigation that ended aborted, whose failure waits for webAbortWait
 	source                driver.WebSource // what the pending or last navigation loads: the config's, or Ref.Load's
 	html, base            string           // the HTML served at its base URL
 	serving               bool
@@ -122,6 +124,12 @@ type webDownload struct {
 }
 
 var webDownloadSerial atomic.Uint64
+
+// COREWEBVIEW2_WEB_ERROR_STATUS_CONNECTION_ABORTED, Chromium's net::ERR_ABORTED: how WebView2 ends a navigation that was stopped, replaced or turned into a download.
+const webErrorConnectionAborted = 9
+
+// webAbortWait is how long an aborted navigation's failure waits for the download or navigation that would explain it; WebView2 raises those within milliseconds.
+const webAbortWait = 500 * time.Millisecond
 
 type webCommand struct {
 	command driver.WebCommand
@@ -303,6 +311,7 @@ func (wv *webView) downloadStarted(args *comObject) {
 	if args == nil {
 		return
 	}
+	wv.aborted = 0 // the navigation that ended aborted became this download
 	if wv.config.DownloadDir == "" {
 		args.call(downloadArgsPutCancel, 1)
 		return
@@ -411,7 +420,9 @@ func (wv *webView) listen() {
 			wv.report(driver.Event{Kind: driver.EventError, Text: driver.RefusedNavigation(nav.URL), Navigation: &nav})
 			return
 		}
-		wv.starting, wv.stopped = nav.URL, false
+		var id uint64
+		a.call(navigationStartingGetNavigationId, uintptr(unsafe.Pointer(&id)))
+		wv.starting, wv.started, wv.aborted = nav.URL, id, 0
 		wv.navigated(nav, driver.EventLoadStart, driver.EventNavigationStateChange)
 	}))
 	web.subscribe(webAddNavigationCompleted, newHandler(&iidNavigationCompleted, func(_ uintptr, args unsafe.Pointer) {
@@ -420,15 +431,31 @@ func (wv *webView) listen() {
 		}
 		a := (*comObject)(args)
 		var status int32
+		var id uint64
 		a.call(navigationGetWebErrorStatus, uintptr(unsafe.Pointer(&status)))
+		a.call(navigationGetNavigationId, uintptr(unsafe.Pointer(&id)))
 		if a.getBool(navigationGetIsSuccess) {
 			wv.navigated(wv.navigation(false), driver.EventLoad, driver.EventNavigationStateChange)
-		} else if why := webError(status); why != "" && !wv.stopped {
+		} else if why := webError(status); why != "" && id == wv.started && id != wv.cut {
 			// The view still shows the page before the one that failed, which never committed.
 			nav := wv.navigation(false)
 			nav.URL = cmp.Or(wv.starting, nav.URL)
-			wv.report(driver.Event{Kind: driver.EventError, Text: why,
-				Data: &driver.WebFailure{Domain: "COREWEBVIEW2_WEB_ERROR_STATUS", Code: int(status)}, Navigation: &nav})
+			e := driver.Event{Kind: driver.EventError, Text: why,
+				Data: &driver.WebFailure{Domain: "COREWEBVIEW2_WEB_ERROR_STATUS", Code: int(status)}, Navigation: &nav}
+			if status != webErrorConnectionAborted {
+				wv.report(e)
+				return
+			}
+			// WebView2 ends a navigation that turned into a download, or that the page replaced with another, as aborted too, and only then raises DownloadStarting or the next NavigationStarting: the failure waits for them, which drop it.
+			wv.aborted = id
+			time.AfterFunc(webAbortWait, func() {
+				wv.w.post(func() {
+					if !wv.closed && wv.aborted == id {
+						wv.aborted = 0
+						wv.report(e)
+					}
+				})
+			})
 		}
 	}))
 	// getUserMedia: what the config's Media grants, without WebView2's
@@ -733,6 +760,8 @@ func (wv *webView) setScrolls(enabled bool) {
 }
 
 func (wv *webView) navigate() {
+	// The navigation this one replaces may still be loading.
+	wv.cut = wv.started
 	src := wv.source
 	wv.html, wv.base = "", ""
 	var hr uintptr
@@ -921,14 +950,16 @@ func (wv *webView) command(c driver.WebCommand, value string, data any) {
 	}
 	switch c {
 	case driver.WebReload:
+		wv.cut = wv.started
 		wv.web.call(webReload)
 	case driver.WebGoBack:
+		wv.cut = wv.started
 		wv.web.call(webGoBack)
 	case driver.WebGoForward:
+		wv.cut = wv.started
 		wv.web.call(webGoForward)
 	case driver.WebStopLoading:
-		// WebView2 ends a navigation it stops as aborted (CONNECTION_ABORTED), not cancelled.
-		wv.stopped = true
+		wv.cut = wv.started
 		wv.web.call(webStop)
 	case driver.WebPostMessage:
 		wv.execute(driver.WebMessageScript(value))
