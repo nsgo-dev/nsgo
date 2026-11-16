@@ -75,6 +75,7 @@ func Refreshes(c *driver.ScrollConfig, offset driver.Point, refreshing bool) boo
 type TouchDrag struct {
 	down    driver.Point
 	from    driver.Points // the offset along the axis at the down
+	raw     driver.Points // the latest offset before rubber banding
 	start   time.Time
 	claimed bool
 	speed   Velocity
@@ -83,7 +84,7 @@ type TouchDrag struct {
 // NewTouchDrag starts following a finger down at at on a view whose offset
 // along its axis is from.
 func NewTouchDrag(at driver.Point, from driver.Points, now time.Time) *TouchDrag {
-	d := &TouchDrag{down: at, from: from, start: now}
+	d := &TouchDrag{down: at, from: from, raw: from, start: now}
 	d.speed.Add(0, at)
 	return d
 }
@@ -116,7 +117,17 @@ func (d *TouchDrag) Claims(c *driver.ScrollConfig, at driver.Point) bool {
 // axis, before any rubber band.
 func (d *TouchDrag) Move(c *driver.ScrollConfig, at driver.Point, now time.Time) driver.Points {
 	d.speed.Add(now.Sub(d.start), at)
-	return d.from - (Along(c, at) - Along(c, d.down))
+	d.raw = d.from - (Along(c, at) - Along(c, d.down))
+	return d.raw
+}
+
+// Refreshes reports whether releasing the finger refreshes, using the
+// pull before rubber banding so the threshold does not depend on the
+// viewport's size or whether the content bounces.
+func (d *TouchDrag) Refreshes(c *driver.ScrollConfig, refreshing bool) bool {
+	var offset driver.Point
+	SetAlong(c, &offset, d.raw)
+	return Refreshes(c, offset, refreshing)
 }
 
 // Velocity returns the offset's speed along the axis as the finger lifts,

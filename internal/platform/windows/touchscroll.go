@@ -139,7 +139,7 @@ func (w *window) touchUp() bool {
 		return false
 	}
 	v, c := t.taken, &t.taken.scroll
-	if scrollbar.Refreshes(c, v.offset, v.refreshing) {
+	if t.drag.Refreshes(c, v.refreshing) {
 		v.refreshing = true
 		w.scrollEvent(v, driver.EventRefresh)
 	}

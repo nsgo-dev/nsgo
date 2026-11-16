@@ -40,6 +40,60 @@ func TestTouchDragClaimsAlongTheAxisAndGlides(t *testing.T) {
 	}
 }
 
+func TestTouchRefreshUsesThePullBeforeRubberBanding(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		behavior driver.ScrollBehavior
+	}{
+		{name: "spinner"},
+		{name: "inset", behavior: driver.ScrollBehavior{ContentInset: driver.Edges{Top: 24}}},
+		{name: "custom indicator", behavior: driver.ScrollBehavior{RefreshIndicator: 96}},
+		{name: "no bounces", behavior: driver.ScrollBehavior{NoBounces: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &driver.ScrollConfig{Refreshable: true, Behavior: tc.behavior}
+			now := time.Unix(0, 0)
+			top := -c.Behavior.ContentInset.Top
+			d := NewTouchDrag(driver.Point{Y: 50}, top, now)
+			if !d.Claims(c, driver.Point{Y: 70}) {
+				t.Fatal("the finger did not claim the scroll view")
+			}
+			threshold := c.Behavior.RefreshThreshold()
+			raw := d.Move(c, driver.Point{Y: 70 + threshold}, now.Add(10*time.Millisecond))
+			shown := Dragged(raw, top, 900, 200, !c.Behavior.NoBounces)
+			if Refreshes(c, driver.Point{Y: shown}, false) {
+				t.Fatal("the displayed offset must remain below the threshold in this regression")
+			}
+			if !d.Refreshes(c, false) {
+				t.Error("releasing at the finger's pull threshold did not refresh")
+			}
+			if d.Refreshes(c, true) {
+				t.Error("an active refresh restarted")
+			}
+			c.Refreshable = false
+			if d.Refreshes(c, false) {
+				t.Error("a view without a refresh handler refreshed")
+			}
+			c.Refreshable = true
+			d.Move(c, driver.Point{Y: 70 + threshold - 1}, now.Add(20*time.Millisecond))
+			if d.Refreshes(c, false) {
+				t.Error("pulling back below the threshold still refreshed")
+			}
+		})
+	}
+}
+
+func TestHorizontalTouchDragDoesNotRefresh(t *testing.T) {
+	c := &driver.ScrollConfig{Horizontal: true, Refreshable: true}
+	now := time.Unix(0, 0)
+	d := NewTouchDrag(driver.Point{X: 50}, 0, now)
+	d.Claims(c, driver.Point{X: 70})
+	d.Move(c, driver.Point{X: 270}, now.Add(10*time.Millisecond))
+	if d.Refreshes(c, false) {
+		t.Error("a horizontal pull refreshed")
+	}
+}
+
 func TestReleasePastTheTopSpringsBackOrRefreshes(t *testing.T) {
 	c := &driver.ScrollConfig{Refreshable: true}
 	frame, content := driver.Size{Width: 100, Height: 100}, driver.Size{Width: 100, Height: 1000}
