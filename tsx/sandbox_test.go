@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"reflect"
@@ -516,6 +517,35 @@ mount(() => <View testID="plugin-root">
 		if !app.Exists("id:dialog-text") {
 			t.Errorf("%s: a dialog its press opened does not show", name)
 		}
+	}
+}
+
+// A sandboxed package's Dialog and NavPage without a statusBar prop ask nothing of the statusBar capability it lacks, so they log no refusal and leave the one logged refusal to a status bar the package does set (#218).
+func TestSandboxLogsOnlyTheStatusBarItSets(t *testing.T) {
+	var logged strings.Builder
+	prev := log.Writer()
+	log.SetOutput(&logged)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	const source = `import { mount, signal, Text } from "nsgo";
+import { Dialog, createNavStack, NavStack, NavPage } from "nsgo/base";
+const nav = createNavStack(["home"]);
+const open = signal(false);
+const hide = signal(false);
+mount(() => <NavStack state={nav}>{(route) => <NavPage title={route}>
+	<Text testID="open" onPress={() => open.set(true)}>Open</Text>
+	<Dialog open={open()} statusBar={hide() ? { hidden: true } : undefined}><Text testID="hide" onPress={() => hide.set(true)}>Hide</Text></Dialog>
+</NavPage>}</NavStack>);`
+	app := nsgotest.Start(t, tsx.View{Package: verified(t, source, pkg.Capabilities{})}.Render)
+	app.Press("id:open")
+	app.Settle()
+	refusals := func() int { return strings.Count(logged.String(), `"statusBar" capability`) }
+	if !app.Exists("id:hide") || refusals() != 0 {
+		t.Fatalf("dialog shown %v; without a status bar setting the package logged %q", app.Exists("id:hide"), logged.String())
+	}
+	app.Press("id:hide")
+	app.Settle()
+	if got := refusals(); got != 1 {
+		t.Errorf("the package's own status bar logged %d refusals, want one: %q", got, logged.String())
 	}
 }
 
