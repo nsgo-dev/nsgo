@@ -797,6 +797,18 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 		}
 	})
 	waitTitle(t, w, func(s string) bool { return strings.HasSuffix(s, "|3") })
+	// GtkVideo's controls play a finished stream again by setting it playing, which the app does not see; a configuration that follows must not stop it.
+	w.onLoop(t, func() {
+		for _, v := range w.views {
+			if v != nil && v.video != nil {
+				gtkMediaStreamSetPlaying(v.video.stream, 1)
+				c := v.video.config
+				c.Volume = 0.6
+				w.configureVideo(v, &c)
+			}
+		}
+	})
+	waitTitle(t, w, func(s string) bool { return strings.HasSuffix(s, "|4") })
 }
 
 // TestVideoReportsWhatGStreamerCannotPlay opens bytes that are no media.

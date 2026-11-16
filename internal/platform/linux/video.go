@@ -287,10 +287,17 @@ func videoPreparedCallback(stream, pspec uintptr, data uintptr) {
 }
 
 func videoEndedCallback(stream, pspec uintptr, data uintptr) {
-	if w, v := videoOf(data, stream); v != nil && gtkMediaStreamGetEnded(stream) != 0 {
-		v.video.completed, v.video.playing = true, false
-		w.report(v, driver.Event{Kind: driver.EventEnd, ID: v.id})
+	w, v := videoOf(data, stream)
+	if v == nil {
+		return
 	}
+	if gtkMediaStreamGetEnded(stream) == 0 {
+		// The stream left its end: a seek, or GtkVideo's controls playing it again, which a later configuration must not stop.
+		v.video.completed = false
+		return
+	}
+	v.video.completed, v.video.playing = true, false
+	w.report(v, driver.Event{Kind: driver.EventEnd, ID: v.id})
 }
 
 func videoErrorCallback(stream, pspec uintptr, data uintptr) {
