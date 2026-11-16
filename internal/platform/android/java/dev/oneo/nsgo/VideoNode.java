@@ -155,9 +155,11 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         });
         p.setOnCompletionListener(mp -> {
             if (mp != player) return;
-            // It stopped at its end: the play state is paused's again.
-            held = false;
-            resumable = false;
+            // One that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while paused goes on; one that does not stops, and the play state is paused's again.
+            if (!repeat) {
+                held = false;
+                resumable = false;
+            }
             report(Protocol.EVENT_END, "", 0, 0, 0, 0, false);
             if (repeat) {
                 mp.seekTo(0);

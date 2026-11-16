@@ -27,8 +27,12 @@ func (p *videoPlayback) configure(pausedChanged bool) bool {
 // applied records the play state the backend is about to give the player, which is not reported.
 func (p *videoPlayback) applied(playing bool) { p.playing = playing }
 
-// ended records that the player stopped at its end, which EventEnd reports, and leaves the play state to Paused again.
-func (p *videoPlayback) ended() {
+// ended records that the player reached its end, which EventEnd reports. A video that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while Paused is true goes on; one that does not stops, and leaves the play state to Paused again.
+func (p *videoPlayback) ended(repeat bool) {
+	if repeat {
+		p.playing = true
+		return
+	}
 	p.playing, p.held, p.ok, p.resumable = false, false, false, false
 }
 

@@ -127,8 +127,31 @@ func TestVideoEndLeavesThePlayStateToPaused(t *testing.T) {
 		{name: "opened playing", do: configure(false, true), apply: true},
 		{name: "controls pause", do: reached(false, false, driver.VideoPauseControls), want: []driver.Event{pausedFor(driver.VideoPauseControls)}},
 		{name: "controls play", do: reached(true, false, driver.VideoPauseControls), want: []driver.Event{played}, apply: true},
-		{name: "ended", do: func(p *videoPlayback) (driver.Event, bool) { p.ended(); return driver.Event{}, false }, apply: true},
+		{name: "ended", do: ended(false), apply: true},
 		// The rate notification of the end comes after it.
 		{name: "end's rate", do: reached(false, false, driver.VideoPauseControls), apply: true},
 	})
+	runSteps(t, []step{
+		{name: "opened paused", do: configure(true, true), apply: true},
+		{name: "controls play", do: reached(true, true, driver.VideoPauseControls), want: []driver.Event{played}},
+		{name: "ended", do: ended(false), apply: true},
+	})
+}
+
+// A repeating video plays on from its start, and a play from the controls while the app's Paused is true holds through the end.
+func TestVideoRepeatKeepsTheControlsPlay(t *testing.T) {
+	runSteps(t, []step{
+		{name: "opened paused", do: configure(true, true), apply: true},
+		{name: "controls play", do: reached(true, true, driver.VideoPauseControls), want: []driver.Event{played}},
+		{name: "ended and repeats", do: ended(true)},
+		// The play from its start comes back as a rate notification that changes nothing.
+		{name: "repeat's rate", do: reached(true, true, driver.VideoPauseControls)},
+		{name: "unrelated config", do: configure(true, false)},
+		{name: "app follows", do: configure(false, true), apply: true},
+	})
+}
+
+// ended is the player reaching its end, repeating or not.
+func ended(repeat bool) func(p *videoPlayback) (driver.Event, bool) {
+	return func(p *videoPlayback) (driver.Event, bool) { p.ended(repeat); return driver.Event{}, false }
 }

@@ -249,11 +249,10 @@ func (v *Video) open() {
 		if v.status != st || v.player == 0 {
 			return
 		}
-		st.play.ended()
+		st.play.ended(v.config.Repeat)
 		v.Dispatch(driver.Event{Kind: driver.EventEnd})
 		if v.config.Repeat {
 			v.player.Send(sel("seekToTime:"), cmTimeOf(0))
-			st.play.applied(true)
 			v.player.Send(sel("play"))
 		}
 		// Stopped, the other apps' audio may play again.
