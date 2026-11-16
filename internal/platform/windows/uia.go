@@ -346,6 +346,7 @@ func groups(p *driver.ViewProps, pressable bool) bool {
 		driver.RoleTreeItem, driver.RoleMenuItemCheckbox, driver.RoleMenuItemRadio:
 		return true
 	case driver.RoleStatus:
+		// A status is named by the texts inside it, as a live region reads them.
 		return true
 	}
 	return p.Accessible == driver.AccessibleYes || p.Role == driver.RoleNone && pressable
@@ -390,9 +391,8 @@ func (e *uiaElement) spec(v *view) uiaSpec {
 	p := &v.props
 	s := uiaSpec{name: p.Label, help: p.Hint, description: p.Description, invalid: p.Invalid, automationID: p.TestID, enabled: !p.Disabled, toggle: -1, live: p.LiveRegion}
 	if p.Role == driver.RoleSearchField {
+		// UIA has no search control type: an edit says what it is, as browsers name ARIA's searchbox. A status bar's own type is the system's, in its language.
 		s.localizedType = "search box"
-	} else if p.Role == driver.RoleStatus {
-		s.localizedType = "status bar"
 	}
 	pressable := takesPresses(v)
 	switch {

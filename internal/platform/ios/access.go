@@ -178,7 +178,13 @@ func (v *view) textChanged(text string) {
 	for p := v; p != nil; p = p.parent() {
 		if p.props.LiveRegion != driver.LiveRegionNone {
 			if p.props.Role == driver.RoleStatus {
-				text = p.spokenLabel()
+				// A status reads its whole text, as ARIA's status is atomic; its view is a container, so spokenLabel reads only its label.
+				text = p.label()
+				if text == "" {
+					var parts []string
+					collectText(p.native, &parts)
+					text = strings.Join(parts, " ")
+				}
 			}
 			uiAccessibilityPost(announcement, apple.NSString(text))
 			return
@@ -214,7 +220,12 @@ func (v *view) updateAccessibility() {
 	const noContainer, semanticGroup = 0, 4
 	pressable := v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress)
 	var t uint64
-	switch p.Role {
+	role := p.Role
+	if role == driver.RoleStatus && v.kind == driver.KindText {
+		// A status that is a text is read as one, not a container of none.
+		role = driver.RoleText
+	}
+	switch role {
 	case driver.RoleRadioGroup, driver.RoleTabList, driver.RoleMenu, driver.RoleDialog, driver.RoleAlertDialog, driver.RoleAlert, driver.RoleStatus,
 		driver.RoleTable, driver.RoleGrid, driver.RoleRowGroup, driver.RoleRow, driver.RoleListbox, driver.RoleGroup,
 		driver.RoleRegion, driver.RoleNavigation, driver.RoleTree, driver.RoleToolbar:
@@ -364,7 +375,7 @@ func editorValue(own string, p *driver.ViewProps) string {
 	return strings.Join(append(parts, spokenStates(p)...), ", ")
 }
 
-// editorAccess are an input's editor's answers to VoiceOver. The editor is the input's element, as UIKit's text field or text view, so it can be edited whatever the input's role; it reads the input's label and hint, and the value editorValue gives.
+// editorAccess are an input's editor's answers to VoiceOver. The editor is the input's element, as UIKit's text field or text view, so it can be edited whatever the input's role; it reads the input's label and hint, the value editorValue gives, and the search field trait for RoleSearchField.
 func editorAccess() []objc.MethodDef {
 	return []objc.MethodDef{
 		{Cmd: sel("accessibilityLabel"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
@@ -380,6 +391,13 @@ func editorAccess() []objc.MethodDef {
 				}
 			}
 			return apple.SendSuper[objc.ID](self, cmd)
+		}},
+		{Cmd: sel("accessibilityTraits"), Fn: func(self objc.ID, cmd objc.SEL) uint64 {
+			t := apple.SendSuper[uint64](self, cmd)
+			if v := views[self]; v != nil && v.props.Role == driver.RoleSearchField {
+				t |= traits["SearchField"]
+			}
+			return t
 		}},
 		{Cmd: sel("accessibilityValue"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
 			own := apple.SendSuper[objc.ID](self, cmd)

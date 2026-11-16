@@ -111,8 +111,8 @@ var roles = map[driver.Role][2]string{
 	driver.RoleAlert:  {"AXGroup", "AXApplicationAlert"},
 	// And for alertdialog.
 	driver.RoleAlertDialog: {"AXGroup", "AXApplicationAlertDialog"},
-	driver.RoleStatus:      {"AXGroup", "AXApplicationStatus"},
-	driver.RoleSearchField: {"AXTextField", "AXSearchField"},
+	// And for status; a search field is its editor (editorAttribute), as a text field is.
+	driver.RoleStatus: {"AXGroup", "AXApplicationStatus"},
 	// A listbox and a tree are lists, as WebKit maps ARIA's. Their items
 	// are static text that reports its state: AppKit's rows need a
 	// table's columns, and its menu items a menu.
@@ -140,8 +140,8 @@ func (v *view) axRole() [2]string {
 		// A button that stays on, as browsers make ARIA's aria-pressed.
 		return [2]string{"AXCheckBox", "AXToggle"}
 	}
-	if v.input != nil && (p.Role == driver.RoleCombobox || p.Role == driver.RoleSpinButton) {
-		// An editable combobox or spin button: its editor is the element (editorAccessMethods).
+	if v.input != nil && (p.Role == driver.RoleCombobox || p.Role == driver.RoleSpinButton || p.Role == driver.RoleSearchField) {
+		// An editable combobox, spin button or search field: its editor is the element (editorAccessMethods).
 		return [2]string{}
 	}
 	if r, ok := roles[p.Role]; ok {
@@ -282,7 +282,7 @@ var axRoleDescription = sync.OnceValue(func() func(role, subrole objc.ID) objc.I
 	return describe
 })
 
-// editorAccessMethods are what an input's editor, a field's cell (cell) or a text view, answers VoiceOver with. AppKit's text classes answer through accessibilityAttributeValue:, which reads none of the attributes set on them, and a field's element is its cell rather than the field, so the editor answers here for its input's view, which is no element: the input's label, help, test ID, value text and standard actions, for RoleCombobox the role of an editable combobox and the popup's state, and for RoleSpinButton the role of an incrementor, whose AXIncrement and AXDecrement step the input. Its text, value and selection stay its class's.
+// editorAccessMethods are what an input's editor, a field's cell (cell) or a text view, answers VoiceOver with. AppKit's text classes answer through accessibilityAttributeValue:, which reads none of the attributes set on them, and a field's element is its cell rather than the field, so the editor answers here for its input's view, which is no element: the input's label, help, test ID, value text and standard actions, for RoleCombobox the role of an editable combobox and the popup's state, for RoleSpinButton the role of an incrementor, whose AXIncrement and AXDecrement step the input, and for RoleSearchField a search field's subrole. Its text, value and selection stay its class's.
 func editorAccessMethods(cell bool) []objc.MethodDef {
 	owner := func(self objc.ID) *view {
 		if cell {
@@ -308,7 +308,7 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 			if v == nil || names == 0 {
 				return names
 			}
-			for _, name := range []string{"AXDescription", "AXIdentifier", "AXExpanded", "AXValueDescription"} {
+			for _, name := range []string{"AXSubrole", "AXDescription", "AXIdentifier", "AXExpanded", "AXValueDescription"} {
 				if _, ok := v.editorAttribute(name); !ok {
 					continue
 				}
@@ -352,22 +352,29 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 func (v *view) editorAttribute(name string) (objc.ID, bool) {
 	p := &v.props
 	combobox := p.Role == driver.RoleCombobox
-	role := ""
+	role, subrole := "", ""
 	switch p.Role {
 	case driver.RoleCombobox:
 		role = "AXComboBox"
 	case driver.RoleSpinButton:
 		// As browsers make a number field, ARIA's spinbutton.
 		role = "AXIncrementor"
+	case driver.RoleSearchField:
+		// As AppKit's NSSearchField and WebKit's searchbox are.
+		role, subrole = "AXTextField", "AXSearchField"
 	}
 	switch name {
 	case "AXRole":
 		if role != "" {
 			return apple.NSString(role), true
 		}
+	case "AXSubrole":
+		if subrole != "" {
+			return apple.NSString(subrole), true
+		}
 	case "AXRoleDescription":
 		if role != "" {
-			return axRoleDescription()(apple.NSString(role), 0), true
+			return axRoleDescription()(apple.NSString(role), nsOrNil(subrole)), true
 		}
 	case "AXDescription":
 		if p.Label != "" {

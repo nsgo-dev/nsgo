@@ -135,13 +135,13 @@ func TestInputPropsSetTheirFields(t *testing.T) {
 	p := setProps(t, r, (*runtime).inputProp, `{value: "v", defaultValue: "d", placeholder: "p", allowFontScaling: false,
 		maxFontSizeMultiplier: 2, masked: true, multiline: true, maxLength: 9, readonly: true, autoFocus: true,
 		disabled: true, autoCorrect: false, caret: false, inputAccessoryViewID: "bar", testID: "a",
-		accessibilityLabel: "b", selectedRange: {start: 1, end: 2},
+		accessibilityLabel: "b", role: "search", selectedRange: {start: 1, end: 2},
 		onChange: e => { globalThis.heard = "change " + e.value },
 		onSubmit: e => { globalThis.heard = "submit " + e.text },
 		onKeyPress: e => { globalThis.heard = "key " + e.key }}`)
 	if p.Value() != "v" || p.DefaultValue != "d" || p.Placeholder != "p" || !p.NoFontScaling || p.MaxFontSizeMultiplier != 2 ||
 		!p.Masked || !p.Multiline || p.MaxLength != 9 || !p.Readonly || !p.AutoFocus || !p.Disabled() || !p.NoAutoCorrect ||
-		!p.HideCaret || p.InputAccessoryViewID != "bar" || p.TestID != "a" || p.Label != "b" {
+		!p.HideCaret || p.InputAccessoryViewID != "bar" || p.TestID != "a" || p.Label != "b" || p.Role != core.RoleSearchField {
 		t.Errorf("decoded %+v", p)
 	}
 	if got := p.SelectedRange(); got.Start != 1 || got.End != 2 {

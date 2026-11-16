@@ -358,7 +358,8 @@ func (w *window) accessChanged(v *view) {
 		if p.props.LiveRegion != driver.LiveRegionNone {
 			text := v.access.label
 			if p.props.Role == driver.RoleStatus {
-				text = groupedText(v)
+				// A status reads its whole text, as ARIA's status is atomic.
+				text = statusText(p)
 			}
 			w.announce(text, p.props.LiveRegion == driver.LiveRegionAssertive)
 			return
@@ -366,32 +367,27 @@ func (w *window) accessChanged(v *view) {
 	}
 }
 
-// groupedText returns the text exposed by a status container, in tree order.
-func groupedText(v *view) string {
-	if v.props.Label != "" {
-		return v.props.Label
-	}
+// statusText is what status v reads: its label, else its text or the labels and texts inside it, in tree order.
+func statusText(v *view) string {
 	var parts []string
 	var walk func(*view)
 	walk = func(n *view) {
-		if n.kind == driver.KindText && n.plain != "" {
-			parts = append(parts, n.plain)
-			return
-		}
-		if n.props.Label != "" {
+		switch {
+		case n.props.Label != "":
 			parts = append(parts, n.props.Label)
-			return
-		}
-		for _, c := range n.children {
-			if c.props.ElementsHidden || c.style.Hidden || c.deleted {
-				continue
+		case n.kind == driver.KindText:
+			if n.plain != "" {
+				parts = append(parts, n.plain)
 			}
-			walk(c)
+		default:
+			for _, c := range n.children {
+				if !c.props.ElementsHidden && !c.style.Hidden && !c.deleted {
+					walk(c)
+				}
+			}
 		}
 	}
-	for _, c := range v.children {
-		walk(c)
-	}
+	walk(v)
 	return strings.Join(parts, " ")
 }
 

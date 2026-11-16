@@ -237,7 +237,7 @@ export interface GestureResponderEvent extends TouchPoint {
 export interface ResponderGestureState { moveX: number; moveY: number; x0: number; y0: number; dx: number; dy: number; vx: number; vy: number; numberActiveTouches: number }
 export interface PanActivation { activeOffsetX?: number; activeOffsetY?: number; failOffsetX?: number; failOffsetY?: number }
 
-export type AccessibilityRole = "none" | "button" | "link" | "search" | "image" | "imagebutton" | "keyboardkey" | "text" | "adjustable" | "header" | "summary" | "alert" | "checkbox" | "combobox" | "menu" | "menubar" | "menuitem" | "progressbar" | "radio" | "radiogroup" | "scrollbar" | "spinbutton" | "switch" | "tab" | "tablist" | "timer" | "toolbar" | "list" | "grid" | "table" | "row" | "cell" | "columnheader" | "rowgroup" | "listbox" | "option" | "group" | "region" | "navigation" | "tree" | "treeitem" | "menuitemcheckbox" | "menuitemradio" | "dialog" | "alertdialog";
+export type AccessibilityRole = "none" | "button" | "link" | "search" | "image" | "imagebutton" | "keyboardkey" | "text" | "adjustable" | "header" | "summary" | "alert" | "checkbox" | "combobox" | "menu" | "menubar" | "menuitem" | "progressbar" | "radio" | "radiogroup" | "scrollbar" | "spinbutton" | "switch" | "tab" | "tablist" | "timer" | "toolbar" | "list" | "grid" | "table" | "row" | "cell" | "columnheader" | "rowgroup" | "listbox" | "option" | "group" | "region" | "navigation" | "tree" | "treeitem" | "menuitemcheckbox" | "menuitemradio" | "dialog" | "alertdialog" | "status" | "searchbox";
 export interface AccessibilityState { disabled?: boolean; selected?: boolean; checked?: boolean | "mixed"; pressed?: boolean | "mixed"; busy?: boolean; expanded?: boolean; invalid?: boolean }
 
 export interface TouchProps {

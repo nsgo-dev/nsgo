@@ -456,3 +456,24 @@ func TestVideoFitModes(t *testing.T) {
 		}
 	}
 }
+
+func TestAStatusReadsItsWholeText(t *testing.T) {
+	text := func(s string) *view { return &view{kind: driver.KindText, plain: s} }
+	changed := text("3")
+	hidden := text("hidden")
+	hidden.style.Hidden = true
+	status := &view{kind: driver.KindView, props: driver.ViewProps{Role: driver.RoleStatus}, children: []*view{
+		text("Saved"), {kind: driver.KindView, children: []*view{changed, text("files")}},
+		{kind: driver.KindImage, props: driver.ViewProps{Label: "done"}}, hidden,
+	}}
+	if got := statusText(status); got != "Saved 3 files done" {
+		t.Errorf("a status reads %q", got)
+	}
+	status.props.Label = "Saving"
+	if got := statusText(status); got != "Saving" {
+		t.Errorf("a labelled status reads %q", got)
+	}
+	if got := statusText(text("1 item")); got != "1 item" {
+		t.Errorf("a status text reads %q", got)
+	}
+}

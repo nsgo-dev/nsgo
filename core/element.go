@@ -234,8 +234,7 @@ type View struct {
 	// assistive technology while it returns true, as content behind a
 	// drawer.
 	AccessibilityElementsHidden func() bool
-	// LiveRegion has screen readers announce changes of the label and
-	// text inside the view.
+	// LiveRegion has screen readers announce changes of the label and text inside the view; a RoleStatus view is a polite one when 0, and reads its whole text.
 	LiveRegion LiveRegion
 	// Tooltip shows above the view, 4 points away, once the pointer has
 	// rested on it for half a second on desktops, until the pointer leaves
@@ -338,7 +337,7 @@ type Text struct {
 	Label     string
 	LabelFunc func() string
 	Hint      string
-	// LiveRegion has screen readers announce the text as it changes.
+	// LiveRegion has screen readers announce the text as it changes; a RoleStatus text is a polite one when 0.
 	LiveRegion LiveRegion
 	TestID     string
 }
@@ -460,7 +459,7 @@ type Input struct {
 	// expects, and that the app rejected its content.
 	AccessibilityDescription string
 	Invalid                  func() bool
-	// Role is what it is for assistive technology, a text field when 0.
+	// Role is what it is for assistive technology, a text field when 0; RoleSearchField keeps it a text field that reads as a search field.
 	Role Role
 	// ReadonlyFunc and KeyboardTypeFunc are Readonly and KeyboardType
 	// following what they read.

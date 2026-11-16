@@ -224,7 +224,7 @@ func (t *Tree) setText(cx *Scope, n *node, v Text) {
 	n.base = base
 	t.setClasses(n, v.Class)
 	n.h = handlers{press: v.OnPress, longPress: v.OnLongPress, layout: v.OnLayout}
-	n.props = driver.ViewProps{Role: v.Role, Label: v.Label, Hint: v.Hint, LiveRegion: v.LiveRegion, TestID: v.TestID,
+	n.props = driver.ViewProps{Role: v.Role, Label: v.Label, Hint: v.Hint, LiveRegion: liveRegion(v.Role, v.LiveRegion), TestID: v.TestID,
 		Selectable: v.Selectable, PointerEvents: v.PointerEvents}
 	n.ownPointer = v.PointerEvents
 	t.pointersMoved = t.pointerStyled
@@ -349,7 +349,7 @@ func (t *Tree) setInput(n *node, v Input) {
 	n.base = base
 	t.setClasses(n, v.Class)
 	n.h = handlers{change: v.OnChange, submit: v.OnSubmit, focus: v.OnFocus, blur: v.OnBlur, layout: v.OnLayout}
-	n.props = driver.ViewProps{Role: RoleTextField, Label: v.Label, TestID: v.TestID}
+	n.props = driver.ViewProps{Role: cmpOr(v.Role, RoleTextField), Label: v.Label, TestID: v.TestID}
 	t.setRef(n, v.Ref)
 	in := n.input
 	if in == nil {

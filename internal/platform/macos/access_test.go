@@ -232,3 +232,49 @@ func editableSpinButton(t *testing.T) {
 	delete(views, stepper.native)
 	stepper.native.Send(selRelease)
 }
+
+// TestSearchFieldAndStatus checks, through the accessibility API VoiceOver uses, that an input with RoleSearchField stays an editable text field on its editor, with AXSearchField's subrole and role description, its view no element, and that a view with RoleStatus is a group with AXApplicationStatus's subrole whose children stay elements.
+func TestSearchFieldAndStatus(t *testing.T) { onMain(func() { searchFieldAndStatus(t) }) }
+
+func searchFieldAndStatus(t *testing.T) {
+	loadAppKit()
+	v := &view{kind: driver.KindInput, native: objc.ID(classInput).Send(selNew), input: &input{}}
+	v.setEditor(false, false)
+	v.input.setText("query")
+	editor := v.input.field.Send(sel("cell"))
+	v.setProps(&driver.ViewProps{Role: driver.RoleTextField, Label: "Find"})
+	plain := axAttr(editor, "AXRoleDescription")
+	v.setProps(&driver.ViewProps{Role: driver.RoleSearchField, Label: "Find", TestID: "find"})
+	if objc.Send[bool](v.native, sel("isAccessibilityElement")) {
+		t.Error("a search field's view is an element")
+	}
+	for name, want := range map[string]string{"AXRole": "AXTextField", "AXSubrole": "AXSearchField", "AXDescription": "Find", "AXIdentifier": "find", "AXValue": "query"} {
+		if got := axAttr(editor, name); got != want {
+			t.Errorf("a search field's %s %q, want %q", name, got, want)
+		}
+	}
+	if got := axAttr(editor, "AXRoleDescription"); got == "" || got == plain {
+		t.Errorf("a search field's role description %q, a plain input's %q", got, plain)
+	}
+	if got := axAttrNames(editor); !slices.Contains(got, "AXSubrole") {
+		t.Errorf("a search field's attributes %v", got)
+	}
+	v.native.Send(selRelease)
+	delete(views, v.input.field)
+	delete(views, v.input.host)
+
+	status := &view{id: 1, kind: driver.KindView, native: objc.ID(classView).Send(selNew)}
+	views[status.native] = status
+	status.setProps(&driver.ViewProps{Role: driver.RoleStatus, LiveRegion: driver.LiveRegionPolite})
+	if got := apple.GoString(status.native.Send(sel("accessibilityRole"))); got != "AXGroup" {
+		t.Errorf("a status is %q, want AXGroup", got)
+	}
+	if got := apple.GoString(status.native.Send(sel("accessibilitySubrole"))); got != "AXApplicationStatus" {
+		t.Errorf("a status's subrole %q, want AXApplicationStatus", got)
+	}
+	if status.axGrouped {
+		t.Error("a status hides its children")
+	}
+	delete(views, status.native)
+	status.native.Send(selRelease)
+}

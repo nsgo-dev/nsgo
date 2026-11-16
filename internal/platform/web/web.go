@@ -2043,9 +2043,6 @@ func setViewProps(v *view, p *driver.ViewProps) {
 	el := v.el
 	if v.kind == driver.KindInput {
 		el = v.inner
-		if p.Role == driver.RoleSearchField {
-			el.Set("type", "search")
-		}
 	}
 	flag := func(on bool) string {
 		if on {

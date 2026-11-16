@@ -560,6 +560,8 @@ func (r *runtime) inputProp(p *core.Input, name string, v js.Value) bool {
 		p.Label = stringOf(v)
 	case "accessibilityDescription":
 		p.AccessibilityDescription = stringOf(v)
+	case "role":
+		p.Role = roles[stringOf(v)]
 	case "accessibilityState":
 		p.Invalid = boolFunc(r.options(v).bool("invalid", false))
 	case "onChange":

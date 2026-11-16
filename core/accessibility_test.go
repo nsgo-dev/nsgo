@@ -167,23 +167,57 @@ func TestAccessibilityActionsAndFocus(t *testing.T) {
 }
 
 func TestStatusAndSearchRoles(t *testing.T) {
-	h := newHost(t, Size{Width: 200, Height: 100}, func(*Scope) Node {
+	var elems []*Element
+	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+		root := NewElement(cx, View{})
+		elems = []*Element{
+			NewElement(cx, View{TestID: "element-status", Role: RoleStatus}),
+			NewElement(cx, Text{TestID: "element-text", Role: RoleStatus, Content: "1 item"}),
+			NewElement(cx, Input{TestID: "element-search", Role: RoleSearchField}),
+			NewElement(cx, Input{TestID: "element-field"}),
+		}
+		for _, e := range elems {
+			root.Insert(e, nil)
+		}
 		return View{Children: []Node{
 			View{TestID: "status", Role: RoleStatus, Children: []Node{Text{Content: "Saved"}}},
+			Text{TestID: "text", Role: RoleStatus, Content: "Saved"},
+			View{TestID: "assertive", Role: RoleStatus, LiveRegion: LiveRegionAssertive},
+			View{TestID: "region", LiveRegion: LiveRegionPolite},
+			View{TestID: "plain", Role: RoleGroup},
 			Input{TestID: "search", Role: RoleSearchField, Label: "Search"},
+			root,
 		}}
 	})
 	props := propsOf(h.commit())
-	if p := props[h.find("status").id]; p.Role != RoleStatus || p.LiveRegion != LiveRegionPolite {
-		t.Fatalf("status props = %+v", p)
+	for id, want := range map[string]struct {
+		role Role
+		live LiveRegion
+	}{
+		"status": {RoleStatus, LiveRegionPolite}, "text": {RoleStatus, LiveRegionPolite},
+		"assertive": {RoleStatus, LiveRegionAssertive}, "region": {RoleNone, LiveRegionPolite}, "plain": {RoleGroup, LiveRegionNone},
+		"search": {RoleSearchField, LiveRegionNone}, "element-status": {RoleStatus, LiveRegionPolite},
+		"element-text": {RoleStatus, LiveRegionPolite}, "element-search": {RoleSearchField, LiveRegionNone},
+		"element-field": {RoleTextField, LiveRegionNone},
+	} {
+		if p := props[h.find(id).id]; p.Role != want.role || p.LiveRegion != want.live {
+			t.Errorf("%s: role %v, live region %v; want %v, %v", id, p.Role, p.LiveRegion, want.role, want.live)
+		}
 	}
-	if p := props[h.find("search").id]; p.Role != RoleSearchField {
-		t.Fatalf("search props = %+v", p)
+	// Set again, an element keeps its role and the status's live region.
+	elems[1].Set(Text{TestID: "element-text", Role: RoleStatus, Content: "2 items"})
+	elems[2].Set(Input{TestID: "element-search", Role: RoleSearchField, Label: "Find"})
+	h.commit()
+	if p := h.find("element-text").props; p.Role != RoleStatus || p.LiveRegion != LiveRegionPolite {
+		t.Errorf("a status text set again: %+v", p)
+	}
+	if p := h.find("element-search").props; p.Role != RoleSearchField || p.Label != "Find" {
+		t.Errorf("a search field set again: %+v", p)
 	}
 	if got := driver.RoleName(RoleStatus); got != "status" {
-		t.Fatalf("status selector name = %q", got)
+		t.Errorf("status selector name = %q", got)
 	}
 	if got := driver.RoleName(RoleSearchField); got != "searchbox" {
-		t.Fatalf("search selector name = %q", got)
+		t.Errorf("search selector name = %q", got)
 	}
 }

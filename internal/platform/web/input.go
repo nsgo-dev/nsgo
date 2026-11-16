@@ -184,10 +184,8 @@ func (s *surface) setInput(v *view, c *driver.InputConfig) {
 	el := v.inner
 	setStyle(el, frameStyle(c.Content))
 	if !c.Multiline {
+		// A search field stays type=text with ARIA's searchbox role (setViewProps): type=search would add the browser's clear button and look, and clear the field on Escape.
 		kind := "text"
-		if v.props.Role == driver.RoleSearchField {
-			kind = "search"
-		}
 		if c.Masked {
 			kind = "password"
 		}
