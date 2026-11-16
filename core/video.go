@@ -14,6 +14,7 @@ type Video struct {
 	// resources.
 	Source     string
 	SourceFunc func() string
+	// Paused applies when the source opens and when its value changes. A non-repeating video stays at its end through other prop changes: set Paused true then false to replay it from the start, or Seek before the end, which plays on from there when Paused is false.
 	Paused     bool
 	PausedFunc func() bool
 	Muted      bool

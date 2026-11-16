@@ -34,7 +34,7 @@ func runSteps(t *testing.T, steps []step) {
 		if len(got) != len(s.want) || len(got) == 1 && (got[0].Kind != s.want[0].Kind || got[0].Index != s.want[0].Index) {
 			t.Fatalf("%s: reported %v, want %v", s.name, got, s.want)
 		}
-		if apply := !p.held; apply != s.apply {
+		if apply := p.configure(false); apply != s.apply {
 			t.Fatalf("%s: a Configure applies Paused %v, want %v", s.name, apply, s.apply)
 		}
 	}
@@ -122,19 +122,24 @@ func TestVideoInterruptionResumesUnlessTheAppTookIt(t *testing.T) {
 	})
 }
 
-func TestVideoEndLeavesThePlayStateToPaused(t *testing.T) {
+func TestVideoEndHoldsUntilExplicitReplay(t *testing.T) {
 	runSteps(t, []step{
 		{name: "opened playing", do: configure(false, true), apply: true},
 		{name: "controls pause", do: reached(false, false, driver.VideoPauseControls), want: []driver.Event{pausedFor(driver.VideoPauseControls)}},
 		{name: "controls play", do: reached(true, false, driver.VideoPauseControls), want: []driver.Event{played}, apply: true},
-		{name: "ended", do: ended(false), apply: true},
+		{name: "ended", do: ended(false)},
 		// The rate notification of the end comes after it.
-		{name: "end's rate", do: reached(false, false, driver.VideoPauseControls), apply: true},
+		{name: "end's rate", do: reached(false, false, driver.VideoPauseControls)},
+		{name: "unrelated config", do: configure(false, false)},
+		{name: "app pauses", do: configure(true, true)},
+		{name: "app replays", do: configure(false, true), apply: true},
 	})
 	runSteps(t, []step{
 		{name: "opened paused", do: configure(true, true), apply: true},
 		{name: "controls play", do: reached(true, true, driver.VideoPauseControls), want: []driver.Event{played}},
-		{name: "ended", do: ended(false), apply: true},
+		{name: "ended", do: ended(false)},
+		{name: "unrelated config", do: configure(true, false)},
+		{name: "controls replay", do: reached(true, true, driver.VideoPauseControls), want: []driver.Event{played}},
 	})
 }
 

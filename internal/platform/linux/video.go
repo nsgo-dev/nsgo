@@ -30,6 +30,8 @@ type video struct {
 	loaded, failed, buffering bool
 	// playing was asked for, applied again once the stream is prepared.
 	playing bool
+	// completed holds the last frame until an explicit replay or seek.
+	completed bool
 	// timer reports EventProgress; timerData finds the view.
 	timer     uint32
 	timerData uintptr
@@ -62,9 +64,13 @@ func (w *window) configureVideo(v *view, c *driver.VideoConfig) {
 		gtkMediaStreamSetMuted(s, boolInt(c.Muted))
 		gtkMediaStreamSetVolume(s, float64(min(max(c.Volume, 0), 1)))
 		gtkMediaStreamSetLoop(s, boolInt(c.Repeat))
-		vd.playing = !c.Paused
-		gtkMediaStreamSetPlaying(s, boolInt(!c.Paused && !vd.failed))
-		w.videoBuffer(v, !c.Paused && !vd.loaded && !vd.failed)
+		vd.playing = !c.Paused && (!vd.completed || reopened || c.Paused != old.Paused)
+		if vd.playing && vd.completed {
+			gtkMediaStreamSeek(s, 0)
+			vd.completed = false
+		}
+		gtkMediaStreamSetPlaying(s, boolInt(vd.playing && !vd.failed))
+		w.videoBuffer(v, vd.playing && !vd.loaded && !vd.failed)
 	}
 	if vd.child != 0 {
 		if vd.controls {
@@ -110,6 +116,7 @@ func (w *window) openVideo(v *view) {
 	vd := v.video
 	w.closeStream(v)
 	vd.loaded, vd.failed, vd.buffering, vd.playing = false, false, false, false
+	vd.completed = false
 	source := vd.config.Source
 	if source == "" {
 		return
@@ -205,7 +212,13 @@ func (w *window) stopProgress(vd *video) {
 // seek moves the video to t if its stream can seek.
 func (vd *video) seek(t time.Duration) {
 	if vd.stream != 0 && gtkMediaStreamIsSeekable(vd.stream) != 0 {
-		gtkMediaStreamSeek(vd.stream, max(t, 0).Microseconds())
+		t = max(t, 0)
+		replay := vd.completed && t < micros(gtkMediaStreamGetDuration(vd.stream))
+		gtkMediaStreamSeek(vd.stream, t.Microseconds())
+		if replay {
+			vd.completed, vd.playing = false, !vd.config.Paused
+			gtkMediaStreamSetPlaying(vd.stream, boolInt(vd.playing))
+		}
 	}
 }
 
@@ -275,6 +288,7 @@ func videoPreparedCallback(stream, pspec uintptr, data uintptr) {
 
 func videoEndedCallback(stream, pspec uintptr, data uintptr) {
 	if w, v := videoOf(data, stream); v != nil && gtkMediaStreamGetEnded(stream) != 0 {
+		v.video.completed, v.video.playing = true, false
 		w.report(v, driver.Event{Kind: driver.EventEnd, ID: v.id})
 	}
 }

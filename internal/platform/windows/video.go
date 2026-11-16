@@ -148,6 +148,9 @@ type video struct {
 	// applied again once the metadata is known.
 	loaded, failed, buffering, playing bool
 
+	// completed holds the last frame until an explicit replay or seek.
+	completed bool
+
 	config     driver.VideoConfig
 	configured bool
 	frame      *videoFrame
@@ -185,13 +188,18 @@ func (vd *video) report(e driver.Event) {
 
 // configure applies c, opening its source when it changed.
 func (vd *video) configure(c *driver.VideoConfig) {
+	old := vd.config
 	reopen := !vd.configured || c.Source != vd.config.Source
 	vd.config, vd.configured = *c, true
 	if reopen {
 		vd.open()
 	}
-	vd.playing = !c.Paused
+	vd.playing = !c.Paused && (!vd.completed || reopen || c.Paused != old.Paused)
 	if e := vd.engine; e != nil {
+		if vd.playing && vd.completed {
+			e.callDouble(meSetCurrentTime, 0)
+			vd.completed = false
+		}
 		e.call(meSetMuted, boolArg(c.Muted))
 		e.callDouble(meSetVolume, float64(min(max(c.Volume, 0), 1)))
 		e.call(meSetLoop, boolArg(c.Repeat))
@@ -199,11 +207,11 @@ func (vd *video) configure(c *driver.VideoConfig) {
 		e.callDouble(meSetPlaybackRate, float64(c.Rate))
 		if c.Paused {
 			e.call(mePause)
-		} else if !vd.failed {
+		} else if vd.playing && !vd.failed {
 			e.call(mePlay)
 		}
-		vd.setBuffering(!c.Paused && !vd.loaded && !vd.failed)
-		if !c.Paused {
+		vd.setBuffering(vd.playing && !vd.loaded && !vd.failed)
+		if vd.playing {
 			vd.pump()
 		}
 	}
@@ -272,6 +280,7 @@ func (vd *video) stop() {
 		vd.engine = nil
 	}
 	vd.loaded, vd.failed, vd.buffering = false, false, false
+	vd.completed = false
 	vd.natural = [2]uint32{}
 	vd.wantFrame, vd.progressAt = time.Time{}, time.Time{}
 }
@@ -298,6 +307,12 @@ func (vd *video) seekTo(t float64) {
 		return
 	}
 	vd.engine.callDouble(meSetCurrentTime, t)
+	if vd.completed && t < finite(vd.engine.getDouble(meGetDuration)) {
+		vd.completed, vd.playing = false, !vd.config.Paused
+		if vd.playing {
+			vd.engine.call(mePlay)
+		}
+	}
 	vd.wantFrame = time.Now().Add(videoFrameWait)
 	vd.pump()
 }
@@ -352,6 +367,7 @@ func (vd *video) notified(serial uint64, event uint32, param1 uintptr, param2 ui
 		vd.w.redrawAll()
 	case mediaEnded:
 		if !vd.config.Repeat {
+			vd.completed, vd.playing = true, false
 			vd.report(driver.Event{Kind: driver.EventEnd})
 		}
 		vd.w.redrawAll()

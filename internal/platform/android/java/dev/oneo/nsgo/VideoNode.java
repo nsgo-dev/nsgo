@@ -50,6 +50,8 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private Surface surface;
     private String source;
     private boolean prepared;
+    /** A non-repeating end stays stopped until an explicit replay, seek or source change. */
+    private boolean completed;
     private boolean paused, muted, repeat;
     /** Whether the player plays or not is the controls' or the system's, not paused, until paused changes: each such play or pause is reported once. resumable is a pause for a transient loss of the audio focus, which plays on when the focus comes back. */
     private boolean held, resumable;
@@ -96,6 +98,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
             // The app decides again.
             held = false;
             resumable = false;
+            if (!paused) completed = false;
         }
         muted = Protocol.flag(flags, 1);
         repeat = Protocol.flag(flags, 2);
@@ -155,8 +158,9 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         });
         p.setOnCompletionListener(mp -> {
             if (mp != player) return;
-            // One that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while paused goes on; one that does not stops, and the play state is paused's again.
+            // One that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while paused goes on; one that does not stops, the play state is paused's again, and it stays at its end through unrelated configuration until paused changes, a seek or the controls play it.
             if (!repeat) {
+                completed = true;
                 held = false;
                 resumable = false;
             }
@@ -239,7 +243,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
         if (!held) {
             if (paused) {
                 if (p.isPlaying()) p.pause();
-            } else if (!p.isPlaying()) {
+            } else if (!completed && !p.isPlaying()) {
                 p.start();
             }
         }
@@ -336,6 +340,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private void platformPlay() {
         MediaPlayer p = player;
         if (p == null || !prepared || p.isPlaying()) return;
+        completed = false;
         p.start();
         held = paused;
         resumable = false;
@@ -363,7 +368,17 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     }
 
     void seek(long millis) {
-        if (player != null && prepared) player.seekTo(millis, MediaPlayer.SEEK_CLOSEST);
+        MediaPlayer p = player;
+        if (p == null || !prepared) return;
+        millis = Math.max(0, millis);
+        boolean replay = completed && millis < p.getDuration();
+        if (replay) {
+            // Leave PlaybackCompleted before seeking: start() in that state restarts at zero instead of resuming at the requested time.
+            p.pause();
+            completed = false;
+        }
+        p.seekTo(millis, MediaPlayer.SEEK_CLOSEST);
+        if (replay) apply();
     }
 
     /** Scales the picture inside the view by its resize mode. */
@@ -403,6 +418,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private void release() {
         removeCallbacks(progress);
         prepared = false;
+        completed = false;
         if (player != null) {
             player.release();
             player = null;
@@ -474,7 +490,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
 
     @Override
     public void seekTo(int pos) {
-        if (player != null && prepared) player.seekTo(pos);
+        seek(pos);
     }
 
     @Override

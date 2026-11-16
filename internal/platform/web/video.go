@@ -21,6 +21,10 @@ type video struct {
 	// buffering is what EventBuffer last said.
 	buffering bool
 	warned    bool // that the browser would not play before a gesture
+
+	paused, made bool
+	// completed keeps an ended element paused through unrelated props.
+	completed bool
 }
 
 // videoFit is the CSS object-fit of each resize mode.
@@ -51,6 +55,7 @@ func (s *surface) createVideo(v *view) {
 		}})
 	})
 	on("playing", func() {
+		vd.completed = false
 		s.videoBuffer(v, false)
 		vd.stopProgress()
 		if v.events.Has(driver.EventProgress) {
@@ -64,6 +69,7 @@ func (s *surface) createVideo(v *view) {
 	on("waiting", func() { s.videoBuffer(v, true) })
 	on("canplay", func() { s.videoBuffer(v, false) })
 	on("ended", func() {
+		vd.completed = true
 		vd.stopProgress()
 		s.videoProgress(v)
 		s.send(v, driver.Event{Kind: driver.EventEnd})
@@ -118,7 +124,10 @@ func (s *surface) setVideo(v *view, c *driver.VideoConfig) {
 	if c.Source != "" {
 		url, _ = imageURL(driver.ImageSource{URI: c.Source})
 	}
+	playChanged := !vd.made || url != vd.src || c.Paused != vd.paused
+	vd.paused, vd.made = c.Paused, true
 	if url != vd.src {
+		vd.completed = false
 		vd.src = url
 		if url != "" {
 			vd.el.Set("src", url)
@@ -140,26 +149,43 @@ func (s *surface) setVideo(v *view, c *driver.VideoConfig) {
 	setStyle(el, map[string]string{"object-fit": fit})
 	if c.Paused {
 		el.Call("pause")
-	} else if url != "" && el.Get("paused").Bool() {
-		// Settled either way, with the error when it fails.
-		var settled js.Func
-		settled = js.FuncOf(func(_ js.Value, args []js.Value) any {
-			settled.Release()
-			// Browsers only start sound on their own after a user gesture.
-			if err := args[0]; err.Truthy() && err.Get("name").String() == "NotAllowedError" && !vd.warned {
-				vd.warned = true
-				js.Global().Get("console").Call("warn",
-					"nsgo: the browser did not let the video play before a user gesture (muted videos can)")
-			}
-			return nil
-		})
-		el.Call("play").Call("then", settled, settled)
+	} else if url != "" && el.Get("paused").Bool() && (!vd.completed || playChanged) {
+		if vd.completed {
+			el.Set("currentTime", 0)
+			vd.completed = false
+		}
+		vd.play()
 	}
+}
+
+// play starts the element, reporting a browser's refusal once.
+func (vd *video) play() {
+	// Settled either way, with the error when it fails.
+	var settled js.Func
+	settled = js.FuncOf(func(_ js.Value, args []js.Value) any {
+		settled.Release()
+		// Browsers only start sound on their own after a user gesture.
+		if err := args[0]; err.Truthy() && err.Get("name").String() == "NotAllowedError" && !vd.warned {
+			vd.warned = true
+			js.Global().Get("console").Call("warn",
+				"nsgo: the browser did not let the video play before a user gesture (muted videos can)")
+		}
+		return nil
+	})
+	vd.el.Call("play").Call("then", settled, settled)
 }
 
 // seek moves the video to t.
 func (vd *video) seek(t time.Duration) {
+	t = max(t, 0)
+	replay := vd.completed && t < vd.seconds("duration")
 	vd.el.Set("currentTime", t.Seconds())
+	if replay {
+		vd.completed = false
+		if !vd.paused {
+			vd.play()
+		}
+	}
 }
 
 // release stops the video: a removed media element keeps playing until

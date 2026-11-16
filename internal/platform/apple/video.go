@@ -155,6 +155,9 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 			play.applied(false)
 			v.player.Send(sel("pause"))
 		default:
+			if play.completed || v.atEnd() {
+				v.player.Send(sel("seekToTime:"), cmTimeOf(0))
+			}
 			play.applied(true)
 			v.player.Send(sel("setRate:"), c.Rate)
 		}
@@ -617,8 +620,19 @@ func (v *Video) report() {
 // Seek jumps to position exactly.
 func (v *Video) Seek(position time.Duration) {
 	if v.player != 0 {
+		position = max(position, 0)
+		play := &v.status.play
+		replay := play.completed && position < v.itemDuration()
+		if replay {
+			play.completed = false
+		}
 		zero := cmTimeOf(0)
-		v.player.Send(sel("seekToTime:toleranceBefore:toleranceAfter:"), cmTimeOf(max(position, 0)), zero, zero)
+		v.player.Send(sel("seekToTime:toleranceBefore:toleranceAfter:"), cmTimeOf(position), zero, zero)
+		if replay && !v.config.Paused {
+			play.applied(true)
+			v.player.Send(sel("setRate:"), v.config.Rate)
+			v.followAudio()
+		}
 	}
 }
 

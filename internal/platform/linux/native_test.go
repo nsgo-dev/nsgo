@@ -715,8 +715,7 @@ func aiff() []byte {
 	return chunk("FORM", body)
 }
 
-// TestVideoReportsLoadProgressAndEnd plays a short sound through a
-// Video, as NSH's Linux backend does, and reads its events.
+// TestVideoReportsLoadProgressAndEnd plays a short sound through a Video and reads its events. At the end, unrelated configuration stays stopped; an explicit replay or seek starts it again.
 func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -755,6 +754,49 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 	if p == 0 {
 		t.Errorf("title = %q: no progress while playing", got)
 	}
+	configure := func(change func(*driver.VideoConfig)) {
+		t.Helper()
+		found := false
+		w.onLoop(t, func() {
+			for _, v := range w.views {
+				if v.video != nil {
+					c := v.video.config
+					change(&c)
+					w.configureVideo(v, &c)
+					found = true
+					break
+				}
+			}
+		})
+		if !found {
+			t.Fatal("no video")
+		}
+	}
+	for _, change := range []func(*driver.VideoConfig){
+		func(c *driver.VideoConfig) { c.Volume = 0.3 },
+		func(c *driver.VideoConfig) { c.Muted = true },
+		func(c *driver.VideoConfig) { c.Rate = 1.25 },
+		func(c *driver.VideoConfig) { c.ResizeMode = driver.Cover },
+		func(c *driver.VideoConfig) { c.Controls = true },
+		func(c *driver.VideoConfig) { c.ProgressInterval = 30 * time.Millisecond },
+	} {
+		configure(change)
+		time.Sleep(150 * time.Millisecond)
+		if after := w.titleOf(t); after != got {
+			t.Fatalf("a finished video reported new events after configuration: %q -> %q", got, after)
+		}
+	}
+	configure(func(c *driver.VideoConfig) { c.Paused = true })
+	configure(func(c *driver.VideoConfig) { c.Paused = false })
+	waitTitle(t, w, func(s string) bool { return strings.HasSuffix(s, "|2") })
+	w.onLoop(t, func() {
+		for _, v := range w.views {
+			if v.video != nil {
+				v.video.seek(200 * time.Millisecond)
+			}
+		}
+	})
+	waitTitle(t, w, func(s string) bool { return strings.HasSuffix(s, "|3") })
 }
 
 // TestVideoReportsWhatGStreamerCannotPlay opens bytes that are no media.

@@ -8,6 +8,8 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 type videoPlayback struct {
 	// playing is what the player did last, as far as the backend knows.
 	playing bool
+	// completed holds a non-repeating end until an explicit replay or seek.
+	completed bool
 	// held says the player's play state is the platform's, not the app's Paused.
 	held bool
 	// reason is why the system is about to pause the player, given before the player says it stopped; ok when there is one.
@@ -21,19 +23,25 @@ func (p *videoPlayback) configure(pausedChanged bool) bool {
 	if pausedChanged {
 		p.held, p.ok, p.resumable = false, false, false
 	}
-	return !p.held
+	return !p.held && (!p.completed || pausedChanged)
 }
 
 // applied records the play state the backend is about to give the player, which is not reported.
-func (p *videoPlayback) applied(playing bool) { p.playing = playing }
+func (p *videoPlayback) applied(playing bool) {
+	p.playing = playing
+	if playing {
+		p.completed = false
+	}
+}
 
-// ended records that the player reached its end, which EventEnd reports. A video that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while Paused is true goes on; one that does not stops, and leaves the play state to Paused again.
+// ended records that the player reached its end, which EventEnd reports. A video that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while Paused is true goes on; one that does not stops, leaves the play state to Paused again, and stays at its end through unrelated configuration until Paused changes, a seek or the controls play it.
 func (p *videoPlayback) ended(repeat bool) {
 	if repeat {
 		p.playing = true
 		return
 	}
 	p.playing, p.held, p.ok, p.resumable = false, false, false, false
+	p.completed = true
 }
 
 // expect records why the system is about to pause the player, before the player says it stopped.
@@ -51,6 +59,7 @@ func (p *videoPlayback) changed(playing, paused bool, reason int) (driver.Event,
 	p.playing = playing
 	p.held = playing == paused
 	if playing {
+		p.completed = false
 		p.ok, p.resumable = false, false
 		return driver.Event{Kind: driver.EventVideoPlay}, true
 	}
