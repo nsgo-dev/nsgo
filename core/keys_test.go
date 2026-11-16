@@ -518,3 +518,64 @@ func TestKeymapFollowsAModalThatBindsNothing(t *testing.T) {
 		t.Fatalf("after the modal: keymap = %q (sent %v), want the page's space", keys, sent)
 	}
 }
+
+// A YieldsToMenu binding leaves its key out of the keymap, which platforms match before the application menu, while an enabled item of the menu has the key as its shortcut, written with "mod" or the platform's own Command or Control, a role's included; a disabled item or one in a disabled submenu leaves it the key, and it takes the key back as the menu goes. A binding without the option keeps its key before the menu. Where no menu shows, on iOS, Android and the web, every binding keeps its key.
+func TestBindingsYieldToTheMenuAsAsked(t *testing.T) {
+	for _, os := range []OS{OSMacOS, OSWindows, OSLinux, OSIOS, OSAndroid, OSWeb} {
+		command := map[OS]string{OSMacOS: "Cmd+R", OSIOS: "Cmd+R"}[os]
+		if command == "" {
+			command = "Ctrl+R"
+		}
+		for _, c := range []struct {
+			name string
+			menu []MenuItem
+			want []string
+		}{
+			{"no menu", nil, []string{"mod+r", "mod+q", "mod+s"}},
+			{"mod+r", []MenuItem{{Label: "Run", Shortcut: "mod+r"}}, []string{"mod+q", "mod+s"}},
+			{command, []MenuItem{{Label: "Run", Shortcut: command}}, []string{"mod+q", "mod+s"}},
+			{"disabled", []MenuItem{{Label: "Run", Shortcut: "mod+r", Disabled: true}}, []string{"mod+r", "mod+q", "mod+s"}},
+			{"in a disabled submenu", []MenuItem{{Label: "More", Disabled: true, Items: []MenuItem{{Label: "Run", Shortcut: "mod+r"}}}}, []string{"mod+r", "mod+q", "mod+s"}},
+			{"other keys", []MenuItem{{Label: "Rerun", Shortcut: "mod+shift+r"}, {Label: "Save", Shortcut: "mod+s"}}, []string{"mod+r", "mod+q", "mod+s"}},
+			// Quit's own shortcut is Command+Q on a Mac, Alt+F4 elsewhere.
+			{"a role", []MenuItem{{Role: MenuQuit}}, map[bool][]string{true: {"mod+r", "mod+s"}, false: {"mod+r", "mod+q", "mod+s"}}[os == OSMacOS]},
+		} {
+			var shown *Signal[bool]
+			var ran []string
+			h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+				shown = NewSignal(cx, false)
+				for _, k := range []string{"mod+r", "mod+q"} {
+					cx.OnKeyWith(k, KeyOptions{YieldsToMenu: true}, func() { ran = append(ran, k) })
+				}
+				cx.OnKey("mod+s", func() { ran = append(ran, "mod+s") })
+				return Show{When: shown.Get, Then: func(cx *Scope) Node {
+					cx.SetApplicationMenu([]MenuItem{{Label: "File", Items: c.menu}})
+					return View{}
+				}}
+			})
+			h.tree.SetEnvironment(Environment{OS: os, Idiom: IdiomDesktop})
+			keys, _ := sentKeys(h.commit())
+			if c.menu != nil {
+				shown.Set(true)
+				keys, _ = sentKeys(h.commit())
+			}
+			if os != OSMacOS && os != OSWindows && os != OSLinux {
+				c.want = []string{"mod+r", "mod+q", "mod+s"}
+			}
+			if !slices.Equal(keys, c.want) {
+				t.Errorf("%s, %s: keymap = %q, want %q", os, c.name, keys, c.want)
+			}
+			h.pressKey("mod+r", 0)
+			if fired := slices.Contains(ran, "mod+r"); fired != slices.Contains(c.want, "mod+r") {
+				t.Errorf("%s, %s: mod+r fired %v", os, c.name, fired)
+			}
+			if c.menu == nil {
+				continue
+			}
+			shown.Set(false)
+			if keys, sent := sentKeys(h.commit()); !sent || !slices.Equal(keys, []string{"mod+r", "mod+q", "mod+s"}) {
+				t.Errorf("%s, %s: after the menu, keymap = %q (sent %v), want every binding", os, c.name, keys, sent)
+			}
+		}
+	}
+}

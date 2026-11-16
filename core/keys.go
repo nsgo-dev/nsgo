@@ -17,7 +17,9 @@ type keyBinding struct {
 	within *Scope
 	// overModals is KeyOptions.OverModals.
 	overModals bool
-	fn         func()
+	// yieldsToMenu is KeyOptions.YieldsToMenu.
+	yieldsToMenu bool
+	fn           func()
 }
 
 // KeyWhen says when a binding fires.
@@ -39,6 +41,8 @@ type KeyOptions struct {
 	Repeat bool
 	// OverModals keeps it firing while a modal its owner's views are not in covers them, for an app-wide shortcut such as a menu's.
 	OverModals bool
+	// YieldsToMenu leaves the key to the application menu while it has an enabled item with the same shortcut on macOS, Windows and Linux, which show the menu, for a default shortcut an app's menu may take over. Else a binding takes its key before the menu does.
+	YieldsToMenu bool
 }
 
 // OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". Of the bindings of a key that fire where the focus is, the newest wins, and only it runs. It fires once while the key is held, and not while the view with the keyboard focus uses the key itself, a text input its editing keys, a button Return and Space, a slider or a tab bar its arrows (KeyAuto); OnKeyWith says else. A control that binds its own keys while it has the focus binds them with KeyNotEditing, or the focus it holds would keep them from it.
@@ -64,7 +68,7 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 	if t.keyID == 0 {
 		t.keyID++
 	}
-	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, fn: fn}
+	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, yieldsToMenu: opts.YieldsToMenu, fn: fn}
 	t.keys = append(t.keys, b)
 	t.keysChanged = true
 	t.changed = true
@@ -195,9 +199,36 @@ func (t *Tree) keymap() []driver.KeyBinding {
 	return out
 }
 
-// keyActive reports whether binding b may fire: its owner lives and shows (keyPlaces.shows), above any modal unless it is OverModals, and the focus is within what it is confined to.
+// keyActive reports whether binding b may fire: its owner lives and shows (keyPlaces.shows), above any modal unless it is OverModals, the focus is within what it is confined to, and unless it is YieldsToMenu, no enabled item of the application menu has its key (menuHasKey).
 func (t *Tree) keyActive(b *keyBinding, places *keyPlaces) bool {
-	return !b.owner.disposed && places.shows(b.owner, b.overModals) && t.focusWithin(b.within)
+	return !b.owner.disposed && places.shows(b.owner, b.overModals) && t.focusWithin(b.within) &&
+		!(b.yieldsToMenu && t.menuHasKey(b.Key))
+}
+
+// menuHasKey reports whether an enabled item of the application menu has the normalized key as its shortcut (menuTakes), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.
+func (t *Tree) menuHasKey(key string) bool {
+	if len(t.menu) == 0 {
+		return false
+	}
+	env := t.root.Env()
+	if os := env.os.GetUntracked(); os != OSMacOS && os != OSWindows && os != OSLinux {
+		return false
+	}
+	command := "ctrl"
+	if env.appleKeys.GetUntracked() {
+		command = "meta"
+	}
+	parts := strings.Split(key, "+")
+	mods, name := parts[:len(parts)-1], parts[len(parts)-1]
+	names := []string{key}
+	for _, s := range [][2]string{{"mod", command}, {command, "mod"}} {
+		if i := slices.Index(mods, s[0]); i >= 0 {
+			swapped := slices.Clone(mods)
+			swapped[i] = s[1]
+			names = append(names, driver.NormalizeKey(strings.Join(append(swapped, name), "+")))
+		}
+	}
+	return menuTakes(t.menu, names, env.os.GetUntracked() == OSMacOS)
 }
 
 // keyPlaces is where the owners of views show, which decides the key bindings and back handlers that take part: read from the views each time a keymap, a key or a back press asks, so it follows a Holder's content in and out of its places, a modal shown or dismissed, and DisplayNone.

@@ -186,4 +186,27 @@ func TestDevReloadKey(t *testing.T) {
 	if own.Load() != 1 {
 		t.Fatalf("the app's own mod+r ran %d times, want once", own.Load())
 	}
+
+	// An app whose application menu has an enabled item with the key keeps it too, as desktops match the keymap before the menu: the binding leaves the keymap while the item is enabled.
+	var disabled *core.Signal[bool]
+	chosen := 0
+	app = nsgotest.Start(t, Wrap(func(cx *core.Scope) core.Node {
+		disabled = core.NewSignal(cx, false)
+		cx.Effect(func() {
+			cx.SetApplicationMenu([]core.MenuItem{{Label: "File", Items: []core.MenuItem{
+				{Label: "Run", Shortcut: "mod+r", Disabled: disabled.Get(), OnSelect: func() { chosen++ }},
+			}}})
+		})
+		return core.View{}
+	}), nsgotest.Environment(driver.Environment{OS: driver.OSMacOS, Idiom: driver.IdiomDesktop}))
+	app.Key("mod+r")
+	waitFor("mod+r the app's menu has", 2)
+	app.ChooseMenu("File", "Run")
+	if chosen != 1 {
+		t.Fatalf("the menu's Run ran %d times, want once", chosen)
+	}
+	app.Post(func() { disabled.Set(true) })
+	app.Settle()
+	app.Key("mod+r")
+	waitFor("mod+r the app's menu has disabled", 3)
 }

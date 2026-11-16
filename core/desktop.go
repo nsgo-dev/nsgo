@@ -124,12 +124,16 @@ func (cx *Scope) SetApplicationMenu(items []MenuItem) {
 		entries = t.menuEntries(items, owner, t.menuActions)
 		owner.addCleanup(func() {
 			if t.menuGen == gen {
-				t.menuActions = nil
+				t.menuActions, t.menu = nil, nil
 				t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemMenu})
+				t.keysChanged = true
 				t.changed = true
 			}
 		})
 	}
+	// Bindings that yield to the menu (KeyOptions.YieldsToMenu) come and go with its shortcuts.
+	t.menu = entries
+	t.keysChanged = true
 	// It replaces a menu not sent yet, such as the default one the
 	// cleanup of the effect setting it again asked for, which would show
 	// for a moment.
@@ -259,6 +263,28 @@ func (t *Tree) popupClosed(id uint32, user bool) {
 		}
 		t.within(owner, p.closed)
 	}
+}
+
+// menuTakes reports whether an enabled item of entries or of their enabled submenus has a shortcut of names, a role's own where it has none, as the platforms read them: on a Mac (mac) every item's, elsewhere all but the editing roles', whose keys the focused field handles itself.
+func menuTakes(entries []MenuEntry, names []string, mac bool) bool {
+	for _, e := range entries {
+		switch {
+		case e.Disabled || e.Separator:
+		case len(e.Items) > 0:
+			if menuTakes(e.Items, names, mac) {
+				return true
+			}
+		case mac || !e.Role.EditsText():
+			shortcut := e.Shortcut
+			if shortcut == "" {
+				shortcut = driver.NormalizeKey(e.Role.Shortcut(mac))
+			}
+			if shortcut != "" && slices.Contains(names, shortcut) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (t *Tree) menuEntries(items []MenuItem, owner *Scope, actions map[uint32]menuAction) []MenuEntry {

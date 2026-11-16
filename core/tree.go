@@ -91,6 +91,7 @@ type Tree struct {
 	historyAgain bool
 	alertID      uint32
 	menuActions  map[uint32]menuAction
+	menu         []MenuEntry // the application menu set, nil for the platform's default (menuHasKey)
 	popup        popupMenu
 	menuID       uint32
 	menuGen      uint32

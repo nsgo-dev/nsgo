@@ -61,7 +61,7 @@ type devOptions struct {
 	server     *devServer
 }
 
-// dev builds and runs the app, with a dev server its builds connect to: a failed build shows over the app, and Command or Control+R in the app, outside the browser, builds and starts it again unless the app binds the key itself (internal/dev's Wrap). It exits once the app does. With nsgo.yaml's hot reload it rebuilds and restarts the app whenever a Go file it compiles from, go.mod, nsgo.yaml or a catalog changes, and keeps the running app when a build fails. After each Go build of an app with a tsconfig.json it writes the TSX's types to .nsgo/types, for editors.
+// dev builds and runs the app, with a dev server its builds connect to: a failed build shows over the app, and Command or Control+R in the app, outside the browser, builds and starts it again unless the app binds the key itself, with OnKey or an enabled item of its application menu (internal/dev's Wrap). It exits once the app does. With nsgo.yaml's hot reload it rebuilds and restarts the app whenever a Go file it compiles from, go.mod, nsgo.yaml or a catalog changes, and keeps the running app when a build fails. After each Go build of an app with a tsconfig.json it writes the TSX's types to .nsgo/types, for editors.
 func dev(ctx context.Context, p *project, opts devOptions) error {
 	if opts.automation {
 		switch {
