@@ -180,6 +180,8 @@ type runtime struct {
 	refusals map[service]bool
 	// speech is the speech session running, one per engine.
 	speech *SpeechSession
+	// speaking is the utterance being spoken, one per engine.
+	speaking *utterance
 	// audio is the engine's sounds and players, made with the first.
 	audio *audioState
 	// causes are what ran since a tree last committed, while driver.TraceCauses is set.

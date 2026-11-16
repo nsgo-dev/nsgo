@@ -709,6 +709,8 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.authSession(it.Count, *it.Auth)
 		case driver.ItemAudio:
 			a.audio(it.Count, *it.Audio)
+		case driver.ItemSpeak:
+			a.speak(it.Count, *it.Speak)
 		case driver.ItemAlert:
 			a.alerts = append(a.alerts, *it.Alert)
 			if a.target == nil {

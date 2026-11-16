@@ -57,6 +57,8 @@ const (
 	AccessPicker = "picker"
 	// AccessSpeech is the microphone and the speech recognizer.
 	AccessSpeech = "speech"
+	// AccessTextToSpeech is speaking text aloud with the system's voices (Speak), refused with SpeakNotAllowed, and listing them (Voices).
+	AccessTextToSpeech = "textToSpeech"
 	// AccessStatusBar is setting the status bar.
 	AccessStatusBar = "statusBar"
 	// AccessNotifications is system notifications and the app's badge.
@@ -159,6 +161,7 @@ const (
 	serviceClipboard       service = "clipboard"
 	servicePicker          service = "picker"
 	serviceSpeech          service = "speech"
+	serviceSpeak           service = "speak"
 	serviceOverlay         service = "overlay"
 	serviceAudio           service = "audio"
 	serviceAuthSession     service = "authSession"
@@ -188,6 +191,7 @@ var services = map[service]serviceRule{
 	serviceClipboard:       {permission: AccessClipboard, runtimeOnly: true},
 	servicePicker:          {permission: AccessPicker, runtimeOnly: true},
 	serviceSpeech:          {permission: AccessSpeech, runtimeOnly: true},
+	serviceSpeak:           {permission: AccessTextToSpeech},
 	serviceOverlay:         {permission: AccessOverlay},
 	serviceAudio:           {permission: AccessAudio},
 	serviceAuthSession:     {permission: AccessAuthSession},

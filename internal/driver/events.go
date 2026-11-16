@@ -267,6 +267,8 @@ const (
 	EventSignInWithApple
 	// EventDockMenu reports the app icon menu's item Count chosen, after the kinds Android's Protocol.java mirrors.
 	EventDockMenu
+	// EventSpeak reports utterance Count's end, or answers ItemSpeak Count's SpeakVoices (Data, a *SpeakEvent).
+	EventSpeak
 )
 
 // What EventInputModality reports.

@@ -354,6 +354,8 @@ const (
 	ItemDockMenu
 	// ItemRecentFile records Value in the platform's recent documents, or clears the app's when On.
 	ItemRecentFile
+	// ItemSpeak asks the platform's speech synthesizer what Speak says, of utterance or request Count; the platform reports it with EventSpeak carrying Count. The core sends none where the environment says no Speak.
+	ItemSpeak
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -540,6 +542,8 @@ type MountItem struct {
 	Auth *AuthRequest
 	// AppleSignIn is an ItemSignInWithApple's request.
 	AppleSignIn *AppleSignInRequest
+	// Speak is an ItemSpeak's request.
+	Speak *SpeakRequest
 	// Notification is what ItemShowNotification shows.
 	Notification *Notification
 	// Permission is an ItemPermission's request.

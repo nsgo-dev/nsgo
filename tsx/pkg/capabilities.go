@@ -21,10 +21,11 @@ type Capabilities struct {
 	WebView *WebView `json:"webview,omitempty"`
 	// OpenURL is openUrl: every URL, or those of Schemes.
 	OpenURL *OpenURL `json:"openUrl,omitempty"`
-	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Secrets the package's own part of the app's secure store, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session.
+	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, TextToSpeech speaking text with the system's voices, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Secrets the package's own part of the app's secure store, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session.
 	Clipboard       bool `json:"clipboard,omitempty"`
 	Picker          bool `json:"picker,omitempty"`
 	Speech          bool `json:"speech,omitempty"`
+	TextToSpeech    bool `json:"textToSpeech,omitempty"`
 	StatusBar       bool `json:"statusBar,omitempty"`
 	Notifications   bool `json:"notifications,omitempty"`
 	Biometrics      bool `json:"biometrics,omitempty"`
@@ -117,6 +118,8 @@ func ParseCapabilities(data []byte, strict bool) (c Capabilities, ignored []stri
 			err = json.Unmarshal(raw, &c.Picker)
 		case "speech":
 			err = json.Unmarshal(raw, &c.Speech)
+		case "textToSpeech":
+			err = json.Unmarshal(raw, &c.TextToSpeech)
 		case "statusBar":
 			err = json.Unmarshal(raw, &c.StatusBar)
 		case "notifications":
@@ -189,6 +192,8 @@ func dropCapability(c *Capabilities, key string) {
 		c.Audio = false
 	case "authSession":
 		c.AuthSession = false
+	case "textToSpeech":
+		c.TextToSpeech = false
 	}
 }
 
@@ -323,6 +328,7 @@ const (
 	capClipboard       = "clipboard"
 	capPicker          = "picker"
 	capSpeech          = "speech"
+	capTextToSpeech    = "textToSpeech"
 	capStatusBar       = "statusBar"
 	capNotifications   = "notifications"
 	capBiometrics      = "biometrics"
@@ -368,6 +374,8 @@ func (c *Capabilities) Allows(permission, resource, method string) bool {
 		return c.Picker
 	case capSpeech:
 		return c.Speech
+	case capTextToSpeech:
+		return c.TextToSpeech
 	case capStatusBar:
 		return c.StatusBar
 	case capNotifications:

@@ -218,6 +218,9 @@ type App struct {
 	Speech     *driver.SpeechRequest
 	speechID   uint32
 	speechText string
+	// Spoken are the utterances the app spoke, oldest first, where the environment says Speak; the last speaks until FinishSpeaking ends it or the app stops it (Speaking). Voices are the voices the platform has, which Scope.Voices answers with.
+	Spoken []*Utterance
+	Voices []core.VoiceInfo
 	// microphone is MicrophoneInput's fake recorder.
 	microphone *Microphone
 	// OpenedURLs are the URLs the app opened, oldest first. OpenURL

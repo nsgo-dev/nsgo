@@ -118,7 +118,7 @@ var itemNames = map[ItemKind]string{
 	ItemBiometricAvailability: "biometric-availability", ItemBiometricAuthenticate: "biometric-authenticate", ItemPermission: "permission",
 	ItemRevealFile: "reveal-file", ItemTrashFile: "trash-file",
 	ItemTaskProgress: "task-progress",
-	ItemAudio:        "audio", ItemAuthSession: "auth-session",
+	ItemAudio:        "audio", ItemAuthSession: "auth-session", ItemSpeak: "speak",
 	ItemSignInWithApple: "sign-in-with-apple", ItemAppleCredentialState: "apple-credential-state",
 }
 
@@ -163,6 +163,8 @@ func (it *MountItem) TraceLine() string {
 		}
 	case ItemAudio:
 		fmt.Fprintf(&b, " %d %s", it.Count, it.Audio.Command)
+	case ItemSpeak:
+		fmt.Fprintf(&b, " %d %s %q", it.Count, it.Speak.Command, it.Speak.Text)
 	}
 	return b.String()
 }

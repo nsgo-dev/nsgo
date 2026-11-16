@@ -2176,6 +2176,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 	case driver.EventAudio:
 		t.rt.audioEvent(ev)
 		return
+	case driver.EventSpeak:
+		t.speakEvent(ev)
+		return
 	case driver.EventImageInfo:
 		t.answerImageInfo(ev)
 		return

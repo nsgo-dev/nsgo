@@ -23,7 +23,7 @@ type Env struct {
 	dark, reduce, reader *Signal[bool]
 	contrast             *Signal[bool]
 	screenColor, speech  *Signal[bool]
-	audio                *Signal[bool]
+	audio, speak         *Signal[bool]
 	camera               *Signal[bool]
 	canSendInput         *Signal[bool]
 	hasWebView           *Signal[bool]
@@ -83,6 +83,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		screenColor:      NewSignal(cx, false),
 		speech:           NewSignal(cx, false),
 		audio:            NewSignal(cx, false),
+		speak:            NewSignal(cx, false),
 		camera:           NewSignal(cx, false),
 		canSendInput:     NewSignal(cx, false),
 		hasWebView:       NewSignal(cx, false),
@@ -185,6 +186,7 @@ func (e *Env) set(v Environment) {
 	e.screenColor.Set(v.ScreenColor)
 	e.speech.Set(v.Speech)
 	e.audio.Set(v.Audio)
+	e.speak.Set(v.Speak)
 	e.camera.Set(v.Camera)
 	e.canSendInput.Set(v.CanSendInput)
 	e.hasWebView.Set(v.HasWebView)
@@ -299,6 +301,9 @@ func (e *Env) CanRecognizeSpeech() bool { return e.speech.Get() }
 
 // CanPlayAudio reports whether the platform plays the audio package's sounds and players; elsewhere they fail with AudioUnavailable without asking it.
 func (e *Env) CanPlayAudio() bool { return e.audio.Get() }
+
+// CanSpeak reports whether Scope.Speak speaks text here: macOS, iOS, tvOS, Android, Windows, the web where the browser has speechSynthesis, and Linux where speech-dispatcher is installed. Elsewhere an utterance fails with SpeakUnavailable without asking the platform.
+func (e *Env) CanSpeak() bool { return e.speak.Get() }
 
 // CanTakePhoto reports whether Scope.TakePhoto shows a camera here: iOS
 // and Android devices with one, and browsers on touch screens.

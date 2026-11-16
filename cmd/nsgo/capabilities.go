@@ -91,7 +91,7 @@ func describeCapabilities(c pkg.Capabilities) []string {
 	for _, b := range []struct {
 		on   bool
 		name string
-	}{{c.Clipboard, "clipboard"}, {c.Picker, "picker"}, {c.Speech, "speech"}, {c.StatusBar, "status_bar"},
+	}{{c.Clipboard, "clipboard"}, {c.Picker, "picker"}, {c.Speech, "speech"}, {c.TextToSpeech, "text_to_speech"}, {c.StatusBar, "status_bar"},
 		{c.Notifications, "notifications"}, {c.Biometrics, "biometrics"}, {c.SignInWithApple, "sign_in_with_apple"}, {c.Secrets, "secrets"}, {c.Audio, "audio"}, {c.AuthSession, "auth_session"}} {
 		if b.on {
 			out = append(out, b.name)

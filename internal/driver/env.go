@@ -46,8 +46,9 @@ type Environment struct {
 	ScreenReader     bool
 	// ScreenColor says ItemPickScreenColor works here.
 	ScreenColor bool
-	// Speech says ItemSpeech recognizes speech here, Audio that ItemAudio plays sounds and players.
+	// Speech says ItemSpeech recognizes speech here, Speak that ItemSpeak speaks text, Audio that ItemAudio plays sounds and players.
 	Speech bool
+	Speak  bool
 	Audio  bool
 	// Camera says ItemTakePhoto shows a camera here.
 	Camera bool
