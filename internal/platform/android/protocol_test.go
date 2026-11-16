@@ -70,7 +70,7 @@ func TestJavaProtocolMatchesTheDriver(t *testing.T) {
 	}
 }
 
-// TestOverlayProtocolMatchesJava holds Protocol.java's overlay constants to Go's: the window commands writeWindow sends, what a SURFACE message reports, and the driver's permissions and ends.
+// TestOverlayProtocolMatchesJava holds Protocol.java's overlay constants to Go's: the window commands writeWindow sends, what a SURFACE message reports, and the driver's permissions and ends; and why a video paused.
 func TestOverlayProtocolMatchesJava(t *testing.T) {
 	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
 	if err != nil {
@@ -88,6 +88,8 @@ func TestOverlayProtocolMatchesJava(t *testing.T) {
 		"OVERLAY_END_DENIED": driver.OverlayEndDenied, "OVERLAY_END_UNAVAILABLE": driver.OverlayEndUnavailable,
 		"OVERLAY_END_REVOKED": driver.OverlayEndRevoked, "OVERLAY_END_REMOVED": driver.OverlayEndRemoved,
 		"OVERLAY_END_FAILED": driver.OverlayEndFailed,
+		"VIDEO_PAUSE_INTERRUPTION": driver.VideoPauseInterruption, "VIDEO_PAUSE_ROUTE_LOST": driver.VideoPauseRouteLost,
+		"VIDEO_PAUSE_CONTROLS": driver.VideoPauseControls,
 	} {
 		if got, ok := values[name]; !ok || got != want {
 			t.Errorf("Protocol.java's %s is %d (found %v), Go's %d", name, got, ok, want)

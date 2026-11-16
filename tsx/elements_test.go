@@ -118,6 +118,24 @@ mount(App);`)
 	app.WaitFor("text:100@0", time.Second)
 }
 
+func TestVideoReportsWhatThePlatformPausedAndPlayed(t *testing.T) {
+	app := run(t, `import { mount, signal, Text, View, Video } from "nsgo";
+function App() {
+	const heard = signal("");
+	return <View style={{ flex: 1 }}>
+		<Video testID="video" src="talk.mp4" style={{ height: 50 }}
+			onPause={(e) => heard.set(heard() + "pause " + e.reason + ";")}
+			onPlay={() => heard.set(heard() + "play;")} />
+		<Text testID="heard">{heard}</Text>
+	</View>;
+}
+mount(App);`)
+	app.PauseVideo("id:video", core.VideoPauseRouteLost)
+	app.PlayVideo("id:video")
+	app.PauseVideo("id:video", core.VideoPauseControls)
+	app.WaitFor("text:pause route-lost;play;pause controls;", time.Second)
+}
+
 func TestVideoAudioSessionFollowsItsProp(t *testing.T) {
 	app := run(t, `import { mount, signal, Text, View, Video } from "nsgo";
 function App() {

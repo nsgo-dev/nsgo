@@ -207,6 +207,7 @@ func videoFace(p *props) core.Node {
 		StyleFunc:        p.styleFunc(),
 		OnLoadStart:      p.on("onLoadStart"),
 		OnEnd:            p.on("onEnd"),
+		OnPlay:           p.on("onPlay"),
 		OnError:          p.onError("onError"),
 		OnPress:          p.onPress("onPress"),
 		OnLayout:         p.onLayout(),
@@ -237,6 +238,13 @@ func videoFace(p *props) core.Node {
 		v.OnBuffer = func(buffering bool) {
 			e := r.vm.NewObject()
 			_ = e.Set("isBuffering", buffering)
+			h(e)
+		}
+	}
+	if h := p.handler("onPause"); h != nil {
+		v.OnPause = func(reason core.VideoPauseReason) {
+			e := r.vm.NewObject()
+			_ = e.Set("reason", reason.String())
 			h(e)
 		}
 	}

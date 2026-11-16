@@ -369,6 +369,24 @@ func (a *App) Progress(selector string, position, duration time.Duration) {
 	}
 }
 
+// PauseVideo reports that the platform paused the video selector matches for reason, as its controls or the system do (Video.OnPause).
+func (a *App) PauseVideo(selector string, reason core.VideoPauseReason) {
+	a.t.Helper()
+	v := a.Find(selector)
+	if v.Events.Has(driver.EventVideoPause) {
+		a.dispatch(driver.Event{Kind: driver.EventVideoPause, ID: v.ID, Index: int(reason)})
+	}
+}
+
+// PlayVideo reports that the platform played the video selector matches, as its controls or the system do (Video.OnPlay).
+func (a *App) PlayVideo(selector string) {
+	a.t.Helper()
+	v := a.Find(selector)
+	if v.Events.Has(driver.EventVideoPlay) {
+		a.dispatch(driver.Event{Kind: driver.EventVideoPlay, ID: v.ID})
+	}
+}
+
 // Navigate reports that the web view selector matches loaded the page nav describes, as a platform does: it starts loading, then loads. The web view need only be mounted, as a hidden one goes on loading.
 func (a *App) Navigate(selector string, nav driver.WebNavigation) {
 	a.t.Helper()

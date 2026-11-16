@@ -155,14 +155,52 @@ func TestVideoSeeksAroundItsConfig(t *testing.T) {
 	check("paused", h.commit(), "seek 4s", "video")
 }
 
+// A video's pause and play share their kinds with image-size answers, which name no view: neither reaches the other, and a removed video's report goes nowhere.
+func TestVideoPauseKeepsApartFromAnswers(t *testing.T) {
+	var got []string
+	var root *Scope
+	var shown *Signal[bool]
+	h := newHost(t, Size{Width: 300, Height: 300}, func(cx *Scope) Node {
+		root, shown = cx, NewSignal(cx, true)
+		return View{Children: []Node{Show{When: shown.Get, Then: func(*Scope) Node {
+			return Video{Source: "asset:/clip.mp4", TestID: "video", Style: Style{Width: Pt(100), Height: Pt(100)},
+				OnPause: func(r VideoPauseReason) { got = append(got, "pause "+r.String()) },
+				OnPlay:  func() { got = append(got, "play") }}
+		}}}}
+	})
+	h.commit()
+	id := h.find("video").id
+	root.ImageSize(Src("asset:/a.png"), func(px Size, err error) { got = append(got, fmt.Sprint("size ", px)) })
+	var ask uint32
+	for _, it := range h.commit().Items {
+		if it.Kind == driver.ItemImageInfo {
+			ask = it.Count
+		}
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventVideoPause, ID: id, Count: ask, Index: driver.VideoPauseControls})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventVideoPlay, ID: id})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventImageInfo, Count: ask, Size: Size{Width: 8, Height: 4}})
+	shown.Set(false)
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventVideoPause, ID: id, Index: driver.VideoPauseInterruption})
+	want := []string{"pause controls", "play", fmt.Sprint("size ", Size{Width: 8, Height: 4})}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+// The reasons are the driver's, which platforms report.
 func TestVideoPauseReasons(t *testing.T) {
-	for r, want := range map[VideoPauseReason]string{
-		VideoPauseInterruption: "interruption",
-		VideoPauseRouteLost:    "route-lost",
-		VideoPauseControls:     "controls",
+	for r, want := range map[VideoPauseReason]struct {
+		name   string
+		driver int
+	}{
+		VideoPauseInterruption: {"interruption", driver.VideoPauseInterruption},
+		VideoPauseRouteLost:    {"route-lost", driver.VideoPauseRouteLost},
+		VideoPauseControls:     {"controls", driver.VideoPauseControls},
 	} {
-		if got := r.String(); got != want {
-			t.Errorf("%d.String() = %q, want %q", r, got, want)
+		if got := r.String(); got != want.name || int(r) != want.driver {
+			t.Errorf("%d.String() = %q, want %q; the driver's %d", r, got, want.name, want.driver)
 		}
 	}
 }

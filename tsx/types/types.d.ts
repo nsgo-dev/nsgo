@@ -555,7 +555,13 @@ export interface VideoHostProps {
   onError?: (e: { message: string }) => void;
   onEnd?: () => void;
   onBuffer?: (e: { isBuffering: boolean }) => void;
+  /** The platform paused the video, not `paused`: its controls, or the system. It stays paused until `paused` changes or the platform plays it again. */
+  onPause?: (e: { reason: VideoPauseReason }) => void;
+  /** The platform played the video, not `paused`: its controls, or the system as an interruption ends. */
+  onPlay?: () => void;
 }
+/** Why the platform paused a video. */
+export type VideoPauseReason = "interruption" | "route-lost" | "controls";
 export interface VideoProps extends Omit<ViewProps, "children">, VideoHostProps {}
 
 /** A shader's uniform: a number, a boolean, a CSS color, an animated

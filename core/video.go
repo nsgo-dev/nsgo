@@ -53,13 +53,9 @@ type Video struct {
 	OnEnd func()
 	// OnBuffer receives whether playback waits for data.
 	OnBuffer func(buffering bool)
-	// OnPause is called once when a video the app asked to play is paused by
-	// the system or by the platform's built-in controls. Paused remains the
-	// app's requested state; the handler should follow the event in its own
-	// state when it wants the app's controls to stay in sync.
+	// OnPause reports that the platform paused the video, not the app: its built-in controls, or the system for an interruption or a lost audio output. The video stays paused until Paused changes, or the controls or the system play it again (OnPlay); an app that shows its own play state sets Paused to true, and then false to play again.
 	OnPause func(VideoPauseReason)
-	// OnPlay is called when a video previously paused by the system or its
-	// built-in controls starts again through those controls or the system.
+	// OnPlay reports that the platform played the video, not the app: its built-in controls, or the system as an interruption that paused it ends. The video plays on until Paused changes, even while Paused is true.
 	OnPlay   func()
 	OnError  func(err error)
 	OnPress  func(PressEvent)
@@ -69,19 +65,15 @@ type Video struct {
 	TestID   string
 }
 
-// VideoPauseReason says why the platform paused a video that the app asked
-// to play.
+// VideoPauseReason says why the platform paused a video (Video.OnPause).
 type VideoPauseReason uint8
 
 const (
-	// VideoPauseInterruption is an incoming call, another app taking audio
-	// focus, Siri or another system interruption.
+	// VideoPauseInterruption is the system's: a call, Siri, another app taking the audio, or the app going to the background.
 	VideoPauseInterruption VideoPauseReason = iota
-	// VideoPauseRouteLost is an audio output disappearing, such as unplugged
-	// headphones.
+	// VideoPauseRouteLost is the audio's output going away, such as headphones unplugged.
 	VideoPauseRouteLost
-	// VideoPauseControls is a pause from the platform's built-in controls or
-	// Control Center.
+	// VideoPauseControls is the platform's built-in controls (Controls), its Picture in Picture window or Control Center.
 	VideoPauseControls
 )
 

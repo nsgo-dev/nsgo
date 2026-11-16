@@ -279,18 +279,13 @@ const (
 	EventWebCookies
 )
 
-// EventVideoPause reports that a video the app asked to play stopped by
-// itself. Index is one of the VideoPause reasons. It uses the protocol slot
-// of EventImageInfo, which is an answer event and is never included in a
-// generic view's event mask, so the new event still fits the uint64 mask.
-const EventVideoPause EventKind = 42
+// EventVideoPause reports that the platform paused video ID, not the app's Paused: Index is why (VideoPauseInterruption, ...). An EventMask has no room for another kind, so it shares EventImageInfo's, an answer that names no view and is never in a mask; Android's Protocol.java mirrors it.
+const EventVideoPause EventKind = EventImageInfo
 
-// EventVideoPlay reports that a video the app had followed as paused started
-// again through its native controls or the system. It uses EventMenuClosed's
-// protocol slot, which likewise is not a view-mask event.
-const EventVideoPlay EventKind = 57
+// EventVideoPlay reports that the platform played video ID, not the app's Paused. It shares EventMenuClosed's kind as EventVideoPause shares EventImageInfo's.
+const EventVideoPlay EventKind = EventMenuClosed
 
-// Video pause reasons carried in EventVideoPause.Index.
+// Why EventVideoPause says a video paused, as core.VideoPauseReason.
 const (
 	VideoPauseInterruption = iota
 	VideoPauseRouteLost
