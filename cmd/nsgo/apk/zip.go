@@ -104,6 +104,9 @@ func archive(files []File) ([]byte, error) {
 	}
 
 	dir := body.Len()
+	if err := checkArchiveSize(uint64(dir)); err != nil {
+		return nil, err
+	}
 	for _, e := range entries {
 		put := func(v any) { binary.Write(&body, binary.LittleEndian, v) }
 		put(uint32(centralHeader))
@@ -143,6 +146,14 @@ func archive(files []File) ([]byte, error) {
 func checkEntrySize(name string, size, compressed uint64) error {
 	if size > maxSize || compressed > maxSize {
 		return fmt.Errorf("%s: an APK holds files below 4 GiB", name)
+	}
+	return nil
+}
+
+// checkArchiveSize keeps the central directory's offset, which is past every local header, below the ZIP64 marker, so no 32-bit offset wraps.
+func checkArchiveSize(dir uint64) error {
+	if dir > maxSize {
+		return errors.New("an APK holds at most 4 GiB")
 	}
 	return nil
 }

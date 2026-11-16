@@ -28,3 +28,25 @@ func TestEntrySizeLimit(t *testing.T) {
 		})
 	}
 }
+
+// Entries that each fit can still push a later local header or the central directory past a 32-bit offset; that archive must be refused, not wrapped.
+func TestArchiveSizeLimit(t *testing.T) {
+	for _, tc := range []struct {
+		dir     uint64
+		refused bool
+	}{
+		{0, false},
+		{0xfffffffe, false},
+		{0xffffffff, true},
+		{1 << 32, true},
+		{^uint64(0), true},
+	} {
+		err := checkArchiveSize(tc.dir)
+		if (err != nil) != tc.refused {
+			t.Fatalf("directory at %d: %v, want refused %v", tc.dir, err, tc.refused)
+		}
+		if err != nil && err.Error() != "an APK holds at most 4 GiB" {
+			t.Fatalf("archive error = %v", err)
+		}
+	}
+}
