@@ -96,3 +96,50 @@ func TestClipHolderClipsToTheCorners(t *testing.T) {
 		t.Fatal("a scroll view's container stopped clipping to its bounds")
 	}
 }
+
+// A holder gives the children the view's perspective, which the view's own sublayer transform gives only the flat holder, and leaves a scroll view's container's sublayer transform, which scrolls its children, alone.
+func TestClipHolderTakesThePerspective(t *testing.T) {
+	layer := objc.ID(objc.GetClass("CALayer")).Send(selNew)
+	defer layer.Send(selRelease)
+	defer ForgetHolder(layer)
+	layer.Send(sel("setBounds:"), CGRect{Size: CGSize{Width: 200, Height: 120}})
+	depth := func() float64 { return objc.Send[transform3D](layer, sel("sublayerTransform")).M34 }
+
+	ClipHolder(layer, &driver.ViewStyle{Clip: true, CornerRadius: 16, ChildPerspective: 500}, false)
+	if got := depth(); got != -1.0/500 {
+		t.Fatalf("held children's perspective m34 = %v, want %v", got, -1.0/500)
+	}
+	ClipHolder(layer, nil, false)
+	if got := depth(); got != 0 {
+		t.Fatalf("unheld children's perspective m34 = %v, want none", got)
+	}
+	SetSublayerTranslation(layer, 0, -40)
+	ClipHolder(layer, &driver.ViewStyle{Clip: true, CornerRadius: 16}, true)
+	if ty := objc.Send[transform3D](layer, sel("sublayerTransform")).M42; ty != -40 {
+		t.Fatalf("a scroll view's container's translation became %v, want -40", ty)
+	}
+}
+
+// An image clips itself to rounded corners that share a radius, some of the four or all, as a view that clips in a holder leaves its corners to it.
+func TestImageClipsToItsRoundedCorners(t *testing.T) {
+	host := objc.ID(objc.GetClass("CALayer")).Send(selNew)
+	defer host.Send(selRelease)
+	iv := NewImageView(host)
+	defer iv.Close()
+	radius := func() float64 { return objc.Send[float64](iv.layer, sel("cornerRadius")) }
+	corners := func() uint { return objc.Send[uint](iv.layer, sel("maskedCorners")) }
+
+	iv.SetStyle(&driver.ViewStyle{Corners: driver.Corners{TopLeft: 12, TopRight: 12}})
+	iv.Layout(CGSize{Width: 200, Height: 120})
+	if radius() != 12 || corners() != 1|2 {
+		t.Fatalf("the top corners: cornerRadius %v, maskedCorners %b; want 12 on the top two", radius(), corners())
+	}
+	iv.SetStyle(&driver.ViewStyle{CornerRadius: 8})
+	if radius() != 8 || corners() != 1|2|4|8 {
+		t.Fatalf("one radius: cornerRadius %v, maskedCorners %b; want 8 on all four", radius(), corners())
+	}
+	iv.SetStyle(&driver.ViewStyle{Corners: driver.Corners{TopLeft: 16, TopRight: 4, BottomRight: 4, BottomLeft: 4}})
+	if radius() != 0 {
+		t.Fatalf("radii that differ: cornerRadius %v; want none, the view's mask clips them", radius())
+	}
+}

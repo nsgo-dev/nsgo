@@ -432,7 +432,10 @@ func (v *view) place(f driver.Bounds) {
 			v.sizeScroll()
 		}
 		if v.clipHeld && v.content != v.native {
-			v.fitHolder(&v.style)
+			// As last drawn, animated corners and all: only the view's own layer leaves the clip out.
+			held := v.drawn
+			held.Clip = true
+			v.fitHolder(&held)
 		}
 	}
 	if v.image != nil {

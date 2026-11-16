@@ -448,7 +448,7 @@ func pressableAt(native objc.ID, skip *int) *view {
 	subs := native.Send(sel("subviews"))
 	for i, n := 0, objc.Send[int](subs, sel("count")); i < n; i++ {
 		sub := subs.Send(sel("objectAtIndex:"), i)
-		if v := views[sub]; v != nil && v.events.Has(driver.EventPress) {
+		if v := views[sub]; v != nil && v.native == sub && v.events.Has(driver.EventPress) {
 			if *skip == 0 {
 				return v
 			}

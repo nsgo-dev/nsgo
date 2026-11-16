@@ -301,7 +301,10 @@ func (v *view) place(f driver.Bounds) {
 	}
 	apple.LayoutDecor(v.native.Send(selLayer))
 	if resized && v.clipHeld && v.container != 0 {
-		v.fitHolder(&v.style)
+		// As last drawn, animated corners and all: only the view's own layer leaves the clip out.
+		held := v.drawn
+		held.Clip = true
+		v.fitHolder(&held)
 	}
 	if v.backdrop != 0 {
 		apple.FitBackdrop(v.backdrop, &v.style, float64(f.Size.Width), float64(f.Size.Height))

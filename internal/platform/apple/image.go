@@ -475,8 +475,7 @@ func (iv *ImageView) SetStyle(vs *driver.ViewStyle) {
 	}
 }
 
-// setCorners clips the image to the view's corners where they share a
-// radius, as the view's layer clips them.
+// setCorners clips the image to the view's corners where the rounded ones share a radius, as the view's layer clips them: a view that clips in a holder (NeedsClipHolder) leaves an image's corners to this alone.
 func (iv *ImageView) setCorners() {
 	if iv.layer == 0 {
 		return
@@ -484,7 +483,7 @@ func (iv *ImageView) setCorners() {
 	w, h := iv.bounds.Width, iv.bounds.Height
 	var r driver.Points
 	var masked uint
-	if radii := iv.corners.Radii(driver.Size{Width: driver.Points(w), Height: driver.Points(h)}); radii.Uniform() {
+	if radii := iv.corners.Radii(driver.Size{Width: driver.Points(w), Height: driver.Points(h)}); !needsShape(&iv.corners, radii) {
 		r, masked = cornersOf(radii)
 	}
 	WithoutAnimation(func() { setCorners(iv.layer, r, masked, iv.corners.ContinuousCorners, w, h) })

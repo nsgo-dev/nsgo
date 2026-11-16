@@ -860,7 +860,11 @@ func blendFilter(b driver.BlendMode) objc.ID {
 // layoutPerspective gives the children the view's perspective, seen from
 // its center: CSS's perspective.
 func (d *decor) layoutPerspective(layer objc.ID, w, h float64) {
-	depth := d.vs.ChildPerspective
+	setPerspective(layer, d.vs.ChildPerspective, w, h)
+}
+
+// setPerspective gives layer's sublayers a perspective of depth, 0 for none, seen from the center of its w by h box.
+func setPerspective(layer objc.ID, depth driver.Points, w, h float64) {
 	if depth <= 0 {
 		layer.Send(selSetSublayerXform, toCA(driver.Identity3D))
 		return
