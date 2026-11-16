@@ -580,7 +580,8 @@ type MountItem struct {
 
 // StickyCell is a sticky list cell and its travel, in its scroll view's
 // main-axis offsets: from Start it moves with the offset, as far as End
-// (which may be infinite).
+// (which may be infinite). End below Start pins to the viewport's end,
+// with a negative shift back toward the content's start.
 type StickyCell struct {
 	Cell       NodeID
 	Start, End Points
@@ -593,7 +594,8 @@ type StickyCell struct {
 // StickyShift is how far a sticky cell moves from its frame along the
 // main axis at offset.
 func (c StickyCell) StickyShift(offset Points) Points {
-	return min(max(offset-c.Start, 0), max(c.End-c.Start, 0))
+	travel := c.End - c.Start
+	return min(max(offset-c.Start, min(travel, 0)), max(travel, 0))
 }
 
 // StickyShift is c.StickyShift with the cell's inset the value its node

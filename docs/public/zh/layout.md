@@ -55,7 +55,7 @@ core.View{Style: core.Style{
 
 ## 定位
 
-`Relative` 是默认值，盒子留在流中，`Top`、`Right`、`Bottom` 和 `Left` 让它偏移。`Absolute` 把盒子移出流，放进最近的已定位祖先。`Fixed` 把它放进根视图或所在的模态，不受滚动影响；`Sticky` 在最近的滚动视图中滚到它的 inset 时固定。`ZIndex` 决定盒子在同级之间的堆叠顺序。
+`Relative` 是默认值，盒子留在流中，`Top`、`Right`、`Bottom` 和 `Left` 让它偏移。`Absolute` 把盒子移出流，放进最近的已定位祖先。`Fixed` 把它放进根视图或所在的模态，不受滚动影响；`Sticky` 在最近的滚动视图中吸附，并限制在父容器内：`Top` 距离顶部，`Top` 为自动值时则用 `Bottom` 距离底部（横向滚动对应 `Left` 和 `Right`）。设置 `Position: core.Sticky, Bottom: core.Pt(0)` 的底栏在长内容滚动时留在底部，在短内容后正常排列。`ZIndex` 决定盒子在同级之间的堆叠顺序。
 
 ```go
 core.View{Style: core.Style{Position: core.Absolute, Top: core.Pt(8), Right: core.Pt(8)}}

@@ -2859,7 +2859,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
     }
 
-    /** Moves scroll node n's sticky cells for its offset: each by clamp(offset - start, 0, end - start) points. */
+    /** Moves scroll node n's sticky cells within their signed travel from start to end. */
     private void pinSticky(Node n) {
         if (n.sticky == null || !(n.scroller instanceof Scrolling.Scroller)) return;
         Scrolling.Scroller s = (Scrolling.Scroller) n.scroller;
@@ -2872,7 +2872,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 double v = animator.valueOf((int) n.sticky[i + 3]);
                 if (!Double.isNaN(v)) offset += (float) v - n.sticky[i + 4];
             }
-            stick(nodes.get((int) n.sticky[i]), Math.min(Math.max(offset - start, 0), Math.max(end - start, 0)), horizontal);
+            float travel = end - start;
+            stick(nodes.get((int) n.sticky[i]), Math.min(Math.max(offset - start, Math.min(travel, 0)), Math.max(travel, 0)), horizontal);
         }
     }
 

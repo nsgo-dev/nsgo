@@ -952,9 +952,8 @@ func (v *view) wheelDelta(dx, dy driver.Points) driver.Points {
 	return dy
 }
 
-// pinSticky moves the scroll view's sticky cells for its offset, as
-// NSH's StickyCells: each by clamp(offset - start, 0, end - start) from
-// its frame.
+// pinSticky moves the scroll view's sticky cells for its offset, within
+// their signed travel through driver.StickyShift.
 func (v *view) pinSticky() {
 	if len(v.sc.sticky) == 0 {
 		return

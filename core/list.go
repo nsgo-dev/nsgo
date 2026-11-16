@@ -1156,9 +1156,8 @@ func (t *Tree) sendSticky() {
 }
 
 // pinRange returns the scroll view sticky view n pins in and its range
-// of travel there, as CSS's position: sticky: from where its start meets
-// the viewport's start less its Top (Left across a horizontal scroll
-// view), to where its end meets its parent's content end.
+// of travel there: Top/Left pins to the viewport's start and Bottom/Right
+// to its end, with movement bounded by the parent's content box.
 func pinRange(n *node) (*node, StickyCell, bool) {
 	if p := n.parent; p != nil && p.scroll != nil && p.scroll.barHost == n {
 		return barRange(n)
@@ -1189,30 +1188,39 @@ func pinRange(n *node) (*node, StickyCell, bool) {
 		}
 		return p.Y
 	}
-	inset, viewport := n.style.Top, sv.frame.Size.Height
+	inset, endInset, viewport := n.style.Top, n.style.Bottom, sv.frame.Size.Height
 	if horizontal {
-		inset, viewport = n.style.Left, sv.frame.Size.Width
+		inset, endInset, viewport = n.style.Left, n.style.Right, sv.frame.Size.Width
 	}
 	at := inset.Resolve(viewport)
 	animatedInset := n.style.Animated != nil && n.style.Animated.StickyInset != nil
+	trailing := at.IsAuto() && !animatedInset
 	if at.IsAuto() && animatedInset {
 		// The animated inset alone: the platform reads it from its node.
 		at = 0
 	} else if at.IsAuto() {
-		return nil, StickyCell{}, false
+		at = endInset.Resolve(viewport)
+		if at.IsAuto() {
+			return nil, StickyCell{}, false
+		}
 	}
 	// The parent's content box, in the scroll view's content.
 	parent := n.nativeParent()
-	var end Points
+	var begin, end Points
 	if parent == sv {
 		end = main(Point{X: sv.scroll.content.Width, Y: sv.scroll.content.Height})
 	} else {
 		l := &parent.lstate.Rounded
 		box := contentBox(l)
+		begin = main(pos) + main(box.Origin)
 		end = main(pos) + main(box.Origin) + main(Point{X: box.Size.Width, Y: box.Size.Height})
 	}
 	start := main(pos) + main(n.frame.Origin)
 	size := main(Point{X: n.frame.Size.Width, Y: n.frame.Size.Height})
+	if trailing {
+		threshold := start + size + at - viewport
+		return sv, StickyCell{Cell: n.id, Start: threshold, End: threshold - max(start-begin, 0)}, true
+	}
 	travel := max(end-start-size, 0)
 	c := StickyCell{Cell: n.id, Start: start - at, End: start - at + travel}
 	if animatedInset {

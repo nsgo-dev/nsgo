@@ -52,9 +52,8 @@ func (v *view) scrollBy(d driver.Point) {
 	v.native.Send(sel("setContentOffset:"), apple.CGPoint{X: o.X + float64(d.X), Y: o.Y + float64(d.Y)})
 }
 
-// pinSticky moves the scroll view's sticky cells for its offset, as
-// NSH's StickyCells: each by clamp(offset - start, 0, end - start) from
-// its frame.
+// pinSticky moves the scroll view's sticky cells for its offset, within
+// their signed travel through driver.StickyShift.
 func (v *view) pinSticky() {
 	o := objc.Send[apple.CGPoint](v.native, selContentOffset)
 	at := driver.Points(o.Y)

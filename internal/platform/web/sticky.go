@@ -112,6 +112,7 @@ func (s *surface) replaceBound() {
 func (v *view) unstick() {
 	track := v.track
 	v.track, v.stickyIn = js.Undefined(), nil
+	setStyle(v.el, map[string]string{"bottom": "", "right": "", "flex-shrink": "", "margin-right": ""})
 	if track.Get("parentNode").Truthy() && v.el.Get("parentNode").Equal(track) {
 		track.Call("replaceWith", v.el)
 	} else {
@@ -157,12 +158,15 @@ func (s *surface) placeTrack(cell *view) {
 	}
 	var origin driver.Points
 	travel := r.End - r.Start
+	trailing := travel < 0
 	if cell.trackPage {
 		origin = s.trackOrigin(cell)
+	} else if trailing {
+		travel = max(travel, -at)
 	} else {
 		travel = min(travel, content-at-size)
 	}
-	length := size + max(travel, 0)
+	length := size + driver.Points(math.Abs(float64(travel)))
 	if math.IsInf(float64(length), 0) || length != length {
 		length = size
 	}
@@ -170,7 +174,19 @@ func (s *surface) placeTrack(cell *view) {
 	if horizontal {
 		w, h = length, 0
 	}
-	setStyle(cell.track, map[string]string{"left": webstyle.Px(f.Origin.X), "top": webstyle.Px(f.Origin.Y), "width": webstyle.Px(w), "height": webstyle.Px(h)})
+	track := map[string]string{"left": webstyle.Px(f.Origin.X), "top": webstyle.Px(f.Origin.Y),
+		"width": webstyle.Px(w), "height": webstyle.Px(h), "display": "block", "flex-direction": "", "justify-content": ""}
+	if trailing {
+		// The normal position is at the track's end. Native bottom/right
+		// stickiness moves it back through this track before it flows there.
+		track["display"], track["flex-direction"], track["justify-content"] = "flex", "column", "flex-end"
+		track["top"] = webstyle.Px(f.Origin.Y + travel)
+		if horizontal {
+			track["flex-direction"], track["top"] = "row", webstyle.Px(f.Origin.Y)
+			track["left"] = webstyle.Px(f.Origin.X + travel)
+		}
+	}
+	setStyle(cell.track, track)
 	start := r.Start
 	if r.Node != 0 {
 		// The inset follows its animated value.
@@ -179,9 +195,22 @@ func (s *surface) placeTrack(cell *view) {
 		}
 	}
 	inset := webstyle.Px(at + origin - start)
-	style := map[string]string{"left": "auto", "top": inset, "width": webstyle.Px(f.Size.Width), "height": webstyle.Px(f.Size.Height)}
+	style := map[string]string{"left": "auto", "top": inset, "right": "auto", "bottom": "auto",
+		"width": webstyle.Px(f.Size.Width), "height": webstyle.Px(f.Size.Height), "flex-shrink": "", "margin-right": "auto"}
 	if horizontal {
 		style["left"], style["top"] = inset, "auto"
+	}
+	if trailing {
+		viewport := list.frame.Size.Height
+		if horizontal {
+			viewport = list.frame.Size.Width
+		}
+		inset = webstyle.Px(start - (at + origin + size) + viewport)
+		style["top"], style["left"], style["bottom"] = "auto", "auto", inset
+		style["flex-shrink"], style["margin-right"] = "0", "0"
+		if horizontal {
+			style["bottom"], style["right"] = "auto", inset
+		}
 	}
 	setStyle(cell.el, style)
 	cell.placedOK = false

@@ -306,7 +306,8 @@ type (
 	StatusBarStyle = driver.StatusBarStyle
 	// StickyCell is a sticky list cell and its travel, in its scroll view's
 	// main-axis offsets: from Start it moves with the offset, as far as End
-	// (which may be infinite).
+	// (which may be infinite). End below Start pins to the viewport's end
+	// with a negative shift.
 	StickyCell = driver.StickyCell
 	// StorageChange is a change to the entries, for the backend to keep.
 	StorageChange = driver.StorageChange

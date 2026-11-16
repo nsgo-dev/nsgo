@@ -423,9 +423,10 @@ const (
 	// Left in the root view, or the modal they are in, whatever scrolls.
 	Fixed
 	// Sticky nodes flow as relative ones, then stick in the nearest
-	// scroll view around them as it scrolls them out: Top (Left in a
-	// horizontal one) from its start, as far as their parent's end. They
-	// draw above their siblings with the same ZIndex.
+	// scroll view around them: Top (Left in a horizontal one) from its
+	// start, or Bottom (Right) from its end when the start inset is auto.
+	// Travel stays inside their parent's content. They draw above their
+	// siblings with the same ZIndex.
 	Sticky
 )
 

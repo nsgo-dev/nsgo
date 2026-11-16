@@ -55,7 +55,7 @@ core.View{Style: core.Style{
 
 ## Position
 
-`Relative` is the default and keeps a box in the flow; `Top`, `Right`, `Bottom` and `Left` offset it. `Absolute` takes it out of the flow and places it in its nearest positioned ancestor. `Fixed` places it in the root view or its modal, whatever scrolls, and `Sticky` pins it in the nearest scroll view once it reaches its inset. `ZIndex` stacks boxes among their siblings.
+`Relative` is the default and keeps a box in the flow; `Top`, `Right`, `Bottom` and `Left` offset it. `Absolute` takes it out of the flow and places it in its nearest positioned ancestor. `Fixed` places it in the root view or its modal, whatever scrolls, and `Sticky` pins it inside its parent in the nearest scroll view: `Top` from the top, or `Bottom` from the bottom when `Top` is auto (`Left` and `Right` horizontally). A footer with `Position: core.Sticky, Bottom: core.Pt(0)` stays at the bottom while long content scrolls and flows after short content. `ZIndex` stacks boxes among their siblings.
 
 ```go
 core.View{Style: core.Style{Position: core.Absolute, Top: core.Pt(8), Right: core.Pt(8)}}
