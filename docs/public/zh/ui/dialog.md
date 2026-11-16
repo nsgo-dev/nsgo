@@ -26,7 +26,9 @@ ui.Dialog{
 
 对话框是否打开由应用保存。`OnOpenChange` 收到对话框请求的每次变化，附带一个 `base.Reason`，用来区分点击外部、Escape 和返回；`OnClose` 在关闭完成后运行。`NoCloseOnEscape` 和 `NoCloseOnBackdropPress` 让 Escape 和点击外部不关闭它。
 
-`Title` 和 `Description` 位于表面顶部，打开期间会变化时用 `TitleFunc` 和 `DescriptionFunc`，`Footer` 放按钮。`Bare` 把整个表面交给 `Children`，用于应用自己布局的对话框，`Inset` 设置它的内边距。
+`Title` 和 `Description` 位于表面顶部，打开期间会变化时用 `TitleFunc` 和 `DescriptionFunc`，`Footer` 放按钮。`Bare` 把整个表面交给 `Children`，用于应用自己布局的对话框，`Inset` 设置桌面对话框到窗口边缘的最小距离。
+
+`Style` 合并到表面的默认外观上，`StyleFunc` 在它之后合并，并跟踪读取的信号，包括外观设置，在打开期间和重新打开时都会更新。例如，先声明 `colors := ui.ColorsOf(cx)`，再用 `StyleFunc: func() core.Style { return core.Style{Background: colors.Surface()} }` 跟随主题。这两个字段也适用于 `ui.AlertDialog`。零值颜色保留已有颜色；要清除颜色，请使用 `core.RGBA(0xFFFFFF, 0)` 这样的非零透明色。
 
 ## Sheet
 

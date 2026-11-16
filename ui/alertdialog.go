@@ -32,6 +32,9 @@ type AlertDialog struct {
 	DescriptionFunc func() string
 	Actions         []AlertAction
 	TestID          string
+	// Style merges over the dialog's surface; StyleFunc merges over Style and follows the signals it reads.
+	Style     core.Style
+	StyleFunc func() core.Style
 }
 
 // Render implements core.Node.
@@ -96,5 +99,5 @@ func (a AlertDialog) Render(cx *core.Scope) core.Node {
 		}
 	}
 	return Dialog{Open: open, OnOpenChange: change, OnClose: a.OnClose, OnConfirm: confirm, Title: a.Title, TitleFunc: a.TitleFunc, Description: a.Description, DescriptionFunc: a.DescriptionFunc, Footer: footer,
-		Role: core.RoleAlertDialog, NoCloseOnBackdropPress: true, TestID: a.TestID}
+		Role: core.RoleAlertDialog, NoCloseOnBackdropPress: true, TestID: a.TestID, Style: a.Style, StyleFunc: a.StyleFunc}
 }

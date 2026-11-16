@@ -26,7 +26,9 @@ ui.Dialog{
 
 The app holds whether the dialog is open. `OnOpenChange` hears every change the dialog asks for, with a `base.Reason` that tells a press outside from Escape or back; `OnClose` runs once it has closed. `NoCloseOnEscape` and `NoCloseOnBackdropPress` keep Escape and a press outside from closing it.
 
-`Title` and `Description` head the surface, `TitleFunc` and `DescriptionFunc` when they change while it is open, and `Footer` holds its buttons. `Bare` leaves the whole surface to `Children`, for a dialog of the app's own layout, and `Inset` sets its padding.
+`Title` and `Description` head the surface, `TitleFunc` and `DescriptionFunc` when they change while it is open, and `Footer` holds its buttons. `Bare` leaves the whole surface to `Children`, for a dialog of the app's own layout, and `Inset` sets its least distance from the window's edges on desktops.
+
+`Style` merges over the surface's look. `StyleFunc` merges after it and follows the signals it reads, including the appearance, while the dialog is open and when reopened. For example, `StyleFunc: func() core.Style { return core.Style{Background: colors.Surface()} }` follows the theme, where `colors := ui.ColorsOf(cx)`. Both fields also work on `ui.AlertDialog`. A zero color leaves the existing color in place; use a nonzero transparent color such as `core.RGBA(0xFFFFFF, 0)` to clear it.
 
 ## Sheets
 

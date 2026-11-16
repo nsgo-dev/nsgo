@@ -43,6 +43,8 @@ type Dialog struct {
 	TestID    string
 	// Style merges over the surface's.
 	Style core.Style
+	// StyleFunc merges over Style and follows the signals it reads.
+	StyleFunc func() core.Style
 }
 
 // Render implements core.Node.
@@ -76,7 +78,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 		return base.Sheet{Open: d.Open, OnOpenChange: d.OnOpenChange, OnClose: d.OnClose, OnConfirm: d.OnConfirm, NoCloseOnEscape: d.NoCloseOnEscape,
 			Role:                   d.Role,
 			NoCloseOnBackdropPress: d.NoCloseOnBackdropPress, CloseOnSwipe: !d.NoCloseOnBackdropPress,
-			BackdropStyle: scrim, PopupStyleFunc: func() core.Style { return sheetPanel(cx, core.PlaceBottom).Merge(d.Style) },
+			BackdropStyle: scrim, PopupStyleFunc: func() core.Style { return d.surfaceStyle(sheetPanel(cx, core.PlaceBottom)) },
 			Children: sheetContent(cx, core.PlaceBottom, body), Label: label, LabelFunc: labelFunc, AccessibilityDescription: d.Description, AccessibilityDescriptionFunc: d.DescriptionFunc, TestID: d.TestID}
 	}
 	if d.Footer != nil {
@@ -101,11 +103,20 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 		PopupStyleFunc: func() core.Style {
 			window, inset := cx.Env().Window(), dialogInset(cx, d.Inset)
 			finish := FinOf(cx).Dialog()
-			return finish.Over(core.Style{Background: Alpha(finish.Background, 0.96), Color: colors.Text(), CornerRadius: RadiusDialog, BorderCurve: core.BorderCurveContinuous, BorderWidth: 1,
-				MaxWidth: core.Pt(max(0, window.Width-2*inset)), MaxHeight: core.Pt(max(0, window.Height-2*inset)), FlexShrink: 0}).Merge(d.Style)
+			return d.surfaceStyle(finish.Over(core.Style{Background: Alpha(finish.Background, 0.96), Color: colors.Text(), CornerRadius: RadiusDialog, BorderCurve: core.BorderCurveContinuous, BorderWidth: 1,
+				MaxWidth: core.Pt(max(0, window.Width-2*inset)), MaxHeight: core.Pt(max(0, window.Height-2*inset)), FlexShrink: 0}))
 		},
 		LayerStyle: core.Style{JustifyContent: core.JustifyStart}, Before: []core.Node{spacer(1)}, After: []core.Node{spacer(2), dialogDragStrip(cx)},
 		Children: body, TestID: d.TestID}
+}
+
+// surfaceStyle applies the app's overrides inside the panel's style binding, shared by the centered dialog and the sheet.
+func (d Dialog) surfaceStyle(style core.Style) core.Style {
+	style = style.Merge(d.Style)
+	if d.StyleFunc != nil {
+		style = style.Merge(d.StyleFunc())
+	}
+	return style
 }
 
 // RadiusDialog rounds a dialog on desktops.

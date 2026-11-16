@@ -27,6 +27,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 - A component's look comes from its `Variant`, a type of its own whose zero value is the default (`ui.ButtonVariant`), and a few take `Size` (`ui.SizeDefault`, small or large). Do not fake a variant with styles over the default.
 - Controlled controls take a getter and a setter: `Value: name.Get, OnChange: name.Set`, `Checked: on.Get`, `Open: dialog.Get, OnOpenChange: ...`.
 - Use `ui.Slider.MinFunc`, `MaxFunc` and `StepFunc` for changing ranges and steps; `base.Slider.Min`, `Max` and `Step` already take getters. This keeps focus and an active drag mounted.
+- `ui.Dialog` and `ui.AlertDialog` take `Style` and `StyleFunc` for their surface; use `StyleFunc` for colors that follow the theme or other signals, merged after `Style` on both centered dialogs and sheets.
 - Give each control a label screen readers hear (`Label`, or the button's text); icon-only buttons need one.
 - `ui.NavPage` and `ui.NavHeader` draw the system's own header and back gesture on phones; do not build a header of views there.
 - `ui.Menu` and `ui.Select` open beside their trigger on any device, or as a sheet when their `Presentation` asks; choose it explicitly instead of switching by device.

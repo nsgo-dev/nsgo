@@ -271,3 +271,70 @@ func TestAlertClosesItselfOnceAnswered(t *testing.T) {
 		}
 	})
 }
+
+// TestDialogStyleFunc follows appearance and app signals on both panels, keeping the open dialog and its content instead of rebuilding either.
+func TestDialogStyleFunc(t *testing.T) {
+	for _, form := range []string{"dialog", "bare", "alert"} {
+		t.Run(form, func(t *testing.T) {
+			each(t, func(t *testing.T, e core.Environment) {
+				e.ReduceMotion = true
+				var open, custom *core.Signal[bool]
+				builds := 0
+				static := core.Style{Background: core.RGB(0x123456), BorderWidth: 2}
+				app, _ := start(t, e, func(cx *core.Scope) core.Node {
+					open, custom = core.NewSignal(cx, true), core.NewSignal(cx, true)
+					colors := ColorsOf(cx)
+					style := func() core.Style {
+						if !custom.Get() {
+							return core.Style{}
+						}
+						return core.Style{Background: colors.Surface(), BorderColor: colors.Text(), BorderWidth: 3}
+					}
+					content := core.Func(func(*core.Scope) core.Node {
+						builds++
+						return core.Text{Content: "Kept content", TestID: "content"}
+					})
+					if form == "alert" {
+						return AlertDialog{TestID: "panel", Open: open.Get, Title: "Confirm", Style: static, StyleFunc: style}
+					}
+					return Dialog{TestID: "panel", Open: open.Get, Bare: form == "bare", Style: static, StyleFunc: style,
+						Children: []core.Node{content}}
+				})
+				check := func(dynamic bool) {
+					t.Helper()
+					s := app.Find("panel").Style
+					background, width := static.Background, static.BorderWidth
+					if dynamic {
+						palette := core.DefaultTheme().Light
+						if e.Dark {
+							palette = core.DefaultTheme().Dark
+						}
+						background, width = palette.Surface, 3
+						if s.BorderColor != palette.Text {
+							t.Fatalf("border = %v, want %v", s.BorderColor, palette.Text)
+						}
+					}
+					if s.Background != background || s.BorderWidth != width {
+						t.Fatalf("panel = background %v, border %v; want %v, %v", s.Background, s.BorderWidth, background, width)
+					}
+				}
+				check(true)
+				id := app.Find("panel").ID
+				e.Dark = !e.Dark
+				app.SetEnvironment(e)
+				check(true)
+				if app.Find("panel").ID != id || form != "alert" && builds != 1 {
+					t.Fatal("restyling rebuilt the dialog or its content")
+				}
+				app.Post(func() { custom.Set(false) })
+				app.Settle()
+				check(false)
+				app.Post(func() { open.Set(false) })
+				app.WaitForGone("panel", time.Second)
+				app.Post(func() { custom.Set(true); open.Set(true) })
+				app.Settle()
+				check(true)
+			})
+		})
+	}
+}
