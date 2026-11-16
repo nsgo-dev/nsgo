@@ -2040,11 +2040,10 @@ func (t *Tree) mountDynamic(cx *Scope, parent *node, d Dynamic) {
 	var b *Scope
 	cx.renderEffect(func() {
 		if b != nil {
-			b.Dispose()
 			t.clear(region)
 		}
 		b = &Scope{}
-		cx.adopt(b)
+		cx.current().adopt(b)
 		// fn's own reads are tracked; what it returns mounts untracked.
 		rt := t.rt
 		prevOwner := rt.owner
@@ -2063,13 +2062,12 @@ func (t *Tree) mountShow(cx *Scope, parent *node, s Show) {
 	cx.renderEffect(func() {
 		on := when.Get()
 		if b != nil {
-			b.Dispose()
 			t.clear(region)
 		}
 		if on {
-			b = t.branch(cx, region, s.Then)
+			b = t.branch(cx.current(), region, s.Then)
 		} else {
-			b = t.branch(cx, region, s.Else)
+			b = t.branch(cx.current(), region, s.Else)
 		}
 	})
 }
@@ -2082,11 +2080,10 @@ func (t *Tree) mountCatch(cx *Scope, parent *node, c Catch) {
 	cx.renderEffect(func() {
 		err := failure.Get()
 		if b != nil {
-			b.Dispose()
 			t.clear(region)
 		}
 		b = &Scope{}
-		cx.adopt(b)
+		cx.current().adopt(b)
 		if err == nil {
 			b.catch = func(err error) { failure.Set(err) }
 			t.within(b, func() { t.mount(b, region, c.Try(b)) })

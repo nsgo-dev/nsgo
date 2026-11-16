@@ -39,7 +39,7 @@ A component is any type whose `Render(cx) Node` returns its nodes, like `http.Ha
 
 `Show`, `Each`, `Dynamic` and `Catch` mount as regions. A region is a node with no native view, laid out as part of its parent's children, and owned by one render effect that rebuilds its span.
 
-- Branches and rows belong to the region's owner, not to its effect, so they outlive the effect's runs and go only when replaced.
+- A `Show`, `Dynamic` or `Catch` branch belongs to its region's render effect: the scheduler settles that effect before the branch's bindings, disposing a replaced branch before it can read the state that removed it. `Each` rows belong to the region's owner instead, so kept rows outlive the effect's runs.
 - `Each` matches rows by key. A kept row gets its item and index through signals, and only the rows that moved are reinserted.
 - An item of plain values (numbers, strings, arrays and structs of them) notifies its row only when it changes; one holding pointers, slices or interfaces notifies on every read, as what it points at may have changed.
 - Go methods cannot take type parameters, so `Each` is a generic function rather than a method or struct.
