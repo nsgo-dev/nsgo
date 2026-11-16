@@ -36,13 +36,7 @@ const (
 	// ItemScrollTo and ItemScrollBy items it applied since it was made
 	// (Count) and, when it zooms, its zoom scale (Value).
 	EventScroll
-	// EventLoadStart, EventProgress (Loaded, Total), EventLoad (Size, the
-	// source's pixels), EventError (Text) and EventLoadEnd follow an image
-	// view's loading. A web view reports EventLoadStart and EventLoad with
-	// its Navigation, and EventError with the URL in Navigation and a
-	// *WebFailure in Data when the platform supplies a domain and code. A video
-	// reports EventLoadStart, EventLoad (Duration and Size, in points),
-	// EventProgress (Time and Duration) and EventError.
+	// EventLoadStart, EventProgress (Loaded, Total), EventLoad (Size, the source's pixels), EventError (Text) and EventLoadEnd follow an image view's loading. A web view reports EventLoadStart and EventLoad with its Navigation, and EventError with the URL in Navigation and a *WebFailure in Data when the platform supplies a domain and code. A video reports EventLoadStart, EventLoad (Duration and Size, in points), EventProgress (Time and Duration) and EventError.
 	EventLoadStart
 	EventProgress
 	EventLoad

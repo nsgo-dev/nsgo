@@ -131,8 +131,7 @@ const (
 	ItemMenu
 	// ItemWeb configures a web view (Web).
 	ItemWeb
-	// ItemWebCommand has a web view do WebCommand, with Value for the
-	// message or script and Data for commands such as WebLoad.
+	// ItemWebCommand has a web view do WebCommand, with Value for the message or script and Data for commands such as WebLoad.
 	ItemWebCommand
 	// ItemVideo configures a video (Video).
 	ItemVideo

@@ -71,8 +71,7 @@ func loadWebKit() {
 		if w := webHandlers[self]; w != nil {
 			domain := GoString(err.Send(sel("domain")))
 			code := objc.Send[int](err, sel("code"))
-			// WebKit reports an intentional stop or policy interruption as a
-			// failed navigation. They are control flow, not page errors.
+			// WebKit reports an intentional stop or policy interruption as a failed navigation. They are control flow, not page errors.
 			if appleWebCancellation(domain, code) {
 				return
 			}

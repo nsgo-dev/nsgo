@@ -161,8 +161,7 @@ type NativeCommand struct {
 	Args any
 }
 
-// WebCommand is a command a web view received, with its message or script in
-// Value and any structured argument in Data (such as WebLoad's WebSource).
+// WebCommand is a command a web view received, with its message or script in Value and any structured argument in Data (such as WebLoad's WebSource).
 type WebCommand struct {
 	Command driver.WebCommand
 	Value   string
