@@ -63,7 +63,7 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
     private boolean hasFocus;
     private int videoWidth, videoHeight;
     private MediaController controller;
-    /** Hears the sound's output go away, such as headphones unplugged, while the video plays. */
+    /** Hears the sound's output go away, such as headphones unplugged, while the video plays and is heard. */
     private final BroadcastReceiver noisy = new BroadcastReceiver() {
         @Override
         public void onReceive(Context ignored, Intent intent) {
@@ -259,13 +259,13 @@ final class VideoNode extends TextureView implements TextureView.SurfaceTextureL
                 .build();
     }
 
-    /** Holds the audio focus and hears the output go away while the video plays. */
+    /** Holds the audio focus while the video plays, and hears the output go away while it plays and is heard: a muted video has nothing to stop. */
     private void followPlaying() {
         MediaPlayer p = player;
-        boolean playing = p != null && prepared && p.isPlaying();
-        if (playing != hearsNoisy) {
-            hearsNoisy = playing;
-            if (playing) {
+        boolean heard = p != null && prepared && p.isPlaying() && !muted;
+        if (heard != hearsNoisy) {
+            hearsNoisy = heard;
+            if (heard) {
                 IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
                 // A system broadcast reaches a receiver that is not exported.
                 if (Build.VERSION.SDK_INT >= 33) {

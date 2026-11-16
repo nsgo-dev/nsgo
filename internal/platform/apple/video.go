@@ -483,7 +483,8 @@ func (v *Video) watchSystemPauses(st *videoStatus) {
 	})
 	v.stopRoutes = Observe(center, avName("AVAudioSessionRouteChangeNotification"), func(note objc.ID) {
 		const oldDeviceUnavailable = 2 // AVAudioSessionRouteChangeReasonOldDeviceUnavailable
-		if v.status == st && v.player != 0 && notificationInt(note, "AVAudioSessionRouteChangeReasonKey") == oldDeviceUnavailable {
+		// A muted video has nothing to stop when the output goes away.
+		if v.status == st && v.player != 0 && !v.config.Muted && notificationInt(note, "AVAudioSessionRouteChangeReasonKey") == oldDeviceUnavailable {
 			v.systemPause(driver.VideoPauseRouteLost)
 		}
 	})
