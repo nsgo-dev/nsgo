@@ -22,13 +22,14 @@ import (
 // focusMethods are the views' first responder methods.
 func focusMethods() []objc.MethodDef {
 	return []objc.MethodDef{
+		// Only the view itself takes the focus: the holder of its children (an effect's or a clip's container) is no second Tab stop.
 		{Cmd: sel("acceptsFirstResponder"), Fn: func(self objc.ID, _ objc.SEL) bool {
 			v := views[self]
-			return v != nil && v.focusable() && !v.surface.clicking()
+			return v != nil && v.native == self && v.focusable() && !v.surface.clicking()
 		}},
 		{Cmd: sel("canBecomeKeyView"), Fn: func(self objc.ID, _ objc.SEL) bool {
 			v := views[self]
-			return v != nil && v.focusable()
+			return v != nil && v.native == self && v.focusable()
 		}},
 		{Cmd: sel("becomeFirstResponder"), Fn: func(self objc.ID, cmd objc.SEL) bool {
 			if v := views[self]; v != nil {

@@ -3,6 +3,7 @@
 package macos
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/ebitengine/purego/objc"
@@ -121,5 +122,53 @@ func aHolderKeepsThePerspective(t *testing.T) {
 	if got, w := sublayer(layer), want(layer, plain); got != w {
 		t.Errorf("after a resize the holder's sublayer transform is %v, want %v", got, w)
 		return
+	}
+}
+
+// TestAHolderIsNoTabStop keeps a pressable view whose children sit in a holder (a clip that keeps its shadow, or an effect) one stop in the window's key view loop: the holder answers for the view in hits, not for the focus.
+func TestAHolderIsNoTabStop(t *testing.T) { onMain(func() { aHolderIsNoTabStop(t) }) }
+
+func aHolderIsNoTabStop(t *testing.T) {
+	loadAppKit()
+	win := objc.ID(apple.Class("NSWindow")).Send(sel("alloc")).Send(sel("initWithContentRect:styleMask:backing:defer:"), apple.Rect(0, 0, 400, 300), uint(0), uint(2), false)
+	win.Send(sel("setReleasedWhenClosed:"), false)
+	defer win.Send(selRelease)
+	root := win.Send(sel("contentView"))
+	s := &surface{window: win}
+	var made []objc.ID
+	defer func() {
+		for _, n := range made {
+			delete(views, n)
+		}
+	}()
+	card := func(x float64) *view {
+		n := objc.ID(classView).Send(selNew)
+		n.Send(selSetFrame, apple.Rect(x, 10, 80, 80))
+		root.Send(selAddSubview, n)
+		n.Send(selRelease)
+		v := &view{kind: driver.KindView, native: n, content: n, surface: s, events: driver.EventMask(1) << driver.EventPress}
+		child := objc.ID(classView).Send(selNew)
+		child.Send(selSetFrame, apple.Rect(0, 0, 20, 20))
+		n.Send(selAddSubview, child)
+		child.Send(selRelease)
+		views[n], views[child] = v, &view{kind: driver.KindView, native: child, content: child, surface: s, up: v}
+		made = append(made, n, child)
+		return v
+	}
+	a, b, c := card(10), card(110), card(210)
+	holder := s.container(b)
+	made = append(made, holder)
+	if objc.Send[bool](holder, sel("canBecomeKeyView")) || objc.Send[bool](holder, sel("acceptsFirstResponder")) {
+		t.Error("the holder of a pressable view's children takes the focus")
+	}
+	win.Send(sel("recalculateKeyViewLoop"))
+	names := map[objc.ID]string{a.native: "a", b.native: "b", c.native: "c", holder: "b's holder"}
+	var got []string
+	for at, i := a.native, 0; at != 0 && i < 4; i++ {
+		got = append(got, names[at])
+		at = at.Send(sel("nextValidKeyView"))
+	}
+	if want := []string{"a", "b", "c", "a"}; !slices.Equal(got, want) {
+		t.Errorf("the key view loop from a is %q, want %q", got, want)
 	}
 }
