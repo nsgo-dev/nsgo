@@ -175,7 +175,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final AccessibilityManager accessibility;
     private final UiModeManager uiMode;
     private final AccessibilityManager.TouchExplorationStateChangeListener screenReader = on -> environment();
-    private final UiModeManager.ContrastChangeListener contrast = value -> environment();
+    /** The UiModeManager.ContrastChangeListener on API 34 and later: an Object, so older Androids, which have no such class, never resolve it. */
+    private Object contrast;
     private final ContentObserver motion = new ContentObserver(ui) {
         @Override
         public void onChange(boolean self) {
@@ -401,7 +402,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         accessibility.addTouchExplorationStateChangeListener(screenReader);
-        if (Build.VERSION.SDK_INT >= 34 && uiMode != null) uiMode.addContrastChangeListener(ui::post, contrast);
+        if (Build.VERSION.SDK_INT >= 34 && uiMode != null && contrast == null) listenContrast();
         getContext().getContentResolver().registerContentObserver(
                 Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, motion);
         if (primary != null) return;
@@ -439,7 +440,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         // An app waiting for the folds starts as the view leaves its window, as it would have without them.
         releaseStart();
         accessibility.removeTouchExplorationStateChangeListener(screenReader);
-        if (Build.VERSION.SDK_INT >= 34 && uiMode != null) uiMode.removeContrastChangeListener(contrast);
+        if (contrast != null) stopContrast();
         getContext().getContentResolver().unregisterContentObserver(motion);
         unregisterBack();
         // A view out of its window keeps the geometry it last reported.
@@ -1827,6 +1828,18 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         });
         backMove = a;
         a.start();
+    }
+
+    /** listenContrast hears the system's contrast change, on API 34 and later only. */
+    private void listenContrast() {
+        UiModeManager.ContrastChangeListener listener = value -> environment();
+        uiMode.addContrastChangeListener(ui::post, listener);
+        contrast = listener;
+    }
+
+    private void stopContrast() {
+        uiMode.removeContrastChangeListener((UiModeManager.ContrastChangeListener) contrast);
+        contrast = null;
     }
 
     private void unregisterBack() {
