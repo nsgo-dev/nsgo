@@ -57,7 +57,7 @@ go tool nsgo test -target macos
 
 可用的目标有 `macos`、`windows`、`linux`、`web`（在 Chrome、Chromium 或 Edge 中）、`ios`（在连接的 iPhone 上运行，连接多台时用 `-device` 指定，用 Xcode 上次使用的团队或 `-team` 指定的团队签名）、`ios_simulator`、`tvos_simulator`（方向键、作为选择键的 Return 和作为 Menu 键的 Escape 模拟遥控器）、`watchos_simulator` 和 `android`，或 `all`。每个测试在独立的进程中运行。`app.Capture()` 返回当前像素的 `image.Image`，`app.CapturePNG()` 返回 PNG 字节，无头运行时两者都会跳过测试。像素采用显示器的色彩空间，在配备 P3 显示器的 Mac 上是 Display P3：PNG 在色彩描述文件中标明了它，但 `image/png` 会忽略描述文件，所以从 `app.Capture()` 读到的颜色是该色彩空间的值而不是 sRGB 值，NSGo 也不会转换。`app.Screenshot("en/library")` 会把截图保存为 `.nsgo/test/screenshots/<target>/en/library.png`，在 `macos` 上即 `.nsgo/test/screenshots/macos/en/library.png`；名称可以包含空格，但不能是绝对路径或包含 `..`。`-screenshots dir` 改为保存到 `dir` 下，`dir` 是相对于当前工作目录的路径，路径与之前的截图重复会让该测试失败。`-fps` 会在 `macos`、`windows`、`linux` 和 `ios_simulator` 上每秒记录一次性能监视器的读数，在 `web` 和 `android` 上只记录引擎的读数。`-env KEY=VALUE` 为测试设置环境变量，手机上的测试只能这样拿到变量。在模拟器或手机上，没有 `nsgo.yaml` 的目录的测试会安装成以该目录命名的应用，ID 是 `dev.nsgo.` 加上目录名中的字母和数字，例如 `base/formula` 的是 `dev.nsgo.formula`。
 
-Android 目标测试必须导入 `github.com/nsgo-dev/nsgo`（空导入即可），因为 Android 宿主使用测试进程的标准输出传输协议。对于没有该导入的库包，`nsgo test -target android` 会在构建或启动 APK 前直接拒绝；请对该包运行无头测试，或添加导入。
+在 `android` 和 `ios` 上，测试只能在 NSGo 的测试宿主中运行：Android 运行时从测试进程的标准输出读取协议，工具也要靠宿主写下的标记才能拿到测试的输出和退出码。要在这两个目标上运行的包，其测试必须链接宿主，即在某个测试文件中导入 `github.com/nsgo-dev/nsgo`（空导入即可），并在 `TestMain` 中用 `nsgotest.Main` 或 `nsgotest.MainFunc` 启动它。缺少任一项时，`nsgo test` 会在构建或安装任何东西之前拒绝该包，并说明缺的是哪一项；像 `ui/chat` 这样的库包，在测试文件中补上这两项后即可在手机上运行，无头运行或在其他目标上运行则无需改动。
 
 要测量而不是检查时，用 `nsgotest.Measure()` 启动：应用运行在系统时钟上，`Advance` 会真实等待相应时长，各步骤只等待正在进行的动画停下。`app.Mark("name")` 标出此后的读数测的是什么，`app.Mark("-")` 结束标记；无论是否加 `-fps`，标记都会打印出来。
 

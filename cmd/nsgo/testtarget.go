@@ -64,8 +64,14 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	if err != nil {
 		return err
 	}
-	if err := targetHostError(opts.target, hosted); err != nil {
-		return err
+	if needsTestHost(opts.target) {
+		funcs, err := testFuncs(ctx, p, seen)
+		if err != nil {
+			return err
+		}
+		if err := testHostError(opts.target, hosted, slices.Contains(funcs, "TestMain")); err != nil {
+			return err
+		}
 	}
 	p.testBinary = true
 	progress := begin("building the tests for %s", opts.target)
@@ -87,10 +93,7 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	}
 	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, trace: opts.trace, out: os.Stderr}
 	savedPaths := map[string]bool{}
-	// A package that links no platform, as a library's, runs headless in the
-	// target's runtime where the target can host that process (the web's
-	// engine, say). Android is rejected above because its stdout is the
-	// protocol and needs the linked test host.
+	// A package that links no platform, as a library's, runs headless in the target's runtime, the web's engine say, but for the targets needsTestHost names, which refused it above.
 	env := slices.Clone(opts.env)
 	if hosted {
 		env = append(env, "NSGO_TEST_TARGET="+opts.target)
@@ -131,14 +134,16 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	return r.finish(opts, nil)
 }
 
-// targetHostError refuses the Android target when the package's test binary
-// does not link NSGo's root package. Android runs that binary as a child
-// process whose stdout is the mount protocol; without the root package,
-// nsgotest.Main falls back to os.Exit and go test writes its own output to
-// that protocol, which the Java reader would interpret as a huge length.
-func targetHostError(target string, hosted bool) error {
-	if target == "android" && !hosted {
-		return errors.New("test: -target android requires the package's tests to import github.com/nsgo-dev/nsgo (a blank import is enough); run it headless or add that import before using an Android target")
+// needsTestHost reports whether target runs a test only through the platform's test host, which nsgotest.Main starts: Android's runtime reads its protocol from the test process's standard output, where go test would otherwise write its own lines, and the tool reads the test's output and exit code on Android and an iPhone between the marks the host writes (readMarkedRun).
+func needsTestHost(target string) bool { return target == "android" || target == "ios" }
+
+// testHostError says why a package's tests cannot run on a target that needs the test host, before the tool builds them: they do not link it, through github.com/nsgo-dev/nsgo, or declare no TestMain to start it from.
+func testHostError(target string, hosted, testMain bool) error {
+	switch {
+	case !hosted:
+		return fmt.Errorf("test: -target %s runs the tests in NSGo's test host, which this package's tests do not link: import github.com/nsgo-dev/nsgo in a test file (a blank import is enough), or run them headless", target)
+	case !testMain:
+		return fmt.Errorf("test: -target %s runs the tests in NSGo's test host, which needs the main thread: add func TestMain(m *testing.M) { nsgotest.Main(m) }", target)
 	}
 	return nil
 }
@@ -327,6 +332,22 @@ func listTestSources(ctx context.Context, p *project, target, run string) ([]str
 	if err != nil {
 		return nil, fmt.Errorf("-run: %w", err)
 	}
+	funcs, err := testFuncs(ctx, p, target)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, name := range funcs {
+		// TestMain runs the tests rather than being one.
+		if name != "TestMain" && isTestName(name) && re.MatchString(name) {
+			names = append(names, name)
+		}
+	}
+	return names, nil
+}
+
+// testFuncs lists the functions the package's test files declare for target, methods aside.
+func testFuncs(ctx context.Context, p *project, target string) ([]string, error) {
 	out, err := goListFor(ctx, p, target, "-f", "{{range .TestGoFiles}}{{$.Dir}}/{{.}}\n{{end}}{{range .XTestGoFiles}}{{$.Dir}}/{{.}}\n{{end}}")
 	if err != nil {
 		return nil, err
@@ -342,11 +363,9 @@ func listTestSources(ctx context.Context, p *project, target, run string) ([]str
 			return nil, err
 		}
 		for _, d := range f.Decls {
-			fn, ok := d.(*ast.FuncDecl)
-			if !ok || fn.Recv != nil || !isTestName(fn.Name.Name) || !re.MatchString(fn.Name.Name) {
-				continue
+			if fn, ok := d.(*ast.FuncDecl); ok && fn.Recv == nil {
+				names = append(names, fn.Name.Name)
 			}
-			names = append(names, fn.Name.Name)
 		}
 	}
 	return names, nil

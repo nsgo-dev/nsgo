@@ -212,28 +212,80 @@ func TestIsTestName(t *testing.T) {
 	}
 }
 
-func TestTargetHostError(t *testing.T) {
+// TestTargetTestsNeedTheTestHost runs a library package's tests on Android and an iPhone, whose runs only the test host can carry: the tool refuses the package before it builds or looks for a device, with what to add, whether the tests link no host or start none from TestMain.
+func TestTargetTestsNeedTheTestHost(t *testing.T) {
+	if testing.Short() {
+		t.Skip("lists a module's packages")
+	}
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum, err := os.ReadFile(filepath.Join(root, "go.sum"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// NSGo's own requirements, which go test -list wants listed in a module that imports it, and NSGo itself from this tree.
+	requires := strings.Replace(string(mod), "module github.com/nsgo-dev/nsgo", "module example.com/lib", 1)
+	requires, _, _ = strings.Cut(requires, "\ntool ")
+	requires += "\nrequire github.com/nsgo-dev/nsgo v0.0.0\n\nreplace github.com/nsgo-dev/nsgo => " + root + "\n"
+	const test = "func TestChat(t *testing.T) {}\n"
 	for _, tc := range []struct {
-		target, want string
-		hosted       bool
+		name, file, want string
 	}{
-		{target: "android", want: "requires the package's tests to import github.com/nsgo-dev/nsgo"},
-		{target: "android", hosted: true},
-		{target: "ios_simulator"},
-		{target: "macos"},
+		{"unhosted", "package lib\n\nimport \"testing\"\n\n" + test, "do not link: import github.com/nsgo-dev/nsgo in a test file"},
+		{"no TestMain", "package lib\n\nimport (\n\t\"testing\"\n\n\t_ \"github.com/nsgo-dev/nsgo\"\n)\n\n" + test, "add func TestMain(m *testing.M) { nsgotest.Main(m) }"},
 	} {
-		t.Run(tc.target+map[bool]string{true: "/hosted", false: "/unhosted"}[tc.hosted], func(t *testing.T) {
-			err := targetHostError(tc.target, tc.hosted)
-			if tc.want == "" {
-				if err != nil {
-					t.Fatalf("targetHostError(%q, %v) = %v, want no error", tc.target, tc.hosted, err)
-				}
-				return
-			}
-			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("targetHostError(%q, %v) = %v, want an error containing %q", tc.target, tc.hosted, err, tc.want)
-			}
+		dir := t.TempDir()
+		writeFiles(t, dir, map[string]string{
+			"go.mod":      requires,
+			"go.sum":      string(sum),
+			"lib.go":      "package lib\n",
+			"lib_test.go": tc.file,
 		})
+		p, err := loadForTest(dir, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, target := range []string{"android", "ios"} {
+			// A device would be looked for, and the tests built, only after the check: none is named, so any other error is the tool going on.
+			err := runTests(t.Context(), p, testOptions{target: target, device: "no-such-device"})
+			if err == nil || !strings.Contains(err.Error(), "-target "+target+" runs the tests in NSGo's test host") || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("%s on %s: runTests = %v, want an error containing %q", tc.name, target, err, tc.want)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(dir, ".nsgo", "test")); err == nil {
+			t.Errorf("%s: the tool started a build in .nsgo/test", tc.name)
+		}
+	}
+}
+
+func TestTestHostError(t *testing.T) {
+	if err := testHostError("android", true, true); err != nil {
+		t.Errorf("testHostError(hosted, TestMain) = %v, want nil", err)
+	}
+	if !needsTestHost("android") || !needsTestHost("ios") || needsTestHost("ios_simulator") || needsTestHost("web") || needsTestHost("macos") {
+		t.Error("needsTestHost names other targets than android and ios")
+	}
+}
+
+func TestListTestSourcesLeavesOutTestMain(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod":      "module example.com/lib\n\ngo 1.26\n",
+		"lib_test.go": "package lib\n\nimport \"testing\"\n\nfunc TestMain(m *testing.M) { m.Run() }\n\nfunc TestChat(t *testing.T) {}\n\nfunc helper() {}\n",
+	})
+	p, err := loadForTest(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, err := listTestSources(t.Context(), p, "", ".")
+	if err != nil || !slices.Equal(names, []string{"TestChat"}) {
+		t.Fatalf("listTestSources = %q, %v; want [TestChat]", names, err)
 	}
 }
 
