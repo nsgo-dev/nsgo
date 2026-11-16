@@ -48,7 +48,7 @@ const (
 	shardPathW          = 3 // SHARD_PATHW
 )
 
-// dockTaskArgument starts the argument a Jump List task starts the app's exe with; the rest is the label of the app icon menu's item it chooses. A label rather than the item's ID, which the next run of the app numbers anew.
+// dockTaskArgument starts the argument a Jump List task starts the app's exe with, a launch flag the backend takes out of os.Args (Options.DockTask); the rest is the label of the app icon menu's item it chooses. A label rather than the item's ID, which the next run of the app numbers anew.
 const dockTaskArgument = "--nsgo-dock-menu="
 
 // jumpTasks are the app icon menu's entries the Jump List was written from last.
@@ -69,7 +69,7 @@ func jumpTask(e driver.MenuEntry) bool {
 	return e.ID != 0 && e.Label != "" && !e.Disabled && !e.Separator && len(e.Items) == 0
 }
 
-// dockTask returns the label of the task args name, as the exe's arguments or those a second launch handed over.
+// dockTask returns the label of the task args name, those a second launch handed over.
 func dockTask(args []string) (string, bool) {
 	for _, arg := range args {
 		if label, ok := strings.CutPrefix(arg, dockTaskArgument); ok && label != "" {

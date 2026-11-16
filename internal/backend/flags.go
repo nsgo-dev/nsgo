@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -33,22 +34,31 @@ type launchFlags struct {
 	registerToast   string
 	unregisterToast bool
 	toastActivation bool
+	// dockTask is the label of the app icon menu's item a Windows Jump List task starts the app with, --nsgo-dock-menu=<label> (desktop.SetDockMenu).
+	dockTask string
 }
 
 // launch holds the flags the app was started with.
 var launch launchFlags
 
-// launchArgs are the program's arguments as it started, its launch flags
-// among them, which a restart passes again.
+// launchArgs are the program's arguments as it started, its launch flags among them but the Jump List task it chose, which a restart passes again.
 var launchArgs []string
 
 // The flags leave os.Args before main runs, so the app's own flag
 // parsing never sees them.
 func init() {
-	if len(os.Args) > 1 {
-		launchArgs = append([]string(nil), os.Args[1:]...)
-	}
+	launchArgs = restartArgs(os.Args)
 	os.Args = launch.parse(os.Args)
+}
+
+// restartArgs are a program's arguments after its name, but a Jump List task's, which chose an item once.
+func restartArgs(args []string) []string {
+	if len(args) < 2 {
+		return nil
+	}
+	return slices.DeleteFunc(slices.Clone(args[1:]), func(arg string) bool {
+		return strings.HasPrefix(arg, "-") && strings.HasPrefix(strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-"), "nsgo-dock-menu=")
+	})
 }
 
 // parse takes the engine's flags out of args, a program's arguments, and
@@ -111,6 +121,11 @@ func (f *launchFlags) set(flag string) error {
 		f.unregisterToast = true
 	case "toast-activation":
 		f.toastActivation = true
+	case "dock-menu":
+		if value == "" {
+			return errors.New("needs the item's label")
+		}
+		f.dockTask = value
 	default:
 		return errors.New("no such flag: --nsgo-fps, --nsgo-lang or --nsgo-appearance")
 	}

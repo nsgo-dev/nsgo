@@ -59,3 +59,23 @@ func TestToastLaunchFlags(t *testing.T) {
 		t.Errorf("args = %q, want %q, flags = %+v", got, want, f)
 	}
 }
+
+// A Windows Jump List task starts the app with the label of the item it chooses, which the app's flag parsing never sees and a restart does not choose again.
+func TestDockTaskLaunchFlag(t *testing.T) {
+	var f launchFlags
+	args := []string{`C:\App\App.exe`, "--nsgo-dock-menu=New Window", "notes.txt"}
+	if got, want := f.parse(args), []string{`C:\App\App.exe`, "notes.txt"}; !slices.Equal(got, want) || f.dockTask != "New Window" {
+		t.Errorf("args = %q, want %q, flags = %+v", got, want, f)
+	}
+	if got, want := restartArgs(append(args, "-nsgo-dock-menu=Other", "--nsgo-fps")), []string{"notes.txt", "--nsgo-fps"}; !slices.Equal(got, want) {
+		t.Errorf("restart args = %q, want %q", got, want)
+	}
+	if got := restartArgs([]string{"app"}); got != nil {
+		t.Errorf("restart args without any = %q", got)
+	}
+	f = launchFlags{}
+	f.parse([]string{"app", "--nsgo-dock-menu="})
+	if f.dockTask != "" {
+		t.Errorf("an empty task = %+v", f)
+	}
+}

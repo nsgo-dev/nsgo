@@ -28,7 +28,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
 	"runtime"
 	"slices"
 	"strings"
@@ -89,6 +88,8 @@ type Options struct {
 	// RegisterToast is the shortcut the installer has the app stamp with the toast activator, and UnregisterToast has the uninstaller's run remove the activator's registration, from the launch flags; either run does that alone and returns (toast_activation.go).
 	RegisterToast   string
 	UnregisterToast bool
+	// DockTask is the label of the item the Jump List task that started the app chose, from the launch flags.
+	DockTask string
 	// Host is what an embedding host gives the view (NewView), and Parent
 	// the HWND of the window it is a child window of.
 	Host   engine.HostOptions
@@ -587,7 +588,7 @@ func Run(app engine.App, opts Options) {
 	var single *instance
 	if opts.ID != "" && opts.test == nil {
 		var alreadyRunning bool
-		if single, alreadyRunning = claimInstance(opts.ID, launchArguments()); alreadyRunning {
+		if single, alreadyRunning = claimInstance(opts.ID, launchArguments(opts.DockTask)); alreadyRunning {
 			return
 		}
 		defer single.close()
@@ -670,9 +671,9 @@ func Run(app engine.App, opts Options) {
 	}
 	if opts.test != nil {
 		opts.test.ready <- w
-	} else if label, ok := dockTask(os.Args[1:]); ok {
+	} else if opts.DockTask != "" {
 		// The core keeps it until the app sets its menu.
-		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: label})
+		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: opts.DockTask})
 	} else if paths := engine.LaunchFiles(); len(paths) > 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
 	}

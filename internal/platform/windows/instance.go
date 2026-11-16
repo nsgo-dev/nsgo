@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -57,11 +56,11 @@ type instance struct {
 	pending [][]string
 }
 
-// launchArguments are what a launch hands the running app: the files it names and the Jump List task it chooses.
-func launchArguments() []string {
+// launchArguments are what a launch hands the running app: the files it names and the label of the Jump List task it chose, if any.
+func launchArguments(task string) []string {
 	args := engine.LaunchFiles()
-	if label, ok := dockTask(os.Args[1:]); ok {
-		args = append(args, dockTaskArgument+label)
+	if task != "" {
+		args = append(args, dockTaskArgument+task)
 	}
 	return args
 }
