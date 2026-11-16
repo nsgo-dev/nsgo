@@ -101,7 +101,7 @@ func iosDeviceTestRunner(ctx context.Context, p *project, sys *appleOS, dir stri
 	}, nil
 }
 
-// readMarkedRun copies to out the lines a test host writes between its run's start and exit marks, and returns the code the exit mark gives, or ended's error when the lines end before it.
+// readMarkedRun copies to out the lines a test host writes between its run's start and exit marks, and returns the code the exit mark gives, a marked runtime error even before the host starts, or ended's error when the lines end before it.
 func readMarkedRun(lines io.Reader, token string, out io.Writer, ended func() error) (int, error) {
 	sc := bufio.NewScanner(lines)
 	sc.Buffer(make([]byte, 1<<16), 1<<22)
@@ -109,6 +109,8 @@ func readMarkedRun(lines io.Reader, token string, out io.Writer, ended func() er
 	for sc.Scan() {
 		line := strings.TrimRight(sc.Text(), "\r")
 		switch {
+		case strings.HasPrefix(line, "nsgo-test-error "+token+" "):
+			return -1, errors.New(strings.TrimPrefix(line, "nsgo-test-error "+token+" "))
 		case line == "nsgo-test-start "+token:
 			started = true
 		case !started:
@@ -174,26 +176,12 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 				"--es", "nsgo.test", base64.StdEncoding.EncodeToString(test)); err != nil {
 				return -1, err
 			}
-			sc := bufio.NewScanner(logs)
-			sc.Buffer(make([]byte, 1<<16), 1<<22)
-			started := false
-			for sc.Scan() {
-				line := sc.Text()
-				switch {
-				case line == "nsgo-test-start "+token:
-					started = true
-				case !started:
-				case strings.HasPrefix(line, "nsgo-test-exit "+token+" "):
-					code, _ := strconv.Atoi(strings.TrimPrefix(line, "nsgo-test-exit "+token+" "))
-					return code, nil
-				default:
-					io.WriteString(out, line+"\n")
+			return readMarkedRun(logs, token, out, func() error {
+				if ctx.Err() != nil {
+					return testContextError(ctx, opts.timeout)
 				}
-			}
-			if ctx.Err() != nil {
-				return -1, testContextError(ctx, opts.timeout)
-			}
-			return -1, errors.New("the device's log ended")
+				return errors.New("the device's log ended")
+			})
 		},
 		close: stop,
 	}, nil

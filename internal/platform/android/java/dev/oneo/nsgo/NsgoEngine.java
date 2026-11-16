@@ -45,6 +45,8 @@ public final class NsgoEngine {
     private BroadcastReceiver zones;
     /** The app's data directory, which its process was started with. */
     private File data;
+    /** Identifies this test even if its TestMain never starts the Go host. */
+    private String testRun;
 
     /** Creates an engine without retaining an Activity or another UI context. */
     public NsgoEngine(Context context) {
@@ -58,6 +60,7 @@ public final class NsgoEngine {
     synchronized void start(ProcessBuilder builder) throws IOException {
         if (!canStart()) throw new IllegalStateException(closed ? "engine is destroyed" : "engine has started its process");
         builder.environment().put("TZ", TimeZone.getDefault().getID());
+        testRun = builder.environment().get("NSGO_TEST_RUN");
         process = builder.start();
         out = new DataOutputStream(new BufferedOutputStream(process.getOutputStream()));
         String dir = builder.environment().get("NSGO_DATA_DIR");
@@ -179,20 +182,19 @@ public final class NsgoEngine {
     private void read(Process running) {
         IOException failure = null;
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(running.getInputStream()))) {
-            while (true) {
-                int kind = in.readUnsignedByte();
-                byte[] payload = new byte[in.readInt()];
-                in.readFully(payload);
+            for (Protocol.Message message; (message = Protocol.readMessage(in)) != null; ) {
                 Listener current;
                 synchronized (this) {
                     current = listener;
                 }
                 // The bound view answers even while detached: Go waits for its text replies.
-                if (current != null) current.onMessage(kind, payload);
+                if (current != null) current.onMessage(message.kind, message.payload);
             }
         } catch (IOException e) {
             failure = e;
         }
+        // A corrupt pipe cannot be resynchronized; do not leave its writer running.
+        if (failure != null) destroy();
         RecordingService.ownerEnded(this);
         Listener current;
         synchronized (this) {
@@ -201,7 +203,12 @@ public final class NsgoEngine {
             out = null;
             unwatchTimeZone();
         }
-        if (current != null) current.onProcessEnded(failure);
+        if (current != null) {
+            if (failure != null && testRun != null && !testRun.isEmpty()) {
+                current.onLog("nsgo-test-error " + testRun + " " + failure.getMessage());
+            }
+            current.onProcessEnded(failure);
+        }
     }
 
     private void log(Process running) {

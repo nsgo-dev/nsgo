@@ -2,6 +2,7 @@ package dev.oneo.nsgo;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -11,6 +12,47 @@ import java.nio.charset.StandardCharsets;
  * internal/platform/android/android.go, whose writers define each payload.
  */
 final class Protocol {
+    /** Bounds an allocation before reading a frame, including images and font data. */
+    static final int MAX_MESSAGE_SIZE = 64 * 1024 * 1024;
+
+    static final class Message {
+        final int kind;
+        final byte[] payload;
+
+        Message(int kind, byte[] payload) {
+            this.kind = kind;
+            this.payload = payload;
+        }
+    }
+
+    /** Reads Go's next message, or null at a clean end of the pipe. */
+    static Message readMessage(DataInputStream in) throws IOException {
+        int kind = in.read();
+        if (kind == -1) return null;
+        if (kind < BATCH || kind > COOKIES) throw invalidMessage("unexpected message kind " + kind);
+        int length;
+        try {
+            length = in.readInt();
+        } catch (EOFException e) {
+            throw invalidMessage("incomplete message header");
+        }
+        if (length < 0 || length > MAX_MESSAGE_SIZE) {
+            throw invalidMessage("message length " + Integer.toUnsignedLong(length) + " exceeds " + MAX_MESSAGE_SIZE + " bytes");
+        }
+        byte[] payload = new byte[length];
+        try {
+            in.readFully(payload);
+        } catch (EOFException e) {
+            throw invalidMessage("incomplete message payload (expected " + length + " bytes)");
+        }
+        return new Message(kind, payload);
+    }
+
+    private static IOException invalidMessage(String reason) {
+        return new IOException("NSGo pipe: " + reason + "; stdout is reserved for the runtime protocol; " +
+                "write logs to stderr and call nsgotest.Main or nsgotest.MainFunc from TestMain when testing");
+    }
+
     // Go to Java.
     static final int BATCH = 1;
     static final int PREPARE = 2;
