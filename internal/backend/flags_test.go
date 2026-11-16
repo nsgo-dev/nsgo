@@ -92,3 +92,14 @@ func TestLoginLaunchFlag(t *testing.T) {
 		t.Fatalf("app-owned flag changed launch reason: %v, args = %q", f.launchedAtLogin, got)
 	}
 }
+
+// A restart is the user's, not the login's: it drops the marker the LaunchAgent started the app with, and keeps the app's own arguments.
+func TestRestartDropsTheLoginMarker(t *testing.T) {
+	got := restartArgs([]string{"app", "--nsgo-launched-at-login", "-v", "-nsgo-launched-at-login", "--nsgo-fps", "--", "--nsgo-launched-at-login"})
+	if want := []string{"-v", "--nsgo-fps", "--", "--nsgo-launched-at-login"}; !slices.Equal(got, want) {
+		t.Errorf("restart args = %q, want %q", got, want)
+	}
+	if got := restartArgs(nil); got != nil {
+		t.Errorf("no args = %q", got)
+	}
+}

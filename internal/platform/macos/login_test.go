@@ -10,6 +10,7 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/ebitengine/purego/objc"
 
@@ -82,9 +83,7 @@ func TestLoginLaunchAppleEvent(t *testing.T) {
 	})
 }
 
-// Each child owns a fresh NSApplication, just as a packaged launch does.
-// The app sees the login reason on its first call, and files received
-// before didFinishLaunching survive until the app registers its handler.
+// Each child owns a fresh NSApplication, as a packaged launch does. The app sees the login reason when its function first runs, and the files and links AppKit hands it before applicationDidFinishLaunching:, before the engine starts, reach the handlers it registers.
 func TestLoginLaunchBeforeAppStarts(t *testing.T) {
 	mode := os.Getenv("NSGO_TEST_LOGIN_RUN")
 	if mode == "" {
@@ -103,28 +102,34 @@ func TestLoginLaunchBeforeAppStarts(t *testing.T) {
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	const link = "nsgo-login-test://open/item"
 	var gotLogin bool
-	var gotPaths []string
+	var gotPaths, gotLinks []string
 	watchdog := time.AfterFunc(20*time.Second, func() { panic("login launch did not reach the app") })
 	defer watchdog.Stop()
 	onMain(func() {
 		loadAppKit()
 		center := objc.ID(apple.Class("NSNotificationCenter")).Send(sel("defaultCenter"))
 		stop := apple.Observe(center, apple.Global(appKitPath, "NSApplicationWillFinishLaunchingNotification"), func(objc.ID) {
-			url := objc.ID(apple.Class("NSURL")).Send(sel("fileURLWithPath:"), apple.NSString(path))
-			urls := objc.ID(apple.Class("NSArray")).Send(sel("arrayWithObject:"), url)
+			file := objc.ID(apple.Class("NSURL")).Send(sel("fileURLWithPath:"), apple.NSString(path))
+			scheme := objc.ID(apple.Class("NSURL")).Send(sel("URLWithString:"), apple.NSString(link))
+			items := [2]objc.ID{file, scheme}
+			urls := objc.ID(apple.Class("NSArray")).Send(sel("arrayWithObjects:count:"), unsafe.Pointer(&items[0]), uint(len(items)))
 			nsApp().Send(sel("delegate")).Send(sel("application:openURLs:"), nsApp(), urls)
 		})
 		defer stop()
 		Run(core.AppRoot(func(cx *core.Scope) {
 			gotLogin = cx.Env().LaunchedAtLogin()
-			cx.OnOpenFiles(func(paths []string) {
-				gotPaths = paths
-				cx.Quit()
-			})
+			quitWhenBoth := func() {
+				if gotPaths != nil && gotLinks != nil {
+					cx.Quit()
+				}
+			}
+			cx.OnOpenFiles(func(paths []string) { gotPaths = paths; quitWhenBoth() })
+			cx.OnOpenLinks(func(links []string) { gotLinks = links; quitWhenBoth() })
 		}), Options{Title: "Login launch", HideDock: true, LaunchedAtLogin: mode == "login"})
 	})
-	if gotLogin != (mode == "login") || !slices.Equal(gotPaths, []string{path}) {
-		t.Fatalf("login = %v, files = %v; want login = %v, files = [%s]", gotLogin, gotPaths, mode == "login", path)
+	if gotLogin != (mode == "login") || !slices.Equal(gotPaths, []string{path}) || !slices.Equal(gotLinks, []string{link}) {
+		t.Fatalf("login = %v, files = %v, links = %v; want login = %v, files = [%s], links = [%s]", gotLogin, gotPaths, gotLinks, mode == "login", path, link)
 	}
 }

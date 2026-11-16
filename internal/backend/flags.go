@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -43,8 +42,11 @@ type launchFlags struct {
 // launch holds the flags the app was started with.
 var launch launchFlags
 
-// launchArgs are the program's arguments as it started, its launch flags among them but the Jump List task it chose, which a restart passes again.
+// launchArgs are the program's arguments as it started, its launch flags among them but the Jump List task it chose and the login marker, which a restart passes again.
 var launchArgs []string
+
+// loginMarker is the flag the macOS 11/12 LaunchAgent starts the app with, so it reports the launch as a login one (desktop.LaunchedAtLogin).
+const loginMarker = "--nsgo-launched-at-login"
 
 // The flags leave os.Args before main runs, so the app's own flag
 // parsing never sees them.
@@ -53,14 +55,22 @@ func init() {
 	os.Args = launch.parse(os.Args)
 }
 
-// restartArgs are a program's arguments after its name, but a Jump List task's, which chose an item once.
+// restartArgs are a program's arguments after its name, but a Jump List task's, which chose an item once, and the login marker, as the system does not start a restarted app at login. Arguments after "--" are the app's and stay.
 func restartArgs(args []string) []string {
 	if len(args) < 2 {
 		return nil
 	}
-	return slices.DeleteFunc(slices.Clone(args[1:]), func(arg string) bool {
-		return strings.HasPrefix(arg, "-") && strings.HasPrefix(strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-"), "nsgo-dock-menu=")
-	})
+	var out []string
+	for i, arg := range args[1:] {
+		if arg == "--" {
+			return append(out, args[1+i:]...)
+		}
+		dockTask := strings.HasPrefix(arg, "-") && strings.HasPrefix(strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-"), "nsgo-dock-menu=")
+		if !dockTask && arg != loginMarker && arg != loginMarker[1:] {
+			out = append(out, arg)
+		}
+	}
+	return out
 }
 
 // parse takes the engine's flags out of args, a program's arguments, and
