@@ -133,8 +133,7 @@ func (run *speakRun) end(e driver.SpeakEvent) {
 func speakVoice(lang, id string) (objc.ID, string) {
 	class := objc.ID(Class("AVSpeechSynthesisVoice"))
 	if id != "" {
-		// Some macOS versions return a default voice for an unknown ID.
-		// An explicit choice must resolve to that voice, not a fallback.
+		// Some macOS versions return a default voice for an unknown ID; an explicit choice must resolve to that voice, not a fallback.
 		if v := class.Send(sel("voiceWithIdentifier:"), NSString(id)); v != 0 && GoString(v.Send(sel("identifier"))) == id {
 			return v, ""
 		}

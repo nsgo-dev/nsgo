@@ -36,8 +36,7 @@ jobs:
 
   apple:
     name: Build and vet (Apple)
-    # Xcode cross-compiles Apple's arm64 targets from an Intel host too.
-    # Use its hosted pool while arm64 jobs fail to acquire a runner.
+    # Xcode cross-compiles Apple's arm64 targets from an Intel host too, so use the Intel pool while hosted arm64 jobs fail to acquire a runner.
     runs-on: macos-15-intel
     timeout-minutes: 30
     steps:

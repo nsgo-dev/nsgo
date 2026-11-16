@@ -81,9 +81,7 @@ func drawMetal(t *testing.T, ir *shaderir.Program, lanes []float64, textures []o
 	}
 	enc.Send(sel("drawPrimitives:vertexStart:vertexCount:"), uint(mtlPrimitiveTypeTriangle), uint(0), uint(3))
 	enc.Send(sel("endEncoding"))
-	// Intel textures default to managed storage, whose CPU copy remains
-	// stale after a GPU write until a blit synchronizes it. Apple silicon
-	// uses shared storage, so only waiting for completion is needed there.
+	// Intel textures default to managed storage, whose CPU copy remains stale after a GPU write until a blit synchronizes it. Apple silicon uses shared storage, so only waiting for completion is needed there.
 	const mtlStorageModeManaged = 1
 	if objc.Send[uint](target, sel("storageMode")) == mtlStorageModeManaged {
 		blit := cb.Send(sel("blitCommandEncoder"))
