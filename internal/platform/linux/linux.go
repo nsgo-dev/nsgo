@@ -106,6 +106,8 @@ type window struct {
 	panelSide    driver.WindowPlacement
 	// settingsHandlers are the handlers setupSettings connects to GTK's settings, which outlive the window.
 	settingsHandlers []uint64
+	// contrastHandler is the handler on GNOME's accessibility settings, which are not GTK's.
+	contrastHandler uint64
 	// embedded is set for a host's widget (NewView): the host owns the
 	// window, its chrome and the main loop. app and opts start its engine
 	// once GTK first allocates it.
@@ -576,12 +578,16 @@ func (w *window) setupSettings() {
 	gSignalConnect(w.surface, "map", cbMapped, w.handle)
 	gSignalConnect(w.surface, "unmap", cbMapped, w.handle)
 	if settings := gtkSettingsGetDefault(); settings != 0 {
-		for _, name := range []string{"gtk-theme-name", "gtk-application-prefer-dark-theme", "gtk-xft-dpi", "gtk-enable-animations"} {
+		names := []string{"gtk-theme-name", "gtk-application-prefer-dark-theme", "gtk-xft-dpi", "gtk-enable-animations"}
+		if colorScheme() {
+			names = append(names, "gtk-interface-contrast")
+		}
+		for _, name := range names {
 			w.settingsHandlers = append(w.settingsHandlers, gSignalConnect(settings, "notify::"+name, cbSettingsChanged, w.handle))
 		}
 	}
 	if settings := gnomeA11ySettingsForWatch(); settings != 0 {
-		w.settingsHandlers = append(w.settingsHandlers, gSignalConnect(settings, "changed::high-contrast", cbSettingsChanged, w.handle))
+		w.contrastHandler = gSignalConnect(settings, "changed::high-contrast", cbSettingsChanged, w.handle)
 	}
 }
 
@@ -732,6 +738,10 @@ func (w *window) destroy() {
 		}
 	}
 	w.settingsHandlers = nil
+	if w.contrastHandler != 0 {
+		gSignalHandlerDisconnect(gnomeA11ySettingsForWatch(), w.contrastHandler)
+		w.contrastHandler = 0
+	}
 	w.hitMu.Lock()
 	for i, m := range w.hitMap {
 		if m != 0 {

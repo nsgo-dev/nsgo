@@ -35,14 +35,15 @@ func (w *window) environment() driver.Environment {
 		reduce = !settingBool(settings, "gtk-enable-animations")
 		dpi = settingInt(settings, "gtk-xft-dpi")
 		theme = settingString(settings, "gtk-theme-name")
+		if colorScheme() {
+			contrast = settingInt(settings, "gtk-interface-contrast") == contrastMore
+		}
 	}
 	if strings.Contains(strings.ToLower(theme), "dark") || strings.Contains(strings.ToLower(os.Getenv("GTK_THEME")), "dark") {
 		dark = true
 	}
-	// GTK does not expose a common contrast property. GNOME's setting is
-	// preferred where its schema is installed; high-contrast theme names are
-	// the fallback used by other GTK desktops.
-	contrast = gnomeHighContrast()
+	// GTK 4.20 and later have the session's contrast as a setting. Before it, GNOME's High Contrast is read where its schema is installed, and other desktops say it with a high-contrast theme.
+	contrast = contrast || gnomeHighContrast()
 	for _, name := range []string{theme, os.Getenv("GTK_THEME")} {
 		name = strings.ToLower(name)
 		if strings.Contains(name, "highcontrast") || strings.Contains(name, "high-contrast") {

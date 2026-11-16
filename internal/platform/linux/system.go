@@ -619,6 +619,9 @@ const (
 	schemeLight   = 3
 )
 
+// contrastMore is GTK_INTERFACE_CONTRAST_MORE, the value of gtk-interface-contrast, 4.20 and later, when the session asks for more contrast.
+const contrastMore = 2
+
 // setAppearance has GTK draw the widgets it hosts, its dialogs and menus
 // in a, or as the session's settings say.
 func (w *window) setAppearance(a driver.Appearance) {
