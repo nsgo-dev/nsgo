@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -58,11 +59,11 @@ func harmonyTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 			// the old process keeps a page that no longer loads and aa start
 			// brings that back, where the tests never run.
 			hdcAt(ctx, hdc, device, "shell", "aa", "force-stop", bundle)
-			if _, err := hdcAt(ctx, hdc, device, "install", "-r", hap); err != nil {
+			if err := hdcDo(ctx, hdc, device, "install", "-r", hap); err != nil {
 				return -1, err
 			}
 			hdcAt(ctx, hdc, device, "shell", "hilog", "-r")
-			if _, err := hdcAt(ctx, hdc, device, "shell", "aa", "start", "-a", "EntryAbility", "-b", bundle); err != nil {
+			if err := hdcDo(ctx, hdc, device, "shell", "aa", "start", "-a", "EntryAbility", "-b", bundle); err != nil {
 				return -1, err
 			}
 			exitCode, testErr := readHarmonyTest(ctx, hdc, device, out)
@@ -79,6 +80,28 @@ func hdcAt(ctx context.Context, hdc string, device []string, rest ...string) (st
 	full := append(append([]string{}, device...), rest...)
 	out, err := exec.CommandContext(ctx, hdc, full...).CombinedOutput()
 	return string(out), err
+}
+
+// hdcDo runs an hdc command whose failure matters. hdc exits 0 when the device refuses an install (a HAP with no signature on a retail device answers code 9568320) or cannot start an ability, and says so only in what it prints, so the output is checked as well as the exit status.
+func hdcDo(ctx context.Context, hdc string, device []string, rest ...string) error {
+	out, err := hdcAt(ctx, hdc, device, rest...)
+	if err == nil {
+		err = hdcFailure(out)
+	}
+	if err != nil {
+		return fmt.Errorf("hdc %s: %w\n%s", strings.Join(rest, " "), err, strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// hdcFailure returns the error line hdc printed, or nil when it printed none.
+func hdcFailure(out string) error {
+	for _, line := range strings.Split(out, "\n") {
+		if i := strings.Index(line, "error:"); i >= 0 {
+			return errors.New(strings.TrimSpace(line[i+len("error:"):]))
+		}
+	}
+	return nil
 }
 
 func envValues(env []string) map[string]string {

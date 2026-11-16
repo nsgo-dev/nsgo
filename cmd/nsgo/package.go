@@ -246,7 +246,7 @@ func runHarmony(ctx context.Context, p *project, dir string, flags []string) err
 	// window back black instead of starting the new one. Stop it first; on a
 	// first run nothing is installed, which hdc reports and this ignores.
 	_ = run(ctx, "hdc", append(append([]string{}, device...), "shell", "aa", "force-stop", bundle)...)
-	if err := run(ctx, "hdc", append(append([]string{}, device...), "install", "-r", hap)...); err != nil {
+	if err := hdcDo(ctx, "hdc", device, "install", "-r", hap); err != nil {
 		return err
 	}
 	start := []string{"shell", "aa", "start", "-a", "EntryAbility", "-b", bundle}
@@ -258,7 +258,7 @@ func runHarmony(ctx context.Context, p *project, dir string, flags []string) err
 			start = append(start, "--pb", name, "true")
 		}
 	}
-	return run(ctx, "hdc", append(append([]string{}, device...), start...)...)
+	return hdcDo(ctx, "hdc", device, start...)
 }
 
 // runPackage starts the package built for target in dir, as -run asks:
