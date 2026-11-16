@@ -73,7 +73,7 @@ var exempt = map[string][]string{
 		"SetWindowConstraints", "OrderFront", "SetMenuBar", "SetWindowControls", "SetWindowMaterial",
 		"SetApplicationMenu", "ExitApp", "OnQuitRequest", "OnQuit", "Quit", "Restart", "OpenWindow", "OpenPanel",
 		"SetShutdownMode", "SetMainWindow", "SetMainView", "OnReopen", "NewTray", "RegisterHotKey", "SetDockVisible",
-		"SetLaunchAtLogin", "OnOpenFiles", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
+		"SetLaunchAtLogin", "OnOpenFiles", "OnOpenLinks", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
 		"OpenInstallSettings", "DataDir", "CacheDir", "LogsDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
 		"SetTaskProgress"},
 }

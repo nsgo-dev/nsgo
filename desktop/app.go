@@ -93,6 +93,9 @@ func OnQuitRequest(cx *core.Scope, fn func(q *QuitRequest)) { cx.OnQuitRequest(f
 // handler.
 func OnOpenFiles(cx *core.Scope, fn func(paths []string)) { cx.OnOpenFiles(fn) }
 
+// OnOpenLinks runs fn with links of the app's own URL schemes, which nsgo.yaml's url_schemes declares, that the system asks the app to open: clicked in a browser or another app, or opened with the open command. On macOS they reach the running app, and the link the app launched to open waits for the first handler. A link carries whatever the page that made it chose, so treat its contents as untrusted input and confirm with the user before acting on it.
+func OnOpenLinks(cx *core.Scope, fn func(links []string)) { cx.OnOpenLinks(fn) }
+
 // NewTray adds a tray icon, which the current owner keeps: an image, or a
 // view that draws it and may change, a panel its primary click shows
 // under it, and a menu its secondary click shows.

@@ -208,6 +208,22 @@ file_types:
 desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
 ```
 
+## 链接
+
+`url_schemes` 让 macOS 应用拥有自己的链接，例如 `myapp://settings`，可以从浏览器、其他应用或 `open` 命令打开它：
+
+```yaml
+url_schemes: [myapp]
+```
+
+应用用 `desktop.OnOpenLinks` 接收这些链接，运行中也能收到。启动应用时带来的链接会等到第一个处理函数注册。任何人都能构造这样的链接，所以在它改变任何东西之前，先检查内容并征得用户确认：
+
+```go
+desktop.OnOpenLinks(cx, func(links []string) { show(links[0]) })
+```
+
+Windows、Linux 和 iOS 暂不支持。
+
 ## 小程序
 
 ```sh

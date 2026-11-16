@@ -261,6 +261,8 @@ const (
 	EventHotKeyState
 	// EventAuthSession reports auth session Count (Data, an *AuthEvent).
 	EventAuthSession
+	// EventOpenLinks reports links of the app's own URL schemes the system asks the app to open (Data, a []string of URLs): clicked elsewhere, or the one it launched to open.
+	EventOpenLinks
 )
 
 // What EventInputModality reports.

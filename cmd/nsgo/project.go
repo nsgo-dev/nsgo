@@ -135,6 +135,8 @@ type project struct {
 	// FileTypes are the kinds of documents the app opens, which its macOS
 	// package registers (filetypes.go).
 	FileTypes []fileType `yaml:"file_types"`
+	// URLSchemes are the schemes of the app's own links, which its macOS package registers (urlschemes.go).
+	URLSchemes []string `yaml:"url_schemes"`
 	// Widgets are the kinds of the app's widgets, which nsgo build puts
 	// into its macOS and iOS packages as a widget extension (widgets.go).
 	Widgets []widgetKind `yaml:"widgets"`
@@ -351,6 +353,9 @@ func load(dir string) (*project, error) {
 		p.I18n.Source = "en"
 	}
 	if err := p.validateFileTypes(); err != nil {
+		return nil, fmt.Errorf("nsgo.yaml: %w", err)
+	}
+	if err := p.validateURLSchemes(); err != nil {
 		return nil, fmt.Errorf("nsgo.yaml: %w", err)
 	}
 	if err := p.validateWidgets(); err != nil {

@@ -747,40 +747,49 @@ func (cx *Scope) LaunchAtLogin(done func(on bool)) {
 
 // surfaceEvent handles an event about the tree's surface or the app
 // rather than a view, and reports whether ev was one.
-type openFilesHandler struct {
+// openHandler hears what the system asks the app to open: files (OnOpenFiles) or the app's own links (OnOpenLinks).
+type openHandler struct {
 	owner *Scope
-	fn    func(paths []string)
+	fn    func(items []string)
 }
 
-// OnOpenFiles is the core's part of desktop.OnOpenFiles, which apps use:
-// fn runs, while the current owner lives, with the paths of files the
-// system asks the app to open. Files that came before any handler, as
-// those the app launched to open, go to the first one registered.
-func (cx *Scope) OnOpenFiles(fn func(paths []string)) {
-	rt := cx.rt
-	h := &openFilesHandler{owner: cx.current(), fn: fn}
-	rt.opens = append(rt.opens, h)
-	h.owner.addCleanup(func() { rt.opens = slices.DeleteFunc(rt.opens, func(o *openFilesHandler) bool { return o == h }) })
-	if paths := rt.openPending; len(paths) > 0 {
-		rt.openPending = nil
-		// Not while the caller builds its view: the handler may well
-		// change what it shows.
-		h.owner.Post(func() { h.fn(paths) })
+// openQueue holds the handlers of one kind of opening, and what came before any of them, as what the app launched to open.
+type openQueue struct {
+	handlers []*openHandler
+	pending  []string
+}
+
+// add registers fn while the current owner lives, handing it what came before any handler.
+func (q *openQueue) add(cx *Scope, fn func(items []string)) {
+	h := &openHandler{owner: cx.current(), fn: fn}
+	q.handlers = append(q.handlers, h)
+	h.owner.addCleanup(func() { q.handlers = slices.DeleteFunc(q.handlers, func(o *openHandler) bool { return o == h }) })
+	if items := q.pending; len(items) > 0 {
+		q.pending = nil
+		// Not while the caller builds its view: the handler may well change what it shows.
+		h.owner.Post(func() { h.fn(items) })
 	}
 }
 
-func (rt *runtime) openFiles(paths []string) {
-	if len(paths) == 0 {
+// open hands items to every handler, or keeps them for the first one registered.
+func (q *openQueue) open(rt *runtime, items []string) {
+	if len(items) == 0 {
 		return
 	}
-	if len(rt.opens) == 0 {
-		rt.openPending = append(rt.openPending, paths...)
+	if len(q.handlers) == 0 {
+		q.pending = append(q.pending, items...)
 		return
 	}
-	for _, h := range slices.Clone(rt.opens) {
-		rt.tree.within(h.owner, func() { h.fn(slices.Clone(paths)) })
+	for _, h := range slices.Clone(q.handlers) {
+		rt.tree.within(h.owner, func() { h.fn(slices.Clone(items)) })
 	}
 }
+
+// OnOpenFiles is the core's part of desktop.OnOpenFiles, which apps use: fn runs, while the current owner lives, with the paths of files the system asks the app to open. Files that came before any handler, as those the app launched to open, go to the first one registered.
+func (cx *Scope) OnOpenFiles(fn func(paths []string)) { cx.rt.opens.add(cx, fn) }
+
+// OnOpenLinks is the core's part of desktop.OnOpenLinks, which apps use: fn runs, while the current owner lives, with the links of the app's own URL schemes the system asks it to open. Links that came before any handler, as one the app launched to open, go to the first one registered.
+func (cx *Scope) OnOpenLinks(fn func(links []string)) { cx.rt.links.add(cx, fn) }
 
 func (t *Tree) surfaceEvent(ev driver.Event) bool {
 	rt := t.rt
@@ -810,7 +819,10 @@ func (t *Tree) surfaceEvent(ev driver.Event) bool {
 		t.within(t.root, rt.reopen)
 	case driver.EventOpenFiles:
 		paths, _ := ev.Data.([]string)
-		t.within(t.root, func() { rt.openFiles(paths) })
+		t.within(t.root, func() { rt.opens.open(rt, paths) })
+	case driver.EventOpenLinks:
+		links, _ := ev.Data.([]string)
+		t.within(t.root, func() { rt.links.open(rt, links) })
 	case driver.EventTray:
 		if tr := rt.trays[ev.Count]; tr != nil {
 			t.within(tr.owner, func() { tr.clicked(ev.Index) })

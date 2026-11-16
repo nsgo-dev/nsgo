@@ -662,6 +662,44 @@ func TestWindowFrame(t *testing.T) {
 	}
 }
 
+func TestOpenLinksWaitForAHandlerApartFromFiles(t *testing.T) {
+	var posted []func()
+	root := NewRoot(RootOptions{Post: func(fn func()) { posted = append(posted, fn) }, Clock: NewManualClock(time.Unix(0, 0))})
+	tree := NewTree(root, ApproxTextEngine{})
+	var links, files [][]string
+	handle := NewSignal(root, false)
+	tree.Mount(func(cx *Scope) Node {
+		return Show{When: handle.Get, Then: func(cx *Scope) Node {
+			cx.OnOpenLinks(func(l []string) { links = append(links, l) })
+			cx.OnOpenFiles(func(p []string) { files = append(files, p) })
+			return nil
+		}}
+	})
+	tree.Commit()
+	tree.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: []string{"umapp://connect?a=1"}})
+	handle.Set(true)
+	tree.Commit()
+	for len(posted) > 0 {
+		fn := posted[0]
+		posted = posted[1:]
+		fn()
+	}
+	tree.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: []string{"umapp://b"}})
+	tree.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: []string{"/a.flow"}})
+	if want := [][]string{{"umapp://connect?a=1"}, {"umapp://b"}}; !slices.EqualFunc(links, want, slices.Equal) {
+		t.Errorf("links %q, want %q", links, want)
+	}
+	if want := [][]string{{"/a.flow"}}; !slices.EqualFunc(files, want, slices.Equal) {
+		t.Errorf("files %q, want %q", files, want)
+	}
+	handle.Set(false)
+	tree.Commit()
+	tree.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: []string{"umapp://c"}})
+	if len(links) != 2 {
+		t.Errorf("a disposed handler heard %q", links[2:])
+	}
+}
+
 func TestOpenFilesWaitForAHandler(t *testing.T) {
 	var posted []func()
 	root := NewRoot(RootOptions{Post: func(fn func()) { posted = append(posted, fn) }, Clock: NewManualClock(time.Unix(0, 0))})

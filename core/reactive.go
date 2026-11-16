@@ -212,14 +212,12 @@ type runtime struct {
 	main, ownMain *Window
 	mainView      *Signal[func(cx *Scope) Node]
 	reopens       []*reopenHandler
-	// opens hear the files the system opens with the app; openPending
-	// are those that came before any did.
-	opens       []*openFilesHandler
-	openPending []string
-	trays       map[uint32]*Tray
-	trayID      uint32
-	hotKeys     []*hotKey
-	hotKeyID    uint32
+	// opens hear the files the system opens with the app, and links the app's own links (desktop.OnOpenLinks).
+	opens, links openQueue
+	trays        map[uint32]*Tray
+	trayID       uint32
+	hotKeys      []*hotKey
+	hotKeyID     uint32
 	// takesHotKeys is RootOptions.HotKeys.
 	takesHotKeys bool
 	// theme is DefaultTheme's, made on first use; subtreeAppearance

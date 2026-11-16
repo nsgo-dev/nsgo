@@ -208,6 +208,22 @@ The app hears the files with `desktop.OnOpenFiles`, which also takes those named
 desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
 ```
 
+## Links
+
+`url_schemes` gives a macOS app links of its own, such as `myapp://settings`, which open it from a browser, another app or `open`:
+
+```yaml
+url_schemes: [myapp]
+```
+
+The app hears them with `desktop.OnOpenLinks`, also while it runs. A link that launched the app waits for the first handler. Anyone can write such a link, so check it and ask the user before it changes anything:
+
+```go
+desktop.OnOpenLinks(cx, func(links []string) { show(links[0]) })
+```
+
+Windows, Linux and iOS don't take them yet.
+
 ## Mini programs
 
 ```sh

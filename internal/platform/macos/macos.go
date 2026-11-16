@@ -700,20 +700,25 @@ func startApp(opts Options) objc.ID {
 			return false
 		},
 	}, {
-		// Files of the types the app declares, opened from the Finder,
-		// the Dock or Open With; at launch, this comes before the app's
-		// first frame, and the core keeps them for its handler
-		// (core.Scope.OnOpenFiles).
+		// Files of the types the app declares, opened from the Finder, the Dock or Open With, and links of the URL schemes it declares, which Launch Services hands the running app; at launch, this comes before the app's first frame, and the core keeps them for its handlers (core.Scope.OnOpenFiles, core.Scope.OnOpenLinks).
 		Cmd: sel("application:openURLs:"),
 		Fn: func(self objc.ID, _ objc.SEL, app, urls objc.ID) {
-			var paths []string
+			var paths, links []string
 			apple.ForEach(urls, func(u objc.ID) {
 				if objc.Send[bool](u, sel("isFileURL")) {
 					paths = append(paths, apple.GoString(u.Send(sel("path"))))
+				} else {
+					links = append(links, apple.GoString(u.Send(sel("absoluteString"))))
 				}
 			})
-			if len(paths) > 0 && !finished && own != nil && own.engine != nil {
+			if finished || own == nil || own.engine == nil {
+				return
+			}
+			if len(paths) > 0 {
 				own.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
+			}
+			if len(links) > 0 {
+				own.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
 			}
 		},
 	}, {

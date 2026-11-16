@@ -695,7 +695,7 @@ func buildMacApp(ctx context.Context, p *project, dir, arch string) (string, err
 		return "", err
 	}
 	if err := writePlist(filepath.Join(app, "Contents", "Info.plist"), p, macPlist,
-		icon+"\n"+names+"\n"+p.fileTypesPlist()+"\n"+p.widgetPlist(false)+"\n"+p.sparklePlist("macos_"+goArchName(arch))); err != nil {
+		icon+"\n"+names+"\n"+p.fileTypesPlist()+"\n"+p.urlSchemesPlist()+"\n"+p.widgetPlist(false)+"\n"+p.sparklePlist("macos_"+goArchName(arch))); err != nil {
 		return "", err
 	}
 	if err := addMacWidgets(ctx, p, app, arch); err != nil {
