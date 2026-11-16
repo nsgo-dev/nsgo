@@ -2415,6 +2415,24 @@ systemError: "Error"
 systemNoHapticsHere: "Only iOS and Android play haptics"
 systemLifecycle: "Lifecycle"
 systemSpeechEnded: "Ended: {reason}"
+systemTextToSpeech: "Text to speech"
+systemSpeakSummary: "Speak · StopSpeaking · Voices"
+systemSpeakEnglish: "Speak English"
+systemSpeakJapanese: "Speak Japanese"
+systemStopSpeaking: "Stop"
+systemNoSpeakingHere: "This platform speaks no text"
+systemSpeaking: "Speaking…"
+systemSpokeToTheEnd: "Finished"
+systemSpeakingStopped: "Stopped"
+systemSpeakingFailed: "Failed: {reason}"
+systemVoiceCount:
+  message: "{english, plural, one {# English voice} other {# English voices}}, {japanese, plural, one {# Japanese voice} other {# Japanese voices}}"
+  description: "The text-to-speech demo: how many voices of each language the platform has installed."
+  placeholders:
+    english:
+      type: int
+    japanese:
+      type: int
 mediaSaved: "Saved"
 mediaScriptResult: "Script result"
 mediaRunAScript: "Run a script"

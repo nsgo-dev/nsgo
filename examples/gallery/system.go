@@ -749,6 +749,56 @@ func speechCard(cx *core.Scope) core.Node {
 	}}
 }
 
+// speakCard speaks a sentence in English and one in Japanese, and counts the voices installed for each.
+func speakCard(cx *core.Scope) core.Node {
+	tr := locales.For(cx)
+	colors := ui.ColorsOf(cx)
+	env := cx.Env()
+	status := core.NewSignal(cx, "")
+	voices := core.NewSignal(cx, "")
+	cx.Effect(func() {
+		if !env.CanSpeak() {
+			return
+		}
+		cx.Voices("en", func(en []core.VoiceInfo) {
+			cx.Voices("ja", func(ja []core.VoiceInfo) { voices.Set(tr.SystemVoiceCount(len(en), len(ja))) })
+		})
+	})
+	speak := func(text, lang string) func() {
+		return func() {
+			status.Set(tr.SystemSpeaking())
+			cx.Speak(text, core.Voice{Lang: lang}, func(stopped bool, err error) {
+				switch {
+				case err != nil:
+					reason := err.Error()
+					if code, ok := err.(core.SpeakError); ok {
+						reason = string(code)
+					}
+					status.Set(tr.SystemSpeakingFailed(reason))
+				case stopped:
+					status.Set(tr.SystemSpeakingStopped())
+				default:
+					status.Set(tr.SystemSpokeToTheEnd())
+				}
+			})
+		}
+	}
+	return Card{Title: tr.SystemTextToSpeech(), Description: tr.SystemSpeakSummary(), Actions: []core.Node{ui.Badge{Text: tr.SystemNsgo()}}, Children: []core.Node{
+		core.Dynamic(func(cx *core.Scope) core.Node {
+			if !env.CanSpeak() {
+				return Note{Text: locales.For(cx).SystemNoSpeakingHere()}
+			}
+			return ui.Wrap{Children: []core.Node{
+				ui.Button{Text: tr.SystemSpeakEnglish(), Size: ui.SizeSmall, OnPress: speak("The quick brown fox jumps over the lazy dog.", "en-US"), TestID: "speak-english"},
+				ui.Button{Text: tr.SystemSpeakJapanese(), Size: ui.SizeSmall, OnPress: speak("今日はいい天気ですね。散歩に行きましょう。", "ja-JP"), TestID: "speak-japanese"},
+				ui.Button{Text: tr.SystemStopSpeaking(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, OnPress: cx.StopSpeaking, TestID: "stop-speaking"},
+			}}
+		}),
+		core.Text{ContentFunc: status.Get, TestID: "speak-status", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+		core.Text{ContentFunc: voices.Get, TestID: "voice-count", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+	}}
+}
+
 // filesCard is the system's file picker and save dialog.
 func filesCard(cx *core.Scope) core.Node {
 	tr := locales.For(cx)
@@ -917,7 +967,7 @@ func filesCard(cx *core.Scope) core.Node {
 
 // systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, secrets, Sign in with Apple, sign-in sessions, the system's permissions and files.
 func systemDemo(cx *core.Scope) core.Node {
-	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, secretsCard, signInWithAppleCard, authSessionCard, permissionsCard, filesCard)
+	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, speakCard, notificationsCard, biometricsCard, secretsCard, signInWithAppleCard, authSessionCard, permissionsCard, filesCard)
 }
 
 // yesNo says whether in tr's language.

@@ -220,6 +220,8 @@ var Parameters = map[string][]string{
 	"SystemNotificationShown":      {"shown"},
 	"SystemNotificationPressed":    {"id"},
 	"SystemSpeechEnded":            {"reason"},
+	"SystemSpeakingFailed":         {"reason"},
+	"SystemVoiceCount":             {"english", "japanese"},
 	"FlowLabel":                    {"nodes", "links"},
 	"FlowNewStep":                  {"number"},
 	"FlowExperiment":               {"number"},
@@ -414,6 +416,8 @@ type Translation struct {
 	SystemNotificationShown      func(shown string) string
 	SystemNotificationPressed    func(id string) string
 	SystemSpeechEnded            func(reason string) string
+	SystemSpeakingFailed         func(reason string) string
+	SystemVoiceCount             func(english int, japanese int) string
 	FlowLabel                    func(nodes int, links int) string
 	FlowNewStep                  func(number int) string
 	FlowExperiment               func(number int) string
@@ -2584,6 +2588,15 @@ const (
 	textSystemError
 	textSystemNoHapticsHere
 	textSystemLifecycle
+	textSystemTextToSpeech
+	textSystemSpeakSummary
+	textSystemSpeakEnglish
+	textSystemSpeakJapanese
+	textSystemStopSpeaking
+	textSystemNoSpeakingHere
+	textSystemSpeaking
+	textSystemSpokeToTheEnd
+	textSystemSpeakingStopped
 	textMediaSaved
 	textMediaScriptResult
 	textMediaRunAScript
@@ -4874,6 +4887,15 @@ var keyOfText = [numTexts]string{
 	"systemError",
 	"systemNoHapticsHere",
 	"systemLifecycle",
+	"systemTextToSpeech",
+	"systemSpeakSummary",
+	"systemSpeakEnglish",
+	"systemSpeakJapanese",
+	"systemStopSpeaking",
+	"systemNoSpeakingHere",
+	"systemSpeaking",
+	"systemSpokeToTheEnd",
+	"systemSpeakingStopped",
 	"mediaSaved",
 	"mediaScriptResult",
 	"mediaRunAScript",
@@ -7162,6 +7184,15 @@ var textsEn = i18n.NewTexts(""+
 	"Error"+
 	"Only iOS and Android play haptics"+
 	"Lifecycle"+
+	"Text to speech"+
+	"Speak · StopSpeaking · Voices"+
+	"Speak English"+
+	"Speak Japanese"+
+	"Stop"+
+	"This platform speaks no text"+
+	"Speaking…"+
+	"Finished"+
+	"Stopped"+
 	"Saved"+
 	"Script result"+
 	"Run a script"+
@@ -9447,6 +9478,15 @@ var textsEn = i18n.NewTexts(""+
 		5,
 		33,
 		9,
+		14,
+		31,
+		13,
+		14,
+		4,
+		28,
+		11,
+		8,
+		7,
 		5,
 		13,
 		12,
@@ -11735,6 +11775,15 @@ var textsZhHans = i18n.NewTexts(""+
 	"错误"+
 	"只有 iOS 和 Android 播放触感反馈"+
 	"生命周期"+
+	"朗读"+
+	"Speak · StopSpeaking · Voices"+
+	"朗读英语"+
+	"朗读日语"+
+	"停止"+
+	"此平台不朗读文本"+
+	"正在朗读…"+
+	"已读完"+
+	"已停止"+
 	"已保存"+
 	"脚本结果"+
 	"运行脚本"+
@@ -14020,6 +14069,15 @@ var textsZhHans = i18n.NewTexts(""+
 		6,
 		41,
 		12,
+		6,
+		31,
+		12,
+		12,
+		6,
+		24,
+		15,
+		9,
+		9,
 		9,
 		12,
 		12,
@@ -14733,6 +14791,12 @@ func Supply(lang string, t Translation) {
 	}
 	if t.SystemSpeechEnded != nil {
 		s.SystemSpeechEnded = t.SystemSpeechEnded
+	}
+	if t.SystemSpeakingFailed != nil {
+		s.SystemSpeakingFailed = t.SystemSpeakingFailed
+	}
+	if t.SystemVoiceCount != nil {
+		s.SystemVoiceCount = t.SystemVoiceCount
 	}
 	if t.FlowLabel != nil {
 		s.FlowLabel = t.FlowLabel
@@ -35140,6 +35204,137 @@ func (msgs Messages) SystemSpeechEnded(reason string) string {
 			return "Ended: " + msgs.arg(reason)
 		case "zh-Hans":
 			return "已结束：" + reason
+		}
+	}
+}
+
+// SystemTextToSpeech says "Text to speech"
+// in the language the app shows under cx.
+func SystemTextToSpeech(cx *core.Scope) string { return For(cx).SystemTextToSpeech() }
+
+// SystemTextToSpeech is the package's SystemTextToSpeech in the language of msgs.
+func (msgs Messages) SystemTextToSpeech() string { return msgs.text(textSystemTextToSpeech) }
+
+// SystemSpeakSummary says "Speak · StopSpeaking · Voices"
+// in the language the app shows under cx.
+func SystemSpeakSummary(cx *core.Scope) string { return For(cx).SystemSpeakSummary() }
+
+// SystemSpeakSummary is the package's SystemSpeakSummary in the language of msgs.
+func (msgs Messages) SystemSpeakSummary() string { return msgs.text(textSystemSpeakSummary) }
+
+// SystemSpeakEnglish says "Speak English"
+// in the language the app shows under cx.
+func SystemSpeakEnglish(cx *core.Scope) string { return For(cx).SystemSpeakEnglish() }
+
+// SystemSpeakEnglish is the package's SystemSpeakEnglish in the language of msgs.
+func (msgs Messages) SystemSpeakEnglish() string { return msgs.text(textSystemSpeakEnglish) }
+
+// SystemSpeakJapanese says "Speak Japanese"
+// in the language the app shows under cx.
+func SystemSpeakJapanese(cx *core.Scope) string { return For(cx).SystemSpeakJapanese() }
+
+// SystemSpeakJapanese is the package's SystemSpeakJapanese in the language of msgs.
+func (msgs Messages) SystemSpeakJapanese() string { return msgs.text(textSystemSpeakJapanese) }
+
+// SystemStopSpeaking says "Stop"
+// in the language the app shows under cx.
+func SystemStopSpeaking(cx *core.Scope) string { return For(cx).SystemStopSpeaking() }
+
+// SystemStopSpeaking is the package's SystemStopSpeaking in the language of msgs.
+func (msgs Messages) SystemStopSpeaking() string { return msgs.text(textSystemStopSpeaking) }
+
+// SystemNoSpeakingHere says "This platform speaks no text"
+// in the language the app shows under cx.
+func SystemNoSpeakingHere(cx *core.Scope) string { return For(cx).SystemNoSpeakingHere() }
+
+// SystemNoSpeakingHere is the package's SystemNoSpeakingHere in the language of msgs.
+func (msgs Messages) SystemNoSpeakingHere() string { return msgs.text(textSystemNoSpeakingHere) }
+
+// SystemSpeaking says "Speaking…"
+// in the language the app shows under cx.
+func SystemSpeaking(cx *core.Scope) string { return For(cx).SystemSpeaking() }
+
+// SystemSpeaking is the package's SystemSpeaking in the language of msgs.
+func (msgs Messages) SystemSpeaking() string { return msgs.text(textSystemSpeaking) }
+
+// SystemSpokeToTheEnd says "Finished"
+// in the language the app shows under cx.
+func SystemSpokeToTheEnd(cx *core.Scope) string { return For(cx).SystemSpokeToTheEnd() }
+
+// SystemSpokeToTheEnd is the package's SystemSpokeToTheEnd in the language of msgs.
+func (msgs Messages) SystemSpokeToTheEnd() string { return msgs.text(textSystemSpokeToTheEnd) }
+
+// SystemSpeakingStopped says "Stopped"
+// in the language the app shows under cx.
+func SystemSpeakingStopped(cx *core.Scope) string { return For(cx).SystemSpeakingStopped() }
+
+// SystemSpeakingStopped is the package's SystemSpeakingStopped in the language of msgs.
+func (msgs Messages) SystemSpeakingStopped() string { return msgs.text(textSystemSpeakingStopped) }
+
+// SystemSpeakingFailed says "Failed: {reason}"
+// in the language the app shows under cx.
+func SystemSpeakingFailed(cx *core.Scope, reason string) string {
+	return For(cx).SystemSpeakingFailed(reason)
+}
+
+// SystemSpeakingFailed is the package's SystemSpeakingFailed in the language of msgs.
+func (msgs Messages) SystemSpeakingFailed(reason string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemSpeakingFailed(reason))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemSpeakingFailed; f != nil {
+			return f(reason)
+		}
+		switch lang {
+		case "", "en":
+			return "Failed: " + msgs.arg(reason)
+		case "zh-Hans":
+			return "失败：" + reason
+		}
+	}
+}
+
+// SystemVoiceCount says "{english, plural, one {# English voice} other {# English voices}}, {japanese, plural, one {# Japanese voice} other {# Japanese voices}}"
+// in the language the app shows under cx.
+//
+// The text-to-speech demo: how many voices of each language the platform has installed.
+func SystemVoiceCount(cx *core.Scope, english int, japanese int) string {
+	return For(cx).SystemVoiceCount(english, japanese)
+}
+
+// SystemVoiceCount is the package's SystemVoiceCount in the language of msgs.
+func (msgs Messages) SystemVoiceCount(english int, japanese int) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemVoiceCount(english, japanese))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemVoiceCount; f != nil {
+			return f(english, japanese)
+		}
+		switch lang {
+		case "", "en":
+			var b strings.Builder
+			switch i18n.Cardinal("en", float64(english)) {
+			case i18n.One:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(english))))
+				b.WriteString(" English voice")
+			default:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(english))))
+				b.WriteString(" English voices")
+			}
+			b.WriteString(", ")
+			switch i18n.Cardinal("en", float64(japanese)) {
+			case i18n.One:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(japanese))))
+				b.WriteString(" Japanese voice")
+			default:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(japanese))))
+				b.WriteString(" Japanese voices")
+			}
+			return b.String()
+		case "zh-Hans":
+			return i18n.FormatNumber("zh-Hans", float64(english)) + " 个英语语音，" + i18n.FormatNumber("zh-Hans", float64(japanese)) + " 个日语语音"
 		}
 	}
 }

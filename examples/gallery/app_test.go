@@ -908,6 +908,34 @@ func TestSystemSecrets(t *testing.T) {
 	}
 }
 
+func TestSystemTextToSpeech(t *testing.T) {
+	headless(t)
+	env := desktopEnv
+	env.Speak = true
+	app := startDesktop(t, nsgotest.Environment(env))
+	app.Voices = []core.VoiceInfo{{ID: "a", Name: "Samantha", Lang: "en-US"}, {ID: "b", Name: "Daniel", Lang: "en-GB"}, {ID: "c", Name: "Kyoko", Lang: "ja-JP"}}
+	open(app, "System")
+	app.Find("text:2 English voices, 1 Japanese voice")
+	app.Press("id:speak-english")
+	app.Find("text:Speaking…")
+	// A second sentence cuts the first, and Stop the second.
+	app.Press("id:speak-japanese")
+	app.Press("id:stop-speaking")
+	app.Find("text:Stopped")
+	if len(app.Spoken) != 2 || app.Spoken[0].Lang != "en-US" || !app.Spoken[0].Stopped || app.Spoken[1].Lang != "ja-JP" || !app.Spoken[1].Stopped {
+		t.Fatalf("spoken = %+v", app.Spoken)
+	}
+	app.Press("id:speak-english")
+	app.FinishSpeaking("")
+	app.Find("text:Finished")
+	app.Press("id:speak-japanese")
+	app.FinishSpeaking(core.SpeakLanguageUnavailable)
+	app.Find("text:Failed: language-unavailable")
+	if app.Speaking() != nil || len(app.Spoken) != 4 {
+		t.Fatalf("spoken = %+v", app.Spoken)
+	}
+}
+
 func TestSystem(t *testing.T) {
 	headless(t)
 	app := startDesktop(t)
