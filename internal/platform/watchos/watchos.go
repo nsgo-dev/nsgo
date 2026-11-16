@@ -268,7 +268,7 @@ func (s *surface) environment(scale float64, safe driver.Edges, flags uint32) dr
 		SafeArea:         safe,
 		Dark:             flags&1 != 0,
 		ReduceMotion:     flags&2 != 0,
-		IncreaseContrast: flags&(1<<16) != 0,
+		IncreaseContrast: flags&8 != 0,
 		ScreenReader:     flags&4 != 0,
 		FontScale:        fontScale(steps),
 		RTL:              rtl,

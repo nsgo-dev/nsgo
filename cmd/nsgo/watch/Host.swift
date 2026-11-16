@@ -569,7 +569,7 @@ struct Root: View {
 		var flags: UInt32 = 0
 		if scheme == .dark { flags |= 1 }
 		if reduceMotion { flags |= 2 }
-		if contrast == .increased { flags |= 1 << 16 }
+		if contrast == .increased { flags |= 8 }
 		if voiceOver { flags |= 4 }
 		let steps: [DynamicTypeSize] = [.xSmall, .small, .medium, .large, .xLarge, .xxLarge, .xxxLarge,
 			.accessibility1, .accessibility2, .accessibility3, .accessibility4, .accessibility5]
