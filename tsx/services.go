@@ -11,7 +11,7 @@ import (
 )
 
 // The services of nsgo (NSH's runtime registry): the keyboard, key
-// bindings, the clipboard, storage, the photo picker, opening URLs,
+// bindings, the clipboard, storage, secrets, the photo picker, opening URLs,
 // speech, accessibility, images, the environment's insets, design tokens,
 // resources and native components, each on core's API of the same
 // meaning. What answers later is a promise core's callback settles.
@@ -29,6 +29,7 @@ var serviceExports = []export{
 	{"Clipboard", (*runtime).clipboard},
 	{"Notifications", (*runtime).notifications},
 	{"Storage", (*runtime).storage},
+	{"Secrets", (*runtime).secrets},
 	{"Picker", (*runtime).picker},
 	{"Speech", (*runtime).speech},
 	{"AuthSession", (*runtime).authSession},
@@ -257,6 +258,57 @@ func (r *runtime) storage() js.Value {
 	set("clear", func(js.FunctionCall) (js.Value, error) {
 		s.Clear()
 		return js.Undefined(), nil
+	})
+	return o
+}
+
+// secrets is the Secrets module, core.Secrets under the sandbox's partition: each call runs off the engine's goroutine, as the system may make it wait, and settles its promise back on it with the value run found, or null, or undefined for a write.
+func (r *runtime) secrets() js.Value {
+	o := r.vm.NewObject()
+	set := func(name string, f func(s core.Secrets, call js.FunctionCall) func() (*string, error)) {
+		_ = o.Set(name, r.function(func(call js.FunctionCall) js.Value {
+			if refused := r.refused(core.AccessSecrets); refused != nil {
+				return refused
+			}
+			p, resolve, reject := r.vm.NewPromise()
+			run := f(r.cx.Secrets(), call)
+			go func() {
+				v, err := run()
+				r.cx.Post(func() {
+					r.inJS(func() {
+						switch {
+						case err != nil:
+							_ = reject(r.goError(err))
+						case name != "get":
+							_ = resolve(js.Undefined())
+						case v == nil:
+							_ = resolve(js.Null())
+						default:
+							_ = resolve(r.vm.ToValue(*v))
+						}
+					})
+				})
+			}()
+			return r.vm.ToValue(p)
+		}))
+	}
+	set("get", func(s core.Secrets, call js.FunctionCall) func() (*string, error) {
+		account := arg(call, 0).String()
+		return func() (*string, error) {
+			v, ok, err := s.Get(account)
+			if err != nil || !ok {
+				return nil, err
+			}
+			return &v, nil
+		}
+	})
+	set("set", func(s core.Secrets, call js.FunctionCall) func() (*string, error) {
+		account, value := arg(call, 0).String(), arg(call, 1).String()
+		return func() (*string, error) { return nil, s.Set(account, value) }
+	})
+	set("delete", func(s core.Secrets, call js.FunctionCall) func() (*string, error) {
+		account := arg(call, 0).String()
+		return func() (*string, error) { return nil, s.Delete(account) }
 	})
 	return o
 }

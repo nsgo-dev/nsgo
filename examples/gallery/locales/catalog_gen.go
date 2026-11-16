@@ -46,6 +46,7 @@ func For(cx *core.Scope) Messages {
 var Parameters = map[string][]string{
 	"SettingsAppInfoValue":         {"version", "build", "development"},
 	"MenusViewState":               {"sidebar", "statusBar", "zoom"},
+	"SystemSecretFailed":           {"reason"},
 	"SystemFolderItems":            {"count"},
 	"SystemCounted":                {"n"},
 	"SystemTitleBarInsets":         {"top", "left", "right"},
@@ -239,6 +240,7 @@ type Translation struct {
 	Texts                        map[string]string
 	SettingsAppInfoValue         func(version string, build string, development string) string
 	MenusViewState               func(sidebar string, statusBar string, zoom string) string
+	SystemSecretFailed           func(reason string) string
 	SystemFolderItems            func(count int) string
 	SystemCounted                func(n int) string
 	SystemTitleBarInsets         func(top float64, left float64, right float64) string
@@ -719,6 +721,15 @@ const (
 	textSystemSignInCancelled
 	textSystemSignInFailed
 	textSystemSignInUnavailable
+	textSystemSecrets
+	textSystemSecretsDetail
+	textSystemSecretKeep
+	textSystemSecretRead
+	textSystemSecretDelete
+	textSystemSecretKept
+	textSystemSecretDeleted
+	textSystemSecretMissing
+	textSystemSecretUnavailable
 	textSystemCancelAndDestructiveButtons
 	textSystemDeleteThePhoto
 	textSystemThisCannotBeUndone
@@ -3000,6 +3011,15 @@ var keyOfText = [numTexts]string{
 	"systemSignInCancelled",
 	"systemSignInFailed",
 	"systemSignInUnavailable",
+	"systemSecrets",
+	"systemSecretsDetail",
+	"systemSecretKeep",
+	"systemSecretRead",
+	"systemSecretDelete",
+	"systemSecretKept",
+	"systemSecretDeleted",
+	"systemSecretMissing",
+	"systemSecretUnavailable",
 	"systemCancelAndDestructiveButtons",
 	"systemDeleteThePhoto",
 	"systemThisCannotBeUndone",
@@ -5279,6 +5299,15 @@ var textsEn = i18n.NewTexts(""+
 	"Cancelled"+
 	"Failed"+
 	"Unavailable"+
+	"Secrets"+
+	"A value the platform's secure store keeps for the app"+
+	"Keep"+
+	"Read"+
+	"Forget"+
+	"Kept"+
+	"Forgotten"+
+	"None kept"+
+	"No secure store here"+
 	"Cancel and destructive buttons"+
 	"Delete the photo?"+
 	"This cannot be undone."+
@@ -7555,6 +7584,15 @@ var textsEn = i18n.NewTexts(""+
 		9,
 		6,
 		11,
+		7,
+		53,
+		4,
+		4,
+		6,
+		4,
+		9,
+		9,
+		20,
 		30,
 		17,
 		22,
@@ -9834,6 +9872,15 @@ var textsZhHans = i18n.NewTexts(""+
 	"已取消"+
 	"失败"+
 	"不可用"+
+	"机密"+
+	"由平台安全存储为应用保管的值"+
+	"保存"+
+	"读取"+
+	"清除"+
+	"已保存"+
+	"已清除"+
+	"未保存任何值"+
+	"此平台没有安全存储"+
 	"取消和破坏性按钮"+
 	"删除这张照片？"+
 	"此操作无法撤销。"+
@@ -12110,6 +12157,15 @@ var textsZhHans = i18n.NewTexts(""+
 		9,
 		6,
 		9,
+		6,
+		42,
+		6,
+		6,
+		6,
+		9,
+		9,
+		18,
+		27,
 		24,
 		21,
 		24,
@@ -14155,6 +14211,9 @@ func Supply(lang string, t Translation) {
 	}
 	if t.MenusViewState != nil {
 		s.MenusViewState = t.MenusViewState
+	}
+	if t.SystemSecretFailed != nil {
+		s.SystemSecretFailed = t.SystemSecretFailed
 	}
 	if t.SystemFolderItems != nil {
 		s.SystemFolderItems = t.SystemFolderItems
@@ -16872,6 +16931,93 @@ func SystemSignInUnavailable(cx *core.Scope) string { return For(cx).SystemSignI
 
 // SystemSignInUnavailable is the package's SystemSignInUnavailable in the language of msgs.
 func (msgs Messages) SystemSignInUnavailable() string { return msgs.text(textSystemSignInUnavailable) }
+
+// SystemSecrets says "Secrets"
+// in the language the app shows under cx.
+func SystemSecrets(cx *core.Scope) string { return For(cx).SystemSecrets() }
+
+// SystemSecrets is the package's SystemSecrets in the language of msgs.
+func (msgs Messages) SystemSecrets() string { return msgs.text(textSystemSecrets) }
+
+// SystemSecretsDetail says "A value the platform's secure store keeps for the app"
+// in the language the app shows under cx.
+func SystemSecretsDetail(cx *core.Scope) string { return For(cx).SystemSecretsDetail() }
+
+// SystemSecretsDetail is the package's SystemSecretsDetail in the language of msgs.
+func (msgs Messages) SystemSecretsDetail() string { return msgs.text(textSystemSecretsDetail) }
+
+// SystemSecretKeep says "Keep"
+// in the language the app shows under cx.
+func SystemSecretKeep(cx *core.Scope) string { return For(cx).SystemSecretKeep() }
+
+// SystemSecretKeep is the package's SystemSecretKeep in the language of msgs.
+func (msgs Messages) SystemSecretKeep() string { return msgs.text(textSystemSecretKeep) }
+
+// SystemSecretRead says "Read"
+// in the language the app shows under cx.
+func SystemSecretRead(cx *core.Scope) string { return For(cx).SystemSecretRead() }
+
+// SystemSecretRead is the package's SystemSecretRead in the language of msgs.
+func (msgs Messages) SystemSecretRead() string { return msgs.text(textSystemSecretRead) }
+
+// SystemSecretDelete says "Forget"
+// in the language the app shows under cx.
+func SystemSecretDelete(cx *core.Scope) string { return For(cx).SystemSecretDelete() }
+
+// SystemSecretDelete is the package's SystemSecretDelete in the language of msgs.
+func (msgs Messages) SystemSecretDelete() string { return msgs.text(textSystemSecretDelete) }
+
+// SystemSecretKept says "Kept"
+// in the language the app shows under cx.
+func SystemSecretKept(cx *core.Scope) string { return For(cx).SystemSecretKept() }
+
+// SystemSecretKept is the package's SystemSecretKept in the language of msgs.
+func (msgs Messages) SystemSecretKept() string { return msgs.text(textSystemSecretKept) }
+
+// SystemSecretDeleted says "Forgotten"
+// in the language the app shows under cx.
+func SystemSecretDeleted(cx *core.Scope) string { return For(cx).SystemSecretDeleted() }
+
+// SystemSecretDeleted is the package's SystemSecretDeleted in the language of msgs.
+func (msgs Messages) SystemSecretDeleted() string { return msgs.text(textSystemSecretDeleted) }
+
+// SystemSecretMissing says "None kept"
+// in the language the app shows under cx.
+func SystemSecretMissing(cx *core.Scope) string { return For(cx).SystemSecretMissing() }
+
+// SystemSecretMissing is the package's SystemSecretMissing in the language of msgs.
+func (msgs Messages) SystemSecretMissing() string { return msgs.text(textSystemSecretMissing) }
+
+// SystemSecretUnavailable says "No secure store here"
+// in the language the app shows under cx.
+func SystemSecretUnavailable(cx *core.Scope) string { return For(cx).SystemSecretUnavailable() }
+
+// SystemSecretUnavailable is the package's SystemSecretUnavailable in the language of msgs.
+func (msgs Messages) SystemSecretUnavailable() string { return msgs.text(textSystemSecretUnavailable) }
+
+// SystemSecretFailed says "Failed: {reason}"
+// in the language the app shows under cx.
+func SystemSecretFailed(cx *core.Scope, reason string) string {
+	return For(cx).SystemSecretFailed(reason)
+}
+
+// SystemSecretFailed is the package's SystemSecretFailed in the language of msgs.
+func (msgs Messages) SystemSecretFailed(reason string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemSecretFailed(reason))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemSecretFailed; f != nil {
+			return f(reason)
+		}
+		switch lang {
+		case "", "en":
+			return "Failed: " + msgs.arg(reason)
+		case "zh-Hans":
+			return "失败：" + reason
+		}
+	}
+}
 
 // SystemCancelAndDestructiveButtons says "Cancel and destructive buttons"
 // in the language the app shows under cx.

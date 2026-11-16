@@ -105,6 +105,8 @@ type Options struct {
 	// Storage keeps the app's entries; in memory for the engine's life
 	// when nil. Platforms pass OpenFileStorage in the data directory.
 	Storage *core.Store
+	// Secrets is the platform's secure store (core.Scope.Secrets); nil where it has none.
+	Secrets driver.SecretStore
 	// DataDir, CacheDir and LogsDir are the app's directories, made when the engine starts; "" where the target has none.
 	DataDir, CacheDir, LogsDir string
 	// Appearance is the appearance the app starts in, forced as
@@ -394,6 +396,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		// The platform owns the display frame: the engine only asks.
 		RequestFrame: requestFrame,
 		Storage:      opts.Storage,
+		Secrets:      opts.Secrets,
 		DataDir:      opts.DataDir,
 		CacheDir:     opts.CacheDir,
 		LogsDir:      opts.LogsDir,

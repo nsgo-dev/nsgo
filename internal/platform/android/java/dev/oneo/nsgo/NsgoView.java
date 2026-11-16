@@ -782,6 +782,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 case Protocol.FOLDER:
                     folders.execute(() -> folder(message));
                     break;
+                case Protocol.SECRET:
+                    Secrets.answer(getContext().getApplicationContext(), message, reply -> write(Protocol.SECRET_REPLY, reply));
+                    break;
                 case Protocol.FETCH:
                     downloads.message(message);
                     break;

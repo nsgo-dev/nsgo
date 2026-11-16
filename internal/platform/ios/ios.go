@@ -518,6 +518,7 @@ func (s *surface) startEngine(test *testOpen) {
 		Thread:      apple.RaiseThread,
 		Appearance:  s.appearance,
 		Host:        s.host,
+		Secrets:     apple.Keychain{},
 	}
 	opts.SetDirs(engine.AppDirs(s.id))
 	if test != nil {

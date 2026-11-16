@@ -75,7 +75,7 @@ func network(req *http.Request) (*http.Response, error) {
 
 // tries is a plugin that runs each named attempt and shows what each
 // gave, in order, as "name: result".
-const tries = `import { mount, signal, Text, AuthSession, Clipboard, openUrl, Storage, host, SignInWithApple } from "nsgo";
+const tries = `import { mount, signal, Text, AuthSession, Clipboard, openUrl, Storage, Secrets, host, SignInWithApple } from "nsgo";
 const log = signal([]);
 const say = (name, v) => log.set([...log(), name + ": " + v]);
 const how = (e) => e.code ? e.code + " " + (e.permission ?? "") : e.name + " " + e.message;
@@ -123,6 +123,7 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 	timers: () => { for (let i = 0; i < 5; i++) setTimeout(() => {}, 100000); },
 	storage: async () => { await Storage.setItem("k", "v"); return (await Storage.keys()).join(","); },
 	full: () => Storage.setItem("big", "x".repeat(100)),
+	secrets: () => Secrets.get("token"),
 	`, pkg.Capabilities{Network: &pkg.Network{Hosts: []string{"api.example.com"}}, Host: []string{"greet"}}, tsx.Sandbox{Host: greeter()})
 	want := map[string]string{
 		"allowed":         "https://api.example.com/a",
@@ -140,11 +141,50 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 		"timers":          "ERR_NSH_QUOTA_EXCEEDED ",
 		"storage":         "k",
 		"full":            "ERR_NSH_QUOTA_EXCEEDED ",
+		"secrets":         "ERR_ACCESS_DENIED secrets",
 	}
 	for k, w := range want {
 		if got[k] != w {
 			t.Errorf("%s gave %q, want %q", k, got[k], w)
 		}
+	}
+}
+
+// TestSandboxKeepsAPackagesSecretsApart grants a package the secrets capability: it keeps and reads its own, under a service of its partition, and never sees the app's.
+func TestSandboxKeepsAPackagesSecretsApart(t *testing.T) {
+	p := verified(t, `const attempts = {
+	missing: async () => String(await Secrets.get("token")),
+	set: () => Secrets.set("token", "the package's"),
+	get: () => Secrets.get("token"),
+	deleted: async () => { await Secrets.delete("token"); await Secrets.set("kept", "1"); return String(await Secrets.get("token")); },
+};
+`+tries, pkg.Capabilities{Secrets: true})
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return tsx.View{Package: p, Sandbox: tsx.Sandbox{WebUnisolated: true}}
+	}, nsgotest.Secrets(map[string]string{"token": "the app's"}))
+	app.WaitUntil(10*time.Second, func() bool { return strings.Contains(app.Find("id:log").Text, "done: 1") })
+	got := map[string]string{}
+	for _, line := range strings.Split(app.Find("id:log").Text, "\n") {
+		k, v, _ := strings.Cut(line, ": ")
+		got[k] = v
+	}
+	for k, w := range map[string]string{"missing": "null", "set": "undefined", "get": "the package's", "deleted": "null"} {
+		if got[k] != w {
+			t.Errorf("%s gave %q, want %q", k, got[k], w)
+		}
+	}
+	items := app.Secrets.Items()
+	var apps, packages int
+	for item, v := range items {
+		switch {
+		case item.Account == "token" && v == "the app's" && !strings.Contains(item.Service, "#"):
+			apps++
+		case item.Account == "kept" && strings.HasSuffix(item.Service, "#com.example.plugin"):
+			packages++
+		}
+	}
+	if len(items) != 2 || apps != 1 || packages != 1 {
+		t.Fatalf("the store holds %v", items)
 	}
 }
 

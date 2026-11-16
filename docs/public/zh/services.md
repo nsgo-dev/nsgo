@@ -1,6 +1,6 @@
 ---
 title: 平台服务
-description: 警告框、剪贴板、文件、照片、分享、存储、语音、网络、登录和应用生命周期。
+description: 警告框、剪贴板、文件、照片、分享、存储、机密、语音、网络、登录和应用生命周期。
 group: 平台功能
 order: 44
 ---
@@ -70,17 +70,53 @@ cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.
 
 ## 存储
 
-`cx.Storage()` 是应用的键值存储，保存在设备上，应用的每个响应式图共享它。读取是同步的，在计算中读取会让它订阅变化；超过配额时 `SetItem` 返回 `core.StorageFullError`（默认 `core.StorageQuota` 为 5 MiB）。
+`cx.Storage()` 是应用的键值存储，保存在设备上，应用的每个响应式图共享它。读取是同步的，在计算中读取会让它订阅变化；超过配额时 `SetItem` 返回 `core.StorageFullError`（默认 `core.StorageQuota` 为 5 MiB）。它是一个用户的任何程序都能读取的明文文件，令牌和密码请放进[机密](#机密)。
 
 ```go
 store := cx.Storage()
-if token, ok := store.GetItem("token"); ok {
-	login(token)
+if tab, ok := store.GetItem("tab"); ok {
+	selected.Set(tab)
 }
-store.SetItem("token", token)
+store.SetItem("tab", "library")
 ```
 
 `store.Keys()` 列出键，`RemoveItem` 删除一个，`Clear` 清空存储。`cx.DataDir()` 和 `cx.CacheDir()` 给出应用存放键值存储放不下的文件的目录；`cx.LogsDir()` 给出平台存放日志的目录；`Scope.ProvideStorage` 给子树一个独立分区。
+
+## 机密
+
+`cx.Secrets()` 是应用的安全存储，用来保存刷新令牌、API 密钥和密码：按账户 `Get`、`Set`、`Delete` 一个字符串，由平台保护。不存在的账户读出 `("", false, nil)`；平台没有安全存储时（例如 Web），每次调用都返回 `core.ErrSecretsUnavailable`，NSGo 不会退回明文存储。系统可能让调用等待，例如钥匙串向用户请求授权，所以请在引擎的 goroutine 之外调用，再用 `cx.Post` 把结果交回。
+
+```go
+secrets := cx.Secrets()
+go func() {
+	token, ok, err := secrets.Get("refresh-token")
+	cx.Post(func() {
+		if err == nil && ok {
+			login(token)
+		}
+	})
+}()
+```
+
+| 平台 | 机密保存在 |
+| --- | --- |
+| macOS | 登录钥匙串中的通用密码：`kSecAttrService` 为服务，`kSecAttrAccount` 为账户 |
+| iOS、tvOS、watchOS | 钥匙串中的通用密码，方式相同 |
+| Windows | 凭据管理器中目标为 `service/account` 的普通凭据，最多 2560 字节 |
+| Linux | Secret Service（GNOME Keyring、KWallet）中带 `service` 和 `account` 属性的条目；会话中没有运行 Secret Service 时不可用 |
+| Android | 用 Android Keystore 中的 AES 密钥加密，保存在应用的私有文件中，不进入备份 |
+| Web、小程序 | 不可用 |
+
+服务默认是应用的 ID（`core.App().ID`）。从其他框架迁移来的应用，只要指定那个框架写入的条目，用户就不会被登出：`Service`，以及 Apple 平台上的 `AccessGroup` 和 `Accessible`。在 iOS 上，`core.SecretAfterFirstUnlock` 让后台任务在手机锁定时也能读取条目，`ThisDeviceOnly` 类的可访问性让条目不进入备份。在 macOS 上，设置 `AccessGroup` 会把条目移到数据保护钥匙串，这需要由团队签名、且 `keychain-access-groups` 权利列出该组的构建，Mac App Store 构建可以通过 `macos.entitlements` 获得它。
+
+```go
+s := cx.Secrets()
+s.Service = "app:no-auth" // 早先版本使用的服务
+s.Accessible = core.SecretAfterFirstUnlockThisDeviceOnly
+err := s.Set("refresh-token", token)
+```
+
+`nsgotest` 把应用的机密保存在内存中（`App.Secrets`），`nsgotest.Secrets` 让测试带着一些机密启动，所以测试不会碰到本机的钥匙串。TSX 包凭 `secrets` 能力访问安全存储，使用它自己的服务。
 
 ## 网络
 

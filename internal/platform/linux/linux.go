@@ -355,6 +355,7 @@ func (w *window) startEngine(app engine.App, opts Options, size driver.Size) {
 		// The app's own window takes its global shortcuts; a host's widget leaves them to the host.
 		HotKeys: !w.embedded,
 		Tray:    !w.embedded,
+		Secrets: secretService{},
 	}
 	if opts.Hidden {
 		eopts.Windows = &engine.WindowOptions{Title: opts.Title, Width: opts.Width, Height: opts.Height,

@@ -890,6 +890,24 @@ func TestSystemSignInWithApple(t *testing.T) {
 	app.Find("text:Revoked")
 }
 
+func TestSystemSecrets(t *testing.T) {
+	headless(t)
+	app := startDesktop(t)
+	open(app, "System")
+	app.Press("id:secret-read")
+	app.WaitFor("text:None kept", 5*time.Second)
+	app.Press("id:secret-keep")
+	app.WaitFor("text:Kept", 5*time.Second)
+	if len(app.Secrets.Items()) != 1 {
+		t.Fatalf("the test's store holds %v", app.Secrets.Items())
+	}
+	app.Press("id:secret-delete")
+	app.WaitFor("text:Forgotten", 5*time.Second)
+	if len(app.Secrets.Items()) != 0 {
+		t.Fatalf("deleted, the store holds %v", app.Secrets.Items())
+	}
+}
+
 func TestSystem(t *testing.T) {
 	headless(t)
 	app := startDesktop(t)

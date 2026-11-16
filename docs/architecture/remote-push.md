@@ -12,7 +12,7 @@ Remote push is a server-to-device channel. An app needs to:
 - receive the data that the platform gives it when a push starts or resumes the app; and
 - let the platform display a notification payload when the app is not in the foreground.
 
-The server, provider credentials, token storage and message encryption remain the app's responsibility. NSGo does not send a token to a service owned by NSGo and does not interpret application data.
+The server, provider credentials, where the server keeps the tokens and message encryption remain the app's responsibility; on the device, the app keeps what it signs in to its server with in `Scope.Secrets` ([services](services.md#secrets)). NSGo does not send a token to a service owned by NSGo and does not interpret application data.
 
 The first implementation covers APNs on iOS and macOS and FCM on Android, the latter for standalone apps only once open decision 2 gives them an adapter. Windows, Linux, the web, tvOS and watchOS report that remote push is unavailable until they have a provider with the same lifecycle guarantees. Local notifications, badges and notification presses remain the existing service in [`services.md`](services.md#notifications-and-the-badge).
 

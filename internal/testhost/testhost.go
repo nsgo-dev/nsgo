@@ -32,6 +32,8 @@ type Options struct {
 	Environment *driver.Environment
 	// Storage seeds the app's storage; in memory when nil.
 	Storage *core.Store
+	// Secrets is the app's secure store, in place of the machine's; one in memory when nil.
+	Secrets driver.SecretStore
 	// Observe sees every batch the engine sends, on the engine's
 	// goroutine, before the platform applies it; Event every event the
 	// platform reports to the engine, on the goroutine it reports from.

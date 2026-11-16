@@ -167,9 +167,10 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 			a.posts = append(a.posts, fn)
 			a.mu.Unlock()
 		},
-		Clock: a.Clock, Storage: a.store,
+		Clock: a.Clock, Storage: a.store, Secrets: a.Secrets,
 	})
 	a.t.Cleanup(a.root.Dispose)
+	a.seed()
 	a.anim = driver.NewAnimator(func(driver.Event) {})
 	// A nil clock is the system's; a nil *ManualClock would not be.
 	var clock core.Clock = a.Clock
@@ -178,7 +179,7 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 		driver.CheckCommits = false
 	}
 	s, err := h.Open(app, testhost.Options{
-		Size: a.size, Environment: a.env, Storage: a.store, Host: a.host, Clock: clock,
+		Size: a.size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
 		FPS:     os.Getenv("NSGO_TEST_FPS") != "",
 		Observe: t.observe,
 		Event:   t.event,

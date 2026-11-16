@@ -78,6 +78,8 @@ const (
 	// msgRecording starts or stops package microphone's recording or
 	// asks for the microphone, JSON (driver.SendRecording).
 	msgRecording = 18
+	// msgSecret reads, writes or deletes a secret in the runtime's keystore (secrets.go).
+	msgSecret = 19
 
 	// Java to Go.
 	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
@@ -103,6 +105,8 @@ const (
 	msgTimeZone = 17
 	// msgRecordingReport is what the runtime's recording service reports, JSON (driver.ReportRecording).
 	msgRecordingReport = 18
+	// msgSecretReply answers a msgSecret.
+	msgSecretReply = 19
 )
 
 // The parts of an image view's request msgImage carries.
@@ -158,6 +162,8 @@ type surface struct {
 	folders folders
 	// downloads are the image downloads Java has yet to finish.
 	downloads downloads
+	// secrets are the secret requests Java has yet to answer.
+	secrets secretWaits
 
 	// testReply takes the runtime's answers to a test host's steps.
 	testReply func(r *reader)
@@ -377,6 +383,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.surfaceReport(&r)
 		case msgFolderReply:
 			s.folderReply(&r)
+		case msgSecretReply:
+			s.secretReply(&r)
 		case msgFetched:
 			s.fetched(&r)
 		case msgTestReply:
@@ -416,7 +424,8 @@ func init() {
 
 // startEngine starts app's engine at size with the fold geometry g measured at it; test, when set, is what a test host opens it with.
 func (s *surface) startEngine(app engine.App, size driver.Size, g driver.Geometry, appearance driver.Appearance, test *testOpen) {
-	eopts := engine.Options{Size: size, Geometry: g, Environment: s.env, Appearance: appearance, Host: s.hostOptions()}
+	eopts := engine.Options{Size: size, Geometry: g, Environment: s.env, Appearance: appearance, Host: s.hostOptions(),
+		Secrets: keystore{s}}
 	// The runtime passes the app's own files and cache directories.
 	data, logs := os.Getenv("NSGO_DATA_DIR"), ""
 	if data != "" {

@@ -836,7 +836,8 @@ func (s *surface) start(app engine.App, opts Options, test *testWindow) {
 	}
 	size := objc.Send[apple.CGRect](s.native, selBounds).Size
 	eopts := engine.Options{Size: driver.Size{Width: driver.Points(size.Width), Height: driver.Points(size.Height)},
-		Environment: s.env, Perf: monitor, Thread: apple.RaiseThread, Appearance: opts.Appearance, Host: opts.Host}
+		Environment: s.env, Perf: monitor, Thread: apple.RaiseThread, Appearance: opts.Appearance, Host: opts.Host,
+		Secrets: apple.Keychain{}}
 	eopts.SetDirs(engine.AppDirs(opts.ID))
 	if test != nil {
 		eopts.UseTest(test.options, &test.pin)

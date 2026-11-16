@@ -915,9 +915,9 @@ func filesCard(cx *core.Scope) core.Node {
 	}}
 }
 
-// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, Sign in with Apple, sign-in sessions, the system's permissions and files.
+// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, secrets, Sign in with Apple, sign-in sessions, the system's permissions and files.
 func systemDemo(cx *core.Scope) core.Node {
-	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, signInWithAppleCard, authSessionCard, permissionsCard, filesCard)
+	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, secretsCard, signInWithAppleCard, authSessionCard, permissionsCard, filesCard)
 }
 
 // yesNo says whether in tr's language.
@@ -1079,6 +1079,51 @@ func signInWithAppleCard(cx *core.Scope) core.Node {
 			ui.Button{Text: tr.SystemCheck(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "apple-credential-state", OnPress: check},
 		}},
 		core.Text{ContentFunc: result.Get, TestID: "apple-sign-in-result", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+	}}
+}
+
+// secretsCard keeps, reads and deletes a value in the platform's secure store, off the engine's goroutine, as the system may ask the user first.
+func secretsCard(cx *core.Scope) core.Node {
+	tr := locales.For(cx)
+	colors := ui.ColorsOf(cx)
+	result := core.NewSignal(cx, tr.SystemNoneYet())
+	secrets := cx.Secrets()
+	const account = "gallery-demo"
+	run := func(op func() (string, error)) func() {
+		return func() {
+			go func() {
+				said, err := op()
+				cx.Post(func() {
+					switch {
+					case errors.Is(err, core.ErrSecretsUnavailable):
+						result.Set(tr.SystemSecretUnavailable())
+					case err != nil:
+						result.Set(tr.SystemSecretFailed(err.Error()))
+					default:
+						result.Set(said)
+					}
+				})
+			}()
+		}
+	}
+	keep := run(func() (string, error) {
+		return tr.SystemSecretKept(), secrets.Set(account, time.Now().Format(time.TimeOnly))
+	})
+	read := run(func() (string, error) {
+		v, ok, err := secrets.Get(account)
+		if !ok {
+			v = tr.SystemSecretMissing()
+		}
+		return v, err
+	})
+	remove := run(func() (string, error) { return tr.SystemSecretDeleted(), secrets.Delete(account) })
+	return Card{Title: tr.SystemSecrets(), Description: tr.SystemSecretsDetail(), Actions: []core.Node{ui.Badge{Text: tr.SystemNsgo()}}, Children: []core.Node{
+		ui.Wrap{Children: []core.Node{
+			ui.Button{Text: tr.SystemSecretKeep(), Size: ui.SizeSmall, TestID: "secret-keep", OnPress: keep},
+			ui.Button{Text: tr.SystemSecretRead(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "secret-read", OnPress: read},
+			ui.Button{Text: tr.SystemSecretDelete(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "secret-delete", OnPress: remove},
+		}},
+		core.Text{ContentFunc: result.Get, TestID: "secret-result", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 	}}
 }
 

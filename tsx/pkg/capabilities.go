@@ -21,7 +21,7 @@ type Capabilities struct {
 	WebView *WebView `json:"webview,omitempty"`
 	// OpenURL is openUrl: every URL, or those of Schemes.
 	OpenURL *OpenURL `json:"openUrl,omitempty"`
-	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session.
+	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Secrets the package's own part of the app's secure store, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session.
 	Clipboard       bool `json:"clipboard,omitempty"`
 	Picker          bool `json:"picker,omitempty"`
 	Speech          bool `json:"speech,omitempty"`
@@ -29,6 +29,7 @@ type Capabilities struct {
 	Notifications   bool `json:"notifications,omitempty"`
 	Biometrics      bool `json:"biometrics,omitempty"`
 	SignInWithApple bool `json:"signInWithApple,omitempty"`
+	Secrets         bool `json:"secrets,omitempty"`
 	Audio           bool `json:"audio,omitempty"`
 	AuthSession     bool `json:"authSession,omitempty"`
 	// Host names the host's handlers host.call and host.post may reach:
@@ -124,6 +125,8 @@ func ParseCapabilities(data []byte, strict bool) (c Capabilities, ignored []stri
 			err = json.Unmarshal(raw, &c.Biometrics)
 		case "signInWithApple":
 			err = json.Unmarshal(raw, &c.SignInWithApple)
+		case "secrets":
+			err = json.Unmarshal(raw, &c.Secrets)
 		case "audio":
 			err = json.Unmarshal(raw, &c.Audio)
 		case "authSession":
@@ -180,6 +183,8 @@ func dropCapability(c *Capabilities, key string) {
 		c.Biometrics = false
 	case "signInWithApple":
 		c.SignInWithApple = false
+	case "secrets":
+		c.Secrets = false
 	case "audio":
 		c.Audio = false
 	case "authSession":
@@ -322,6 +327,7 @@ const (
 	capNotifications   = "notifications"
 	capBiometrics      = "biometrics"
 	capSignInWithApple = "signInWithApple"
+	capSecrets         = "secrets"
 	capAudio           = "audio"
 	capAuthSession     = "authSession"
 	capHost            = "host"
@@ -370,6 +376,8 @@ func (c *Capabilities) Allows(permission, resource, method string) bool {
 		return c.Biometrics
 	case capSignInWithApple:
 		return c.SignInWithApple
+	case capSecrets:
+		return c.Secrets
 	case capAudio:
 		return c.Audio
 	case capAuthSession:

@@ -78,6 +78,7 @@ var (
 	cbGlobalHotKeyResponse  uintptr
 	cbGlobalHotKeyActivated uintptr
 	cbX11HotKeyEvent        uintptr
+	cbSecretPrompt          uintptr
 
 	cbShaderRender    uintptr
 	cbShaderUnrealize uintptr
@@ -157,6 +158,7 @@ func init() {
 	cbGlobalHotKeyResponse = newCallback(globalHotKeyResponse)
 	cbGlobalHotKeyActivated = newCallback(globalHotKeyActivated)
 	cbX11HotKeyEvent = newCallback(x11HotKeyEvent)
+	cbSecretPrompt = newCallback(secretPromptCompleted)
 
 	cbShaderRender = newCallback(shaderRenderCallback)
 	cbShaderUnrealize = newCallback(shaderUnrealizeCallback)

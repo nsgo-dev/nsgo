@@ -591,3 +591,57 @@ func TestStartLaysOutWithItsGeometry(t *testing.T) {
 		t.Errorf("the app built with %v regions, want 2", regions)
 	}
 }
+
+// machineKeychain fails a test that reaches it, as the platform's own secure store would be the machine's.
+type machineKeychain struct{ t *testing.T }
+
+func (k machineKeychain) ReadSecret(driver.SecretItem) (string, bool, error) {
+	k.t.Error("a test read the machine's keychain")
+	return "", false, nil
+}
+
+func (k machineKeychain) WriteSecret(driver.SecretItem, string) error {
+	k.t.Error("a test wrote the machine's keychain")
+	return nil
+}
+
+func (k machineKeychain) DeleteSecret(driver.SecretItem) error {
+	k.t.Error("a test deleted from the machine's keychain")
+	return nil
+}
+
+// TestATestsSecretsAreItsOwn keeps an app a test opens on a platform away from the platform's secure store: what the app keeps goes to the test's store, in memory.
+func TestATestsSecretsAreItsOwn(t *testing.T) {
+	p := &recorder{mounted: make(chan struct{}, 1)}
+	read := make(chan string, 1)
+	mem := &driver.MemorySecrets{}
+	opts := Options{Secrets: machineKeychain{t}}
+	o := testhostOptions(func(*driver.MountBatch) {})
+	o.Secrets = mem
+	opts.UseTest(o, &TestPin{})
+	opts.Size = driver.Size{Width: 100, Height: 100}
+	e := Start(p, func(cx *core.Scope) core.Node {
+		s := cx.Secrets()
+		if err := s.Set("token", "kept"); err != nil {
+			t.Error(err)
+		}
+		v, _, _ := s.Get("token")
+		read <- v
+		return core.View{}
+	}, opts)
+	defer e.Close()
+	select {
+	case v := <-read:
+		if v != "kept" || len(mem.Items()) != 1 {
+			t.Errorf("read %q; the test's store holds %v", v, mem.Items())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the app never ran")
+	}
+	// Without a store of the test's, one in memory still takes the platform's place.
+	opts = Options{Secrets: machineKeychain{t}}
+	opts.UseTest(testhostOptions(func(*driver.MountBatch) {}), &TestPin{})
+	if _, ok := opts.Secrets.(*driver.MemorySecrets); !ok {
+		t.Errorf("a test keeps its secrets in %T", opts.Secrets)
+	}
+}

@@ -296,6 +296,13 @@ export interface StorageModule {
   clear(): Promise<void>;
 }
 export declare const Storage: StorageModule;
+/** The app's secure store, by account: the keychain, Credential Manager, Secret Service or Android Keystore; a package's own part of it under the secrets capability. */
+export interface SecretsModule {
+  get(account: string): Promise<string | null>;
+  set(account: string, value: string): Promise<void>;
+  delete(account: string): Promise<void>;
+}
+export declare const Secrets: SecretsModule;
 /** The formats a pick asks for: "compatible" converts to JPEG, "current" keeps the photos' own. */
 export type PickFormat = "compatible" | "current";
 export interface PickImagesOptions { multiple?: boolean; limit?: number; maxDimension?: number; quality?: number; format?: PickFormat }

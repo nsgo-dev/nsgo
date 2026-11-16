@@ -70,6 +70,11 @@ func Storage(entries map[string]string) Option {
 	return func(a *App) { a.store = core.NewStore(seed(entries)) }
 }
 
+// Secrets starts the app with values kept in its secure store, by account under the app's own service (core.Secrets.Service), as if kept from an earlier run; it starts empty otherwise.
+func Secrets(values map[string]string) Option {
+	return func(a *App) { a.seedSecrets = values }
+}
+
 // Environment starts the app in env from its first frame, as a platform
 // reports it before the app mounts: screens have the system header where
 // env has HeaderHeight.
@@ -363,6 +368,9 @@ type App struct {
 	root     *core.Scope
 	store    *core.Store
 	Clock    *core.ManualClock
+	// Secrets is the app's secure store, in memory: what Scope.Secrets keeps, by item, for a test to read or change, so no test touches the machine's keychain, also on a target. seedSecrets are what the Secrets option starts it with.
+	Secrets     *core.MemorySecrets
+	seedSecrets map[string]string
 	// responseTree is the surface whose batch is being applied, which the platform's answers to what it asked go back to; guideTree the one that asked for the permission guide shown.
 	responseTree *core.Tree
 	guideTree    *core.Tree
@@ -457,6 +465,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 
 		Permissions:       map[core.Permission]core.PermissionStatus{},
 		PermissionAnswers: map[core.Permission]core.PermissionStatus{},
+		Secrets:           &core.MemorySecrets{},
 	}
 	for _, o := range opts {
 		o(a)
@@ -523,11 +532,13 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		},
 		Storage: a.store,
 		DataDir: data, CacheDir: cache, LogsDir: logs,
+		Secrets: a.Secrets,
 		Host:    a.host,
 		HotKeys: true,
 		Windows: windows,
 	})
 	t.Cleanup(a.root.Dispose)
+	a.seed()
 	a.start = a.Clock.Now()
 	a.anim = driver.NewAnimator(func(ev driver.Event) {
 		a.mu.Lock()
@@ -559,6 +570,16 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 	a.tree.Mount(view)
 	a.done()
 	return a
+}
+
+// seed keeps the values of the Secrets option, before the app runs.
+func (a *App) seed() {
+	s := a.root.Secrets()
+	for account, v := range a.seedSecrets {
+		if err := s.Set(account, v); err != nil {
+			a.t.Fatalf("nsgotest: seeding the secret %q: %v", account, err)
+		}
+	}
 }
 
 // Storage returns the app's storage, to read what it kept or change it as

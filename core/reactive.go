@@ -98,6 +98,8 @@ type RootOptions struct {
 	RequestFrame func()
 	// Storage keeps the app's entries; a store in memory when nil.
 	Storage *Store
+	// Secrets is the platform's secure store, which Scope.Secrets keeps secrets in; nil where there is none, so Secrets fails with ErrSecretsUnavailable.
+	Secrets SecretStore
 	// DataDir, CacheDir and LogsDir are the app's directories, "" where the target has none.
 	DataDir, CacheDir, LogsDir string
 	// Host is the channel to the host app that embeds the app: its
@@ -121,7 +123,7 @@ func NewRoot(opts RootOptions) *Scope {
 		opts.Clock = SystemClock{}
 	}
 	rt := &runtime{post: opts.Post, clock: opts.Clock, report: opts.Report,
-		store: opts.Storage, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
+		store: opts.Storage, secrets: opts.Secrets, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
 		requestFrame: opts.RequestFrame, windows: opts.Windows, takesHotKeys: opts.HotKeys, tray: opts.Tray}
 	rt.root = &Scope{rt: rt}
 	if devtools.Enabled {
@@ -159,6 +161,7 @@ type runtime struct {
 	root           *Scope
 	store          *Store
 	storage        *storageWatch
+	secrets        driver.SecretStore
 	dataDir        string
 	cacheDir       string
 	logsDir        string
@@ -166,8 +169,9 @@ type runtime struct {
 	// restricted says an owner was given an Access (ProvideAccess), so
 	// requests look for one.
 	restricted bool
-	// storageScoped says an owner was given a partition (ProvideStorage).
+	// storageScoped says an owner was given a partition (ProvideStorage), and secretsScoped one of the secrets (ProvideSecrets).
 	storageScoped bool
+	secretsScoped bool
 	// hostScoped says an owner was given a host (ProvideHost).
 	hostScoped bool
 	// parked counts the parked scopes, so a memo looks for one above it only while there are any.

@@ -32,6 +32,8 @@ final class Protocol {
     static final int LIVE_UPDATE = 17;
     /** Starts or stops a recording or asks for the microphone: JSON (RecordingService). */
     static final int RECORDING = 18;
+    /** Reads, writes or deletes a secret: its number, a SECRET_* op, the service, the account and the value (Secrets). */
+    static final int SECRET = 19;
 
     // Java to Go.
     static final int START = 1;
@@ -56,6 +58,13 @@ final class Protocol {
     static final int TIME_ZONE = 17;
     /** What RecordingService reports: JSON. */
     static final int RECORDING_REPORT = 18;
+    /** Answers a SECRET: its number, an error ("" for none), whether a value was found and the value. */
+    static final int SECRET_REPLY = 19;
+
+    // What a SECRET message asks, as secrets.go has them.
+    static final int SECRET_READ = 0;
+    static final int SECRET_WRITE = 1;
+    static final int SECRET_DELETE = 2;
 
     // What a SURFACE message reports, as overlay.go has them: the window's size and place in points, then the environment, or its end, an OVERLAY_END_*.
     static final int SURFACE_STATE = 1;

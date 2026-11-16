@@ -46,6 +46,11 @@ func (o *Options) UseTest(t testhost.Options, pin *TestPin) {
 	pin.Set(t.Environment)
 	o.Pin = pin.apply
 	o.Storage = t.Storage
+	// Nor is its keychain.
+	o.Secrets = t.Secrets
+	if o.Secrets == nil {
+		o.Secrets = &driver.MemorySecrets{}
+	}
 	o.Host.Channel = t.Host
 	dir, err := os.MkdirTemp("", "nsgo-test-")
 	if err == nil {

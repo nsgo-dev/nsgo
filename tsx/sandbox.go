@@ -111,8 +111,7 @@ type Sandbox struct {
 	// Host is the channel its host module reaches, for the Go app to
 	// answer its calls and send it events; nil gives it none.
 	Host *core.Host
-	// Storage names its partition of the app's storage, which no one
-	// else's code sees; "" leaves it the app's storage.
+	// Storage names its partition of the app's storage and of its secrets (core.Scope.ProvideSecrets), which no one else's code sees; "" leaves it the app's.
 	Storage string
 	// WebUnisolated runs it on the web with the page's authority. The page's engine runs it in a realm of the page's origin, which reaches the page's own APIs (XMLHttpRequest, WebSocket, navigator, localStorage, the page's window) past Go, so there Capabilities and Grant hold only the requests the runtime and core make, and Storage's partition and a pkg.Trust kept in the page's storage are open to its code. Without it, a sandbox with Capabilities or Grant refuses to start on the web with ErrUnisolated. Other targets isolate it and ignore this.
 	WebUnisolated bool
@@ -164,6 +163,7 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 	cx.Confine()
 	if s.Storage != "" {
 		cx.ProvideStorage(s.Storage, limits.Storage)
+		cx.ProvideSecrets(s.Storage)
 	}
 	r := newRuntime(cx)
 	r.limits = limits

@@ -1,6 +1,6 @@
 ---
 title: Platform services
-description: Alerts, the clipboard, files, photos, sharing, storage, speech, networking, signing in and the app's lifecycle.
+description: Alerts, the clipboard, files, photos, sharing, storage, secrets, speech, networking, signing in and the app's lifecycle.
 group: Platform features
 order: 44
 ---
@@ -70,17 +70,53 @@ cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.
 
 ## Storage
 
-`cx.Storage()` is the app's key-value storage, kept on the device and shared by every graph of the app. Reads are synchronous and read inside a computation subscribe it to changes; `SetItem` returns a `core.StorageFullError` past the quota (`core.StorageQuota`, 5 MiB by default).
+`cx.Storage()` is the app's key-value storage, kept on the device and shared by every graph of the app. Reads are synchronous and read inside a computation subscribe it to changes; `SetItem` returns a `core.StorageFullError` past the quota (`core.StorageQuota`, 5 MiB by default). It is a plain file any program of the user's can read, so keep tokens and passwords in [secrets](#secrets) instead.
 
 ```go
 store := cx.Storage()
-if token, ok := store.GetItem("token"); ok {
-	login(token)
+if tab, ok := store.GetItem("tab"); ok {
+	selected.Set(tab)
 }
-store.SetItem("token", token)
+store.SetItem("tab", "library")
 ```
 
 `store.Keys()` lists the keys, `RemoveItem` deletes one and `Clear` empties the storage. `cx.DataDir()` and `cx.CacheDir()` give the app's folders for files the key-value storage is too small for; `cx.LogsDir()` gives the platform's directory for log files, and a `Scope.ProvideStorage` gives a subtree a partition of its own.
+
+## Secrets
+
+`cx.Secrets()` is the app's secure store, for refresh tokens, API keys and passwords: `Get`, `Set` and `Delete` a string by account, which the platform protects. A missing account reads as `("", false, nil)`, and where the platform has no secure store, as on the web, every call returns `core.ErrSecretsUnavailable`; NSGo never falls back to plain storage. The system may make a call wait, as a keychain asking the user does, so call them off the engine's goroutine and hand the result back with `cx.Post`.
+
+```go
+secrets := cx.Secrets()
+go func() {
+	token, ok, err := secrets.Get("refresh-token")
+	cx.Post(func() {
+		if err == nil && ok {
+			login(token)
+		}
+	})
+}()
+```
+
+| Platform | Where a secret is kept |
+| --- | --- |
+| macOS | A generic password of the login keychain: `kSecAttrService` is the service, `kSecAttrAccount` the account |
+| iOS, tvOS, watchOS | A generic password of the keychain, the same way |
+| Windows | A generic credential of the Credential Manager whose target is `service/account`, at most 2560 bytes |
+| Linux | An item of the Secret Service (GNOME Keyring, KWallet) with `service` and `account` attributes; unavailable where the session runs none |
+| Android | Encrypted with an AES key of the Android Keystore, in the app's private files, outside backups |
+| Web, mini programs | Unavailable |
+
+The service is the app's ID (`core.App().ID`) by default. An app that moves from another framework keeps its users signed in by naming the items that framework wrote: `Service`, and on Apple platforms `AccessGroup` and `Accessible`. On iOS, `core.SecretAfterFirstUnlock` lets background work read an item while the phone is locked, and a `ThisDeviceOnly` accessibility keeps it out of backups. On macOS an `AccessGroup` moves the items to the data protection keychain, which needs a build signed by a team whose `keychain-access-groups` entitlement lists the group, as `macos.entitlements` gives a Mac App Store build.
+
+```go
+s := cx.Secrets()
+s.Service = "app:no-auth" // the service an earlier build used
+s.Accessible = core.SecretAfterFirstUnlockThisDeviceOnly
+err := s.Set("refresh-token", token)
+```
+
+`nsgotest` keeps an app's secrets in memory, in `App.Secrets`, and `nsgotest.Secrets` starts a test with some, so a test never touches the machine's keychain. A TSX package reaches the store with the `secrets` capability, under a service of its own.
 
 ## Networking
 

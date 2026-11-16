@@ -825,6 +825,7 @@ func (w *window) startEngine(app engine.App, opts Options, size driver.Size) {
 		Appearance:  opts.Appearance,
 		Host:        opts.Host,
 		Tray:        !w.embedded,
+		Secrets:     credentials{},
 	}
 	if opts.Hidden {
 		eopts.Windows = &engine.WindowOptions{Title: opts.Title, Width: opts.Width, Height: opts.Height,

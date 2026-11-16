@@ -85,6 +85,10 @@ nsgo.Picker.takePhoto
 nsgo.ScreenEffect
 nsgo.ScreenTransition
 nsgo.Scroll
+nsgo.Secrets
+nsgo.Secrets.delete
+nsgo.Secrets.get
+nsgo.Secrets.set
 nsgo.Shader
 nsgo.ShaderEffect
 nsgo.ShaderTransition

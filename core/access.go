@@ -65,6 +65,8 @@ const (
 	AccessBiometrics = "biometrics"
 	// AccessSignInWithApple is Sign in with Apple and its credentials' states.
 	AccessSignInWithApple = "signInWithApple"
+	// AccessSecrets is the app's secure store (Scope.Secrets), with Resource the service of a refused item.
+	AccessSecrets = "secrets"
 	// AccessPermissions is checking, asking for and opening the settings of the system's permissions, by the permission's key (AccessRequest.Resource), and guiding the user to give them.
 	AccessPermissions = "permissions"
 	// AccessOverlay is windows over other apps on Android (OpenOverlay), which TSX packages cannot declare.
@@ -150,6 +152,7 @@ const (
 	serviceNotifications   service = "notifications"
 	serviceBiometrics      service = "biometrics"
 	serviceSignInWithApple service = "signInWithApple"
+	serviceSecrets         service = "secrets"
 	servicePermissions     service = "permissions"
 	serviceHost            service = "host"
 	serviceImage           service = "image"
@@ -178,6 +181,7 @@ var services = map[service]serviceRule{
 	serviceNotifications:   {permission: AccessNotifications},
 	serviceBiometrics:      {permission: AccessBiometrics},
 	serviceSignInWithApple: {permission: AccessSignInWithApple},
+	serviceSecrets:         {permission: AccessSecrets},
 	servicePermissions:     {permission: AccessPermissions},
 	serviceHost:            {permission: AccessHost},
 	serviceImage:           {permission: AccessNetwork, source: true},
