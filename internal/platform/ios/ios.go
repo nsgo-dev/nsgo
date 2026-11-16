@@ -542,6 +542,7 @@ func (s *surface) startEngine(test *testOpen) {
 	s.engine = engine.Start(s, s.app, opts)
 	e := s.engine
 	apple.SetNotificationPress(func(id string) { e.Dispatch(driver.Event{Kind: driver.EventNotificationPress, Text: id}) })
+	apple.SetPurchaseUpdates(e.Dispatch)
 	s.observe()
 }
 
@@ -607,6 +608,7 @@ func (s *surface) environment() driver.Environment {
 		CanSendInput:     false,
 		HasWebView:       idiom != driver.IdiomTV,
 		SignInWithApple:  apple.AppleSignInAvailable(),
+		Purchases:        apple.PurchasesAvailable(),
 		VerticalBarEdge:  verticalBarEdge(traits),
 		Lifecycle:        appLifecycle(),
 		AppClip:          appClip(),
@@ -938,6 +940,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemSignInWithApple, driver.ItemAppleCredentialState:
 			apple.HandleAppleSignIn(it, s.native.Send(sel("window")), s.engine.Dispatch)
+			continue
+		case driver.ItemPurchase:
+			apple.HandlePurchase(it, s.engine.Dispatch)
 			continue
 		case driver.ItemCheckForUpdates:
 			s.checkForUpdates(it.Count)

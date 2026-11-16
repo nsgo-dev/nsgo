@@ -936,6 +936,41 @@ func TestSystemTextToSpeech(t *testing.T) {
 	}
 }
 
+func TestSystemPurchases(t *testing.T) {
+	headless(t)
+	app := startDesktop(t)
+	open(app, "System")
+	app.Press("id:purchase-buy")
+	if got := app.Find("id:purchase-result").Text; got != "The store sells none of the gallery's products" {
+		t.Fatalf("result %q", got)
+	}
+	app.Press("id:purchase-products")
+	app.Find("text:Unavailable")
+	env := desktopEnv
+	env.Purchases = true
+	app.SetEnvironment(env)
+	app.Products = []core.Product{{ID: "dev.oneo.nsgo.gallery.coins", Type: core.ProductConsumable, Title: "Coins", DisplayPrice: "$0.99"}}
+	app.Press("id:purchase-products")
+	app.Find("text:Coins $0.99")
+	app.Press("id:purchase-buy")
+	if got := app.Find("id:purchase-result").Text; got != "Bought dev.oneo.nsgo.gallery.coins" || len(app.Unfinished) != 0 || len(app.Finished) != 1 {
+		t.Fatalf("result %q, unfinished %v, finished %v", got, app.Unfinished, app.Finished)
+	}
+	app.PurchaseAnswer = func(core.PurchaseRequest) (core.Transaction, error) { return core.Transaction{}, core.PurchasePending }
+	app.Press("id:purchase-buy")
+	if got := app.Find("id:purchase-result").Text; got != "Waiting for approval" {
+		t.Fatalf("result %q", got)
+	}
+	app.UpdatePurchase(core.Transaction{ProductID: "dev.oneo.nsgo.gallery.coins"})
+	if got := app.Find("id:purchase-result").Text; got != "Updated dev.oneo.nsgo.gallery.coins" || len(app.Unfinished) != 0 {
+		t.Fatalf("result %q, unfinished %v", got, app.Unfinished)
+	}
+	app.Press("id:purchase-restore")
+	if got := app.Find("id:purchase-result").Text; got != "0 products owned" {
+		t.Fatalf("result %q", got)
+	}
+}
+
 func TestSystem(t *testing.T) {
 	headless(t)
 	app := startDesktop(t)

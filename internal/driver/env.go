@@ -58,6 +58,8 @@ type Environment struct {
 	HasWebView bool
 	// SignInWithApple says ItemSignInWithApple and ItemAppleCredentialState reach Sign in with Apple here.
 	SignInWithApple bool
+	// Purchases says ItemPurchase reaches the platform's store here.
+	Purchases bool
 	// ScheduledNotifications says ItemShowNotification schedules a notification for a later At, which the system shows with the app's process ended.
 	ScheduledNotifications bool
 	// VerticalBarEdge is the edge the system chose for a vertical bar where it may place one, as iOS 27.1 does; Unspecified elsewhere. It is not geometry: Tree.Resize reports that.

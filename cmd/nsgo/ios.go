@@ -157,6 +157,9 @@ func buildIOSApp(ctx context.Context, p *project, sys *appleOS, dir string, simu
 	if err := addIOSFrameworks(ctx, p, sys, app, env, simulator); err != nil {
 		return "", err
 	}
+	if err := addIOSStoreKit(ctx, p, sys, app, simulator); err != nil {
+		return "", err
+	}
 	if widgets {
 		if err := addIOSWidgets(ctx, p, app, simulator); err != nil {
 			return "", err

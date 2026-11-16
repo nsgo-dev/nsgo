@@ -358,6 +358,8 @@ const (
 	ItemSpeak
 	// ItemSensor starts, stops or queries sensor session Count.
 	ItemSensor
+	// ItemPurchase asks the platform's store what Purchase says; the platform answers with EventPurchase carrying Count and Data a *PurchaseAnswer. The core sends none where the environment says no Purchases.
+	ItemPurchase
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -547,6 +549,8 @@ type MountItem struct {
 	AppleSignIn *AppleSignInRequest
 	// Speak is an ItemSpeak's request.
 	Speak *SpeakRequest
+	// Purchase is an ItemPurchase's request.
+	Purchase *PurchaseRequest
 	// Notification is what ItemShowNotification shows.
 	Notification *Notification
 	// Permission is an ItemPermission's request.

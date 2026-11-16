@@ -55,6 +55,7 @@ build:
   jobs: 0               # 同时构建的目标数；0 为 CPU 数的一半，1 为逐个构建
   targets: [macos_arm64, macos_x64, windows_arm64, windows_x64, linux_arm64, linux_x64, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android_arm64, web]
 # apple: { sign_in_with_apple: true }  # 「通过 Apple 登录」的授权，用于 iOS、tvOS 和 Mac App Store 构建
+# apple: { purchases: true }  # App 内购买所经由的 StoreKit 库，放进 macOS、iOS 和 tvOS 包
 # android: { permissions: [REQUEST_INSTALL_PACKAGES] }  # 运行时所需之外的清单权限
 # android: { recording: true }  # microphone.RecordWAV 录音所用的麦克风服务，连同 RECORD_AUDIO、前台服务权限和 POST_NOTIFICATIONS；从 Android 13 起 RecordWAV 会一并申请后者以显示录音通知，用户拒绝时照常录音
 # windows: { command_line: true }  # 添加 <name>.com 控制台伴侣，把参数和标准流转给 <name>.exe；store 构建不含

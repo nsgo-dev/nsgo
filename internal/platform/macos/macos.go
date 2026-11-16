@@ -983,6 +983,7 @@ func (s *surface) environment() driver.Environment {
 		CanSendInput:     true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
+		Purchases:        apple.PurchasesAvailable(),
 		RTL:              rtl,
 		PixelRatio:       s.backingScale(),
 		Locale:           locale,
@@ -1528,6 +1529,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemSignInWithApple, driver.ItemAppleCredentialState:
 			apple.HandleAppleSignIn(it, s.window, s.engine.Dispatch)
+			continue
+		case driver.ItemPurchase:
+			apple.HandlePurchase(it, s.engine.Dispatch)
 			continue
 		case driver.ItemKeepAwake:
 			if it.Awake != nil && !s.closed {

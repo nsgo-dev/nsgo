@@ -75,7 +75,7 @@ func network(req *http.Request) (*http.Response, error) {
 
 // tries is a plugin that runs each named attempt and shows what each
 // gave, in order, as "name: result".
-const tries = `import { mount, signal, Text, AuthSession, Clipboard, openUrl, Storage, Secrets, host, SignInWithApple } from "nsgo";
+const tries = `import { mount, signal, Text, AuthSession, Clipboard, openUrl, Storage, Secrets, host, SignInWithApple, Purchases } from "nsgo";
 const log = signal([]);
 const say = (name, v) => log.set([...log(), name + ": " + v]);
 const how = (e) => e.code ? e.code + " " + (e.permission ?? "") : e.name + " " + e.message;
@@ -118,6 +118,7 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 	openUrl: () => openUrl("https://example.com"),
 	auth: () => AuthSession.start((redirect) => "https://provider.example/?redirect_uri=" + redirect).result,
 	signInWithApple: () => SignInWithApple.signIn(),
+	purchases: () => Purchases.products(["coins"]),
 	granted: () => host.call("greet", "Ada"),
 	refused: () => host.call("secret"),
 	timers: () => { for (let i = 0; i < 5; i++) setTimeout(() => {}, 100000); },
@@ -136,6 +137,7 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 		"openUrl":         "ERR_ACCESS_DENIED openUrl",
 		"auth":            "ERR_ACCESS_DENIED authSession",
 		"signInWithApple": "ERR_ACCESS_DENIED signInWithApple",
+		"purchases":       "ERR_ACCESS_DENIED purchases",
 		"granted":         "hi Ada",
 		"refused":         "ERR_ACCESS_DENIED host",
 		"timers":          "ERR_NSH_QUOTA_EXCEEDED ",

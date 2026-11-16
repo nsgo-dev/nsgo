@@ -46,6 +46,10 @@ func For(cx *core.Scope) Messages {
 var Parameters = map[string][]string{
 	"SettingsAppInfoValue":         {"version", "build", "development"},
 	"MenusViewState":               {"sidebar", "statusBar", "zoom"},
+	"SystemPurchased":              {"product"},
+	"SystemPurchaseUpdated":        {"product"},
+	"SystemEntitled":               {"count"},
+	"SystemPurchaseFailed":         {"reason"},
 	"SystemSecretFailed":           {"reason"},
 	"SystemFolderItems":            {"count"},
 	"SystemCounted":                {"n"},
@@ -242,6 +246,10 @@ type Translation struct {
 	Texts                        map[string]string
 	SettingsAppInfoValue         func(version string, build string, development string) string
 	MenusViewState               func(sidebar string, statusBar string, zoom string) string
+	SystemPurchased              func(product string) string
+	SystemPurchaseUpdated        func(product string) string
+	SystemEntitled               func(count int) string
+	SystemPurchaseFailed         func(reason string) string
 	SystemSecretFailed           func(reason string) string
 	SystemFolderItems            func(count int) string
 	SystemCounted                func(n int) string
@@ -725,6 +733,16 @@ const (
 	textSystemSignInCancelled
 	textSystemSignInFailed
 	textSystemSignInUnavailable
+	textSystemPurchases
+	textSystemPurchasesDetail
+	textSystemProducts
+	textSystemNoProducts
+	textSystemLoadProducts
+	textSystemBuy
+	textSystemRestore
+	textSystemPurchaseCancelled
+	textSystemPurchasePending
+	textSystemPurchasesUnavailable
 	textSystemSecrets
 	textSystemSecretsDetail
 	textSystemSecretKeep
@@ -3037,6 +3055,16 @@ var keyOfText = [numTexts]string{
 	"systemSignInCancelled",
 	"systemSignInFailed",
 	"systemSignInUnavailable",
+	"systemPurchases",
+	"systemPurchasesDetail",
+	"systemProducts",
+	"systemNoProducts",
+	"systemLoadProducts",
+	"systemBuy",
+	"systemRestore",
+	"systemPurchaseCancelled",
+	"systemPurchasePending",
+	"systemPurchasesUnavailable",
 	"systemSecrets",
 	"systemSecretsDetail",
 	"systemSecretKeep",
@@ -5347,6 +5375,16 @@ var textsEn = i18n.NewTexts(""+
 	"Cancelled"+
 	"Failed"+
 	"Unavailable"+
+	"In-app purchases"+
+	"The store's products at its own prices, a purchase and the transactions that update outside it"+
+	"Products"+
+	"The store sells none of the gallery's products"+
+	"Load"+
+	"Buy"+
+	"Restore"+
+	"Cancelled"+
+	"Waiting for approval"+
+	"Unavailable"+
 	"Secrets"+
 	"A value the platform's secure store keeps for the app"+
 	"Keep"+
@@ -7653,6 +7691,16 @@ var textsEn = i18n.NewTexts(""+
 		11,
 		9,
 		6,
+		11,
+		16,
+		94,
+		8,
+		46,
+		4,
+		3,
+		7,
+		9,
+		20,
 		11,
 		7,
 		53,
@@ -9964,6 +10012,16 @@ var textsZhHans = i18n.NewTexts(""+
 	"已取消"+
 	"失败"+
 	"不可用"+
+	"App 内购买"+
+	"商店给出的商品和价格、一次购买，以及在购买之外更新的交易"+
+	"商品"+
+	"商店里没有图库的商品"+
+	"载入"+
+	"购买"+
+	"恢复购买"+
+	"已取消"+
+	"等待批准"+
+	"不可用"+
 	"机密"+
 	"由平台安全存储为应用保管的值"+
 	"保存"+
@@ -12271,6 +12329,16 @@ var textsZhHans = i18n.NewTexts(""+
 		9,
 		6,
 		9,
+		13,
+		84,
+		6,
+		30,
+		6,
+		6,
+		12,
+		9,
+		12,
+		9,
 		6,
 		42,
 		6,
@@ -14347,6 +14415,18 @@ func Supply(lang string, t Translation) {
 	}
 	if t.MenusViewState != nil {
 		s.MenusViewState = t.MenusViewState
+	}
+	if t.SystemPurchased != nil {
+		s.SystemPurchased = t.SystemPurchased
+	}
+	if t.SystemPurchaseUpdated != nil {
+		s.SystemPurchaseUpdated = t.SystemPurchaseUpdated
+	}
+	if t.SystemEntitled != nil {
+		s.SystemEntitled = t.SystemEntitled
+	}
+	if t.SystemPurchaseFailed != nil {
+		s.SystemPurchaseFailed = t.SystemPurchaseFailed
 	}
 	if t.SystemSecretFailed != nil {
 		s.SystemSecretFailed = t.SystemSecretFailed
@@ -17073,6 +17153,186 @@ func SystemSignInUnavailable(cx *core.Scope) string { return For(cx).SystemSignI
 
 // SystemSignInUnavailable is the package's SystemSignInUnavailable in the language of msgs.
 func (msgs Messages) SystemSignInUnavailable() string { return msgs.text(textSystemSignInUnavailable) }
+
+// SystemPurchases says "In-app purchases"
+// in the language the app shows under cx.
+func SystemPurchases(cx *core.Scope) string { return For(cx).SystemPurchases() }
+
+// SystemPurchases is the package's SystemPurchases in the language of msgs.
+func (msgs Messages) SystemPurchases() string { return msgs.text(textSystemPurchases) }
+
+// SystemPurchasesDetail says "The store's products at its own prices, a purchase and the transactions that update outside it"
+// in the language the app shows under cx.
+func SystemPurchasesDetail(cx *core.Scope) string { return For(cx).SystemPurchasesDetail() }
+
+// SystemPurchasesDetail is the package's SystemPurchasesDetail in the language of msgs.
+func (msgs Messages) SystemPurchasesDetail() string { return msgs.text(textSystemPurchasesDetail) }
+
+// SystemProducts says "Products"
+// in the language the app shows under cx.
+func SystemProducts(cx *core.Scope) string { return For(cx).SystemProducts() }
+
+// SystemProducts is the package's SystemProducts in the language of msgs.
+func (msgs Messages) SystemProducts() string { return msgs.text(textSystemProducts) }
+
+// SystemNoProducts says "The store sells none of the gallery's products"
+// in the language the app shows under cx.
+func SystemNoProducts(cx *core.Scope) string { return For(cx).SystemNoProducts() }
+
+// SystemNoProducts is the package's SystemNoProducts in the language of msgs.
+func (msgs Messages) SystemNoProducts() string { return msgs.text(textSystemNoProducts) }
+
+// SystemLoadProducts says "Load"
+// in the language the app shows under cx.
+func SystemLoadProducts(cx *core.Scope) string { return For(cx).SystemLoadProducts() }
+
+// SystemLoadProducts is the package's SystemLoadProducts in the language of msgs.
+func (msgs Messages) SystemLoadProducts() string { return msgs.text(textSystemLoadProducts) }
+
+// SystemBuy says "Buy"
+// in the language the app shows under cx.
+func SystemBuy(cx *core.Scope) string { return For(cx).SystemBuy() }
+
+// SystemBuy is the package's SystemBuy in the language of msgs.
+func (msgs Messages) SystemBuy() string { return msgs.text(textSystemBuy) }
+
+// SystemRestore says "Restore"
+// in the language the app shows under cx.
+func SystemRestore(cx *core.Scope) string { return For(cx).SystemRestore() }
+
+// SystemRestore is the package's SystemRestore in the language of msgs.
+func (msgs Messages) SystemRestore() string { return msgs.text(textSystemRestore) }
+
+// SystemPurchased says "Bought {product}"
+// in the language the app shows under cx.
+func SystemPurchased(cx *core.Scope, product string) string { return For(cx).SystemPurchased(product) }
+
+// SystemPurchased is the package's SystemPurchased in the language of msgs.
+func (msgs Messages) SystemPurchased(product string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemPurchased(product))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemPurchased; f != nil {
+			return f(product)
+		}
+		switch lang {
+		case "", "en":
+			return "Bought " + msgs.arg(product)
+		case "zh-Hans":
+			return "已购买 " + product
+		}
+	}
+}
+
+// SystemPurchaseUpdated says "Updated {product}"
+// in the language the app shows under cx.
+func SystemPurchaseUpdated(cx *core.Scope, product string) string {
+	return For(cx).SystemPurchaseUpdated(product)
+}
+
+// SystemPurchaseUpdated is the package's SystemPurchaseUpdated in the language of msgs.
+func (msgs Messages) SystemPurchaseUpdated(product string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemPurchaseUpdated(product))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemPurchaseUpdated; f != nil {
+			return f(product)
+		}
+		switch lang {
+		case "", "en":
+			return "Updated " + msgs.arg(product)
+		case "zh-Hans":
+			return "已更新 " + product
+		}
+	}
+}
+
+// SystemEntitled says "{count, plural, one {# product owned} other {# products owned}}"
+// in the language the app shows under cx.
+func SystemEntitled(cx *core.Scope, count int) string { return For(cx).SystemEntitled(count) }
+
+// SystemEntitled is the package's SystemEntitled in the language of msgs.
+func (msgs Messages) SystemEntitled(count int) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemEntitled(count))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemEntitled; f != nil {
+			return f(count)
+		}
+		switch lang {
+		case "", "en":
+			var b strings.Builder
+			switch i18n.Cardinal("en", float64(count)) {
+			case i18n.One:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(count))))
+				b.WriteString(" product owned")
+			default:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(count))))
+				b.WriteString(" products owned")
+			}
+			return b.String()
+		case "zh-Hans":
+			var b strings.Builder
+			switch i18n.Cardinal("zh-Hans", float64(count)) {
+			default:
+				b.WriteString("已拥有 ")
+				b.WriteString(i18n.FormatNumber("zh-Hans", float64(count)))
+				b.WriteString(" 件商品")
+			}
+			return b.String()
+		}
+	}
+}
+
+// SystemPurchaseCancelled says "Cancelled"
+// in the language the app shows under cx.
+func SystemPurchaseCancelled(cx *core.Scope) string { return For(cx).SystemPurchaseCancelled() }
+
+// SystemPurchaseCancelled is the package's SystemPurchaseCancelled in the language of msgs.
+func (msgs Messages) SystemPurchaseCancelled() string { return msgs.text(textSystemPurchaseCancelled) }
+
+// SystemPurchasePending says "Waiting for approval"
+// in the language the app shows under cx.
+func SystemPurchasePending(cx *core.Scope) string { return For(cx).SystemPurchasePending() }
+
+// SystemPurchasePending is the package's SystemPurchasePending in the language of msgs.
+func (msgs Messages) SystemPurchasePending() string { return msgs.text(textSystemPurchasePending) }
+
+// SystemPurchaseFailed says "Failed: {reason}"
+// in the language the app shows under cx.
+func SystemPurchaseFailed(cx *core.Scope, reason string) string {
+	return For(cx).SystemPurchaseFailed(reason)
+}
+
+// SystemPurchaseFailed is the package's SystemPurchaseFailed in the language of msgs.
+func (msgs Messages) SystemPurchaseFailed(reason string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.SystemPurchaseFailed(reason))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].SystemPurchaseFailed; f != nil {
+			return f(reason)
+		}
+		switch lang {
+		case "", "en":
+			return "Failed: " + msgs.arg(reason)
+		case "zh-Hans":
+			return "失败：" + reason
+		}
+	}
+}
+
+// SystemPurchasesUnavailable says "Unavailable"
+// in the language the app shows under cx.
+func SystemPurchasesUnavailable(cx *core.Scope) string { return For(cx).SystemPurchasesUnavailable() }
+
+// SystemPurchasesUnavailable is the package's SystemPurchasesUnavailable in the language of msgs.
+func (msgs Messages) SystemPurchasesUnavailable() string {
+	return msgs.text(textSystemPurchasesUnavailable)
+}
 
 // SystemSecrets says "Secrets"
 // in the language the app shows under cx.

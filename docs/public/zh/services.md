@@ -1,6 +1,6 @@
 ---
 title: 平台服务
-description: 警告框、剪贴板、文件、照片、分享、存储、机密、语音、朗读、网络、登录和应用生命周期。
+description: 警告框、剪贴板、文件、照片、分享、存储、机密、语音、朗读、网络、登录、App 内购买和应用生命周期。
 group: 平台功能
 order: 44
 ---
@@ -270,6 +270,41 @@ apple:
 ```
 
 `nsgo dev` 的设备构建由 Xcode 注册这项能力；`sign.profile` 或 `sign.macos_profile` 中的描述文件必须来自开启了「通过 Apple 登录」的 App ID。macOS 只在有描述文件时授予它，所以磁盘映像和 Mac 上的 `nsgo dev` 都无法登录，模拟器也不行，它的构建不声明任何开发者授权。
+
+## App 内购买
+
+`cx.Products`、`cx.Purchase` 及其旁边的调用在 macOS、iOS 和 tvOS 上通过 App Store 销售，这些平台上 `cx.Env().CanPurchase()` 为 true，前提是构建的 `nsgo.yaml` 要求了 StoreKit：
+
+```yaml
+apple:
+  purchases: true  # StoreKit 的库，放进 macOS、iOS 和 tvOS 包；不需要任何授权
+```
+
+显示商店给出的价格 `DisplayPrice`，不要显示应用自己定的价格：商店按各地区自行定价。一次购买只回答一次，给出交易或错误：用户关闭面板时是 `core.PurchaseCancelled`，等待批准（如「询问购买」）时是 `core.PurchasePending`，其余是附带商店原话的 `core.PurchaseFailed`，其他平台上是 `PurchasesUnavailable`。把交易的 `Signed`（商店签名的 JWS）交给应用的服务器验证，交付所购内容，再完成这笔交易；未完成的交易每次启动时商店都会再次交给应用。
+
+```go
+cx.OnPurchaseUpdate(func(t core.Transaction) { // 续订、获批的购买、其他设备上的购买、退款，以及启动时未完成的交易
+	verifyAndDeliver(t.Signed, func() { cx.FinishTransaction(t.ID, nil) })
+})
+cx.Products([]string{"com.example.pro.monthly"}, func(products []core.Product, err error) {
+	if err == nil && len(products) > 0 {
+		price.Set(products[0].DisplayPrice)
+	}
+})
+cx.Purchase("com.example.pro.monthly", core.PurchaseOptions{AccountToken: userUUID}, func(t core.Transaction, err error) {
+	switch {
+	case errors.Is(err, core.PurchaseCancelled):
+	case errors.Is(err, core.PurchasePending):
+		showWaiting() // 它的交易稍后经 OnPurchaseUpdate 到达
+	case err != nil:
+		showError(err)
+	default:
+		verifyAndDeliver(t.Signed, func() { cx.FinishTransaction(t.ID, nil) })
+	}
+})
+```
+
+在应用启动时注册 `OnPurchaseUpdate`：在任何处理函数之前到达的更新会留给第一个注册的。`cx.CurrentEntitlements` 回答用户当前拥有的内容，供启动时解锁；「恢复购买」按钮调用 `cx.SyncPurchases`，它可能要求用户登录。`AccountToken` 是应用自己的 UUID，交易和 App Store 发给服务器的通知都会带上它。macOS 只有 Mac App Store 构建能销售，App Clip 不销售任何东西；Android、watchOS、Windows、Linux、Web 和小程序目前回答 `PurchasesUnavailable`。用 `nsgotest` 测试购买，它的 `Products`、`PurchaseAnswer`、`UpdatePurchase` 和 `UnfinishedTransactions` 代替商店。在 TSX 中，`Purchases` 模块需要 `purchases` 能力：`purchase` 解析为 `{ status: "purchased", transaction }`、`"pending"` 或 `"cancelled"`，`on("update", listener)` 接收更新。
 
 ## 朗读文本
 

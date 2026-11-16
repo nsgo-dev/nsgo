@@ -28,6 +28,7 @@ type Env struct {
 	canSendInput         *Signal[bool]
 	hasWebView           *Signal[bool]
 	appleSignIn          *Signal[bool]
+	purchases            *Signal[bool]
 	scheduled            *Signal[bool]
 	fontScale, ratio     *Signal[float32]
 	// locale and systemRTL are the platform's or the host's; forced is
@@ -88,6 +89,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		canSendInput:     NewSignal(cx, false),
 		hasWebView:       NewSignal(cx, false),
 		appleSignIn:      NewSignal(cx, false),
+		purchases:        NewSignal(cx, false),
 		scheduled:        NewSignal(cx, false),
 		fontScale:        NewSignal(cx, float32(1)),
 		ratio:            NewSignal(cx, float32(1)),
@@ -191,6 +193,7 @@ func (e *Env) set(v Environment) {
 	e.canSendInput.Set(v.CanSendInput)
 	e.hasWebView.Set(v.HasWebView)
 	e.appleSignIn.Set(v.SignInWithApple)
+	e.purchases.Set(v.Purchases)
 	e.scheduled.Set(v.ScheduledNotifications)
 	e.fontScale.Set(v.FontScale)
 	e.ratio.Set(v.PixelRatio)
@@ -320,6 +323,9 @@ func (e *Env) HasWebView() bool { return e.hasWebView.Get() }
 
 // CanSignInWithApple reports whether Scope.SignInWithApple and Scope.AppleCredentialState reach Sign in with Apple here: macOS, iOS and tvOS.
 func (e *Env) CanSignInWithApple() bool { return e.appleSignIn.Get() }
+
+// CanPurchase reports whether Scope.Products, Purchase and the other in-app purchase services reach a store here: the App Store on macOS, iOS and tvOS, in a build nsgo.yaml's apple.purchases gives StoreKit.
+func (e *Env) CanPurchase() bool { return e.purchases.Get() }
 
 // CanScheduleNotifications reports whether a Notification with a later At or a Repeat is scheduled here, for the system to show with the app's process ended: on macOS and iOS in an app bundle, Android, and Windows for one without a Repeat. Elsewhere ShowNotification answers false for one without asking the platform.
 func (e *Env) CanScheduleNotifications() bool { return e.scheduled.Get() }

@@ -550,6 +550,8 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemAppleCredentialState:
 			state := cmp.Or(a.AppleCredentialStates[it.Value], core.AppleCredentialNotFound)
 			a.post(driver.Event{Kind: driver.EventSignInWithApple, Count: it.Count, Index: int(state)})
+		case driver.ItemPurchase:
+			a.purchase(it.Count, *it.Purchase)
 		case driver.ItemPermission:
 			a.permission(&it)
 		case driver.ItemPickImages:

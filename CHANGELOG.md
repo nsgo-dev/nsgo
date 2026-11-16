@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add in-app purchases on macOS, iOS and tvOS through StoreKit 2: the store's products and prices, purchases answering cancelled and pending apart from failed with the signed transaction, updates made outside the app, finishing, current entitlements and restoring, in Go, TSX and `nsgotest`, when `nsgo.yaml` sets `apple.purchases` (#353 by @houko).
 - Add `SidebarShell.Fixed`, a sidebar the user cannot resize.
 - Add `WebView.PinchZoom`, `Ref.Load` and the platform's `Domain` and `Code` on `WebError`; on Windows, Ctrl with the wheel or with + and - zooms a web view only with `PinchZoom` (#233 by @houko).
 - Stop reporting a web view load that was stopped, replaced or turned into a download to `OnError` on Apple platforms and Windows (#233 by @houko).

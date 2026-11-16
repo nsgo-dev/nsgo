@@ -62,7 +62,7 @@ capabilities:
     hosts: [api.example.com, "*.cdn.example.com"]
   open_url: true # 或 { schemes: [https] }
   host: [search, "player.*"] # 它可以调用的应用处理函数
-  # webview: { hosts: [...], input: true, media: [microphone, camera] }、clipboard、picker、speech、text_to_speech、status_bar、notifications、biometrics、sign_in_with_apple、secrets、audio、auth_session
+  # webview: { hosts: [...], input: true, media: [microphone, camera] }、clipboard、picker、speech、text_to_speech、status_bar、notifications、biometrics、sign_in_with_apple、purchases、secrets、audio、auth_session
 ```
 
 根密钥离线保存，用它为发布密钥签发证书，然后在该目录中签名应用。`go tool nsgo keygen` 打印一对密钥，不写任何文件；根密钥和每个发布密钥各运行一次。公钥写在参数和应用代码里；私钥不要放进仓库，只通过 `NSGO_ROOT_KEY` 和 `NSGO_RELEASE_KEY` 交给工具：

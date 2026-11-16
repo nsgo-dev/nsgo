@@ -309,6 +309,16 @@ type App struct {
 	AppleSignIns          []core.AppleSignInRequest
 	AppleSignIn           func(r core.AppleSignInRequest) (core.AppleCredential, error)
 	AppleCredentialStates map[string]core.AppleCredentialState
+	// Products are what the store sells where the environment says Purchases. PurchaseRequests are the in-app purchase requests the app made, oldest first. PurchaseAnswer answers each purchase with the transaction the user buys, or an error, core.PurchaseCancelled for a user who closes the sheet and core.PurchasePending for one waiting for approval; without it a product among Products is bought and any other fails. A transaction bought joins Unfinished, and Entitlements unless consumable; FinishTransaction takes it out of Unfinished into Finished, by ID, and CurrentEntitlements answers Entitlements. SyncAnswer is what SyncPurchases answers, nil by default. UpdatePurchase delivers a transaction as the store does one made outside the app, and UnfinishedTransactions those the store hands the app as it starts.
+	Products         []core.Product
+	PurchaseRequests []core.PurchaseRequest
+	PurchaseAnswer   func(r core.PurchaseRequest) (core.Transaction, error)
+	Unfinished       []core.Transaction
+	Entitlements     []core.Transaction
+	Finished         []string
+	SyncAnswer       error
+	// transactions numbers the transactions the model's store makes.
+	transactions int
 	// Permissions is each permission's status as the platform answers it, PermissionNotAsked for one it does not hold; a request while not asked makes it PermissionAnswers' for it, the user granting it when that has none. Start makes both maps. PermissionSettings are the permissions whose settings the app opened, oldest first, and Guide the permission a guide shows, "" for none: GrantPermission and CloseGuide end it.
 	Permissions        map[core.Permission]core.PermissionStatus
 	PermissionAnswers  map[core.Permission]core.PermissionStatus
@@ -574,6 +584,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 	if fn != nil {
 		view = core.AppRoot(fn)
 	}
+	a.launchPurchases()
 	a.tree.Mount(view)
 	a.done()
 	return a

@@ -701,6 +701,9 @@ func buildMacApp(ctx context.Context, p *project, dir, arch string) (string, err
 	if err := addMacWidgets(ctx, p, app, arch); err != nil {
 		return "", err
 	}
+	if err := addMacStoreKit(ctx, p, app, arch); err != nil {
+		return "", err
+	}
 	if err := addSparkle(ctx, p, app); err != nil {
 		return "", err
 	}

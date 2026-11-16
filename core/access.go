@@ -67,6 +67,8 @@ const (
 	AccessBiometrics = "biometrics"
 	// AccessSignInWithApple is Sign in with Apple and its credentials' states.
 	AccessSignInWithApple = "signInWithApple"
+	// AccessPurchases is in-app purchases: the store's products, buying them, their transactions and updates.
+	AccessPurchases = "purchases"
 	// AccessSecrets is the app's secure store (Scope.Secrets), with Resource the service of a refused item.
 	AccessSecrets = "secrets"
 	// AccessPermissions is checking, asking for and opening the settings of the system's permissions, by the permission's key (AccessRequest.Resource), and guiding the user to give them.
@@ -158,6 +160,7 @@ const (
 	serviceNotifications   service = "notifications"
 	serviceBiometrics      service = "biometrics"
 	serviceSignInWithApple service = "signInWithApple"
+	servicePurchases       service = "purchases"
 	serviceSecrets         service = "secrets"
 	servicePermissions     service = "permissions"
 	serviceHost            service = "host"
@@ -191,6 +194,7 @@ var services = map[service]serviceRule{
 	serviceNotifications:   {permission: AccessNotifications},
 	serviceBiometrics:      {permission: AccessBiometrics},
 	serviceSignInWithApple: {permission: AccessSignInWithApple},
+	servicePurchases:       {permission: AccessPurchases},
 	serviceSecrets:         {permission: AccessSecrets},
 	servicePermissions:     {permission: AccessPermissions},
 	serviceHost:            {permission: AccessHost},

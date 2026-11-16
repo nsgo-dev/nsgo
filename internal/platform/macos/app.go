@@ -52,6 +52,7 @@ func startOwn(app engine.App, opts Options) *surface {
 	s.engine = engine.Start(s, app, eopts)
 	e := s.engine
 	apple.SetNotificationPress(func(id string) { e.Dispatch(driver.Event{Kind: driver.EventNotificationPress, Text: id}) })
+	apple.SetPurchaseUpdates(e.Dispatch)
 	observeApp()
 	return s
 }

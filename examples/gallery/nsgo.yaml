@@ -24,6 +24,7 @@ build:
   targets: [all]
 
 apple:
+  purchases: true
   info:
     NSMicrophoneUsageDescription: The System page dictates what you say.
     NSSpeechRecognitionUsageDescription: The System page turns what you say into text.

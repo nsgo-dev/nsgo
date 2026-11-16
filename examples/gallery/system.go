@@ -965,9 +965,9 @@ func filesCard(cx *core.Scope) core.Node {
 	}}
 }
 
-// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, secrets, Sign in with Apple, sign-in sessions, the system's permissions and files.
+// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, secrets, Sign in with Apple, in-app purchases, sign-in sessions, the system's permissions and files.
 func systemDemo(cx *core.Scope) core.Node {
-	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, speakCard, sensorsCard, notificationsCard, biometricsCard, secretsCard, signInWithAppleCard, authSessionCard, permissionsCard, filesCard)
+	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, speakCard, sensorsCard, notificationsCard, biometricsCard, secretsCard, signInWithAppleCard, purchasesCard, authSessionCard, permissionsCard, filesCard)
 }
 
 // yesNo says whether in tr's language.
@@ -1131,6 +1131,90 @@ func signInWithAppleCard(cx *core.Scope) core.Node {
 		core.Text{ContentFunc: result.Get, TestID: "apple-sign-in-result", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 	}}
 }
+
+// purchasesCard looks up the gallery's products in the store, buys the first one, finishing it at once as the gallery has no server to verify it, restores what the user owns and shows the transactions the store updates outside a purchase.
+func purchasesCard(cx *core.Scope) core.Node {
+	tr := locales.For(cx)
+	colors := ui.ColorsOf(cx)
+	// loaded are the products the last lookup found, which Buy buys the first of.
+	var loaded []core.Product
+	listed := core.NewSignal(cx, tr.SystemNoneYet())
+	result := core.NewSignal(cx, tr.SystemNoneYet())
+	failure := func(err error) string {
+		switch {
+		case errors.Is(err, core.PurchaseCancelled):
+			return tr.SystemPurchaseCancelled()
+		case errors.Is(err, core.PurchasePending):
+			return tr.SystemPurchasePending()
+		case errors.Is(err, core.PurchasesUnavailable):
+			return tr.SystemPurchasesUnavailable()
+		}
+		return tr.SystemPurchaseFailed(err.Error())
+	}
+	cx.OnPurchaseUpdate(func(t core.Transaction) {
+		result.Set(tr.SystemPurchaseUpdated(t.ProductID))
+		cx.FinishTransaction(t.ID, nil)
+	})
+	load := func() {
+		cx.Products([]string{galleryProduct + ".coins", galleryProduct + ".pro"}, func(p []core.Product, err error) {
+			switch {
+			case err != nil:
+				listed.Set(failure(err))
+			case len(p) == 0:
+				listed.Set(tr.SystemNoProducts())
+			default:
+				names := make([]string, len(p))
+				for i, pr := range p {
+					names[i] = pr.Title + " " + pr.DisplayPrice
+				}
+				listed.Set(strings.Join(names, " · "))
+			}
+			loaded = p
+		})
+	}
+	buy := func() {
+		p := loaded
+		if len(p) == 0 {
+			result.Set(tr.SystemNoProducts())
+			return
+		}
+		cx.Purchase(p[0].ID, core.PurchaseOptions{}, func(t core.Transaction, err error) {
+			if err != nil {
+				result.Set(failure(err))
+				return
+			}
+			result.Set(tr.SystemPurchased(t.ProductID))
+			cx.FinishTransaction(t.ID, nil)
+		})
+	}
+	restore := func() {
+		cx.SyncPurchases(func(err error) {
+			if err != nil {
+				result.Set(failure(err))
+				return
+			}
+			cx.CurrentEntitlements(func(t []core.Transaction, err error) {
+				if err != nil {
+					result.Set(failure(err))
+					return
+				}
+				result.Set(tr.SystemEntitled(len(t)))
+			})
+		})
+	}
+	return Card{Title: tr.SystemPurchases(), Description: tr.SystemPurchasesDetail(), Actions: []core.Node{ui.Badge{Text: tr.SystemNsgo()}}, Children: []core.Node{
+		Caption{Label: tr.SystemProducts(), Note: listed.Get},
+		ui.Wrap{Children: []core.Node{
+			ui.Button{Text: tr.SystemLoadProducts(), Size: ui.SizeSmall, TestID: "purchase-products", OnPress: load},
+			ui.Button{Text: tr.SystemBuy(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "purchase-buy", OnPress: buy},
+			ui.Button{Text: tr.SystemRestore(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "purchase-restore", OnPress: restore},
+		}},
+		core.Text{ContentFunc: result.Get, TestID: "purchase-result", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+	}}
+}
+
+// galleryProduct prefixes the IDs of the gallery's products in the store.
+const galleryProduct = "dev.oneo.nsgo.gallery"
 
 // secretsCard keeps, reads and deletes a value in the platform's secure store, off the engine's goroutine, as the system may ask the user first.
 func secretsCard(cx *core.Scope) core.Node {

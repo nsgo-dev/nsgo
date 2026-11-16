@@ -364,6 +364,76 @@ export interface SignInWithAppleModule {
   credentialState(user: string): Promise<AppleCredentialState>;
 }
 export declare const SignInWithApple: SignInWithAppleModule;
+export type ProductType = "consumable" | "nonConsumable" | "autoRenewable" | "nonRenewable";
+export interface SubscriptionPeriod { unit: "day" | "week" | "month" | "year"; value: number }
+export interface SubscriptionOffer {
+  /** A promotional offer's identifier, `""` for the introductory offer. */
+  id: string;
+  displayPrice: string;
+  period: SubscriptionPeriod;
+  periodCount: number;
+  paymentMode: "freeTrial" | "payAsYouGo" | "payUpFront";
+}
+export interface Product {
+  id: string;
+  type: ProductType;
+  title: string;
+  description: string;
+  /** The price as the store formats it for the user's storefront: show it as it is, never a price of the app's own. */
+  displayPrice: string;
+  /** The same amount as a decimal number, `"4.99"`, in `currencyCode`. */
+  price: string;
+  currencyCode: string;
+  subscription: { groupId: string; period: SubscriptionPeriod; introductoryOffer: SubscriptionOffer | null; offers: SubscriptionOffer[] } | null;
+}
+export interface Transaction {
+  /** What `finish` takes. */
+  id: string;
+  originalId: string;
+  productId: string;
+  productType: ProductType;
+  /** Milliseconds since the Unix epoch, as `Date`'s `valueOf`. */
+  purchaseDate: number;
+  /** When a subscription's period ends and when the store refunded or revoked it; null for none. */
+  expirationDate: number | null;
+  revocationDate: number | null;
+  quantity: number;
+  accountToken: string;
+  familyShared: boolean;
+  upgraded: boolean;
+  /** `"Production"`, `"Sandbox"` or `"Xcode"`. */
+  environment: string;
+  /** The store's signed transaction, a JWS, for the app's server to verify before it delivers what was bought. */
+  signed: string;
+  /** Whether the device verified the signature; the server trusts only its own check. */
+  verified: boolean;
+}
+export interface PurchaseOptions {
+  /** A UUID tying the purchase to the app's user, which the transaction carries. */
+  accountToken?: string;
+  /** How many of a consumable; 1 by default. */
+  quantity?: number;
+  /** A promotional offer the app's server signed; `signature` is base64 and `timestamp` milliseconds since the Unix epoch. */
+  offer?: { id: string; keyId: string; nonce: string; signature: string; timestamp: number };
+}
+export type PurchaseResult = { status: "purchased"; transaction: Transaction } | { status: "pending" } | { status: "cancelled" };
+export interface PurchasesModule {
+  /** Whether this build reaches a store: macOS, iOS and tvOS packages built with `apple.purchases`. */
+  available(): Promise<boolean>;
+  /** The products of `ids` the store sells, leaving out those it does not know. */
+  products(ids: string[]): Promise<Product[]>;
+  /** Buys a product through the store's sheet. `"pending"` waits for approval, as Ask to Buy does, and its transaction comes through `on("update")`. Rejects when the store fails, with `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM` where unavailable. */
+  purchase(productId: string, options?: PurchaseOptions | null): Promise<PurchaseResult>;
+  /** Finishes a transaction once the app delivered what it bought; false when no unfinished transaction has the ID. */
+  finish(transactionId: string): Promise<boolean>;
+  /** The transactions entitling the user now. */
+  currentEntitlements(): Promise<Transaction[]>;
+  /** Brings the user's transactions up to date, from a Restore Purchases button; false when the user declines to sign in. */
+  sync(): Promise<boolean>;
+  /** A transaction made or changed outside `purchase`, those unfinished at launch included. Returns a function that stops listening. */
+  on(event: "update", listener: (transaction: Transaction) => void): () => void;
+}
+export declare const Purchases: PurchasesModule;
 
 export type HostValue = null | boolean | number | string | HostValue[] | { [key: string]: HostValue };
 export interface HostSubscription { (): void; remove(): void }

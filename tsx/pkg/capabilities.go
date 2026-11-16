@@ -21,7 +21,7 @@ type Capabilities struct {
 	WebView *WebView `json:"webview,omitempty"`
 	// OpenURL is openUrl: every URL, or those of Schemes.
 	OpenURL *OpenURL `json:"openUrl,omitempty"`
-	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, TextToSpeech speaking text with the system's voices, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Secrets the package's own part of the app's secure store, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session, Location foreground location, BackgroundLocation location that continues in the background, Motion the motion sensors.
+	// Clipboard is reading and writing the system clipboard, Picker the photo and camera pickers, Speech the microphone and speech recognizer, TextToSpeech speaking text with the system's voices, StatusBar setting the status bar, Notifications system notifications and the app's badge, Biometrics device authentication, SignInWithApple Sign in with Apple and its credentials' states, Purchases in-app purchases, Secrets the package's own part of the app's secure store, Audio the audio package's sounds and players, AuthSession signing in through the system's authentication session, Location foreground location, BackgroundLocation location that continues in the background, Motion the motion sensors.
 	Clipboard          bool `json:"clipboard,omitempty"`
 	Picker             bool `json:"picker,omitempty"`
 	Speech             bool `json:"speech,omitempty"`
@@ -30,6 +30,7 @@ type Capabilities struct {
 	Notifications      bool `json:"notifications,omitempty"`
 	Biometrics         bool `json:"biometrics,omitempty"`
 	SignInWithApple    bool `json:"signInWithApple,omitempty"`
+	Purchases          bool `json:"purchases,omitempty"`
 	Secrets            bool `json:"secrets,omitempty"`
 	Audio              bool `json:"audio,omitempty"`
 	AuthSession        bool `json:"authSession,omitempty"`
@@ -131,6 +132,8 @@ func ParseCapabilities(data []byte, strict bool) (c Capabilities, ignored []stri
 			err = json.Unmarshal(raw, &c.Biometrics)
 		case "signInWithApple":
 			err = json.Unmarshal(raw, &c.SignInWithApple)
+		case "purchases":
+			err = json.Unmarshal(raw, &c.Purchases)
 		case "secrets":
 			err = json.Unmarshal(raw, &c.Secrets)
 		case "audio":
@@ -195,6 +198,8 @@ func dropCapability(c *Capabilities, key string) {
 		c.Biometrics = false
 	case "signInWithApple":
 		c.SignInWithApple = false
+	case "purchases":
+		c.Purchases = false
 	case "secrets":
 		c.Secrets = false
 	case "audio":
@@ -342,6 +347,7 @@ const (
 	capNotifications      = "notifications"
 	capBiometrics         = "biometrics"
 	capSignInWithApple    = "signInWithApple"
+	capPurchases          = "purchases"
 	capSecrets            = "secrets"
 	capAudio              = "audio"
 	capAuthSession        = "authSession"
@@ -396,6 +402,8 @@ func (c *Capabilities) Allows(permission, resource, method string) bool {
 		return c.Biometrics
 	case capSignInWithApple:
 		return c.SignInWithApple
+	case capPurchases:
+		return c.Purchases
 	case capSecrets:
 		return c.Secrets
 	case capAudio:

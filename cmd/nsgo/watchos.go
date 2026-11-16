@@ -70,6 +70,9 @@ func buildWatchApp(ctx context.Context, p *project, dir string, simulator bool) 
 	if p.iosExtension() {
 		detailIn(ctx, "no widgets or Live Activities on watchOS: they are left out")
 	}
+	if p.Apple.Purchases {
+		detailIn(ctx, "no in-app purchases on watchOS: StoreKit's library is left out")
+	}
 	extra := icon + "\n" + names + "\n\t<key>CFBundleSupportedPlatforms</key><array><string>" + sys.platformName(simulator) + "</string></array>"
 	if err := writePlist(filepath.Join(app, "Info.plist"), p, sys.plist, extra); err != nil {
 		return "", err

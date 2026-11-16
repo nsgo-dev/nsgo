@@ -1,6 +1,6 @@
 ---
 title: Platform services
-description: Alerts, the clipboard, files, photos, sharing, storage, secrets, speech, speaking text, networking, signing in and the app's lifecycle.
+description: Alerts, the clipboard, files, photos, sharing, storage, secrets, speech, speaking text, networking, signing in, in-app purchases and the app's lifecycle.
 group: Platform features
 order: 44
 ---
@@ -300,6 +300,41 @@ apple:
 ```
 
 Xcode registers the capability for device builds from `nsgo dev`; a provisioning profile in `sign.profile` or `sign.macos_profile` must come from an App ID with Sign in with Apple turned on. macOS grants it only with a profile, so a disk image or a `nsgo dev` run on a Mac cannot sign in, nor can the simulator, whose builds claim no developer entitlement.
+
+## In-app purchases
+
+`cx.Products`, `cx.Purchase` and the calls beside them sell through the App Store on macOS, iOS and tvOS, where `cx.Env().CanPurchase()` is true, in a build whose `nsgo.yaml` asks for StoreKit:
+
+```yaml
+apple:
+  purchases: true  # StoreKit's library, in macOS, iOS and tvOS packages; no entitlement is needed
+```
+
+Show the prices the store gives, `DisplayPrice`, never prices of the app's own: the store prices each storefront itself. A purchase answers once, with the transaction or an error: `core.PurchaseCancelled` when the user closes the sheet, `core.PurchasePending` while it waits for approval, as Ask to Buy does, and otherwise `core.PurchaseFailed`, with the store's words, or `PurchasesUnavailable` elsewhere. Send the transaction's `Signed`, the store's JWS, to the app's server to verify, deliver what it bought, then finish it; the store hands an unfinished transaction to the app again at every launch.
+
+```go
+cx.OnPurchaseUpdate(func(t core.Transaction) { // renewals, approved purchases, other devices', refunds, and unfinished ones at launch
+	verifyAndDeliver(t.Signed, func() { cx.FinishTransaction(t.ID, nil) })
+})
+cx.Products([]string{"com.example.pro.monthly"}, func(products []core.Product, err error) {
+	if err == nil && len(products) > 0 {
+		price.Set(products[0].DisplayPrice)
+	}
+})
+cx.Purchase("com.example.pro.monthly", core.PurchaseOptions{AccountToken: userUUID}, func(t core.Transaction, err error) {
+	switch {
+	case errors.Is(err, core.PurchaseCancelled):
+	case errors.Is(err, core.PurchasePending):
+		showWaiting() // its transaction comes through OnPurchaseUpdate
+	case err != nil:
+		showError(err)
+	default:
+		verifyAndDeliver(t.Signed, func() { cx.FinishTransaction(t.ID, nil) })
+	}
+})
+```
+
+Register `OnPurchaseUpdate` as the app starts: updates that come before any handler wait for the first. `cx.CurrentEntitlements` answers what the user owns now, to unlock it at launch, and a Restore Purchases button calls `cx.SyncPurchases`, which may ask the user to sign in. `AccountToken` is a UUID of the app's own that the transaction and the App Store's server notifications carry. macOS sells only in a Mac App Store build, and an App Clip sells nothing; Android, watchOS, Windows, Linux, the web and mini programs answer `PurchasesUnavailable` for now. Test purchases with `nsgotest`, whose `Products`, `PurchaseAnswer`, `UpdatePurchase` and `UnfinishedTransactions` stand in for the store. In TSX, the `Purchases` module needs the `purchases` capability: `purchase` resolves with `{ status: "purchased", transaction }`, `"pending"` or `"cancelled"`, and `on("update", listener)` hears updates.
 
 ## Overlays on Android
 
