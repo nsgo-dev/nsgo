@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/xml"
+	"flag"
 	"os"
 	"path/filepath"
 	"slices"
@@ -288,7 +289,7 @@ func readJUnitFixture(t *testing.T, path string) junitSuites {
 	return suites
 }
 
-func TestDevTestArgs(t *testing.T) {
+func TestTestTagArgs(t *testing.T) {
 	dir, abs := filepath.FromSlash("/repo"), t.TempDir()
 	for _, c := range []struct {
 		tags, args, wantTags, wantFlags []string
@@ -302,9 +303,53 @@ func TestDevTestArgs(t *testing.T) {
 		{nil, []string{"-test.coverprofile=c.out", "-outputdir", "out"}, nil, []string{"-outputdir", "out"}, filepath.Join(dir, "out", "c.out")},
 		{nil, []string{"-outputdir=" + abs, "-coverprofile=c.out"}, nil, []string{"-outputdir=" + abs}, filepath.Join(abs, "c.out")},
 	} {
-		tags, flags, cover := devTestArgs(dir, c.tags, c.args)
+		tags, flags, cover := testTagArgs(dir, c.tags, c.args)
 		if !slices.Equal(tags, c.wantTags) || !slices.Equal(flags, c.wantFlags) || cover != c.wantCover {
-			t.Errorf("devTestArgs(%q, %q) = %q, %q, %q, want %q, %q, %q", c.tags, c.args, tags, flags, cover, c.wantTags, c.wantFlags, c.wantCover)
+			t.Errorf("testTagArgs(%q, %q) = %q, %q, %q, want %q, %q, %q", c.tags, c.args, tags, flags, cover, c.wantTags, c.wantFlags, c.wantCover)
+		}
+	}
+}
+
+// Headless tests build with nsgocheck, which keeps core's ownership checks, whether or not the command line or GOFLAGS name tags of their own.
+func TestRunTestsBuildWithChecks(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs go test")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod":          "module checkedtest\n\ngo 1.26\n",
+		"checked_test.go": "//go:build nsgocheck\n\npackage checked\n\nimport \"testing\"\n\nfunc TestChecked(t *testing.T) {}\n",
+		"plain_test.go":   "//go:build !nsgocheck\n\npackage checked\n\nimport \"testing\"\n\nfunc TestPlain(t *testing.T) { t.Fatal(\"built without nsgocheck\") }\n",
+		"tagged_test.go":  "//go:build fixture\n\npackage checked\n\nimport \"testing\"\n\nfunc TestTagged(t *testing.T) {}\n",
+	})
+	p, err := loadForTest(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		goflags string
+		args    []string
+		want    []string
+	}{
+		{"", nil, []string{"TestChecked"}},
+		{"", []string{"-tags", "fixture"}, []string{"TestChecked", "TestTagged"}},
+		{"-tags=fixture", nil, []string{"TestChecked", "TestTagged"}},
+		{"-tags=fixture", []string{"-tags=other"}, []string{"TestChecked"}},
+	} {
+		report := filepath.Join(t.TempDir(), "tests.xml")
+		err := runTests(t.Context(), p, testOptions{junit: report, env: []string{"GOWORK=off", "GOFLAGS=" + c.goflags}, args: append([]string{"-count=1"}, c.args...)})
+		if err != nil {
+			t.Errorf("GOFLAGS %q, args %q: runTests = %v", c.goflags, c.args, err)
+		}
+		var got []string
+		for _, suite := range readJUnitFixture(t, report).Suites {
+			for _, test := range suite.Cases {
+				got = append(got, test.Name)
+			}
+		}
+		slices.Sort(got)
+		if !slices.Equal(got, c.want) {
+			t.Errorf("GOFLAGS %q, args %q: ran %q, want %q", c.goflags, c.args, got, c.want)
 		}
 	}
 }
@@ -318,6 +363,28 @@ func TestRunTestsRejectsASecondPackage(t *testing.T) {
 		err := runTests(t.Context(), p, testOptions{target: target, args: []string{"-v", "./b"}})
 		if err == nil || !strings.Contains(err.Error(), `takes one directory, not "./b"`) {
 			t.Errorf("target %q: runTests = %v, want an error naming ./b", target, err)
+		}
+	}
+}
+
+func TestForwardedTestFlagsDoNotNameADirectory(t *testing.T) {
+	for _, tc := range []struct {
+		in   []string
+		dir  string
+		args []string
+	}{
+		{[]string{"--", "-timeout=20m"}, "", []string{"-timeout=20m"}},
+		{[]string{".", "--", "-timeout=20m"}, ".", []string{"-timeout=20m"}},
+		{[]string{"./core"}, "./core", nil},
+		{[]string{"App.tsx", "--", "-count=1"}, "App.tsx", []string{"-count=1"}},
+	} {
+		fs := flag.NewFlagSet("test", flag.ContinueOnError)
+		if err := fs.Parse(tc.in); err != nil {
+			t.Fatal(err)
+		}
+		dir, args := splitTestArgs(fs.Args())
+		if dir != tc.dir || !slices.Equal(args, tc.args) {
+			t.Errorf("args %q: directory=%q, forwarded=%q; want %q, %q", tc.in, dir, args, tc.dir, tc.args)
 		}
 	}
 }

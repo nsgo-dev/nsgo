@@ -109,15 +109,8 @@ func main() {
 			return nil
 		})
 		fs.Parse(args)
-		rest := fs.Args()
-		dir := ""
-		if len(rest) > 0 && rest[0] != "--" {
-			dir, rest = rest[0], rest[1:]
-		}
-		if len(rest) > 0 && rest[0] == "--" {
-			rest = rest[1:]
-		}
-		o.args = rest
+		dir, forwarded := splitTestArgs(fs.Args())
+		o.args = forwarded
 		var p *project
 		if p, err = loadForTest(dir, os.Stdin); err == nil {
 			err = runTests(ctx, p, o)

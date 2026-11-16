@@ -157,11 +157,16 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 		}
 		return cmd
 	}
-	runs := []testCommand{{cmd: command("./...", tags, opts.args)}}
+	// Headless tests build with nsgocheck, which keeps core's graph ownership checks in the build; a -tags on the command line replaces the tags before it, as go test does, without dropping nsgocheck.
+	runTags, flags, profile := testTagArgs(p.Dir, tags, opts.args)
+	if profile != "" {
+		flags = append([]string{"-coverprofile=" + profile}, flags...)
+	}
+	runs := []testCommand{{cmd: command("./...", uniqueTags(append(runTags, "nsgocheck")), flags)}}
 	// As check does, NSGo's own repository also tests the dev client, whose files build only with nsgodev, unless the run's tags already include it; there are no automation-only dev tests. Its coverage profile goes to a file of its own, appended to the run's once both have ended, since go test would overwrite the first run's.
 	var cover, devCover string
 	if dev, ok := devClientPattern(p.Dir); ok && p.steps == nil {
-		devTags, flags, profile := devTestArgs(p.Dir, tags, opts.args)
+		devTags, flags, profile := testTagArgs(p.Dir, tags, opts.args)
 		if !slices.Contains(devTags, "nsgodev") {
 			if profile != "" {
 				f, err := os.CreateTemp("", "nsgo-dev-*.cover")
@@ -208,8 +213,8 @@ func devClientPattern(dir string) (string, bool) {
 	return "./" + sub, true
 }
 
-// devTestArgs reads the command line's -tags as Go does, replacing the tags before it, and returns the other flags, so a later -tags cannot drop the nsgodev added to the tags, leaving the test binary's own arguments intact. It takes -coverprofile out as well, returning the file it names, resolved as go test does against -outputdir and dir, so the dev run can write its profile elsewhere.
-func devTestArgs(dir string, tags, args []string) (devTags, flags []string, cover string) {
+// testTagArgs reads the command line's -tags as Go does, replacing the tags before it, and returns the other flags, so a later -tags cannot drop the nsgocheck or nsgodev added to the tags, leaving the test binary's own arguments intact. It takes -coverprofile out as well, returning the file it names, resolved as go test does against -outputdir and dir, so the dev run can write its profile elsewhere.
+func testTagArgs(dir string, tags, args []string) (devTags, flags []string, cover string) {
 	var outputDir string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -276,6 +281,17 @@ func appendCoverProfile(to, from string) error {
 		err = cerr
 	}
 	return err
+}
+
+// splitTestArgs takes the optional project directory before forwarded Go flags. flag.Parse already consumes -- when no directory precedes it.
+func splitTestArgs(rest []string) (dir string, args []string) {
+	if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
+		dir, rest = rest[0], rest[1:]
+	}
+	if len(rest) > 0 && rest[0] == "--" {
+		rest = rest[1:]
+	}
+	return dir, rest
 }
 
 // loadForTest reads the app's nsgo.yaml; a directory without one still
