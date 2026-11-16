@@ -183,7 +183,7 @@ func squashfs(root *sqfsNode, mtime uint32) ([]byte, error) {
 		files[n] = fd
 	}
 	walkData(root)
-	if img.Len() > 0xffffffff {
+	if uint64(img.Len()) > 0xffffffff {
 		return nil, errors.New("squashfs: the files take more than 4 GB")
 	}
 

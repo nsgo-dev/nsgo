@@ -81,8 +81,8 @@ func archive(files []File) ([]byte, error) {
 			}
 			e.compressed = buf.Bytes()
 		}
-		if len(f.Data) > maxSize || len(e.compressed) > maxSize {
-			return nil, fmt.Errorf("%s: an APK holds files below 4 GiB", f.Name)
+		if err := checkEntrySize(f.Name, uint64(len(f.Data)), uint64(len(e.compressed))); err != nil {
+			return nil, err
 		}
 		e.offset = uint32(body.Len())
 		put := func(v any) { binary.Write(&body, binary.LittleEndian, v) }
@@ -137,4 +137,12 @@ func archive(files []File) ([]byte, error) {
 	put(uint32(dir))
 	put(uint16(0)) // comment
 	return body.Bytes(), nil
+}
+
+// checkEntrySize keeps both ZIP sizes below the ZIP64 marker, comparing in uint64 so the limit also compiles where slice lengths are 32-bit.
+func checkEntrySize(name string, size, compressed uint64) error {
+	if size > maxSize || compressed > maxSize {
+		return fmt.Errorf("%s: an APK holds files below 4 GiB", name)
+	}
+	return nil
 }
