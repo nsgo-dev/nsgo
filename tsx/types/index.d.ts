@@ -256,6 +256,27 @@ export interface NotificationsModule {
   on(event: "press", listener: (press: { id: string }) => void): () => void;
 }
 export declare const Notifications: NotificationsModule;
+export interface AuthSessionOptions {
+  /** The app's own callback scheme, `"com.example.app"`, or `"https"` with `host`; without one desktops serve a loopback redirect and the web one on the page's origin. */
+  scheme?: string;
+  host?: string;
+  /** The redirect's path, `"/"` by default. */
+  path?: string;
+  /** Share no cookies with the user's browser, where the platform can. */
+  ephemeral?: boolean;
+  /** Milliseconds before the session ends with the code `"timeout"`. */
+  timeout?: number;
+}
+export interface AuthSession {
+  /** The URL the provider redirected to, with its `code` and `state`; null when the user or `cancel` cancelled it. Rejects with an Error whose `code` is `"unavailable"`, `"timeout"` or `"failed"`. */
+  readonly result: Promise<string | null>;
+  cancel(): void;
+}
+export interface AuthSessionModule {
+  /** Signs in in the system's authentication session: `url` builds the authorization URL for the redirect the session catches. */
+  start(url: (redirect: string) => string, options?: AuthSessionOptions | null): AuthSession;
+}
+export declare const AuthSession: AuthSessionModule;
 export interface StorageModule {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;

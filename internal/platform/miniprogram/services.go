@@ -88,6 +88,11 @@ func (s *surface) service(it *driver.MountItem) {
 		s.engine.Dispatch(driver.Event{Kind: driver.EventLaunchAtLogin, Count: it.Count})
 	case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 		s.engine.Dispatch(driver.NoBiometric(it))
+	case driver.ItemAuthSession:
+		// A mini program signs in through its platform's own login (docs/roadmap.md).
+		if ev, ok := driver.NoAuthSession(it); ok {
+			s.engine.Dispatch(ev)
+		}
 	case driver.ItemImageInfo:
 		s.imageInfo(it)
 	case driver.ItemAppearance:

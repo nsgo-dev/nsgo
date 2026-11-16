@@ -41,6 +41,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/finger"
 	"github.com/nsgo-dev/nsgo/internal/platform/hover"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/loopback"
 	"github.com/nsgo-dev/nsgo/internal/platform/queue"
 	"github.com/nsgo-dev/nsgo/internal/platform/scrollbar"
 	"github.com/nsgo-dev/nsgo/internal/platform/textselect"
@@ -360,6 +361,8 @@ type window struct {
 	placement    driver.WindowPlacement
 	// language is what the menus say (driver.ItemDirection).
 	language string
+	// loopback are the auth sessions the default browser shows.
+	loopback loopback.Sessions
 	// rtl is the app's direction (driver.ItemDirection), which the menus
 	// lay out in.
 	rtl bool
@@ -1128,6 +1131,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 			w.engine.Dispatch(driver.NoBiometric(it))
+			continue
+		case driver.ItemAuthSession:
+			w.authSession(it.Count, *it.Auth)
 			continue
 		case driver.ItemOpenSurface:
 			if it.Surface != nil {
@@ -2419,6 +2425,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		w.unregisterHotKeys()
 		endWindowGuide(w)
 		w.releaseAllAwake()
+		w.loopback.Close()
 		// Clients let the window's providers go.
 		if uiaReturnRawElementProvider.Find() == nil {
 			uiaReturnRawElementProvider.Call(hwnd, 0, 0, 0)

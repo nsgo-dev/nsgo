@@ -347,6 +347,8 @@ const (
 	ItemTaskProgress
 	// ItemAudio asks of sound or player Count what Audio says; the platform reports it with EventAudio carrying Count. The core sends none where the environment says no Audio.
 	ItemAudio
+	// ItemAuthSession asks of auth session Count what Auth says; the platform reports it with EventAuthSession carrying Count.
+	ItemAuthSession
 )
 
 // OverlayPermission is what EventOverlayPermission answers an ItemOverlayPermission with, as core's.
@@ -484,6 +486,8 @@ type MountItem struct {
 	// Speech is an ItemSpeech's request, Audio an ItemAudio's.
 	Speech *SpeechRequest
 	Audio  *AudioRequest
+	// Auth is an ItemAuthSession's request.
+	Auth *AuthRequest
 	// Notification is what ItemShowNotification shows.
 	Notification *Notification
 	// Permission is an ItemPermission's request.

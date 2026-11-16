@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/nsgo-dev/nsgo/icons/lucide"
 	"log"
@@ -913,9 +914,9 @@ func filesCard(cx *core.Scope) core.Node {
 	}}
 }
 
-// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, the system's permissions and files.
+// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, sign-in sessions, the system's permissions and files.
 func systemDemo(cx *core.Scope) core.Node {
-	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, permissionsCard, filesCard)
+	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, authSessionCard, permissionsCard, filesCard)
 }
 
 // yesNo says whether in tr's language.
@@ -994,6 +995,37 @@ func notificationsCard(cx *core.Scope) core.Node {
 				}}
 			}),
 		}}
+}
+
+// authSessionCard signs in through the system's authentication session. Its provider is the redirect itself, which hands a code straight back, so the demo needs no account: desktops open it in the browser and serve it on loopback, and the web in a popup.
+func authSessionCard(cx *core.Scope) core.Node {
+	tr := locales.For(cx)
+	colors := ui.ColorsOf(cx)
+	result := core.NewSignal(cx, tr.SystemNoneYet())
+	cancel := func() {}
+	signIn := func() {
+		cancel()
+		cancel = cx.AuthSession(func(redirect string) string { return redirect + "?code=demo&state=gallery" },
+			core.AuthSessionOptions{Path: "/signed-in", Timeout: 2 * time.Minute}, func(callback string, err error) {
+				switch {
+				case err == nil:
+					result.Set(callback)
+				case errors.Is(err, core.AuthCancelled):
+					result.Set(tr.SystemBiometricCancelled())
+				case errors.Is(err, core.AuthUnavailable):
+					result.Set(tr.SystemBiometricUnavailable())
+				default:
+					result.Set(tr.SystemBiometricFailed())
+				}
+			})
+	}
+	return Card{Title: tr.SystemAuthSession(), Description: tr.SystemAuthSessionDetail(), Actions: []core.Node{ui.Badge{Text: tr.SystemNsgo()}}, Children: []core.Node{
+		ui.Wrap{Children: []core.Node{
+			ui.Button{Text: tr.SystemSignIn(), Size: ui.SizeSmall, TestID: "auth-sign-in", OnPress: signIn},
+			ui.Button{Text: tr.SystemCancel(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "auth-cancel", OnPress: func() { cancel() }},
+		}},
+		core.Text{ContentFunc: result.Get, TestID: "auth-result", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+	}}
 }
 
 // biometricsCard is the system's enrolled biometric and authentication prompt.

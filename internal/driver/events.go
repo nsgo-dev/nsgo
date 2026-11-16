@@ -264,6 +264,8 @@ const (
 	EventWindowPlacementFailed
 	// EventHotKeyState answers global shortcut Count of the latest ItemHotKeys with its registration state, a HotKeyState, in Index, after the kinds Android's Protocol.java mirrors so that they keep their values.
 	EventHotKeyState
+	// EventAuthSession reports auth session Count (Data, an *AuthEvent).
+	EventAuthSession
 )
 
 // What EventInputModality reports.

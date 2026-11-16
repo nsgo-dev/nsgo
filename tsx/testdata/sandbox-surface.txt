@@ -18,6 +18,8 @@ nsgo.Animated.subtract
 nsgo.Animated.timing
 nsgo.AnimatedNode
 nsgo.AnimatedValue
+nsgo.AuthSession
+nsgo.AuthSession.start
 nsgo.Canvas
 nsgo.CanvasGradient
 nsgo.CanvasRenderingContext2D

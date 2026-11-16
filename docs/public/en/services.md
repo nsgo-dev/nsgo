@@ -1,6 +1,6 @@
 ---
 title: Platform services
-description: Alerts, the clipboard, files, photos, sharing, storage, speech, networking and the app's lifecycle.
+description: Alerts, the clipboard, files, photos, sharing, storage, speech, networking, signing in and the app's lifecycle.
 group: Platform features
 order: 44
 ---
@@ -194,6 +194,33 @@ cx.BiometricAvailability(func(kind core.BiometricKind) {
 ```
 
 Face ID apps declare `NSFaceIDUsageDescription` under `apple.info`; Android apps list `USE_BIOMETRIC` under `android.permissions`.
+
+## Signing in
+
+`cx.AuthSession` signs the user in with an OAuth provider in the system's authentication session rather than a web view: `ASWebAuthenticationSession` on macOS and iOS, the default browser with a loopback redirect on Windows, Linux and a Mac without a scheme, and a popup on the web. The app keeps the protocol: it makes the PKCE verifier and the state, builds the authorization URL for the redirect it is given, and checks the callback before trading its code. Cancelling is not failing: `errors.Is(err, core.AuthCancelled)` tells the user closing the session, or the returned `cancel` ending it.
+
+```go
+verifier, challenge, state := newPKCE() // the app's own
+cx.AuthSession(func(redirect string) string {
+	q := url.Values{"client_id": {clientID(redirect)}, "redirect_uri": {redirect}, "response_type": {"code"}, "scope": {"openid email"},
+		"state": {state}, "code_challenge": {challenge}, "code_challenge_method": {"S256"}}
+	return "https://accounts.example.com/authorize?" + q.Encode()
+}, core.AuthSessionOptions{Scheme: "com.example.app", Path: "/oauth2redirect", Timeout: 5 * time.Minute}, func(callback string, err error) {
+	if errors.Is(err, core.AuthCancelled) {
+		return
+	}
+	if err != nil {
+		showError(err)
+		return
+	}
+	u, _ := url.Parse(callback)
+	if u.Query().Get("state") == state {
+		exchangeCode(u.Query().Get("code"), verifier)
+	}
+})
+```
+
+The redirect is `com.example.app:/oauth2redirect` where the system's session catches the scheme, which the app need not declare, and `http://127.0.0.1:<port>/oauth2redirect` on the desktops' loopback, so register both with the provider, often as clients of their own. Leave `Scheme` empty for loopback alone, or set it to `https` with `Host` for the app's associated domain, which iOS 17.4 and macOS 14.4 catch. A closed browser tab tells a loopback session nothing, so give it a `Timeout` or a cancel button. `Ephemeral` asks macOS and iOS not to share the browser's cookies. Android, tvOS, watchOS and mini programs answer `core.AuthUnavailable` for now. In TSX, `AuthSession.start(url, options)` needs the `auth_session` capability and gives a session whose `result` resolves with the callback, or null once cancelled.
 
 ## Overlays on Android
 

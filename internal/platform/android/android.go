@@ -844,7 +844,7 @@ func (s *surface) Mount(b *driver.MountBatch) {
 
 // mount sends the batch of v's tree to Java, which names its surface, and loads the image sources it changed.
 func (s *surface) mount(v *treeView, b *driver.MountBatch) {
-	b = s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutTaskProgress(withoutEffects(b))))
+	b = s.withoutAuthSessions(v.id, s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutTaskProgress(withoutEffects(b)))))
 	// Android has no file manager an app can reveal in or trash through. The batch may be the engine's own, which a test's observer holds, so the items are filtered from a copy.
 	fileManager := func(it driver.MountItem) bool {
 		return it.Kind == driver.ItemRevealFile || it.Kind == driver.ItemTrashFile

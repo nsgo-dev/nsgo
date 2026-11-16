@@ -1345,6 +1345,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 			s.engine.Dispatch(driver.NoBiometric(it))
 			continue
+		case driver.ItemAuthSession:
+			s.authSession(it.Count, *it.Auth)
+			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge, driver.ItemTaskProgress:
 			s.notify(it)
 			continue

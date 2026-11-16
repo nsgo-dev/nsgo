@@ -41,6 +41,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/finger"
 	"github.com/nsgo-dev/nsgo/internal/platform/hover"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/loopback"
 	"github.com/nsgo-dev/nsgo/internal/platform/queue"
 	"github.com/nsgo-dev/nsgo/internal/platform/scrollbar"
 	"github.com/nsgo-dev/nsgo/internal/platform/textselect"
@@ -114,6 +115,8 @@ type window struct {
 	watchedRoot uintptr
 	// language is what the menus say (driver.ItemDirection).
 	language string
+	// loopback are the auth sessions the default browser shows.
+	loopback loopback.Sessions
 	// dir is the app's direction (driver.ItemDirection) as GTK's, or 0
 	// before the app has one.
 	dir     int32
@@ -694,6 +697,7 @@ func (w *window) close() {
 	} else {
 		w.releaseAllAwake()
 	}
+	w.loopback.Close()
 	w.visible = false
 	w.removeTrays()
 	if w.tickID != 0 {
@@ -795,6 +799,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 			w.engine.Dispatch(driver.NoBiometric(it))
+			continue
+		case driver.ItemAuthSession:
+			w.authSession(it.Count, *it.Auth)
 			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge, driver.ItemTaskProgress:
 			w.notify(it)

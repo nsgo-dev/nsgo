@@ -72,3 +72,6 @@ permissionBluetooth:
 permissionMediaLibrary:
   message: "Media & Apple Music"
   description: The title of macOS's privacy pane, as System Settings shows it.
+authSessionDone:
+  message: "You can close this page and return to the app."
+  description: The page the default browser shows once a sign-in started from the app redirects back to it on desktops.

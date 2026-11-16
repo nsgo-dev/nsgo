@@ -62,7 +62,7 @@ capabilities:
     hosts: [api.example.com, "*.cdn.example.com"]
   open_url: true # or { schemes: [https] }
   host: [search, "player.*"] # the app's handlers it may call
-  # webview: { hosts: [...], input: true, media: [microphone, camera] }, clipboard, picker, speech, status_bar
+  # webview: { hosts: [...], input: true, media: [microphone, camera] }, clipboard, picker, speech, status_bar, notifications, biometrics, audio, auth_session
 ```
 
 Keep a root key offline and certify release keys with it, then sign the app in that directory. `go tool nsgo keygen` prints a key pair and writes no file; run it once for the root and once for each release key. Public keys go in flags and the app's code; secret keys stay out of the repository and reach the tool only through `NSGO_ROOT_KEY` and `NSGO_RELEASE_KEY`:

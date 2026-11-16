@@ -31,6 +31,7 @@ var serviceExports = []export{
 	{"Storage", (*runtime).storage},
 	{"Picker", (*runtime).picker},
 	{"Speech", (*runtime).speech},
+	{"AuthSession", (*runtime).authSession},
 	fn("openUrl", func(r *runtime, call js.FunctionCall) js.Value {
 		p, resolve, reject := r.vm.NewPromise()
 		u := arg(call, 0).String()

@@ -837,6 +837,22 @@ func TestSystemNotificationsAndBadge(t *testing.T) {
 	}
 }
 
+func TestSystemAuthSession(t *testing.T) {
+	headless(t)
+	app := startDesktop(t)
+	open(app, "System")
+	app.AuthAnswer = func(s nsgotest.AuthSession) (string, error) { return s.URL, nil }
+	app.Press("id:auth-sign-in")
+	app.Find("text:" + nsgotest.AuthLoopback + "/signed-in?code=demo&state=gallery")
+	app.AuthAnswer = nil
+	app.Press("id:auth-sign-in")
+	app.Press("id:auth-cancel")
+	app.Find("text:Cancelled")
+	if s := app.AuthSessions[len(app.AuthSessions)-1]; !s.Cancelled {
+		t.Fatalf("the platform's session went on: %+v", s)
+	}
+}
+
 func TestSystem(t *testing.T) {
 	headless(t)
 	app := startDesktop(t)

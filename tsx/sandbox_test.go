@@ -75,7 +75,7 @@ func network(req *http.Request) (*http.Response, error) {
 
 // tries is a plugin that runs each named attempt and shows what each
 // gave, in order, as "name: result".
-const tries = `import { mount, signal, Text, Clipboard, openUrl, Storage, host } from "nsgo";
+const tries = `import { mount, signal, Text, AuthSession, Clipboard, openUrl, Storage, host } from "nsgo";
 const log = signal([]);
 const say = (name, v) => log.set([...log(), name + ": " + v]);
 const how = (e) => e.code ? e.code + " " + (e.permission ?? "") : e.name + " " + e.message;
@@ -116,6 +116,7 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 	data: async () => (await fetch("data:,hi")).text(),
 	clipboard: () => Clipboard.readText(),
 	openUrl: () => openUrl("https://example.com"),
+	auth: () => AuthSession.start((redirect) => "https://provider.example/?redirect_uri=" + redirect).result,
 	granted: () => host.call("greet", "Ada"),
 	refused: () => host.call("secret"),
 	timers: () => { for (let i = 0; i < 5; i++) setTimeout(() => {}, 100000); },
@@ -131,6 +132,7 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 		"data":      "hi",
 		"clipboard": "ERR_ACCESS_DENIED clipboard",
 		"openUrl":   "ERR_ACCESS_DENIED openUrl",
+		"auth":      "ERR_ACCESS_DENIED authSession",
 		"granted":   "hi Ada",
 		"refused":   "ERR_ACCESS_DENIED host",
 		"timers":    "ERR_NSH_QUOTA_EXCEEDED ",

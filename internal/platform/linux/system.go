@@ -241,16 +241,21 @@ func setClipboardImage(data []byte) {
 // openURL opens u with GtkUriLauncher, through the desktop portal where
 // there is one, and reports whether it opened.
 func (w *window) openURL(u string, id uint32) {
+	w.launchURI(u, func(ok bool) { w.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: ok}) })
+}
+
+// launchURI opens u with the app the desktop picks, and answers whether it launched; a closing window hears nothing.
+func (w *window) launchURI(u string, answer func(ok bool)) {
 	launcher := gtkURILauncherNew(cstr(u))
 	if launcher == 0 {
-		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id})
+		answer(false)
 		return
 	}
 	gtkURILauncherLaunch(launcher, w.toplevel(), 0, cbAsync, async(func(source, result uintptr) {
 		ok := gtkURILauncherLaunchFinish(source, result, 0) != 0
 		gObjectUnref(source)
 		if !w.closing {
-			w.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: ok})
+			answer(ok)
 		}
 	}))
 }

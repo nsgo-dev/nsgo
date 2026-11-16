@@ -91,6 +91,7 @@ const (
 	textPermissionDeveloperTools
 	textPermissionBluetooth
 	textPermissionMediaLibrary
+	textAuthSessionDone
 	numTexts
 )
 
@@ -128,6 +129,7 @@ var keyOfText = [numTexts]string{
 	"permissionDeveloperTools",
 	"permissionBluetooth",
 	"permissionMediaLibrary",
+	"authSessionDone",
 }
 
 // textsEn are the messages without arguments in en.
@@ -162,7 +164,8 @@ var textsEn = i18n.NewTexts(""+
 	"App Management"+
 	"Developer Tools"+
 	"Bluetooth"+
-	"Media & Apple Music",
+	"Media & Apple Music"+
+	"You can close this page and return to the app.",
 	[]uint16{
 		4,
 		6,
@@ -195,6 +198,7 @@ var textsEn = i18n.NewTexts(""+
 		15,
 		9,
 		19,
+		46,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -229,7 +233,8 @@ var textsZhHans = i18n.NewTexts(""+
 	"App管理"+
 	"开发者工具"+
 	"蓝牙"+
-	"媒体与Apple Music",
+	"媒体与Apple Music"+
+	"现在可以关闭此页面并返回应用。",
 	[]uint16{
 		6,
 		6,
@@ -262,6 +267,7 @@ var textsZhHans = i18n.NewTexts(""+
 		15,
 		6,
 		20,
+		45,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -697,3 +703,12 @@ func PermissionMediaLibrary(cx *core.Scope) string { return For(cx).PermissionMe
 
 // PermissionMediaLibrary is the package's PermissionMediaLibrary in the language of msgs.
 func (msgs Messages) PermissionMediaLibrary() string { return msgs.text(textPermissionMediaLibrary) }
+
+// AuthSessionDone says "You can close this page and return to the app."
+// in the language the app shows under cx.
+//
+// The page the default browser shows once a sign-in started from the app redirects back to it on desktops.
+func AuthSessionDone(cx *core.Scope) string { return For(cx).AuthSessionDone() }
+
+// AuthSessionDone is the package's AuthSessionDone in the language of msgs.
+func (msgs Messages) AuthSessionDone() string { return msgs.text(textAuthSessionDone) }

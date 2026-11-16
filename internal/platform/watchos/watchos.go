@@ -452,6 +452,12 @@ func (s *surface) apply(b *driver.MountBatch) {
 			// LocalAuthentication's biometric policy is not on watchOS.
 			s.engine.Dispatch(driver.NoBiometric(it))
 			continue
+		case driver.ItemAuthSession:
+			// The SwiftUI host starts no ASWebAuthenticationSession yet (docs/roadmap.md).
+			if ev, ok := driver.NoAuthSession(it); ok {
+				s.engine.Dispatch(ev)
+			}
+			continue
 		case driver.ItemPermission:
 			// The SwiftUI host asks nothing yet (docs/roadmap.md): what a watch keeps answers unknown.
 			driver.AnswerPermission(it.Count, *it.Permission, watchPermission, s.engine.Dispatch)

@@ -705,6 +705,9 @@ const (
 	textSystemBiometricCancelled
 	textSystemBiometricFailed
 	textSystemBiometricUnavailable
+	textSystemAuthSession
+	textSystemAuthSessionDetail
+	textSystemSignIn
 	textSystemCancelAndDestructiveButtons
 	textSystemDeleteThePhoto
 	textSystemThisCannotBeUndone
@@ -2969,6 +2972,9 @@ var keyOfText = [numTexts]string{
 	"systemBiometricCancelled",
 	"systemBiometricFailed",
 	"systemBiometricUnavailable",
+	"systemAuthSession",
+	"systemAuthSessionDetail",
+	"systemSignIn",
 	"systemCancelAndDestructiveButtons",
 	"systemDeleteThePhoto",
 	"systemThisCannotBeUndone",
@@ -5231,6 +5237,9 @@ var textsEn = i18n.NewTexts(""+
 	"Cancelled"+
 	"Failed"+
 	"Unavailable"+
+	"Sign-in session"+
+	"The system's browser shows the provider and hands its redirect back; here the provider is the redirect"+
+	"Sign in"+
 	"Cancel and destructive buttons"+
 	"Delete the photo?"+
 	"This cannot be undone."+
@@ -7490,6 +7499,9 @@ var textsEn = i18n.NewTexts(""+
 		9,
 		6,
 		11,
+		15,
+		102,
+		7,
 		30,
 		17,
 		22,
@@ -9752,6 +9764,9 @@ var textsZhHans = i18n.NewTexts(""+
 	"已取消"+
 	"失败"+
 	"不可用"+
+	"登录会话"+
+	"系统浏览器打开登录页并交回重定向；这里的登录页就是重定向本身"+
+	"登录"+
 	"取消和破坏性按钮"+
 	"删除这张照片？"+
 	"此操作无法撤销。"+
@@ -12011,6 +12026,9 @@ var textsZhHans = i18n.NewTexts(""+
 		9,
 		6,
 		9,
+		12,
+		90,
+		6,
 		24,
 		21,
 		24,
@@ -16666,6 +16684,27 @@ func SystemBiometricUnavailable(cx *core.Scope) string { return For(cx).SystemBi
 func (msgs Messages) SystemBiometricUnavailable() string {
 	return msgs.text(textSystemBiometricUnavailable)
 }
+
+// SystemAuthSession says "Sign-in session"
+// in the language the app shows under cx.
+func SystemAuthSession(cx *core.Scope) string { return For(cx).SystemAuthSession() }
+
+// SystemAuthSession is the package's SystemAuthSession in the language of msgs.
+func (msgs Messages) SystemAuthSession() string { return msgs.text(textSystemAuthSession) }
+
+// SystemAuthSessionDetail says "The system's browser shows the provider and hands its redirect back; here the provider is the redirect"
+// in the language the app shows under cx.
+func SystemAuthSessionDetail(cx *core.Scope) string { return For(cx).SystemAuthSessionDetail() }
+
+// SystemAuthSessionDetail is the package's SystemAuthSessionDetail in the language of msgs.
+func (msgs Messages) SystemAuthSessionDetail() string { return msgs.text(textSystemAuthSessionDetail) }
+
+// SystemSignIn says "Sign in"
+// in the language the app shows under cx.
+func SystemSignIn(cx *core.Scope) string { return For(cx).SystemSignIn() }
+
+// SystemSignIn is the package's SystemSignIn in the language of msgs.
+func (msgs Messages) SystemSignIn() string { return msgs.text(textSystemSignIn) }
 
 // SystemCancelAndDestructiveButtons says "Cancel and destructive buttons"
 // in the language the app shows under cx.

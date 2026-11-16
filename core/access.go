@@ -69,6 +69,8 @@ const (
 	AccessOverlay = "overlay"
 	// AccessAudio is the audio package's sounds and players, refused with AudioNotAllowed.
 	AccessAudio = "audio"
+	// AccessAuthSession is signing in through the system's authentication session (AuthSession).
+	AccessAuthSession = "authSession"
 	// AccessHost is the host's handlers, by name (CallHost, PostHost).
 	AccessHost = "host"
 )
@@ -153,6 +155,7 @@ const (
 	serviceSpeech        service = "speech"
 	serviceOverlay       service = "overlay"
 	serviceAudio         service = "audio"
+	serviceAuthSession   service = "authSession"
 )
 
 // serviceRule is how core holds a kind of service to Access.
@@ -179,6 +182,7 @@ var services = map[service]serviceRule{
 	serviceSpeech:        {permission: AccessSpeech, runtimeOnly: true},
 	serviceOverlay:       {permission: AccessOverlay},
 	serviceAudio:         {permission: AccessAudio},
+	serviceAuthSession:   {permission: AccessAuthSession},
 }
 
 // gate is the refusal of a service of kind for resource by the current owner's Access, as services holds it; a kind services lacks is refused.

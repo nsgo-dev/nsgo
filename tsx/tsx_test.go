@@ -239,6 +239,43 @@ mount(App);`)
 	}
 }
 
+func TestAuthSession(t *testing.T) {
+	app := run(t, `import { mount, signal, AuthSession, Text, View } from "nsgo";
+function App() {
+	const got = signal("idle");
+	let session = null;
+	const start = (options) => {
+		session = AuthSession.start((redirect) => "https://provider.example/auth?redirect_uri=" + encodeURIComponent(redirect), options);
+		session.result.then((url) => got.set("callback " + url), (e) => got.set("error " + e.code));
+	};
+	return <View>
+		<View testID="start" style={{ height: 20 }} onPress={() => start({ scheme: "com.example.app", path: "/oauth", ephemeral: true })} />
+		<View testID="bad" style={{ height: 20 }} onPress={() => start({ path: "oauth" })} />
+		<View testID="cancel" style={{ height: 20 }} onPress={() => session.cancel()} />
+		<Text>{got()}</Text>
+	</View>;
+}
+mount(App);`)
+	app.AuthAnswer = func(s nsgotest.AuthSession) (string, error) { return s.Redirect + "?code=abc&state=s1", nil }
+	app.Press("id:start")
+	if !slices.Contains(app.Texts(), "callback com.example.app:/oauth?code=abc&state=s1") {
+		t.Fatalf("texts %q", app.Texts())
+	}
+	if s := app.AuthSessions[0]; s.URL != "https://provider.example/auth?redirect_uri=com.example.app%3A%2Foauth" || !s.Ephemeral {
+		t.Fatalf("session %+v", s)
+	}
+	app.Press("id:bad")
+	if !slices.Contains(app.Texts(), "error failed") {
+		t.Fatalf("bad options: %q", app.Texts())
+	}
+	app.AuthAnswer = nil
+	app.Press("id:start")
+	app.Press("id:cancel")
+	if !slices.Contains(app.Texts(), "callback null") || !app.AuthSessions[len(app.AuthSessions)-1].Cancelled {
+		t.Fatalf("cancelled: %q", app.Texts())
+	}
+}
+
 func TestAsyncGeneratorsAreLowered(t *testing.T) {
 	app := run(t, `import { mount, signal, Text } from "nsgo";
 async function* count() { yield 1; yield 2; }

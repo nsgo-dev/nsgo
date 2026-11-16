@@ -52,6 +52,7 @@ var gated = map[string]service{
 	"RequestOverlayPermission":      serviceOverlay,
 	"LoadSound":                     serviceAudio,
 	"NewAudioPlayer":                serviceAudio,
+	"AuthSession":                   serviceAuthSession,
 }
 
 // exempt are the exported Scope methods that do not ask gate, by why.

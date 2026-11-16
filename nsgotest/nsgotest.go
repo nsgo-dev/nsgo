@@ -170,6 +170,19 @@ type AwakeHold struct {
 	core.KeepAwake
 }
 
+// AuthSession is an auth session the app opened (core.Scope.AuthSession): the redirect the model catches, the authorization URL the app built for it, whether it asked for an ephemeral session, and whether the app cancelled it or its timeout passed.
+type AuthSession struct {
+	Redirect  string
+	URL       string
+	Ephemeral bool
+	Cancelled bool
+	id        uint32
+	scheme    bool
+}
+
+// AuthLoopback is where the model serves a loopback redirect, before the session's path.
+const AuthLoopback = "http://127.0.0.1:49152"
+
 // App is an app running in a test. Its methods run on the test's
 // goroutine; the app's goroutines reach it through Scope.Post, which App
 // runs when it settles.
@@ -204,6 +217,9 @@ type App struct {
 	// answers whether each opens; every one does when it is nil.
 	OpenedURLs []string
 	OpenURL    func(url string) bool
+	// AuthSessions are the auth sessions the app opened, oldest first. The model catches the app's scheme as macOS's and iOS's session does, and serves a redirect without one on AuthLoopback, as desktops do. AuthAnswer answers each as it opens with the URL the provider redirects to, or an error: core.AuthCancelled for a user who closes it, another for a failure. Without AuthAnswer, or with neither, the session stays open until the app cancels it or its timeout passes.
+	AuthSessions []*AuthSession
+	AuthAnswer   func(s AuthSession) (callback string, err error)
 	// UpdateChecks are the checks for a newer version the app asked the
 	// platform's updater for (updater.Check), oldest first, true for one
 	// in the background. Update answers each with what the updater found;

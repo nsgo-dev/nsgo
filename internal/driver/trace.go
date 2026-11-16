@@ -118,7 +118,7 @@ var itemNames = map[ItemKind]string{
 	ItemBiometricAvailability: "biometric-availability", ItemBiometricAuthenticate: "biometric-authenticate", ItemPermission: "permission",
 	ItemRevealFile: "reveal-file", ItemTrashFile: "trash-file",
 	ItemTaskProgress: "task-progress",
-	ItemAudio: "audio",
+	ItemAudio:        "audio", ItemAuthSession: "auth-session",
 }
 
 // TraceLine is the item as traces print it: its kind, its view and what

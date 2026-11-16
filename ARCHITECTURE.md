@@ -51,7 +51,7 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `internal/shader`, `internal/shader/wgsl`, `internal/shaderir` | — (a fork of Ebitengine's Kage); `nsh-core`'s `shader` | The shader compilers: Go's syntax and WGSL checked into an IR, written as MSL, GLSL or HLSL ([shaders](docs/architecture/shaders.md)) |
 | `internal/engine` | `nsh-engine` | The engine goroutine: a mailbox, a batch per commit, storage files, the performance monitor |
 | `internal/platform/<target>` | `nsh-platform-*` | Native view mounting, text engine and input for one target |
-| `internal/platform/*` | Platforms' shared code | What backends share: `apple` for macOS and iOS, `privacy` for their permissions, which `microphone` shares too, `webstyle` and `canvas2d` for the web and mini programs, images ([images](docs/architecture/images.md)), picked photos, process readings, update checks |
+| `internal/platform/*` | Platforms' shared code | What backends share: `apple` for macOS and iOS, `privacy` for their permissions, which `microphone` shares too, `webstyle` and `canvas2d` for the web and mini programs, `loopback` for desktops' sign-in redirects, images ([images](docs/architecture/images.md)), picked photos, process readings, update checks |
 | `examples/gallery` | `examples/gallery` | NSH's gallery in Go, with headless tests; the website runs its web build |
 | `examples/previews` | | The docs' component examples, one demo per marked code block, in one web build the website mounts per block |
 | `examples/embedded`, `examples/embed-*` | `examples/embed-*` | An app to embed, and desktop, iOS and Android apps and a web page embedding it |

@@ -54,6 +54,20 @@ NSGo's own, beyond NSH's notifications: a server reaching the app ([remote push]
 | --- | --- | --- |
 | Remote push notifications | APNs, Firebase Cloud Messaging | An iOS app, a macOS app and an Android app register, report their token and receive a data push and a pressed notification's payload from APNs' sandbox or a test FCM project, through one provider-neutral `core` API |
 
+## Sign-in sessions
+
+NSGo's own, beyond NSH: OAuth sign-in in the system's authentication session ([sign-in sessions](architecture/services.md#sign-in-sessions), [#355](https://github.com/nsgo-dev/nsgo/issues/355)).
+
+| Item | Reference | Done when |
+| --- | --- | --- |
+| Sign-in on devices | `ASWebAuthenticationSession`, RFC 8252 | On an iPhone, a Mac, Windows, Linux and in Chrome a PKCE sign-in against a test provider returns its callback with its `code` and `state`, and closing the session answers cancelled; so far `core`, `nsgotest`, TSX and the gallery ran headless and the loopback server answered real requests in its tests, and the macOS, iOS, tvOS, Windows, Linux and web backends were only built (2026-11-16) |
+| Sign-in on Android | Custom Tabs, `Intent.getData` | The runtime opens the URL in a Custom Tab, falling back to the browser, and an activity it declares for the app's scheme hands the redirect back, once [the app's own links](#widgets) and [opened links elsewhere](#app-clips) reach a running Android app; a session ends unavailable there now, with `classes.dex` rebuilt |
+| Google's ID tokens on Android | `androidx.credentials`, `GetGoogleIdOption` | Credential Manager signs in with Google, which needs a Google library and so waits on the same adapter decision as FCM ([remote push](architecture/remote-push.md#open-decisions)); the session above serves other providers |
+| The app's own scheme on desktops | #262 | Windows and Linux catch a redirect to a scheme the app registers, once #262 lets one reach the running app, where they serve loopback redirects alone now |
+| Sign-in on watchOS | `ASWebAuthenticationSession` | The SwiftUI host starts a session from watchOS 6.2, where a session ends unavailable now; tvOS has no such session |
+| Popups their provider cuts off | `Cross-Origin-Opener-Policy` | A web sign-in completes with a provider whose page sends a COOP that cuts the popup off from the page, which then reads the popup as closed and ends the session cancelled: the page served at the redirect hands its address back over a `BroadcastChannel` instead |
+| Sign-in in mini programs | `wx.login` and the platforms' own | A mini program signs in through its platform's login, where a session ends unavailable now |
+
 ## Location and motion
 NSGo's own design for [#56](https://github.com/nsgo-dev/nsgo/issues/56) ([location and motion](architecture/location-motion.md)), which waits on its [open questions](../ARCHITECTURE.md#open-questions).
 | Location and motion on phones | `CLLocationManager`, `CMMotionManager`, `LocationManager`, `SensorManager` | The gallery's System page, the permission granted, gets a one-shot fix and a stream and accelerometer, gyroscope and device-motion samples at the rate it asks on an iPhone, an Android 9 device and one on API 31 or later, a phone lying face up reading +9.81 m/s² on z on both; a denied permission reaches the app as denied, and `nsgotest` grants, denies and feeds fixes and samples headless |

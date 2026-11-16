@@ -626,6 +626,8 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 		case driver.ItemSpeech:
 			a.speech(it.Count, *it.Speech)
+		case driver.ItemAuthSession:
+			a.authSession(it.Count, *it.Auth)
 		case driver.ItemAudio:
 			a.audio(it.Count, *it.Audio)
 		case driver.ItemAlert:
@@ -662,6 +664,50 @@ func (a *App) speech(id uint32, r driver.SpeechRequest) {
 	case driver.SpeechAbort:
 		if a.speechID == id {
 			a.Speech = nil
+		}
+	}
+}
+
+// authSession answers an ItemAuthSession as a platform with the system's session and a loopback server would: a start reports the redirect, an open asks AuthAnswer.
+func (a *App) authSession(id uint32, r driver.AuthRequest) {
+	report := func(e driver.AuthEvent) { a.post(driver.Event{Kind: driver.EventAuthSession, Count: id, Data: &e}) }
+	var s *AuthSession
+	for _, o := range a.AuthSessions {
+		if o.id == id {
+			s = o
+		}
+	}
+	switch r.Command {
+	case driver.AuthStart:
+		s = &AuthSession{id: id, Ephemeral: r.Ephemeral, scheme: r.Scheme != "", Redirect: AuthLoopback + r.Path}
+		if s.scheme {
+			s.Redirect = driver.AuthRedirectURI(r)
+		}
+		a.AuthSessions = append(a.AuthSessions, s)
+		report(driver.AuthEvent{Phase: driver.AuthRedirect, Redirect: s.Redirect})
+	case driver.AuthOpen:
+		if s == nil {
+			return
+		}
+		s.URL = r.URL
+		if a.AuthAnswer == nil {
+			return
+		}
+		callback, err := a.AuthAnswer(*s)
+		var code core.AuthError
+		switch {
+		case errors.As(err, &code) && err == error(code):
+			report(driver.AuthEvent{Phase: driver.AuthEnded, Error: string(code)})
+		case errors.As(err, &code):
+			report(driver.AuthEvent{Phase: driver.AuthEnded, Error: string(code), Message: err.Error()})
+		case err != nil:
+			report(driver.AuthEvent{Phase: driver.AuthEnded, Error: driver.AuthFailed, Message: err.Error()})
+		case callback != "":
+			report(driver.AuthEvent{Phase: driver.AuthEnded, Callback: callback})
+		}
+	case driver.AuthCancel:
+		if s != nil {
+			s.Cancelled = true
 		}
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 
+	"github.com/nsgo-dev/nsgo/desktop/locales"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
@@ -113,6 +114,16 @@ func (s *surface) notify(it *driver.MountItem) {
 	case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 		apple.HandleBiometric(it, s.engine.Dispatch)
 	}
+}
+
+// authSession carries out an auth session's request: ASWebAuthenticationSession for a callback scheme, else the default browser and a loopback redirect.
+func (s *surface) authSession(id uint32, r driver.AuthRequest) {
+	if r.Command == driver.AuthStart && r.Scheme == "" || r.Command != driver.AuthStart && s.loopback.Has(id) {
+		open := func(u string, answer func(bool)) { answer(openSystemURL(u)) }
+		s.loopback.Handle(id, r, open, locales.In(s.language).AuthSessionDone(), s.engine.Dispatch)
+		return
+	}
+	apple.HandleAuthSession(id, r, func() objc.ID { return s.native.Send(sel("window")) }, s.engine.Dispatch)
 }
 
 // openURL opens u with the app the system picks and reports whether one took it.

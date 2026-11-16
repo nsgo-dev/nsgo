@@ -73,6 +73,7 @@ type Tree struct {
 	ratio       float32
 	alerts      map[uint32]alertWait
 	waits       map[uint32]wait
+	auths       map[uint32]*authSession // the auth sessions waiting for the platform
 	imageInfos  map[uint32]imageInfoWait
 	keys        []*keyBinding
 	keysChanged bool
@@ -2159,6 +2160,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		return
 	case driver.EventSpeech:
 		t.rt.speechEvent(ev)
+		return
+	case driver.EventAuthSession:
+		t.authEvent(ev)
 		return
 	case driver.EventAudio:
 		t.rt.audioEvent(ev)

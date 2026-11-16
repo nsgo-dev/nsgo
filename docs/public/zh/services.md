@@ -1,6 +1,6 @@
 ---
 title: 平台服务
-description: 警告框、剪贴板、文件、照片、分享、存储、语音、网络和应用生命周期。
+description: 警告框、剪贴板、文件、照片、分享、存储、语音、网络、登录和应用生命周期。
 group: 平台功能
 order: 44
 ---
@@ -176,6 +176,33 @@ warning := core.Text{ContentFunc: func() string {
 	return ""
 }}
 ```
+
+## 登录
+
+`cx.AuthSession` 在系统的认证会话里用 OAuth 服务登录，而不是在网页视图里：macOS 和 iOS 用 `ASWebAuthenticationSession`，Windows、Linux 以及没有设置 scheme 的 Mac 用默认浏览器加回环地址重定向，Web 用弹出窗口。协议由应用负责：它生成 PKCE 校验码和 state，为传给它的重定向地址拼出授权 URL，并在用 code 换令牌前检查回调。取消不算失败：`errors.Is(err, core.AuthCancelled)` 表示用户关闭了会话，或返回的 `cancel` 结束了它。
+
+```go
+verifier, challenge, state := newPKCE() // 应用自己的实现
+cx.AuthSession(func(redirect string) string {
+	q := url.Values{"client_id": {clientID(redirect)}, "redirect_uri": {redirect}, "response_type": {"code"}, "scope": {"openid email"},
+		"state": {state}, "code_challenge": {challenge}, "code_challenge_method": {"S256"}}
+	return "https://accounts.example.com/authorize?" + q.Encode()
+}, core.AuthSessionOptions{Scheme: "com.example.app", Path: "/oauth2redirect", Timeout: 5 * time.Minute}, func(callback string, err error) {
+	if errors.Is(err, core.AuthCancelled) {
+		return
+	}
+	if err != nil {
+		showError(err)
+		return
+	}
+	u, _ := url.Parse(callback)
+	if u.Query().Get("state") == state {
+		exchangeCode(u.Query().Get("code"), verifier)
+	}
+})
+```
+
+系统会话能捕获 scheme 的平台上，重定向地址是 `com.example.app:/oauth2redirect`，应用不必声明这个 scheme；桌面的回环地址上是 `http://127.0.0.1:<端口>/oauth2redirect`，所以两者都要在服务方登记，通常各是一个客户端。`Scheme` 留空则只用回环地址；设为 `https` 并给出 `Host` 则用应用的关联域名，iOS 17.4 和 macOS 14.4 起能捕获。浏览器标签页被关闭时回环会话无从得知，所以要给它 `Timeout` 或一个取消按钮。`Ephemeral` 让 macOS 和 iOS 不共享浏览器的 Cookie。Android、tvOS、watchOS 和小程序目前回答 `core.AuthUnavailable`。在 TSX 中，`AuthSession.start(url, options)` 需要 `auth_session` 能力，返回的会话的 `result` 解析为回调地址，取消时为 null。
 
 ## Android 上的悬浮窗
 

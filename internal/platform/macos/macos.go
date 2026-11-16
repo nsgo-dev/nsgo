@@ -25,6 +25,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 	"github.com/nsgo-dev/nsgo/internal/platform/finger"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/loopback"
 	"github.com/nsgo-dev/nsgo/internal/platform/queue"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
@@ -195,6 +196,8 @@ type surface struct {
 	// rtl is the app's direction (driver.ItemDirection), which AppKit's
 	// views and the menus the surface shows lay out in once directed.
 	rtl, directed bool
+	// loopback are the auth sessions without a callback scheme, which the default browser shows.
+	loopback loopback.Sessions
 	// id is the surface's tree for a surface the app opened, of kind;
 	// tray is the tray icon a SurfaceTrayIcon draws, anchor the one a panel last showed under, and anchorBounds and placement where core.Window.ShowAt last placed it, placement WindowPlaceDefault for nowhere. hideOnBlur hides a panel as it loses the focus, and noActivate keeps it from ever taking it.
 	id           uint32
@@ -849,6 +852,7 @@ func (s *surface) close() {
 		s.engine.Close()
 	}
 	s.awake.releaseAll()
+	s.loopback.Close()
 	for _, v := range s.views {
 		if v != nil && v.component != nil {
 			v.component.Close()
@@ -1459,6 +1463,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemSpeech:
 			apple.HandleSpeech(it.Count, *it.Speech, s.engine.Dispatch)
+			continue
+		case driver.ItemAuthSession:
+			s.authSession(it.Count, *it.Auth)
 			continue
 		case driver.ItemSetClipboard:
 			pb := objc.ID(apple.Class("NSPasteboard")).Send(sel("generalPasteboard"))
