@@ -14,6 +14,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/engine"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // Embedding: an iOS app of its own shows NSGo apps in NSGoViews, from the
@@ -380,7 +381,7 @@ func (s *surface) handle(name string, block objc.ID) {
 				call.Reject(errors.New("nsgo: the host removed the handler"))
 				return
 			}
-			reply := objc.NewBlock(func(_ objc.Block, result, failure objc.ID) {
+			reply := objcblock.New(func(_ objc.Block, result, failure objc.ID) {
 				if failure != 0 {
 					call.Reject(errors.New(apple.GoString(failure)))
 				} else {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // The services UIKit performs: the pasteboard's images and files,
@@ -128,7 +129,7 @@ func openSystemURL(u string, answer func(opened bool)) {
 		answer(false)
 		return
 	}
-	done := objc.NewBlock(func(_ objc.Block, ok bool) { answer(ok) })
+	done := objcblock.New(func(_ objc.Block, ok bool) { answer(ok) })
 	app := objc.ID(apple.Class("UIApplication")).Send(sel("sharedApplication"))
 	opts := objc.ID(apple.Class("NSDictionary")).Send(sel("dictionary"))
 	app.Send(sel("openURL:options:completionHandler:"), nsURL, opts, done)
@@ -256,7 +257,7 @@ func (s *surface) picked(req pickRequest, results objc.ID) {
 	for i, p := range providers {
 		files[i].Name = apple.GoString(p.Send(sel("suggestedName")))
 		wg.Add(1)
-		done := objc.NewBlock(func(_ objc.Block, data, err objc.ID) {
+		done := objcblock.New(func(_ objc.Block, data, err objc.ID) {
 			files[i].Data = apple.Bytes(data)
 			wg.Done()
 		})

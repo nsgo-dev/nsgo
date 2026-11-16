@@ -10,6 +10,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/audiosession"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
@@ -42,7 +43,7 @@ func enterSession(ended func()) (leave func(), err error) {
 		return nil, errSession
 	}
 	center := objc.ID(objc.GetClass("NSNotificationCenter")).Send(sel("defaultCenter"))
-	block := objc.NewBlock(func(objc.Block, objc.ID) { ended() })
+	block := objcblock.New(func(objc.Block, objc.ID) { ended() })
 	var tokens []objc.ID
 	for _, name := range []objc.ID{global(foundationPath, "AVAudioSessionInterruptionNotification"),
 		global(uikitPath, "UIApplicationDidEnterBackgroundNotification")} {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // Video is a video's AVPlayer, filling the view that holds it: in an
@@ -248,7 +249,7 @@ func (v *Video) open() {
 	v.player = objc.ID(Class("AVPlayer")).Send(sel("playerWithPlayerItem:"), item).Send(sel("retain"))
 	v.Dispatch(driver.Event{Kind: driver.EventLoadStart})
 	// The end of the item: report it, and loop if asked.
-	ended := objc.NewBlock(func(objc.Block, objc.ID) {
+	ended := objcblock.New(func(objc.Block, objc.ID) {
 		if v.status != st || v.player == 0 {
 			return
 		}
@@ -442,7 +443,7 @@ func (v *Video) observe() {
 	st := v.status
 	// The block's CMTime argument is left out: the player's current time
 	// is the same, and purego callbacks take no structs.
-	tick := objc.NewBlock(func(objc.Block) {
+	tick := objcblock.New(func(objc.Block) {
 		if v.status != st || v.player == 0 {
 			return
 		}

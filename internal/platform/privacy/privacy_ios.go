@@ -6,6 +6,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 const mediaPlayerPath = "/System/Library/Frameworks/MediaPlayer.framework/MediaPlayer"
@@ -47,7 +48,7 @@ func platformRequest(string) int { return driver.PermissionUnavailable }
 
 // platformAskOnce asks for the media library.
 func platformAskOnce(name string, answer func(int)) {
-	block := objc.NewBlock(func(objc.Block, int) { answer(Status(name)) })
+	block := objcblock.New(func(objc.Block, int) { answer(Status(name)) })
 	mediaLibrary().Send(sel("requestAuthorization:"), block)
 	block.Release()
 }

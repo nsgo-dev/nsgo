@@ -84,3 +84,11 @@ jobs:
         run: go tool nsgo test ./internal/platform/macos
       - name: Test native input isolation
         run: go tool nsgo test -target macos ./testdata/inputisolation
+      - name: Stress Objective-C blocks under GC and the race detector
+        env:
+          GOGC: "1"
+        run: go tool nsgo test ./internal/platform/objcblock -- -race
+      - name: Stress window observers in fresh processes
+        env:
+          GOGC: "1"
+        run: go tool nsgo test -run '^TestWindowObserversSurviveGC$' ./internal/platform/macos -- -race -timeout=180s

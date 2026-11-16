@@ -12,6 +12,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 var (
@@ -122,7 +123,7 @@ func Observe(center, name objc.ID, fn func(note objc.ID)) (stop func()) {
 	if center == 0 || name == 0 {
 		return func() {}
 	}
-	block := objc.NewBlock(func(_ objc.Block, note objc.ID) { fn(note) })
+	block := objcblock.New(func(_ objc.Block, note objc.ID) { fn(note) })
 	queue := objc.ID(Class("NSOperationQueue")).Send(selMainQueue)
 	token := center.Send(selAddObserver, name, objc.ID(0), queue, block).Send(sel("retain"))
 	block.Release()

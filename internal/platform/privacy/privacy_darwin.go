@@ -12,6 +12,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // The frameworks that keep the permissions phones and Macs share, loaded as one is first asked about.
@@ -150,7 +151,7 @@ func Request(name string, answer func(status int)) {
 	switch name {
 	case driver.PermissionMicrophone, driver.PermissionCamera:
 		device, media := captureDevice(name)
-		block := objc.NewBlock(func(objc.Block, bool) { answer(Status(name)) })
+		block := objcblock.New(func(objc.Block, bool) { answer(Status(name)) })
 		device.Send(sel("requestAccessForMediaType:completionHandler:"), media, block)
 		block.Release()
 	case driver.PermissionCalendars, driver.PermissionReminders:
@@ -160,7 +161,7 @@ func Request(name string, answer func(status int)) {
 		}
 		store := eventStore
 		requestMu.Unlock()
-		block := objc.NewBlock(func(objc.Block, bool, objc.ID) { answer(Status(name)) })
+		block := objcblock.New(func(objc.Block, bool, objc.ID) { answer(Status(name)) })
 		switch {
 		case fullAccess() && name == driver.PermissionCalendars:
 			store.Send(sel("requestFullAccessToEventsWithCompletion:"), block)

@@ -11,6 +11,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // Image downloads go through URLSession on macOS, iOS and watchOS.
@@ -56,7 +57,7 @@ func httpGet(ctx context.Context, url string, header imageload.Header, progress 
 		}
 		// On the session's queue: read what the objects hold here, as
 		// they are gone once the handler returns.
-		handler := objc.NewBlock(func(_ objc.Block, data, response, failure objc.ID) {
+		handler := objcblock.New(func(_ objc.Block, data, response, failure objc.ID) {
 			if failure != 0 {
 				done <- httpResult{err: errors.New("apple: " + GoString(failure.Send(sel("localizedDescription"))))}
 				return

@@ -9,6 +9,11 @@ The Go packages ported from NSH are modified: Rust is translated into Go, names
 follow Go conventions, and behavior differs where ARCHITECTURE.md records it.
 ARCHITECTURE.md's "Code map" names the NSH crate each package comes from.
 
+internal/platform/objcblock follows purego's Objective-C block bridge,
+https://github.com/ebitengine/purego, Copyright 2025 The Ebitengine Authors,
+licensed under the Apache License, Version 2.0. NSGo pins the templates,
+keeps descriptors in native memory and checks allocation before returning a block.
+
 core/tailwind_palette.go is Tailwind CSS's default palette,
 https://github.com/tailwindlabs/tailwindcss, Copyright (c) Tailwind Labs, Inc.,
 licensed under the MIT License, converted to sRGB as NSH converts it.

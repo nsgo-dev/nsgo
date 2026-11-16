@@ -10,6 +10,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
@@ -110,7 +111,7 @@ func (s *speechState) authorize(run *speechRun, next func()) {
 	switch objc.Send[int](recognizer, sel("authorizationStatus")) {
 	case authAllowed:
 	case authNotAsked:
-		block := objc.NewBlock(func(_ objc.Block, status int) {
+		block := objcblock.New(func(_ objc.Block, status int) {
 			OnMain(func() {
 				if status != authAllowed {
 					s.finish(run, driver.SpeechNotAllowed)
@@ -186,7 +187,7 @@ func (s *speechState) begin(run *speechRun, lang string) {
 	run.request.Send(sel("setShouldReportPartialResults:"), run.interim)
 	request := run.request
 	// On the audio thread: the request takes buffers from any thread.
-	tap := objc.NewBlock(func(_ objc.Block, buffer, _ objc.ID) { request.Send(sel("appendAudioPCMBuffer:"), buffer) })
+	tap := objcblock.New(func(_ objc.Block, buffer, _ objc.ID) { request.Send(sel("appendAudioPCMBuffer:"), buffer) })
 	input.Send(sel("installTapOnBus:bufferSize:format:block:"), uint(0), uint32(speechBufSize), format, tap)
 	tap.Release()
 	run.engine.Send(sel("prepare"))
@@ -194,7 +195,7 @@ func (s *speechState) begin(run *speechRun, lang string) {
 		s.finish(run, driver.SpeechAudioCapture)
 		return
 	}
-	handler := objc.NewBlock(func(_ objc.Block, result, failure objc.ID) {
+	handler := objcblock.New(func(_ objc.Block, result, failure objc.ID) {
 		// Read what the objects say here, as they are gone by the time
 		// the main thread runs.
 		var text, code string

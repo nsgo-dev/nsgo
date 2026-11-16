@@ -12,6 +12,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // System notifications for macOS and iOS through UserNotifications' UNUserNotificationCenter, as NSH's notifications: its delegate shows them while the app is in front and reports their presses, the one that launched the app included. The center serves only an app in a bundle, and raises for a bare executable, so one outside a bundle answers unavailable. A scheduled notification is the center's pending request, which the system shows at its trigger with the app's process ended.
@@ -136,7 +137,7 @@ func NotificationPermission(ask bool, answer func(int)) {
 		return
 	}
 	query := func() {
-		read := objc.NewBlock(func(_ objc.Block, settings objc.ID) {
+		read := objcblock.New(func(_ objc.Block, settings objc.ID) {
 			// UNAuthorizationStatus: not determined, denied, authorized,
 			// provisional and ephemeral.
 			switch objc.Send[int](settings, sel("authorizationStatus")) {
@@ -157,7 +158,7 @@ func NotificationPermission(ask bool, answer func(int)) {
 	}
 	// UNAuthorizationOptions: badge, sound and alert.
 	const options = 1<<0 | 1<<1 | 1<<2
-	asked := objc.NewBlock(func(_ objc.Block, _ bool, _ objc.ID) { query() })
+	asked := objcblock.New(func(_ objc.Block, _ bool, _ objc.ID) { query() })
 	center.Send(sel("requestAuthorizationWithOptions:completionHandler:"), uint(options), asked)
 	asked.Release()
 }
@@ -181,7 +182,7 @@ func ShowNotification(n driver.Notification, answer func(bool)) {
 	request := objc.ID(Class("UNNotificationRequest")).Send(sel("requestWithIdentifier:content:trigger:"),
 		NSString(n.ID), content, notificationTrigger(n))
 	content.Send(sel("release"))
-	added := objc.NewBlock(func(_ objc.Block, failure objc.ID) { answer(failure == 0) })
+	added := objcblock.New(func(_ objc.Block, failure objc.ID) { answer(failure == 0) })
 	center.Send(sel("addNotificationRequest:withCompletionHandler:"), request, added)
 	added.Release()
 }

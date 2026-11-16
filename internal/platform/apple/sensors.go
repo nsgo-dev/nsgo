@@ -13,6 +13,7 @@ import (
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
@@ -415,7 +416,7 @@ func (r *appleSensorRun) motion() {
 		}
 		packet := &r.packets[i+1]
 		var previous time.Duration
-		block := objc.NewBlock(func(_ objc.Block, data, failure objc.ID) {
+		block := objcblock.New(func(_ objc.Block, data, failure objc.ID) {
 			if failure != 0 {
 				if !r.motionFailure.CompareAndSwap(false, true) {
 					return

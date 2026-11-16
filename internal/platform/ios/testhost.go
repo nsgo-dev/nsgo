@@ -17,6 +17,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
@@ -527,7 +528,7 @@ func (t *testSurface) Screenshot() ([]byte, error) {
 	onMainSync(func() {
 		bounds := objc.Send[apple.CGRect](window, selBounds)
 		renderer := objc.ID(apple.Class("UIGraphicsImageRenderer")).Send(selAlloc).Send(sel("initWithBounds:"), bounds)
-		draw := objc.NewBlock(func(_ objc.Block, _ objc.ID) {
+		draw := objcblock.New(func(_ objc.Block, _ objc.ID) {
 			objc.Send[bool](window, sel("drawViewHierarchyInRect:afterScreenUpdates:"), bounds, true)
 		})
 		data := renderer.Send(sel("PNGDataWithActions:"), draw)

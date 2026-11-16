@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/ebitengine/purego/objc"
+
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // Go reads the local zone from /etc/localtime on macOS, once, but leaves time.Local UTC on iOS, tvOS and watchOS, which Go builds as GOOS=ios (time's zoneinfo_ios.go), where time.LoadLocation reads no system files either: it finds a zone there only in a time/tzdata the app links. loadTimeZone makes time.Local the zone NSTimeZone says, from the zone's own TZif data, before the app's main runs on those three, and again on every Apple target whenever NSSystemTimeZoneDidChangeNotification arrives. Times read after a change are in the new zone; the app is not rendered again for it.
@@ -20,7 +22,7 @@ func loadTimeZone() {
 			time.Local = localZone()
 		}
 		// The block runs on the thread that posts the notification, so a change applies whether or not the main thread runs a run loop, as a test's does not.
-		block := objc.NewBlock(func(objc.Block, objc.ID) {
+		block := objcblock.New(func(objc.Block, objc.ID) {
 			// Go has no other way to change the zone: the store races with readers of time.Local, but it is one pointer, which none sees torn.
 			time.Local = localZone()
 		})

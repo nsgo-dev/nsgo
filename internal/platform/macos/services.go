@@ -14,6 +14,7 @@ import (
 	"github.com/nsgo-dev/nsgo/desktop/locales"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // The services AppKit performs: the clipboard's images and files,
@@ -234,7 +235,7 @@ func (s *surface) pickImages(r driver.PickRequest, id uint32) {
 	}
 	panel.Send(sel("setAllowedFileTypes:"), types)
 	panel.Send(sel("retain"))
-	done := objc.NewBlock(func(_ objc.Block, response int) {
+	done := objcblock.New(func(_ objc.Block, response int) {
 		defer panel.Send(selRelease)
 		var paths []string
 		if response == 1 { // NSModalResponseOK
@@ -270,7 +271,7 @@ func (s *surface) pickFiles(r driver.FilesRequest, id uint32) {
 	panel.Send(sel("setAllowedContentTypes:"), apple.ContentTypes(r))
 	configureOpenPanel(panel, r.Title, r.Button, r.Start)
 	panel.Send(sel("retain"))
-	done := objc.NewBlock(func(_ objc.Block, response int) {
+	done := objcblock.New(func(_ objc.Block, response int) {
 		defer panel.Send(selRelease)
 		var files []driver.File
 		if response == 1 { // NSModalResponseOK
@@ -294,7 +295,7 @@ func (s *surface) pickDirectories(r driver.DirectoriesRequest, id uint32) {
 	panel.Send(sel("setAllowsMultipleSelection:"), r.Limit > 1)
 	configureOpenPanel(panel, r.Title, r.Button, r.Start)
 	panel.Send(sel("retain"))
-	done := objc.NewBlock(func(_ objc.Block, response int) {
+	done := objcblock.New(func(_ objc.Block, response int) {
 		defer panel.Send(selRelease)
 		var dirs []driver.Directory
 		if response == 1 { // NSModalResponseOK
@@ -339,7 +340,7 @@ func (s *surface) saveFile(r driver.SaveRequest, id uint32) {
 		panel.Send(sel("setAllowsOtherFileTypes:"), true)
 	}
 	panel.Send(sel("retain"))
-	done := objc.NewBlock(func(_ objc.Block, response int) {
+	done := objcblock.New(func(_ objc.Block, response int) {
 		defer panel.Send(selRelease)
 		if response != 1 {
 			s.engine.Dispatch(driver.Event{Kind: driver.EventFiles, Count: id})
@@ -614,7 +615,7 @@ func readPicked(path string) (driver.PickedFile, bool) {
 // pickScreenColor shows the system's color sampler, answering id.
 func (s *surface) pickScreenColor(id uint32) {
 	sampler := objc.ID(apple.Class("NSColorSampler")).Send(sel("alloc")).Send(sel("init"))
-	done := objc.NewBlock(func(_ objc.Block, color objc.ID) {
+	done := objcblock.New(func(_ objc.Block, color objc.ID) {
 		defer sampler.Send(selRelease)
 		if color == 0 {
 			s.engine.Dispatch(driver.Event{Kind: driver.EventFiles, Count: id})

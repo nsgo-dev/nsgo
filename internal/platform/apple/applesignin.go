@@ -10,6 +10,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // Sign in with Apple for macOS, iOS and tvOS through AuthenticationServices: ASAuthorizationAppleIDProvider's request, which an ASAuthorizationController shows over the window of the surface that asked, its delegate NSGo's. The system answers only an app signed with the com.apple.developer.applesignin entitlement, which nsgo build claims when nsgo.yaml's apple.sign_in_with_apple is set; others fail with ASAuthorizationErrorUnknown.
@@ -85,7 +86,7 @@ func HandleAppleSignIn(it *driver.MountItem, anchor objc.ID, dispatch func(drive
 	}
 	provider := objc.ID(Class("ASAuthorizationAppleIDProvider")).Send(sel("new"))
 	if it.Kind == driver.ItemAppleCredentialState {
-		block := objc.NewBlock(func(_ objc.Block, state int, err objc.ID) {
+		block := objcblock.New(func(_ objc.Block, state int, err objc.ID) {
 			ev := driver.Event{Kind: driver.EventSignInWithApple, Count: id}
 			if err != 0 {
 				ev.Text = driver.AppleSignInFailed

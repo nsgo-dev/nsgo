@@ -7,6 +7,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // regionKinds are UIViewReservedRegionKind's occlusion and division kinds, from iOS 27.1; zero before it.
@@ -55,7 +56,7 @@ func (s *surface) watchHinge() {
 	if c == 0 {
 		return
 	}
-	handler := objc.NewBlock(func(_ objc.Block, _, update objc.ID) {
+	handler := objcblock.New(func(_ objc.Block, _, update objc.ID) {
 		h := update.Send(sel("hinge"))
 		if h == 0 {
 			s.hinge = hingeReading{}

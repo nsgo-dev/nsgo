@@ -26,6 +26,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/finger"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
 	"github.com/nsgo-dev/nsgo/internal/platform/loopback"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/queue"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
@@ -1165,7 +1166,7 @@ func (s *surface) observe() {
 	}
 
 	const keyDown, leftDown, leftUp, mouseMoved, leftDragged, rightDown, otherDown, rightDragged, otherDragged, wheel, flags = 1 << 10, 1 << 1, 1 << 2, 1 << 5, 1 << 6, 1 << 3, 1 << 25, 1 << 7, 1 << 27, 1 << 22, 1 << 12
-	handler := objc.NewBlock(func(_ objc.Block, event objc.ID) objc.ID { return s.filter(event) })
+	handler := objcblock.New(func(_ objc.Block, event objc.ID) objc.ID { return s.filter(event) })
 	nsEvent := objc.ID(apple.Class("NSEvent"))
 	monitor := nsEvent.Send(sel("addLocalMonitorForEventsMatchingMask:handler:"),
 		uint64(keyDown|leftDown|leftUp|mouseMoved|leftDragged|rightDown|otherDown|rightDragged|otherDragged|wheel|flags), handler).Send(sel("retain"))
@@ -1484,7 +1485,7 @@ func (s *surface) alert(a *driver.AlertConfig) {
 		})
 		return
 	}
-	done := objc.NewBlock(func(_ objc.Block, response int) { answer(response) })
+	done := objcblock.New(func(_ objc.Block, response int) { answer(response) })
 	alert.Send(sel("beginSheetModalForWindow:completionHandler:"), s.window, done)
 	done.Release()
 }

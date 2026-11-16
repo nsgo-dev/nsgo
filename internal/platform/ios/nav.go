@@ -12,6 +12,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // Screens, sheets and the status bar, after NSH's navigation.rs. The
@@ -352,7 +353,7 @@ func (s *surface) followLargeTitle(sv *view, offset driver.Points) {
 		return
 	}
 	b.collapsed = collapsed
-	animations := objc.NewBlock(func(objc.Block) {
+	animations := objcblock.New(func(objc.Block) {
 		s.showLargeTitle(b)
 		s.styleBar(b, &b.config)
 		s.layoutBar(screen)
@@ -834,7 +835,7 @@ func (s *surface) animateSlide(sl *slide, from, to, seconds float64) {
 	top, below := s.slideViews(sl)
 	tx := objc.ID(apple.Class("CATransaction"))
 	tx.Send(sel("begin"))
-	done := objc.NewBlock(func(objc.Block) { s.endSlide(sl) })
+	done := objcblock.New(func(objc.Block) { s.endSlide(sl) })
 	tx.Send(sel("setCompletionBlock:"), done)
 	if sl.fade {
 		// Off is transparent: the top screen fades in over the one below,
@@ -1091,7 +1092,7 @@ func (s *surface) setStatusBar(c *driver.StatusBarConfig) {
 		update()
 		return
 	}
-	block := objc.NewBlock(func(objc.Block) { update() })
+	block := objcblock.New(func(objc.Block) { update() })
 	objc.ID(apple.Class("UIView")).Send(sel("animateWithDuration:animations:"), 0.25, block)
 	block.Release()
 }

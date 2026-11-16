@@ -10,6 +10,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // Auth sessions for macOS and iOS through AuthenticationServices' ASWebAuthenticationSession, which shows the provider's page in a browser sheet sharing the user's Safari cookies (unless ephemeral) and ends once the page redirects to the app's callback scheme, which the app need not register. tvOS has no such session and answers unavailable.
@@ -96,7 +97,7 @@ func openWebAuth(id uint32, a *webAuth, rawURL string, dispatch func(driver.Even
 		dispatch(driver.AuthEnd(id, driver.AuthFailed, "the authorization URL is not one Foundation reads"))
 		return
 	}
-	done := objc.NewBlock(func(_ objc.Block, callback, failure objc.ID) {
+	done := objcblock.New(func(_ objc.Block, callback, failure objc.ID) {
 		// Read the answer here, as it is gone by the time the main thread runs.
 		ev := driver.Event{Kind: driver.EventAuthSession, Count: id, Data: &driver.AuthEvent{Phase: driver.AuthEnded,
 			Callback: GoString(callback.Send(sel("absoluteString")))}}

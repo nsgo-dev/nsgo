@@ -7,6 +7,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // The focused input is kept clear of the software keyboard by the
@@ -52,7 +53,7 @@ func (s *surface) keepFocusedClear() {
 	scroll.setInset(scroll.sc.config.Behavior.ContentInset)
 	r := objc.Send[apple.CGRect](scroll.native, sel("convertRect:fromView:"), objc.Send[apple.CGRect](field.native, selBounds), field.native)
 	r.Size.Height += keyboardMargin
-	animations := objc.NewBlock(func(objc.Block) {
+	animations := objcblock.New(func(objc.Block) {
 		scroll.native.Send(sel("scrollRectToVisible:animated:"), r, false)
 	})
 	objc.ID(apple.Class("UIView")).Send(sel("animateWithDuration:animations:"), s.keyboardDuration.Seconds(), animations)

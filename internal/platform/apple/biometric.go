@@ -10,6 +10,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/privacy"
 )
 
@@ -65,7 +66,7 @@ func HandleBiometric(it *driver.MountItem, dispatch func(driver.Event)) {
 		return
 	}
 	reason := NSString(it.Value)
-	block := objc.NewBlock(func(_ objc.Block, success bool, err objc.ID) {
+	block := objcblock.New(func(_ objc.Block, success bool, err objc.ID) {
 		// Read the error here, as it is gone by the time the main thread runs.
 		result := driver.BiometricFailure
 		if success {

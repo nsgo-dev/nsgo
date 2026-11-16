@@ -9,6 +9,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
 // SetWebCookies carries out an ItemWebCookies: it sets each cookie in WKWebsiteDataStore's default store, whose WKHTTPCookieStore every web view but an Incognito one reads, and answers once WebKit has taken them all. The store exists without a web view, and WebKit writes it to disk, so a cookie with an expiry outlives the app. A target without WebKit, tvOS, has no store.
@@ -35,7 +36,7 @@ func SetWebCookies(id uint32, r driver.WebCookiesRequest, dispatch func(driver.E
 			continue
 		}
 		// WebKit calls the handler on the main thread; OnMain keeps the count there whatever it does.
-		set := objc.NewBlock(func(objc.Block) { OnMain(finish) })
+		set := objcblock.New(func(objc.Block) { OnMain(finish) })
 		store.Send(sel("setCookie:completionHandler:"), cookie, set)
 		set.Release()
 	}

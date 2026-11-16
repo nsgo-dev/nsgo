@@ -22,6 +22,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/engine"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/queue"
 	"github.com/nsgo-dev/nsgo/internal/platform/updates"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
@@ -749,7 +750,7 @@ func (s *surface) alert(a *driver.AlertConfig) {
 	s.directTree(ctrl.Send(sel("view")))
 	id := a.ID
 	add := func(label string, style, index int) {
-		handler := objc.NewBlock(func(_ objc.Block, _ objc.ID) {
+		handler := objcblock.New(func(_ objc.Block, _ objc.ID) {
 			if s.alerts != nil {
 				delete(s.alerts, id)
 			}
@@ -783,7 +784,7 @@ func (s *surface) alert(a *driver.AlertConfig) {
 		// center without an arrow. It hides its cancel action and runs it
 		// on a tap outside, so one that is never shown closes it.
 		if !cancel {
-			handler := objc.NewBlock(func(_ objc.Block, _ objc.ID) {
+			handler := objcblock.New(func(_ objc.Block, _ objc.ID) {
 				s.engine.Dispatch(driver.Event{Kind: driver.EventAlert, Count: id, Index: -1})
 			})
 			action := objc.ID(apple.Class("UIAlertAction")).Send(sel("actionWithTitle:style:handler:"),
