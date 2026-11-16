@@ -282,10 +282,8 @@ func TestAnEventBeforeAFrameSharesItsPass(t *testing.T) {
 	}, Options{Size: driver.Size{Width: 100, Height: 100}})
 	defer e.Close()
 	<-p.mounted
-	// settle returns once the passes begun so far have committed: Sync
-	// returns from inside a pass, and a second one runs in a later pass.
+	// Sync waits for the passes begun so far to commit.
 	settle := func() int {
-		e.Sync()
 		e.Sync()
 		p.mu.Lock()
 		defer p.mu.Unlock()

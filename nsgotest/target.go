@@ -72,6 +72,9 @@ type target struct {
 	live bool
 	// quiet reports whether the last settle came to quiet before settleWait.
 	quiet bool
+	// syncing is the one outstanding engine barrier, retained when a
+	// settle times out so a blocked engine never accumulates waiters.
+	syncing chan struct{}
 
 	mu      sync.Mutex
 	batches []*driver.MountBatch
@@ -250,10 +253,41 @@ func (t *target) drain() bool {
 	return len(batches)+len(events) > 0
 }
 
-// settle waits until no batch came and the platform animated nothing for
-// quietFor, settleWait at most, applying what came.
+// sync waits for the engine's pending commit within the step's deadline.
+func (t *target) sync(deadline time.Time) bool {
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return false
+	}
+	if t.syncing == nil {
+		done := make(chan struct{})
+		t.syncing = done
+		go func() { t.surface.Sync(); close(done) }()
+	}
+	timer := time.NewTimer(remaining)
+	defer timer.Stop()
+	select {
+	case <-t.syncing:
+		t.syncing = nil
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
+// settle waits for the engine to commit, then for no batch or finite
+// animation for quietFor, settleWait at most, applying what came.
 func (t *target) settle() {
-	deadline := time.Now().Add(settleWait)
+	t.settleUntil(time.Now().Add(settleWait))
+}
+
+func (t *target) settleUntil(deadline time.Time) {
+	t.runPosts()
+	if !t.sync(deadline) {
+		t.drain()
+		t.quiet = false
+		return
+	}
 	if t.a.measure {
 		// An app measured may commit as long as it runs, as a ticking
 		// table does, and asking the platform what animates walks its
@@ -279,8 +313,24 @@ func (t *target) settle() {
 		if t.drain() || t.surface.Animating() {
 			quiet = time.Now()
 		}
-		if time.Since(quiet) >= quietFor || time.Now().After(deadline) {
-			t.quiet = time.Since(quiet) >= quietFor
+		if time.Now().After(deadline) {
+			t.quiet = false
+			return
+		}
+		if time.Since(quiet) >= quietFor {
+			// The engine can be in a slow commit while no batch arrives.
+			// Check it again before declaring the app quiet, then take the
+			// batches it sent before completing the barrier.
+			if !t.sync(deadline) {
+				t.drain()
+				t.quiet = false
+				return
+			}
+			if t.drain() || t.surface.Animating() {
+				quiet = time.Now()
+				continue
+			}
+			t.quiet = time.Now().Before(deadline)
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

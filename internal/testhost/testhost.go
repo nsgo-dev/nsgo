@@ -104,7 +104,7 @@ type Surface interface {
 	Resize(size driver.Size) error
 	SetEnvironment(env driver.Environment) error
 	// Sync returns once the app's engine ran what was posted to it
-	// before: what the timers the test's clock fired run.
+	// before and handed the resulting commits to the platform.
 	Sync()
 }
 

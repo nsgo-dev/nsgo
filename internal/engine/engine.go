@@ -267,11 +267,13 @@ type message struct {
 	geometry driver.Geometry
 	// resized are closed once the commit after the resize is mounted.
 	resized []chan struct{}
-	env     *driver.Environment
-	at      *driver.Event // a press to hit test
-	tokens  *core.Tokens
-	fn      func()
-	fonts   bool
+	// synced is closed once this pass's commits have been mounted.
+	synced chan struct{}
+	env    *driver.Environment
+	at     *driver.Event // a press to hit test
+	tokens *core.Tokens
+	fn     func()
+	fonts  bool
 	// attach is the platform of an opened surface; detach ends it.
 	attach Platform
 	detach bool
@@ -509,9 +511,12 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		if perf != nil || trace != nil {
 			start = time.Now()
 		}
-		var resized []chan struct{}
+		var completed []chan struct{}
 		for _, m := range taken {
 			switch {
+			case m.synced != nil:
+				completed = append(completed, m.synced)
+				continue
 			case m.frame:
 				frameAsked = false
 				root.RunFrame()
@@ -563,7 +568,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 						t.SetEnvironment(*m.env)
 					}
 				})
-				resized = append(resized, m.resized...)
+				completed = append(completed, m.resized...)
 			case m.env != nil:
 				t.SetEnvironment(*m.env)
 			case m.at != nil:
@@ -573,7 +578,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			}
 		}
 		commit(start)
-		for _, done := range resized {
+		for _, done := range completed {
 			close(done)
 		}
 	}
@@ -694,11 +699,12 @@ func LaunchFiles() []string {
 	return paths
 }
 
-// Sync returns once the engine ran what was posted to it before, as a
-// test host waits for the timers a step of its clock fired.
+// Sync returns once the engine ran what was posted to it before and
+// handed the resulting commits to the platforms, or the engine exited.
+// It must not be called from the engine goroutine.
 func (e *Engine) Sync() {
 	done := make(chan struct{})
-	e.push(message{fn: func() { close(done) }})
+	e.push(message{synced: done})
 	select {
 	case <-done:
 	case <-e.exited:
