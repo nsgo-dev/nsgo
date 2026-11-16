@@ -814,8 +814,13 @@ func (m *mounter) key(code driver.NodeID, action, mods int, text string) {
 	if mods&1 != 0 {
 		names = []string{"mod+" + rest, "ctrl+" + rest}
 	}
-	if key, _ := driver.FindKey(m.keys, names, m.editing(), repeat); key != "" {
-		m.s.dispatch(driver.Event{Kind: driver.EventKey, Text: key})
+	// The page knows only whether a text input has the keyboard focus, so it reports KeyUseText alone, as FindKey allows.
+	var focus driver.KeyUse
+	if m.editing() {
+		focus = driver.KeyUseText
+	}
+	if id, _ := driver.FindKey(m.keys, names, focus, repeat); id != 0 {
+		m.s.dispatch(driver.Event{Kind: driver.EventKey, Count: id})
 	}
 }
 

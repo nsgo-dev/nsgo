@@ -37,7 +37,11 @@ var unsupportedItems = map[string]string{
 	"notifications and badges": `ItemBadge ItemCloseNotification ItemHaptic`,
 	"desktop only": `ItemDock ItemMenu ItemPopupMenu ItemLaunchAtLogin
 		ItemSetLaunchAtLogin ItemOpenSurface ItemQuit ItemTray ItemTrayMenu
-		ItemWindow ItemHotKeys ItemQuitResponse`,
+		ItemWindow ItemHotKeys ItemQuitResponse ItemDockMenu ItemRecentFile`,
+	"Apple only": `ItemAppleCredentialState ItemSignInWithApple`,
+	// Services main added after this target, which no HarmonyOS kit answers here yet.
+	"services added since": `ItemAuthSession ItemPurchase ItemSensor ItemSpeak
+		ItemWebCookies`,
 	// The core answers these before the platform sees them: it resolves a
 	// path with os.Stat, which js/wasm does not implement, answers the
 	// install family itself off Android, and sends no audio where the
@@ -62,7 +66,11 @@ var unsupportedEvents = map[string]string{
 	"notifications and input modality": `EventNotificationPress EventInputModality
 		EventWindowEnded`,
 	"system and desktop": `EventTray EventHotKey EventLaunchAtLogin EventSpeech
-		EventQuitRequest`,
+		EventQuitRequest EventDockMenu EventHotKeyState EventWindowPlacementFailed`,
+	"Apple only": `EventSignInWithApple`,
+	// Services main added after this target, which no HarmonyOS kit answers here yet.
+	"services added since": `EventAuthSession EventOpenLinks EventPurchase
+		EventPurchaseUpdate EventSensor EventSpeak EventWebCookies`,
 	// The app hears neither: the core sends no audio where the environment
 	// says none, and asks about a quit only where the platform ends apps
 	// itself.
