@@ -47,6 +47,9 @@ func buildMacStorePackage(ctx context.Context, p *project, app, dir, arch string
 	identity, installer := "-", ""
 	if p.Sign.MacOSProfile == "" {
 		detailIn(ctx, "unsigned: set sign.macos_profile to upload it to the Mac App Store")
+		if p.Apple.SignInWithApple {
+			warnIn(ctx, "Sign in with Apple is left out: macOS grants it only with sign.macos_profile")
+		}
 	} else {
 		data, err := os.ReadFile(p.Sign.MacOSProfile)
 		if err != nil {
@@ -64,6 +67,9 @@ func buildMacStorePackage(ctx context.Context, p *project, app, dir, arch string
 		team, _ := granted["com.apple.developer.team-identifier"].(string)
 		ents["com.apple.application-identifier"] = signedAppID(appID, p.ID)
 		ents["com.apple.developer.team-identifier"] = team
+		if err := p.claimSignInWithApple(ents, granted); err != nil {
+			return "", err
+		}
 		if err := os.WriteFile(filepath.Join(app, "Contents", "embedded.provisionprofile"), data, 0o644); err != nil {
 			return "", err
 		}

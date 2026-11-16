@@ -957,29 +957,30 @@ func (s *surface) environment() driver.Environment {
 	locale, rtl := apple.Locale()
 	appearance := apple.GoString(s.native.Send(sel("effectiveAppearance")).Send(sel("name")))
 	return driver.Environment{
-		Dark:           strings.Contains(appearance, "Dark"),
-		FontScale:      1,
-		ReduceMotion:   objc.Send[bool](ws, sel("accessibilityDisplayShouldReduceMotion")),
-		ScreenReader:   objc.Send[bool](ws, sel("isVoiceOverEnabled")),
-		ScreenColor:    true,
-		Speech:         apple.SpeechAvailable(),
-		CanSendInput:   true,
-		HasWebView:     true,
-		RTL:            rtl,
-		PixelRatio:     s.backingScale(),
-		Locale:         locale,
-		LocaleSettings: apple.LocaleSettings(),
-		Displays:       displays(),
-		OS:             driver.OSMacOS,
-		Idiom:          driver.IdiomDesktop,
-		OSVersion:      osVersion(),
-		TitleBar:       s.titleBarArea(),
-		WindowMaterial: s.material,
-		Maximized:      !s.embedded && objc.Send[bool](s.window, sel("isZoomed")),
-		FullScreen:     !s.embedded && s.window != 0 && objc.Send[uint](s.window, selStyleMask)&maskFullScreen != 0,
-		Minimized:      s.window != 0 && objc.Send[bool](s.window, sel("isMiniaturized")),
-		WindowFrame:    s.windowFrame(),
-		Lifecycle:      s.lifecycle(),
+		Dark:            strings.Contains(appearance, "Dark"),
+		FontScale:       1,
+		ReduceMotion:    objc.Send[bool](ws, sel("accessibilityDisplayShouldReduceMotion")),
+		ScreenReader:    objc.Send[bool](ws, sel("isVoiceOverEnabled")),
+		ScreenColor:     true,
+		Speech:          apple.SpeechAvailable(),
+		CanSendInput:    true,
+		HasWebView:      true,
+		SignInWithApple: apple.AppleSignInAvailable(),
+		RTL:             rtl,
+		PixelRatio:      s.backingScale(),
+		Locale:          locale,
+		LocaleSettings:  apple.LocaleSettings(),
+		Displays:        displays(),
+		OS:              driver.OSMacOS,
+		Idiom:           driver.IdiomDesktop,
+		OSVersion:       osVersion(),
+		TitleBar:        s.titleBarArea(),
+		WindowMaterial:  s.material,
+		Maximized:       !s.embedded && objc.Send[bool](s.window, sel("isZoomed")),
+		FullScreen:      !s.embedded && s.window != 0 && objc.Send[uint](s.window, selStyleMask)&maskFullScreen != 0,
+		Minimized:       s.window != 0 && objc.Send[bool](s.window, sel("isMiniaturized")),
+		WindowFrame:     s.windowFrame(),
+		Lifecycle:       s.lifecycle(),
 	}
 }
 
@@ -1498,6 +1499,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemPermission:
 			s.permission(it.Count, *it.Permission)
+			continue
+		case driver.ItemSignInWithApple, driver.ItemAppleCredentialState:
+			apple.HandleAppleSignIn(it, s.window, s.engine.Dispatch)
 			continue
 		case driver.ItemKeepAwake:
 			if it.Awake != nil && !s.closed {

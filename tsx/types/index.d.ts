@@ -322,6 +322,32 @@ export interface SpeechModule {
   start(options?: SpeechStartOptions | null): SpeechSession;
 }
 export declare const Speech: SpeechModule;
+export interface AppleSignInOptions {
+  /** Ask for the name and the email, which Apple gives only on the user's first sign-in to the app. */
+  fullName?: boolean;
+  email?: boolean;
+  /** Sent as its SHA-256 in lowercase hex, which the identity token's `nonce` claim holds. */
+  nonce?: string;
+}
+export interface AppleCredential {
+  /** The user's stable ID, which `credentialState` takes. */
+  user: string;
+  /** A JWT for the app's server to verify. */
+  identityToken: string;
+  authorizationCode: string;
+  /** `""` but on the first sign-in, as the name's parts. */
+  email: string;
+  fullName: { givenName: string; familyName: string; middleName: string; namePrefix: string; nameSuffix: string; nickname: string };
+}
+export type AppleCredentialState = "authorized" | "revoked" | "notFound" | "transferred";
+export interface SignInWithAppleModule {
+  /** Whether this platform has Sign in with Apple: macOS, iOS and tvOS. */
+  available(): Promise<boolean>;
+  /** Shows the system's sheet. Resolves with the credential, `null` when the user cancels; rejects with `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM` where unavailable, otherwise when the system fails. */
+  signIn(options?: AppleSignInOptions | null): Promise<AppleCredential | null>;
+  credentialState(user: string): Promise<AppleCredentialState>;
+}
+export declare const SignInWithApple: SignInWithAppleModule;
 
 export type HostValue = null | boolean | number | string | HostValue[] | { [key: string]: HostValue };
 export interface HostSubscription { (): void; remove(): void }

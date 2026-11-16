@@ -231,3 +231,36 @@ func TestPBXString(t *testing.T) {
 		t.Errorf("pbxString = %s, want %s", got, want)
 	}
 }
+
+// Sign in with Apple's entitlement goes into what Xcode and a provisioning profile sign with only when nsgo.yaml asks for it, and a profile that does not grant it refuses the build.
+func TestSignInWithAppleEntitlement(t *testing.T) {
+	p := &project{ID: "dev.example.hello"}
+	if ents := p.xcodeEntitlements(false); len(ents) != 0 {
+		t.Errorf("an app asking for nothing claims %v", ents)
+	}
+	granted := map[string]any{signInWithAppleEntitlement: []any{"Default"}, "application-identifier": "TEAM.dev.example.hello"}
+	if err := p.claimSignInWithApple(granted, granted); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := granted[signInWithAppleEntitlement]; ok {
+		t.Error("a profile granting Sign in with Apple claims it for an app that does not ask")
+	}
+	p.Apple.SignInWithApple = true
+	ents := p.xcodeEntitlements(true)
+	if v, _ := ents[signInWithAppleEntitlement].([]any); len(v) != 1 || v[0] != "Default" {
+		t.Errorf("Xcode's entitlements %v", ents)
+	}
+	if _, ok := ents["com.apple.security.application-groups"]; !ok {
+		t.Errorf("Xcode's entitlements lose the widgets' app group: %v", ents)
+	}
+	if err := p.claimSignInWithApple(map[string]any{}, map[string]any{"application-identifier": "TEAM.dev.example.hello"}); err == nil || !strings.Contains(err.Error(), "does not grant Sign in with Apple") {
+		t.Errorf("a profile without the capability: %v", err)
+	}
+	signed := map[string]any{}
+	if err := p.claimSignInWithApple(signed, map[string]any{signInWithAppleEntitlement: []any{"Default"}}); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := signed[signInWithAppleEntitlement].([]any); len(v) != 1 || v[0] != "Default" {
+		t.Errorf("signed with %v", signed)
+	}
+}

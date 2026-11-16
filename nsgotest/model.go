@@ -535,6 +535,11 @@ func (a *App) apply(b *driver.MountBatch) {
 				result = core.BiometricUnavailable
 			}
 			a.post(driver.Event{Kind: driver.EventBiometric, Count: it.Count, Index: int(result)})
+		case driver.ItemSignInWithApple:
+			a.signInWithApple(&it)
+		case driver.ItemAppleCredentialState:
+			state := cmp.Or(a.AppleCredentialStates[it.Value], core.AppleCredentialNotFound)
+			a.post(driver.Event{Kind: driver.EventSignInWithApple, Count: it.Count, Index: int(state)})
 		case driver.ItemPermission:
 			a.permission(&it)
 		case driver.ItemPickImages:
@@ -774,6 +779,27 @@ func (a *App) authSession(id uint32, r driver.AuthRequest) {
 			s.Cancelled = true
 		}
 	}
+}
+
+// signInWithApple records an ItemSignInWithApple and answers it as AppleSignIn says, cancelled without it.
+func (a *App) signInWithApple(it *driver.MountItem) {
+	r := *it.AppleSignIn
+	a.AppleSignIns = append(a.AppleSignIns, r)
+	ev := driver.Event{Kind: driver.EventSignInWithApple, Count: it.Count, Text: driver.AppleSignInCancelled}
+	if a.AppleSignIn != nil {
+		c, err := a.AppleSignIn(r)
+		var code core.AppleSignInError
+		switch {
+		case err == nil:
+			cred := driver.AppleCredential(c)
+			ev.Text, ev.Data = "", &cred
+		case errors.As(err, &code):
+			ev.Text = string(code)
+		default:
+			ev.Text = driver.AppleSignInFailed
+		}
+	}
+	a.post(ev)
 }
 
 // permission answers an ItemPermission from Permissions, as a platform whose system keeps every permission does.

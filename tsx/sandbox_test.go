@@ -75,7 +75,7 @@ func network(req *http.Request) (*http.Response, error) {
 
 // tries is a plugin that runs each named attempt and shows what each
 // gave, in order, as "name: result".
-const tries = `import { mount, signal, Text, AuthSession, Clipboard, openUrl, Storage, host } from "nsgo";
+const tries = `import { mount, signal, Text, AuthSession, Clipboard, openUrl, Storage, host, SignInWithApple } from "nsgo";
 const log = signal([]);
 const say = (name, v) => log.set([...log(), name + ": " + v]);
 const how = (e) => e.code ? e.code + " " + (e.permission ?? "") : e.name + " " + e.message;
@@ -117,6 +117,7 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 	clipboard: () => Clipboard.readText(),
 	openUrl: () => openUrl("https://example.com"),
 	auth: () => AuthSession.start((redirect) => "https://provider.example/?redirect_uri=" + redirect).result,
+	signInWithApple: () => SignInWithApple.signIn(),
 	granted: () => host.call("greet", "Ada"),
 	refused: () => host.call("secret"),
 	timers: () => { for (let i = 0; i < 5; i++) setTimeout(() => {}, 100000); },
@@ -124,20 +125,21 @@ func TestSandboxHoldsAPackageToItsCapabilities(t *testing.T) {
 	full: () => Storage.setItem("big", "x".repeat(100)),
 	`, pkg.Capabilities{Network: &pkg.Network{Hosts: []string{"api.example.com"}}, Host: []string{"greet"}}, tsx.Sandbox{Host: greeter()})
 	want := map[string]string{
-		"allowed":   "https://api.example.com/a",
-		"other":     "ERR_ACCESS_DENIED network",
-		"redirect":  "ERR_ACCESS_DENIED network",
-		"file":      "ERR_ACCESS_DENIED network",
-		"big":       "ERR_NSH_QUOTA_EXCEEDED ",
-		"data":      "hi",
-		"clipboard": "ERR_ACCESS_DENIED clipboard",
-		"openUrl":   "ERR_ACCESS_DENIED openUrl",
-		"auth":      "ERR_ACCESS_DENIED authSession",
-		"granted":   "hi Ada",
-		"refused":   "ERR_ACCESS_DENIED host",
-		"timers":    "ERR_NSH_QUOTA_EXCEEDED ",
-		"storage":   "k",
-		"full":      "ERR_NSH_QUOTA_EXCEEDED ",
+		"allowed":         "https://api.example.com/a",
+		"other":           "ERR_ACCESS_DENIED network",
+		"redirect":        "ERR_ACCESS_DENIED network",
+		"file":            "ERR_ACCESS_DENIED network",
+		"big":             "ERR_NSH_QUOTA_EXCEEDED ",
+		"data":            "hi",
+		"clipboard":       "ERR_ACCESS_DENIED clipboard",
+		"openUrl":         "ERR_ACCESS_DENIED openUrl",
+		"auth":            "ERR_ACCESS_DENIED authSession",
+		"signInWithApple": "ERR_ACCESS_DENIED signInWithApple",
+		"granted":         "hi Ada",
+		"refused":         "ERR_ACCESS_DENIED host",
+		"timers":          "ERR_NSH_QUOTA_EXCEEDED ",
+		"storage":         "k",
+		"full":            "ERR_NSH_QUOTA_EXCEEDED ",
 	}
 	for k, w := range want {
 		if got[k] != w {

@@ -32,6 +32,7 @@ var serviceExports = []export{
 	{"Picker", (*runtime).picker},
 	{"Speech", (*runtime).speech},
 	{"AuthSession", (*runtime).authSession},
+	{"SignInWithApple", (*runtime).signInWithApple},
 	fn("openUrl", func(r *runtime, call js.FunctionCall) js.Value {
 		p, resolve, reject := r.vm.NewPromise()
 		u := arg(call, 0).String()

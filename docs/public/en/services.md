@@ -222,6 +222,37 @@ cx.AuthSession(func(redirect string) string {
 
 The redirect is `com.example.app:/oauth2redirect` where the system's session catches the scheme, which the app need not declare, and `http://127.0.0.1:<port>/oauth2redirect` on the desktops' loopback, so register both with the provider, often as clients of their own. Leave `Scheme` empty for loopback alone, or set it to `https` with `Host` for the app's associated domain, which iOS 17.4 and macOS 14.4 catch. A closed browser tab tells a loopback session nothing, so give it a `Timeout` or a cancel button. `Ephemeral` asks macOS and iOS not to share the browser's cookies. Android, tvOS, watchOS and mini programs answer `core.AuthUnavailable` for now. In TSX, `AuthSession.start(url, options)` needs the `auth_session` capability and gives a session whose `result` resolves with the callback, or null once cancelled.
 
+## Sign in with Apple
+
+`cx.SignInWithApple` shows the system's Sign in with Apple sheet from the app's own button on macOS, iOS and tvOS, where `cx.Env().CanSignInWithApple()` is true. It answers once with the credential, or with an error: `core.AppleSignInCancelled` when the user closes the sheet, which is not a failure, else `AppleSignInFailed` or, on other platforms, `AppleSignInUnavailable`. Apple gives the email and the name only on the user's first sign-in to the app, so keep them then. `Nonce` goes into the request as its SHA-256 in lowercase hex, which the identity token's `nonce` claim holds: the server hashes the nonce it gave the app and compares. `cx.AppleCredentialState` tells whether the user has since revoked it.
+
+```go
+nonce := rand.Text() // also sent to the server, which checks the token's claim against its SHA-256
+cx.SignInWithApple(core.AppleSignInOptions{FullName: true, Email: true, Nonce: nonce}, func(c core.AppleCredential, err error) {
+	switch {
+	case errors.Is(err, core.AppleSignInCancelled):
+	case err != nil:
+		showError(err)
+	default:
+		signInOnServer(c.IdentityToken, c.AuthorizationCode, nonce, c.GivenName, c.FamilyName, c.Email)
+	}
+})
+cx.AppleCredentialState(savedUser, func(s core.AppleCredentialState, err error) {
+	if err == nil && s == core.AppleCredentialRevoked {
+		signOut()
+	}
+})
+```
+
+The app must be signed with the Sign in with Apple entitlement, which `build` adds when `nsgo.yaml` asks for it; without it the sheet fails:
+
+```yaml
+apple:
+  sign_in_with_apple: true  # com.apple.developer.applesignin, in iOS and tvOS packages and Mac App Store builds
+```
+
+Xcode registers the capability for device builds from `nsgo dev`; a provisioning profile in `sign.profile` or `sign.macos_profile` must come from an App ID with Sign in with Apple turned on. macOS grants it only with a profile, so a disk image or a `nsgo dev` run on a Mac cannot sign in, nor can the simulator, whose builds claim no developer entitlement.
+
 ## Overlays on Android
 
 `mobile.OpenOverlay` shows a view of the app's over other apps on Android, a tree of its own that shares the app's signals, and a foreground service keeps the app running while it shows. The app lists `SYSTEM_ALERT_WINDOW` under `android.permissions`, and the user grants it in the system's settings, which `mobile.RequestOverlayPermission` opens; without it the overlay ends at once and `OnEnd` hears why. It takes touches but leaves the keys and the touches around it to the app in front, unless it is `Focusable` or `Passive`, and moves with `desktop.SetWindowFrame` from its content. Other platforms open none.

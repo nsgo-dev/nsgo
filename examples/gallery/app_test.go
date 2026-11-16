@@ -60,7 +60,9 @@ func open(app *nsgotest.App, name string) {
 
 // showBase shows the base form of the playground titled title, on the tab
 // beside its ui form's.
-func showBase(app *nsgotest.App, title string) { app.Press("id:package-" + title + " >> role:tab Base") }
+func showBase(app *nsgotest.App, title string) {
+	app.Press("id:package-" + title + " >> role:tab Base")
+}
 
 // openTab chooses a tab of the phone layout's system tab bar.
 func openTab(app *nsgotest.App, i int) { app.Emit("id:tab-bar", "change", float64(i)) }
@@ -856,6 +858,36 @@ func TestSystemAuthSession(t *testing.T) {
 	if s := app.AuthSessions[len(app.AuthSessions)-1]; !s.Cancelled {
 		t.Fatalf("the platform's session went on: %+v", s)
 	}
+}
+
+func TestSystemSignInWithApple(t *testing.T) {
+	headless(t)
+	app := startDesktop(t)
+	open(app, "System")
+	app.Press("id:apple-sign-in")
+	if got := app.Find("id:apple-sign-in-result").Text; got != "Unavailable" {
+		t.Fatalf("result %q, want %q", got, "Unavailable")
+	}
+	env := desktopEnv
+	env.SignInWithApple = true
+	app.SetEnvironment(env)
+	app.Press("id:apple-sign-in")
+	if got := app.Find("id:apple-sign-in-result").Text; got != "Cancelled" {
+		t.Fatalf("result %q, want %q", got, "Cancelled")
+	}
+	app.AppleSignIn = func(r core.AppleSignInRequest) (core.AppleCredential, error) {
+		if !r.FullName || !r.Email || len(r.Nonce) != 64 {
+			t.Errorf("request %+v", r)
+		}
+		return core.AppleCredential{User: "ada"}, nil
+	}
+	app.AppleCredentialStates = map[string]core.AppleCredentialState{"ada": core.AppleCredentialRevoked}
+	app.Press("id:apple-sign-in")
+	if got := app.Find("id:apple-sign-in-result").Text; got != "Signed in" {
+		t.Fatalf("result %q, want %q", got, "Signed in")
+	}
+	app.Press("id:apple-credential-state")
+	app.Find("text:Revoked")
 }
 
 func TestSystem(t *testing.T) {

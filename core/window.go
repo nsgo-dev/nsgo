@@ -834,7 +834,7 @@ func (t *Tree) surfaceEvent(ev driver.Event) bool {
 		if state <= driver.HotKeyUnsupported {
 			rt.hotKeyState(ev.Count, state)
 		}
-	case driver.EventLaunchAtLogin, driver.EventNotification, driver.EventBiometric, driver.EventPermission, driver.EventOverlayPermission:
+	case driver.EventLaunchAtLogin, driver.EventNotification, driver.EventBiometric, driver.EventPermission, driver.EventOverlayPermission, driver.EventSignInWithApple:
 		t.answer(ev)
 	case driver.EventNotificationPress:
 		t.within(t.root, func() { rt.notificationPressed(ev.Text) })

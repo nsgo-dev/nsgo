@@ -92,7 +92,7 @@ func describeCapabilities(c pkg.Capabilities) []string {
 		on   bool
 		name string
 	}{{c.Clipboard, "clipboard"}, {c.Picker, "picker"}, {c.Speech, "speech"}, {c.StatusBar, "status_bar"},
-		{c.Notifications, "notifications"}, {c.Biometrics, "biometrics"}, {c.Audio, "audio"}, {c.AuthSession, "auth_session"}} {
+		{c.Notifications, "notifications"}, {c.Biometrics, "biometrics"}, {c.SignInWithApple, "sign_in_with_apple"}, {c.Audio, "audio"}, {c.AuthSession, "auth_session"}} {
 		if b.on {
 			out = append(out, b.name)
 		}

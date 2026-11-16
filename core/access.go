@@ -63,6 +63,8 @@ const (
 	AccessNotifications = "notifications"
 	// AccessBiometrics is Face ID, Touch ID and device biometric unlock.
 	AccessBiometrics = "biometrics"
+	// AccessSignInWithApple is Sign in with Apple and its credentials' states.
+	AccessSignInWithApple = "signInWithApple"
 	// AccessPermissions is checking, asking for and opening the settings of the system's permissions, by the permission's key (AccessRequest.Resource), and guiding the user to give them.
 	AccessPermissions = "permissions"
 	// AccessOverlay is windows over other apps on Android (OpenOverlay), which TSX packages cannot declare.
@@ -143,19 +145,20 @@ type service string
 
 // The services core holds to Access.
 const (
-	serviceOpenURL       service = "openURL"
-	serviceStatusBar     service = "statusBar"
-	serviceNotifications service = "notifications"
-	serviceBiometrics    service = "biometrics"
-	servicePermissions   service = "permissions"
-	serviceHost          service = "host"
-	serviceImage         service = "image"
-	serviceClipboard     service = "clipboard"
-	servicePicker        service = "picker"
-	serviceSpeech        service = "speech"
-	serviceOverlay       service = "overlay"
-	serviceAudio         service = "audio"
-	serviceAuthSession   service = "authSession"
+	serviceOpenURL         service = "openURL"
+	serviceStatusBar       service = "statusBar"
+	serviceNotifications   service = "notifications"
+	serviceBiometrics      service = "biometrics"
+	serviceSignInWithApple service = "signInWithApple"
+	servicePermissions     service = "permissions"
+	serviceHost            service = "host"
+	serviceImage           service = "image"
+	serviceClipboard       service = "clipboard"
+	servicePicker          service = "picker"
+	serviceSpeech          service = "speech"
+	serviceOverlay         service = "overlay"
+	serviceAudio           service = "audio"
+	serviceAuthSession     service = "authSession"
 )
 
 // serviceRule is how core holds a kind of service to Access.
@@ -170,19 +173,20 @@ type serviceRule struct {
 
 // services are the kinds of service gate knows, and how it holds each.
 var services = map[service]serviceRule{
-	serviceOpenURL:       {permission: AccessOpenURL},
-	serviceStatusBar:     {permission: AccessStatusBar},
-	serviceNotifications: {permission: AccessNotifications},
-	serviceBiometrics:    {permission: AccessBiometrics},
-	servicePermissions:   {permission: AccessPermissions},
-	serviceHost:          {permission: AccessHost},
-	serviceImage:         {permission: AccessNetwork, source: true},
-	serviceClipboard:     {permission: AccessClipboard, runtimeOnly: true},
-	servicePicker:        {permission: AccessPicker, runtimeOnly: true},
-	serviceSpeech:        {permission: AccessSpeech, runtimeOnly: true},
-	serviceOverlay:       {permission: AccessOverlay},
-	serviceAudio:         {permission: AccessAudio},
-	serviceAuthSession:   {permission: AccessAuthSession},
+	serviceOpenURL:         {permission: AccessOpenURL},
+	serviceStatusBar:       {permission: AccessStatusBar},
+	serviceNotifications:   {permission: AccessNotifications},
+	serviceBiometrics:      {permission: AccessBiometrics},
+	serviceSignInWithApple: {permission: AccessSignInWithApple},
+	servicePermissions:     {permission: AccessPermissions},
+	serviceHost:            {permission: AccessHost},
+	serviceImage:           {permission: AccessNetwork, source: true},
+	serviceClipboard:       {permission: AccessClipboard, runtimeOnly: true},
+	servicePicker:          {permission: AccessPicker, runtimeOnly: true},
+	serviceSpeech:          {permission: AccessSpeech, runtimeOnly: true},
+	serviceOverlay:         {permission: AccessOverlay},
+	serviceAudio:           {permission: AccessAudio},
+	serviceAuthSession:     {permission: AccessAuthSession},
 }
 
 // gate is the refusal of a service of kind for resource by the current owner's Access, as services holds it; a kind services lacks is refused.

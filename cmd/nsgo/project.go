@@ -131,6 +131,8 @@ type project struct {
 		// AppGroup is the app group an iOS app shares with its widgets,
 		// group.<id> by default.
 		AppGroup string `yaml:"app_group"`
+		// SignInWithApple claims com.apple.developer.applesignin, which Sign in with Apple needs, for the iOS and tvOS packages and the Mac App Store's (sign.go).
+		SignInWithApple bool `yaml:"sign_in_with_apple"`
 	} `yaml:"apple"`
 	// FileTypes are the kinds of documents the app opens, which its macOS
 	// package registers (filetypes.go).

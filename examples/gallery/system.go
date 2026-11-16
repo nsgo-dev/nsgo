@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -914,9 +915,9 @@ func filesCard(cx *core.Scope) core.Node {
 	}}
 }
 
-// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, sign-in sessions, the system's permissions and files.
+// systemDemo is what the platform does for the app: the environment, the status bar, alerts, frames and timers, shortcuts, the network, the window, the clipboard, links, photos, the appearance, dictation, the lifecycle, notifications, the badge, task progress, haptics, biometrics, Sign in with Apple, sign-in sessions, the system's permissions and files.
 func systemDemo(cx *core.Scope) core.Node {
-	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, authSessionCard, permissionsCard, filesCard)
+	return demoPage(cx, pageProps{}, environmentCard, statusBarCard, dialogsCard, framesAndTimers, shortcuts, networkCard, windowCard, clipboardCard, servicesCard, speechCard, notificationsCard, biometricsCard, signInWithAppleCard, authSessionCard, permissionsCard, filesCard)
 }
 
 // yesNo says whether in tr's language.
@@ -1025,6 +1026,58 @@ func authSessionCard(cx *core.Scope) core.Node {
 			ui.Button{Text: tr.SystemCancel(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "auth-cancel", OnPress: func() { cancel() }},
 		}},
 		core.Text{ContentFunc: result.Get, TestID: "auth-result", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+	}}
+}
+
+// signInWithAppleCard signs in with Apple, asking for the name and email with a fresh nonce, and checks the state of the credential it gave.
+func signInWithAppleCard(cx *core.Scope) core.Node {
+	tr := locales.For(cx)
+	colors := ui.ColorsOf(cx)
+	user := core.NewSignal(cx, "")
+	state := core.NewSignal(cx, tr.SystemNoneYet())
+	result := core.NewSignal(cx, tr.SystemNoneYet())
+	failure := func(err error) string {
+		switch {
+		case errors.Is(err, core.AppleSignInCancelled):
+			return tr.SystemSignInCancelled()
+		case errors.Is(err, core.AppleSignInUnavailable):
+			return tr.SystemSignInUnavailable()
+		}
+		return tr.SystemSignInFailed()
+	}
+	signIn := func() {
+		cx.SignInWithApple(core.AppleSignInOptions{FullName: true, Email: true, Nonce: rand.Text()}, func(c core.AppleCredential, err error) {
+			if err != nil {
+				result.Set(failure(err))
+				return
+			}
+			user.Set(c.User)
+			result.Set(tr.SystemSignedIn())
+		})
+	}
+	check := func() {
+		cx.AppleCredentialState(user.GetUntracked(), func(s core.AppleCredentialState, err error) {
+			switch {
+			case err != nil:
+				state.Set(failure(err))
+			case s == core.AppleCredentialAuthorized:
+				state.Set(tr.SystemCredentialAuthorized())
+			case s == core.AppleCredentialRevoked:
+				state.Set(tr.SystemCredentialRevoked())
+			case s == core.AppleCredentialTransferred:
+				state.Set(tr.SystemCredentialTransferred())
+			default:
+				state.Set(tr.SystemCredentialNotFound())
+			}
+		})
+	}
+	return Card{Title: tr.SystemAppleSignIn(), Description: tr.SystemAppleSignInDetail(), Actions: []core.Node{ui.Badge{Text: tr.SystemNsgo()}}, Children: []core.Node{
+		Caption{Label: tr.SystemCredential(), Note: state.Get},
+		ui.Wrap{Children: []core.Node{
+			ui.Button{Text: tr.SystemSignIn(), Size: ui.SizeSmall, TestID: "apple-sign-in", OnPress: signIn},
+			ui.Button{Text: tr.SystemCheck(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, TestID: "apple-credential-state", OnPress: check},
+		}},
+		core.Text{ContentFunc: result.Get, TestID: "apple-sign-in-result", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 	}}
 }
 

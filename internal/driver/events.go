@@ -263,6 +263,8 @@ const (
 	EventAuthSession
 	// EventOpenLinks reports links of the app's own URL schemes the system asks the app to open (Data, a []string of URLs): clicked elsewhere, or the one it launched to open.
 	EventOpenLinks
+	// EventSignInWithApple answers ItemSignInWithApple or ItemAppleCredentialState Count: Data an *AppleCredential or Index a credential's state, else Text why it failed (AppleSignInCancelled, ...).
+	EventSignInWithApple
 )
 
 // What EventInputModality reports.

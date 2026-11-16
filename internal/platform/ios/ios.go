@@ -600,6 +600,7 @@ func (s *surface) environment() driver.Environment {
 		Camera:           cameraAvailable(),
 		CanSendInput:     false,
 		HasWebView:       idiom != driver.IdiomTV,
+		SignInWithApple:  apple.AppleSignInAvailable(),
 		VerticalBarEdge:  verticalBarEdge(traits),
 		Lifecycle:        appLifecycle(),
 		AppClip:          appClip(),
@@ -918,6 +919,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemPermission:
 			s.permission(it.Count, *it.Permission)
+			continue
+		case driver.ItemSignInWithApple, driver.ItemAppleCredentialState:
+			apple.HandleAppleSignIn(it, s.native.Send(sel("window")), s.engine.Dispatch)
 			continue
 		case driver.ItemCheckForUpdates:
 			s.checkForUpdates(it.Count)

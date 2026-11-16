@@ -119,6 +119,7 @@ var itemNames = map[ItemKind]string{
 	ItemRevealFile: "reveal-file", ItemTrashFile: "trash-file",
 	ItemTaskProgress: "task-progress",
 	ItemAudio:        "audio", ItemAuthSession: "auth-session",
+	ItemSignInWithApple: "sign-in-with-apple", ItemAppleCredentialState: "apple-credential-state",
 }
 
 // TraceLine is the item as traces print it: its kind, its view and what

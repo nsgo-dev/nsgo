@@ -708,6 +708,17 @@ const (
 	textSystemAuthSession
 	textSystemAuthSessionDetail
 	textSystemSignIn
+	textSystemAppleSignIn
+	textSystemAppleSignInDetail
+	textSystemSignedIn
+	textSystemCredential
+	textSystemCredentialAuthorized
+	textSystemCredentialRevoked
+	textSystemCredentialNotFound
+	textSystemCredentialTransferred
+	textSystemSignInCancelled
+	textSystemSignInFailed
+	textSystemSignInUnavailable
 	textSystemCancelAndDestructiveButtons
 	textSystemDeleteThePhoto
 	textSystemThisCannotBeUndone
@@ -2977,6 +2988,17 @@ var keyOfText = [numTexts]string{
 	"systemAuthSession",
 	"systemAuthSessionDetail",
 	"systemSignIn",
+	"systemAppleSignIn",
+	"systemAppleSignInDetail",
+	"systemSignedIn",
+	"systemCredential",
+	"systemCredentialAuthorized",
+	"systemCredentialRevoked",
+	"systemCredentialNotFound",
+	"systemCredentialTransferred",
+	"systemSignInCancelled",
+	"systemSignInFailed",
+	"systemSignInUnavailable",
 	"systemCancelAndDestructiveButtons",
 	"systemDeleteThePhoto",
 	"systemThisCannotBeUndone",
@@ -5244,6 +5266,17 @@ var textsEn = i18n.NewTexts(""+
 	"Sign-in session"+
 	"The system's browser shows the provider and hands its redirect back; here the provider is the redirect"+
 	"Sign in"+
+	"Sign in with Apple"+
+	"The system's sheet, and the state of the credential it gave"+
+	"Signed in"+
+	"Credential"+
+	"Authorized"+
+	"Revoked"+
+	"Not found"+
+	"Transferred"+
+	"Cancelled"+
+	"Failed"+
+	"Unavailable"+
 	"Cancel and destructive buttons"+
 	"Delete the photo?"+
 	"This cannot be undone."+
@@ -7508,6 +7541,17 @@ var textsEn = i18n.NewTexts(""+
 		15,
 		102,
 		7,
+		18,
+		59,
+		9,
+		10,
+		10,
+		7,
+		9,
+		11,
+		9,
+		6,
+		11,
 		30,
 		17,
 		22,
@@ -9775,6 +9819,17 @@ var textsZhHans = i18n.NewTexts(""+
 	"登录会话"+
 	"系统浏览器打开登录页并交回重定向；这里的登录页就是重定向本身"+
 	"登录"+
+	"通过 Apple 登录"+
+	"系统的登录面板，以及它所给凭据的状态"+
+	"已登录"+
+	"凭据"+
+	"已授权"+
+	"已撤销"+
+	"未找到"+
+	"已转移"+
+	"已取消"+
+	"失败"+
+	"不可用"+
 	"取消和破坏性按钮"+
 	"删除这张照片？"+
 	"此操作无法撤销。"+
@@ -12039,6 +12094,17 @@ var textsZhHans = i18n.NewTexts(""+
 		12,
 		90,
 		6,
+		19,
+		54,
+		9,
+		6,
+		9,
+		9,
+		9,
+		9,
+		9,
+		6,
+		9,
 		24,
 		21,
 		24,
@@ -16717,6 +16783,89 @@ func SystemSignIn(cx *core.Scope) string { return For(cx).SystemSignIn() }
 
 // SystemSignIn is the package's SystemSignIn in the language of msgs.
 func (msgs Messages) SystemSignIn() string { return msgs.text(textSystemSignIn) }
+
+// SystemAppleSignIn says "Sign in with Apple"
+// in the language the app shows under cx.
+func SystemAppleSignIn(cx *core.Scope) string { return For(cx).SystemAppleSignIn() }
+
+// SystemAppleSignIn is the package's SystemAppleSignIn in the language of msgs.
+func (msgs Messages) SystemAppleSignIn() string { return msgs.text(textSystemAppleSignIn) }
+
+// SystemAppleSignInDetail says "The system's sheet, and the state of the credential it gave"
+// in the language the app shows under cx.
+func SystemAppleSignInDetail(cx *core.Scope) string { return For(cx).SystemAppleSignInDetail() }
+
+// SystemAppleSignInDetail is the package's SystemAppleSignInDetail in the language of msgs.
+func (msgs Messages) SystemAppleSignInDetail() string { return msgs.text(textSystemAppleSignInDetail) }
+
+// SystemSignedIn says "Signed in"
+// in the language the app shows under cx.
+func SystemSignedIn(cx *core.Scope) string { return For(cx).SystemSignedIn() }
+
+// SystemSignedIn is the package's SystemSignedIn in the language of msgs.
+func (msgs Messages) SystemSignedIn() string { return msgs.text(textSystemSignedIn) }
+
+// SystemCredential says "Credential"
+// in the language the app shows under cx.
+func SystemCredential(cx *core.Scope) string { return For(cx).SystemCredential() }
+
+// SystemCredential is the package's SystemCredential in the language of msgs.
+func (msgs Messages) SystemCredential() string { return msgs.text(textSystemCredential) }
+
+// SystemCredentialAuthorized says "Authorized"
+// in the language the app shows under cx.
+func SystemCredentialAuthorized(cx *core.Scope) string { return For(cx).SystemCredentialAuthorized() }
+
+// SystemCredentialAuthorized is the package's SystemCredentialAuthorized in the language of msgs.
+func (msgs Messages) SystemCredentialAuthorized() string {
+	return msgs.text(textSystemCredentialAuthorized)
+}
+
+// SystemCredentialRevoked says "Revoked"
+// in the language the app shows under cx.
+func SystemCredentialRevoked(cx *core.Scope) string { return For(cx).SystemCredentialRevoked() }
+
+// SystemCredentialRevoked is the package's SystemCredentialRevoked in the language of msgs.
+func (msgs Messages) SystemCredentialRevoked() string { return msgs.text(textSystemCredentialRevoked) }
+
+// SystemCredentialNotFound says "Not found"
+// in the language the app shows under cx.
+func SystemCredentialNotFound(cx *core.Scope) string { return For(cx).SystemCredentialNotFound() }
+
+// SystemCredentialNotFound is the package's SystemCredentialNotFound in the language of msgs.
+func (msgs Messages) SystemCredentialNotFound() string {
+	return msgs.text(textSystemCredentialNotFound)
+}
+
+// SystemCredentialTransferred says "Transferred"
+// in the language the app shows under cx.
+func SystemCredentialTransferred(cx *core.Scope) string { return For(cx).SystemCredentialTransferred() }
+
+// SystemCredentialTransferred is the package's SystemCredentialTransferred in the language of msgs.
+func (msgs Messages) SystemCredentialTransferred() string {
+	return msgs.text(textSystemCredentialTransferred)
+}
+
+// SystemSignInCancelled says "Cancelled"
+// in the language the app shows under cx.
+func SystemSignInCancelled(cx *core.Scope) string { return For(cx).SystemSignInCancelled() }
+
+// SystemSignInCancelled is the package's SystemSignInCancelled in the language of msgs.
+func (msgs Messages) SystemSignInCancelled() string { return msgs.text(textSystemSignInCancelled) }
+
+// SystemSignInFailed says "Failed"
+// in the language the app shows under cx.
+func SystemSignInFailed(cx *core.Scope) string { return For(cx).SystemSignInFailed() }
+
+// SystemSignInFailed is the package's SystemSignInFailed in the language of msgs.
+func (msgs Messages) SystemSignInFailed() string { return msgs.text(textSystemSignInFailed) }
+
+// SystemSignInUnavailable says "Unavailable"
+// in the language the app shows under cx.
+func SystemSignInUnavailable(cx *core.Scope) string { return For(cx).SystemSignInUnavailable() }
+
+// SystemSignInUnavailable is the package's SystemSignInUnavailable in the language of msgs.
+func (msgs Messages) SystemSignInUnavailable() string { return msgs.text(textSystemSignInUnavailable) }
 
 // SystemCancelAndDestructiveButtons says "Cancel and destructive buttons"
 // in the language the app shows under cx.

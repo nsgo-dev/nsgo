@@ -109,6 +109,9 @@ func releaseKey(ctx context.Context, p *project) (*apk.Key, error) {
 // grants a program signed by an identity across builds, and loses them
 // with each new ad hoc signature, which stays without an identity.
 func signMacApp(ctx context.Context, p *project, app string) error {
+	if p.Apple.SignInWithApple {
+		warnIn(ctx, "Sign in with Apple is left out: macOS grants it only with a provisioning profile, which only store builds (sign.macos_profile) embed")
+	}
 	if p.Sign.Identity == "" {
 		return nil
 	}
@@ -202,6 +205,9 @@ func signForStore(ctx context.Context, p *project, app string) error {
 	if _, ok := entitlements["com.apple.developer.associated-appclip-app-identifiers"]; p.AppClip != nil && !ok {
 		return fmt.Errorf("the provisioning profile does not tie %s to its App Clip: add the clip's target to the App ID's App Clip capability", p.ID)
 	}
+	if err := p.claimSignInWithApple(entitlements, entitlements); err != nil {
+		return err
+	}
 	identity := p.Sign.Identity
 	if identity == "" {
 		if identity, err = profileIdentity(ctx, profile); err != nil {
@@ -228,6 +234,25 @@ func signForStore(ctx context.Context, p *project, app string) error {
 		return err
 	}
 	return run(ctx, "codesign", "--force", "--sign", identity, "--entitlements", ents, "--generate-entitlement-der", app)
+}
+
+// signInWithAppleEntitlement is the entitlement Sign in with Apple needs, and its one value.
+const signInWithAppleEntitlement = "com.apple.developer.applesignin"
+
+// signInWithApple is the value an app signed for Sign in with Apple claims.
+func signInWithApple() []any { return []any{"Default"} }
+
+// claimSignInWithApple puts Sign in with Apple into ents when apple.sign_in_with_apple asks for it, which granted, a provisioning profile's entitlements, must grant, and takes it out otherwise, so a profile granting it claims it only for an app that asks.
+func (p *project) claimSignInWithApple(ents, granted map[string]any) error {
+	if !p.Apple.SignInWithApple {
+		delete(ents, signInWithAppleEntitlement)
+		return nil
+	}
+	if _, ok := granted[signInWithAppleEntitlement]; !ok {
+		return fmt.Errorf("the provisioning profile does not grant Sign in with Apple, which apple.sign_in_with_apple needs: add the capability to the App ID %s and download the profile again", p.ID)
+	}
+	ents[signInWithAppleEntitlement] = signInWithApple()
+	return nil
 }
 
 // readProfile decodes a provisioning profile: CMS-signed XML, which

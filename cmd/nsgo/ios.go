@@ -374,25 +374,33 @@ func signIOSApp(ctx context.Context, p *project, sys *appleOS, app, work, team s
 		if domains := p.parentClip.Domains; len(domains) > 0 {
 			ents["com.apple.developer.associated-domains"] = clipDomains(domains)
 		}
+		if p.Apple.SignInWithApple {
+			ents[signInWithAppleEntitlement] = signInWithApple()
+		}
 		if err := os.WriteFile(filepath.Join(work, "Clip.entitlements"), encodePlist(ents), 0o644); err != nil {
 			return "", err
 		}
 		data["Entitlements"] = "Clip.entitlements"
 	}
+	if p.clipParent == "" {
+		if ents := p.xcodeEntitlements(data["Widgets"] != ""); len(ents) > 0 {
+			if err := os.WriteFile(filepath.Join(work, "App.entitlements"), encodePlist(ents), 0o644); err != nil {
+				return "", err
+			}
+			data["Entitlements"] = "App.entitlements"
+		}
+	}
 	if data["Widgets"] != "" {
-		// The extension signs as a target of its own, and both share the
-		// app group, which Xcode's automatic signing registers.
+		// The extension signs as a target of its own, and shares the app group with the app.
 		info, err := os.ReadFile(filepath.Join(iosWidgetsAppex(app), "Info.plist"))
 		if err != nil {
 			return "", err
 		}
-		group := encodePlist(p.groupEntitlements())
-		for name, content := range map[string][]byte{"Widgets-Info.plist": info, "Widgets.entitlements": group, "App.entitlements": group} {
+		for name, content := range map[string][]byte{"Widgets-Info.plist": info, "Widgets.entitlements": encodePlist(p.groupEntitlements())} {
 			if err := os.WriteFile(filepath.Join(work, name), content, 0o644); err != nil {
 				return "", err
 			}
 		}
-		data["Entitlements"] = "App.entitlements"
 	}
 	f, err := os.Create(filepath.Join(project, "project.pbxproj"))
 	if err != nil {
@@ -455,6 +463,18 @@ func iosProjectData(p *project, sys *appleOS, team string) map[string]string {
 		data["WidgetsScript"] = iosWidgetsScript
 	}
 	return data
+}
+
+// xcodeEntitlements are what an app signed by Xcode claims, which its automatic signing registers: the app group it shares with widgets and Sign in with Apple when apple.sign_in_with_apple asks for it.
+func (p *project) xcodeEntitlements(widgets bool) map[string]any {
+	ents := map[string]any{}
+	if widgets {
+		ents = p.groupEntitlements()
+	}
+	if p.Apple.SignInWithApple {
+		ents[signInWithAppleEntitlement] = signInWithApple()
+	}
+	return ents
 }
 
 // iosWidgetsScript replaces Xcode's empty widget extension with the Go

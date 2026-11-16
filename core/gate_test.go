@@ -25,6 +25,8 @@ var gated = map[string]service{
 	"OnNotificationPress":           serviceNotifications,
 	"BiometricAvailability":         serviceBiometrics,
 	"AuthenticateBiometric":         serviceBiometrics,
+	"SignInWithApple":               serviceSignInWithApple,
+	"AppleCredentialState":          serviceSignInWithApple,
 	"PermissionStatus":              servicePermissions,
 	"RequestPermission":             servicePermissions,
 	"OpenPermissionSettings":        servicePermissions,

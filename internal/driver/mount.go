@@ -348,6 +348,37 @@ const (
 	ItemAudio
 	// ItemAuthSession asks of auth session Count what Auth says; the platform reports it with EventAuthSession carrying Count.
 	ItemAuthSession
+	// ItemSignInWithApple shows Sign in with Apple's sheet for AppleSignIn; the platform answers with EventSignInWithApple carrying Count, Data an *AppleCredential once the user signs in, else Text the AppleSignIn error. The core sends none where the environment says no SignInWithApple.
+	ItemSignInWithApple
+	// ItemAppleCredentialState asks the state of the Sign in with Apple credential of the user whose ID is Value; the platform answers with EventSignInWithApple carrying Count, Index the state (AppleCredentialAuthorized, ...), else Text the AppleSignIn error. The core sends none where the environment says no SignInWithApple.
+	ItemAppleCredentialState
+)
+
+// AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
+type AppleSignInRequest struct {
+	FullName, Email bool
+	Nonce           string
+}
+
+// AppleCredential is what EventSignInWithApple answers a sign-in with, as core.AppleCredential.
+type AppleCredential struct {
+	User, IdentityToken, AuthorizationCode, Email                       string
+	GivenName, FamilyName, MiddleName, NamePrefix, NameSuffix, Nickname string
+}
+
+// Why EventSignInWithApple's Text says a sign-in or a credential state failed, as core.AppleSignInError.
+const (
+	AppleSignInCancelled   = "cancelled"
+	AppleSignInFailed      = "failed"
+	AppleSignInUnavailable = "unavailable"
+)
+
+// The states of a Sign in with Apple credential, as core.AppleCredentialState.
+const (
+	AppleCredentialAuthorized = iota + 1
+	AppleCredentialRevoked
+	AppleCredentialNotFound
+	AppleCredentialTransferred
 )
 
 // OverlayPermission is what EventOverlayPermission answers an ItemOverlayPermission with, as core's.
@@ -487,6 +518,8 @@ type MountItem struct {
 	Audio  *AudioRequest
 	// Auth is an ItemAuthSession's request.
 	Auth *AuthRequest
+	// AppleSignIn is an ItemSignInWithApple's request.
+	AppleSignIn *AppleSignInRequest
 	// Notification is what ItemShowNotification shows.
 	Notification *Notification
 	// Permission is an ItemPermission's request.

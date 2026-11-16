@@ -26,6 +26,7 @@ type Env struct {
 	camera               *Signal[bool]
 	canSendInput         *Signal[bool]
 	hasWebView           *Signal[bool]
+	appleSignIn          *Signal[bool]
 	fontScale, ratio     *Signal[float32]
 	// locale and systemRTL are the platform's or the host's; forced is
 	// the locale Scope.SetLocale forces.
@@ -82,6 +83,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		camera:           NewSignal(cx, false),
 		canSendInput:     NewSignal(cx, false),
 		hasWebView:       NewSignal(cx, false),
+		appleSignIn:      NewSignal(cx, false),
 		fontScale:        NewSignal(cx, float32(1)),
 		ratio:            NewSignal(cx, float32(1)),
 		locale:           NewSignal(cx, ""),
@@ -181,6 +183,7 @@ func (e *Env) set(v Environment) {
 	e.camera.Set(v.Camera)
 	e.canSendInput.Set(v.CanSendInput)
 	e.hasWebView.Set(v.HasWebView)
+	e.appleSignIn.Set(v.SignInWithApple)
 	e.fontScale.Set(v.FontScale)
 	e.ratio.Set(v.PixelRatio)
 	e.locale.Set(v.Locale)
@@ -300,6 +303,9 @@ func (e *Env) CanSendInput() bool { return e.canSendInput.Get() }
 // HasWebView reports whether this target provides the native or browser web
 // view host used by WebView.
 func (e *Env) HasWebView() bool { return e.hasWebView.Get() }
+
+// CanSignInWithApple reports whether Scope.SignInWithApple and Scope.AppleCredentialState reach Sign in with Apple here: macOS, iOS and tvOS.
+func (e *Env) CanSignInWithApple() bool { return e.appleSignIn.Get() }
 
 // RTL reports whether the app lays out right to left: as the language it
 // shows is written (Language), else the locale it forces, else as the

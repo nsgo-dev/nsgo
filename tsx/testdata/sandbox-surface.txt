@@ -87,6 +87,10 @@ nsgo.Scroll
 nsgo.Shader
 nsgo.ShaderEffect
 nsgo.ShaderTransition
+nsgo.SignInWithApple
+nsgo.SignInWithApple.available
+nsgo.SignInWithApple.credentialState
+nsgo.SignInWithApple.signIn
 nsgo.Speech
 nsgo.Speech.available
 nsgo.Speech.start

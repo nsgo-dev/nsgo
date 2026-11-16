@@ -53,6 +53,8 @@ type Environment struct {
 	CanSendInput bool
 	// HasWebView says this target provides a web view host.
 	HasWebView bool
+	// SignInWithApple says ItemSignInWithApple and ItemAppleCredentialState reach Sign in with Apple here.
+	SignInWithApple bool
 	// VerticalBarEdge is the edge the system chose for a vertical bar where it may place one, as iOS 27.1 does; Unspecified elsewhere. It is not geometry: Tree.Resize reports that.
 	VerticalBarEdge VerticalBarEdge
 	// RTL lays the app out right to left.

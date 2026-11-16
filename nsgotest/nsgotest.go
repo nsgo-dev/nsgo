@@ -297,6 +297,10 @@ type App struct {
 	BiometricAvailability core.BiometricKind
 	BiometricAnswer       core.BiometricResult
 	AuthenticationReasons []string
+	// AppleSignIns are the Sign in with Apple requests the app made where the environment says SignInWithApple, oldest first, their nonces hashed as the system receives them. AppleSignIn answers each with the credential the user signs in with, or an error, core.AppleSignInCancelled for a user who closes the sheet; without it the user cancels. AppleCredentialStates is what the platform answers a credential's state with, by user ID, AppleCredentialNotFound for one it does not hold.
+	AppleSignIns          []core.AppleSignInRequest
+	AppleSignIn           func(r core.AppleSignInRequest) (core.AppleCredential, error)
+	AppleCredentialStates map[string]core.AppleCredentialState
 	// Permissions is each permission's status as the platform answers it, PermissionNotAsked for one it does not hold; a request while not asked makes it PermissionAnswers' for it, the user granting it when that has none. Start makes both maps. PermissionSettings are the permissions whose settings the app opened, oldest first, and Guide the permission a guide shows, "" for none: GrantPermission and CloseGuide end it.
 	Permissions        map[core.Permission]core.PermissionStatus
 	PermissionAnswers  map[core.Permission]core.PermissionStatus
