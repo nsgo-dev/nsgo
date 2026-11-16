@@ -523,10 +523,23 @@ func (t *testSurface) ChooseMenu(id uint32) error {
 	return err
 }
 
-// ChooseDockMenu implements testhost.Surface: it activates the app icon action through the same event the Dock delegate sends.
+// ChooseDockMenu implements testhost.Surface: the item of the Dock menu, as the app delegate hands it to AppKit where it is the app's, sends its action, as a click on it does.
 func (t *testSurface) ChooseDockMenu(id uint32) error {
-	onMainSync(func() { t.s.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: id}) })
-	return nil
+	var err error
+	onMainSync(func() {
+		menu := dockMenu.menu
+		app := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+		if d, dock := app.Send(sel("delegate")), sel("applicationDockMenu:"); d != 0 && objc.Send[bool](d, sel("respondsToSelector:"), dock) {
+			menu = d.Send(dock, app)
+		}
+		item, in := menuItem(menu, id)
+		if item == 0 {
+			err = fmt.Errorf("the Dock menu has no item %d", id)
+			return
+		}
+		in.Send(sel("performActionForItemAtIndex:"), objc.Send[int](in, sel("indexOfItem:"), item))
+	})
+	return err
 }
 
 // ChoosePopup implements testhost.Surface: the tracking context menu's

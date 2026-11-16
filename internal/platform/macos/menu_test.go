@@ -70,3 +70,55 @@ func menuSyncsInPlace(t *testing.T) {
 		t.Error("the added menu is missing its item")
 	}
 }
+
+// TestDockMenu checks the menu applicationDockMenu: hands AppKit: the items, check marks, disabled items, submenus and separators as set, its actions reporting to the surface that set it, without shortcuts, and none once that surface sets nil.
+func TestDockMenu(t *testing.T) {
+	onMain(func() { dockMenuBuilt(t) })
+}
+
+func dockMenuBuilt(t *testing.T) {
+	loadAppKit()
+	s := &surface{}
+	defer func() { clearDockMenu(); delete(menuTargets, s.menuTarget) }()
+	s.setDockMenu([]driver.MenuEntry{
+		{Separator: true},
+		{Label: "New Window", ID: 7, Shortcut: "mod+n"},
+		{Label: "Library", Checkable: true, Checked: true, ID: 8},
+		{Separator: true},
+		{Separator: true},
+		{Label: "Paused", Disabled: true, ID: 9},
+		{Label: "More", Items: []driver.MenuEntry{{Label: "Open", ID: 10}}},
+		{Label: "Locked", Disabled: true, Items: []driver.MenuEntry{{Label: "Inside", ID: 11}}},
+		{Separator: true},
+	})
+	m := dockMenu.menu
+	if m == 0 || dockMenu.target != s {
+		t.Fatal("no Dock menu was set")
+	}
+	var titles []string
+	for i := range objc.Send[int](m, sel("numberOfItems")) {
+		titles = append(titles, apple.GoString(m.Send(selItemAtIndex, i).Send(sel("title"))))
+	}
+	if want := []string{"New Window", "Library", "", "Paused", "More", "Locked"}; !slices.Equal(titles, want) {
+		t.Fatalf("the Dock menu has %q, want %q", titles, want)
+	}
+	item := func(i int) objc.ID { return m.Send(selItemAtIndex, i) }
+	if it := item(0); objc.Send[objc.SEL](it, sel("action")) != selDockMenuChosen || it.Send(sel("target")) != s.menuTarget ||
+		objc.Send[int](it, sel("tag")) != 7 || apple.GoString(it.Send(sel("keyEquivalent"))) != "" {
+		t.Error("New Window does not report its ID to the surface, or has a shortcut")
+	}
+	if objc.Send[int](item(1), sel("state")) != 1 {
+		t.Error("Library is not checked")
+	}
+	if objc.Send[objc.SEL](item(3), sel("action")) != selMenuDisabled || objc.Send[objc.SEL](item(5), sel("action")) != selMenuDisabled {
+		t.Error("a disabled item or submenu has an action")
+	}
+	open := item(4).Send(sel("submenu")).Send(selItemAtIndex, 0)
+	if objc.Send[objc.SEL](open, sel("action")) != selDockMenuChosen || objc.Send[int](open, sel("tag")) != 10 {
+		t.Error("the submenu's item does not report its ID")
+	}
+	s.setDockMenu(nil)
+	if dockMenu.menu != 0 || dockMenu.target != nil {
+		t.Error("nil left a Dock menu")
+	}
+}

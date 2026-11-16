@@ -110,6 +110,7 @@ func (s *surface) chromeItem(it *driver.MountItem) {
 	}
 }
 
+// recentFile notes path among the app's recent documents, which the Dock menu and File › Open Recent list for the types the app declares, or forgets them all when clearRecent.
 func recentFile(path string, clearRecent bool) {
 	doc := objc.ID(apple.Class("NSDocumentController")).Send(sel("sharedDocumentController"))
 	if clearRecent {
@@ -516,106 +517,78 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 	s.menu = bar
 }
 
+// dockMenu is the menu applicationDockMenu: hands AppKit, the one a surface set last (core.Scope.SetDockMenu), and that surface, whose engine hears its items.
 var dockMenu struct {
 	menu   objc.ID
 	target *surface
 }
 
-// setDockMenu updates the menu returned synchronously by NSApplication's
-// applicationDockMenu: delegate callback.
+// setDockMenu makes entries the app's Dock menu, nil none. AppKit asks for it as the Dock shows the menu, so it is built here, ahead of time.
 func (s *surface) setDockMenu(entries []driver.MenuEntry) {
-	if dockMenu.menu != 0 {
-		dockMenu.menu.Send(selRelease)
-		dockMenu.menu = 0
-	}
-	dockMenu.target = nil
+	clearDockMenu()
 	if entries == nil {
 		return
 	}
 	s.ensureMenuTarget()
-	m := objc.ID(apple.Class("NSMenu")).Send(selAlloc).Send(sel("initWithTitle:"), apple.NSString(""))
+	dockMenu.menu, dockMenu.target = s.dockSubmenu("", entries), s
+}
+
+// clearDockMenu leaves the app with the system's Dock items alone.
+func clearDockMenu() {
+	if dockMenu.menu != 0 {
+		dockMenu.menu.Send(selRelease)
+	}
+	dockMenu.menu, dockMenu.target = 0, nil
+}
+
+// dockSubmenu returns a new menu of Dock items: as submenu builds the application menu's, but its actions report EventDockMenu, and roles and shortcuts, which a Dock menu has none of, are left out.
+func (s *surface) dockSubmenu(title string, items []driver.MenuEntry) objc.ID {
+	m := objc.ID(apple.Class("NSMenu")).Send(selAlloc).Send(sel("initWithTitle:"), apple.NSString(title))
 	lastSeparator := true
-	for _, e := range entries {
-		switch {
-		case e.Separator:
+	for _, e := range items {
+		if e.Separator {
 			if !lastSeparator {
 				sep := objc.ID(apple.Class("NSMenuItem")).Send(sel("separatorItem"))
 				sep.Send(selSetIdentifier, ownItem())
 				m.Send(sel("addItem:"), sep)
+				lastSeparator = true
 			}
-			lastSeparator = true
-		case len(e.Items) > 0:
-			holder := s.dockHolder(e.Label, e.Items)
-			m.Send(sel("addItem:"), holder)
-			holder.Send(selRelease)
-			lastSeparator = false
-		default:
-			item := s.dockItem(e)
-			m.Send(sel("addItem:"), item)
-			item.Send(selRelease)
-			lastSeparator = false
+			continue
 		}
+		action := objc.SEL(0)
+		switch {
+		case e.Disabled:
+			action = selMenuDisabled
+		case e.ID != 0 && len(e.Items) == 0:
+			action = selDockMenuChosen
+		}
+		it := objc.ID(apple.Class("NSMenuItem")).Send(selAlloc).Send(sel("initWithTitle:action:keyEquivalent:"),
+			apple.NSString(e.Label), action, apple.NSString(""))
+		it.Send(selSetIdentifier, ownItem())
+		if action == selDockMenuChosen {
+			it.Send(selSetTarget, s.menuTarget)
+			it.Send(sel("setTag:"), int(e.ID))
+		}
+		if e.Checkable {
+			state := 0
+			if e.Checked {
+				state = 1
+			}
+			it.Send(sel("setState:"), state)
+		}
+		if len(e.Items) > 0 {
+			sub := s.dockSubmenu(e.Label, e.Items)
+			it.Send(sel("setSubmenu:"), sub)
+			sub.Send(selRelease)
+		}
+		m.Send(sel("addItem:"), it)
+		it.Send(selRelease)
+		lastSeparator = false
 	}
 	if n := objc.Send[int](m, sel("numberOfItems")); n > 0 && lastSeparator {
 		m.Send(sel("removeItemAtIndex:"), n-1)
 	}
-	dockMenu.menu, dockMenu.target = m, s
-}
-
-func (s *surface) dockHolder(label string, items []driver.MenuEntry) objc.ID {
-	it := objc.ID(apple.Class("NSMenuItem")).Send(selAlloc).Send(sel("initWithTitle:action:keyEquivalent:"),
-		apple.NSString(label), objc.SEL(0), apple.NSString(""))
-	it.Send(selSetIdentifier, ownItem())
-	sub := objc.ID(apple.Class("NSMenu")).Send(selAlloc).Send(sel("initWithTitle:"), apple.NSString(label))
-	lastSeparator := true
-	for _, e := range items {
-		switch {
-		case e.Separator:
-			if !lastSeparator {
-				sep := objc.ID(apple.Class("NSMenuItem")).Send(sel("separatorItem"))
-				sep.Send(selSetIdentifier, ownItem())
-				sub.Send(sel("addItem:"), sep)
-			}
-			lastSeparator = true
-		case len(e.Items) > 0:
-			h := s.dockHolder(e.Label, e.Items)
-			sub.Send(sel("addItem:"), h)
-			h.Send(selRelease)
-			lastSeparator = false
-		default:
-			item := s.dockItem(e)
-			sub.Send(sel("addItem:"), item)
-			item.Send(selRelease)
-			lastSeparator = false
-		}
-	}
-	it.Send(sel("setSubmenu:"), sub)
-	sub.Send(selRelease)
-	return it
-}
-
-func (s *surface) dockItem(e driver.MenuEntry) objc.ID {
-	action := objc.SEL(0)
-	if e.Disabled {
-		action = selMenuDisabled
-	} else if e.ID != 0 {
-		action = selDockMenuChosen
-	}
-	it := objc.ID(apple.Class("NSMenuItem")).Send(selAlloc).Send(sel("initWithTitle:action:keyEquivalent:"),
-		apple.NSString(e.Label), action, apple.NSString(""))
-	it.Send(selSetIdentifier, ownItem())
-	if action == selDockMenuChosen {
-		it.Send(selSetTarget, s.menuTarget)
-		it.Send(sel("setTag:"), int(e.ID))
-	}
-	if e.Checkable {
-		state := 0
-		if e.Checked {
-			state = 1
-		}
-		it.Send(sel("setState:"), state)
-	}
-	return it
+	return m
 }
 
 // syncMenu makes the app's items of menu m what next is, keeping those
@@ -962,10 +935,10 @@ func menuChosen(self objc.ID, _ objc.SEL, item objc.ID) {
 	}
 }
 
+// dockMenuChosen reports a chosen Dock menu item's ID to the surface that set the menu.
 func dockMenuChosen(self objc.ID, _ objc.SEL, item objc.ID) {
-	if s := menuTargets[self]; s != nil && s.engine != nil && !s.closed {
-		if id := objc.Send[int](item, sel("tag")); id > 0 {
-			s.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: uint32(id)})
-		}
+	s := menuTargets[self]
+	if id := objc.Send[int](item, sel("tag")); id > 0 && s != nil && s.engine != nil && !s.closed {
+		s.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Count: uint32(id)})
 	}
 }

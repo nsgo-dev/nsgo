@@ -650,10 +650,7 @@ func surfaceMoved(self objc.ID, cmd objc.SEL) {
 // delegate, in opts' appearance, and returns NSApp.
 func startApp(opts Options) objc.ID {
 	loadAppKit()
-	if dockMenu.menu != 0 {
-		dockMenu.menu.Send(selRelease)
-	}
-	dockMenu.menu, dockMenu.target = 0, nil
+	clearDockMenu()
 	quitPending = false
 	quitRequestID = 0
 	finished = false
@@ -705,9 +702,9 @@ func startApp(opts Options) objc.ID {
 			return false
 		},
 	}, {
-		// The menu above the system's Dock items, if the app set one.
+		// The app's items above the system's in its Dock menu, if it set any (core.Scope.SetDockMenu).
 		Cmd: sel("applicationDockMenu:"),
-		Fn: func(self objc.ID, _ objc.SEL, app objc.ID) objc.ID {
+		Fn: func(objc.ID, objc.SEL, objc.ID) objc.ID {
 			return dockMenu.menu
 		},
 	}, {
@@ -862,10 +859,7 @@ func (s *surface) close() {
 	}
 	s.closed = true
 	if dockMenu.target == s {
-		if dockMenu.menu != 0 {
-			dockMenu.menu.Send(selRelease)
-		}
-		dockMenu.menu, dockMenu.target = 0, nil
+		clearDockMenu()
 	}
 	delete(surfaces, s)
 	s.stopTicking()
