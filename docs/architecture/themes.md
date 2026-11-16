@@ -28,6 +28,8 @@ Overlays (muted and faint text, hover, press, edges, scroll bars, switch tracks)
 - Both setters keep a signal in the scope's values, as `core.Key` does; a node made under a forced subtree binds the nearest one, so lookups cost nothing until an app forces one.
 - `base` components read no theme. `Editor`, `DiffView` and highlighting follow `cx.Dark()`, so they match their subtree. `TestBaseComponentsDoNotReadTheme` (`internal/moduletest`) type-checks `base` and fails a package that calls `cx.Palette()`, `cx.Theme()` or `core.DefaultTheme()`, or `cx.Dark()` outside those three.
 
+Without an explicit text color above, text, icons and `CurrentColor` take the subtree's `Palette.Text`, including host overrides, and follow changes in place. Default ink stays distinct from an explicit inherited color, so a nested theme or forced appearance supplies its own default. Views of one owner share a palette binding, released with the owner; discarded views leave it.
+
 Native views follow a subtree's forced appearance through `ViewProps.Appearance`, which each node carries: `NSView.appearance` on macOS, `overrideUserInterfaceStyle` on iOS, `color-scheme` on the web. Windows, Linux and Android scope appearance per window only, so their native parts keep the app's.
 
 ## Theme files
@@ -85,6 +87,7 @@ A `Switch` has a track of its own: 30 × 16, 40 × 20 and 48 × 24 pt. `Size.Hei
 | NSH | NSGo | Why |
 | --- | --- | --- |
 | shadcn's roles from `nsh.json`, as Tailwind tokens | Roles as typed fields of a Go value, plus named ones (shadcn/ui's and `ui`'s among them), which classes name in kebab case | Go code reads the fields |
+| Black when no text color is set | The subtree's palette text color | Unstyled text and monochrome icons stay readable in both appearances |
 | One theme per engine | A theme and an appearance per subtree | Apps can theme a sidebar or panel apart |
 | A theme file in `nsh.json` | `ParseTheme` over an embedded file | Go embeds files itself; the tool stays out of it |
 | `nsh.json`'s `tailwind`, one per engine | `Theme.Tailwind`, per subtree; `nsgo.yaml`'s `tailwind` for TSX | It travels with the theme a subtree takes |

@@ -77,6 +77,8 @@ cx.SetTheme(theme)
 
 `cx.SetAppearance` forces the whole app light or dark, `cx.SetSubtreeAppearance` does it for a subtree, and `core.AppearanceSystem` follows the system again. `cx.Dark()` says which appearance a subtree shows, and `cx.Palette()` gives its colors with the embedding host's overrides applied.
 
+When no ancestor sets `Style.Color`, text and `currentColor` icons use the subtree's `Palette.Text`, following theme, appearance and host token changes in place. An explicit color, including `core.Transparent`, keeps inheriting.
+
 ## Colors in components
 
 A component reads its colors where it is built and in its `StyleFunc`s, so a theme or appearance change follows in place, without building the component again. `ui.ColorsOf(cx)` names the roles `ui` uses, `ui.TintsOf(cx)` gives their translucent fills, and `ui.FinOf(cx)` gives `ui`'s layered finishes.

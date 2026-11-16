@@ -522,6 +522,47 @@ func (cx *Scope) Palette() Palette {
 	return p
 }
 
+// textColorBinding shares one palette subscription among an owner's views.
+// Only views that use default ink need resolving when that ink changes.
+type textColorBinding struct {
+	color Color
+	nodes map[*node]struct{}
+}
+
+func (t *Tree) paletteText(n *node) Color {
+	owner := n.owner
+	b := t.textColors[owner]
+	if b == nil {
+		if t.textColors == nil {
+			t.textColors = make(map[*Scope]*textColorBinding)
+		}
+		b = &textColorBinding{nodes: make(map[*node]struct{})}
+		t.textColors[owner] = b
+		t.within(owner, func() {
+			owner.addCleanup(func() { delete(t.textColors, owner) })
+			owner.renderEffect(func() {
+				color := owner.Palette().Text
+				if color == 0 {
+					p := t.rt.defaultTheme().Light
+					if owner.Dark() {
+						p = t.rt.defaultTheme().Dark
+					}
+					color = p.Text
+				}
+				if b.color != color {
+					b.color = color
+					for n := range b.nodes {
+						t.markResolve(n)
+					}
+				}
+			})
+		})
+	}
+	b.nodes[n] = struct{}{}
+	n.ink = b
+	return b.color
+}
+
 func (rt *runtime) defaultTheme() *Theme {
 	if rt.theme == nil {
 		rt.theme = DefaultTheme()

@@ -61,7 +61,7 @@ func main() { nsgo.Run(Root) }
 - Let a scroll view fill its container and put the padding on its content, so the scroll bar stays against the edge. Scroll only through `core.Scroll`, `core.List` or `ui`'s scroll views, never by stepping offsets from pointer or wheel events; they keep native inertia and edges.
 - Keep content clear of the notch and the keyboard with `PaddingEnv: core.EnvEdges{Top: core.EnvSafeArea, Bottom: core.EnvKeyboard}` rather than fixed insets.
 - `core.Style` is typed CSS: zero fields are unset and `Merge` composes styles. `Class` takes Tailwind CSS 4 classes, responsive (`md:`), appearance (`dark:`) and state (`hover:`) variants included; a `Style` wins over a class.
-- Take colors from the theme, never fixed hex values in a component: `ui.ColorsOf(cx)` inside a `StyleFunc` follows theme and appearance changes in place. `cx.SetTheme` themes a subtree; `core.ParseTheme` reads a YAML or shadcn/ui theme.
+- Take colors from the theme, never fixed hex values in a component: `ui.ColorsOf(cx)` inside a `StyleFunc` follows theme and appearance changes in place. Unset text and `currentColor` icons follow the subtree's `Palette.Text`; explicit colors keep inheriting. `cx.SetTheme` themes a subtree; `core.ParseTheme` reads a YAML or shadcn/ui theme.
 - Do nothing implicitly by device. Choose sizes and forms for a phone or a desktop explicitly, from the window's width or the target, not by a component changing on its own.
 - Leave the pointer's arrow alone and give lists, tables and sidebars a selected look without hover or press: NSGo apps look native, not like web pages, on the web too.
 

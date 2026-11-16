@@ -78,7 +78,7 @@ func TestEffectsKeepTheirPointerWhileEqual(t *testing.T) {
 	if vs == nil || vs.Effects == nil || len(vs.Effects.Shadows) != 2 || len(vs.Effects.Gradients) != 1 {
 		t.Fatalf("effects = %+v", vs)
 	}
-	if vs.Effects.Shadows[1].Color != RGB(0x000000) {
+	if vs.Effects.Shadows[1].Color != DefaultTheme().Light.Text {
 		t.Errorf("ring = %+v, want the text color", vs.Effects.Shadows[1])
 	}
 	// A change elsewhere sends the same effects again by pointer.

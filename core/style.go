@@ -192,7 +192,9 @@ type Style struct {
 	// every frame, over the ones above.
 	Animated *AnimatedStyle
 
-	// Text, inherited by descendants that set none.
+	// Color is the text color, inherited by descendants that set none.
+	// Without an explicit color above, it follows the subtree's Palette.Text,
+	// including changes of theme, appearance and host tokens.
 	Color Color
 	// FontFamily names a font family or a CSS list of them, each used for
 	// the characters those before it lack; empty is the system font, and
@@ -918,7 +920,9 @@ func setSlice[T any](dst *[]T, v []T) {
 // textFields are a style's text fields, which views pass the views inside
 // them: comparable, and small enough to copy down the tree.
 type textFields struct {
-	Color                            Color
+	Color Color
+	// paletteColor distinguishes the default ink from an explicit inherited color.
+	paletteColor                     bool
 	FontFamily                       string
 	Language                         string
 	FontSize                         Points

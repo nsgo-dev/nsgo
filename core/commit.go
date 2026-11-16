@@ -324,7 +324,17 @@ func (t *Tree) resolve(n *node, inherited textFields, force bool) {
 	// holds.
 	kids := force || self && n.kind == 0
 	if n.kind != 0 {
+		if inherited.Color == 0 || inherited.paletteColor {
+			inherited.Color = t.paletteText(n)
+			inherited.paletteColor = true
+		} else if n.ink != nil {
+			delete(n.ink.nodes, n)
+			n.ink = nil
+		}
 		inherited = n.style.inherit(inherited)
+		if n.style.Color != 0 {
+			inherited.paletteColor = false
+		}
 		if self && inherited != n.passed {
 			n.passed = inherited
 			kids = true
@@ -343,9 +353,6 @@ func (t *Tree) resolve(n *node, inherited textFields, force bool) {
 			t.restyleExpanded(n)
 		}
 		n.color = inherited.Color
-		if n.color == 0 {
-			n.color = RGB(0x000000)
-		}
 		rtl := t.rtl
 		if d := inherited.LayoutDirection; d != 0 {
 			rtl = d == DirectionRTL

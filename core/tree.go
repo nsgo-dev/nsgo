@@ -55,6 +55,9 @@ type Tree struct {
 	ending   []*node // nodes with OnTransitionEnd restyled since the last commit
 	reports  []report
 	stacks   []*node
+
+	// textColors shares default ink bindings among each owner's views.
+	textColors map[*Scope]*textColorBinding
 	// matchGone and matchNew are the views with a MatchID the round
 	// deletes and creates, which emitMatches pairs.
 	matchGone, matchNew []*node
@@ -230,6 +233,7 @@ type node struct {
 	pointerNone, pointerTarget bool
 	// color is the text color the node has, for CurrentColor.
 	color Color
+	ink   *textColorBinding
 	h     handlers
 	props driver.ViewProps
 	// bound are the animated values its gestures and scrolling set, as
@@ -928,6 +932,9 @@ func (t *Tree) discard(n *node) {
 		return
 	}
 	n.deleted = true
+	if n.ink != nil {
+		delete(n.ink.nodes, n)
+	}
 	if n.kind == 0 {
 		delete(t.regions, n)
 	}

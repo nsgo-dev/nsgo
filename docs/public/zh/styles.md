@@ -77,6 +77,8 @@ cx.SetTheme(theme)
 
 `cx.SetAppearance` 强制整个应用使用浅色或深色，`cx.SetSubtreeAppearance` 只作用于子树，`core.AppearanceSystem` 重新跟随系统。`cx.Dark()` 返回子树当前的外观，`cx.Palette()` 返回应用了嵌入宿主覆盖后的颜色。
 
+若祖先没有设置 `Style.Color`，文字和使用 `currentColor` 的图标会使用子树的 `Palette.Text`，并随主题、外观和宿主 token 原地更新。显式设置的颜色（包括 `core.Transparent`）继续向下继承。
+
 ## 组件中的颜色
 
 组件在构建时和 `StyleFunc` 中读取颜色，因此主题或外观变化会原地生效，不需要重新构建组件。`ui.ColorsOf(cx)` 给出 `ui` 使用的角色，`ui.TintsOf(cx)` 给出它们的半透明填充，`ui.FinOf(cx)` 给出 `ui` 的层次质感。
