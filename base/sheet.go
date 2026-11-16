@@ -41,7 +41,8 @@ type Sheet struct {
 	Style     core.Style
 	StyleFunc func() core.Style
 	// Children are the content, made on each opening.
-	Children                     []core.Node
+	Children []core.Node
+	// Label names the sheet for screen readers, a dialog, and AccessibilityDescription is read after it.
 	Label                        string
 	LabelFunc                    func() string
 	AccessibilityDescription     string

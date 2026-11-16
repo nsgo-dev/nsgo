@@ -59,25 +59,46 @@ func TestDialog(t *testing.T) {
 	})
 }
 
+// TestDialogTextFuncsUpdateInPlace changes a dialog's and an alert dialog's title and description while they are open: the texts shown and what screen readers read follow on the same views, and the field inside keeps its focus and text.
 func TestDialogTextFuncsUpdateInPlace(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
+		var title, description, alert *core.Signal[string]
 		app, _ := start(t, e, func(cx *core.Scope) core.Node {
-			title, description := core.NewSignal(cx, "First title"), core.NewSignal(cx, "First description")
+			title, description = core.NewSignal(cx, "First title"), core.NewSignal(cx, "First description")
+			alert = core.NewSignal(cx, "First alert")
 			return core.View{Children: []core.Node{
-				Button{Text: "Change", TestID: "change", OnPress: func() {
-					title.Set("Second title")
-					description.Set("Second description")
-				}},
-				Dialog{Open: func() bool { return true }, TestID: "dialog", TitleFunc: title.Get, DescriptionFunc: description.Get},
+				Dialog{Open: func() bool { return true }, TestID: "dialog", TitleFunc: title.Get, DescriptionFunc: description.Get,
+					Children: []core.Node{Input{Label: "Name", TestID: "name"}}},
+				AlertDialog{Open: func() bool { return true }, TestID: "alert", TitleFunc: alert.Get, Description: "Static"},
 			}}
 		})
-		id := app.Find("dialog").ID
+		dialog, alert0 := app.Find("dialog"), app.Find("alert")
+		if p := dialog.Props; p.Label != "First title" || p.Description != "First description" {
+			t.Fatalf("dialog reads %q, %q", p.Label, p.Description)
+		}
+		if p := alert0.Props; p.Label != "First alert" || p.Description != "Static" {
+			t.Fatalf("alert dialog reads %q, %q", p.Label, p.Description)
+		}
 		app.Find("First title")
-		app.Press("change")
+		app.Type("name", "Ada")
+		field := app.Find("name")
+		app.Post(func() {
+			title.Set("Second title")
+			description.Set("Second description")
+			alert.Set("Second alert")
+		})
+		app.Settle()
 		app.Find("Second title")
 		app.Find("Second description")
-		if got := app.Find("dialog").ID; got != id {
-			t.Fatalf("dialog remounted on text update: %v then %v", id, got)
+		app.Find("Second alert")
+		if got := app.Find("dialog"); got.ID != dialog.ID || got.Props.Label != "Second title" || got.Props.Description != "Second description" {
+			t.Fatalf("dialog %v reads %q, %q after the change, was %v", got.ID, got.Props.Label, got.Props.Description, dialog.ID)
+		}
+		if got := app.Find("alert"); got.ID != alert0.ID || got.Props.Label != "Second alert" {
+			t.Fatalf("alert dialog %v reads %q after the change, was %v", got.ID, got.Props.Label, alert0.ID)
+		}
+		if got := app.Find("name"); got.ID != field.ID || got.Text != "Ada" || got.Focused != field.Focused {
+			t.Fatalf("the field became %v %q focused %v, was %v %q focused %v", got.ID, got.Text, got.Focused, field.ID, field.Text, field.Focused)
 		}
 	})
 }

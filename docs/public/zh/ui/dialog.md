@@ -26,7 +26,7 @@ ui.Dialog{
 
 对话框是否打开由应用保存。`OnOpenChange` 收到对话框请求的每次变化，附带一个 `base.Reason`，用来区分点击外部、Escape 和返回；`OnClose` 在关闭完成后运行。`NoCloseOnEscape` 和 `NoCloseOnBackdropPress` 让 Escape 和点击外部不关闭它。
 
-`Title` 和 `Description` 位于表面顶部，`Footer` 放按钮。`Bare` 把整个表面交给 `Children`，用于应用自己布局的对话框，`Inset` 设置它的内边距。
+`Title` 和 `Description` 位于表面顶部，打开期间会变化时用 `TitleFunc` 和 `DescriptionFunc`，`Footer` 放按钮。`Bare` 把整个表面交给 `Children`，用于应用自己布局的对话框，`Inset` 设置它的内边距。
 
 ## Sheet
 
@@ -61,7 +61,7 @@ ui.AlertDialog{
 
 ## 无障碍
 
-对话框报告 `RoleDialog` 并读出标题，标题不够时读出 `Label`。打开时焦点移入，关闭时焦点返回；背景不是停靠点。底部按钮保留各自的角色和标签。
+对话框报告 `RoleDialog` 并读出标题，标题不够时读出 `Label`，然后读出描述，居中对话框和底部面板都是如此。打开时焦点移入，关闭时焦点返回；背景不是停靠点。底部按钮保留各自的角色和标签。
 
 ## 平台
 

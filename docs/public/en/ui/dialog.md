@@ -26,7 +26,7 @@ ui.Dialog{
 
 The app holds whether the dialog is open. `OnOpenChange` hears every change the dialog asks for, with a `base.Reason` that tells a press outside from Escape or back; `OnClose` runs once it has closed. `NoCloseOnEscape` and `NoCloseOnBackdropPress` keep Escape and a press outside from closing it.
 
-`Title` and `Description` head the surface and `Footer` holds its buttons. `Bare` leaves the whole surface to `Children`, for a dialog of the app's own layout, and `Inset` sets its padding.
+`Title` and `Description` head the surface, `TitleFunc` and `DescriptionFunc` when they change while it is open, and `Footer` holds its buttons. `Bare` leaves the whole surface to `Children`, for a dialog of the app's own layout, and `Inset` sets its padding.
 
 ## Sheets
 
@@ -61,7 +61,7 @@ A modal blocks the app behind it, takes the keyboard focus and closes on Escape 
 
 ## Accessibility
 
-The dialog reports `RoleDialog` and reads its title, or `Label` when the title is not enough. Focus moves into it when it opens and returns when it closes; the backdrop is not a stop. The footer's buttons keep their roles and labels.
+The dialog reports `RoleDialog` and reads its title, or `Label` when the title is not enough, then its description, as a centered dialog and as a sheet. Focus moves into it when it opens and returns when it closes; the backdrop is not a stop. The footer's buttons keep their roles and labels.
 
 ## Platform
 

@@ -104,18 +104,45 @@ func TestAccessibilityDescriptionAndInputLabelFollowSignals(t *testing.T) {
 		label, description = NewSignal(cx, "Name"), NewSignal(cx, "Your full name")
 		return View{Children: []Node{
 			View{TestID: "view", Role: RoleGroup, AccessibilityDescriptionFunc: description.Get},
-			Input{TestID: "input", LabelFunc: label.Get, AccessibilityDescriptionFunc: description.Get},
+			Input{TestID: "input", DefaultValue: "Ada", LabelFunc: label.Get, AccessibilityDescriptionFunc: description.Get},
 		}}
 	})
 	props := propsOf(h.commit())
-	if p := props[h.find("input").id]; p.Label != "Name" || p.Description != "Your full name" {
+	view, input := h.find("view").id, h.find("input").id
+	if p := props[view]; p.Description != "Your full name" {
+		t.Fatalf("initial view props = %+v", p)
+	}
+	if p := props[input]; p.Label != "Name" || p.Description != "Your full name" {
 		t.Fatalf("initial input props = %+v", p)
 	}
+	// A field's label changing alone goes alone, as a view's does.
 	label.Set("Nombre")
+	b := h.commit()
+	if k := kinds(b); k[driver.ItemViewProps] != 0 || k[driver.ItemAccessibilityLabel] != 1 {
+		t.Fatalf("an input's label change sent %v, want one ItemAccessibilityLabel", k)
+	}
+	for _, it := range b.Items {
+		if it.Kind == driver.ItemAccessibilityLabel && (it.ID != input || it.Value != "Nombre") {
+			t.Errorf("label item = %+v", it)
+		}
+	}
 	description.Set("Su nombre completo")
 	props = propsOf(h.commit())
-	if p := props[h.find("input").id]; p.Label != "Nombre" || p.Description != "Su nombre completo" {
-		t.Fatalf("updated input props = %+v", p)
+	if p := props[view]; p.Description != "Su nombre completo" {
+		t.Errorf("updated view props = %+v", p)
+	}
+	if p := props[input]; p.Label != "Nombre" || p.Description != "Su nombre completo" {
+		t.Errorf("updated input props = %+v", p)
+	}
+	// The same elements change, keeping what the field holds.
+	if h.find("view").id != view || h.find("input").id != input {
+		t.Error("a changing label or description remounted its element")
+	}
+	if v := h.find("input").input.value; v != "Ada" {
+		t.Errorf("input value = %q after its texts changed, want Ada", v)
+	}
+	if k := kinds(h.commit()); k[driver.ItemViewProps] != 0 || k[driver.ItemAccessibilityLabel] != 0 {
+		t.Errorf("an idle commit sent %v", k)
 	}
 }
 

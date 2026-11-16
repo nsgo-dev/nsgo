@@ -34,9 +34,7 @@ type Dialog struct {
 	// Bare leaves out the surface's padding, gap and width, for content
 	// that fills it, sizes it and is clipped to its corners.
 	Bare bool
-	// Label names the dialog for assistive technology, Title when empty,
-	// which reads Description after it. Role makes it an alert dialog,
-	// one asking for an answer, as a confirmation.
+	// Label names the dialog for assistive technology, Title when it and LabelFunc are not given, which reads Description after it. Role makes it an alert dialog, one asking for an answer, as a confirmation.
 	Label     string
 	LabelFunc func() string
 	Role      core.Role
