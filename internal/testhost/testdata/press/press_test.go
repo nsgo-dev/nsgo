@@ -1,11 +1,15 @@
-package main
+package press_test
 
 import (
 	"testing"
 
+	_ "github.com/nsgo-dev/nsgo"
+
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
+
+func TestMain(m *testing.M) { nsgotest.Main(m) }
 
 // TestPressModifiersReachTheApp uses the same press steps headless and
 // through the targets' native input, checking every edge and the next tap.
