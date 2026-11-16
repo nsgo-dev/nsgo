@@ -112,36 +112,15 @@ func (v *view) selects(presses objc.ID) bool {
 	return onTV() && v.pressable() && v.focusable() && hasPress(presses, pressSelect)
 }
 
-func (s *surface) focusedKeyUse() driver.KeyUse {
-	if s.focused != nil {
-		return keyUse(s.focused)
-	}
+// focusKeyUse returns the keys the focused view uses itself, which the keymap's bindings that yield them leave it (driver.FindKey): a field's editing keys, and on an Apple TV the focused view's, a pressable view's Return and Space or a slider's arrows.
+func (s *surface) focusKeyUse() driver.KeyUse {
 	if s.editing() {
 		return driver.KeyUseText
 	}
+	if v := s.focused; v != nil && s.views[v.id] == v {
+		return driver.FocusKeyUse(v.kind, v.props.Role, v.pressable())
+	}
 	return 0
-}
-
-func keyUse(v *view) driver.KeyUse {
-	if v == nil {
-		return 0
-	}
-	if v.kind == driver.KindInput || v.kind == driver.KindWeb {
-		return driver.KeyUseText
-	}
-	var use driver.KeyUse
-	if v.pressable() {
-		use |= driver.KeyUsePress
-	}
-	switch v.props.Role {
-	case driver.RoleAdjustable, driver.RoleSpinButton:
-		use |= driver.KeyUseAdjust
-	case driver.RoleTab, driver.RoleTabList, driver.RoleRadio, driver.RoleRadioGroup,
-		driver.RoleOption, driver.RoleListbox, driver.RoleMenuItem, driver.RoleMenuItemRadio,
-		driver.RoleMenuItemCheckbox:
-		use |= driver.KeyUseSelect
-	}
-	return use
 }
 
 // hasPress reports whether presses, an NSSet of UIPress, hold one of kind.

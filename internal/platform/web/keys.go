@@ -32,26 +32,17 @@ var apple = func() bool {
 
 func (s *surface) setKeymap(keys []driver.KeyBinding) { s.keys = keys }
 
-func focusedKeyUse(v *view) driver.KeyUse {
+// focusKeyUse returns the keys the focused element uses itself, which the keymap's bindings that yield them leave it (driver.FindKey): a field's, a select's or an editable element's editing keys, a pressable view's Return and Space, a slider's or a tab bar's arrows.
+func (s *surface) focusKeyUse() driver.KeyUse {
+	el := s.doc.Get("activeElement")
+	if editing(el) {
+		return driver.KeyUseText
+	}
+	v := s.viewOf(el)
 	if v == nil {
 		return 0
 	}
-	if v.kind == driver.KindInput || v.kind == driver.KindWeb {
-		return driver.KeyUseText
-	}
-	var use driver.KeyUse
-	if v.pressable() {
-		use |= driver.KeyUsePress
-	}
-	switch v.props.Role {
-	case driver.RoleAdjustable, driver.RoleSpinButton:
-		use |= driver.KeyUseAdjust
-	case driver.RoleTab, driver.RoleTabList, driver.RoleRadio, driver.RoleRadioGroup,
-		driver.RoleOption, driver.RoleListbox, driver.RoleMenuItem, driver.RoleMenuItemRadio,
-		driver.RoleMenuItemCheckbox:
-		use |= driver.KeyUseSelect
-	}
-	return use
+	return driver.FocusKeyUse(v.kind, v.props.Role, v.pressable())
 }
 
 // keyName returns the normalized name of e's key without modifiers, or
@@ -84,19 +75,13 @@ func keyName(e js.Value) string {
 
 // shortcut consumes a key press that a binding of the keymap names,
 // with "mod" or with the literal modifier, and reports it, as
-// core.FindKey decides for a text field and a held key.
+// driver.FindKey decides for the focused element and a held key.
 func (s *surface) shortcut(e js.Value) {
 	if len(s.keys) == 0 || len(s.alerts) > 0 || e.Get("isComposing").Bool() {
 		return
 	}
 	name := keyName(e)
 	if name == "" {
-		return
-	}
-	// Return and Space press the focused view, whatever the keymap binds.
-	if v := s.viewOf(s.doc.Get("activeElement")); v != nil && v.kind != driver.KindInput && v.pressable() &&
-		(name == "enter" || name == "space") && !e.Get("ctrlKey").Bool() && !e.Get("altKey").Bool() &&
-		!e.Get("metaKey").Bool() && !e.Get("shiftKey").Bool() {
 		return
 	}
 	ctrl, alt, shift, meta := e.Get("ctrlKey").Bool(), e.Get("altKey").Bool(), e.Get("shiftKey").Bool(), e.Get("metaKey").Bool()
@@ -119,13 +104,14 @@ func (s *surface) shortcut(e js.Value) {
 	case !apple && ctrl:
 		names = append([]string{join(true, false, alt, shift, meta)}, names...)
 	}
-	k, consumed := driver.FindKeyWithFocus(s.keys, names, focusedKeyUse(s.viewOf(s.doc.Get("activeElement"))), e.Get("repeat").Bool())
+	focus := s.focusKeyUse()
+	k, consumed := driver.FindKey(s.keys, names, focus, e.Get("repeat").Bool())
 	if !consumed {
 		return
 	}
 	e.Call("preventDefault")
 	e.Call("stopPropagation")
 	if k != "" {
-		s.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: k})
+		s.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: k, Count: uint32(focus)})
 	}
 }

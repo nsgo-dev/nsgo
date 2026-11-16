@@ -26,16 +26,11 @@ type keyBinding struct {
 type KeyWhen uint8
 
 const (
-	// KeyAuto fires it unless a focused text editor or control uses the key
-	// itself. Text editors use the keys EditsText reports; buttons, menu rows
-	// and other pressables keep Enter and Space; sliders keep their arrow,
-	// paging, Home and End keys; tabs and radio groups keep their navigation
-	// keys.
+	// KeyAuto fires it unless the view with the keyboard focus uses the key itself: a text input or a web view the keys EditsText reports, a view that takes presses (a button, a menu row, a switch) Return and Space, a slider or spin button the arrows, Page Up, Page Down, Home and End, and a tab bar, radio group, list, menu or tree, or one of their items, the same keys to move in it. Modified keys, such as Shift+Space, are none of these but a text input's.
 	KeyAuto KeyWhen = iota
 	// KeyAlways fires it wherever the keyboard focus is.
 	KeyAlways
-	// KeyNotEditing fires it only while no text input or web view has
-	// the keyboard focus.
+	// KeyNotEditing fires it only while no text input or web view has the keyboard focus, and takes its key from any other focused view: a control binds its own keys with it while it has the focus, as a select does Return while its trigger keeps the focus, where KeyAuto would leave them to the control.
 	KeyNotEditing
 )
 
@@ -48,7 +43,7 @@ type KeyOptions struct {
 	OverModals bool
 }
 
-// OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". The newest binding of a key wins. It fires once while the key is held, and not while a text input that uses the key has the keyboard focus; focused controls keep the keys they use as described by KeyAuto. OnKeyWith says else.
+// OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". The newest binding of a key wins. It fires once while the key is held, and not while the view with the keyboard focus uses the key itself, a text input its editing keys, a button Return and Space, a slider or a tab bar its arrows (KeyAuto); OnKeyWith says else. A control that binds its own keys while it has the focus binds them with KeyNotEditing, or the focus it holds would keep them from it.
 //
 // What the owner shows are the views of the nearest owner at or above it that has any. The binding rests while none of them shows: in a Holder's content no place shows, under a DisplayNone view such as a navigation stack's screen below the top, in a dismissed modal. While a modal is shown it rests too if any of them is outside the topmost modal, as the page under a dialog is, unless KeyOptions.OverModals. It fires again once they show, without binding it again.
 func (cx *Scope) OnKey(key string, fn func()) { cx.OnKeyWith(key, KeyOptions{}, fn) }
@@ -61,12 +56,12 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 	}
 	k := driver.NormalizeKey(key)
 	inText := opts.When == KeyAlways || opts.When == KeyAuto && !EditsText(k)
-	blocked := driver.KeyUse(0)
+	var yields driver.KeyUse
 	if opts.When == KeyAuto {
-		blocked = keyControlUses(k)
+		yields = driver.KeyUsedBy(k)
 	}
 	owner := cx.current()
-	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, BlockedBy: blocked}, owner: owner, within: confinement(owner), overModals: opts.OverModals, fn: fn}
+	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, Yields: yields}, owner: owner, within: confinement(owner), overModals: opts.OverModals, fn: fn}
 	t.keys = append(t.keys, b)
 	t.keysChanged = true
 	t.changed = true
@@ -75,21 +70,6 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 		t.keysChanged = true
 		t.changed = true
 	})
-}
-
-func keyControlUses(key string) driver.KeyUse {
-	parts := strings.Split(key, "+")
-	if len(parts) != 1 {
-		return 0
-	}
-	switch parts[0] {
-	case "enter", "space":
-		return driver.KeyUsePress
-	case "up", "down", "left", "right", "home", "end", "pageup", "pagedown":
-		return driver.KeyUseAdjust | driver.KeyUseSelect
-	default:
-		return 0
-	}
 }
 
 type backHandler struct {
@@ -282,12 +262,13 @@ func (p *keyPlaces) shows(o *Scope, overModals bool) bool {
 	return true
 }
 
-func (t *Tree) pressKey(key string) {
+func (t *Tree) pressKey(key string, focus driver.KeyUse) {
 	key = driver.NormalizeKey(key)
 	var places *keyPlaces
 	for i := len(t.keys) - 1; i >= 0; i-- {
 		// A binding is checked again, as the platform may have matched the press by a keymap the focus or the views have since left.
-		if b := t.keys[i]; b.Key == key {
+		// The focus the platform matched by passes over the bindings it passed over, so the one it chose runs rather than a newer one of the key that yields to the focused control.
+		if b := t.keys[i]; b.Key == key && b.FiresOver(focus) {
 			if places == nil {
 				places = t.keyPlaces()
 			}

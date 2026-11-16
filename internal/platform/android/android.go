@@ -1377,15 +1377,15 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.u32(uint32(len(it.Keys)))
 			for _, k := range it.Keys {
 				w.str(k.Key)
-				flags := uint8(0)
+				// InText and Repeat, then from bit 2 on the keys it yields (Protocol.java's KEY_USE_*).
+				var flags byte
 				if k.InText {
 					flags |= 1
 				}
 				if k.Repeat {
 					flags |= 2
 				}
-				flags |= uint8(k.BlockedBy) << 2
-				w.byte(flags)
+				w.byte(flags | byte(k.Yields)<<2)
 			}
 		case driver.ItemStatusBar:
 			c := it.StatusBar

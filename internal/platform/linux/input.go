@@ -800,9 +800,14 @@ func (w *window) shortcut(keyval, state uint32, repeat bool) bool {
 		}
 		names = append(names, strings.Join(append(parts, name), "+"))
 	}
-	if key, consumed := driver.FindKey(w.keys, names, editing, repeat); consumed {
+	// Only fields and pages take the keyboard focus here (#266), so the focus uses a text input's keys or none.
+	var focus driver.KeyUse
+	if editing {
+		focus = driver.KeyUseText
+	}
+	if key, consumed := driver.FindKey(w.keys, names, focus, repeat); consumed {
 		if key != "" {
-			w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: key})
+			w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: key, Count: uint32(focus)})
 		}
 		return true
 	}

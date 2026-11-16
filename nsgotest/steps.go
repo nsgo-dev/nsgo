@@ -731,13 +731,7 @@ func (a *App) Commit(selector, text string) {
 	a.Compose(selector, "")
 }
 
-// Key presses a key on a hardware keyboard, as the app's keymap reads it
-// ("mod+s", "Escape", "a"): a binding of the keymap fires; else, in a
-// macOS or web environment, Tab and Shift+Tab move the keyboard focus
-// between fields and pressable views, and Return or Space press the
-// pressable view it is on; else the focused field takes a character,
-// Backspace or Enter; else Escape goes back. A key nothing takes does
-// nothing, as on a device.
+// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a macOS or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on; else the focused field takes a character, Backspace or Enter; else Escape goes back. A key nothing takes does nothing, as on a device.
 func (a *App) Key(key string) {
 	a.t.Helper()
 	a.step("key(%s)", key)
@@ -749,9 +743,10 @@ func (a *App) Key(key string) {
 	k := driver.NormalizeKey(key)
 	a.inputBy(driver.ModalityKeyboard)
 	names := a.keyNames(k)
-	if binding, consumed := driver.FindKeyWithFocus(a.keyBindings, names, a.focusedKeyUse(), false); consumed {
+	focus := a.focusKeyUse()
+	if binding, consumed := driver.FindKey(a.keyBindings, names, focus, false); consumed {
 		if binding != "" {
-			a.dispatch(driver.Event{Kind: driver.EventKey, Text: binding})
+			a.dispatch(driver.Event{Kind: driver.EventKey, Text: binding, Count: uint32(focus)})
 		}
 		a.done()
 		return
@@ -808,25 +803,12 @@ func (a *App) Key(key string) {
 	a.done()
 }
 
-func (a *App) focusedKeyUse() driver.KeyUse {
+// focusKeyUse returns the keys the view with the keyboard focus uses itself (driver.FocusKeyUse), which the keymap's bindings that yield them leave it, as on a device.
+func (a *App) focusKeyUse() driver.KeyUse {
 	var use driver.KeyUse
 	for _, v := range a.views {
-		if !v.Focused {
-			continue
-		}
-		if v.Kind == driver.KindInput || v.Kind == driver.KindWeb {
-			use |= driver.KeyUseText
-		}
-		if pressable(v) {
-			use |= driver.KeyUsePress
-		}
-		switch v.Props.Role {
-		case driver.RoleAdjustable, driver.RoleSpinButton:
-			use |= driver.KeyUseAdjust
-		case driver.RoleTab, driver.RoleTabList, driver.RoleRadio, driver.RoleRadioGroup,
-			driver.RoleOption, driver.RoleListbox, driver.RoleMenuItem, driver.RoleMenuItemRadio,
-			driver.RoleMenuItemCheckbox:
-			use |= driver.KeyUseSelect
+		if v.Focused {
+			use |= driver.FocusKeyUse(v.Kind, v.Props.Role, pressable(v) || v.Events.Has(driver.EventLongPress) || v.Events.Has(driver.EventPressUp))
 		}
 	}
 	return use

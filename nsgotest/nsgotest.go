@@ -323,9 +323,8 @@ type App struct {
 	// reader's focus to.
 	AccessibilityFocus *View
 	// Keymap is the keyboard shortcuts the app binds; Title its title.
-	Keymap      []string
-	keyBindings []driver.KeyBinding
-	Title       string
+	Keymap []string
+	Title  string
 	// Language is the language the platform labels its menus in, and
 	// LanguageForced whether the app forces it (core.Scope.SetLocale),
 	// which Apple platforms keep for the system's words in later launches.
@@ -361,6 +360,9 @@ type App struct {
 	rootID driver.NodeID
 	edits  map[driver.NodeID]uint32
 	env    *driver.Environment
+	// keyBindings is the keymap as the platform matches it, which Key reads.
+	keyBindings []driver.KeyBinding
+
 	// blocked is set while the touch responder keeps native drags from
 	// starting (ItemBlockNative).
 	blocked bool

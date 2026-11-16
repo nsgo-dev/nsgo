@@ -26,7 +26,11 @@ func TestKeyBindingsFireAsTheirOptionsSay(t *testing.T) {
 		{[]string{"mod+z"}, true, true, "mod+z", true},
 		{[]string{"x"}, false, false, "", false},
 	} {
-		key, consumed := driver.FindKey(keymap, c.names, c.editing, c.repeat)
+		var focus driver.KeyUse
+		if c.editing {
+			focus = driver.KeyUseText
+		}
+		key, consumed := driver.FindKey(keymap, c.names, focus, c.repeat)
 		if key != c.key || consumed != c.consumed {
 			t.Errorf("FindKey(%v, editing %v, repeat %v) = %q, %v; want %q, %v", c.names, c.editing, c.repeat,
 				key, consumed, c.key, c.consumed)
@@ -34,27 +38,77 @@ func TestKeyBindingsFireAsTheirOptionsSay(t *testing.T) {
 	}
 }
 
-func TestAutomaticBindingsYieldToFocusedControls(t *testing.T) {
+// TestBindingsYieldToTheFocusedControl holds KeyAuto bindings to leave a focused control the keys it uses, and KeyNotEditing and KeyAlways ones to take them, KeyNotEditing's none from a text input (#205).
+func TestBindingsYieldToTheFocusedControl(t *testing.T) {
 	var keymap []driver.KeyBinding
 	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
-		cx.OnKeyWith("space", KeyOptions{}, func() {})
-		cx.OnKeyWith("right", KeyOptions{}, func() {})
-		cx.OnKeyWith("mod+enter", KeyOptions{}, func() {})
-		keymap = cx.tree().keymap()
+		for _, b := range []struct {
+			key  string
+			when KeyWhen
+		}{{"space", KeyAuto}, {"right", KeyAuto}, {"mod+enter", KeyAuto}, {"enter", KeyNotEditing},
+			{"down", KeyNotEditing}, {"home", KeyAlways}, {"shift+space", KeyAuto}} {
+			cx.OnKeyWith(b.key, KeyOptions{When: b.when}, func() {})
+		}
+		return View{}
+	})
+	for _, it := range h.commit().Items {
+		if it.Kind == driver.ItemKeymap {
+			keymap = it.Keys
+		}
+	}
+	if len(keymap) != 7 {
+		t.Fatalf("keymap = %v", keymap)
+	}
+	press, adjust, sel := driver.KeyUsePress, driver.KeyUseAdjust, driver.KeyUseSelect
+	want := []driver.KeyUse{press, adjust | sel, 0, 0, 0, 0, 0}
+	for i, b := range keymap {
+		if b.Yields != want[i] {
+			t.Errorf("%s yields %b, want %b", b.Key, b.Yields, want[i])
+		}
+	}
+	button := driver.FocusKeyUse(driver.KindView, driver.RoleButton, true)
+	slider := driver.FocusKeyUse(driver.KindView, driver.RoleAdjustable, true)
+	tab := driver.FocusKeyUse(driver.KindView, driver.RoleTab, true)
+	plain := driver.FocusKeyUse(driver.KindView, driver.RoleNone, false)
+	for _, c := range []struct {
+		name  string
+		focus driver.KeyUse
+		fires bool
+	}{
+		{"space", button, false}, {"space", plain, true}, {"space", slider, false},
+		{"right", slider, false}, {"right", tab, false}, {"right", button, true},
+		{"mod+enter", button, true}, {"enter", button, true}, {"enter", driver.KeyUseText, false},
+		{"down", slider, true}, {"down", driver.KeyUseText, false},
+		{"home", slider, true}, {"home", driver.KeyUseText, true}, {"shift+space", button, true},
+	} {
+		key, consumed := driver.FindKey(keymap, []string{c.name}, c.focus, false)
+		if fired := key == c.name && consumed; fired != c.fires || !fired && consumed {
+			t.Errorf("%s with focus %b = %q, %v; want firing %v", c.name, c.focus, key, consumed, c.fires)
+		}
+	}
+	if got := driver.FocusKeyUse(driver.KindInput, driver.RoleNone, false); got != driver.KeyUseText {
+		t.Errorf("a text input uses %b", got)
+	}
+}
+
+// TestAKeyRunsTheBindingThePlatformChose holds the engine to run, of a key's bindings, the one the platform chose for the focus it matched by: the control's own, not a newer one that yields to it (#205).
+func TestAKeyRunsTheBindingThePlatformChose(t *testing.T) {
+	var log []string
+	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+		cx.OnKeyWith("right", KeyOptions{When: KeyNotEditing}, func() { log = append(log, "slider") })
+		cx.OnKey("right", func() { log = append(log, "app") })
 		return View{}
 	})
 	h.commit()
-	if keymap[0].BlockedBy != driver.KeyUsePress || keymap[1].BlockedBy != driver.KeyUseAdjust|driver.KeyUseSelect || keymap[2].BlockedBy != 0 {
-		t.Fatalf("automatic key uses = %#v", keymap)
-	}
-	if got, consumed := driver.FindKeyWithFocus(keymap, []string{"space"}, driver.KeyUsePress, false); got != "" || consumed {
-		t.Fatalf("space on a pressable control = %q, %v", got, consumed)
-	}
-	if got, consumed := driver.FindKeyWithFocus(keymap, []string{"right"}, driver.KeyUseAdjust, false); got != "" || consumed {
-		t.Fatalf("right on an adjustable control = %q, %v", got, consumed)
-	}
-	if got, consumed := driver.FindKeyWithFocus(keymap, []string{"mod+enter"}, driver.KeyUsePress, false); got != "mod+enter" || !consumed {
-		t.Fatalf("modified enter on a pressable control = %q, %v", got, consumed)
+	for _, c := range []struct {
+		focus driver.KeyUse
+		want  string
+	}{{driver.KeyUseAdjust | driver.KeyUsePress, "slider"}, {driver.KeyUsePress, "app"}, {0, "app"}} {
+		log = nil
+		h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Text: "right", Count: uint32(c.focus)})
+		if !slices.Equal(log, []string{c.want}) {
+			t.Errorf("right over focus %b ran %q, want %q", c.focus, log, c.want)
+		}
 	}
 }
 

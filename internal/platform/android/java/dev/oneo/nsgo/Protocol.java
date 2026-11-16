@@ -333,6 +333,19 @@ final class Protocol {
     static final int ROLE_ROW = 22;
     static final int ROLE_COLUMN_HEADER = 23;
     static final int ROLE_CELL = 24;
+    static final int ROLE_LISTBOX = 25;
+    static final int ROLE_OPTION = 26;
+    static final int ROLE_TREE = 30;
+    static final int ROLE_TREE_ITEM = 31;
+    static final int ROLE_MENU_ITEM_CHECKBOX = 33;
+    static final int ROLE_MENU_ITEM_RADIO = 34;
+    static final int ROLE_SPIN_BUTTON = 35;
+
+    // The keys a focused view uses itself, as driver.KeyUse: a keymap binding's flags carry the ones it yields from bit 2 on.
+    static final int KEY_USE_PRESS = 1;
+    static final int KEY_USE_ADJUST = 2;
+    static final int KEY_USE_SELECT = 4;
+    static final int KEY_USE_TEXT = 8;
 
     // How a view is an accessibility element, as core.Accessible.
     static final int ACCESSIBLE_YES = 1;

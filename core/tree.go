@@ -2167,7 +2167,7 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		t.answerImageInfo(ev)
 		return
 	case driver.EventKey:
-		t.pressKey(ev.Text)
+		t.pressKey(ev.Text, driver.KeyUse(ev.Count))
 		return
 	case driver.EventMenu:
 		t.chooseMenu(ev.Count)

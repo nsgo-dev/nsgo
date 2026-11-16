@@ -45,26 +45,55 @@ type KeyBinding struct {
 	// Repeat fires it again on the auto-repeats of a held key; else they
 	// are consumed and fire nothing.
 	Repeat bool
-	// BlockedBy says which focused controls keep the key from an automatic
-	// binding. It is zero for bindings that always remain eligible.
-	BlockedBy KeyUse
+	// Yields are the focused controls it gives its key to, a subset of what KeyUsedBy says for the key: it takes no press while such a control has the keyboard focus, which an older binding of the key or the control then takes.
+	Yields KeyUse
 	// ID is a global shortcut's (ItemHotKeys), which EventHotKey reports.
 	ID uint32
 }
 
-// KeyUse says which keys a focused control keeps for itself.
+// KeyUse is a set of the keys a focused view uses itself, by the kind of view.
 type KeyUse uint8
 
 const (
-	// KeyUsePress is Enter or Space on a focused pressable control.
+	// KeyUsePress is Return and Space, which press a focused pressable view.
 	KeyUsePress KeyUse = 1 << iota
-	// KeyUseAdjust is an arrow, paging, Home or End key on an adjustable control.
+	// KeyUseAdjust is the arrows, Page Up, Page Down, Home and End, which move a focused slider or spin button.
 	KeyUseAdjust
-	// KeyUseSelect is an arrow, Home or End key on a tab or radio control.
+	// KeyUseSelect is the arrows, Page Up, Page Down, Home and End, which move the selection or the focus in a focused tab bar, radio group, list, menu or tree.
 	KeyUseSelect
-	// KeyUseText is a focused text editor or web view.
+	// KeyUseText is the keys a focused text input or web view edits with; InText says whether a binding fires over it.
 	KeyUseText
 )
+
+// KeyUsedBy returns the focused views that use key, a normalized key, themselves: Return and Space a pressable view, the arrows and the paging keys a slider or a selection. Modified keys are none's.
+func KeyUsedBy(key string) KeyUse {
+	switch key {
+	case "enter", "space":
+		return KeyUsePress
+	case "up", "down", "left", "right", "home", "end", "pageup", "pagedown":
+		return KeyUseAdjust | KeyUseSelect
+	}
+	return 0
+}
+
+// FocusKeyUse returns the keys a focused view uses itself, by its kind, its role and whether it takes presses: a text input or web view its editing keys, a pressable view Return and Space, a slider or spin button its adjusting keys, and a tab bar, radio group, list, menu or tree and their items their moving keys. Each backend's focused view and nsgotest's are read the same way.
+func FocusKeyUse(kind ViewKind, role Role, pressable bool) KeyUse {
+	var use KeyUse
+	if kind == KindInput || kind == KindWeb {
+		use |= KeyUseText
+	}
+	if pressable {
+		use |= KeyUsePress
+	}
+	switch role {
+	case RoleAdjustable, RoleSpinButton:
+		use |= KeyUseAdjust
+	case RoleTab, RoleTabList, RoleRadio, RoleRadioGroup, RoleListbox, RoleOption, RoleMenu, RoleMenuItem,
+		RoleMenuItemCheckbox, RoleMenuItemRadio, RoleTree, RoleTreeItem:
+		use |= KeyUseSelect
+	}
+	return use
+}
 
 // NormalizeKey returns key lowercased with its modifiers in the order mod, ctrl, alt, shift, meta; "cmd" and "command" are meta, "option" is alt, "control" is ctrl and the key "return" is "enter".
 func NormalizeKey(key string) string {
@@ -90,27 +119,16 @@ func NormalizeKey(key string) string {
 	return strings.Join(append(mods, name), "+")
 }
 
-// FindKey says what a key press does with keymap: names are the press's
-// normalized names (with "mod" and with the literal modifier), editing
-// whether a text input or web view has the keyboard focus, and repeat
-// whether it is a held key's auto-repeat. It returns the binding that
-// fires, or "" and whether the press is consumed anyway: the repeat of a
-// binding that fires once.
-func FindKey(keymap []KeyBinding, names []string, editing, repeat bool) (key string, consumed bool) {
-	var use KeyUse
-	if editing {
-		use = KeyUseText
-	}
-	return FindKeyWithFocus(keymap, names, use, repeat)
+// FiresOver reports whether the binding takes a press while the view with the keyboard focus uses the keys focus says: not from a text input or web view unless InText, nor from a control whose keys it Yields.
+func (b KeyBinding) FiresOver(focus KeyUse) bool {
+	return (focus&KeyUseText == 0 || b.InText) && focus&b.Yields == 0
 }
 
-// FindKeyWithFocus is FindKey with the focused control's key uses. Automatic
-// bindings whose key a focused control owns are skipped; KeyAlways and
-// KeyNotEditing bindings have no BlockedBy bits and remain eligible.
-func FindKeyWithFocus(keymap []KeyBinding, names []string, use KeyUse, repeat bool) (key string, consumed bool) {
+// FindKey says what a key press does with keymap: names are the press's normalized names (with "mod" and with the literal modifier), focus the keys the view with the keyboard focus uses itself (FocusKeyUse, KeyUseText alone for a backend that knows only whether a text input or web view has it), and repeat whether it is a held key's auto-repeat. A binding takes no press from a focused text input or web view unless InText, nor from a focused control whose keys it Yields. It returns the binding that fires, or "" and whether the press is consumed anyway: the repeat of a binding that fires once.
+func FindKey(keymap []KeyBinding, names []string, focus KeyUse, repeat bool) (key string, consumed bool) {
 	for i := len(keymap) - 1; i >= 0; i-- {
 		b := keymap[i]
-		if !slices.Contains(names, b.Key) || use&KeyUseText != 0 && !b.InText || use&b.BlockedBy != 0 {
+		if !slices.Contains(names, b.Key) || !b.FiresOver(focus) {
 			continue
 		}
 		if repeat && !b.Repeat {

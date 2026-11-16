@@ -20,10 +20,7 @@ import (
 // javaNames are the driver's names of the kinds Java names otherwise.
 var javaNames = map[string]string{"EventHoverIn": "EventMouseEnter", "EventHoverOut": "EventMouseLeave", "EventHoverMove": "EventMouseMove"}
 
-// TestJavaProtocolMatchesTheDriver holds Protocol.java's item and event
-// kinds to the driver's of the same names, which the Java runtime reads
-// the batches and writes the events by: a kind the driver gains shifts
-// the ones after it.
+// TestJavaProtocolMatchesTheDriver holds Protocol.java's item and event kinds, roles and key uses to the driver's of the same names, which the Java runtime reads the batches and writes the events by: a kind the driver gains shifts the ones after it.
 func TestJavaProtocolMatchesTheDriver(t *testing.T) {
 	fset := token.NewFileSet()
 	dir := filepath.Join("..", "..", "driver")
@@ -45,9 +42,9 @@ func TestJavaProtocolMatchesTheDriver(t *testing.T) {
 		t.Fatal(err)
 	}
 	checked := 0
-	for _, m := range regexp.MustCompile(`static final int (ITEM|EVENT)_(\w+) = (\d+);`).FindAllStringSubmatch(string(java), -1) {
-		name := strings.ToUpper(m[1][:1]) + strings.ToLower(m[1][1:])
-		for _, word := range strings.Split(m[2], "_") {
+	for _, m := range regexp.MustCompile(`static final int (ITEM|EVENT|ROLE|KEY_USE)_(\w+) = (\d+);`).FindAllStringSubmatch(string(java), -1) {
+		var name string
+		for _, word := range strings.Split(m[1]+"_"+m[2], "_") {
 			if word == "URL" {
 				name += word
 				continue

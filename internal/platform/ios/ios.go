@@ -1583,8 +1583,9 @@ func pressesBegan(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 		app.menuHeld = true
 		return
 	}
-	binding, consumed := "", false
+	binding, consumed, focus := "", false, driver.KeyUse(0)
 	if app != nil && app.engine != nil && len(app.keys) > 0 {
+		focus = app.focusKeyUse()
 		apple.ForEach(presses, func(press objc.ID) {
 			key := press.Send(sel("key"))
 			if key == 0 || consumed {
@@ -1595,8 +1596,8 @@ func pressesBegan(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 				name = strings.ToLower(apple.GoString(key.Send(sel("charactersIgnoringModifiers"))))
 			}
 			if name != "" {
-				binding, consumed = driver.FindKeyWithFocus(app.keys, apple.KeyNames(name, objc.Send[uint](key, sel("modifierFlags"))),
-					app.focusedKeyUse(), false)
+				binding, consumed = driver.FindKey(app.keys, apple.KeyNames(name, objc.Send[uint](key, sel("modifierFlags"))),
+					focus, false)
 			}
 		})
 	}
@@ -1604,9 +1605,9 @@ func pressesBegan(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 		apple.Super(self, cmd, presses, event)
 		return
 	}
-	app.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding})
-	if i := slices.IndexFunc(app.keys, func(b driver.KeyBinding) bool { return b.Key == binding }); i >= 0 && app.keys[i].Repeat {
-		app.repeatKey(binding)
+	app.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding, Count: uint32(focus)})
+	if i := slices.IndexFunc(app.keys, func(b driver.KeyBinding) bool { return b.Key == binding && b.FiresOver(focus) }); i >= 0 && app.keys[i].Repeat {
+		app.repeatKey(binding, focus)
 	}
 }
 
@@ -1652,7 +1653,7 @@ func pressesEnded(self objc.ID, cmd objc.SEL, presses, event objc.ID) {
 
 // repeatKey fires binding again while its key is held, as a hardware
 // keyboard's auto-repeat would: after 500 ms, then 30 times a second.
-func (s *surface) repeatKey(binding string) {
+func (s *surface) repeatKey(binding string, focus driver.KeyUse) {
 	if s.heldStop != nil {
 		close(s.heldStop)
 	}
@@ -1667,7 +1668,7 @@ func (s *surface) repeatKey(binding string) {
 			case <-stop:
 				return
 			case <-t.C:
-				e.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding})
+				e.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding, Count: uint32(focus)})
 				t.Reset(33 * time.Millisecond)
 			}
 		}

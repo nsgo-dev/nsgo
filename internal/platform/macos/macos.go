@@ -1159,9 +1159,9 @@ func (s *surface) filterEvent(event objc.ID) objc.ID {
 			break
 		}
 		s.engine.InputModality(driver.ModalityKeyboard)
-		if binding, consumed := s.binding(event); consumed {
+		if binding, focus, consumed := s.binding(event); consumed {
 			if binding != "" {
-				s.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding})
+				s.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: binding, Count: uint32(focus)})
 			}
 			return 0
 		}
@@ -1237,24 +1237,23 @@ var keyNames = map[uint16]string{
 	109: "f10", 103: "f11", 111: "f12",
 }
 
-// binding returns the keymap's binding a key event presses, as
-// core.FindKey decides, and whether the event is consumed. It names the
-// press both with "mod", Command here, and with "meta". Keys go to an
-// input method composing text, as arrows choose its candidates.
-func (s *surface) binding(event objc.ID) (string, bool) {
-	if len(s.keys) == 0 || s.composing() || activates(event) && s.focusedPressable() {
-		return "", false
+// binding returns the keymap's binding a key event presses, as driver.FindKey decides for the focused view, the keys that view uses, and whether the event is consumed. It names the press both with "mod", Command here, and with "meta". Keys go to an input method composing text, as arrows choose its candidates.
+func (s *surface) binding(event objc.ID) (string, driver.KeyUse, bool) {
+	if len(s.keys) == 0 || s.composing() {
+		return "", 0, false
 	}
 	name, ok := keyNames[objc.Send[uint16](event, sel("keyCode"))]
 	if !ok {
 		// The key's character without Shift or Option, in the current layout.
 		name = strings.ToLower(apple.GoString(event.Send(sel("charactersByApplyingModifiers:"), uint(0))))
 		if name == "" {
-			return "", false
+			return "", 0, false
 		}
 	}
-	return driver.FindKeyWithFocus(s.keys, apple.KeyNames(name, objc.Send[uint](event, sel("modifierFlags"))), s.focusedKeyUse(),
+	focus := s.focusKeyUse()
+	key, consumed := driver.FindKey(s.keys, apple.KeyNames(name, objc.Send[uint](event, sel("modifierFlags"))), focus,
 		objc.Send[bool](event, sel("isARepeat")))
+	return key, focus, consumed
 }
 
 // isBack reports whether a key event is Escape, Cmd-[ or Option-Left.

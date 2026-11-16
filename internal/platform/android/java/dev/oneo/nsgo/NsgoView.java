@@ -3536,12 +3536,15 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         if (e.getAction() == KeyEvent.ACTION_UP && consumedKeys.remove(code)) return true;
         if (e.getAction() == KeyEvent.ACTION_DOWN && keys.length > 0) {
             String[] names = names(e);
-            // The newest binding of the key that fires here, as core.FindKey decides.
+            int focus = names == null ? 0 : focusKeyUse();
+            // The newest binding of the key that fires here, as driver.FindKey decides.
             for (int i = keys.length - 1; names != null && i >= 0; i--) {
                 if (!keys[i].equals(names[0]) && !keys[i].equals(names[1])) continue;
-                if (editing() && (keyFlags[i] & 1) == 0) continue;
+                if ((focus & Protocol.KEY_USE_TEXT) != 0 && (keyFlags[i] & 1) == 0) continue;
+                if ((focus & (keyFlags[i] >> 2)) != 0) continue;
                 consumedKeys.add(code);
-                if (e.getRepeatCount() == 0 || (keyFlags[i] & 2) != 0) event(Protocol.EVENT_KEY, 0, 0, 0, 0, keys[i]);
+                // The count carries the focus matched by, as driver.EventKey's.
+                if (e.getRepeatCount() == 0 || (keyFlags[i] & 2) != 0) event(Protocol.EVENT_KEY, 0, focus, 0, 0, keys[i]);
                 return true;
             }
         }
@@ -3557,10 +3560,29 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         return e.isCtrlPressed() ? new String[] {"mod+" + rest, "ctrl+" + rest} : new String[] {rest, rest};
     }
 
-    /** Whether a text field or a web view has the keyboard focus. */
-    private boolean editing() {
+    /** The keys the view with the keyboard focus uses itself, as driver.FocusKeyUse says: a text field's or a web view's editing keys, a pressable view's Return and Space, a slider's or a tab bar's arrows. */
+    private int focusKeyUse() {
         View focused = findFocus();
-        return focused instanceof android.widget.EditText || focused instanceof android.webkit.WebView;
+        if (focused instanceof android.widget.EditText || focused instanceof android.webkit.WebView) return Protocol.KEY_USE_TEXT;
+        Node n = focused == null ? null : byView.get(focused);
+        if (n == null) return 0;
+        int use = 0;
+        if (n.has(Protocol.EVENT_PRESS) || n.has(Protocol.EVENT_LONG_PRESS) || n.has(Protocol.EVENT_PRESS_DOWN)
+                || n.has(Protocol.EVENT_PRESS_UP)) use |= Protocol.KEY_USE_PRESS;
+        switch (n.role) {
+            case Protocol.ROLE_ADJUSTABLE: case Protocol.ROLE_SPIN_BUTTON:
+                use |= Protocol.KEY_USE_ADJUST;
+                break;
+            case Protocol.ROLE_TAB: case Protocol.ROLE_TAB_LIST: case Protocol.ROLE_RADIO: case Protocol.ROLE_RADIO_GROUP:
+            case Protocol.ROLE_LISTBOX: case Protocol.ROLE_OPTION: case Protocol.ROLE_MENU: case Protocol.ROLE_MENU_ITEM:
+            case Protocol.ROLE_MENU_ITEM_CHECKBOX: case Protocol.ROLE_MENU_ITEM_RADIO: case Protocol.ROLE_TREE:
+            case Protocol.ROLE_TREE_ITEM:
+                use |= Protocol.KEY_USE_SELECT;
+                break;
+            default:
+                break;
+        }
+        return use;
     }
 
     /** The key's name as core.NormalizeKey writes it, or null for keys it has none for. */

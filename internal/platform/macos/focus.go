@@ -107,44 +107,16 @@ func (s *surface) clicking() bool {
 	return t == leftDown || t == rightDown || t == otherDown
 }
 
-// focusedPressable reports whether a view that takes presses has the
-// keyboard focus: Return and Space are its, not the keymap's.
-func (s *surface) focusedPressable() bool {
-	v := views[s.window.Send(sel("firstResponder"))]
-	return v != nil && v.surface == s && v.focusable()
-}
-
-// focusedKeyUse describes the keys the focused drawn control keeps before
-// the app's automatic key bindings. Text fields and pages keep their own
-// editing keys; controls keep the standard activation and navigation keys.
-func (s *surface) focusedKeyUse() driver.KeyUse {
+// focusKeyUse returns the keys the view with the keyboard focus uses itself, which the keymap's bindings that yield them leave it (driver.FindKey): a field's or a page's editing keys, a pressable view's Return and Space, a slider's or a tab bar's arrows.
+func (s *surface) focusKeyUse() driver.KeyUse {
+	if s.editing() {
+		return driver.KeyUseText
+	}
 	v := views[s.window.Send(sel("firstResponder"))]
 	if v == nil || v.surface != s {
 		return 0
 	}
-	return keyUse(v)
-}
-
-func keyUse(v *view) driver.KeyUse {
-	if v == nil {
-		return 0
-	}
-	if v.kind == driver.KindInput || v.kind == driver.KindWeb {
-		return driver.KeyUseText
-	}
-	var use driver.KeyUse
-	if v.pressable() {
-		use |= driver.KeyUsePress
-	}
-	switch v.props.Role {
-	case driver.RoleAdjustable, driver.RoleSpinButton:
-		use |= driver.KeyUseAdjust
-	case driver.RoleTab, driver.RoleTabList, driver.RoleRadio, driver.RoleRadioGroup,
-		driver.RoleOption, driver.RoleListbox, driver.RoleMenuItem, driver.RoleMenuItemRadio,
-		driver.RoleMenuItemCheckbox:
-		use |= driver.KeyUseSelect
-	}
-	return use
+	return driver.FocusKeyUse(v.kind, v.props.Role, v.pressable())
 }
 
 // modalCame remembers what had the focus as modal v came: a field's
