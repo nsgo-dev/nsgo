@@ -84,6 +84,7 @@ nsgo
 │
 ├── Protocol
 │   ├── internal/automation              Requests the nsgo tool sends a running dev build's agent
+│   ├── internal/mimeinfo                Fixed extension/MIME table shared by the tool and runtime
 │   ├── internal/woff                    WOFF and WOFF2 fonts unpacked, for the bundler
 │   ├── internal/driver                  Mount items, events, TextEngine, shared values
 │   ├── internal/devtools                What DevTools and the automation's agent read from core's trees
@@ -132,7 +133,7 @@ A line means "imports". `internal/moduletest/layering_test.go` checks the graph 
 ```
 
 - Apps may import any public package directly, `core` included. `core`, or the public package itself, aliases each internal type a public package's API reaches; `TestPublicAPINamesNoInternalType` lists the public packages with `go list`, every package outside `internal/`, `cmd/`, `tools/` and `examples/`, so a new one is checked without a list to edit.
-- `internal/driver` imports from the module only `internal/shaderir`, for the shader programs it carries.
+- `internal/driver` imports `internal/shaderir` for shader programs and `internal/mimeinfo` for file types. The latter holds only fixed tables and standard-library helpers, so the build tool shares those names without linking the runtime.
 - `core` imports only `internal/driver`, `internal/devtools`, `internal/layout` and the shader compilers (`internal/shader`, `internal/shader/wgsl`, `internal/shaderir`). `internal/devtools` imports only `internal/driver`, for the batches and events it hands `nsgo dev -automation`'s agent, so DevTools' overlay, the layout audit's included, lives in `core` (`UpdateHighlights`).
 - Backends import `internal/driver`, `internal/engine`, `desktop/locales`, their shared packages and the shader writers, never the compilers, which only `core` links.
 - Only a backend's test host, built with the `nsgotest` tag, imports `core`; its surface (`testsurface.go`) also builds with `nsgoautomation`, for `nsgo dev -automation`'s live windows. The release, embed, watch and mini-program backend builds are checked separately so a test-only import cannot leak into an app.
@@ -156,7 +157,7 @@ Backends reach `core` only through the engine and `core` imports no backend, so 
 
 `microphone` stands apart from the layers, as recording has nothing to do with views: it loads the system's audio libraries through purego, holds iOS's audio session while it records through `internal/audiosession`, which imports nothing of the module and which the backends' videos and speech hold too, reaches Android's runtime, whose foreground service records, through `internal/driver`'s recording channel, which the backend connects outside any surface, as a recording belongs to the process, and elsewhere builds to report that it cannot. It asks for the microphone through `internal/platform/privacy`, which the Apple backends answer `core`'s permission requests, speech and iOS's camera with, so the permission has one implementation; `privacy` imports `internal/driver` and the block bridge `internal/platform/objcblock`. `widget` stands apart too, as widgets are drawn by an extension the tool compiles rather than by the engine: it imports `core`, for its colors, edges and fonts, writes timelines for the extension and loads the tool's library of Swift through purego ([tool](tool.md#widgets)). On Android its Live Activities reach the runtime through `internal/driver`'s Live Updates, a channel outside any surface, which the backend connects, as an activity outlives the app's views.
 
-Portable packages build unchanged for every target, with no purego, `syscall` or `unsafe`: `core`, `base` but for `base/terminal`, `ui`, `i18n`, `mobile`, `audio`, `desktop`, `icons`, `tsx`, `nsgotest`, `internal/automation`, `internal/driver`, `internal/layout`, `internal/testhost`, the shader compilers and `internal/engine`. No package has cgo files or hand-written C.
+Portable packages build unchanged for every target, with no purego, `syscall` or `unsafe`: `core`, `base` but for `base/terminal`, `ui`, `i18n`, `mobile`, `audio`, `desktop`, `icons`, `tsx`, `nsgotest`, `internal/automation`, `internal/driver`, `internal/mimeinfo`, `internal/layout`, `internal/testhost`, the shader compilers and `internal/engine`. No package has cgo files or hand-written C.
 
 ## Backends
 

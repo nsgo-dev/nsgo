@@ -1,0 +1,188 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
+)
+
+// TestWindowsFileAssociationsNative installs an isolated NSIS package,
+// opens a spaced/Unicode path through its ProgID, upgrades its declarations
+// and uninstalls it. Only the manual CI job opts into writing test keys.
+func TestWindowsFileAssociationsNative(t *testing.T) {
+	if os.Getenv("NSGO_FILE_ASSOCIATIONS") == "" {
+		t.Skip("set NSGO_FILE_ASSOCIATIONS=1 to test NSIS install and uninstall")
+	}
+	if nsisCompiler() == "" {
+		t.Fatal("native file association verification needs NSIS")
+	}
+	dir, pkg, installed := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "installed app")
+	id := fmt.Sprintf("dev.nsgo.associations.%d", time.Now().UnixNano())
+	ext := fmt.Sprintf("nsgo%d", time.Now().UnixNano())
+	p := &project{Dir: dir, Name: "Test App", ID: id, Version: "1.0.0", Release: true}
+	p.FileTypes = []fileType{
+		{Name: "Document", ID: id + ".document", Extensions: []string{ext, ext + "old"}, Role: "viewer"},
+		{Name: "Reassigned", ID: id + ".reassigned", Extensions: []string{ext + "other"}},
+	}
+	writeFiles(t, dir, map[string]string{
+		"go.mod": "module fileassociationstest\n\ngo 1.27.3\n",
+		"main.go": `package main
+import ("fmt"; "os"; "strings")
+func main() {
+  if len(os.Args) < 2 || strings.HasPrefix(os.Args[1], "--nsgo-") { return }
+  f, err := os.Create(os.Getenv("NSGO_ASSOC_OUTPUT")); if err != nil { panic(err) }; defer f.Close()
+  for _, arg := range os.Args[1:] { fmt.Fprintln(f, arg) }
+}
+`,
+	})
+	if err := goBuild(t.Context(), p, filepath.Join(pkg, p.Name+".exe"), []string{"CGO_ENABLED=0"}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := nsisScript(t.Context(), p, pkg, "x64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog, reassigned := d.FileTypes[0].ProgID, d.FileTypes[1].ProgID
+	meta := d.UninstallKey
+	// Cleanup is bounded to this test's unique keys, including failures.
+	t.Cleanup(func() {
+		for _, key := range []string{meta, `Software\Classes\` + prog, `Software\Classes\` + reassigned,
+			`Software\Classes\.` + ext, `Software\Classes\.` + ext + "old", `Software\Classes\.` + ext + "other"} {
+			exec.Command("reg", "delete", `HKCU\`+key, "/f").Run()
+		}
+	})
+	set := func(key, name, value string) {
+		t.Helper()
+		k, _, err := registry.CreateKey(registry.CURRENT_USER, key, registry.SET_VALUE)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer k.Close()
+		if err := k.SetStringValue(name, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func(key, name string) (string, error) {
+		k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.QUERY_VALUE)
+		if err != nil {
+			return "", err
+		}
+		defer k.Close()
+		value, _, err := k.GetStringValue(name)
+		return value, err
+	}
+	set(`Software\Classes\.`+ext, "", "Other.App")
+	set(`Software\Classes\.`+ext+`\OpenWithProgids`, "Other.App", "")
+	install := func() {
+		t.Helper()
+		setup, err := buildNSIS(t.Context(), p, pkg, "x64")
+		if err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.CommandContext(t.Context(), setup)
+		// NSIS requires /D to be last and unquoted, even with spaces.
+		cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `"` + setup + `" /S /D=` + installed}
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("install: %v\n%s", err, out)
+		}
+	}
+	install()
+	for _, suffix := range []string{"", "old"} {
+		if _, err := read(`Software\Classes\.`+ext+suffix+`\OpenWithProgids`, prog); err != nil {
+			t.Fatalf("Open With lacks the installed app: %v", err)
+		}
+	}
+	if got, err := read(`Software\Classes\.`+ext, ""); err != nil || got != "Other.App" {
+		t.Fatalf("installer replaced the default: %q, %v", got, err)
+	}
+	path := filepath.Join(t.TempDir(), "日本語 document."+ext)
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result := filepath.Join(t.TempDir(), "opened")
+	t.Setenv("NSGO_ASSOC_OUTPUT", result)
+	openAssociation(t, prog, path)
+	if got, err := os.ReadFile(result); err != nil || string(got) != path+"\n" {
+		t.Fatalf("Shell file arguments = %q, %v", got, err)
+	}
+	// Another program replaces one command; neither upgrade nor uninstall
+	// may remove that registration. The old extension of our type must go.
+	set(`Software\Classes\`+reassigned+`\shell\open\command`, "", `"foreign.exe" "%1"`)
+	p.FileTypes = p.FileTypes[:1]
+	p.FileTypes[0].Extensions = []string{ext}
+	install()
+	if _, err := read(`Software\Classes\.`+ext+`old\OpenWithProgids`, prog); err == nil {
+		t.Error("upgrade kept a dropped extension")
+	}
+	uninstaller := filepath.Join(installed, "Uninstall.exe")
+	cmd := exec.CommandContext(t.Context(), uninstaller)
+	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `"` + uninstaller + `" /S _?=` + installed}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("uninstall: %v\n%s", err, out)
+	}
+	for _, key := range []string{meta, `Software\Classes\` + prog} {
+		if k, err := registry.OpenKey(registry.CURRENT_USER, key, registry.READ); err == nil {
+			k.Close()
+			t.Errorf("uninstall kept %s", key)
+		}
+	}
+	if _, err := read(`Software\Classes\.`+ext+`\OpenWithProgids`, prog); err == nil {
+		t.Error("uninstall kept our Open With value")
+	}
+	if _, err := read(`Software\Classes\.`+ext+`\OpenWithProgids`, "Other.App"); err != nil {
+		t.Error("uninstall removed another app's Open With value")
+	}
+	if got, err := read(`Software\Classes\.`+ext, ""); err != nil || got != "Other.App" {
+		t.Error("uninstall changed the default handler")
+	}
+	if got, err := read(`Software\Classes\`+reassigned+`\shell\open\command`, ""); err != nil || !strings.Contains(got, "foreign.exe") {
+		t.Error("uninstall removed a reassigned ProgID")
+	}
+}
+
+// openAssociation uses Explorer's class selection without changing the
+// user's default handler or showing an Open With chooser.
+func openAssociation(t *testing.T, progID, file string) {
+	t.Helper()
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	ole := windows.NewLazySystemDLL("ole32.dll")
+	hr, _, _ := ole.NewProc("CoInitializeEx").Call(0, 2)
+	if int32(hr) < 0 {
+		t.Fatalf("CoInitializeEx: %#x", hr)
+	}
+	defer ole.NewProc("CoUninitialize").Call()
+	type shellExecuteInfo struct {
+		Size, Mask                        uint32
+		Wnd                               windows.Handle
+		Verb, File, Parameters, Directory *uint16
+		Show                              int32
+		Instance                          windows.Handle
+		IDList                            uintptr
+		Class                             *uint16
+		Key                               windows.Handle
+		HotKey                            uint32
+		Icon, Process                     windows.Handle
+	}
+	info := shellExecuteInfo{Mask: 0x541, Show: 0, File: windows.StringToUTF16Ptr(file), Class: windows.StringToUTF16Ptr(progID), Verb: windows.StringToUTF16Ptr("open")}
+	info.Size = uint32(unsafe.Sizeof(info))
+	ok, _, err := windows.NewLazySystemDLL("shell32.dll").NewProc("ShellExecuteExW").Call(uintptr(unsafe.Pointer(&info)))
+	if ok == 0 {
+		t.Fatalf("ShellExecuteEx: %v", err)
+	}
+	defer windows.CloseHandle(info.Process)
+	if state, err := windows.WaitForSingleObject(info.Process, 10000); err != nil || state != windows.WAIT_OBJECT_0 {
+		windows.TerminateProcess(info.Process, 1)
+		t.Fatalf("document app did not exit: %d, %v", state, err)
+	}
+}

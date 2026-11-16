@@ -216,8 +216,9 @@ modules:
       - cp -a . /app/lib/{{.Slug}}/
       - ln -s {{q (printf "/app/lib/%s/%s" .Slug .Command)}} {{q (printf "/app/bin/%s" .Command)}}
       - install -Dm644 {{.ID}}.desktop /app/share/applications/{{.ID}}.desktop
-      - install -Dm644 {{.ID}}.png /app/share/icons/hicolor/512x512/apps/{{.ID}}.png
+      - if [ -f {{.ID}}.png ]; then install -Dm644 {{.ID}}.png /app/share/icons/hicolor/512x512/apps/{{.ID}}.png; fi
       - install -Dm644 {{.ID}}.metainfo.xml /app/share/metainfo/{{.ID}}.metainfo.xml
+      - if [ -f {{.ID}}.mime.xml ]; then install -Dm644 {{.ID}}.mime.xml /app/share/mime/packages/{{.ID}}.xml; update-mime-database /app/share/mime; fi
     sources:
 {{- range .Sources}}
       - type: archive

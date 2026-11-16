@@ -9,13 +9,16 @@ import (
 )
 
 // fileType is a kind of document the app opens, which nsgo.yaml's
-// file_types lists and the macOS package registers with Launch Services:
-// files of it then open with the app from the Finder, and reach it through
-// desktop.OnOpenFiles.
+// file_types lists and desktop packages register with the system.
+// Opening one reaches desktop.OnOpenFiles.
 type fileType struct {
 	// Name is what the Finder calls such a file.
 	Name       string   `yaml:"name"`
 	Extensions []string `yaml:"extensions"`
+	// MIME names existing media types. Without it Linux uses the built-in
+	// extension table, defining unknown extensions of an owned type as
+	// application/x-<id>.
+	MIME []string `yaml:"mime"`
 	// ID is its uniform type identifier: <app id>.<first extension> by
 	// default. The app declares, and owns, a type under its own ID; any
 	// other it imports, ranking as an alternative to its owner's app.
@@ -33,6 +36,7 @@ type fileType struct {
 var (
 	extensionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 	utiPattern       = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
+	mimePattern      = regexp.MustCompile(`^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$`)
 )
 
 // validateFileTypes checks file_types and fills in their defaults; it
@@ -51,6 +55,11 @@ func (p *project) validateFileTypes() error {
 		for _, ext := range f.Extensions {
 			if !extensionPattern.MatchString(ext) {
 				return fmt.Errorf("%s.extensions: %q is not an extension; write flow, not .flow", key, ext)
+			}
+		}
+		for _, m := range f.MIME {
+			if !mimePattern.MatchString(m) {
+				return fmt.Errorf("%s.mime: %q is not a media type, as video/mp4", key, m)
 			}
 		}
 		if f.ID == "" {
@@ -163,8 +172,12 @@ func (p *project) fileTypesPlist() string {
 		if name := f.iconName(); name != "" {
 			fmt.Fprintf(decls, "\t\t\t<key>UTTypeIconFile</key><string>%s</string>\n", xmlText(name))
 		}
-		fmt.Fprintf(decls, "\t\t\t<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key>%s</dict>\n",
+		fmt.Fprintf(decls, "\t\t\t<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key>%s",
 			plistStrings(f.Extensions))
+		if len(f.MIME) > 0 {
+			fmt.Fprintf(decls, "<key>public.mime-type</key>%s", plistStrings(f.MIME))
+		}
+		decls.WriteString("</dict>\n")
 		decls.WriteString("\t\t</dict>\n")
 	}
 	out := "\t<key>CFBundleDocumentTypes</key>\n\t<array>\n" + docs.String() + "\t</array>"

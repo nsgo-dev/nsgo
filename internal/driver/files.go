@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/mimeinfo"
 )
 
 // The system's file and folder pickers and save dialog, which NSH has
@@ -285,41 +287,13 @@ func FinishDirectories(r DirectoriesRequest, dirs []Directory) []Directory {
 	return dirs
 }
 
-// fileTypes are the media types of common extensions, so every platform
-// names a file's type alike; mime's table, which differs by system,
-// covers the rest.
-var fileTypes = map[string]string{
-	"7z": "application/x-7z-compressed", "aac": "audio/aac", "apk": "application/vnd.android.package-archive",
-	"avi": "video/x-msvideo", "bz2": "application/x-bzip2", "csv": "text/csv", "doc": "application/msword",
-	"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-	"epub": "application/epub+zip", "flac": "audio/flac", "gz": "application/gzip", "htm": "text/html",
-	"html": "text/html", "ics": "text/calendar", "js": "text/javascript", "json": "application/json",
-	"key": "application/x-iwork-keynote-sffkey", "log": "text/plain", "m4a": "audio/mp4", "m4v": "video/mp4",
-	"md": "text/markdown", "mkv": "video/x-matroska", "mov": "video/quicktime", "mp3": "audio/mpeg",
-	"mp4": "video/mp4", "numbers": "application/x-iwork-numbers-sffnumbers", "odp": "application/vnd.oasis.opendocument.presentation",
-	"ods": "application/vnd.oasis.opendocument.spreadsheet", "odt": "application/vnd.oasis.opendocument.text",
-	"oga": "audio/ogg", "ogg": "audio/ogg", "ogv": "video/ogg", "opus": "audio/opus", "otf": "font/otf",
-	"pages": "application/x-iwork-pages-sffpages", "pdf": "application/pdf", "ppt": "application/vnd.ms-powerpoint",
-	"pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "rar": "application/vnd.rar",
-	"rtf": "application/rtf", "svg": "image/svg+xml", "tar": "application/x-tar", "tgz": "application/gzip",
-	"ttf": "font/ttf", "txt": "text/plain", "wav": "audio/wav", "weba": "audio/webm", "webm": "video/webm",
-	"woff": "font/woff", "woff2": "font/woff2", "xls": "application/vnd.ms-excel",
-	"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xml": "application/xml",
-	"xz": "application/x-xz", "yaml": "application/yaml", "yml": "application/yaml", "zip": "application/zip",
-	"3gp": "video/3gpp",
-}
-
 // mimeForExtension returns the media type of ext (zip, without a dot),
 // or "".
 func mimeForExtension(ext string) string {
-	ext = strings.ToLower(ext)
-	if t := imageExtensions[ext]; t != "" {
+	if t := mimeinfo.ForExtension(ext); t != "" {
 		return t
 	}
-	if t := fileTypes[ext]; t != "" {
-		return t
-	}
-	t, _, _ := strings.Cut(mime.TypeByExtension("."+ext), ";")
+	t, _, _ := strings.Cut(mime.TypeByExtension("."+strings.ToLower(ext)), ";")
 	return strings.TrimSpace(t)
 }
 
@@ -367,13 +341,9 @@ func (r FilesRequest) Extensions() (exts []string, any bool) {
 			continue
 		}
 		n := len(exts)
-		family, wild := strings.CutSuffix(t, "/*")
-		for _, table := range []map[string]string{imageExtensions, fileTypes} {
-			for ext, m := range table {
-				if m == t || wild && strings.HasPrefix(m, family+"/") {
-					add(ext)
-				}
-			}
+		_, wild := strings.CutSuffix(t, "/*")
+		for _, ext := range mimeinfo.Extensions(t) {
+			add(ext)
 		}
 		if !wild {
 			sys, _ := mime.ExtensionsByType(t)

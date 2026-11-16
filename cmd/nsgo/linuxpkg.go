@@ -124,7 +124,7 @@ func linuxPackageFiles(p *project, dir string) ([]linuxPackageEntry, error) {
 		rel = filepath.ToSlash(rel)
 		// What the packages put where desktops look for it, and the
 		// packages themselves, stay out of /opt.
-		if !d.IsDir() && !strings.Contains(rel, "/") && (rel == p.ID+".desktop" || rel == p.ID+".png" || isLinuxPackage(rel)) {
+		if !d.IsDir() && !strings.Contains(rel, "/") && (rel == p.ID+".desktop" || rel == p.ID+".png" || rel == p.ID+".mime.xml" || isLinuxPackage(rel)) {
 			return nil
 		}
 		name := opt + "/" + rel
@@ -165,7 +165,11 @@ func linuxPackageFiles(p *project, dir string) ([]linuxPackageEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID}
+	types, definitions, err := p.linuxFileTypes()
+	if err != nil {
+		return nil, err
+	}
+	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID, MIMETypes: types}
 	if n != nil {
 		entry.Name = n.names[n.source]
 		for _, lang := range n.languages()[1:] {
@@ -177,6 +181,9 @@ func linuxPackageFiles(p *project, dir string) ([]linuxPackageEntry, error) {
 		return nil, err
 	}
 	add("usr/share/applications/"+p.ID+".desktop", desktop.Bytes(), 0o644)
+	if len(definitions) > 0 {
+		add("usr/share/mime/packages/"+p.ID+".xml", definitions, 0o644)
+	}
 	img, err := p.iconImage()
 	if err != nil {
 		return nil, err
@@ -255,10 +262,16 @@ func debPackage(p *project, files []linuxPackageEntry, arch string) ([]byte, err
 		"Depends: %s\nRecommends: %s\nSection: misc\nPriority: optional\nDescription: %s\n",
 		p.packageSlug(), debVersion(p.Version), debArch[arch], p.maintainer(), (linuxPackageSize(files)+1023)/1024,
 		linuxDependency("libgtk-4-1", p.Linux.Depends.Deb), linuxDependency("libwebkitgtk-6.0-4", p.Linux.Recommends.Deb), name)
-	controlTar, err := tarGz([]linuxPackageEntry{
+	controlFiles := []linuxPackageEntry{
 		{name: "control", data: []byte(control), mode: 0o644},
 		{name: "md5sums", data: md5sums.Bytes(), mode: 0o644},
-	}, "./")
+	}
+	if len(p.FileTypes) > 0 {
+		for _, script := range []string{"postinst", "postrm"} {
+			controlFiles = append(controlFiles, linuxPackageEntry{name: script, data: []byte(linuxCacheScript), mode: 0o755})
+		}
+	}
+	controlTar, err := tarGz(controlFiles, "./")
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +316,9 @@ func archPackage(p *project, files []linuxPackageEntry, arch string) ([]byte, er
 		fmt.Fprintf(&info, "optdepend = %s\n", dep)
 	}
 	entries := append([]linuxPackageEntry{{name: ".PKGINFO", data: []byte(info.String()), mode: 0o644}}, files...)
+	if len(p.FileTypes) > 0 {
+		entries = append(entries, linuxPackageEntry{name: ".INSTALL", data: []byte(archCacheScript), mode: 0o644})
+	}
 	return tarGz(entries, "")
 }
 

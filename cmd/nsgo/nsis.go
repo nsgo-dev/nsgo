@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"image"
@@ -185,6 +186,15 @@ type nsisData struct {
 	// the uninstaller removes; Excludes what is beside them but the
 	// installer leaves out.
 	Files, Dirs, Excludes []string
+	FileTypes             []nsisFileType
+}
+
+// nsisFileType has an app-specific ProgID, independent of a type's
+// position or display name. Install metadata remembers its extensions
+// so an upgrade can remove declarations that the new version dropped.
+type nsisFileType struct {
+	ProgID, Name string
+	Extensions   []string
 }
 
 func nsisScript(ctx context.Context, p *project, dir, arch string) (*nsisData, error) {
@@ -236,6 +246,12 @@ func nsisScript(ctx context.Context, p *project, dir, arch string) (*nsisData, e
 			words = nsisWords["English"]
 		}
 		d.Languages = append(d.Languages, nsisLanguage{Name: l, Shortcut: words[0], Running: fmt.Sprintf(words[1], name)})
+	}
+	for _, f := range p.FileTypes {
+		sum := sha256.Sum256([]byte(f.ID))
+		d.FileTypes = append(d.FileTypes, nsisFileType{
+			ProgID: fmt.Sprintf("%s.File.%x", p.ID, sum[:8]), Name: f.Name, Extensions: f.Extensions,
+		})
 	}
 	err = filepath.WalkDir(dir, func(path string, e fs.DirEntry, err error) error {
 		if err != nil || path == dir {
@@ -300,6 +316,8 @@ var nsisTemplate = template.Must(template.New("nsi").Funcs(template.FuncMap{
 	"path": func(variable string, names ...string) string {
 		return `"` + variable + nsisEscape(strings.Join(names, "")) + `"`
 	},
+	// registry appends a runtime suffix to a literal, escaped key.
+	"registry": func(key, suffix string) string { return `"` + nsisEscape(key) + suffix + `"` },
 	// cmd is a command line for Exec and ExecWait, its parts joined in an NSIS single-quoted string, in which a quote of the app's name is $\'.
 	"cmd": func(parts ...string) string {
 		return "'" + strings.ReplaceAll(strings.Join(parts, ""), "'", `$\'`) + "'"
@@ -399,6 +417,54 @@ FunctionEnd
 !macroend
 !insertmacro CloseApp ""
 !insertmacro CloseApp "un."
+
+; Remove only this installation's registrations, including types and
+; extensions dropped in an upgrade. A changed command belongs to someone
+; else; preserve it and its Open With entries.
+!macro RemoveFileTypes un
+Function ${un}RemoveFileTypes
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  Push $4
+  next_type:
+  EnumRegKey $0 HKCU {{q (printf "%s\\FileTypes" .UninstallKey)}} 0
+  StrCmp $0 "" done
+  ReadRegStr $1 HKCU {{registry .UninstallKey "\\FileTypes\\$0"}} ""
+  ReadRegStr $2 HKCU "Software\Classes\$0\shell\open\command" ""
+  StrCmp $1 "" forget_type
+  StrCmp $1 $2 0 forget_type
+  StrCpy $4 0
+  next_extension:
+  ClearErrors
+  EnumRegValue $3 HKCU {{registry .UninstallKey "\\FileTypes\\$0"}} $4
+  IfErrors remove_type
+  IntOp $4 $4 + 1
+  StrCmp $3 "" next_extension
+  DeleteRegValue HKCU "Software\Classes\.$3\OpenWithProgids" "$0"
+  DeleteRegKey /ifempty HKCU "Software\Classes\.$3\OpenWithProgids"
+  DeleteRegKey /ifempty HKCU "Software\Classes\.$3"
+  Goto next_extension
+  remove_type:
+  DeleteRegKey HKCU "Software\Classes\$0"
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
+  forget_type:
+  ClearErrors
+  DeleteRegKey HKCU {{registry .UninstallKey "\\FileTypes\\$0"}}
+  IfErrors done
+  Goto next_type
+  done:
+  DeleteRegKey /ifempty HKCU {{q (printf "%s\\FileTypes" .UninstallKey)}}
+  Pop $4
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+FunctionEnd
+!macroend
+!insertmacro RemoveFileTypes ""
+!insertmacro RemoveFileTypes "un."
 {{- if .Command}}
 
 ; Put the command companion's folder on the user's Path and remove it on uninstall.
@@ -433,6 +499,21 @@ Section
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 {{- if .Command}}
   Call UserPath
+{{- end}}
+  Call RemoveFileTypes
+{{- range .FileTypes}}
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\%s" .ProgID)}} "" {{q .Name}}
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\%s\\DefaultIcon" .ProgID)}} "" {{cmd (path "$INSTDIR\\" $.Exe) ",0"}}
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\%s\\shell\\open\\command" .ProgID)}} "" {{cmd (path "$INSTDIR\\" $.Exe) " \"%1\""}}
+  WriteRegStr HKCU {{q (printf "%s\\FileTypes\\%s" $.UninstallKey .ProgID)}} "" {{cmd (path "$INSTDIR\\" $.Exe) " \"%1\""}}
+{{- $progID := .ProgID}}
+{{- range .Extensions}}
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\.%s\\OpenWithProgids" .)}} {{q $progID}} ""
+  WriteRegStr HKCU {{q (printf "%s\\FileTypes\\%s" $.UninstallKey $progID)}} {{q .}} ""
+{{- end}}
+{{- end}}
+{{- if .FileTypes}}
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 {{- end}}
   CreateShortCut {{path "$SMPROGRAMS\\" .Name ".lnk"}} {{path "$INSTDIR\\" .Exe}}
   ; Give desktop toasts a COM activator CLSID on the Start menu shortcut.
@@ -469,6 +550,7 @@ Section "Uninstall"
 {{- if .Command}}
   Call un.UserPath
 {{- end}}
+  Call un.RemoveFileTypes
   ; Remove the per-user toast COM registration before deleting the EXE.
   ExecWait {{cmd (path "$INSTDIR\\" .Exe) " --nsgo-unregister-toast"}}
   Delete {{path "$SMPROGRAMS\\" .Name ".lnk"}}

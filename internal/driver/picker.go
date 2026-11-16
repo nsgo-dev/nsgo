@@ -6,6 +6,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/mimeinfo"
 )
 
 // The system's photo picker, as NSH's picker module: the user picks
@@ -177,16 +179,10 @@ func SniffImage(b []byte) string {
 	return ""
 }
 
-var imageExtensions = map[string]string{
-	"jpg": "image/jpeg", "jpeg": "image/jpeg", "jpe": "image/jpeg", "png": "image/png", "gif": "image/gif",
-	"webp": "image/webp", "heic": "image/heic", "heif": "image/heif", "avif": "image/avif",
-	"tif": "image/tiff", "tiff": "image/tiff", "bmp": "image/bmp",
-}
-
 // MIMEForName returns the image type a file name's extension says, or
 // "".
 func MIMEForName(name string) string {
-	return imageExtensions[strings.ToLower(strings.TrimPrefix(path.Ext(name), "."))]
+	return mimeinfo.ImageForExtension(strings.TrimPrefix(path.Ext(name), "."))
 }
 
 // ImageExtension returns the extension of an image of type mime, or "".

@@ -79,6 +79,13 @@ func appDirEntries(p *project, dir string) ([]linuxPackageEntry, error) {
 		return nil, err
 	}
 	entries = append(entries, linuxPackageEntry{name: "AppRun", link: p.Name, mode: 0o777})
+	_, definitions, err := p.linuxFileTypes()
+	if err != nil {
+		return nil, err
+	}
+	if len(definitions) > 0 {
+		entries = append(entries, linuxPackageEntry{name: "usr/share/mime/packages/" + p.ID + ".xml", data: definitions, mode: 0o644})
+	}
 	if _, err := os.Stat(filepath.Join(dir, p.ID+".png")); err == nil {
 		entries = append(entries, linuxPackageEntry{name: ".DirIcon", link: p.ID + ".png", mode: 0o777})
 	}

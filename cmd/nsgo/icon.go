@@ -600,17 +600,28 @@ func plistEntries(plist string) string {
 // with a desktop entry that names it.
 func writeLinuxIcon(p *project, dir string) error {
 	img, err := p.iconImage()
-	if img == nil || err != nil {
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, p.ID+".png"), scaledPNG(img, 512), 0o644); err != nil {
+	if img != nil {
+		if err := os.WriteFile(filepath.Join(dir, p.ID+".png"), scaledPNG(img, 512), 0o644); err != nil {
+			return err
+		}
+	}
+	types, definitions, err := p.linuxFileTypes()
+	if err != nil {
 		return err
+	}
+	if len(definitions) > 0 {
+		if err := os.WriteFile(filepath.Join(dir, p.ID+".mime.xml"), definitions, 0o644); err != nil {
+			return err
+		}
 	}
 	n, err := p.appNames()
 	if err != nil {
 		return err
 	}
-	entry := desktopData{Name: p.Name, Exec: p.Name, ID: p.ID}
+	entry := desktopData{Name: p.Name, Exec: p.Name, ID: p.ID, MIMETypes: types}
 	if n != nil {
 		entry.Name = n.names[n.source]
 		for _, lang := range n.languages()[1:] {
@@ -629,17 +640,34 @@ func writeLinuxIcon(p *project, dir string) error {
 type desktopData struct {
 	Name, Exec, ID string
 	Names          [][2]string
+	MIMETypes      []string
 }
 
-var desktopEntry = template.Must(template.New("desktop").Parse(`[Desktop Entry]
+// desktopString escapes a Desktop Entry string, before Exec's separate
+// argument parsing. Keep field codes out of the executable's name.
+func desktopString(s string) string {
+	return strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\r", `\r`, "\t", `\t`).Replace(s)
+}
+
+func desktopExec(s string) string {
+	s = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", `$`, `\$`, `%`, `%%`).Replace(s)
+	return desktopString(`"` + s + `"`)
+}
+
+var desktopEntry = template.Must(template.New("desktop").Funcs(template.FuncMap{
+	"s": desktopString, "exec": desktopExec,
+}).Parse(`[Desktop Entry]
 Type=Application
-Name={{.Name}}
+Name={{s .Name}}
 {{- range .Names}}
-Name[{{index . 0}}]={{index . 1}}
+Name[{{index . 0}}]={{s (index . 1)}}
 {{- end}}
-Exec="{{.Exec}}"
+Exec={{exec .Exec}}{{if .MIMETypes}} %F{{end}}
 Icon={{.ID}}
 Terminal=false
+{{- if .MIMETypes}}
+MimeType={{range .MIMETypes}}{{.}};{{end}}
+{{- end}}
 StartupWMClass={{.ID}}
 `))
 

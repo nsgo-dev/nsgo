@@ -49,6 +49,10 @@ go tool nsgo build -channel store        # store packages instead of installers 
 
 Packages land in `dist/<name>-<version>-<target>`, and everything to hand out in `dist/releases`, each file named `<name>-<version>-<system>-<arch>` with its `.sha256`. Builds are release builds; `go tool nsgo dev -release` runs one with hot reload for measuring.
 
+## Documents
+
+Declare `file_types` in `nsgo.yaml` and handle paths with `desktop.OnOpenFiles`. macOS, Windows (NSIS/MSIX) and Linux packages register them; Windows retains the user’s default handler. Linux infers common extensions from a fixed table and defines unknown app-owned types as `application/x-<type id>`; set `mime: [video/mp4]` to reference existing types, especially for unknown imported extensions. AppImage needs desktop integration to install the bundled entry and any custom MIME definitions.
+
 ## Secrets
 
 Never commit secret keys or passwords. The tool reads them from the environment: `NSGO_UPDATES_KEY` for update feeds, `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD` for Android keystores, `NSGO_CERTIFICATE_PASSWORD` for a Windows code signing certificate, `NSGO_NOTARY_KEY`, `NSGO_NOTARY_KEY_ID` and `NSGO_NOTARY_ISSUER` for notarizing in CI, `NSGO_ROOT_KEY` and `NSGO_RELEASE_KEY` for signed TSX packages. Public keys belong in `nsgo.yaml` and the app's code.

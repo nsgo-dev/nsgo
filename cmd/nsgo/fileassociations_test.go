@@ -1,0 +1,246 @@
+package main
+
+import (
+	"bytes"
+	"encoding/xml"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
+
+func associationProject(t *testing.T) *project {
+	t.Helper()
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"nsgo.yaml": `name: My App
+id: dev.example.documents
+version: 1.0.0
+file_types:
+  - name: Movie
+    id: public.movie
+    extensions: [MP4, mov, mkv, webm, avi, flv]
+    role: viewer
+  - name: Flow & Notes
+    extensions: [flow, flownote]
+  - name: External
+    id: org.example.external
+    extensions: [external]
+    mime: [application/vnd.example.external]
+`})
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestLinuxFileAssociations(t *testing.T) {
+	p := associationProject(t)
+	types, definitions, err := p.linuxFileTypes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTypes := []string{"video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "video/x-msvideo", "video/x-flv",
+		"application/x-dev.example.documents.flow", "application/vnd.example.external"}
+	if !slices.Equal(types, wantTypes) {
+		t.Fatalf("media types = %v; want %v", types, wantTypes)
+	}
+	var info struct {
+		XMLName xml.Name
+		Types   []struct {
+			Type    string `xml:"type,attr"`
+			Comment string `xml:"comment"`
+			Globs   []struct {
+				Pattern string `xml:"pattern,attr"`
+			} `xml:"glob"`
+		} `xml:"mime-type"`
+	}
+	if err := xml.Unmarshal(definitions, &info); err != nil {
+		t.Fatal(err)
+	}
+	if info.XMLName.Space != "http://www.freedesktop.org/standards/shared-mime-info" || len(info.Types) != 1 {
+		t.Fatalf("MIME definitions declare imported or known types: %s", definitions)
+	}
+	custom := info.Types[0]
+	if custom.Type != wantTypes[6] || custom.Comment != "Flow & Notes" || len(custom.Globs) != 2 || custom.Globs[0].Pattern != "*.flow" || custom.Globs[1].Pattern != "*.flownote" {
+		t.Fatalf("custom type = %+v", custom)
+	}
+
+	// The portable/AppImage and Flatpak payload must have a desktop entry
+	// even when an app has no icon. Both use the staged entry unchanged.
+	stage := t.TempDir()
+	if err := writeLinuxIcon(p, stage); err != nil {
+		t.Fatal(err)
+	}
+	entry, err := os.ReadFile(filepath.Join(stage, p.ID+".desktop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(entry string, executable string) {
+		t.Helper()
+		for _, want := range []string{`Exec="` + executable + `" %F` + "\n", "MimeType=" + strings.Join(wantTypes, ";") + ";\n"} {
+			if !strings.Contains(entry, want) {
+				t.Errorf("desktop entry lacks %q:\n%s", want, entry)
+			}
+		}
+	}
+	check(string(entry), p.Name)
+	files, err := linuxPackageFiles(p, stage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deb, err := debPackage(p, files, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := tarFiles(t, arMembers(t, deb)["data.tar.gz"])
+	check(data["./usr/share/applications/"+p.ID+".desktop"], "/opt/my-app/"+p.Name)
+	if got := data["./usr/share/mime/packages/"+p.ID+".xml"]; got != string(definitions) {
+		t.Errorf("Debian package MIME definition = %q", got)
+	}
+	control := tarFiles(t, arMembers(t, deb)["control.tar.gz"])
+	for _, script := range []string{"postinst", "postrm"} {
+		if !strings.Contains(control["./"+script], "update-mime-database /usr/share/mime") || !strings.Contains(control["./"+script], "update-desktop-database -q /usr/share/applications") {
+			t.Errorf("Debian package lacks cache updates in %s", script)
+		}
+	}
+	arch, err := archPackage(p, files, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = tarFiles(t, arch)
+	check(data["usr/share/applications/"+p.ID+".desktop"], "/opt/my-app/"+p.Name)
+	if data["usr/share/mime/packages/"+p.ID+".xml"] != string(definitions) || !strings.Contains(data[".INSTALL"], "post_remove()") {
+		t.Error("Arch package lacks its MIME definition or removal cache hook")
+	}
+	entries, err := appDirEntries(p, stage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]string{}
+	for _, e := range entries {
+		found[e.name] = string(e.data)
+	}
+	check(found[p.ID+".desktop"], p.Name)
+	if found["usr/share/mime/packages/"+p.ID+".xml"] != string(definitions) {
+		t.Error("AppImage lacks its MIME definition")
+	}
+	archive, err := buildLinuxArchive(t.Context(), p, stage, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = tarFiles(t, b)
+	check(data["my-app/"+p.ID+".desktop"], p.Name)
+	if data["my-app/"+p.ID+".mime.xml"] != string(definitions) {
+		t.Error("Flatpak archive lacks its MIME definition")
+	}
+}
+
+func TestFileAssociationsWithoutDeclarations(t *testing.T) {
+	p := associationProject(t)
+	p.FileTypes = nil
+	dir := t.TempDir()
+	if err := writeLinuxIcon(p, dir); err != nil {
+		t.Fatal(err)
+	}
+	entry, err := os.ReadFile(filepath.Join(dir, p.ID+".desktop"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(entry), "%F") || strings.Contains(string(entry), "MimeType=") {
+		t.Errorf("an app without declarations registers types: %s", entry)
+	}
+	types, definitions, err := p.linuxFileTypes()
+	if err != nil || len(types) != 0 || len(definitions) != 0 {
+		t.Fatalf("no declarations = %v, %s, %v", types, definitions, err)
+	}
+	d, err := nsisScript(t.Context(), p, dir, "x64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d.FileTypes) != 0 {
+		t.Error("an app without declarations registers Windows types")
+	}
+}
+
+func TestLinuxFileAssociationsRequireImportedMIME(t *testing.T) {
+	p := associationProject(t)
+	p.FileTypes[2].MIME = nil
+	if _, _, err := p.linuxFileTypes(); err == nil || !strings.Contains(err.Error(), "needs mime") {
+		t.Fatalf("unknown imported type = %v", err)
+	}
+	// An explicit MIME replaces inference, including a known extension;
+	// duplicate declarations produce one desktop association.
+	p.FileTypes[2].MIME = []string{"video/mp4", "video/mp4"}
+	types, _, err := p.linuxFileTypes()
+	if err != nil || len(types) != 7 {
+		t.Fatalf("explicit media types = %v, %v", types, err)
+	}
+}
+
+func TestNSISFileAssociations(t *testing.T) {
+	p := associationProject(t)
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{p.Name + ".exe": "exe"})
+	d, err := nsisScript(t.Context(), p, dir, "x64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := nsisTemplate.Execute(&out, d); err != nil {
+		t.Fatal(err)
+	}
+	script := out.String()
+	for i, f := range d.FileTypes {
+		if !strings.HasPrefix(f.ProgID, p.ID+".") {
+			t.Errorf("foreign ProgID = %s", f.ProgID)
+		}
+		for _, want := range []string{
+			`WriteRegStr HKCU "Software\Classes\` + f.ProgID + `" "" ` + nsisString(p.FileTypes[i].Name),
+			`WriteRegStr HKCU "Software\Classes\` + f.ProgID + `\DefaultIcon" "" '"$INSTDIR\My App.exe",0'`,
+			`WriteRegStr HKCU "Software\Classes\` + f.ProgID + `\shell\open\command" "" '"$INSTDIR\My App.exe" "%1"'`,
+		} {
+			if !strings.Contains(script, want) {
+				t.Errorf("NSIS script lacks %s", want)
+			}
+		}
+		for _, ext := range f.Extensions {
+			if want := `WriteRegStr HKCU "Software\Classes\.` + ext + `\OpenWithProgids" "` + f.ProgID + `" ""`; !strings.Contains(script, want) {
+				t.Errorf("NSIS script lacks %s", want)
+			}
+			if strings.Contains(script, `WriteRegStr HKCU "Software\Classes\.`+ext+`"`) {
+				t.Error("NSIS sets an extension's default handler")
+			}
+		}
+	}
+	for _, want := range []string{"Call RemoveFileTypes", "Call un.RemoveFileTypes", `StrCmp $1 $2 0 forget_type`,
+		`DeleteRegValue HKCU "Software\Classes\.$3\OpenWithProgids" "$0"`,
+		`DeleteRegKey /ifempty HKCU "Software\Classes\.$3"`,
+		`System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'`,
+		`\FileTypes\$0"`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("NSIS cleanup lacks %s", want)
+		}
+	}
+	// Reordering or translating types must keep their registry identities.
+	slices.Reverse(p.FileTypes)
+	p.FileTypes[0].Name = "Translated"
+	newData, err := nsisScript(t.Context(), p, dir, "x64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newData.FileTypes[0].ProgID != d.FileTypes[2].ProgID {
+		t.Error("ProgID changed when its type was moved or renamed")
+	}
+	if nsisCompiler() != "" {
+		if _, err := buildNSIS(t.Context(), p, dir, "x64"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

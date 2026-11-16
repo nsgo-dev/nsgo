@@ -15,6 +15,7 @@ id: me.oneo.flow
 file_types:
   - name: Flow File
     extensions: [flow]
+    mime: [application/x-me.oneo.flow.flow]
   - name: Markdown
     id: net.daringfireball.markdown
     extensions: [md, markdown]
@@ -40,6 +41,7 @@ file_types:
 		"<key>LSHandlerRank</key><string>Owner</string>",
 		"<key>CFBundleTypeRole</key><string>Viewer</string>",
 		"<key>LSHandlerRank</key><string>Alternate</string>",
+		"<key>public.mime-type</key><array><string>application/x-me.oneo.flow.flow</string></array>",
 	} {
 		if !strings.Contains(plist, want) {
 			t.Errorf("Info.plist lacks %q:\n%s", want, plist)
@@ -61,12 +63,15 @@ file_types:
 
 func TestFileTypesAreChecked(t *testing.T) {
 	for yaml, want := range map[string]string{
-		"- name: Flow\n  extensions: [.flow]":                              "not .flow",
-		"- name: Flow":                                                     "extensions is required",
-		"- extensions: [flow]":                                             "name is required",
-		"- name: Flow\n  extensions: [flow]\n  role: owner":                "role is \"owner\"",
-		"- name: Flow\n  extensions: [flow]\n  icon: flow.svg":             "neither an .icns nor a .png",
-		"- name: A\n  extensions: [flow]\n- name: B\n  extensions: [flow]": "listed twice",
+		"- name: Flow\n  extensions: [.flow]":                               "not .flow",
+		"- name: Flow":                                                      "extensions is required",
+		"- extensions: [flow]":                                              "name is required",
+		"- name: Flow\n  extensions: [flow]\n  role: owner":                 "role is \"owner\"",
+		"- name: Flow\n  extensions: [flow]\n  icon: flow.svg":              "neither an .icns nor a .png",
+		"- name: A\n  extensions: [flow]\n- name: B\n  extensions: [flow]":  "listed twice",
+		"- name: Flow\n  extensions: [flow]\n  mime: [video/*]":             "not a media type",
+		"- name: Flow\n  extensions: [flow]\n  mime: ['video/mp4;foo=bar']": "not a media type",
+		"- name: Flow\n  extensions: [flow]\n  mime: [video/mp4/extra]":     "not a media type",
 	} {
 		dir := t.TempDir()
 		writeFiles(t, dir, map[string]string{"nsgo.yaml": "name: Flow\nfile_types:\n" + yamlItems(yaml)})
