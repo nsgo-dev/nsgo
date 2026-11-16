@@ -567,6 +567,73 @@ document.body.append(f);
 	}
 }
 
+// TestWebHistoryStepWithinThePageGrantsNothing goes back from a pushState entry to the app's own page, a step within one document that starts no navigation, so the exemption the step was given must not pass to the page's next navigation, to an about: page the access refuses.
+func TestWebHistoryStepWithinThePageGrantsNothing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("NSGO_TEST_WEBKIT_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		dir := t.TempDir()
+		cmd.Env = append(os.Environ(), "NSGO_TEST_WEBKIT_PROCESS="+t.Name(),
+			"XDG_DATA_HOME="+filepath.Join(dir, "data"), "XDG_CACHE_HOME="+filepath.Join(dir, "cache"))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
+	}
+	if err := openWebKit(); err != nil {
+		t.Skip(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(rw, "<p>own</p>")
+	}))
+	defer server.Close()
+	title := "nsgo-native-" + t.Name()
+	var root *core.Scope
+	var ref core.Ref
+	errors := make(chan error, 4)
+	app := func(cx *core.Scope) core.Node {
+		root = cx
+		cx.ProvideAccess(webSchemesAccess{})
+		loads := core.NewSignal(cx, 0)
+		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%d", title, loads.Get())) })
+		return core.WebView{Source: core.WebSrc(server.URL + "/own"), Ref: &ref,
+			Style: core.Style{Width: core.Pt(150), Height: core.Pt(100)},
+			OnLoad: func(n core.WebNavigation) {
+				if loads.Get() > 0 {
+					t.Errorf("the page loaded %s", n.URL)
+				}
+				loads.Update(func(n int) int { return n + 1 })
+			},
+			OnError: func(err error) { errors <- err },
+		}
+	}
+	w := startTestWindow(t, app, Options{ID: "nsgo-test-web-history-step", Title: title, Width: 150, Height: 100})
+	waitForTitle(t, w, fmt.Sprintf("%s|1", title))
+	root.Post(func() {
+		ref.Evaluate(`addEventListener('popstate', () => { location.href = 'about:blank' }); history.pushState(null, '', '#step'); 1`, func(_ string, err error) {
+			if err != nil {
+				t.Errorf("pushState: %v", err)
+			}
+			ref.GoBack()
+		})
+	})
+	select {
+	case err := <-errors:
+		if e, ok := err.(*core.WebError); !ok || e.URL != "about:blank" {
+			t.Errorf("page navigation error = %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the page's about: navigation was not refused")
+	}
+}
+
 // TestWebPagesAboutPageIsRefusedAtTheTopLevel has the app's page, under an Access whose WebSchemes allow none, send itself to about:blank once its srcdoc frame has loaded. WebKitGTK shows an about: page as soon as its navigation action is used and says no action's frame, so the view refuses it as it commits: the about: page posts nothing and reports no load, the refusal reaches OnError once, and the app's page loads again with its frame. It skips where WebKitGTK 6.0 is missing, in a process of its own as WebKit takes the first thread that uses it.
 func TestWebPagesAboutPageIsRefusedAtTheTopLevel(t *testing.T) {
 	if testing.Short() {

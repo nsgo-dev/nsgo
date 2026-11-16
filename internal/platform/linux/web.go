@@ -99,6 +99,7 @@ var (
 	webkitPolicyErrorQuark               func() uint32
 	webkitNavigationDecisionGetAction    func(uintptr) uintptr
 	webkitNavigationActionGetRequest     func(uintptr) uintptr
+	webkitNavigationActionGetType        func(uintptr) uint32
 	webkitURIRequestNew                  func(*byte) uintptr
 	webkitURIRequestGetHTTPHeaders       func(uintptr) uintptr
 	webkitURIRequestGetURI               func(uintptr) uintptr
@@ -209,6 +210,7 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitPolicyErrorQuark, "webkit_policy_error_quark")
 	reg(&webkitNavigationDecisionGetAction, "webkit_navigation_policy_decision_get_navigation_action")
 	reg(&webkitNavigationActionGetRequest, "webkit_navigation_action_get_request")
+	reg(&webkitNavigationActionGetType, "webkit_navigation_action_get_navigation_type")
 	reg(&webkitURIRequestNew, "webkit_uri_request_new")
 	reg(&webkitURIRequestGetHTTPHeaders, "webkit_uri_request_get_http_headers")
 	reg(&webkitURIRequestGetURI, "webkit_uri_request_get_uri")
@@ -235,6 +237,7 @@ const (
 	webkitPolicyInterrupt  = 102 // WEBKIT_POLICY_ERROR_FRAME_LOAD_INTERRUPTED_BY_POLICY_CHANGE
 	webkitNewWindowAction  = 1   // WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION
 	webkitResponse         = 2   // WEBKIT_POLICY_DECISION_TYPE_RESPONSE
+	webkitBackForward      = 2   // WEBKIT_NAVIGATION_TYPE_BACK_FORWARD
 	webkitCookieSQLite     = 1   // WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE
 	gtkOverflowHidden      = 1
 )
@@ -267,6 +270,7 @@ type web struct {
 	failed        bool                         // the navigation failed; WebKit still finishes it
 	pending       bool                         // a load waits for the page to be mapped
 	ownNavigation bool                         // loadWeb started the app's source, until it commits or fails
+	ownStep       string                       // the URI of the entry a history command granted ownNavigation for, until a back-forward action to it; "" for loadWeb's load or a reload
 	aboutPending  bool                         // a refused about: action, possibly a frame's, may start the next top-level load
 	startPending  bool                         // hold that load's start until its top-level URI commits
 	ownPage       bool                         // the page last committed is the app's source (loadWeb's)
@@ -681,6 +685,7 @@ func (w *window) loadWeb(v *view) {
 		return
 	}
 	wv.pending = false
+	wv.ownStep = ""
 	src := wv.source
 	switch {
 	case src.HTML != "":
@@ -730,7 +735,7 @@ func (w *window) webCommand(v *view, c driver.WebCommand, value string, data any
 			w.loadWeb(v)
 			return
 		}
-		v.web.ownNavigation = v.web.ownPage
+		v.web.ownNavigation, v.web.ownStep = v.web.ownPage, ""
 		webkitWebViewReload(page)
 	case driver.WebGoBack:
 		if v.web.htmlStart != nil && !v.web.htmlShown && webkitBackForwardListGetCurrentItem(webkitWebViewGetBackForwardList(page)) == v.web.htmlAnchor {
@@ -743,7 +748,7 @@ func (w *window) webCommand(v *view, c driver.WebCommand, value string, data any
 	case driver.WebGoForward:
 		if v.web.htmlShown && v.web.htmlAnchor != 0 {
 			v.web.htmlShown = false
-			v.web.ownNavigation = false
+			v.web.ownNavigation, v.web.ownStep = false, ""
 			webkitWebViewGoToHistory(page, v.web.htmlAnchor)
 			return
 		}
@@ -799,9 +804,10 @@ func (wv *web) ownsHistory(item uintptr) bool {
 // useHistory grants only the app-created native entry selected by a host command. Frame navigation actions never set this flag.
 func (wv *web) useHistory(item uintptr) {
 	src, own := wv.ownHistory[item]
-	wv.ownNavigation = item != 0 && own
+	wv.ownNavigation, wv.ownStep = item != 0 && own, ""
 	if wv.ownNavigation {
 		wv.source = src
+		wv.ownStep = goString(webkitBackForwardListItemGetURI(item))
 	}
 }
 
@@ -925,11 +931,11 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 			w.navigated(v, true, driver.EventLoadStart)
 		}
 	case webkitLoadCommitted:
-		own, restoring := v.web.ownNavigation, v.web.restoring
+		uri := goString(webkitWebViewGetURI(page))
+		own, restoring := v.web.ownNavigation && (v.web.ownStep == "" || uri == v.web.ownStep), v.web.restoring
 		start := v.web.startPending
 		v.web.aboutPending, v.web.startPending = false, false
-		v.web.ownNavigation, v.web.refused, v.web.restoring = false, false, false
-		uri := goString(webkitWebViewGetURI(page))
+		v.web.ownNavigation, v.web.ownStep, v.web.refused, v.web.restoring = false, "", false, false
 		// An about: page has no response for webPolicyCallback to hold, and WebKit has made its document by the time the top level's load starts, so the top level's is held as it commits, load-changed being only the top level's: it posts nothing and reports no load, and the view goes back to the page before it.
 		if v.web.config.Restricted && !own && aboutScheme(uri) && !v.web.config.Navigable(uri) {
 			v.web.failed, v.web.refused = true, true
@@ -987,7 +993,7 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 		w.navigatedTo(v, goString(uri), true, driver.EventLoadStart)
 	}
 	v.web.failed = true
-	v.web.ownNavigation = false
+	v.web.ownNavigation, v.web.ownStep = false, ""
 	v.web.aboutPending, v.web.startPending = false, false
 	if gerr != 0 {
 		e := (*gError)(cPointer(gerr))
@@ -1014,7 +1020,7 @@ func (w *window) restore(v *view) {
 	}
 	v.web.restoring = true
 	// The page before is the app's source again, which the restoring navigation may show as loadWeb's could.
-	v.web.ownNavigation = v.web.ownPage
+	v.web.ownNavigation, v.web.ownStep = v.web.ownPage, ""
 	list := webkitWebViewGetBackForwardList(page)
 	is := func(item uintptr) bool { return item != 0 && goString(webkitBackForwardListItemGetURI(item)) == prev }
 	switch {
@@ -1048,13 +1054,21 @@ func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 
 		if !pageScheme(url) {
 			return 0
 		}
-		if v.web.ownNavigation {
+		if v.web.ownNavigation && (v.web.ownStep == "" || url == v.web.ownStep) {
 			allowed = v.web.config.SourceNavigable
 		}
 	case webkitNewWindowAction:
 		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
 	default:
-		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(webkitNavigationDecisionGetAction(decision))))
+		action := webkitNavigationDecisionGetAction(decision)
+		url = goString(webkitURIRequestGetURI(webkitNavigationActionGetRequest(action)))
+		// A history step within the page starts no navigation and leaves the step's grant set: the back-forward action to its entry takes it, as a load's navigation does, and any other action, a page's own navigation, drops it.
+		if v.web.ownStep != "" {
+			if webkitNavigationActionGetType(action) != webkitBackForward || url != v.web.ownStep {
+				v.web.ownNavigation = false
+			}
+			v.web.ownStep = ""
+		}
 		if pageScheme(url) {
 			if aboutScheme(url) && !allowed(url) {
 				v.web.aboutPending = true
@@ -1067,7 +1081,7 @@ func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 
 	}
 	if kind != webkitNewWindowAction {
 		// A refused load of the app's source neither commits nor fails, so the next navigation is not its.
-		v.web.ownNavigation = false
+		v.web.ownNavigation, v.web.ownStep = false, ""
 	}
 	webkitPolicyDecisionIgnore(decision)
 	w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: driver.RefusedNavigation(url),

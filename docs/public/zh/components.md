@@ -18,6 +18,8 @@ core.View{
 }
 ```
 
+`core.WebView` 显示网页内容；给它绑定一个 `core.Ref` 即可调用 `Reload`、`GoBack` 和 `GoForward`。在原生目标上，这些命令让应用自己的 HTML 和 data 来源继续不受 `core.AccessWebSchemes` 限制；页面自己发起的新导航仍遵循访问策略。
+
 ## 组件
 
 组件是一个接收 scope、返回元素的函数。它只运行一次，之后的变化由 signal 驱动。

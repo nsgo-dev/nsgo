@@ -35,6 +35,7 @@ type Web struct {
 	config        driver.WebConfig
 	fileDir       string                        // the directory a file: page, or HTML with a file: base URL, may navigate in; "" for other sources
 	ownNavigation bool                          // load started the app's source, whose top-level navigation comes next
+	ownStep       string                        // the URL of the entry a history command granted ownNavigation for, which only a back-forward action to it takes; "" for a load or reload
 	committingOwn bool                          // the policy accepted an app-owned navigation, until commit
 	ownPage       bool                          // the document last committed came from the app
 	ownHistory    map[objc.ID]*driver.WebSource // retained native app-created entries
@@ -177,25 +178,26 @@ func loadWebKit() {
 					if frame == 0 || objc.Send[bool](frame, sel("isMainFrame")) {
 						url := GoString(action.Send(sel("request")).Send(sel("URL")).Send(sel("absoluteString")))
 						// The app's source loads in the main frame, so a new window's action is the page's.
-						own := frame != 0 && w.ownNavigation
+						kind := objc.Send[int](action, sel("navigationType"))
+						const backForward, reload = 2, 3 // WKNavigationType
+						// A history step within the page starts no navigation, so the step's grant may still be set: only a back-forward action to the entry it was for takes it, never a page's navigation of another kind.
+						own := frame != 0 && w.ownNavigation && (w.ownStep == "" || kind == backForward && url == w.ownStep)
 						if frame != 0 && !own {
-							kind := objc.Send[int](action, sel("navigationType"))
 							item := w.currentHistory()
-							// WKNavigationTypeBackForward and Reload target an
-							// existing main-frame entry, never a frame's request.
-							own = (kind == 2 || kind == 3) && w.ownHistory[item] != nil &&
+							// A reload, the page's own included, loads the current entry again; which entry a page's back-forward action goes to WebKit does not say, so only the app's history commands grant those.
+							own = kind == reload && w.ownHistory[item] != nil &&
 								url == GoString(item.Send(sel("URL")).Send(sel("absoluteString")))
 							if own {
 								w.pageSource = *w.ownHistory[item]
 							}
-							if kind == 3 && w.ownPage && w.pageSource.HTML != "" {
+							if kind == reload && w.ownPage && w.pageSource.HTML != "" {
 								CallBlock(decide, cancel)
 								w.load(w.pageSource)
 								return
 							}
 						}
 						if frame != 0 {
-							w.ownNavigation = false
+							w.ownNavigation, w.ownStep = false, ""
 						}
 						allowed := fileNavigable(url, w.fileDir, w.config.Restricted)
 						if allowed && own {
@@ -453,7 +455,7 @@ func (w *Web) addScripts() {
 
 func (w *Web) load(src driver.WebSource) {
 	w.pageSource = src
-	w.ownNavigation = false
+	w.ownNavigation, w.ownStep = false, ""
 	w.fileDir = ""
 	switch {
 	case src.HTML != "":
@@ -638,7 +640,7 @@ func (w *Web) Command(c driver.WebCommand, value string, data any) {
 			w.load(w.pageSource)
 			return
 		}
-		w.ownNavigation = w.ownPage
+		w.ownNavigation, w.ownStep = w.ownPage, ""
 		web.Send(sel("reload"))
 	case driver.WebGoBack:
 		if w.htmlStart != nil && !w.htmlShown && w.currentHistory() == w.htmlAnchor {
@@ -671,9 +673,10 @@ func (w *Web) Command(c driver.WebCommand, value string, data any) {
 
 func (w *Web) useHistory(item objc.ID) {
 	src := w.ownHistory[item]
-	w.ownNavigation = src != nil
+	w.ownNavigation, w.ownStep = src != nil, ""
 	if src != nil {
 		w.pageSource = *src
+		w.ownStep = GoString(item.Send(sel("URL")).Send(sel("absoluteString")))
 	}
 }
 

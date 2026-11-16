@@ -368,15 +368,13 @@ func (r *Ref) Load(src WebSource) {
 	r.t.changed = true
 }
 
-// Reload loads the web view's page again. On native targets, reloading an
-// app-owned source is not held to AccessWebSchemes.
+// Reload loads the web view's page again. On native targets, reloading the page of the app's own source is not held to AccessWebSchemes.
 func (r *Ref) Reload() { r.webCommand(driver.WebReload, "") }
 
-// GoBack goes back in the web view's history. On native targets, an
-// app-owned entry keeps its exemption from AccessWebSchemes.
+// GoBack goes back in the web view's history. On native targets, going back to the page of the app's own source is not held to AccessWebSchemes.
 func (r *Ref) GoBack() { r.webCommand(driver.WebGoBack, "") }
 
-// GoForward goes forward in the web view's history.
+// GoForward goes forward in the web view's history. On native targets, going forward to the page of the app's own source is not held to AccessWebSchemes.
 func (r *Ref) GoForward() { r.webCommand(driver.WebGoForward, "") }
 
 // StopLoading stops the web view's page loading.

@@ -116,3 +116,62 @@ document.body.append(f);
 		t.Errorf("%d views completed, want 2", finished)
 	}
 }
+
+// TestWebHistoryStepWithinThePageGrantsNothing goes back from a pushState entry to the app's own page, a step within one document that starts no navigation, so the exemption the step was given must not pass to the page's next navigation, here to an about: page the access refuses. (WebKit itself drops a page's top-level navigation to a data: URL.)
+func TestWebHistoryStepWithinThePageGrantsNothing(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("NSGO_TEST_WEB_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		cmd.Env = append(os.Environ(), "NSGO_TEST_WEB_PROCESS="+t.Name())
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		return
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, "<p>own</p>")
+	}))
+	defer server.Close()
+	const target = "about:blank"
+	refused := false
+	app := func(cx *core.Scope) core.Node {
+		cx.ProvideAccess(webHistoryAccess{})
+		var ref core.Ref
+		loads := 0
+		return core.WebView{Source: core.WebSrc(server.URL + "/own"), Ref: &ref,
+			Style: core.Style{Width: core.Pt(150), Height: core.Pt(100)},
+			OnLoad: func(n core.WebNavigation) {
+				loads++
+				if loads > 1 {
+					t.Errorf("the page loaded %s", n.URL)
+					cx.Quit()
+					return
+				}
+				ref.Evaluate(`addEventListener('popstate', () => { location.href = `+fmt.Sprintf("%q", target)+` }); history.pushState(null, '', '#step'); 1`, func(_ string, err error) {
+					if err != nil {
+						t.Errorf("pushState: %v", err)
+						cx.Quit()
+						return
+					}
+					ref.GoBack()
+				})
+			},
+			OnError: func(err error) {
+				if e, ok := err.(*core.WebError); !ok || e.URL != target {
+					t.Errorf("error = %v", err)
+				}
+				refused = true
+				cx.Quit()
+			},
+		}
+	}
+	watchdog := time.AfterFunc(15*time.Second, func() { panic("the page's navigation was neither refused nor loaded") })
+	defer watchdog.Stop()
+	onMain(func() { Run(app, Options{Title: "Web history step", Width: 150, Height: 100}) })
+	if !refused {
+		t.Error("the page's about: navigation was not refused")
+	}
+}
