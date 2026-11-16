@@ -93,7 +93,7 @@ core.View{Style: core.Style{
 core.View{Class: "flex flex-col gap-3 p-4 md:flex-row md:gap-6 dark:bg-zinc-900 rtl:flex-row-reverse"}
 ```
 
-`sm:`, `md:`, `lg:`, `xl:` and `2xl:` apply from 40, 48, 64, 80 and 96 rems wide; `max-md:` applies below one. `portrait:`, `dark:`, `rtl:`, `motion-reduce:`, `ios:`, `android:` and `web:` follow what the environment says. Classes merge under a `Style`, and a state's class (`hover:`) becomes a state style, so the two can be mixed.
+`sm:`, `md:`, `lg:`, `xl:` and `2xl:` apply from 40, 48, 64, 80 and 96 rems wide; `max-md:` applies below one. `portrait:`, `dark:`, `rtl:`, `motion-reduce:`, `contrast-more:`, `ios:`, `android:` and `web:` follow what the environment says. Classes merge under a `Style`, and a state's class (`hover:`) becomes a state style, so the two can be mixed.
 
 ## Next
 
