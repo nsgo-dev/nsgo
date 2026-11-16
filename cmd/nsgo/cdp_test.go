@@ -24,12 +24,41 @@ func TestBrowserStartupReportsExitAndCleansItsProfile(t *testing.T) {
 
 func TestBrowserStartupHonorsCancellation(t *testing.T) {
 	fakeBrowser(t, "exec sleep 60\n")
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	var err error
+	go func() {
+		_, err = startBrowser(ctx)
+		close(done)
+	}()
+	t.Cleanup(func() { cancel(); <-done })
+	// Cancel after the child has started and recorded its profile. Under
+	// load, a fixed deadline can expire before its shell ever runs.
+	ready := time.NewTicker(10 * time.Millisecond)
+	defer ready.Stop()
+	timeout := time.NewTimer(10 * time.Second)
+	defer timeout.Stop()
+	waiting := true
+	for waiting {
+		select {
+		case <-done:
+			t.Fatalf("browser exited before cancellation: %v", err)
+		case <-timeout.C:
+			t.Fatal("fake browser did not record its profile")
+		case <-ready.C:
+			profile, readErr := os.ReadFile(os.Getenv("NSGO_TEST_BROWSER_PROFILE"))
+			waiting = readErr != nil || len(profile) == 0
+		}
+	}
 	start := time.Now()
-	_, err := startBrowser(ctx)
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("startup error = %v, want the context deadline", err)
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("canceled browser did not stop within 3s")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("startup error = %v, want context cancellation", err)
 	}
 	if elapsed := time.Since(start); elapsed > 3*time.Second {
 		t.Fatalf("canceled browser took %s to stop", elapsed)
