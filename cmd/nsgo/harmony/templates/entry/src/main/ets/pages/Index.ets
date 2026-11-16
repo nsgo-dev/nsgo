@@ -2839,6 +2839,8 @@ class Renderer {
       }
       this.nodes.set(id, made);
       parent.appendChild(made);
+      // The view is written below; a dirty flag left set would write it, and every view under it, again on the next batch that reaches its parent.
+      v.dirty = false;
       const mf = v.matchFrame;
       if (mf !== undefined) {
         // A shared element starts at the frame of the view it replaces
