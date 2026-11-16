@@ -412,6 +412,9 @@ class Tree {
   structural: boolean = false;
   geometry: boolean = false;
   dirtyIDs: number[] = [];
+  // parents collects the views whose children this batch inserted, moved or removed, and rootChanged a new root: a structural batch syncs those parents' children rather than writing every view again.
+  parents: number[] = [];
+  rootChanged: boolean = false;
 
   // scrollAt returns the refreshable scroll view of id's subtree that
   // holds the point, the last drawn first, or found when none does.
@@ -468,6 +471,28 @@ class Tree {
     return d;
   }
 
+  // mark queues a view to be written: a header or sticky cells the batch changed are drawn when their view is, and a structural batch no longer writes every view.
+  mark(v: VNode): void {
+    v.dirty = true;
+    if (!v.queued) {
+      v.queued = true;
+      this.dirtyIDs.push(v.id);
+    }
+  }
+
+  // takeParents returns the views whose children the last batch changed and clears them.
+  takeParents(): number[] {
+    const p = this.parents;
+    this.parents = [];
+    return p;
+  }
+
+  takeRootChanged(): boolean {
+    const r = this.rootChanged;
+    this.rootChanged = false;
+    return r;
+  }
+
   // takeStructural and takeGeometry report and clear what the last batch
   // changed of the tree's shape and frames.
   takeStructural(): boolean {
@@ -501,6 +526,7 @@ class Tree {
         }
       } else if (code === 'root') {
         this.root = id;
+        this.rootChanged = true;
         this.structural = true;
         this.geometry = true;
       } else if (code === 'app') {
@@ -514,6 +540,10 @@ class Tree {
       } else if (code === 'sticky') {
         this.sticky.set(id, JSON.parse(o[2] as string) as StickyCell[]);
         this.geometry = true;
+        const n = this.nodes.get(id);
+        if (n !== undefined) {
+          this.mark(n);
+        }
       } else if (code === 'scr') {
         const n = this.nodes.get(id);
         if (n !== undefined) {
@@ -527,6 +557,7 @@ class Tree {
           n.scrBg = o[8] as string;
           n.scrTitleColor = o[9] as string;
           n.scrTintColor = o[10] as string;
+          this.mark(n);
         }
       } else if (code === 'i') {
         const v = this.nodes.get(id);
@@ -539,6 +570,7 @@ class Tree {
         const parentId = o[2] as number;
         const before = o[3] as number;
         v.parent = parentId;
+        this.parents.push(parentId);
         const p = this.nodes.get(parentId);
         if (p === undefined) {
           continue;
@@ -706,6 +738,7 @@ class Tree {
     if (p !== undefined) {
       p.children = p.children.filter((c: number) => c !== v.id);
     }
+    this.parents.push(v.parent);
     v.parent = 0;
   }
 
@@ -2662,20 +2695,45 @@ class Renderer {
       if (geometry) {
         host.tree.measure();
       }
-      if (structural) {
-        // A structural batch may name only deleted views: they have no
-        // dirty node left to walk from, so a sync gated on dirty would
-        // never reach the parents whose syncChildren drops their ArkUI
-        // children. Walk the tree in full for these batches.
+      const parents = host.tree.takeParents();
+      if (host.tree.takeRootChanged()) {
+        // A new root is drawn from scratch.
         host.tree.takeDirty();
         this.sync(true);
       } else {
-        // Nothing moved: write the views the batch named, and no others.
+        if (structural) {
+          // A structural batch may name only deleted views, which leave no dirty node to walk from: sync the children of every parent the batch changed, so their ArkUI children are dropped, added and ordered. Views the batch did not name keep what they were given; writing every view again cost hundreds of milliseconds a navigation on a phone. Removals go first, so a view moved to another parent has left the old one before the new one takes it.
+          const synced = new Set<number>();
+          const targets: VNode[] = [];
+          const holders: FrameNode[] = [];
+          for (let i = 0; i < parents.length; i++) {
+            const id = parents[i];
+            if (synced.has(id)) {
+              continue;
+            }
+            synced.add(id);
+            const v = host.tree.at(id);
+            const n = this.nodes.get(id);
+            if (v === undefined || n === undefined) {
+              continue;
+            }
+            const holder = v.kind === KIND_SCROLL ? this.contents.get(id) : n;
+            if (holder !== undefined) {
+              this.pruneChildren(v, holder);
+              targets.push(v);
+              holders.push(holder);
+            }
+          }
+          for (let i = 0; i < targets.length; i++) {
+            this.syncChildren(targets[i], holders[i]);
+          }
+        }
+        // Write the views the batch named, and no others; a view made above was written as it was made.
         const dirty = host.tree.takeDirty();
         for (let i = 0; i < dirty.length; i++) {
           const v = host.tree.at(dirty[i]);
           const n = this.nodes.get(dirty[i]);
-          if (v !== undefined && n !== undefined) {
+          if (v !== undefined && n !== undefined && v.dirty) {
             v.dirty = false;
             this.update(v, n);
           }
@@ -3345,13 +3403,7 @@ class Renderer {
 
   // syncChildren makes the FrameNode's children match the view's, in order.
   syncChildren(v: VNode, parent: FrameNode, full: boolean = false): void {
-    const count = parent.getChildrenCount();
-    for (let i = count - 1; i >= 0; i--) {
-      const child = parent.getChild(i);
-      if (child !== null && !this.wanted(v, child)) {
-        parent.removeChild(child);
-      }
-    }
+    this.pruneChildren(v, parent);
     for (let k = 0; k < v.children.length; k++) {
       this.syncNode(v.children[k], parent, full);
       const c = this.nodes.get(v.children[k]);
@@ -3368,6 +3420,28 @@ class Renderer {
         parent.insertChildAfter(c, null);
       } else {
         parent.insertChildAfter(c, parent.getChild(k - 1));
+      }
+    }
+  }
+
+  // pruneChildren removes the FrameNode's children the view no longer has. The wanted ones are collected once: asking for each child scanned every child, quadratic in a long list.
+  pruneChildren(v: VNode, parent: FrameNode): void {
+    const keep = new Set<FrameNode>();
+    const h = this.headers.get(v.id);
+    if (h !== undefined) {
+      keep.add(h);
+    }
+    for (let i = 0; i < v.children.length; i++) {
+      const c = this.nodes.get(v.children[i]);
+      if (c !== undefined) {
+        keep.add(c);
+      }
+    }
+    const count = parent.getChildrenCount();
+    for (let i = count - 1; i >= 0; i--) {
+      const child = parent.getChild(i);
+      if (child !== null && !keep.has(child)) {
+        parent.removeChild(child);
       }
     }
   }
