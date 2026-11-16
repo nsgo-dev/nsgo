@@ -1162,6 +1162,9 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemAuthSession:
 			w.authSession(it.Count, *it.Auth)
 			continue
+		case driver.ItemSpeak:
+			w.speak(it.Count, *it.Speak)
+			continue
 		case driver.ItemOpenSurface:
 			if it.Surface != nil {
 				w.openSurface(*it.Surface)
