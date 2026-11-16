@@ -280,8 +280,7 @@ func (e *Env) FontScale() float32 { return e.fontScale.Get() }
 // ReduceMotion reports whether the user asked for less motion.
 func (e *Env) ReduceMotion() bool { return e.reduce.Get() }
 
-// IncreaseContrast reports whether the user asked the system for stronger
-// contrast, such as macOS Increase Contrast or a Windows contrast theme.
+// IncreaseContrast reports whether the user asked the system for stronger contrast, such as macOS Increase Contrast or a Windows contrast theme.
 func (e *Env) IncreaseContrast() bool { return e.contrast.Get() }
 
 // ScreenReader reports whether a screen reader is running.

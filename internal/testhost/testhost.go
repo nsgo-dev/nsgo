@@ -120,15 +120,12 @@ func Register(h Host) { host = h }
 // Current returns the test host, or nil when the backend linked has none.
 func Current() Host { return host }
 
-// Pin applies what a test set in pin over env, as the platform reports
-// it: the appearance, reduced motion, and the locale and text size when
-// set. The rest, such as the OS, the idiom and the safe area, stays the
-// platform's.
+// Pin applies what a test set in pin over env, as the platform reports it: the appearance, reduced motion, increased contrast, and the locale and text size when set. The rest, such as the OS, the idiom and the safe area, stays the platform's.
 func Pin(env driver.Environment, pin *driver.Environment) driver.Environment {
 	if pin == nil {
 		return env
 	}
-	env.Dark, env.ReduceMotion = pin.Dark, pin.ReduceMotion
+	env.Dark, env.ReduceMotion, env.IncreaseContrast = pin.Dark, pin.ReduceMotion, pin.IncreaseContrast
 	if pin.Locale != "" {
 		env.Locale = pin.Locale
 	}

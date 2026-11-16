@@ -462,9 +462,7 @@ var (
 	gnomeA11ySettings, gnomeGetBoolean uintptr
 )
 
-// gnomeHighContrast reads GNOME's optional accessibility setting without
-// linking to GSettings at build time. Other GTK desktops use their theme
-// name, handled by environment.
+// gnomeHighContrast reads GNOME's optional accessibility setting without linking to GSettings at build time. Other GTK desktops use their theme name, handled by environment.
 func gnomeHighContrast() bool {
 	gnomeA11yOnce.Do(func() {
 		var lookup, source, settingsNew uintptr
