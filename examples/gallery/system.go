@@ -939,9 +939,9 @@ func notificationsCard(cx *core.Scope) core.Node {
 	answer := func(p core.NotificationPermission) { permission.Set(p.String()) }
 	cx.NotificationPermission(answer)
 	cx.OnNotificationPress(func(id string) { pressed.Set(tr.SystemNotificationPressed(id)) })
-	show := func(silent bool) {
+	show := func(silent bool, at time.Time) {
 		_ = cx.ShowNotification(core.Notification{ID: "gallery", Title: tr.SystemNotificationTitle(), Body: tr.SystemNotificationBody(),
-			Silent: silent}, func(ok bool) { shown.Set(tr.SystemNotificationShown(yesNo(tr, ok))) })
+			Silent: silent, At: at}, func(ok bool) { shown.Set(tr.SystemNotificationShown(yesNo(tr, ok))) })
 	}
 	setBadge := func(n int) {
 		badge.Set(n)
@@ -962,8 +962,9 @@ func notificationsCard(cx *core.Scope) core.Node {
 			ui.Wrap{Children: []core.Node{
 				ui.Button{Text: tr.SystemAskPermission(), Size: ui.SizeSmall, TestID: "ask-notifications",
 					OnPress: func() { cx.RequestNotificationPermission(answer) }},
-				small(tr.SystemShowNotification(), "show-notification", func() { show(false) }),
-				small(tr.SystemShowSilently(), "", func() { show(true) }),
+				small(tr.SystemShowNotification(), "show-notification", func() { show(false, time.Time{}) }),
+				small(tr.SystemShowSilently(), "", func() { show(true, time.Time{}) }),
+				small(tr.SystemShowInAMinute(), "schedule-notification", func() { show(false, cx.WallTime().Add(time.Minute)) }),
 				small(tr.SystemCloseNotification(), "close-notification", func() { cx.CloseNotification("gallery") }),
 			}},
 			core.Text{ContentFunc: shown.Get, TestID: "notification-shown", Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},

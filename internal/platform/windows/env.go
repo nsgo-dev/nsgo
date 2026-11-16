@@ -95,6 +95,9 @@ func (w *window) environment() driver.Environment {
 		Minimized:        isIconicWindow(w.owner()),
 		WindowFrame:      w.windowFrame(),
 		Lifecycle:        w.lifecycle(),
+
+		// The toast notifier's schedule, which has no repeats.
+		ScheduledNotifications: true,
 	}
 }
 

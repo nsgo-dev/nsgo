@@ -373,6 +373,35 @@ mount(App);`)
 	}
 }
 
+func TestScheduledNotifications(t *testing.T) {
+	app := run(t, `import { mount, signal, Notifications, Text } from "nsgo";
+function App() {
+	const out = signal("");
+	(async () => {
+		await Notifications.requestPermission();
+		const can = await Notifications.canSchedule();
+		const later = await Notifications.show({ id: "review", title: "Review", at: new Date(Date.now() + 60000) });
+		const daily = await Notifications.show({ id: "daily", title: "Daily", at: Date.now(), repeat: "daily" });
+		let bad = "";
+		try { await Notifications.show({ id: "x", title: "X", at: Date.now(), repeat: "hourly" }); } catch (e) { bad = e.name; }
+		out.set([can, later, daily, bad].join("|"));
+	})();
+	return <Text testID="out">{out}</Text>;
+}
+mount(App);`, nsgotest.Environment(core.Environment{ScheduledNotifications: true}))
+	app.WaitUntil(time.Second, func() bool { return app.Find("id:out").Text != "" })
+	if got, want := app.Find("id:out").Text, "true|true|true|RangeError"; got != want {
+		t.Errorf("scheduling gave %q, want %q", got, want)
+	}
+	if len(app.PendingNotifications) != 2 {
+		t.Fatalf("pending %+v", app.PendingNotifications)
+	}
+	app.FastForward(time.Minute)
+	if len(app.Notifications) != 1 || app.Notifications[0].ID != "review" {
+		t.Errorf("a minute later: %+v", app.Notifications)
+	}
+}
+
 // A dialog shadows the page's keymap bindings, but not one bound with overModals.
 func TestKeymapOverModals(t *testing.T) {
 	app := run(t, `import { mount, signal, keymap, View, Text } from "nsgo";

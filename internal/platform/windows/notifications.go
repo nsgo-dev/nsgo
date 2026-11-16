@@ -22,12 +22,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/engine"
 )
 
-// System notifications as Windows' toasts through WinRT's
-// ToastNotificationManager, and the badge as the taskbar button's overlay
-// icon. An app outside an MSIX names itself with an AppUserModelID, its
-// ID, which the current user's registry gives the app's name and icon,
-// as toasts need; a press reaches the app while it runs, through the
-// toast's Activated event, or starts the app through the COM activator.
+// System notifications as Windows' toasts through WinRT's ToastNotificationManager, and the badge as the taskbar button's overlay icon. An app outside an MSIX names itself with an AppUserModelID, its ID, which the current user's registry gives the app's name and icon, as toasts need; a press reaches the app while it runs, through the toast's Activated event, or starts the app through the COM activator. A scheduled toast is the notifier's, which shows it at its time whether the app runs or not.
 
 var (
 	combase                   = syscall.NewLazyDLL("combase.dll")
@@ -35,6 +30,7 @@ var (
 	roActivateInstance        = combase.NewProc("RoActivateInstance")
 	windowsCreateString       = combase.NewProc("WindowsCreateString")
 	windowsDeleteString       = combase.NewProc("WindowsDeleteString")
+	windowsGetStringRawBuffer = combase.NewProc("WindowsGetStringRawBuffer")
 	getCurrentPackageFullName = kernel32.NewProc("GetCurrentPackageFullName")
 	advapi32                  = syscall.NewLazyDLL("advapi32.dll")
 	regCreateKeyExW           = advapi32.NewProc("RegCreateKeyExW")
@@ -62,6 +58,9 @@ var (
 	iidToastNotification2   = parseGUID("9dfb9fd1-143a-490e-90bf-b9fba7132de7")
 	iidXmlDocumentIO        = parseGUID("6cd0e74e-ee65-4489-9ebf-ca43e87ba637")
 	iidXmlDocument          = parseGUID("f7f3a506-1e87-42d6-bcfb-b8c809fa5494")
+	// IScheduledToastNotificationFactory and IScheduledToastNotification2.
+	iidScheduledToasts = parseGUID("e7bed191-0bb9-4189-8394-31761b476fd7")
+	iidScheduledToast2 = parseGUID("a66ea09c-31b4-43b0-b5dd-7a40e85363b1")
 	// TypedEventHandler<ToastNotification, IInspectable>, Activated's.
 	iidToastActivated = parseGUID("ab54de2d-97d9-5528-b6ad-105afe156530")
 	clsidTaskbarList  = parseGUID("56fdf344-fd6d-11d0-958a-006097c9a090")
@@ -76,6 +75,15 @@ const (
 	toastStatics2History             = 6
 	toastNotifierShow                = 6
 	toastNotifierSetting             = 8
+	toastNotifierAddToSchedule       = 9
+	toastNotifierRemoveFromSchedule  = 10
+	toastNotifierGetScheduled        = 11
+	scheduledToastFactoryCreate      = 6
+	scheduledToast2PutTag            = 6
+	scheduledToast2GetTag            = 7
+	scheduledToast2PutGroup          = 8
+	vectorViewGetAt                  = 6
+	vectorViewSize                   = 7
 	toastFactoryCreate               = 6
 	toastAddActivated                = 11
 	toast2PutTag                     = 6
@@ -452,34 +460,42 @@ func toastXML(n driver.Notification, launch string) string {
 	return s + `</toast>`
 }
 
-// showToast shows n as a toast tagged with its ID, replacing the one of
-// that tag, and reports whether the notifier took it.
-func (w *window) showToast(n driver.Notification) bool {
-	notifier := w.toastNotifier()
-	if notifier == nil {
-		return false
-	}
+// toastDocument is n's toast content as an XmlDocument launching with launch, nil where Windows cannot load it.
+func toastDocument(n driver.Notification, launch string) *comObject {
 	var inspectable *comObject
 	class := hstring("Windows.Data.Xml.Dom.XmlDocument")
 	hr, _, _ := roActivateInstance.Call(class, uintptr(unsafe.Pointer(&inspectable)))
 	deleteHString(class)
 	if failed(hr) {
-		return false
+		return nil
 	}
 	defer inspectable.release()
 	io := inspectable.query(&iidXmlDocumentIO)
 	if io == nil {
-		return false
+		return nil
 	}
-	launch := toastLaunch(n.ID)
 	content := hstring(toastXML(n, launch))
 	hr = io.call(xmlDocumentIOLoadXML, content)
 	deleteHString(content)
 	io.release()
 	if failed(hr) {
+		return nil
+	}
+	return inspectable.query(&iidXmlDocument)
+}
+
+// showToast shows n as a toast tagged with its ID, or schedules it for its At, replacing the one of that tag, shown or scheduled, and reports whether the notifier took it.
+func (w *window) showToast(n driver.Notification) bool {
+	notifier := w.toastNotifier()
+	if notifier == nil {
 		return false
 	}
-	doc := inspectable.query(&iidXmlDocument)
+	unscheduleToast(notifier, n.ID)
+	if !n.At.IsZero() {
+		return scheduleToast(notifier, n)
+	}
+	launch := toastLaunch(n.ID)
+	doc := toastDocument(n, launch)
 	factory := activationFactory("Windows.UI.Notifications.ToastNotification", &iidToastFactory)
 	if doc == nil || factory == nil {
 		doc.release()
@@ -487,7 +503,7 @@ func (w *window) showToast(n driver.Notification) bool {
 		return false
 	}
 	var toast *comObject
-	hr = factory.call(toastFactoryCreate, doc.ptr(), uintptr(unsafe.Pointer(&toast)))
+	hr := factory.call(toastFactoryCreate, doc.ptr(), uintptr(unsafe.Pointer(&toast)))
 	factory.release()
 	doc.release()
 	if failed(hr) {
@@ -531,7 +547,88 @@ func (w *window) showToast(n driver.Notification) bool {
 	return true
 }
 
-// closeToast removes the toast tagged id from the screen and the action center, and with an empty id every toast in the app's group, those of earlier runs included, which leaves other apps' toasts alone.
+// scheduleToast has the notifier show n as a toast tagged with its ID at its At, with the app's process ended too, and reports whether it took it. Windows has no daily or weekly schedule, only a snooze's, so a repeated one is refused. A press of it reaches the app through the toast activator alone, as no toast the app holds hears its Activated.
+func scheduleToast(notifier *comObject, n driver.Notification) bool {
+	if n.Repeat != driver.NotificationOnce {
+		return false
+	}
+	doc := toastDocument(n, toastLaunch(n.ID))
+	factory := activationFactory("Windows.UI.Notifications.ScheduledToastNotification", &iidScheduledToasts)
+	if doc == nil || factory == nil {
+		doc.release()
+		factory.release()
+		return false
+	}
+	// A DateTime by value: 100-nanosecond intervals since 1601 in UTC; the notifier refuses one that passed.
+	at := n.At
+	if soon := time.Now().Add(time.Second); at.Before(soon) {
+		at = soon
+	}
+	ticks := uint64(at.UnixNano()/100 + 116444736000000000)
+	var toast *comObject
+	hr := factory.call(scheduledToastFactoryCreate, append(append([]uintptr{doc.ptr()}, u64Args(ticks)...), uintptr(unsafe.Pointer(&toast)))...)
+	factory.release()
+	doc.release()
+	if failed(hr) {
+		return false
+	}
+	defer toast.release()
+	if t2 := toast.query(&iidScheduledToast2); t2 != nil {
+		tag, group := hstring(n.ID), hstring(toastGroup)
+		t2.call(scheduledToast2PutTag, tag)
+		t2.call(scheduledToast2PutGroup, group)
+		deleteHString(tag)
+		deleteHString(group)
+		t2.release()
+	}
+	return !failed(notifier.call(toastNotifierAddToSchedule, toast.ptr()))
+}
+
+// unscheduleToast takes the notifier's scheduled toasts tagged id off its schedule, and every one it holds, all the app's, when id is empty.
+func unscheduleToast(notifier *comObject, id string) {
+	var list *comObject
+	if failed(notifier.call(toastNotifierGetScheduled, uintptr(unsafe.Pointer(&list)))) || list == nil {
+		return
+	}
+	defer list.release()
+	var size uint32
+	if failed(list.call(vectorViewSize, uintptr(unsafe.Pointer(&size)))) {
+		return
+	}
+	for i := range size {
+		var toast *comObject
+		if failed(list.call(vectorViewGetAt, uintptr(i), uintptr(unsafe.Pointer(&toast)))) || toast == nil {
+			continue
+		}
+		if t2 := toast.query(&iidScheduledToast2); t2 != nil {
+			var tag uintptr
+			if !failed(t2.call(scheduledToast2GetTag, uintptr(unsafe.Pointer(&tag)))) {
+				if id == "" || hstringText(tag) == id {
+					notifier.call(toastNotifierRemoveFromSchedule, toast.ptr())
+				}
+				deleteHString(tag)
+			}
+			t2.release()
+		}
+		toast.release()
+	}
+}
+
+// hstringText is the text of WinRT string h.
+func hstringText(h uintptr) string {
+	if h == 0 {
+		return ""
+	}
+	var n uint32
+	p, _, _ := windowsGetStringRawBuffer.Call(h, uintptr(unsafe.Pointer(&n)))
+	if p == 0 || n == 0 {
+		return ""
+	}
+	// The buffer is the string's own, which h keeps alive.
+	return string(utf16.Decode(unsafe.Slice(*(**uint16)(unsafe.Pointer(&p)), n)))
+}
+
+// closeToast removes the toast tagged id from the screen, the action center and the notifier's schedule, and with an empty id every toast in the app's group, those of earlier runs included, which leaves other apps' toasts alone.
 func (w *window) closeToast(id string) {
 	if id == "" {
 		for tag, old := range toasts.shown {
@@ -542,9 +639,11 @@ func (w *window) closeToast(id string) {
 		old.release()
 		delete(toasts.shown, id)
 	}
-	if w.toastNotifier() == nil {
+	notifier := w.toastNotifier()
+	if notifier == nil {
 		return
 	}
+	unscheduleToast(notifier, id)
 	statics := activationFactory("Windows.UI.Notifications.ToastNotificationManager", &iidToastManagerStatics2)
 	if statics == nil {
 		return

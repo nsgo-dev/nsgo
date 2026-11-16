@@ -499,15 +499,22 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemShowNotification:
 			shown := a.NotificationPermission == core.NotificationsGranted
 			if shown {
-				n := core.Notification(*it.Notification)
-				a.Notifications = append(slices.DeleteFunc(a.Notifications, func(o core.Notification) bool { return o.ID == n.ID }), n)
+				d := it.Notification
+				n := core.Notification{ID: d.ID, Title: d.Title, Body: d.Body, Silent: d.Silent, At: d.At, Repeat: core.NotificationRepeat(d.Repeat)}
+				a.PendingNotifications = slices.DeleteFunc(a.PendingNotifications, func(o core.Notification) bool { return o.ID == n.ID })
+				if n.At.IsZero() {
+					a.showNotification(n)
+				} else {
+					a.PendingNotifications = append(a.PendingNotifications, n)
+				}
 			}
 			a.post(driver.Event{Kind: driver.EventNotification, Count: it.Count, Finished: shown})
 		case driver.ItemCloseNotification:
 			if it.Value == "" {
-				a.Notifications = nil
+				a.Notifications, a.PendingNotifications = nil, nil
 			} else {
 				a.Notifications = slices.DeleteFunc(a.Notifications, func(o core.Notification) bool { return o.ID == it.Value })
+				a.PendingNotifications = slices.DeleteFunc(a.PendingNotifications, func(o core.Notification) bool { return o.ID == it.Value })
 			}
 		case driver.ItemBadge:
 			a.Badge = int(it.Count)
@@ -861,6 +868,39 @@ func (a *App) CloseGuide() {
 	}
 	a.endGuide()
 	a.Settle()
+}
+
+// showNotification shows n, replacing the one of its ID.
+func (a *App) showNotification(n core.Notification) {
+	a.Notifications = append(slices.DeleteFunc(a.Notifications, func(o core.Notification) bool { return o.ID == n.ID }), n)
+}
+
+// showDueNotifications shows the pending notifications whose time the clock's wall time reached, in the order they come due, as the system does with the app running or not, while the permission is granted; a repeated one stays pending for its next time, its At moved on a day or a week.
+func (a *App) showDueNotifications() {
+	now := a.Clock.WallTime()
+	for {
+		i := -1
+		for j, n := range a.PendingNotifications {
+			if !n.At.After(now) && (i < 0 || n.At.Before(a.PendingNotifications[i].At)) {
+				i = j
+			}
+		}
+		if i < 0 {
+			return
+		}
+		n := a.PendingNotifications[i]
+		if a.NotificationPermission == core.NotificationsGranted {
+			a.showNotification(n)
+		}
+		switch n.Repeat {
+		case core.NotificationDaily:
+			a.PendingNotifications[i].At = n.At.AddDate(0, 0, 1)
+		case core.NotificationWeekly:
+			a.PendingNotifications[i].At = n.At.AddDate(0, 0, 7)
+		default:
+			a.PendingNotifications = slices.Delete(a.PendingNotifications, i, i+1)
+		}
+	}
 }
 
 // PressNotification has the user press the notification called id,

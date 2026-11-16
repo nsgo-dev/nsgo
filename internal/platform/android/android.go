@@ -203,7 +203,7 @@ func connect(opts Options) *surface {
 		lines:    make(chan []driver.TextLine, 1),
 		carets:   make(chan driver.CaretLayout, 1),
 		started:  make(chan struct{}),
-		env:      driver.Environment{OS: driver.OSAndroid, HasWebView: true},
+		env:      driver.Environment{OS: driver.OSAndroid, HasWebView: true, ScheduledNotifications: true},
 		main:     treeView{images: map[driver.NodeID]*imageView{}},
 		overlays: map[uint32]*overlay{},
 
@@ -576,6 +576,9 @@ func readEnvironment(r *reader) driver.Environment {
 		KeyboardHeight: r.points(),
 		FontScale:      r.float(),
 		PixelRatio:     r.float(),
+
+		// The runtime's alarms show them, its receiver setting them again after a reboot.
+		ScheduledNotifications: true,
 	}
 	flags := r.byte()
 	env.Dark = flags&1 != 0
@@ -1320,6 +1323,13 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.str(n.Title)
 			w.str(n.Body)
 			w.flags(n.Silent)
+			// When it shows, in Unix milliseconds, 0 for now, and how it repeats.
+			var at int64
+			if !n.At.IsZero() {
+				at = n.At.UnixMilli()
+			}
+			w.u64(uint64(at))
+			w.byte(byte(n.Repeat))
 		case driver.ItemCloseNotification:
 			w.str(it.Value)
 		case driver.ItemPickImages, driver.ItemTakePhoto:

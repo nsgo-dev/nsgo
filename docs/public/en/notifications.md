@@ -1,6 +1,6 @@
 ---
 title: Notifications
-description: Ask to show notifications, show and close them, count them and show a task's progress on the app's icon and hear presses.
+description: Ask to show notifications, show, schedule and close them, count them and show a task's progress on the app's icon and hear presses.
 group: Platform features
 order: 45
 ---
@@ -26,7 +26,7 @@ err := cx.ShowNotification(core.Notification{ID: "sync", Title: "Synced", Body: 
 cx.CloseNotification("sync")
 ```
 
-`cx.CloseNotifications` removes every notification the app showed. On macOS, iOS, Windows and Android that includes those earlier runs left in Notification Center, Action Center or the shade; on Linux and the web it reaches only those this run showed. Call it as the app comes to the front when its window shows what they told:
+`cx.CloseNotifications` removes every notification the app showed and cancels those it scheduled. On macOS, iOS, Windows and Android that includes those earlier runs left in Notification Center, Action Center or the shade; on Linux and the web it reaches only those this run showed. Call it as the app comes to the front when its window shows what they told:
 
 ```go
 cx.Effect(func() {
@@ -36,6 +36,18 @@ cx.Effect(func() {
 	}
 })
 ```
+
+## Scheduling one
+
+A notification whose `At` is later than now is scheduled: the system shows it then, whether the app runs or not, and calling `cx.ShowNotification` again with its `ID` moves it, while `cx.CloseNotification` cancels it before it shows. `Repeat` shows it every day at `At`'s time of day, or every week on its weekday too, from the next such time, in the device's time zone. `cx.Env().CanScheduleNotifications()` says whether the platform schedules them: macOS and iOS apps in a bundle, Android and Windows, which schedules no `Repeat`. Elsewhere `done` answers false.
+
+```go
+cx.ShowNotification(core.Notification{ID: "review", Title: "Cards to review", At: due}, nil)
+cx.ShowNotification(core.Notification{ID: "habit", Title: "Practice",
+	At: time.Date(2026, 1, 1, 9, 0, 0, 0, time.Local), Repeat: core.NotificationDaily}, nil)
+```
+
+Android may show a scheduled notification some minutes after its time while the phone dozes; an app that needs it on the minute, such as an alarm clock, lists `android.permission.SCHEDULE_EXACT_ALARM` in `android.permissions`, which the user grants in the system's settings from Android 12, or `USE_EXACT_ALARM`, which Google Play allows only alarm and calendar apps. A force-stopped Android app's notifications wait until it next starts.
 
 ## Presses
 

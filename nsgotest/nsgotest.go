@@ -278,14 +278,10 @@ type App struct {
 	Installs        []driver.SharedFile
 	InstallAllowed  bool
 	InstallSettings int
-	// Notifications are the notifications showing, oldest first, one of
-	// an ID replacing the one before; Badge is the count on the app's
-	// icon. NotificationPermission is what the platform answers whether
-	// the app may show them with, the user not asked at first; a request
-	// while not asked makes it NotificationAnswer, the user granting it
-	// when that is zero. Only a granted app shows them.
-	Notifications []core.Notification
-	Badge         int
+	// Notifications are the notifications showing, oldest first, one of an ID replacing the one before; Badge is the count on the app's icon. NotificationPermission is what the platform answers whether the app may show them with, the user not asked at first; a request while not asked makes it NotificationAnswer, the user granting it when that is zero. Only a granted app shows them. PendingNotifications are those scheduled for a later time, where the environment says ScheduledNotifications, each At the next time it shows: Advance and FastForward show them as the clock's wall time reaches it, and a repeated one stays for its next time.
+	Notifications        []core.Notification
+	PendingNotifications []core.Notification
+	Badge                int
 	// TaskProgress is the last task progress sent by the app. A zero value
 	// means the indicator is cleared.
 	TaskProgress           core.TaskProgress
@@ -754,6 +750,7 @@ func (a *App) elapse(d time.Duration) {
 		step := min(d, driver.FrameInterval)
 		a.Clock.Advance(step)
 		a.playAudio(step)
+		a.showDueNotifications()
 		d -= step
 		a.runFrame()
 		a.Settle()
@@ -772,6 +769,7 @@ func (a *App) FastForward(d time.Duration) {
 	a.stepName = fmt.Sprintf("fastForward(%v)", d)
 	a.Clock.Jump(d)
 	a.playAudio(d)
+	a.showDueNotifications()
 	a.runFrame()
 	a.Settle()
 }

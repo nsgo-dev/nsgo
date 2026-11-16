@@ -245,15 +245,22 @@ export interface ShowNotificationOptions {
   body?: string;
   /** Without the system's sound or vibration. */
   silent?: boolean;
+  /** When it shows, whether the app runs or not, where the platform schedules notifications; now when absent or past. */
+  at?: Date | number;
+  /** Shows it every day at `at`'s time of day, or every week on its weekday too, from the next such time. */
+  repeat?: "daily" | "weekly";
 }
 export interface NotificationsModule {
   permission(): Promise<NotificationPermission>;
   requestPermission(): Promise<NotificationPermission>;
-  /** Resolves with whether the system took it: not without the permission. */
+  /** Resolves with whether the system took it: not without the permission, nor a scheduled one where `canSchedule` is false. */
   show(options: ShowNotificationOptions): Promise<boolean>;
+  /** Removes the notification `id` names, shown or scheduled. */
   close(id: string): Promise<void>;
   /** Closes every notification `show` showed, also those earlier runs left on macOS, iOS, Windows and Android; Linux and the web reach only this run's. */
   closeAll(): Promise<void>;
+  /** Whether `show` schedules one for a later `at` or with a `repeat`, which the system shows with the app's process ended. */
+  canSchedule(): Promise<boolean>;
   /** Shows `count` on the app's icon; `0` clears it. */
   setBadge(count: number): Promise<void>;
   /** The user pressed a notification, the one that started the app included. Returns a function that stops listening. */

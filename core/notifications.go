@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"slices"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -41,20 +42,32 @@ func (p NotificationPermission) String() string {
 
 // Notification is a system notification (ShowNotification).
 type Notification struct {
-	// ID is the app's name for it: showing another with the same ID
-	// replaces it, CloseNotification removes it and a press reports it.
-	// Keep in it what the press opens ("chat:42"), as a press can start
-	// the app anew.
+	// ID is the app's name for it: showing another with the same ID replaces it, shown or still to show, CloseNotification removes it and a press reports it. Keep in it what the press opens ("chat:42"), as a press can start the app anew.
 	ID string
 	// Title and Body are its text.
 	Title, Body string
 	// Silent shows it without the system's sound or vibration.
 	Silent bool
+	// At, when later than now (Scope.WallTime), schedules it to show then, whether the app runs or not, where Env.CanScheduleNotifications says the platform does; zero or earlier shows it at once.
+	At time.Time
+	// Repeat shows it again and again, at At's time of day, its clock reading in At's location, which the device keeps to in its own time zone, and for NotificationWeekly on At's weekday: first at the next such time after now, whatever At's date. It needs At.
+	Repeat NotificationRepeat
 }
 
-// ErrNotification is ShowNotification's error for a notification
-// without an ID or a title.
-var ErrNotification = errors.New("nsgo: a notification needs an ID and a title")
+// NotificationRepeat is how often a scheduled notification shows (Notification.Repeat).
+type NotificationRepeat uint8
+
+const (
+	// NotificationOnce shows it once.
+	NotificationOnce NotificationRepeat = iota
+	// NotificationDaily shows it every day at At's time of day.
+	NotificationDaily
+	// NotificationWeekly shows it every week on At's weekday at its time of day.
+	NotificationWeekly
+)
+
+// ErrNotification is ShowNotification's error for a notification without an ID or a title, or with a Repeat it does not know or no At to repeat.
+var ErrNotification = errors.New("nsgo: a notification needs an ID and a title, and a repeated one a time")
 
 // NotificationPermission answers done with whether the app may show notifications, without asking the user. On macOS checking uses the notification center as asking does, so from then on the app's Dock badge shows only while the user allows its badges.
 func (cx *Scope) NotificationPermission(done func(NotificationPermission)) {
@@ -81,12 +94,9 @@ func (cx *Scope) notificationPermission(ask bool, done func(NotificationPermissi
 	})
 }
 
-// ShowNotification shows n, also while the app is in front, and answers
-// done, when not nil, with whether the system took it: false without the
-// permission. It returns ErrNotification, calling no done, for n without
-// an ID or a title.
+// ShowNotification shows n, also while the app is in front, or schedules it for its At or Repeat, and answers done, when not nil, with whether the system took it: false without the permission, and for a scheduled one where Env.CanScheduleNotifications is false. It returns ErrNotification, calling no done, for n without an ID or a title, or with a Repeat but no At.
 func (cx *Scope) ShowNotification(n Notification, done func(shown bool)) error {
-	if n.ID == "" || n.Title == "" {
+	if n.ID == "" || n.Title == "" || n.Repeat > NotificationWeekly || n.Repeat != NotificationOnce && n.At.IsZero() {
 		return ErrNotification
 	}
 	answer := func(shown bool) {
@@ -99,14 +109,37 @@ func (cx *Scope) ShowNotification(n Notification, done func(shown bool)) error {
 		answer(false)
 		return nil
 	}
-	dn := driver.Notification(n)
+	dn := driver.Notification{ID: n.ID, Title: n.Title, Body: n.Body, Silent: n.Silent, Repeat: driver.NotificationRepeat(n.Repeat)}
+	if now := cx.WallTime(); n.Repeat != NotificationOnce {
+		dn.At = nextRepeat(n.At, n.Repeat, now)
+	} else if n.At.After(now) {
+		dn.At = n.At
+	}
+	if !dn.At.IsZero() && !Untracked(cx, cx.Env().CanScheduleNotifications) {
+		answer(false)
+		return nil
+	}
 	t.request(cx, driver.MountItem{Kind: driver.ItemShowNotification, Notification: &dn},
 		func(ev driver.Event) { answer(ev.Finished) })
 	return nil
 }
 
-// CloseNotification removes the notification called id, if it still
-// shows.
+// nextRepeat is the first time after now that a notification repeated as r shows: at's clock reading in its location, on at's weekday for a weekly one.
+func nextRepeat(at time.Time, r NotificationRepeat, now time.Time) time.Time {
+	now = now.In(at.Location())
+	next := time.Date(now.Year(), now.Month(), now.Day(), at.Hour(), at.Minute(), at.Second(), 0, at.Location())
+	step := 1
+	if r == NotificationWeekly {
+		step = 7
+		next = next.AddDate(0, 0, (int(at.Weekday())-int(next.Weekday())+7)%7)
+	}
+	if !next.After(now) {
+		next = next.AddDate(0, 0, step)
+	}
+	return next
+}
+
+// CloseNotification removes the notification called id, if it still shows, or keeps it from showing if it is scheduled.
 func (cx *Scope) CloseNotification(id string) {
 	if t := cx.tree(); t != nil && id != "" && !cx.denied(serviceNotifications, "") {
 		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemCloseNotification, Value: id})
@@ -114,7 +147,7 @@ func (cx *Scope) CloseNotification(id string) {
 	}
 }
 
-// CloseNotifications removes every notification ShowNotification showed, also those earlier runs left where the system keeps them: on macOS, iOS, Windows and Android. Linux and the web reach only those this run showed. It leaves the app's other notifications alone, such as Android's Live Updates and its foreground services', and the badge.
+// CloseNotifications removes every notification ShowNotification showed or scheduled, also those earlier runs left where the system keeps them: on macOS, iOS, Windows and Android. Linux and the web reach only those this run showed. It leaves the app's other notifications alone, such as Android's Live Updates and its foreground services', and the badge.
 func (cx *Scope) CloseNotifications() {
 	if t := cx.tree(); t != nil && !cx.denied(serviceNotifications, "") {
 		// An empty Value, which CloseNotification never sends, means all.

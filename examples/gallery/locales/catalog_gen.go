@@ -2554,6 +2554,7 @@ const (
 	textSystemAskPermission
 	textSystemShowNotification
 	textSystemShowSilently
+	textSystemShowInAMinute
 	textSystemCloseNotification
 	textSystemNotificationTitle
 	textSystemNotificationBody
@@ -4834,6 +4835,7 @@ var keyOfText = [numTexts]string{
 	"systemAskPermission",
 	"systemShowNotification",
 	"systemShowSilently",
+	"systemShowInAMinute",
 	"systemCloseNotification",
 	"systemNotificationTitle",
 	"systemNotificationBody",
@@ -7112,6 +7114,7 @@ var textsEn = i18n.NewTexts(""+
 	"Ask"+
 	"Show"+
 	"Show silently"+
+	"In a minute"+
 	"Close"+
 	"Hello from the gallery"+
 	"Press it to come back to the System page."+
@@ -9387,6 +9390,7 @@ var textsEn = i18n.NewTexts(""+
 		3,
 		4,
 		13,
+		11,
 		5,
 		22,
 		41,
@@ -11665,6 +11669,7 @@ var textsZhHans = i18n.NewTexts(""+
 	"请求"+
 	"显示"+
 	"静音显示"+
+	"一分钟后"+
 	"关闭"+
 	"来自示例程序的问候"+
 	"点按它回到系统页面。"+
@@ -13939,6 +13944,7 @@ var textsZhHans = i18n.NewTexts(""+
 		6,
 		6,
 		6,
+		12,
 		12,
 		6,
 		27,
@@ -34786,6 +34792,13 @@ func SystemShowSilently(cx *core.Scope) string { return For(cx).SystemShowSilent
 
 // SystemShowSilently is the package's SystemShowSilently in the language of msgs.
 func (msgs Messages) SystemShowSilently() string { return msgs.text(textSystemShowSilently) }
+
+// SystemShowInAMinute says "In a minute"
+// in the language the app shows under cx.
+func SystemShowInAMinute(cx *core.Scope) string { return For(cx).SystemShowInAMinute() }
+
+// SystemShowInAMinute is the package's SystemShowInAMinute in the language of msgs.
+func (msgs Messages) SystemShowInAMinute() string { return msgs.text(textSystemShowInAMinute) }
 
 // SystemCloseNotification says "Close"
 // in the language the app shows under cx.

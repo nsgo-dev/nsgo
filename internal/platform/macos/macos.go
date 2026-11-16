@@ -982,6 +982,9 @@ func (s *surface) environment() driver.Environment {
 		Minimized:        s.window != 0 && objc.Send[bool](s.window, sel("isMiniaturized")),
 		WindowFrame:      s.windowFrame(),
 		Lifecycle:        s.lifecycle(),
+
+		// The center serves only an app in a bundle.
+		ScheduledNotifications: apple.NotificationsAvailable(),
 	}
 }
 

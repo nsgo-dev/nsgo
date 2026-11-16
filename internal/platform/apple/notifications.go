@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
@@ -13,11 +14,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// System notifications for macOS and iOS through UserNotifications'
-// UNUserNotificationCenter, as NSH's notifications: its delegate shows
-// them while the app is in front and reports their presses. The center
-// serves only an app in a bundle, and raises for a bare executable, so
-// one outside a bundle answers unavailable.
+// System notifications for macOS and iOS through UserNotifications' UNUserNotificationCenter, as NSH's notifications: its delegate shows them while the app is in front and reports their presses, the one that launched the app included. The center serves only an app in a bundle, and raises for a bare executable, so one outside a bundle answers unavailable. A scheduled notification is the center's pending request, which the system shows at its trigger with the app's process ended.
 
 const notificationsPath = "/System/Library/Frameworks/UserNotifications.framework/UserNotifications"
 
@@ -29,21 +26,24 @@ var notifications struct {
 	pending []string
 }
 
-// notificationCenter returns the current center, or 0 where the process
-// has none: outside an app bundle, or without the framework.
-var notificationCenter = sync.OnceValue(func() objc.ID {
+// hasNotificationCenter reports whether the process has a notification center, an app bundle with the framework, without touching the center, which on macOS ties the Dock badge to the user's badge setting.
+var hasNotificationCenter = sync.OnceValue(func() bool {
 	bundle := objc.ID(Class("NSBundle")).Send(sel("mainBundle"))
 	if bundle.Send(sel("bundleIdentifier")) == 0 || !strings.HasSuffix(GoString(bundle.Send(sel("bundlePath"))), ".app") {
-		return 0
+		return false
 	}
 	if _, err := purego.Dlopen(notificationsPath, purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
+		return false
+	}
+	return Class("UNUserNotificationCenter") != 0
+})
+
+// notificationCenter returns the current center, or 0 where the process has none: outside an app bundle, or without the framework.
+var notificationCenter = sync.OnceValue(func() objc.ID {
+	if !hasNotificationCenter() {
 		return 0
 	}
-	c := Class("UNUserNotificationCenter")
-	if c == 0 {
-		return 0
-	}
-	return objc.ID(c).Send(sel("currentNotificationCenter"))
+	return objc.ID(Class("UNUserNotificationCenter")).Send(sel("currentNotificationCenter"))
 })
 
 // notificationsUsedKey is the defaults key NSGo sets once the app checks or asks for the notification permission or shows a notification, so later launches set the delegate before launching ends and hear a press on a notification an earlier run showed.
@@ -162,9 +162,10 @@ func NotificationPermission(ask bool, answer func(int)) {
 	asked.Release()
 }
 
-// ShowNotification shows n, replacing a notification of its ID, and
-// answers with whether the center took it: not without the permission.
-// answer runs on any goroutine.
+// NotificationsAvailable reports whether the process has a notification center, which also shows the notifications it schedules after the process ends: Environment.ScheduledNotifications. It leaves the center untouched, as the environment is read before the app uses notifications.
+func NotificationsAvailable() bool { return hasNotificationCenter() }
+
+// ShowNotification shows n, or schedules it for its At, replacing a notification of its ID, delivered or pending, and answers with whether the center took it: not without the permission. answer runs on any goroutine.
 func ShowNotification(n driver.Notification, answer func(bool)) {
 	center := useNotifications()
 	if center == 0 {
@@ -178,11 +179,34 @@ func ShowNotification(n driver.Notification, answer func(bool)) {
 		content.Send(sel("setSound:"), objc.ID(Class("UNNotificationSound")).Send(sel("defaultSound")))
 	}
 	request := objc.ID(Class("UNNotificationRequest")).Send(sel("requestWithIdentifier:content:trigger:"),
-		NSString(n.ID), content, objc.ID(0))
+		NSString(n.ID), content, notificationTrigger(n))
 	content.Send(sel("release"))
 	added := objc.NewBlock(func(_ objc.Block, failure objc.ID) { answer(failure == 0) })
 	center.Send(sel("addNotificationRequest:withCompletionHandler:"), request, added)
 	added.Release()
+}
+
+// notificationTrigger is when the center shows n: nil for now, an interval's trigger for one At, and for a repeated one a calendar trigger matching At's time of day, and its weekday for a weekly one, in the device's time zone as it changes.
+func notificationTrigger(n driver.Notification) objc.ID {
+	if n.At.IsZero() {
+		return 0
+	}
+	if n.Repeat == driver.NotificationOnce {
+		// The interval must be positive; one just passed shows at once.
+		return objc.ID(Class("UNTimeIntervalNotificationTrigger")).Send(sel("triggerWithTimeInterval:repeats:"),
+			max(time.Until(n.At).Seconds(), 0.001), false)
+	}
+	parts := objc.ID(Class("NSDateComponents")).Send(sel("new"))
+	parts.Send(sel("setHour:"), n.At.Hour())
+	parts.Send(sel("setMinute:"), n.At.Minute())
+	parts.Send(sel("setSecond:"), n.At.Second())
+	if n.Repeat == driver.NotificationWeekly {
+		// NSCalendar's weekdays start at 1, Sunday.
+		parts.Send(sel("setWeekday:"), int(n.At.Weekday())+1)
+	}
+	trigger := objc.ID(Class("UNCalendarNotificationTrigger")).Send(sel("triggerWithDateMatchingComponents:repeats:"), parts, true)
+	parts.Send(sel("release"))
+	return trigger
 }
 
 // CloseNotification removes the notification called id, shown or still to show, and every one the app's notification center holds when id is empty, those earlier runs left included. A macOS app that never used notifications has none to close, and closing leaves its center untouched, as an app clearing them each time it comes to the front would otherwise make its Dock badge wait for the user to allow badges.

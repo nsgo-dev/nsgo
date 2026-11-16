@@ -2,6 +2,7 @@ package tsx
 
 import (
 	"math"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 
@@ -45,9 +46,24 @@ func (r *runtime) notifications() js.Value {
 		n := core.Notification{ID: opt.str("id", ""), Title: opt.str("title", ""), Body: opt.str("body", ""),
 			Silent: opt.bool("silent", false)}
 		p, resolve, reject := r.vm.NewPromise()
+		if opt.has("at") {
+			// A Date or a number of milliseconds, as Date's own valueOf.
+			ms := opt.get("at").ToFloat()
+			if math.IsNaN(ms) || math.IsInf(ms, 0) {
+				_ = reject(r.goError(&JSError{Name: "RangeError", Message: "Notifications.show: `at` must be a valid date"}))
+				return r.vm.ToValue(p)
+			}
+			n.At = time.UnixMilli(int64(ms)).In(time.Local)
+		}
+		repeat, ok := notificationRepeats[opt.str("repeat", "")]
+		if !ok {
+			_ = reject(r.goError(&JSError{Name: "RangeError", Message: "Notifications.show: no repeat " + opt.str("repeat", "")}))
+			return r.vm.ToValue(p)
+		}
+		n.Repeat = repeat
 		err := r.cx.ShowNotification(n, func(shown bool) { r.inJS(func() { _ = resolve(shown) }) })
 		if err != nil {
-			_ = reject(r.goError(&JSError{Name: "RangeError", Message: "Notifications.show: `id` and `title` must not be empty"}))
+			_ = reject(r.goError(&JSError{Name: "RangeError", Message: "Notifications.show: `id` and `title` must not be empty, and `repeat` needs `at`"}))
 		}
 		return r.vm.ToValue(p)
 	})
@@ -61,6 +77,11 @@ func (r *runtime) notifications() js.Value {
 		r.cx.CloseNotifications()
 		p, done := r.promise()
 		done(js.Undefined)
+		return r.vm.ToValue(p)
+	})
+	set("canSchedule", func(js.FunctionCall) js.Value {
+		p, resolve, _ := r.vm.NewPromise()
+		_ = resolve(core.Untracked(r.cx, r.cx.Env().CanScheduleNotifications))
 		return r.vm.ToValue(p)
 	})
 	set("setBadge", func(call js.FunctionCall) js.Value {
@@ -98,6 +119,10 @@ func (r *runtime) notifications() js.Value {
 	}))
 	return o
 }
+
+// notificationRepeats are show's repeats by their names, "" for none.
+var notificationRepeats = map[string]core.NotificationRepeat{"": core.NotificationOnce,
+	"daily": core.NotificationDaily, "weekly": core.NotificationWeekly}
 
 // hapticNames are Haptics' styles and kinds by their names.
 var (

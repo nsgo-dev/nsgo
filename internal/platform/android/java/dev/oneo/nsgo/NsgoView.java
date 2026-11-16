@@ -291,6 +291,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         primary = first;
         this.surface = surface;
         if (first == null) {
+            // Alarms a force stop cleared, which the boot receiver cannot set again.
+            Notifications.rearm(context);
             prepared = new SparseArray<>();
             layouts = new ConcurrentHashMap<>();
             shown = new ConcurrentHashMap<>();
@@ -2472,7 +2474,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 long count = in.readInt() & 0xffffffffL;
                 String nid = Protocol.readString(in), title = Protocol.readString(in), body = Protocol.readString(in);
                 boolean silent = in.readUnsignedByte() != 0;
-                boolean shown = Notifications.show(getContext(), activity(), nid, title, body, silent);
+                long at = in.readLong();
+                int repeat = in.readUnsignedByte();
+                boolean shown = at == 0 ? Notifications.showNow(getContext(), activity(), nid, title, body, silent)
+                        : Notifications.schedule(getContext(), nid, title, body, silent, at, repeat);
                 event(Protocol.EVENT_NOTIFICATION, 0, count, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, null, 0, 0, false, "", shown);
                 break;
             }

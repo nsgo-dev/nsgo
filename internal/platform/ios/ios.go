@@ -607,6 +607,9 @@ func (s *surface) environment() driver.Environment {
 		Lifecycle:        appLifecycle(),
 		AppClip:          appClip(),
 		OpenedURL:        openedURL,
+
+		// tvOS's center shows badges only.
+		ScheduledNotifications: idiom != driver.IdiomTV && apple.NotificationsAvailable(),
 	}
 	env.HeaderHeight, env.LargeHeaderHeight = s.headers[0], s.headers[1]
 	return env

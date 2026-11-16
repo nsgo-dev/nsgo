@@ -66,6 +66,7 @@ nsgo.LayoutAnimation.linear
 nsgo.LayoutAnimation.spring
 nsgo.List
 nsgo.Notifications
+nsgo.Notifications.canSchedule
 nsgo.Notifications.close
 nsgo.Notifications.closeAll
 nsgo.Notifications.on

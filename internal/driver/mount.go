@@ -313,11 +313,9 @@ const (
 	// answers with EventNotification carrying Count and the permission as
 	// Index (a NotificationPermission).
 	ItemNotificationPermission
-	// ItemShowNotification shows Notification, replacing one of its ID;
-	// the platform answers with EventNotification carrying Count, Finished
-	// when the system took it.
+	// ItemShowNotification shows Notification, or schedules it for its At, replacing one of its ID, shown or pending; the platform answers with EventNotification carrying Count, Finished when the system took it.
 	ItemShowNotification
-	// ItemCloseNotification removes the notification whose ID is Value, and every notification ShowNotification showed when Value is empty (core.Scope.CloseNotifications).
+	// ItemCloseNotification removes the notification whose ID is Value, shown or pending, and every notification ShowNotification showed when Value is empty (core.Scope.CloseNotifications).
 	ItemCloseNotification
 	// ItemBadge shows Count on the app's icon; 0 clears it.
 	ItemBadge
@@ -421,12 +419,22 @@ func NoBiometric(it *MountItem) Event {
 	return Event{Kind: EventBiometric, Count: it.Count, Index: result}
 }
 
-// Notification is a system notification (ItemShowNotification), as
-// core.Notification.
+// Notification is a system notification (ItemShowNotification), as core.Notification. At is when it shows, zero for now; core sends a later one only where Environment.ScheduledNotifications says so, and with Repeat, At is the first time it shows, after now, and its clock reading in At's location the time of day it shows again, in the device's time zone.
 type Notification struct {
 	ID, Title, Body string
 	Silent          bool
+	At              time.Time
+	Repeat          NotificationRepeat
 }
+
+// NotificationRepeat is how a scheduled notification shows again, as core's.
+type NotificationRepeat uint8
+
+const (
+	NotificationOnce NotificationRepeat = iota
+	NotificationDaily
+	NotificationWeekly
+)
 
 // NotificationPermission is what EventNotification answers an
 // ItemNotificationPermission with, as core's.

@@ -1,6 +1,6 @@
 ---
 title: 通知
-description: 请求显示通知的权限，显示和关闭通知，在应用图标上显示数字和任务进度并接收点按。
+description: 请求显示通知的权限，显示、定时和关闭通知，在应用图标上显示数字和任务进度并接收点按。
 group: 平台功能
 order: 45
 ---
@@ -26,7 +26,7 @@ err := cx.ShowNotification(core.Notification{ID: "sync", Title: "已同步", Bod
 cx.CloseNotification("sync")
 ```
 
-`cx.CloseNotifications` 移除应用显示过的所有通知。在 macOS、iOS、Windows 和 Android 上，这也包括之前运行留在通知中心、操作中心或通知栏里的通知；在 Linux 和 Web 上，它只能移除本次运行显示的通知。应用的窗口已经显示了通知所说的内容时，在应用回到前台时调用它：
+`cx.CloseNotifications` 移除应用显示过的所有通知，并取消它定时的通知。在 macOS、iOS、Windows 和 Android 上，这也包括之前运行留在通知中心、操作中心或通知栏里的通知；在 Linux 和 Web 上，它只能移除本次运行显示的通知。应用的窗口已经显示了通知所说的内容时，在应用回到前台时调用它：
 
 ```go
 cx.Effect(func() {
@@ -36,6 +36,18 @@ cx.Effect(func() {
 	}
 })
 ```
+
+## 定时通知
+
+`At` 晚于当前时间的通知会被定时：系统到时显示它，无论应用是否在运行；用同一 `ID` 再次调用 `cx.ShowNotification` 会改动它的时间，在它显示之前调用 `cx.CloseNotification` 会取消它。`Repeat` 让它每天在 `At` 的时刻显示，或者每周在 `At` 的星期几的那个时刻显示，从下一个这样的时刻开始，按设备的时区计算。`cx.Env().CanScheduleNotifications()` 说明平台是否能定时：在应用包中运行的 macOS 和 iOS 应用、Android 和 Windows，其中 Windows 不支持 `Repeat`。在其他平台上，`done` 回答 false。
+
+```go
+cx.ShowNotification(core.Notification{ID: "review", Title: "有卡片要复习", At: due}, nil)
+cx.ShowNotification(core.Notification{ID: "habit", Title: "练习",
+	At: time.Date(2026, 1, 1, 9, 0, 0, 0, time.Local), Repeat: core.NotificationDaily}, nil)
+```
+
+手机处于低电耗模式时，Android 可能在定时通知的时间过后几分钟才显示它；需要准时显示的应用（如闹钟）要在 `android.permissions` 中列出 `android.permission.SCHEDULE_EXACT_ALARM`，从 Android 12 起由用户在系统设置中授予；或者列出 `USE_EXACT_ALARM`，Google Play 只允许闹钟和日历应用使用它。被强行停止的 Android 应用，它的定时通知要等到下次启动时才会显示。
 
 ## 点按
 

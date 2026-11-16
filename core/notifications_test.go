@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/nsgotest"
@@ -159,3 +160,97 @@ type denyAll struct{}
 
 func (denyAll) Allows(core.AccessRequest) bool { return false }
 func (denyAll) WebHosts() []string             { return nil }
+
+func TestScheduledNotificationsShowAsTheClockReachesThem(t *testing.T) {
+	var scope *core.Scope
+	var shown []bool
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		scope = cx
+		return core.View{}
+	}, nsgotest.Environment(core.Environment{ScheduledNotifications: true}))
+	app.NotificationPermission = core.NotificationsGranted
+	show := func(n core.Notification) {
+		if err := scope.ShowNotification(n, func(ok bool) { shown = append(shown, ok) }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := scope.WallTime()
+	show(core.Notification{ID: "review", Title: "Review", At: now.Add(2 * time.Minute)})
+	show(core.Notification{ID: "gone", Title: "Gone", At: now.Add(time.Minute)})
+	// Showing it again replaces the pending one: it moves.
+	show(core.Notification{ID: "review", Title: "Review", Body: "5 cards", At: now.Add(time.Minute)})
+	show(core.Notification{ID: "past", Title: "Past", At: now.Add(-time.Minute)})
+	scope.CloseNotification("gone")
+	app.Settle()
+	if !slices.Equal(shown, []bool{true, true, true, true}) {
+		t.Errorf("shown %v", shown)
+	}
+	if len(app.Notifications) != 1 || app.Notifications[0].ID != "past" {
+		t.Errorf("a past one shows at once: %+v", app.Notifications)
+	}
+	if len(app.PendingNotifications) != 1 || app.PendingNotifications[0].Body != "5 cards" {
+		t.Fatalf("pending %+v", app.PendingNotifications)
+	}
+	app.FastForward(59 * time.Second)
+	if len(app.Notifications) != 1 {
+		t.Errorf("shown early: %+v", app.Notifications)
+	}
+	app.FastForward(time.Second)
+	if len(app.Notifications) != 2 || app.Notifications[1].ID != "review" || len(app.PendingNotifications) != 0 {
+		t.Errorf("at its time: shown %+v, pending %+v", app.Notifications, app.PendingNotifications)
+	}
+	var pressed []string
+	scope.OnNotificationPress(func(id string) { pressed = append(pressed, id) })
+	app.PressNotification("review")
+	if !slices.Equal(pressed, []string{"review"}) {
+		t.Errorf("pressed %v", pressed)
+	}
+
+	// A daily one shows first at At's time of day after now, then each day.
+	nine := time.Date(2020, 3, 4, 9, 0, 0, 0, time.UTC)
+	show(core.Notification{ID: "daily", Title: "Daily", At: nine, Repeat: core.NotificationDaily})
+	app.Settle()
+	if got, want := app.PendingNotifications[0].At, time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Errorf("daily first at %v, want %v", got, want)
+	}
+	daily := func() bool { return slices.ContainsFunc(app.Notifications, func(n core.Notification) bool { return n.ID == "daily" }) }
+	app.FastForward(9 * time.Hour)
+	if !daily() {
+		t.Errorf("no daily one at nine: %+v", app.Notifications)
+	}
+	app.Notifications = nil
+	app.FastForward(24 * time.Hour)
+	if !daily() || len(app.PendingNotifications) != 1 {
+		t.Errorf("the next day: shown %+v, pending %+v", app.Notifications, app.PendingNotifications)
+	}
+	scope.CloseNotification("daily")
+	app.Settle()
+	if len(app.PendingNotifications) != 0 {
+		t.Errorf("closed, still pending: %+v", app.PendingNotifications)
+	}
+
+	// Weekly: on At's weekday, a Wednesday.
+	show(core.Notification{ID: "weekly", Title: "Weekly", At: nine, Repeat: core.NotificationWeekly})
+	app.Settle()
+	if at := app.PendingNotifications[0].At; at.Weekday() != time.Wednesday || at.Hour() != 9 || !at.After(scope.WallTime()) {
+		t.Errorf("weekly first at %v", at)
+	}
+	if err := scope.ShowNotification(core.Notification{ID: "x", Title: "X", Repeat: core.NotificationDaily}, nil); !errors.Is(err, core.ErrNotification) {
+		t.Errorf("a repeat without At: %v", err)
+	}
+}
+
+func TestScheduledNotificationsUnavailable(t *testing.T) {
+	var scope *core.Scope
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		scope = cx
+		return core.View{}
+	})
+	app.NotificationPermission = core.NotificationsGranted
+	shown := true
+	_ = scope.ShowNotification(core.Notification{ID: "later", Title: "Later", At: scope.WallTime().Add(time.Hour)}, func(ok bool) { shown = ok })
+	app.Settle()
+	if scope.Env().CanScheduleNotifications() || shown || len(app.PendingNotifications) != 0 {
+		t.Errorf("unscheduled platform: can %v, shown %v, pending %+v", scope.Env().CanScheduleNotifications(), shown, app.PendingNotifications)
+	}
+}
