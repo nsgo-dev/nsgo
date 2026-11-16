@@ -5,7 +5,7 @@ group: Components
 order: 33
 ---
 
-`ui.Input` is the platform's text field in `ui`'s look, one line unless `Multiline`. It has `base.Input`'s fields, as every styled field does; `ui.Field` is the same field in a borderless rim, for a field the app sizes itself.
+`ui.Input` is the platform's text field in `ui`'s look, one line unless `Multiline`. It has `base.Input`'s fields, as every styled field does; `ui.Field` is the same field with no size of its own, in a rim that does not follow the pointer or the focus.
 
 ```go preview=input/basic
 name := core.NewSignal(cx, "")
@@ -38,7 +38,11 @@ ui.Input{Masked: true, Value: password.Get, OnChange: password.Set,
 
 `KeyboardType` picks a software keyboard (`KeyboardEmail`, `KeyboardNumber`, `KeyboardURL` and the rest), `ReturnKeyType` labels its return key, and `SubmitBehavior` says whether Return submits or breaks a multiline line. `AutoCapitalize`, `NoAutoCorrect` and `AutoComplete` tune the system's help.
 
-`Style` is merged over the input's default size and look, so it can set the height, padding, font or any other field style. `StyleFunc` is merged over the reactive look as well; the focus and hover rims remain automatic when it leaves those properties unset.
+`Style` merges over the field's look, and `StyleFunc` over that: what they set, such as the height, the padding, the font or a color, replaces `ui`'s, and the rest stays. The rim darkens under the pointer and takes the accent while focused as long as neither sets `BorderColor` or `Hover`.
+
+```go
+ui.Input{Placeholder: "Filter", Style: core.Style{Height: core.Pt(ui.SizeSmall.Height()), FontSize: 12}}
+```
 
 ## Focus and events
 

@@ -5,7 +5,7 @@ group: 组件
 order: 33
 ---
 
-`ui.Input` 是 `ui` 外观的平台文本框，除非设置 `Multiline`，否则只有一行。它的字段与 `base.Input` 相同，所有带样式的输入框都是如此；`ui.Field` 是放在无边框容器里的同一种输入框，用于应用自己设置尺寸的输入框。
+`ui.Input` 是 `ui` 外观的平台文本框，除非设置 `Multiline`，否则只有一行。它的字段与 `base.Input` 相同，所有带样式的输入框都是如此；`ui.Field` 是同一种输入框，没有自己的尺寸，边框不随指针和焦点变化。
 
 ```go preview=input/basic
 name := core.NewSignal(cx, "")
@@ -38,7 +38,11 @@ ui.Input{Masked: true, Value: password.Get, OnChange: password.Set,
 
 `KeyboardType` 选择软件键盘（`KeyboardEmail`、`KeyboardNumber`、`KeyboardURL` 等），`ReturnKeyType` 设置回车键的标签，`SubmitBehavior` 决定回车是提交还是换行。`AutoCapitalize`、`NoAutoCorrect` 和 `AutoComplete` 调整系统的辅助行为。
 
-`Style` 会合并在输入框的默认尺寸和外观之上，因此可以设置高度、内边距、字体和其他字段样式。`StyleFunc` 同样会合并在响应式外观之上；如果不设置边框属性，焦点和悬停边框仍会自动生效。
+`Style` 合并在输入框的外观之上，`StyleFunc` 再合并在它之上：它们设置的高度、内边距、字体或颜色等取代 `ui` 的，其余保持不变。只要两者都不设置 `BorderColor` 或 `Hover`，边框在指针下仍会加深，获得焦点时仍显示强调色。
+
+```go
+ui.Input{Placeholder: "Filter", Style: core.Style{Height: core.Pt(ui.SizeSmall.Height()), FontSize: 12}}
+```
 
 ## 焦点与事件
 

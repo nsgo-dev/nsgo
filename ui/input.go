@@ -5,9 +5,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// Input is the platform's text field with base.Input's fields, styled as
-// a text box 28 pt tall, or Multiline growing from three lines: its rim
-// darker under the pointer and the accent while focused.
+// Input is the platform's text field with base.Input's fields, styled as a text box 28 pt tall with 13 pt text, or Multiline growing from three lines: its rim darker under the pointer and the accent while focused. Its Style and then its StyleFunc merge over that look, so the focus and hover rims stay while neither sets BorderColor or Hover.
 type Input base.Input
 
 // Render implements core.Node.
@@ -33,8 +31,9 @@ func (f Input) Render(cx *core.Scope) core.Node {
 		shape = core.Style{MinHeight: core.Pt(ButtonHeight + 2*TypeBody.LineHeight), Padding: core.Symmetric(6, 10),
 			TextAlignVertical: core.TextAlignVerticalTop, FontSize: 13}
 	}
-	in.Style = shape.Merge(in.Style)
-	own := in.StyleFunc
+	// The caller's style goes over the look's colors as well as its shape: the core merges a dynamic style over a static one, so a static color would otherwise lose to the look's.
+	static, own := in.Style, in.StyleFunc
+	in.Style = shape.Merge(static)
 	in.StyleFunc = func() core.Style {
 		s := core.Style{PlaceholderColor: colors.Faint(), SelectionColor: cx.Palette().Selection, CaretColor: colors.Accent(),
 			Color: colors.Text(), Background: colors.Field(),
@@ -43,6 +42,7 @@ func (f Input) Render(cx *core.Scope) core.Node {
 		if focused.Get() {
 			s.BorderColor, s.Hover = colors.Accent(), nil
 		}
+		s = s.Merge(static)
 		if own != nil {
 			s = s.Merge(own())
 		}

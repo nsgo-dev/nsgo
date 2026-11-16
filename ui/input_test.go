@@ -34,13 +34,17 @@ func TestInput(t *testing.T) {
 	})
 }
 
+// TestInputMergesCallerStyle sizes a field with its Style, colors one with its Style and gives one a StyleFunc, and checks each keeps the rest of ui's look: the focus rim and the hover rim stay while the caller's style sets neither.
 func TestInputMergesCallerStyle(t *testing.T) {
+	ink, paper := core.RGB(0x112233), core.RGB(0xfedcba)
 	each(t, func(t *testing.T, e core.Environment) {
-		app, _ := start(t, e, func(cx *core.Scope) core.Node {
-			return core.View{Style: core.Style{Width: core.Pt(240)}, Children: []core.Node{
+		app, p := start(t, e, func(cx *core.Scope) core.Node {
+			return core.View{Style: core.Style{Width: core.Pt(240), Gap: 8}, Children: []core.Node{
 				Input{TestID: "styled", Placeholder: "Search", Style: core.Style{
 					Height: core.Pt(24), FontSize: 12, Padding: core.Edges{Left: 10, Right: 28},
 				}, StyleFunc: func() core.Style { return core.Style{FontFamily: "Menlo"} }},
+				Input{TestID: "colored", Style: core.Style{Color: ink, Background: paper}},
+				Input{TestID: "plain"},
 			}}
 		})
 		f := app.Find("styled")
@@ -55,6 +59,26 @@ func TestInputMergesCallerStyle(t *testing.T) {
 		}
 		if f.Input.Style.Font.Family != "Menlo" {
 			t.Fatalf("font family = %q, want Menlo", f.Input.Style.Font.Family)
+		}
+		if f.Style.BorderColor != p.FieldBorder || f.Input.Style.Color != p.Text {
+			t.Fatalf("styled field: edge %x, text %x; want the field border and the text color", f.Style.BorderColor, f.Input.Style.Color)
+		}
+		if c := app.Find("colored"); c.Input.Style.Color != ink || c.Style.Background != paper || c.Style.BorderColor != p.FieldBorder {
+			t.Fatalf("colored field: text %x, fill %x, edge %x; want the style's and the field border", c.Input.Style.Color, c.Style.Background, c.Style.BorderColor)
+		}
+		if f := app.Find("plain"); f.Frame.Size.Height != ButtonHeight || f.Input.Style.Font.Size != 13 {
+			t.Fatalf("plain field: %v tall, %v pt text; want %v and 13", f.Frame.Size.Height, f.Input.Style.Font.Size, ButtonHeight)
+		}
+		if e.Idiom == core.IdiomDesktop {
+			app.Hover("styled")
+			if got := app.Find("styled").Style.BorderColor; got == p.FieldBorder {
+				t.Fatalf("hovered edge = %x, want darker than the field border", got)
+			}
+			app.HoverOut()
+		}
+		app.Focus("styled")
+		if got := app.Find("styled").Style.BorderColor; got != p.Accent {
+			t.Fatalf("focused edge = %x, want the accent %x", got, p.Accent)
 		}
 	})
 }
