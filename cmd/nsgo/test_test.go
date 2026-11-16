@@ -184,6 +184,78 @@ func TestBenchmarkResults(t *testing.T) {
 	}
 }
 
+// A process panic can end the package without any closing test event.
+// Keep its last test's output and leave another package's tests alone.
+func TestInterruptedTestsKeepTheirOutput(t *testing.T) {
+	var out bytes.Buffer
+	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, out: &out}
+	r.read(strings.NewReader(`{"Action":"run","Package":"p","Test":"TestCrash"}
+{"Action":"run","Package":"q","Test":"TestOther"}
+{"Action":"output","Package":"p","Test":"TestCrash","Output":"panic: native callback failed\nstack trace\n"}
+{"Action":"output","Package":"p","Output":"FAIL\tp\t0.1s\n"}
+{"Action":"fail","Package":"p","Elapsed":0.1}
+{"Action":"pass","Package":"q","Test":"TestOther","Elapsed":0.2}
+{"Action":"pass","Package":"q","Elapsed":0.2}
+`))
+	err := r.finish(testOptions{}, nil)
+	if err == nil || err.Error() != "1 test failed" {
+		t.Errorf("finish = %v, want the interrupted test to fail", err)
+	}
+	for _, want := range []string{"✗ TestCrash", "panic: native callback failed", "stack trace", "✓ TestOther", "1 passed, 1 failed, 0 skipped"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("console misses %q:\n%s", want, out.String())
+		}
+	}
+	if len(r.running) != 0 {
+		t.Errorf("unfinished tests = %v", r.running)
+	}
+}
+
+// Exercise the real go test event stream, including a panic on another
+// goroutine during a subtest, and the JUnit artifact CI consumers read.
+func TestRunTestsReportsProcessPanic(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs a test process that panics")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod": "module example.com/crash\n\ngo 1.26\n",
+		"crash_test.go": `package crash
+import "testing"
+func TestCrash(t *testing.T) {
+    t.Run("worker", func(t *testing.T) {
+        go func() { panic("nsgo process panic fixture") }()
+        <-make(chan struct{})
+    })
+}
+`,
+	})
+	p, err := loadForTest(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := filepath.Join(dir, "report.xml")
+	if err := runTests(t.Context(), p, testOptions{junit: report, args: []string{"-count=1"}}); err == nil || err.Error() != "1 test failed" {
+		t.Fatalf("runTests = %v, want a failed test rather than a build failure", err)
+	}
+	data, err := os.ReadFile(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var suites junitSuites
+	if err := xml.Unmarshal(data, &suites); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range suites.Suites {
+		for _, c := range s.Cases {
+			if c.Name == "TestCrash/worker" && c.Failure != nil && strings.Contains(c.Failure.Body, "panic: nsgo process panic fixture") {
+				return
+			}
+		}
+	}
+	t.Fatalf("JUnit lost the interrupted subtest or its panic:\n%s", data)
+}
+
 func TestTSXTestsSkipOwnTrees(t *testing.T) {
 	dir := t.TempDir()
 	for _, f := range []string{"app/nsgo.yaml", "app/app.test.tsx", "lib/go.mod", "lib/lib.test.tsx", "testdata/x.test.tsx"} {

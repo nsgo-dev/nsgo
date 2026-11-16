@@ -272,6 +272,24 @@ func (r *testRun) event(ev testEvent) {
 			pkg.Status = "fail"
 			// A package that did not build shows why.
 			pkg.Output += r.builds[ev.FailedBuild]
+			// A panic on another goroutine can end the process without
+			// closing the tests it interrupted. Their output includes the
+			// panic and stack, which a package's output does not.
+			var interrupted []string
+			for key, t := range r.running {
+				// Benchmarks finish through result lines, not closing events.
+				if t.Package == ev.Package && !strings.HasPrefix(t.Name, "Benchmark") {
+					interrupted = append(interrupted, key)
+				}
+			}
+			sort.Strings(interrupted)
+			for _, key := range interrupted {
+				t := r.running[key]
+				delete(r.running, key)
+				t.failFor("the test process exited before reporting an outcome")
+				r.results = append(r.results, t)
+				r.print(t)
+			}
 		case "pass", "skip":
 			pkg.Status = ev.Action
 		}
