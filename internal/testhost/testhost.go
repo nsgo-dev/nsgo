@@ -57,8 +57,8 @@ type Options struct {
 // left is 0, 0), and return once the input is posted.
 type Surface interface {
 	// Press presses at at for hold (a tap when 0), as a finger or the
-	// mouse's primary button does.
-	Press(at driver.Point, hold time.Duration) error
+	// mouse's primary button does, with mods held for the press only.
+	Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error
 	// RightClick clicks the secondary button at at.
 	RightClick(at driver.Point) error
 	// Drag puts a finger or the primary button down at path[0], rests,

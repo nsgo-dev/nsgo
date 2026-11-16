@@ -73,23 +73,40 @@ func (t *testSurface) windowPoint(p driver.Point) apple.CGPoint {
 
 // mouse posts a mouse event of kind at p to the application's queue.
 func (t *testSurface) mouse(kind uint, p driver.Point, clicks int) {
+	t.mouseWith(kind, p, clicks, driver.Modifiers{})
+}
+
+func (t *testSurface) mouseWith(kind uint, p driver.Point, clicks int, mods driver.Modifiers) {
+	var flags uint
+	if mods.Control {
+		flags |= flagControl
+	}
+	if mods.Alt {
+		flags |= flagOption
+	}
+	if mods.Shift {
+		flags |= flagShift
+	}
+	if mods.Platform {
+		flags |= flagCommand
+	}
 	onMainSync(func() {
 		w := t.s.window
 		ev := objc.ID(apple.Class("NSEvent")).Send(
 			sel("mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:"),
-			kind, t.windowPoint(p), uint(0), uptime(), objc.Send[int](w, sel("windowNumber")), objc.ID(0), 0, clicks, float32(1))
+			kind, t.windowPoint(p), flags, uptime(), objc.Send[int](w, sel("windowNumber")), objc.ID(0), 0, clicks, float32(1))
 		rememberTestInput(ev)
 		nsApp().Send(sel("postEvent:atStart:"), ev, false)
 	})
 }
 
-func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
-	t.mouse(evMoved, at, 0)
-	t.mouse(evLeftDown, at, 1)
+func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	t.mouseWith(evMoved, at, 0, mods)
+	t.mouseWith(evLeftDown, at, 1, mods)
 	if hold > 0 {
 		time.Sleep(hold + 50*time.Millisecond)
 	}
-	t.mouse(evLeftUp, at, 1)
+	t.mouseWith(evLeftUp, at, 1, mods)
 	return nil
 }
 

@@ -112,8 +112,8 @@ func (t *testSurface) do(op map[string]any) error {
 	return err
 }
 
-func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
-	return t.do(map[string]any{"op": "press", "x": at.X, "y": at.Y, "hold": hold.Milliseconds()})
+func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	return t.do(map[string]any{"op": "press", "x": at.X, "y": at.Y, "hold": hold.Milliseconds(), "modifiers": mods})
 }
 
 func (t *testSurface) RightClick(driver.Point) error {

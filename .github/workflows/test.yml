@@ -53,6 +53,11 @@ jobs:
           pactl set-default-sink nsgo_test
       - name: Vet
         run: go tool nsgo check
+      - name: Test native modified presses
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: xvfb-run -a go tool nsgo test -target linux -run '^TestPressModifiersReachTheApp$' ./examples/gallery
       - name: Test
         env:
           GDK_BACKEND: x11
@@ -92,3 +97,21 @@ jobs:
         env:
           GOGC: "1"
         run: go tool nsgo test -run '^TestWindowObserversSurviveGC$' ./internal/platform/macos -- -race -timeout=180s
+      - name: Test native modified presses
+        run: go tool nsgo test -target macos -run '^TestPressModifiersReachTheApp$' ./examples/gallery
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test native modified presses
+        run: go tool nsgo test -target windows -run '^TestPressModifiersReachTheApp$' ./examples/gallery

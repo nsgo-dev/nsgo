@@ -102,11 +102,41 @@ func (t *testSurface) post(message, wParam uintptr, at driver.Point) {
 	postMessageW.Call(t.w.hwnd, message, wParam, t.lParam(at))
 }
 
-func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
-	t.post(wmMouseMove, 0, at)
-	t.post(wmLButtonDown, mkLButton, at)
+func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	var buttons uintptr
+	if mods.Shift {
+		buttons |= 0x0004 // MK_SHIFT
+	}
+	if mods.Control {
+		buttons |= 0x0008 // MK_CONTROL
+	}
+	// Send each message on the window's thread while its keyboard state
+	// holds the modifiers, so GetKeyState and native controls see them too.
+	send := func(message, buttons uintptr) {
+		t.onMain(func() {
+			var saved [256]byte
+			hostGetKeyboardState.Call(uintptr(unsafe.Pointer(&saved)))
+			state := saved
+			for _, key := range []uintptr{vkControl, vkShift, vkMenu, vkLWin, vkRWin, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5} {
+				state[key] &^= 0x80
+			}
+			for _, key := range []struct {
+				code uintptr
+				held bool
+			}{{vkControl, mods.Control}, {vkShift, mods.Shift}, {vkMenu, mods.Alt}, {vkLWin, mods.Platform}} {
+				if key.held {
+					state[key.code] |= 0x80
+				}
+			}
+			hostSetKeyboardState.Call(uintptr(unsafe.Pointer(&state)))
+			defer hostSetKeyboardState.Call(uintptr(unsafe.Pointer(&saved)))
+			hostSendMessage.Call(t.w.hwnd, message, buttons, t.lParam(at))
+		})
+	}
+	send(wmMouseMove, buttons)
+	send(wmLButtonDown, buttons|mkLButton)
 	time.Sleep(max(hold+50*time.Millisecond, 50*time.Millisecond))
-	t.post(hostLButtonUp, 0, at)
+	send(hostLButtonUp, buttons)
 	return nil
 }
 

@@ -274,8 +274,8 @@ func (f *fakeLive) commit() {
 	}
 }
 
-func (f *fakeLive) Press(at driver.Point, hold time.Duration) error {
-	f.tree.PressAt(driver.Event{Page: at, Count: 1})
+func (f *fakeLive) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	f.tree.PressAt(driver.Event{Page: at, Count: 1, Modifiers: mods})
 	f.commit()
 	return nil
 }

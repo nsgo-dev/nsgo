@@ -229,7 +229,22 @@ func focusAt(p driver.Point) {
 	})
 }
 
-func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
+func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	var held []uint32
+	for _, key := range []struct {
+		usage uint32
+		held  bool
+	}{{0xe0, mods.Control}, {0xe1, mods.Shift}, {0xe2, mods.Alt}, {0xe3, mods.Platform}} {
+		if key.held {
+			hidKey(key.usage, true)
+			held = append(held, key.usage)
+		}
+	}
+	defer func() {
+		for i := len(held) - 1; i >= 0; i-- {
+			hidKey(held[i], false)
+		}
+	}()
 	touch(at, down)
 	time.Sleep(max(hold+50*time.Millisecond, 60*time.Millisecond))
 	touch(at, up)
@@ -505,7 +520,7 @@ func (t *testSurface) Answer(id uint32, index int) error {
 	if err != nil {
 		return err
 	}
-	return t.Press(at, 0)
+	return t.Press(at, 0, driver.Modifiers{})
 }
 
 // findLabel finds the label reading text in v.

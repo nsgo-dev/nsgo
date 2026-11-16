@@ -449,13 +449,15 @@ func (t *target) answer(alert driver.AlertConfig, index int) {
 	t.settle()
 }
 
-func (t *target) press(at driver.Point, hold time.Duration) { t.check(t.surface.Press(at, hold)) }
+func (t *target) press(at driver.Point, hold time.Duration, mods driver.Modifiers) {
+	t.check(t.surface.Press(at, hold, mods))
+}
 
 // pressWhile holds a press for hold, running during once the finger is
 // down.
 func (t *target) pressWhile(at driver.Point, hold time.Duration, during func()) {
 	done := make(chan error, 1)
-	go func() { done <- t.surface.Press(at, hold) }()
+	go func() { done <- t.surface.Press(at, hold, driver.Modifiers{}) }()
 	time.Sleep(hold / 2)
 	during()
 	t.check(<-done)

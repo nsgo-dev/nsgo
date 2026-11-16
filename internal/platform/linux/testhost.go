@@ -121,10 +121,23 @@ func (t *testSurface) focusAt(at driver.Point) {
 	t.field = v
 }
 
-func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
+func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	var state uint32
+	if mods.Control {
+		state |= gdkControl
+	}
+	if mods.Alt {
+		state |= gdkAlt
+	}
+	if mods.Shift {
+		state |= gdkShift
+	}
+	if mods.Platform {
+		state |= gdkSuper
+	}
 	t.onLoop(func() {
 		t.focusAt(at)
-		t.w.pointerDown(at, 1, 0, 0, 1)
+		t.w.pointerDown(at, 1, 0, state, 1)
 	})
 	if hold > 0 {
 		time.Sleep(hold + 50*time.Millisecond)

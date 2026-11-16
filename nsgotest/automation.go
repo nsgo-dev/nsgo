@@ -844,25 +844,25 @@ type noSurface struct{}
 
 var errNoWindow = errors.New("the surface shows no window to act on")
 
-func (noSurface) Press(driver.Point, time.Duration) error { return errNoWindow }
-func (noSurface) RightClick(driver.Point) error           { return errNoWindow }
-func (noSurface) Drag([]driver.Point) error               { return errNoWindow }
-func (noSurface) Scroll(driver.Point, driver.Point) error { return errNoWindow }
-func (noSurface) Hover(driver.Point) error                { return errNoWindow }
-func (noSurface) Type(string) error                       { return errNoWindow }
-func (noSurface) Compose(string) error                    { return errNoWindow }
-func (noSurface) Commit(string) error                     { return errNoWindow }
-func (noSurface) Key(string) error                        { return errNoWindow }
-func (noSurface) Back() error                             { return errNoWindow }
-func (noSurface) Answer(uint32, int) error                { return errNoWindow }
-func (noSurface) ChooseMenu(uint32) error                 { return testhost.ErrNoMenu }
-func (noSurface) ChooseDockMenu(uint32) error             { return testhost.ErrNoMenu }
-func (noSurface) ChoosePopup(uint32) error                { return testhost.ErrNoMenu }
-func (noSurface) Screenshot() ([]byte, error)             { return nil, errNoWindow }
-func (noSurface) Animating() bool                         { return false }
-func (noSurface) Resize(driver.Size) error                { return errNoWindow }
-func (noSurface) SetEnvironment(driver.Environment) error { return errNoWindow }
-func (noSurface) Sync()                                   {}
+func (noSurface) Press(driver.Point, time.Duration, driver.Modifiers) error { return errNoWindow }
+func (noSurface) RightClick(driver.Point) error                             { return errNoWindow }
+func (noSurface) Drag([]driver.Point) error                                 { return errNoWindow }
+func (noSurface) Scroll(driver.Point, driver.Point) error                   { return errNoWindow }
+func (noSurface) Hover(driver.Point) error                                  { return errNoWindow }
+func (noSurface) Type(string) error                                         { return errNoWindow }
+func (noSurface) Compose(string) error                                      { return errNoWindow }
+func (noSurface) Commit(string) error                                       { return errNoWindow }
+func (noSurface) Key(string) error                                          { return errNoWindow }
+func (noSurface) Back() error                                               { return errNoWindow }
+func (noSurface) Answer(uint32, int) error                                  { return errNoWindow }
+func (noSurface) ChooseMenu(uint32) error                                   { return testhost.ErrNoMenu }
+func (noSurface) ChooseDockMenu(uint32) error                               { return testhost.ErrNoMenu }
+func (noSurface) ChoosePopup(uint32) error                                  { return testhost.ErrNoMenu }
+func (noSurface) Screenshot() ([]byte, error)                               { return nil, errNoWindow }
+func (noSurface) Animating() bool                                           { return false }
+func (noSurface) Resize(driver.Size) error                                  { return errNoWindow }
+func (noSurface) SetEnvironment(driver.Environment) error                   { return errNoWindow }
+func (noSurface) Sync()                                                     {}
 
 // liveTB is the testing.TB the agent's models run steps with: what fails a step panics with a liveFailure, which try turns into the request's error, as tsxtest's appTB does for a TSX test's steps.
 type liveTB struct{ testing.TB }

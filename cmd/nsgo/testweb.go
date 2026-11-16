@@ -76,16 +76,22 @@ func webTestRunner(ctx context.Context, p *project, dir string, opts testOptions
 	}, nil
 }
 
+// webModifiers is the modifier state the page sends across the test bridge.
+type webModifiers struct {
+	Control, Alt, Shift, Platform bool
+}
+
 // webOp is what the page asks the tool to do.
 type webOp struct {
-	ID   int     `json:"id"`
-	Op   string  `json:"op"`
-	X    float64 `json:"x"`
-	Y    float64 `json:"y"`
-	DX   float64 `json:"dx"`
-	DY   float64 `json:"dy"`
-	Hold int64   `json:"hold,omitempty"`
-	Path []struct {
+	ID        int          `json:"id"`
+	Op        string       `json:"op"`
+	X         float64      `json:"x"`
+	Y         float64      `json:"y"`
+	DX        float64      `json:"dx"`
+	DY        float64      `json:"dy"`
+	Hold      int64        `json:"hold,omitempty"`
+	Modifiers webModifiers `json:"modifiers,omitempty"`
+	Path      []struct {
 		X, Y float64
 	} `json:"path,omitempty"`
 	Text   string  `json:"text,omitempty"`
@@ -224,7 +230,24 @@ func (p *webPage) call(method string, params any) (json.RawMessage, error) {
 }
 
 func (p *webPage) mouse(kind string, x, y float64, button string, buttons, clicks int) error {
-	params := map[string]any{"type": kind, "x": x, "y": y, "button": button, "buttons": buttons, "clickCount": clicks}
+	return p.mouseWith(kind, x, y, button, buttons, clicks, webModifiers{})
+}
+
+func (p *webPage) mouseWith(kind string, x, y float64, button string, buttons, clicks int, mods webModifiers) error {
+	var flags int
+	if mods.Alt {
+		flags |= 1
+	}
+	if mods.Control {
+		flags |= 2
+	}
+	if mods.Platform {
+		flags |= 4
+	}
+	if mods.Shift {
+		flags |= 8
+	}
+	params := map[string]any{"type": kind, "x": x, "y": y, "button": button, "buttons": buttons, "clickCount": clicks, "modifiers": flags}
 	_, err := p.call("Input.dispatchMouseEvent", params)
 	return err
 }
@@ -256,16 +279,16 @@ func (p *webPage) do(op webOp, data *any) error {
 			"width": int(math.Round(op.Width)), "height": int(math.Round(op.Height)), "deviceScaleFactor": webTestScale, "mobile": false})
 		return err
 	case "press":
-		if err := p.mouse("mouseMoved", op.X, op.Y, "none", 0, 0); err != nil {
+		if err := p.mouseWith("mouseMoved", op.X, op.Y, "none", 0, 0, op.Modifiers); err != nil {
 			return err
 		}
-		if err := p.mouse("mousePressed", op.X, op.Y, "left", 1, 1); err != nil {
+		if err := p.mouseWith("mousePressed", op.X, op.Y, "left", 1, 1, op.Modifiers); err != nil {
 			return err
 		}
 		if op.Hold > 0 {
 			time.Sleep(time.Duration(op.Hold+50) * time.Millisecond)
 		}
-		return p.mouse("mouseReleased", op.X, op.Y, "left", 0, 1)
+		return p.mouseWith("mouseReleased", op.X, op.Y, "left", 0, 1, op.Modifiers)
 	case "rightClick":
 		if err := p.mouse("mousePressed", op.X, op.Y, "right", 2, 1); err != nil {
 			return err

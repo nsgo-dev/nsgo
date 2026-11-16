@@ -122,9 +122,20 @@ func (a *App) charsAt(selector string, v *View) int {
 // takes the press itself.
 func (a *App) Press(selector string) {
 	a.t.Helper()
-	a.step("press(%s)", selector)
+	a.PressWith(selector, driver.Modifiers{})
+}
+
+// PressWith presses as Press does, with the modifier keys held for this
+// press only. A target sends them through its native input.
+func (a *App) PressWith(selector string, mods driver.Modifiers) {
+	a.t.Helper()
+	if mods == (driver.Modifiers{}) {
+		a.step("press(%s)", selector)
+	} else {
+		a.step("pressWith(%s, %v)", selector, mods)
+	}
 	v, at, index := a.pressTarget(selector)
-	a.pressAt(v, at, index)
+	a.pressAt(v, at, index, mods)
 }
 
 // PressAt presses the view selector matches at a point in it, or what is
@@ -132,21 +143,32 @@ func (a *App) Press(selector string) {
 // targets under the pointer, such as a canvas.
 func (a *App) PressAt(selector string, at driver.Point) {
 	a.t.Helper()
-	a.step("pressAt(%s, %v, %v)", selector, at.X, at.Y)
+	a.PressAtWith(selector, at, driver.Modifiers{})
+}
+
+// PressAtWith presses as PressAt does, with the modifier keys held for
+// this press only.
+func (a *App) PressAtWith(selector string, at driver.Point, mods driver.Modifiers) {
+	a.t.Helper()
+	if mods == (driver.Modifiers{}) {
+		a.step("pressAt(%s, %v, %v)", selector, at.X, at.Y)
+	} else {
+		a.step("pressAtWith(%s, %v, %v, %v)", selector, at.X, at.Y, mods)
+	}
 	m := a.pick(selector, "view", func(m *View) (*View, bool) { return m, true })
 	page := m.pagePoint(at)
 	v := a.pressableAt(page)
 	if v == nil {
 		a.t.Fatalf("nsgotest: nothing pressable at %v in %q\n%s", at, selector, a.Dump())
 	}
-	a.pressAt(v, page, 0)
+	a.pressAt(v, page, 0, mods)
 }
 
 // pressAt presses v at the surface point at.
-func (a *App) pressAt(v *View, at driver.Point, index int) {
+func (a *App) pressAt(v *View, at driver.Point, index int, mods driver.Modifiers) {
 	a.t.Helper()
 	if a.target != nil {
-		a.target.press(at, 0)
+		a.target.press(at, 0, mods)
 		a.done()
 		return
 	}
@@ -174,6 +196,7 @@ func (a *App) pressAt(v *View, at driver.Point, index int) {
 	for _, k := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp, driver.EventPress} {
 		ev := a.pressEvent(v, at)
 		ev.Kind, ev.Index, ev.Count = k, index, a.clicks
+		ev.Modifiers = mods
 		a.send(v, ev)
 	}
 	a.touchAt(driver.GestureEnded, at, 0)
@@ -397,7 +420,7 @@ func (a *App) inputStep(selector, step string) *View {
 	})
 	if !v.Focused {
 		if a.target != nil {
-			a.target.press(a.target.reveal(v), 0)
+			a.target.press(a.target.reveal(v), 0, driver.Modifiers{})
 			a.target.settle()
 		} else {
 			a.inputBy(driver.ModalityPointer)
@@ -445,7 +468,7 @@ func (a *App) Focus(selector string) {
 		case v.Kind != driver.KindInput:
 			a.tabTo(selector, v)
 		case a.target != nil:
-			a.target.press(a.target.reveal(v), 0)
+			a.target.press(a.target.reveal(v), 0, driver.Modifiers{})
 		default:
 			a.inputBy(driver.ModalityPointer)
 			for _, o := range a.views {

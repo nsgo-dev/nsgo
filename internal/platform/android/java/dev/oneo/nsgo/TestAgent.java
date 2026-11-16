@@ -112,9 +112,18 @@ final class TestAgent {
                 float[] p = window(op.getDouble("x"), op.getDouble("y"));
                 long hold = Math.max(op.optLong("hold"), 0) + 50;
                 long down = SystemClock.uptimeMillis();
-                touch(down, MotionEvent.ACTION_DOWN, p);
+                JSONObject mods = op.optJSONObject("modifiers");
+                int meta = 0;
+                if (mods != null) {
+                    if (mods.optBoolean("Control")) meta |= KeyEvent.META_CTRL_ON | KeyEvent.META_CTRL_LEFT_ON;
+                    if (mods.optBoolean("Shift")) meta |= KeyEvent.META_SHIFT_ON | KeyEvent.META_SHIFT_LEFT_ON;
+                    if (mods.optBoolean("Alt")) meta |= KeyEvent.META_ALT_ON | KeyEvent.META_ALT_LEFT_ON;
+                    if (mods.optBoolean("Platform")) meta |= KeyEvent.META_META_ON;
+                }
+                final int held = meta;
+                touch(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_DOWN, p, held);
                 ui.postDelayed(() -> {
-                    touch(down, MotionEvent.ACTION_UP, p);
+                    touch(down, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, p, held);
                     view.testReply(id, "", "");
                 }, hold);
                 return;
@@ -214,12 +223,17 @@ final class TestAgent {
     }
 
     private void touch(long down, int action, float[] p) {
-        touch(down, SystemClock.uptimeMillis(), action, p);
+        touch(down, SystemClock.uptimeMillis(), action, p, 0);
     }
 
     /** A touch stamped at time, so a velocity read from it does not depend on when a loaded device runs the post that sends it. */
     private void touch(long down, long time, int action, float[] p) {
-        MotionEvent e = MotionEvent.obtain(down, time, action, p[0], p[1], 0);
+        touch(down, time, action, p, 0);
+    }
+
+    /** A touch stamped at time with the meta state of the modifier keys held. */
+    private void touch(long down, long time, int action, float[] p, int meta) {
+        MotionEvent e = MotionEvent.obtain(down, time, action, p[0], p[1], meta);
         e.setSource(InputDevice.SOURCE_TOUCHSCREEN);
         activity().dispatchTouchEvent(e);
         e.recycle();

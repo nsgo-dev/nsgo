@@ -37,6 +37,8 @@ func TestMain(m *testing.M) {
 
 用应用函数运行的应用（`nsgo.Run(func(app *core.Scope) {...})`）用 `nsgotest.StartApp(t, fn)` 测试：它像 `Run` 一样在应用自己的作用域中运行该函数一次，因此应用菜单和退出处理器都会保留。使用桌面环境的 `nsgotest.Environment` 时，凡是 `nsgo.Run` 会打开窗口的地方（macOS，以及 Windows 和 Linux 上的应用函数），应用的主视图都显示在主窗口中。此时 `desktop.CurrentWindow` 和 `OnClosing` 都能工作；`app.CloseWindow()` 发出窗口关闭按钮的请求，并返回窗口是否关闭。单独测试一个处理器时，直接调用它并读取 `WindowClosing.Canceled()`，`OnQuitRequest` 的处理器则读取 `QuitRequest.Canceled()`。步骤只作用于主窗口。`app.DropFiles` 可以指定放置区域中的任意视图：外层最近的带 `OnFileDrop` 的视图接收文件。视图的 `Bounds()` 是它在窗口坐标（点）中的框，与 `Ref.Bounds` 报告的一致。无头运行时，`app.Press` 会像在目标上一样切换系统开关（`ui.SwitchSystem`），`app.Emit("id:switch", "change", true)` 则直接报告一个值。`app.Navigate` 和 `app.PostMessage` 能到达已挂载但隐藏的 Web 视图，因为它仍会继续加载。
 
+`app.PressWith("id:row", core.Modifiers{Shift: true})` 为一次点击按住修饰键；`PressAtWith(selector, core.Point{X: 20, Y: 10}, mods)` 点击视图中的指定点。`Shift`、`Control`、`Alt` 和 `Platform`（Apple 上为 Command，其他平台为 Windows/Super 键）会通过无头模型和目标的原生输入传给 `OnPressDown`、`OnPressUp` 和 `OnPress`。仍遵循平台的原生约定：例如 macOS 上的 Chrome 会将 Control-click 转为上下文菜单。之后的 `Press` 或 `PressAt` 不带修饰键。watchOS 没有键盘修饰键输入，因此会拒绝带修饰键的点击。
+
 ## 运行测试
 
 ```sh

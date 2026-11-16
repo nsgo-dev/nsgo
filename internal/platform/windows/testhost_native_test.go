@@ -128,11 +128,11 @@ func TestTestHostCommitsCompositionBeforeBlur(t *testing.T) {
 			waitForTitle(t, hwnd, title+"||focus,composition", 5*time.Second)
 			switch by {
 			case "click":
-				if err := ts.Press(driver.Point{X: 20, Y: 65}, 0); err != nil {
+				if err := ts.Press(driver.Point{X: 20, Y: 65}, 0, driver.Modifiers{}); err != nil {
 					t.Fatal(err)
 				}
 			case "same":
-				if err := ts.Press(driver.Point{X: 20, Y: 25}, 0); err != nil {
+				if err := ts.Press(driver.Point{X: 20, Y: 25}, 0, driver.Modifiers{}); err != nil {
 					t.Fatal(err)
 				}
 			case "app":

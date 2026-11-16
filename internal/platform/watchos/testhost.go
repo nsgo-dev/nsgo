@@ -72,7 +72,10 @@ func touchAt(phase uint8, at driver.Point) {
 	onMainSync(func() { hostTouch(phase, float64(at.X), float64(at.Y), t) })
 }
 
-func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
+func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	if mods != (driver.Modifiers{}) {
+		return errors.New("watchOS has no keyboard modifier input")
+	}
 	touchAt(touchBegan, at)
 	time.Sleep(max(hold+50*time.Millisecond, 60*time.Millisecond))
 	touchAt(touchEnded, at)

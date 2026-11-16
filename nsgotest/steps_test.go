@@ -357,6 +357,20 @@ func TestSpanStylesAreRead(t *testing.T) {
 	}
 }
 
+func TestModifiedPressKeepsItsSpanModifiers(t *testing.T) {
+	var span core.Modifiers
+	app := Start(t, func(*core.Scope) core.Node {
+		return core.View{Children: []core.Node{
+			core.Text{Spans: []core.Span{{Content: "plain "}, {Content: "link", OnPress: func(e core.PressEvent) { span = e.Modifiers }}}},
+		}}
+	})
+	mods := core.Modifiers{Shift: true, Platform: true}
+	app.PressWith("text:link", mods)
+	if span != mods {
+		t.Fatalf("span modifiers = %v; want %v", span, mods)
+	}
+}
+
 func TestTabMovesTheFocusBetweenPressablesAndFields(t *testing.T) {
 	var log []string
 	button := func(name string, noFocus bool) core.Node {
