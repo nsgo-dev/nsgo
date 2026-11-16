@@ -1,6 +1,6 @@
 name: Check
 
-# Builds and vets every package for every target go tool nsgo check -target all names, on every pull request and push to main even before the first release, so a change that leaves main unable to build cannot merge. It runs no tests: test.yml does, when dispatched (AGENTS.md).
+# Builds and vets every target on pull requests and pushes to main; test.yml runs the tests.
 on:
   pull_request:
   push:
@@ -36,7 +36,9 @@ jobs:
 
   apple:
     name: Build and vet (Apple)
-    runs-on: macos-latest
+    # Xcode cross-compiles Apple's arm64 targets from an Intel host too.
+    # Use its hosted pool while arm64 jobs fail to acquire a runner.
+    runs-on: macos-15-intel
     timeout-minutes: 30
     steps:
       - name: Check out
