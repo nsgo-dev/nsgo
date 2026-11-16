@@ -20,12 +20,9 @@ const (
 	IconButtonRaised
 )
 
-// IconButton is a button of an icon alone, Size points across, faded while
-// Disabled. IconFunc and LabelFunc replace Icon and Label, what assistive
-// technology reads.
+// IconButton is a button of an icon alone, Size points across, faded while Disabled. Icon follows what it reads, and LabelFunc replaces Label, what assistive technology reads.
 type IconButton struct {
 	Icon      func() *core.SVG
-	IconFunc  func() *core.SVG
 	Label     string
 	LabelFunc func() string
 	Variant   IconButtonVariant
@@ -62,7 +59,7 @@ func (b IconButton) Render(cx *core.Scope) core.Node {
 		StyleFunc: func() core.Style {
 			return core.Style{Hover: &core.Style{Background: Alpha(colors.Text(), 0.08)}, Active: &core.Style{Background: Alpha(colors.Text(), 0.14)}, FocusVisible: FocusRing(cx, -2)}
 		},
-		Children: []core.Node{IconOf(b.name(), b.glyph(size, 0.6), tint)}}
+		Children: []core.Node{IconOf(b.Icon, b.glyph(size, 0.6), tint)}}
 }
 
 // circle is the round looks: a face that sinks under the finger.
@@ -95,15 +92,7 @@ func (b IconButton) circle(cx *core.Scope) core.Node {
 	}
 	return Press{OnPress: b.OnPress, Scale: 0.96, Label: b.Label, LabelFunc: b.LabelFunc, Selected: b.Selected, Disabled: b.Disabled, TestID: b.TestID,
 		HitSlop: max(0, (44-size)/2), Style: core.Style{Group: "button"},
-		Children: []core.Node{core.View{StyleFunc: face, Children: []core.Node{IconOf(b.name(), b.glyph(size, 0.45), tint)}}}}
-}
-
-// name is what gives the icon.
-func (b IconButton) name() func() *core.SVG {
-	if b.IconFunc != nil {
-		return b.IconFunc
-	}
-	return b.Icon
+		Children: []core.Node{core.View{StyleFunc: face, Children: []core.Node{IconOf(b.Icon, b.glyph(size, 0.45), tint)}}}}
 }
 
 // glyph is the icon's size, ratio of size unless IconSize sets it.
