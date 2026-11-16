@@ -999,6 +999,8 @@ struct Index {
   private keyboard: number = 0;
   // The display clock that runs while something animates.
   private sync: displaySync.DisplaySync | undefined = undefined;
+  // framePending is a frame the page has not finished. The display clock fires every vsync whether or not the engine kept up, and each runJavaScript queues behind the last, so a frame slower than the vsync let dozens queue in the page (over a hundred at launch on a phone) and every touch waited behind them. A vsync that finds a frame pending is skipped; the engine's clock reads the time, so the next frame catches up.
+  private framePending: boolean = false;
   // pinchState is the pinch in progress over a zoomable scroll view.
   private pinchState: PinchState | undefined = undefined;
   private ticking: boolean = false;
@@ -1869,7 +1871,15 @@ struct Index {
   }
 
   frame(): void {
-    this.controller.runJavaScript('nsgoFrame()');
+    if (this.framePending) {
+      return;
+    }
+    this.framePending = true;
+    this.controller.runJavaScript('nsgoFrame()').then(() => {
+      this.framePending = false;
+    }).catch(() => {
+      this.framePending = false;
+    });
   }
 
   // tick keeps the display clock running: each frame asks the engine for
