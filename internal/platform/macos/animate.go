@@ -431,10 +431,10 @@ func (v *view) place(f driver.Bounds) {
 		if v.sc != nil {
 			v.sizeScroll()
 		}
-		if v.clipHeld && v.content != v.native {
-			// As last drawn, animated corners and all: only the view's own layer leaves the clip out.
+		if (v.clipHeld || v.sc == nil) && v.content != v.native {
+			// As last drawn, animated corners and all: only the view's own layer leaves the clip out. The perspective's centre follows the size too.
 			held := v.drawn
-			held.Clip = true
+			held.Clip = v.clipHeld
 			v.fitHolder(&held)
 		}
 	}

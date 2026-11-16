@@ -323,18 +323,16 @@ func (v *view) clipsInHolder(vs *driver.ViewStyle) bool {
 	return v.kind == driver.KindView
 }
 
-// holdClip clips v's children as vs says, in a holder it makes the first time a plain view needs one, and reports whether v's own layer leaves them to it (clipHeld). A holder an effect or a scroll view made clips as before otherwise.
+// holdClip clips v's children as vs says, in a holder it makes the first time a plain view needs one, and reports whether v's own layer leaves them to it (clipHeld). A scroll view's container clips as before otherwise; any other holder, an effect's or one that clipped, follows every style unclipped, as it takes the view's perspective (apple.ClipHolder).
 func (v *view) holdClip(vs *driver.ViewStyle) bool {
 	held := v.clipsInHolder(vs)
 	if held && v.kind == driver.KindView && v.content == v.native {
 		v.surface.container(v)
 	}
-	if (held || v.clipHeld) && v.content != v.native {
-		var clip *driver.ViewStyle
-		if held {
-			clip = vs
-		}
-		v.fitHolder(clip)
+	if (held || v.clipHeld || v.sc == nil) && v.content != v.native {
+		clip := *vs
+		clip.Clip = held
+		v.fitHolder(&clip)
 	}
 	v.clipHeld = held
 	return held

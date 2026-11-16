@@ -38,7 +38,8 @@ func aHolderIsHitAsItsView(t *testing.T) {
 	holder := s.container(v)
 	defer delete(views, holder)
 	if holder == native || childNative.Send(selSuperview) != holder {
-		t.Fatal("the child did not move into the holder")
+		t.Error("the child did not move into the holder")
+		return
 	}
 	// Asked of the view, at points in its superview's coordinates: up, out of a window, would take them in the window's, unflipped.
 	hit := func(x, y float64) objc.ID { return native.Send(sel("hitTest:"), apple.CGPoint{X: x, Y: y}) }
@@ -55,5 +56,70 @@ func aHolderIsHitAsItsView(t *testing.T) {
 	}
 	if got := hit(60, 60); got != childNative {
 		t.Errorf("a box-none view's child hit %v, want %v", got, childNative)
+	}
+}
+
+// TestAHolderKeepsThePerspective keeps a view's Perspective on its children once its holder stops clipping, as the shadow it clipped for goes away, and after a resize, centred on the new size: the view's own sublayer transform reaches only the flat holder.
+func TestAHolderKeepsThePerspective(t *testing.T) { onMain(func() { aHolderKeepsThePerspective(t) }) }
+
+func aHolderKeepsThePerspective(t *testing.T) {
+	loadAppKit()
+	native := objc.ID(classView).Send(selNew)
+	defer native.Send(selRelease)
+	native.Send(selSetWantsLayer, true)
+	native.Send(selSetFrame, apple.Rect(0, 0, 200, 120))
+	s := &surface{}
+	v := &view{kind: driver.KindView, native: native, content: native, surface: s}
+	views[native] = v
+	defer delete(views, native)
+
+	// CATransform3D, by rows.
+	type matrix struct{ M11, M12, M13, M14, M21, M22, M23, M24, M31, M32, M33, M34, M41, M42, M43, M44 float64 }
+	sublayer := func(layer objc.ID) matrix { return objc.Send[matrix](layer, sel("sublayerTransform")) }
+	// What a holder of layer's anchor and size takes for the style: the perspective centred on it.
+	want := func(layer objc.ID, vs driver.ViewStyle) matrix {
+		ref := objc.ID(apple.Class("CALayer")).Send(selNew)
+		defer ref.Send(selRelease)
+		ref.Send(sel("setAnchorPoint:"), objc.Send[apple.CGPoint](layer, sel("anchorPoint")))
+		ref.Send(sel("setBounds:"), objc.Send[apple.CGRect](layer, selBounds))
+		apple.ClipHolder(ref, &vs, false)
+		return sublayer(ref)
+	}
+
+	shadow := &driver.Effects{Shadows: []driver.BoxShadow{{Blur: 24, Color: driver.RGBA(0, 0x59)}}}
+	card := driver.ViewStyle{Clip: true, CornerRadius: 32, ChildPerspective: 300, Effects: shadow}
+	if !v.holdClip(&card) {
+		t.Error("a clipped card with a shadow did not clip in a holder")
+		return
+	}
+	holder := v.content
+	defer delete(views, holder)
+	defer apple.ForgetHolder(holder.Send(selLayer))
+	layer := holder.Send(selLayer)
+	if got := sublayer(layer); got.M34 != -1.0/300 {
+		t.Errorf("the held children's perspective m34 = %v, want %v", got.M34, -1.0/300)
+		return
+	}
+
+	plain := card
+	plain.Effects = nil
+	if v.holdClip(&plain) {
+		t.Error("a card without a shadow still clips in its holder")
+		return
+	}
+	if got := sublayer(layer); got.M34 != -1.0/300 {
+		t.Errorf("once the shadow went, the children's perspective m34 = %v, want %v", got.M34, -1.0/300)
+		return
+	}
+	if objc.Send[bool](layer, sel("masksToBounds")) {
+		t.Error("the holder still clips once the view's own layer does")
+	}
+
+	plain.Clip = false
+	v.drawn, v.styled = plain, true
+	v.place(driver.Bounds{Size: driver.Size{Width: 400, Height: 300}})
+	if got, w := sublayer(layer), want(layer, plain); got != w {
+		t.Errorf("after a resize the holder's sublayer transform is %v, want %v", got, w)
+		return
 	}
 }

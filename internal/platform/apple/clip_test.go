@@ -109,9 +109,17 @@ func TestClipHolderTakesThePerspective(t *testing.T) {
 	if got := depth(); got != -1.0/500 {
 		t.Fatalf("held children's perspective m34 = %v, want %v", got, -1.0/500)
 	}
+	// A holder that stopped clipping, as its view lost its shadow, still gives the children the view's perspective.
+	ClipHolder(layer, &driver.ViewStyle{ChildPerspective: 500}, false)
+	if got := depth(); got != -1.0/500 {
+		t.Fatalf("unclipped children's perspective m34 = %v, want %v", got, -1.0/500)
+	}
+	if objc.Send[bool](layer, sel("masksToBounds")) {
+		t.Fatal("a holder that does not clip still masks to its bounds")
+	}
 	ClipHolder(layer, nil, false)
 	if got := depth(); got != 0 {
-		t.Fatalf("unheld children's perspective m34 = %v, want none", got)
+		t.Fatalf("children's perspective with no style m34 = %v, want none", got)
 	}
 	SetSublayerTranslation(layer, 0, -40)
 	ClipHolder(layer, &driver.ViewStyle{Clip: true, CornerRadius: 16}, true)

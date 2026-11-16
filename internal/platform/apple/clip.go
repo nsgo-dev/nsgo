@@ -37,7 +37,7 @@ func ShapedCorners(vs *driver.ViewStyle) bool {
 // holderMasks are the shape masks ClipHolder gave holders whose corners differ, which they keep.
 var holderMasks = map[objc.ID]objc.ID{}
 
-// ClipHolder clips layer, the layer of the view holding a view's children, to the box and corners of vs, the view's style; nil leaves the children unclipped, or clipped to the holder's bounds for a scroll view's container (scrolls), as NSClipView clips. Corners of different radii take a shape mask, laid over the bounds as they are now, so a holder whose bounds scroll takes none (ShapedCorners). A mask an effect set in its place, hiding the children, stays until the effect puts back HolderMask. A holder that is not a scroll view's container also takes the view's perspective (ChildPerspective), which would otherwise stop at the holder.
+// ClipHolder clips layer, the layer of the view holding a view's children, to the box and corners of vs, the view's style; nil or a style that does not clip leaves the children unclipped, or clipped to the holder's bounds for a scroll view's container (scrolls), as NSClipView clips. Corners of different radii take a shape mask, laid over the bounds as they are now, so a holder whose bounds scroll takes none (ShapedCorners). A mask an effect set in its place, hiding the children, stays until the effect puts back HolderMask. A holder that is not a scroll view's container also takes the view's perspective (ChildPerspective), clipping or not, which would otherwise stop at the holder.
 func ClipHolder(layer objc.ID, vs *driver.ViewStyle, scrolls bool) {
 	if layer == 0 {
 		return
@@ -49,7 +49,7 @@ func ClipHolder(layer objc.ID, vs *driver.ViewStyle, scrolls bool) {
 		if !scrolls {
 			// The view's perspective reaches only its own sublayer, the holder, which is flat: the holder gives it to the children. A scroll view's container moves its children with its sublayer transform.
 			var depth driver.Points
-			if vs != nil && vs.Clip {
+			if vs != nil {
 				depth = vs.ChildPerspective
 			}
 			setPerspective(layer, depth, w, h)
