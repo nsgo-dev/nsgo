@@ -2526,7 +2526,8 @@ struct WebView {
         .fontWeight(r.w ?? v.fw)
         .fontColor(r.c ?? v.color)
         .fontStyle(r.i === true ? FontStyle.Italic : FontStyle.Normal)
-    }, (r: TextRun, i: number) => i.toString())
+    // A run is keyed by what it draws, not only its place: ForEach keeps the child of a key it has seen, so with index keys a run whose text or style changed, such as a counter's digits, kept showing the old one.
+    }, (r: TextRun, i: number) => i + ':' + JSON.stringify(r))
   }
   .textAlign(v.align === 1 ? TextAlign.Center :
     (v.align === 2 ? TextAlign.End : TextAlign.Start))
