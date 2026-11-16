@@ -74,6 +74,36 @@ func TestInstallsWhole(t *testing.T) {
 	}
 }
 
+func TestReportsAcceptanceWriteFailure(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("the web stores trust without files and refuses isolated packages")
+	}
+	dir := t.TempDir()
+	trust, err := pkg.OpenTrust(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := pkg.DecodePublicKey(rootKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trust.AddRoot(root)
+	// Verification can read the empty state, but accepting the running
+	// build cannot rename its state file over this directory.
+	if err := os.Mkdir(filepath.Join(dir, "trust.json"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node { return Host(cx, greeter, trust, "") })
+	app.WaitFor("id:install", wait)
+	app.Press("id:install")
+	app.WaitUntil(wait, func() bool {
+		return app.Exists("id:status") && strings.HasPrefix(app.Find("id:status").Text, "Refused")
+	})
+	if got := app.Find("id:status").Text; !strings.Contains(got, pkg.ErrState.Error()) {
+		t.Fatalf("acceptance failure = %q, want a trust-state error", got)
+	}
+}
+
 // refusal starts a host of data and returns why it refused it.
 func refusal(t *testing.T, data []byte, trust *pkg.Trust) string {
 	t.Helper()

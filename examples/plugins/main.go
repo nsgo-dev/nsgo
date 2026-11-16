@@ -117,7 +117,17 @@ func Host(cx *core.Scope, data []byte, trust *pkg.Trust, dir string) core.Node {
 		return core.Catch{
 			Try: func(cx *core.Scope) core.Node {
 				n := tsx.View{Package: p, Sandbox: tsx.Sandbox{Host: channel}}.Render(cx)
-				go trust.Accept(p)
+				// Keep the disk write off the engine, but finish it before
+				// this view's owner and its data directory can go away.
+				accepted := make(chan struct{})
+				cx.Cleanup(func() { <-accepted })
+				go func() {
+					err := trust.Accept(p)
+					close(accepted)
+					if err != nil {
+						cx.Post(func() { failed.Set(err) })
+					}
+				}()
 				// A view of the package's content height: the view it shows in fills the room it is given.
 				return core.View{Children: []core.Node{n}}
 			},
