@@ -225,11 +225,15 @@ github.com/nsgo-dev/nsgo/base/locales:
   sortBy: "Nach {column} sortieren"
   diffExpandAll: "Alle aufklappen"
   calendarMonth: "Monat: {d, date, ::yMMMM}"
-  calendarMonthName: "Monat: {d, date, ::MMM}"
+  calendarMonthName: "Monat: {d, date, ::MMM}, {d, time, short}"
   calendarWeekday: "Tag: {d, date, ::EEEEE}"
 `,
 		"locales/en-GB.yaml":  `greeting: "Hiya, {name}!"`,
-		"locales/ar.yaml":     `due: "{d, date, medium}"`,
+		"locales/ar.yaml": `
+due: "{d, date, medium}"
+github.com/nsgo-dev/nsgo/base/locales:
+  calendarWeekday: "يوم"
+`,
 		"locales/en.yaml.txt": "",
 		"app_test.go": `package app
 
@@ -239,6 +243,8 @@ import (
 
 	"example.com/app/locales"
 	baselocales "github.com/nsgo-dev/nsgo/base/locales"
+	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
 func TestMessages(t *testing.T) {
@@ -281,8 +287,9 @@ func TestMessages(t *testing.T) {
 		{baselocales.In("de-AT").SortBy("Name"), "Nach Name sortieren"},
 		{baselocales.In("de-AT").DiffExpandAll(), "Alle aufklappen"},
 		{baselocales.In("de-AT").CalendarMonth(day), "Monat: Januar 2026"},
-		{baselocales.In("de-AT").CalendarMonthName(day), "Monat: Jan"},
+		{baselocales.In("de-AT").CalendarMonthName(day), "Monat: Jan, 13:07"},
 		{baselocales.In("de-AT").CalendarWeekday(day), "Tag: M"},
+		{baselocales.In("ar").CalendarWeekday(day), "يوم"},
 		{baselocales.In("fr").DiffExpandAll(), "Expand all"},
 		{baselocales.In("zh-CN").SortBy("名称"), "按名称排序"},
 		{baselocales.In("fr").SortBy("Nom"), "Sort by Nom"},
@@ -293,6 +300,32 @@ func TestMessages(t *testing.T) {
 	}
 	if got := locales.Catalog.Languages(); len(got) != 4 || got[0] != "en" {
 		t.Errorf("languages %v", got)
+	}
+}
+
+// A supplied time follows the hour cycle the user set, as the package's own do.
+func TestSuppliedHours(t *testing.T) {
+	day := time.Date(2026, 1, 5, 13, 7, 0, 0, time.UTC)
+	for _, c := range []struct {
+		locale, hc, want string
+	}{
+		{"de-AT", "", "Monat: Jan, 13:07"},
+		{"de-AT", "h12", "Monat: Jan, 1:07 PM"},
+		{"en-US", "", "Jan"},
+		{"en-US", "h23", "Jan"},
+	} {
+		var got, own string
+		nsgotest.Start(t, func(cx *core.Scope) core.Node {
+			got = baselocales.CalendarMonthName(cx, day)
+			own = locales.Sent(cx, day)
+			return core.View{}
+		}, nsgotest.Environment(core.Environment{Locale: c.locale, LocaleSettings: core.LocaleSettings{HourCycle: c.hc}}))
+		if got != c.want {
+			t.Errorf("%s with %q hours: %q, want %q", c.locale, c.hc, got, c.want)
+		}
+		if c.locale == "en-US" && c.hc == "h23" && own != "Sent 1/5/26, 13:07" {
+			t.Errorf("the app's own message with h23 hours: %q", own)
+		}
 	}
 }
 `,
@@ -310,7 +343,13 @@ func TestMessages(t *testing.T) {
 		t.Errorf("check after writing: %v", err)
 	}
 	code, _ := os.ReadFile(filepath.Join(dir, "locales", genFile))
-	for _, want := range []string{"i18n.SetApp(Catalog)", `baselocales.Supply("de"`, "func Type(cx *core.Scope, type_ string, string_ string) string"} {
+	for _, want := range []string{
+		"i18n.SetApp(Catalog)", `baselocales.Supply("de"`, "func Type(cx *core.Scope, type_ string, string_ string) string",
+		// Messages with dates take the hour cycle; others keep their parameters alone, and one that writes no date makes no Messages.
+		"CalendarMonth: func(hc string, d time.Time) string {\n\t\t\tmsgs := Messages{hc: hc}\n",
+		"SortBy: func(column string) string {\n\t\t\treturn ",
+		"CalendarWeekday: func(hc string, d time.Time) string {\n\t\t\treturn ",
+	} {
 		if !strings.Contains(string(code), want) {
 			t.Errorf("generated code lacks %q", want)
 		}

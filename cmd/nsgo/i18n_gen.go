@@ -371,10 +371,16 @@ func (c *catalog) writeSupplies(g *goWriter) error {
 		for _, key := range funcs {
 			params := t.params[key]
 			g.p("\t\t%s: func(%s) string {", exportName(key), translationSignature(params))
-			if hasTimeParam(params) {
+			// The closure's dates are formatted through this package's Messages with the target's hour cycle; a message that writes no date leaves msgs out, which Go would reject as unused.
+			var fn bytes.Buffer
+			out := g.out
+			g.out = &fn
+			g.say(e.s.msgs[key].parts, e.lang, params, "\t\t\t")
+			g.out = out
+			if bytes.Contains(fn.Bytes(), []byte("msgs.dated(")) {
 				g.p("\t\t\tmsgs := Messages{hc: hc}")
 			}
-			g.say(e.s.msgs[key].parts, e.lang, params, "\t\t\t")
+			g.out.Write(fn.Bytes())
 			g.p("\t\t},")
 		}
 		g.p("\t})")
@@ -689,9 +695,7 @@ func hasTimeParam(params []param) bool {
 	return false
 }
 
-// translationSignature is the function type used when another package
-// supplies a message. Date and time messages receive the target's hour cycle
-// so their formatting follows the user's locale settings.
+// translationSignature is the parameter list of a Translation field, the function another package supplies a message with: a message with a date or time takes the target's hour cycle first, so the times it writes follow the user's hours.
 func translationSignature(params []param) string {
 	sig := signature(params)
 	if !hasTimeParam(params) {
@@ -717,15 +721,12 @@ func arguments(params []param) string {
 	return strings.Join(parts, ", ")
 }
 
+// translationArguments are the arguments a Messages method passes a supplied message, as translationSignature lists them.
 func translationArguments(params []param) string {
-	args := arguments(params)
 	if !hasTimeParam(params) {
-		return args
+		return arguments(params)
 	}
-	if args == "" {
-		return "msgs.hc"
-	}
-	return "msgs.hc, " + args
+	return "msgs.hc, " + arguments(params)
 }
 
 func quoteList(items []string) string {
