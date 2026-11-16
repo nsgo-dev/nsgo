@@ -84,6 +84,7 @@ What NSGo's own issues ask for beyond NSH's releases, each issue where its desig
 | --- | --- | --- |
 | Mention completion in Composer | [#46](https://github.com/nsgo-dev/nsgo/issues/46), [mention completion](architecture/mention-completion.md) | The test that presses a row, run with `nsgo test -target` in the iOS simulator and the Android emulator, where the platform's own keyboard-dismissing tap runs, finds the row inserted and the field still focused |
 | Task progress on app icons | [#116](https://github.com/nsgo-dev/nsgo/issues/116) | `core.SetTaskProgress` shows, updates and clears a bar beside the badge on the macOS Dock tile, the Windows taskbar button, indeterminate there, and Linux launchers with LauncherEntry (Ubuntu dock, Plasma, Dash to Dock), and clearing it on macOS brings back the plain icon; so far it ran only in `nsgotest` and pure-logic tests, on no Dock, taskbar or launcher (2026-11-15) |
+| A clip that keeps its own shadows everywhere | [#210](https://github.com/nsgo-dev/nsgo/issues/210) | A view with `Overflow: Hidden` keeps its own outer shadows and outline on Android, drawing them outside the clipped render node, and on Apple for texts, canvases, inputs, web, video and native views, iOS scroll views, and images and scroll views whose corners differ in radius, checked on a device, so `ui.Dialog`'s `Bare` drops its inner clipping view; so far views, images and macOS scroll views do on macOS and iOS (2026-11-16) |
 
 ## Application and windows
 

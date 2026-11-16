@@ -77,8 +77,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 	}
 	popup := core.Style{Width: core.Pt(440), Padding: core.All(20), Gap: 12, Transition: dialogPop}
 	if d.Bare {
-		// The clip is a view of its own: on Apple's targets a view that
-		// clips loses its outer shadow.
+		// The clip is a view of its own: on Android a view that clips loses its outer shadow.
 		popup = core.Style{Transition: dialogPop}
 		body = []core.Node{core.View{Style: core.Style{Overflow: core.Hidden, CornerRadius: RadiusDialog - 1, BorderCurve: core.BorderCurveContinuous,
 			FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0)}, Children: body}}

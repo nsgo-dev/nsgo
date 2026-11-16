@@ -20,7 +20,7 @@ card := core.Style{
 }
 ```
 
-样式支持 CSS 的颜色、圆角、边框、描边、阴影、渐变、滤镜、背景模糊、遮罩、混合模式、3D 变换和过渡。`core.RGB`、`core.RGBA` 和 `core.ParseColor` 生成颜色，`core.LinearGradient` 及其同类生成渐变，`core.Ring` 生成 Tailwind 的 ring，`core.AllCorners` 设置每个角。`BorderCurveContinuous` 让圆角像 iOS 一样平滑接入边。
+样式支持 CSS 的颜色、圆角、边框、描边、阴影、渐变、滤镜、背景模糊、遮罩、混合模式、3D 变换和过渡。`core.RGB`、`core.RGBA` 和 `core.ParseColor` 生成颜色，`core.LinearGradient` 及其同类生成渐变，`core.Ring` 生成 Tailwind 的 ring，`core.AllCorners` 设置每个角。`BorderCurveContinuous` 让圆角像 iOS 一样平滑接入边。盒子的阴影和描边留在 `Overflow` 的裁剪之外，例外见[布局](layout.md#定位)。
 
 ```go
 core.View{Style: core.Style{
