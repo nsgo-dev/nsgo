@@ -244,6 +244,30 @@ func TestDockMenuTasksByLabel(t *testing.T) {
 	}
 }
 
+// TestDockMenuTaskAfterItsMenuWent: a task chosen after the menu's owner went, as Windows keeps the Jump List, does nothing, and does not run when a menu with that label comes back.
+func TestDockMenuTaskAfterItsMenuWent(t *testing.T) {
+	var log []string
+	var open *Signal[bool]
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		open = NewSignal(cx, true)
+		return Show{When: open.Get, Then: func(cx *Scope) Node {
+			cx.SetDockMenu([]MenuItem{{Label: "New Window", OnSelect: func() { log = append(log, "new") }}})
+			return View{}
+		}}
+	})
+	h.commit()
+	open.Set(false)
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: "New Window"})
+	h.drain()
+	open.Set(true)
+	h.commit()
+	h.drain()
+	if len(log) != 0 {
+		t.Fatalf("log = %q", log)
+	}
+}
+
 // TestDockMenuSetAgainForgetsTheItemsBefore: an effect setting the menu again sends it in place of the one before, without removing it between, and an item of the menu before, chosen as its menu was replaced, does nothing.
 func TestDockMenuSetAgainForgetsTheItemsBefore(t *testing.T) {
 	var log []string

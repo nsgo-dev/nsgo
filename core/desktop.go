@@ -143,8 +143,9 @@ type dockMenu struct {
 	entries []MenuEntry
 	// actions are nil while no menu is set.
 	actions map[uint32]menuAction
-	// pending are the labels of tasks chosen before the app set a menu, as the one a Windows Jump List started the app with.
+	// pending are the labels of tasks chosen before the app set a menu, as the one a Windows Jump List started the app with; set is whether it has set one.
 	pending []string
+	set     bool
 }
 
 // SetDockMenu is the core's part of desktop.SetDockMenu, which apps use. The menu belongs to the current owner, and replaces the one any surface set before.
@@ -159,6 +160,7 @@ func (cx *Scope) SetDockMenu(items []MenuItem) {
 	d.tree, d.entries, d.actions = t, nil, nil
 	owner := cx.current()
 	if items != nil {
+		d.set = true
 		d.actions = map[uint32]menuAction{}
 		d.entries = t.menuEntries(items, owner, d.actions)
 		owner.addCleanup(func() {
@@ -314,11 +316,13 @@ func (t *Tree) chooseDockMenu(ev driver.Event) {
 	}
 }
 
-// chooseDockTask runs the first enabled top-level action labeled label of the app icon's menu, or keeps the label for the first menu the app sets when it has set none. A label the menu lacks does nothing.
+// chooseDockTask runs the first enabled top-level action labeled label of the app icon's menu, or keeps the label for the first menu the app sets when it has set none yet. A label the menu lacks, or one chosen after the menu went, as from a Jump List Windows kept, does nothing.
 func (t *Tree) chooseDockTask(label string) {
 	d := &t.rt.dock
 	if d.actions == nil {
-		d.pending = append(d.pending, label)
+		if !d.set {
+			d.pending = append(d.pending, label)
+		}
 		return
 	}
 	for _, e := range d.entries {
