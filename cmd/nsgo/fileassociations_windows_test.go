@@ -112,8 +112,20 @@ func main() {
 	result := filepath.Join(t.TempDir(), "opened")
 	t.Setenv("NSGO_ASSOC_OUTPUT", result)
 	openAssociation(t, prog, path)
-	if got, err := os.ReadFile(result); err != nil || string(got) != path+"\n" {
-		t.Fatalf("Shell file arguments = %q, %v", got, err)
+	got, err := os.ReadFile(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := strings.Split(strings.TrimSuffix(string(got), "\n"), "\n")
+	if len(args) != 1 {
+		t.Fatalf("Shell file arguments = %q; want one path", got)
+	}
+	// The Shell may expand a TEMP path's 8.3 directory names. Compare
+	// file identity, rather than the spelling of two paths to one file.
+	wantInfo, wantErr := os.Stat(path)
+	gotInfo, gotErr := os.Stat(args[0])
+	if wantErr != nil || gotErr != nil || !os.SameFile(wantInfo, gotInfo) {
+		t.Fatalf("Shell opened %q instead of %q: %v, %v", args[0], path, gotErr, wantErr)
 	}
 	// Another program replaces one command; neither upgrade nor uninstall
 	// may remove that registration. The old extension of our type must go.

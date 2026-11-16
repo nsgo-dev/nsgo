@@ -650,8 +650,14 @@ func desktopString(s string) string {
 }
 
 func desktopExec(s string) string {
+	prefix := ""
+	// GIO checks argv[0] exists before expanding %%. Keep a literal '%'
+	// in a command argument, so discovery and launch see the same path.
+	if strings.Contains(s, "%") {
+		prefix = "env -- "
+	}
 	s = strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", `$`, `\$`, `%`, `%%`).Replace(s)
-	return desktopString(`"` + s + `"`)
+	return prefix + desktopString(`"`+s+`"`)
 }
 
 var desktopEntry = template.Must(template.New("desktop").Funcs(template.FuncMap{

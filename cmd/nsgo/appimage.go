@@ -74,7 +74,7 @@ func buildAppImage(ctx context.Context, p *project, dir, arch string) (string, e
 // appDirEntries are the AppImage's files: the Linux package in dir, with
 // AppRun starting the app and .DirIcon its icon.
 func appDirEntries(p *project, dir string) ([]linuxPackageEntry, error) {
-	entries, err := linuxDirEntries(dir)
+	entries, err := linuxDirEntries(p, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func appDirEntries(p *project, dir string) ([]linuxPackageEntry, error) {
 
 // linuxDirEntries are the files of the Linux package in dir, by their
 // paths in it, without the packages written beside them.
-func linuxDirEntries(dir string) ([]linuxPackageEntry, error) {
+func linuxDirEntries(p *project, dir string) ([]linuxPackageEntry, error) {
 	var entries []linuxPackageEntry
 	err := filepath.WalkDir(dir, func(file string, d fs.DirEntry, err error) error {
 		if err != nil || file == dir {
@@ -126,7 +126,7 @@ func linuxDirEntries(dir string) ([]linuxPackageEntry, error) {
 			return err
 		}
 		mode := int64(0o644)
-		if info.Mode()&0o111 != 0 {
+		if rel == p.Name || info.Mode()&0o111 != 0 {
 			mode = 0o755
 		}
 		entries = append(entries, linuxPackageEntry{name: rel, data: data, mode: mode})

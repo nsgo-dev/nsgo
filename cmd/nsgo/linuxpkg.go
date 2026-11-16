@@ -149,7 +149,7 @@ func linuxPackageFiles(p *project, dir string) ([]linuxPackageEntry, error) {
 			return err
 		}
 		mode := int64(0o644)
-		if info.Mode()&0o111 != 0 {
+		if rel == p.Name || info.Mode()&0o111 != 0 {
 			mode = 0o755
 		}
 		add(name, data, mode)

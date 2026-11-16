@@ -70,6 +70,9 @@ func TestLinuxFileAssociations(t *testing.T) {
 	// The portable/AppImage and Flatpak payload must have a desktop entry
 	// even when an app has no icon. Both use the staged entry unchanged.
 	stage := t.TempDir()
+	// The executable must keep its Linux mode even on a Windows build
+	// host, whose filesystem reports no Unix executable permission bits.
+	writeFiles(t, stage, map[string]string{p.Name: "binary"})
 	if err := writeLinuxIcon(p, stage); err != nil {
 		t.Fatal(err)
 	}
@@ -121,6 +124,9 @@ func TestLinuxFileAssociations(t *testing.T) {
 	found := map[string]string{}
 	for _, e := range entries {
 		found[e.name] = string(e.data)
+		if e.name == p.Name && e.mode&0o111 == 0 {
+			t.Error("AppImage/store payload lost the main executable's mode")
+		}
 	}
 	check(found[p.ID+".desktop"], p.Name)
 	if found["usr/share/mime/packages/"+p.ID+".xml"] != string(definitions) {

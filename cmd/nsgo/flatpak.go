@@ -43,7 +43,7 @@ func buildLinuxArchive(ctx context.Context, p *project, dir, arch string) (strin
 	if err := os.WriteFile(filepath.Join(dir, p.ID+".metainfo.xml"), metainfo, 0o644); err != nil {
 		return "", err
 	}
-	entries, err := linuxDirEntries(dir)
+	entries, err := linuxDirEntries(p, dir)
 	if err != nil {
 		return "", err
 	}
