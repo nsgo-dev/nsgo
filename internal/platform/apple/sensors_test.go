@@ -4,6 +4,7 @@ package apple
 
 import (
 	"math"
+	"runtime"
 	"testing"
 	"time"
 
@@ -31,21 +32,24 @@ func TestSensorAppleLocationFixtureRejectsOldFixByDefault(t *testing.T) {
 	if !loadLocation() {
 		t.Skip("Core Location unavailable")
 	}
-	pool := poolPush()
-	defer poolPop(pool)
-	date := objc.ID(Class("NSDate")).Send(sel("dateWithTimeIntervalSince1970:"), float64(1000))
-	fixture := objc.ID(Class("CLLocation")).Send(sel("alloc")).Send(sel("initWithCoordinate:altitude:horizontalAccuracy:verticalAccuracy:timestamp:"), locationCoordinate{Latitude: 51.5, Longitude: -0.12}, float64(35), float64(5), float64(-1), date)
-	if fixture == 0 {
-		t.Fatal("could not create fixture")
-	}
-	defer fixture.Send(selRelease)
-	r := &appleSensorRun{r: driver.SensorRequest{Command: driver.SensorLocate}, started: time.Unix(1001, 0)}
-	if _, ok := r.location(fixture); ok {
-		t.Fatal("old fix accepted without MaxAge")
-	}
-	r.r.Location.MaxAge = 100 * 365 * 24 * time.Hour
-	f, ok := r.location(fixture)
-	if !ok || f.Latitude != 51.5 || f.Longitude != -0.12 || !f.Cached || f.Timestamp.Unix() != 1000 || f.HasMonotonic || f.VerticalAccuracy.Valid || f.MSLAltitude.Valid || f.HorizontalAccuracy.Value != 5 {
-		t.Fatalf("fix %+v, accepted %v", f, ok)
-	}
+	withPool(func() {
+		date := objc.ID(Class("NSDate")).Send(sel("dateWithTimeIntervalSince1970:"), float64(1000))
+		fixture := objc.ID(Class("CLLocation")).Send(sel("alloc")).Send(sel("initWithCoordinate:altitude:horizontalAccuracy:verticalAccuracy:timestamp:"), locationCoordinate{Latitude: 51.5, Longitude: -0.12}, float64(35), float64(5), float64(-1), date)
+		if fixture == 0 {
+			t.Fatal("could not create fixture")
+		}
+		defer fixture.Send(selRelease)
+		// A GC may resume this goroutine on another thread unless the
+		// pool pins it there until its objects have been released.
+		runtime.GC()
+		r := &appleSensorRun{r: driver.SensorRequest{Command: driver.SensorLocate}, started: time.Unix(1001, 0)}
+		if _, ok := r.location(fixture); ok {
+			t.Fatal("old fix accepted without MaxAge")
+		}
+		r.r.Location.MaxAge = 100 * 365 * 24 * time.Hour
+		f, ok := r.location(fixture)
+		if !ok || f.Latitude != 51.5 || f.Longitude != -0.12 || !f.Cached || f.Timestamp.Unix() != 1000 || f.HasMonotonic || f.VerticalAccuracy.Valid || f.MSLAltitude.Valid || f.HorizontalAccuracy.Value != 5 {
+			t.Fatalf("fix %+v, accepted %v", f, ok)
+		}
+	})
 }
