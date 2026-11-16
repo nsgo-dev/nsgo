@@ -1,6 +1,7 @@
 package core
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 
@@ -143,6 +144,117 @@ func TestAccessibilityDescriptionAndInputLabelFollowSignals(t *testing.T) {
 	}
 	if k := kinds(h.commit()); k[driver.ItemViewProps] != 0 || k[driver.ItemAccessibilityLabel] != 0 {
 		t.Errorf("an idle commit sent %v", k)
+	}
+}
+
+func TestInputElementAccessibilityMatchesMountedInput(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input Input
+	}{
+		{"default", Input{}},
+		{"static", Input{Role: RoleSearchField, Label: "Name", AccessibilityDescription: "As on your passport",
+			AccessibilityActions: []AccessibilityAction{{Name: "clear", Label: "Clear"}}}},
+		{"functions", Input{
+			LabelFunc: func() string { return "Country" }, AccessibilityDescriptionFunc: func() string { return "Choose a country" },
+			AccessibilityValue: func() AccessibilityValue { return AccessibilityValue{Text: "Japan"} },
+			Expanded:           func() bool { return true }}},
+		{"empty-functions", Input{
+			LabelFunc: func() string { return "" }, AccessibilityDescriptionFunc: func() string { return "" },
+			Expanded: func() bool { return false }}},
+		{"states", Input{Invalid: func() bool { return true }, Disabled: func() bool { return true }}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+				mounted, element := tc.input, tc.input
+				mounted.TestID, element.TestID = "mounted", "element"
+				return View{Children: []Node{mounted, NewElement(cx, element)}}
+			})
+			props := propsOf(h.commit())
+			if len(h.errs) != 0 {
+				t.Fatalf("mount errors: %v", h.errs)
+			}
+			want, got := props[h.find("mounted").id], props[h.find("element").id]
+			want.TestID, got.TestID = "", ""
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("element props = %+v, want mounted input's %+v", got, want)
+			}
+		})
+	}
+}
+
+func TestInputElementAccessibilityChangesOnlyOnSet(t *testing.T) {
+	var el *Element
+	var state *Signal[bool]
+	var input Input
+	var actions []string
+	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+		state = NewSignal(cx, false)
+		input = Input{TestID: "field",
+			LabelFunc: func() string {
+				if state.Get() {
+					return "Country"
+				}
+				return "Name"
+			},
+			AccessibilityDescriptionFunc: func() string {
+				if state.Get() {
+					return "Choose a country"
+				}
+				return "Your full name"
+			},
+			AccessibilityValue: func() AccessibilityValue {
+				if state.Get() {
+					return AccessibilityValue{Text: "Japan"}
+				}
+				return AccessibilityValue{Text: "Ada"}
+			},
+			Expanded: state.Get, Invalid: state.Get,
+			AccessibilityActions:  []AccessibilityAction{{Name: "clear", Label: "Clear"}},
+			OnAccessibilityAction: func(name string) { actions = append(actions, name) }}
+		el = NewElement(cx, input)
+		return el
+	})
+	h.commit()
+	id := h.find("field").id
+	initial := h.find("field").sent.props
+	if initial.Value.Text != "Ada" || !initial.Expandable || !initial.HasAction("clear") {
+		t.Fatalf("initial props = %+v", initial)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventAccessibilityAction, ID: id, Text: "clear"})
+	if !slices.Equal(actions, []string{"clear"}) {
+		t.Fatalf("accessibility actions = %v, want clear", actions)
+	}
+	state.Set(true)
+	if k := kinds(h.commit()); k[driver.ItemViewProps] != 0 || k[driver.ItemAccessibilityLabel] != 0 {
+		t.Fatalf("changing signals without Set sent %v", k)
+	}
+	if got := h.find("field").sent.props; !reflect.DeepEqual(got, initial) {
+		t.Fatalf("changing signals without Set changed props to %+v", got)
+	}
+	el.Set(input)
+	h.commit()
+	if p := h.find("field").sent.props; p.Label != "Country" || p.Description != "Choose a country" ||
+		p.Value.Text != "Japan" || !p.Expanded || !p.Invalid || !p.HasAction("clear") {
+		t.Fatalf("props after Set = %+v", p)
+	}
+	el.Set(Input{TestID: "field"})
+	b := h.commit()
+	if p := h.find("field").sent.props; p.Label != "" || p.Description != "" || p.Value != (AccessibilityValue{}) ||
+		p.Expandable || p.Expanded || p.Invalid || len(p.ActionList()) != 0 {
+		t.Errorf("removed accessibility props remain after Set: %+v", p)
+	}
+	if h.find("field").sent.events.Has(driver.EventAccessibilityAction) {
+		t.Error("removed accessibility handler remains in the event mask")
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventAccessibilityAction, ID: id, Text: "clear"})
+	if !slices.Equal(actions, []string{"clear"}) {
+		t.Errorf("removed accessibility handler ran: %v", actions)
+	}
+	for _, it := range b.Items {
+		if it.Kind == driver.ItemCreate || it.Kind == driver.ItemDelete {
+			t.Errorf("Set remounted the field: %v", it.Kind)
+		}
 	}
 }
 
