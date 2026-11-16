@@ -60,6 +60,7 @@ var (
 	webkitWebViewLoadHTML                func(uintptr, *byte, *byte)
 	webkitWebViewReload                  func(uintptr)
 	webkitWebViewGoBack                  func(uintptr)
+	webkitWebViewGoToHistory             func(uintptr, uintptr)
 	webkitWebViewGoForward               func(uintptr)
 	webkitWebViewStopLoading             func(uintptr)
 	webkitWebViewEvaluateJavascript      func(uintptr, *byte, int, *byte, *byte, uintptr, uintptr, uintptr)
@@ -69,6 +70,8 @@ var (
 	webkitWebViewCanGoBack               func(uintptr) int32
 	webkitWebViewCanGoForward            func(uintptr) int32
 	webkitWebViewGetBackForwardList      func(uintptr) uintptr
+	webkitBackForwardListGetCurrentItem  func(uintptr) uintptr
+	webkitBackForwardListGetNthItem      func(uintptr, int32) uintptr
 	webkitBackForwardListGetBackItem     func(uintptr) uintptr
 	webkitBackForwardListGetForwardItem  func(uintptr) uintptr
 	webkitBackForwardListItemGetURI      func(uintptr) uintptr
@@ -167,6 +170,7 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitWebViewLoadHTML, "webkit_web_view_load_html")
 	reg(&webkitWebViewReload, "webkit_web_view_reload")
 	reg(&webkitWebViewGoBack, "webkit_web_view_go_back")
+	reg(&webkitWebViewGoToHistory, "webkit_web_view_go_to_back_forward_list_item")
 	reg(&webkitWebViewGoForward, "webkit_web_view_go_forward")
 	reg(&webkitWebViewStopLoading, "webkit_web_view_stop_loading")
 	reg(&webkitWebViewEvaluateJavascript, "webkit_web_view_evaluate_javascript")
@@ -176,6 +180,8 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitWebViewCanGoBack, "webkit_web_view_can_go_back")
 	reg(&webkitWebViewCanGoForward, "webkit_web_view_can_go_forward")
 	reg(&webkitWebViewGetBackForwardList, "webkit_web_view_get_back_forward_list")
+	reg(&webkitBackForwardListGetCurrentItem, "webkit_back_forward_list_get_current_item")
+	reg(&webkitBackForwardListGetNthItem, "webkit_back_forward_list_get_nth_item")
 	reg(&webkitBackForwardListGetBackItem, "webkit_back_forward_list_get_back_item")
 	reg(&webkitBackForwardListGetForwardItem, "webkit_back_forward_list_get_forward_item")
 	reg(&webkitBackForwardListItemGetURI, "webkit_back_forward_list_item_get_uri")
@@ -258,18 +264,22 @@ type web struct {
 	page          string  // the URI of the page last committed, which its messages report
 	config        driver.WebConfig
 	made          bool
-	failed        bool             // the navigation failed; WebKit still finishes it
-	pending       bool             // a load waits for the page to be mapped
-	ownNavigation bool             // loadWeb started the app's source, until it commits or fails
-	aboutPending  bool             // a refused about: action, possibly a frame's, may start the next top-level load
-	startPending  bool             // hold that load's start until its top-level URI commits
-	ownPage       bool             // the page last committed is the app's source (loadWeb's)
-	refused       bool             // the top level committed an about: page the config refuses, which restore leaves; until the next commit it reports no load and posts nothing
-	restoring     bool             // restore started a navigation back to the page before a refused one, until a page commits
-	restored      time.Time        // when the page last committed did, if restore brought it back; zero for another
-	source        driver.WebSource // what the pending or last load shows: the config's, or Ref.Load's
-	background    [4]float32       // WebKit's own, for views without an opaque one
-	pointer       driver.Point     // where the pointer is in the page
+	failed        bool                         // the navigation failed; WebKit still finishes it
+	pending       bool                         // a load waits for the page to be mapped
+	ownNavigation bool                         // loadWeb started the app's source, until it commits or fails
+	aboutPending  bool                         // a refused about: action, possibly a frame's, may start the next top-level load
+	startPending  bool                         // hold that load's start until its top-level URI commits
+	ownPage       bool                         // the page last committed is the app's source (loadWeb's)
+	ownHistory    map[uintptr]driver.WebSource // retained native history entries created by the app
+	htmlStart     *driver.WebSource            // the initial HTML, which load_html omits from native history
+	htmlAnchor    uintptr                      // retained first native entry after that HTML
+	htmlShown     bool                         // the initial HTML is shown in place of its anchor
+	refused       bool                         // the top level committed an about: page the config refuses, which restore leaves; until the next commit it reports no load and posts nothing
+	restoring     bool                         // restore started a navigation back to the page before a refused one, until a page commits
+	restored      time.Time                    // when the page last committed did, if restore brought it back; zero for another
+	source        driver.WebSource             // what the pending or last load shows: the config's, or Ref.Load's
+	background    [4]float32                   // WebKit's own, for views without an opaque one
+	pointer       driver.Point                 // where the pointer is in the page
 }
 
 // webPage is the window and view a WebKitWebView belongs to.
@@ -675,12 +685,18 @@ func (w *window) loadWeb(v *view) {
 	switch {
 	case src.HTML != "":
 		wv.ownNavigation = true
+		if wv.htmlStart == nil && webkitBackForwardListGetCurrentItem(webkitWebViewGetBackForwardList(wv.widget)) == 0 {
+			saved := src
+			wv.htmlStart = &saved
+		}
+		wv.htmlShown = wv.htmlStart != nil
 		var base *byte
 		if src.BaseURL != "" {
 			base = cstr(src.BaseURL)
 		}
 		webkitWebViewLoadHTML(wv.widget, cstr(src.HTML), base)
 	case src.Src != "":
+		wv.htmlShown = false
 		wv.ownNavigation = true
 		if len(wv.config.Headers) == 0 {
 			webkitWebViewLoadURI(wv.widget, cstr(src.Src))
@@ -710,10 +726,28 @@ func (w *window) webCommand(v *view, c driver.WebCommand, value string, data any
 	page := v.web.widget
 	switch c {
 	case driver.WebReload:
+		if v.web.ownPage && v.web.source.HTML != "" {
+			w.loadWeb(v)
+			return
+		}
+		v.web.ownNavigation = v.web.ownPage
 		webkitWebViewReload(page)
 	case driver.WebGoBack:
+		if v.web.htmlStart != nil && !v.web.htmlShown && webkitBackForwardListGetCurrentItem(webkitWebViewGetBackForwardList(page)) == v.web.htmlAnchor {
+			v.web.source = *v.web.htmlStart
+			w.loadWeb(v)
+			return
+		}
+		v.web.useHistory(webkitBackForwardListGetBackItem(webkitWebViewGetBackForwardList(page)))
 		webkitWebViewGoBack(page)
 	case driver.WebGoForward:
+		if v.web.htmlShown && v.web.htmlAnchor != 0 {
+			v.web.htmlShown = false
+			v.web.ownNavigation = false
+			webkitWebViewGoToHistory(page, v.web.htmlAnchor)
+			return
+		}
+		v.web.useHistory(webkitBackForwardListGetForwardItem(webkitWebViewGetBackForwardList(page)))
 		webkitWebViewGoForward(page)
 	case driver.WebStopLoading:
 		webkitWebViewStopLoading(page)
@@ -736,6 +770,12 @@ func evaluate(page uintptr, script string) {
 // closeWeb stops v's page, cancels its downloads and lets it go.
 func (w *window) closeWeb(v *view) {
 	wv := v.web
+	if wv.htmlAnchor != 0 {
+		gObjectUnref(wv.htmlAnchor)
+	}
+	for item := range wv.ownHistory {
+		gObjectUnref(item)
+	}
 	v.web = nil
 	cancelDownloads(v)
 	if wv.widget != 0 {
@@ -748,6 +788,57 @@ func (w *window) closeWeb(v *view) {
 	if wv.session != 0 {
 		// The Incognito page's own session, whose website data goes with its last reference.
 		gObjectUnref(wv.session)
+	}
+}
+
+func (wv *web) ownsHistory(item uintptr) bool {
+	_, ok := wv.ownHistory[item]
+	return item != 0 && ok
+}
+
+// useHistory grants only the app-created native entry selected by a host command. Frame navigation actions never set this flag.
+func (wv *web) useHistory(item uintptr) {
+	src, own := wv.ownHistory[item]
+	wv.ownNavigation = item != 0 && own
+	if wv.ownNavigation {
+		wv.source = src
+	}
+}
+
+func (wv *web) rememberHistory() {
+	item := webkitBackForwardListGetCurrentItem(webkitWebViewGetBackForwardList(wv.widget))
+	if item == 0 || wv.htmlShown && wv.htmlAnchor != 0 || wv.ownsHistory(item) {
+		return
+	}
+	if wv.ownHistory == nil {
+		wv.ownHistory = make(map[uintptr]driver.WebSource)
+	}
+	gObjectRef(item)
+	wv.ownHistory[item] = wv.source
+}
+
+// pruneHistory releases entries WebKit dropped, including a discarded forward branch. Retaining live entries keeps recycled native pointers from inheriting an app source's exemption.
+func (wv *web) pruneHistory() {
+	list := webkitWebViewGetBackForwardList(wv.widget)
+	live := map[uintptr]bool{webkitBackForwardListGetCurrentItem(list): true}
+	for _, step := range []int32{-1, 1} {
+		for i := step; ; i += step {
+			item := webkitBackForwardListGetNthItem(list, i)
+			if item == 0 {
+				break
+			}
+			live[item] = true
+		}
+	}
+	for item := range wv.ownHistory {
+		if !live[item] {
+			delete(wv.ownHistory, item)
+			gObjectUnref(item)
+		}
+	}
+	if wv.htmlAnchor != 0 && !live[wv.htmlAnchor] {
+		gObjectUnref(wv.htmlAnchor)
+		wv.htmlStart, wv.htmlAnchor, wv.htmlShown = nil, 0, false
 	}
 }
 
@@ -804,6 +895,13 @@ func (w *window) navigatedTo(v *view, uri string, loading bool, kind driver.Even
 		CanGoBack:    webkitWebViewCanGoBack(page) != 0,
 		CanGoForward: webkitWebViewCanGoForward(page) != 0,
 	}
+	if v.web.htmlAnchor != 0 {
+		if v.web.htmlShown {
+			nav.CanGoBack, nav.CanGoForward = false, true
+		} else if webkitBackForwardListGetCurrentItem(webkitWebViewGetBackForwardList(page)) == v.web.htmlAnchor {
+			nav.CanGoBack = true
+		}
+	}
 	for _, k := range []driver.EventKind{kind, driver.EventNavigationStateChange} {
 		n := nav
 		w.report(v, driver.Event{Kind: k, ID: v.id, Navigation: &n})
@@ -842,13 +940,29 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 		if start {
 			w.navigated(v, true, driver.EventLoadStart)
 		}
+		if !own && v.web.htmlStart != nil {
+			v.web.htmlShown = false
+			if v.web.htmlAnchor == 0 {
+				v.web.htmlAnchor = webkitBackForwardListGetCurrentItem(webkitWebViewGetBackForwardList(page))
+				if v.web.htmlAnchor != 0 {
+					gObjectRef(v.web.htmlAnchor)
+				}
+			}
+		}
 		v.web.ownPage, v.web.restored = own, time.Time{}
+		v.web.pruneHistory()
+		if own {
+			v.web.rememberHistory()
+		}
 		if restoring {
 			v.web.restored = time.Now()
 		}
 		// From here the view's URI is the page that posts; until a load commits, the page before it still does.
 		v.web.page = uri
 	case webkitLoadFinished:
+		if v.web.ownPage && !v.web.failed {
+			v.web.rememberHistory()
+		}
 		// A failed or refused navigation finishes too; it was reported as an error.
 		if !v.web.failed {
 			w.navigated(v, false, driver.EventLoad)
@@ -1054,10 +1168,10 @@ func historyKey(keyval, state uint32) int {
 func (w *window) goHistory(v *view, way int) bool {
 	page := v.web.widget
 	switch {
-	case way < 0 && webkitWebViewCanGoBack(page) != 0:
-		webkitWebViewGoBack(page)
-	case way > 0 && webkitWebViewCanGoForward(page) != 0:
-		webkitWebViewGoForward(page)
+	case way < 0 && (webkitWebViewCanGoBack(page) != 0 || v.web.htmlAnchor != 0 && !v.web.htmlShown):
+		w.webCommand(v, driver.WebGoBack, "", nil)
+	case way > 0 && (webkitWebViewCanGoForward(page) != 0 || v.web.htmlAnchor != 0 && v.web.htmlShown):
+		w.webCommand(v, driver.WebGoForward, "", nil)
 	case way < 0:
 		w.back()
 	default:

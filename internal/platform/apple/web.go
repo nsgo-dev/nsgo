@@ -33,8 +33,15 @@ type Web struct {
 	web           objc.ID
 	handler       objc.ID
 	config        driver.WebConfig
-	fileDir       string // the directory a file: page, or HTML with a file: base URL, may navigate in; "" for other sources
-	ownNavigation bool   // load started the app's source, whose top-level navigation comes next
+	fileDir       string                        // the directory a file: page, or HTML with a file: base URL, may navigate in; "" for other sources
+	ownNavigation bool                          // load started the app's source, whose top-level navigation comes next
+	committingOwn bool                          // the policy accepted an app-owned navigation, until commit
+	ownPage       bool                          // the document last committed came from the app
+	ownHistory    map[objc.ID]*driver.WebSource // retained native app-created entries
+	pageSource    driver.WebSource              // the app source reload replays, including HTML bytes
+	htmlStart     *driver.WebSource             // initial HTML if WebKit omitted its history entry
+	htmlAnchor    objc.ID                       // retained first native entry after that HTML
+	htmlShown     bool                          // initial HTML is shown in place of its anchor
 	made          bool
 }
 
@@ -96,6 +103,11 @@ func loadWebKit() {
 		[]objc.MethodDef{
 			nav("webView:didStartProvisionalNavigation:", true, driver.EventLoadStart, driver.EventNavigationStateChange),
 			nav("webView:didFinishNavigation:", false, driver.EventLoad, driver.EventNavigationStateChange),
+			{Cmd: sel("webView:didCommitNavigation:"), Fn: func(self objc.ID, _ objc.SEL, _, _ objc.ID) {
+				if w := webHandlers[self]; w != nil {
+					w.committed()
+				}
+			}},
 			{Cmd: sel("webView:didFailNavigation:withError:"), Fn: failed},
 			{Cmd: sel("webView:didFailProvisionalNavigation:withError:"), Fn: failed},
 			{Cmd: sel("userContentController:didReceiveScriptMessage:"), Fn: func(self objc.ID, _ objc.SEL, _, message objc.ID) {
@@ -166,6 +178,22 @@ func loadWebKit() {
 						url := GoString(action.Send(sel("request")).Send(sel("URL")).Send(sel("absoluteString")))
 						// The app's source loads in the main frame, so a new window's action is the page's.
 						own := frame != 0 && w.ownNavigation
+						if frame != 0 && !own {
+							kind := objc.Send[int](action, sel("navigationType"))
+							item := w.currentHistory()
+							// WKNavigationTypeBackForward and Reload target an
+							// existing main-frame entry, never a frame's request.
+							own = (kind == 2 || kind == 3) && w.ownHistory[item] != nil &&
+								url == GoString(item.Send(sel("URL")).Send(sel("absoluteString")))
+							if own {
+								w.pageSource = *w.ownHistory[item]
+							}
+							if kind == 3 && w.ownPage && w.pageSource.HTML != "" {
+								CallBlock(decide, cancel)
+								w.load(w.pageSource)
+								return
+							}
+						}
 						if frame != 0 {
 							w.ownNavigation = false
 						}
@@ -180,6 +208,9 @@ func loadWebKit() {
 							w.Dispatch(driver.Event{Kind: driver.EventError, Text: driver.RefusedNavigation(url),
 								Navigation: &driver.WebNavigation{URL: url}})
 							return
+						}
+						if frame != 0 {
+							w.committingOwn = own
 						}
 					}
 				}
@@ -421,11 +452,17 @@ func (w *Web) addScripts() {
 }
 
 func (w *Web) load(src driver.WebSource) {
+	w.pageSource = src
 	w.ownNavigation = false
 	w.fileDir = ""
 	switch {
 	case src.HTML != "":
 		w.ownNavigation = true
+		if w.htmlStart == nil && w.currentHistory() == 0 {
+			saved := src
+			w.htmlStart = &saved
+		}
+		w.htmlShown = w.htmlStart != nil
 		base := objc.ID(0)
 		if src.BaseURL != "" {
 			base = nsURL(src.BaseURL)
@@ -433,6 +470,7 @@ func (w *Web) load(src driver.WebSource) {
 		}
 		w.web.Send(sel("loadHTMLString:baseURL:"), NSString(src.HTML), base)
 	case src.Src != "":
+		w.htmlShown = false
 		// A URL NSURL cannot parse loads nothing.
 		if url := nsURL(src.Src); url != 0 {
 			if path, ok := fileURLPath(src.Src); ok {
@@ -448,6 +486,51 @@ func (w *Web) load(src driver.WebSource) {
 			}
 			w.web.Send(sel("loadRequest:"), request)
 		}
+	}
+}
+
+func (w *Web) currentHistory() objc.ID {
+	return w.web.Send(sel("backForwardList")).Send(sel("currentItem"))
+}
+
+func (w *Web) committed() {
+	w.ownPage, w.committingOwn = w.committingOwn, false
+	w.pruneHistory()
+	item := w.currentHistory()
+	if !w.ownPage && w.htmlStart != nil {
+		w.htmlShown = false
+		if w.htmlAnchor == 0 && item != 0 {
+			w.htmlAnchor = item.Send(sel("retain"))
+		}
+	}
+	if w.ownPage && item != 0 && !(w.htmlShown && w.htmlAnchor != 0) && w.ownHistory[item] == nil {
+		if w.ownHistory == nil {
+			w.ownHistory = make(map[objc.ID]*driver.WebSource)
+		}
+		item.Send(sel("retain"))
+		src := w.pageSource
+		w.ownHistory[item] = &src
+	}
+}
+
+func (w *Web) pruneHistory() {
+	list := w.web.Send(sel("backForwardList"))
+	live := map[objc.ID]bool{w.currentHistory(): true}
+	for _, name := range []string{"backList", "forwardList"} {
+		items := list.Send(sel(name))
+		for i, n := uint(0), objc.Send[uint](items, sel("count")); i < n; i++ {
+			live[items.Send(sel("objectAtIndex:"), i)] = true
+		}
+	}
+	for item := range w.ownHistory {
+		if !live[item] {
+			delete(w.ownHistory, item)
+			item.Send(sel("release"))
+		}
+	}
+	if w.htmlAnchor != 0 && !live[w.htmlAnchor] {
+		w.htmlAnchor.Send(sel("release"))
+		w.htmlStart, w.htmlAnchor, w.htmlShown = nil, 0, false
 	}
 }
 
@@ -527,6 +610,13 @@ func (w *Web) navigated(loading bool, kinds ...driver.EventKind) {
 		CanGoBack:    objc.Send[bool](w.web, sel("canGoBack")),
 		CanGoForward: objc.Send[bool](w.web, sel("canGoForward")),
 	}
+	if w.htmlAnchor != 0 {
+		if w.htmlShown {
+			nav.CanGoBack, nav.CanGoForward = false, true
+		} else if w.currentHistory() == w.htmlAnchor {
+			nav.CanGoBack = true
+		}
+	}
 	for _, k := range kinds {
 		n := nav
 		w.Dispatch(driver.Event{Kind: k, Navigation: &n})
@@ -544,10 +634,27 @@ func (w *Web) Command(c driver.WebCommand, value string, data any) {
 	defer web.Send(sel("release"))
 	switch c {
 	case driver.WebReload:
+		if w.ownPage && w.pageSource.HTML != "" {
+			w.load(w.pageSource)
+			return
+		}
+		w.ownNavigation = w.ownPage
 		web.Send(sel("reload"))
 	case driver.WebGoBack:
+		if w.htmlStart != nil && !w.htmlShown && w.currentHistory() == w.htmlAnchor {
+			w.load(*w.htmlStart)
+			return
+		}
+		w.useHistory(web.Send(sel("backForwardList")).Send(sel("backItem")))
 		web.Send(sel("goBack"))
 	case driver.WebGoForward:
+		if w.htmlShown && w.htmlAnchor != 0 {
+			w.htmlShown = false
+			w.useHistory(w.htmlAnchor)
+			web.Send(sel("goToBackForwardListItem:"), w.htmlAnchor)
+			return
+		}
+		w.useHistory(web.Send(sel("backForwardList")).Send(sel("forwardItem")))
 		web.Send(sel("goForward"))
 	case driver.WebStopLoading:
 		web.Send(sel("stopLoading"))
@@ -559,6 +666,14 @@ func (w *Web) Command(c driver.WebCommand, value string, data any) {
 		if src, ok := data.(*driver.WebSource); ok && src != nil {
 			w.load(*src)
 		}
+	}
+}
+
+func (w *Web) useHistory(item objc.ID) {
+	src := w.ownHistory[item]
+	w.ownNavigation = src != nil
+	if src != nil {
+		w.pageSource = *src
 	}
 }
 
@@ -577,6 +692,14 @@ func (w *Web) close() {
 	w.web.Send(sel("stopLoading"))
 	w.web.Send(sel("setNavigationDelegate:"), objc.ID(0))
 	w.web.Send(sel("setUIDelegate:"), objc.ID(0))
+	for item := range w.ownHistory {
+		item.Send(sel("release"))
+	}
+	w.ownHistory = nil
+	if w.htmlAnchor != 0 {
+		w.htmlAnchor.Send(sel("release"))
+		w.htmlAnchor = 0
+	}
 	// The content controller holds the handler, which would keep it alive.
 	w.web.Send(sel("configuration")).Send(sel("userContentController")).
 		Send(sel("removeScriptMessageHandlerForName:"), NSString(messageHandler))

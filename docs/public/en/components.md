@@ -18,6 +18,8 @@ core.View{
 }
 ```
 
+`core.WebView` shows web content; attach a `core.Ref` to call `Reload`, `GoBack` and `GoForward`. On native targets these commands keep the app's own HTML and data sources exempt from `core.AccessWebSchemes`; pages that create new navigations still follow the access policy.
+
 ## Components
 
 A component is a function that takes a scope and returns an element. It runs once; what changes later is driven by signals.

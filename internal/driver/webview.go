@@ -179,7 +179,7 @@ func (c *WebConfig) Navigable(rawURL string) bool {
 	return c.navigable(rawURL, false)
 }
 
-// SourceNavigable reports whether a restricted view may start the app's own load of its Source, at rawURL: as Navigable, except that a page of PageSchemes is the app's and not held to Schemes. A backend asks it for the top-level navigation its own load starts, and Navigable for the rest.
+// SourceNavigable reports whether a restricted view may start the app's own load of its Source, at rawURL: as Navigable, except that a page of PageSchemes is the app's and not held to Schemes. A backend asks it for its own loads and trusted reloads or history traversals of app-owned entries, and Navigable for page-created navigations.
 func (c *WebConfig) SourceNavigable(rawURL string) bool {
 	return c.navigable(rawURL, true)
 }

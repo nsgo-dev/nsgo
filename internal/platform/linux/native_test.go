@@ -456,6 +456,117 @@ func (webSchemesAccess) Allows(core.AccessRequest) bool { return true }
 func (webSchemesAccess) WebHosts() []string             { return []string{"*"} }
 func (webSchemesAccess) WebSchemes() []string           { return nil }
 
+// TestWebOwnPagesReloadAndReturn keeps the app's HTML and data pages exempt from page schemes when reloading and traversing history.
+func TestWebOwnPagesReloadAndReturn(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("NSGO_TEST_WEBKIT_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		dir := t.TempDir()
+		cmd.Env = append(os.Environ(), "NSGO_TEST_WEBKIT_PROCESS="+t.Name(),
+			"XDG_DATA_HOME="+filepath.Join(dir, "data"), "XDG_CACHE_HOME="+filepath.Join(dir, "cache"))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
+	}
+	if err := openWebKit(); err != nil {
+		t.Skip(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(rw, "<p>next</p>")
+	}))
+	defer server.Close()
+	title := "nsgo-native-" + t.Name()
+	var root *core.Scope
+	var refs [2]core.Ref
+	errors := make(chan error, 8)
+	app := func(cx *core.Scope) core.Node {
+		root = cx
+		cx.ProvideAccess(webSchemesAccess{})
+		loads, errs := core.NewSignal(cx, [2]int{}), core.NewSignal(cx, "")
+		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%v|%s", title, loads.Get(), errs.Get())) })
+		var views []core.Node
+		for i, src := range []core.WebSource{core.WebHTML("<p>own</p>", ""), core.WebSrc("data:text/html,<p>own</p>")} {
+			views = append(views, core.WebView{Source: src, Ref: &refs[i],
+				Style: core.Style{Width: core.Pt(150), Height: core.Pt(100)},
+				OnLoad: func(n core.WebNavigation) {
+					phase := loads.Get()[i] + 1
+					if (phase == 3 || phase == 6) && !n.CanGoBack {
+						t.Errorf("view %d phase %d cannot go back", i, phase)
+					}
+					if (phase == 4 || phase == 5) && !n.CanGoForward {
+						t.Errorf("view %d cannot go forward after going back", i)
+					}
+					refs[i].Evaluate("document.body.textContent.trim()", func(body string, err error) {
+						want := "\"own\""
+						if phase == 3 || phase == 6 {
+							want = "\"next\""
+						}
+						if err != nil || body != want {
+							t.Errorf("view %d phase %d body = %s, %v; want %s", i, phase, body, err, want)
+						}
+						loads.Update(func(v [2]int) [2]int { v[i]++; return v })
+					})
+				},
+				OnError: func(err error) { errors <- err; errs.Update(func(s string) string { return s + err.Error() + ";" }) },
+			})
+		}
+		return core.View{Style: core.Style{Direction: core.Row}, Children: views}
+	}
+	w := startTestWindow(t, app, Options{ID: "nsgo-test-web-own-history", Title: title, Width: 300, Height: 100})
+	wait := func(n int) { waitForTitle(t, w, fmt.Sprintf("%s|[%d %d]|", title, n, n)) }
+	command := func(fn func(*core.Ref)) {
+		root.Post(func() {
+			for i := range refs {
+				fn(&refs[i])
+			}
+		})
+	}
+	wait(1)
+	command(func(r *core.Ref) { r.Reload() })
+	wait(2)
+	command(func(r *core.Ref) { r.InjectJavaScript(fmt.Sprintf("location.href = %q", server.URL+"/next")) })
+	wait(3)
+	command(func(r *core.Ref) { r.GoBack() })
+	wait(4)
+	command(func(r *core.Ref) { r.Reload() })
+	wait(5)
+	command(func(r *core.Ref) { r.GoForward() })
+	wait(6)
+	command(func(r *core.Ref) { r.GoBack() })
+	wait(7)
+	// A subframe reload cannot prime permission for the top level's next page-made about: navigation, even from an app-owned about:/data: page.
+	command(func(r *core.Ref) {
+		r.InjectJavaScript(`{
+const f = document.createElement('iframe');
+let reloaded = false;
+f.onload = () => {
+  if (!reloaded) { reloaded = true; f.contentWindow.location.reload(); return; }
+  location.href = 'about:blank';
+};
+f.src = 'about:blank';
+document.body.append(f);
+}`)
+	})
+	for range refs {
+		select {
+		case err := <-errors:
+			if e, ok := err.(*core.WebError); !ok || e.URL != "about:blank" {
+				t.Errorf("page navigation error = %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("the page-made about: navigation was not refused")
+		}
+	}
+}
+
 // TestWebPagesAboutPageIsRefusedAtTheTopLevel has the app's page, under an Access whose WebSchemes allow none, send itself to about:blank once its srcdoc frame has loaded. WebKitGTK shows an about: page as soon as its navigation action is used and says no action's frame, so the view refuses it as it commits: the about: page posts nothing and reports no load, the refusal reaches OnError once, and the app's page loads again with its frame. It skips where WebKitGTK 6.0 is missing, in a process of its own as WebKit takes the first thread that uses it.
 func TestWebPagesAboutPageIsRefusedAtTheTopLevel(t *testing.T) {
 	if testing.Short() {

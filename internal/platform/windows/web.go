@@ -96,7 +96,13 @@ type webView struct {
 	scriptGen, scrollGen  int
 	adding                int
 	navigatePending       bool
-	ownNavigation         bool             // navigate started the app's source, whose NavigationStarting comes next
+	ownNavigation         bool // navigate started the app's source, whose NavigationStarting comes next
+	ownStarted            uint64
+	ownEntries            map[int]*driver.WebSource // CDP entry IDs created by the app
+	historySource         *driver.WebSource         // trusted entry selected by a host command
+	historyURL            string
+	historyKind           int32
+	ownSource             driver.WebSource
 	starting              string           // the URL of the navigation started last, which a failure reports
 	started               uint64           // the NavigationId of the navigation started last
 	cut                   uint64           // the NavigationId of a navigation the view cut short (StopLoading, or a load that replaced it), whose failure is no error
@@ -419,7 +425,21 @@ func (wv *webView) listen() {
 		nav.URL = a.getString(navigationStartingGetUri)
 		// A restricted view's page goes only where its config allows; NavigationStarting is the top level's.
 		allowed := wv.config.Navigable
-		if wv.ownNavigation {
+		own := wv.ownNavigation
+		source := wv.source
+		if saved := wv.historySource; !own && saved != nil && (nav.URL == wv.historyURL || saved.HTML != "" && saved.BaseURL == "" && (nav.URL == "about:blank" || strings.HasPrefix(nav.URL, "data:"))) {
+			if a3 := a.query(&iidNavigationStartingArgs3); a3 != nil {
+				var kind int32
+				hr := a3.call(navigationStartingGetKind, uintptr(unsafe.Pointer(&kind)))
+				a3.release()
+				own = !failed(hr) && kind == wv.historyKind
+				if own {
+					source = *saved
+				}
+			}
+		}
+		wv.historySource = nil
+		if own {
 			allowed = wv.config.SourceNavigable
 		}
 		wv.ownNavigation = false
@@ -431,6 +451,12 @@ func (wv *webView) listen() {
 		var id uint64
 		a.call(navigationStartingGetNavigationId, uintptr(unsafe.Pointer(&id)))
 		wv.starting, wv.started, wv.aborted = nav.URL, id, 0
+		if own {
+			wv.ownStarted = id
+			wv.ownSource = source
+		} else {
+			wv.ownStarted = 0
+		}
 		wv.navigated(nav, driver.EventLoadStart, driver.EventNavigationStateChange)
 	}))
 	web.subscribe(webAddNavigationCompleted, newHandler(&iidNavigationCompleted, func(_ uintptr, args unsafe.Pointer) {
@@ -443,6 +469,22 @@ func (wv *webView) listen() {
 		a.call(navigationGetWebErrorStatus, uintptr(unsafe.Pointer(&status)))
 		a.call(navigationGetNavigationId, uintptr(unsafe.Pointer(&id)))
 		if a.getBool(navigationGetIsSuccess) {
+			if id == wv.ownStarted {
+				source, nav := wv.ownSource, wv.navigation(false)
+				wv.readHistory(func(history *webHistorySnapshot) {
+					if wv.closed || wv.started != id {
+						return
+					}
+					if history != nil && history.CurrentIndex >= 0 && history.CurrentIndex < len(history.Entries) {
+						if wv.ownEntries == nil {
+							wv.ownEntries = make(map[int]*driver.WebSource)
+						}
+						wv.ownEntries[history.Entries[history.CurrentIndex].ID] = &source
+					}
+					wv.navigated(nav, driver.EventLoad, driver.EventNavigationStateChange)
+				})
+				return
+			}
 			wv.navigated(wv.navigation(false), driver.EventLoad, driver.EventNavigationStateChange)
 		} else if why := webError(status); why != "" && id == wv.started && id != wv.cut {
 			// The view still shows the page before the one that failed, which never committed.
@@ -959,15 +1001,8 @@ func (wv *webView) command(c driver.WebCommand, value string, data any) {
 		return
 	}
 	switch c {
-	case driver.WebReload:
-		wv.cut = wv.started
-		wv.web.call(webReload)
-	case driver.WebGoBack:
-		wv.cut = wv.started
-		wv.web.call(webGoBack)
-	case driver.WebGoForward:
-		wv.cut = wv.started
-		wv.web.call(webGoForward)
+	case driver.WebReload, driver.WebGoBack, driver.WebGoForward:
+		wv.historyCommand(c)
 	case driver.WebStopLoading:
 		wv.cut = wv.started
 		wv.web.call(webStop)
@@ -1104,6 +1139,8 @@ func (wv *webView) close() {
 	}
 	wv.closed = true
 	wv.commands = nil
+	wv.ownEntries = nil
+	wv.historySource = nil
 	for _, dl := range wv.downloads {
 		if dl.op != nil {
 			dl.op.call(downloadCancel)

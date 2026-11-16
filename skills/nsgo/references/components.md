@@ -23,6 +23,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 
 ## Using them well
 
+- Drive a native `core.WebView` through its `core.Ref` (`Reload`, `GoBack`, `GoForward`); app-owned history entries keep their `core.AccessWebSchemes` exemption, while new page-created navigations remain restricted.
 - A component's look comes from its `Variant`, a type of its own whose zero value is the default (`ui.ButtonVariant`), and a few take `Size` (`ui.SizeDefault`, small or large). Do not fake a variant with styles over the default.
 - Controlled controls take a getter and a setter: `Value: name.Get, OnChange: name.Set`, `Checked: on.Get`, `Open: dialog.Get, OnOpenChange: ...`.
 - Use `ui.Slider.MinFunc`, `MaxFunc` and `StepFunc` for changing ranges and steps; `base.Slider.Min`, `Max` and `Step` already take getters. This keeps focus and an active drag mounted.
