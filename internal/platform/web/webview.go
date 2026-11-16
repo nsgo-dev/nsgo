@@ -103,14 +103,8 @@ func (s *surface) setWeb(v *view, c *driver.WebConfig) {
 	if w.loaded && sameFrame(c, &w.config) {
 		return
 	}
-	src := c.Source
-	if w.loaded && c.Source == w.config.Source && c.InjectedJavaScript == w.config.InjectedJavaScript &&
-		c.InjectedJavaScriptBeforeContent == w.config.InjectedJavaScriptBeforeContent {
-		// Only the frame's settings changed, which other platforms apply to the live page: the page Ref.Load showed stays.
-		src = w.source
-	}
 	w.loaded, w.config = true, *c
-	s.loadFrame(v, src)
+	s.loadFrame(v, c.Source)
 }
 
 // loadFrame loads src in v's frame with the config's settings.

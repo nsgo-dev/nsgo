@@ -47,6 +47,7 @@ package windows
 // once the document scripts asked for are added.
 
 import (
+	"cmp"
 	"maps"
 	"net/url"
 	"os"
@@ -95,6 +96,8 @@ type webView struct {
 	scriptGen, scrollGen  int
 	adding                int
 	navigatePending       bool
+	starting              string           // the URL of the navigation started last, which a failure reports
+	stopped               bool             // StopLoading cut that navigation short, whose failure is no error
 	source                driver.WebSource // what the pending or last navigation loads: the config's, or Ref.Load's
 	html, base            string           // the HTML served at its base URL
 	serving               bool
@@ -408,6 +411,7 @@ func (wv *webView) listen() {
 			wv.report(driver.Event{Kind: driver.EventError, Text: driver.RefusedNavigation(nav.URL), Navigation: &nav})
 			return
 		}
+		wv.starting, wv.stopped = nav.URL, false
 		wv.navigated(nav, driver.EventLoadStart, driver.EventNavigationStateChange)
 	}))
 	web.subscribe(webAddNavigationCompleted, newHandler(&iidNavigationCompleted, func(_ uintptr, args unsafe.Pointer) {
@@ -419,8 +423,10 @@ func (wv *webView) listen() {
 		a.call(navigationGetWebErrorStatus, uintptr(unsafe.Pointer(&status)))
 		if a.getBool(navigationGetIsSuccess) {
 			wv.navigated(wv.navigation(false), driver.EventLoad, driver.EventNavigationStateChange)
-		} else if why := webError(status); why != "" {
+		} else if why := webError(status); why != "" && !wv.stopped {
+			// The view still shows the page before the one that failed, which never committed.
 			nav := wv.navigation(false)
+			nav.URL = cmp.Or(wv.starting, nav.URL)
 			wv.report(driver.Event{Kind: driver.EventError, Text: why,
 				Data: &driver.WebFailure{Domain: "COREWEBVIEW2_WEB_ERROR_STATUS", Code: int(status)}, Navigation: &nav})
 		}
@@ -921,6 +927,8 @@ func (wv *webView) command(c driver.WebCommand, value string, data any) {
 	case driver.WebGoForward:
 		wv.web.call(webGoForward)
 	case driver.WebStopLoading:
+		// WebView2 ends a navigation it stops as aborted (CONNECTION_ABORTED), not cancelled.
+		wv.stopped = true
 		wv.web.call(webStop)
 	case driver.WebPostMessage:
 		wv.execute(driver.WebMessageScript(value))
