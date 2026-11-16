@@ -469,28 +469,75 @@ func TestHotKeysWithoutWindows(t *testing.T) {
 	}
 }
 
+// TestHotKeyRegistrationState: a shortcut's handle is pending until the platform answers its ID, follows each answer, a computation reading it included, goes pending again while a change to the set registers it anew, and ignores answers for IDs no longer registered and states out of range; where the platform has no global shortcuts it is unsupported at once.
 func TestHotKeyRegistrationState(t *testing.T) {
-	var handle *HotKey
+	var first, second *HotKey
+	var scope *Scope
+	var seen []HotKeyState
 	w := newWindows(t, func(cx *Scope) {
-		handle = cx.RegisterHotKey("Ctrl+Alt+K", nil)
+		first = cx.RegisterHotKey("Ctrl+Alt+K", nil)
+		scope = cx.Child()
+		cx.Effect(func() { seen = append(seen, first.State()) })
 	})
 	keys := w.take(0, driver.ItemHotKeys)
-	if handle == nil || handle.State() != HotKeyPending {
-		t.Fatalf("initial hot key state %v, want pending", handle.State())
+	if len(keys) != 1 || len(keys[0].Keys) != 1 {
+		t.Fatalf("keys %+v", keys)
 	}
-	w.dispatch(0, driver.Event{Kind: driver.EventHotKeyState, Count: keys[0].Keys[0].ID, Index: int(HotKeyRegistered)})
-	if got := handle.State(); got != HotKeyRegistered {
-		t.Fatalf("registered hot key state %v", got)
+	id := keys[0].Keys[0].ID
+	answer := func(id uint32, state HotKeyState) {
+		t.Helper()
+		w.dispatch(0, driver.Event{Kind: driver.EventHotKeyState, Count: id, Index: int(state)})
 	}
-	w.dispatch(0, driver.Event{Kind: driver.EventHotKeyState, Count: keys[0].Keys[0].ID, Index: int(HotKeyTaken)})
-	if got := handle.State(); got != HotKeyTaken {
-		t.Fatalf("taken hot key state %v", got)
+	if got := first.State(); got != HotKeyPending {
+		t.Fatalf("before an answer the state is %v, want pending", got)
+	}
+	answer(id, HotKeyRegistered)
+	if got := first.State(); got != HotKeyRegistered {
+		t.Fatalf("after registered the state is %v", got)
+	}
+	w.dispatch(0, driver.Event{Kind: driver.EventHotKeyState, Count: id, Index: 9})
+	if got := first.State(); got != HotKeyRegistered {
+		t.Errorf("a state out of range changed it to %v", got)
+	}
+
+	// Another shortcut sends the whole set again, which the platform registers anew.
+	scope.Run(func() { second = scope.RegisterHotKey("Ctrl+Alt+J", nil) })
+	w.commit()
+	keys = w.take(0, driver.ItemHotKeys)
+	if len(keys) != 1 || len(keys[0].Keys) != 2 {
+		t.Fatalf("keys after the second shortcut %+v", keys)
+	}
+	if got := first.State(); got != HotKeyPending {
+		t.Errorf("while the set registers anew the first shortcut is %v, want pending", got)
+	}
+	answer(id, HotKeyRegistered)
+	answer(keys[0].Keys[1].ID, HotKeyTaken)
+	if got := second.State(); got != HotKeyTaken {
+		t.Errorf("the second shortcut is %v, want taken", got)
+	}
+	if want := []HotKeyState{HotKeyPending, HotKeyRegistered, HotKeyPending, HotKeyRegistered}; !slices.Equal(seen, want) {
+		t.Errorf("a computation reading the state saw %v, want %v", seen, want)
+	}
+
+	// Its owner gone, an answer for its ID changes nothing.
+	gone := keys[0].Keys[1].ID
+	scope.Dispose()
+	w.commit()
+	if keys = w.take(0, driver.ItemHotKeys); len(keys) != 1 || len(keys[0].Keys) != 1 {
+		t.Fatalf("keys after the drop %+v", keys)
+	}
+	answer(id, HotKeyRegistered)
+	answer(gone, HotKeyRegistered)
+	if got := second.State(); got != HotKeyTaken {
+		t.Errorf("an answer for a dropped shortcut changed its handle to %v", got)
 	}
 
 	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0))})
-	unsupported := root.RegisterHotKey("Ctrl+Alt+K", nil)
-	if unsupported.State() != HotKeyUnsupported {
-		t.Errorf("headless unsupported state %v", unsupported.State())
+	if got := root.RegisterHotKey("Ctrl+Alt+K", nil).State(); got != HotKeyUnsupported {
+		t.Errorf("without global shortcuts the state is %v, want unsupported", got)
+	}
+	if got := (*HotKey)(nil).State(); got != HotKeyUnsupported {
+		t.Errorf("a nil handle's state is %v, want unsupported", got)
 	}
 }
 

@@ -5,6 +5,7 @@ package windows
 import (
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -146,4 +147,90 @@ func TestGlobalHotKeysReachTheApp(t *testing.T) {
 		t.Fatal("the window did not close")
 	}
 	waitForHeld(t, kept, false)
+}
+
+// TestGlobalHotKeyAnswers runs an app the way nsgo.Run runs an app function while this thread, standing for another app, holds one of its combinations: that shortcut is taken, a free one registers, and a key RegisterHotKey has no code for is unsupported. Once the other holder lets go, the next change to the app's shortcuts registers the combination, and a second registration of it in the app is taken.
+func TestGlobalHotKeyAnswers(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	// The probe's hot key belongs to this thread, which must keep it.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	const held, free = "ctrl+alt+shift+f21", "ctrl+alt+shift+f22"
+	if heldBySomeone(t, held) || heldBySomeone(t, free) {
+		t.Skip("another app holds the test's shortcuts")
+	}
+	mods, vk, _ := globalHotKey(held)
+	const probe = 0xBFFE
+	if r, _, err := registerHotKey.Call(0, probe, uintptr(mods|modNoRepeat), vk); r == 0 {
+		t.Fatalf("the probe could not hold %s: %v", held, err)
+	}
+	released := false
+	release := func() {
+		if !released {
+			unregisterHotKey.Call(0, probe)
+			released = true
+		}
+	}
+	defer release()
+
+	title := "nsgo-native-hotkey-answers"
+	answers := make(chan string, 32)
+	app := core.AppRoot(func(cx *core.Scope) {
+		watch := func(name string, h *core.HotKey) {
+			cx.Effect(func() { answers <- name + " " + h.State().String() })
+		}
+		again := cx.Child()
+		watch("held", cx.RegisterHotKey(held, nil))
+		watch("unknown", cx.RegisterHotKey("ctrl+alt+shift+nosuchkey", nil))
+		// The free shortcut registers the held combination a second time, which sends the set again.
+		watch("free", cx.RegisterHotKey(free, func() {
+			again.Run(func() { watch("again", again.RegisterHotKey(held, nil)) })
+		}))
+	})
+	done := make(chan struct{})
+	go func() {
+		runtime.LockOSThread()
+		defer close(done)
+		Run(app, Options{Title: title, Width: 360, Height: 240, Hidden: true})
+	}()
+	hwnd := waitForWindow(t, title, done)
+	sendMessage.Call(hwnd, 0, 0, 0)
+	t.Cleanup(func() {
+		postMessageW.Call(hwnd, wmClose, 0, 0)
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("the window did not close")
+		}
+	})
+	latest := map[string]string{}
+	waitFor := func(want map[string]string) {
+		t.Helper()
+		deadline := time.After(5 * time.Second)
+		for {
+			matched := true
+			for name, state := range want {
+				matched = matched && latest[name] == state
+			}
+			if matched {
+				return
+			}
+			select {
+			case a := <-answers:
+				name, state, _ := strings.Cut(a, " ")
+				latest[name] = state
+			case <-deadline:
+				t.Fatalf("answers %v, want %v", latest, want)
+			}
+		}
+	}
+	waitFor(map[string]string{"held": "taken", "unknown": "unsupported", "free": "registered"})
+
+	release()
+	// Shortcut 3 is the free one: the core numbers shortcuts from 1 in the order they register.
+	postMessageW.Call(hwnd, wmHotKey, 3, 0)
+	waitFor(map[string]string{"held": "registered", "again": "taken", "free": "registered", "unknown": "unsupported"})
+	waitForHeld(t, held, true)
 }

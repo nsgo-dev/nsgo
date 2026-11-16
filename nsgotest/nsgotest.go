@@ -57,9 +57,6 @@ func init() { driver.CheckCommits = !automationBuild }
 // Option configures Start.
 type Option func(*App)
 
-// HotKeyState is the state a headless platform reports for a global shortcut.
-type HotKeyState = core.HotKeyState
-
 // Size sets the surface size; 390 by 844 points by default.
 func Size(width, height driver.Points) Option {
 	return func(a *App) { a.size = driver.Size{Width: width, Height: height} }
@@ -78,8 +75,7 @@ func Environment(env driver.Environment) Option {
 	return func(a *App) { a.env = &env }
 }
 
-// HotKeyTaken marks normalized keys as held by another registration in the
-// headless platform. Unlisted keys register successfully.
+// HotKeyTaken has the headless platform answer the global shortcuts of keys, in core.Scope.OnKey's form, as desktop.HotKeyTaken, so a test runs an app's path for a combination another app holds; other keys register.
 func HotKeyTaken(keys ...string) Option {
 	return func(a *App) {
 		if a.hotKeyStates == nil {
@@ -91,8 +87,7 @@ func HotKeyTaken(keys ...string) Option {
 	}
 }
 
-// HotKeyUnsupported marks normalized keys as unsupported by the headless
-// platform, so tests can exercise an app's unavailable path.
+// HotKeyUnsupported has the headless platform answer the global shortcuts of keys as desktop.HotKeyUnsupported.
 func HotKeyUnsupported(keys ...string) Option {
 	return func(a *App) {
 		if a.hotKeyStates == nil {

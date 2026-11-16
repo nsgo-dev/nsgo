@@ -98,26 +98,24 @@ func OnOpenFiles(cx *core.Scope, fn func(paths []string)) { cx.OnOpenFiles(fn) }
 // under it, and a menu its secondary click shows.
 func NewTray(cx *core.Scope, opts TrayOptions) *Tray { return cx.NewTray(opts) }
 
-// HotKeyState says whether a global shortcut is still pending, registered,
-// held by another registration, or unsupported by the key or session.
+// HotKeyState is what the platform answered a global shortcut's registration.
 type HotKeyState = core.HotKeyState
 
 const (
-	HotKeyPending     = core.HotKeyPending
-	HotKeyRegistered  = core.HotKeyRegistered
-	HotKeyTaken       = core.HotKeyTaken
+	// HotKeyPending waits for the platform's answer.
+	HotKeyPending = core.HotKeyPending
+	// HotKeyRegistered is a shortcut the platform fires.
+	HotKeyRegistered = core.HotKeyRegistered
+	// HotKeyTaken is a combination another registration holds: the app's own, or another app's on Windows and X11; on macOS another app's only when it registered exclusively.
+	HotKeyTaken = core.HotKeyTaken
+	// HotKeyUnsupported is a key the platform cannot make a global shortcut, or a platform or session with none.
 	HotKeyUnsupported = core.HotKeyUnsupported
 )
 
-// HotKey is a global shortcut registration whose State changes when the
-// platform answers it.
+// HotKey is a global shortcut's registration, whose State follows the platform's answers.
 type HotKey = core.HotKey
 
-// RegisterHotKey runs fn when key, in core.Scope.OnKey's form such as
-// "alt+space", is pressed whichever app has the focus, while the current
-// owner lives. Its returned handle starts Pending and settles to Registered,
-// Taken or Unsupported. Linux uses its compositor's global-shortcut portal
-// on Wayland and X11 passive grabs.
+// RegisterHotKey runs fn when key, in core.Scope.OnKey's form such as "alt+space", is pressed whichever app has the focus, while the current owner lives. The handle's State is Pending until the platform answers, then Registered, Taken or Unsupported, and Pending again while a change to the app's shortcuts registers them anew. Global shortcuts work on macOS, on Linux and, for an app run with nsgo.Run(App), on Windows; elsewhere, nsgo.NewView's hosts included, the handle is Unsupported. Linux uses X11 passive grabs, and its compositor's global-shortcut portal on Wayland, where the shortcut is Registered once the user accepts the binding.
 func RegisterHotKey(cx *core.Scope, key string, fn func()) *HotKey { return cx.RegisterHotKey(key, fn) }
 
 // SetDockVisible shows the app in the Dock and the app switcher, or

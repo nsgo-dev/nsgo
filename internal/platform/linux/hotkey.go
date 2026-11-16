@@ -132,6 +132,8 @@ type globalHotKeys struct {
 	ids          map[string]uint32
 	specs        []globalHotKeySpec
 	x11          *x11HotKeys
+	// x11Taken are the keys another X11 client's grab holds, which a portal that cannot take them reports taken.
+	x11Taken map[uint32]bool
 }
 
 const (
@@ -148,46 +150,51 @@ const (
 )
 
 // applyX11HotKeys uses passive grabs on the X11 root window. GTK 4 has no display filters; its GdkX11Display emits xevent for every X event before translating it, and the handler takes the grabbed key presses while the focused app keeps its normal event stream for every other key.
-func (w *window) applyX11HotKeys(keys []driver.KeyBinding) bool {
+//
+// It reports whether a grab succeeded, having then answered every key. Otherwise it answers none, and taken holds the keys another client's grab holds, which the portal, tried next, reports taken should it be unavailable.
+func (w *window) applyX11HotKeys(keys []driver.KeyBinding) (grabbed bool, taken map[uint32]bool) {
 	bindX11HotKeys()
 	if !x11HotKeysReady {
-		return false
+		return false, nil
 	}
 	gdk := gdkDisplayGetDefault()
 	if gdk == 0 {
-		return false
+		return false, nil
 	}
 	display := gdkX11DisplayGetXDisplay(gdk)
 	if display == 0 {
-		return false
+		return false, nil
 	}
 	x := &x11HotKeys{gdk: gdk, display: display, root: x11DefaultRootWindow(display), bindings: map[x11HotKey]uint32{}}
-	for _, key := range keys {
+	type answer struct {
+		id    uint32
+		state driver.HotKeyState
+	}
+	answers := make([]answer, len(keys))
+	for i, key := range keys {
+		answers[i] = answer{key.ID, driver.HotKeyUnsupported}
+		verdict := &answers[i].state
 		trigger, ok := portalTrigger(key.Key)
 		if !ok {
-			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		parts := strings.Split(trigger, "+")
 		name := parts[len(parts)-1]
 		keysym := x11StringToKeysym(cstr(name))
 		if keysym == 0 {
-			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		keycode := x11KeysymToKeycode(display, keysym)
 		if keycode == 0 {
-			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		mods, ok := x11TriggerModifiers(parts[:len(parts)-1])
 		if !ok {
-			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
 			continue
 		}
 		combo := x11HotKey{keycode: keycode, modifiers: mods}
 		if _, exists := x.bindings[combo]; exists {
-			w.hotKeyState(key.ID, driver.HotKeyTaken)
+			*verdict = driver.HotKeyTaken
 			continue
 		}
 		grabs := make([]x11Grab, 0, 4)
@@ -201,19 +208,30 @@ func (w *window) applyX11HotKeys(keys []driver.KeyBinding) bool {
 		}
 		if gdkX11DisplayErrorTrapPop(gdk) != 0 {
 			x.ungrab(grabs)
-			w.hotKeyState(key.ID, driver.HotKeyTaken)
+			*verdict = driver.HotKeyTaken
 			continue
 		}
 		x.grabs = append(x.grabs, grabs...)
 		x.bindings[combo] = key.ID
-		w.hotKeyState(key.ID, driver.HotKeyRegistered)
+		*verdict = driver.HotKeyRegistered
 	}
 	if len(x.grabs) == 0 {
-		return true
+		for _, a := range answers {
+			if a.state == driver.HotKeyTaken {
+				if taken == nil {
+					taken = map[uint32]bool{}
+				}
+				taken[a.id] = true
+			}
+		}
+		return false, taken
 	}
 	x.handler = gSignalConnect(gdk, "xevent", cbX11HotKeyEvent, w.handle)
 	w.hotKeys = &globalHotKeys{x11: x}
-	return true
+	for _, a := range answers {
+		w.hotKeyState(a.id, a.state)
+	}
+	return true, nil
 }
 
 func (w *window) hotKeyState(id uint32, state driver.HotKeyState) {
@@ -369,10 +387,11 @@ func (w *window) applyHotKeys(keys []driver.KeyBinding) {
 	if len(keys) == 0 || w.engine == nil {
 		return
 	}
-	if w.applyX11HotKeys(keys) {
+	grabbed, taken := w.applyX11HotKeys(keys)
+	if grabbed {
 		return
 	}
-	state := &globalHotKeys{ids: map[string]uint32{}}
+	state := &globalHotKeys{ids: map[string]uint32{}, x11Taken: taken}
 	for _, key := range keys {
 		trigger, ok := portalTrigger(key.Key)
 		if !ok {
@@ -421,7 +440,11 @@ func (w *window) hotKeyStates(state *globalHotKeys, status driver.HotKeyState) {
 		return
 	}
 	for _, spec := range state.specs {
-		w.hotKeyState(spec.key, status)
+		if status == driver.HotKeyUnsupported && state.x11Taken[spec.key] {
+			w.hotKeyState(spec.key, driver.HotKeyTaken)
+		} else {
+			w.hotKeyState(spec.key, status)
+		}
 	}
 }
 

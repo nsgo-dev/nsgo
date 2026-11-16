@@ -52,31 +52,30 @@ func TestEnvironmentReportsMinimized(t *testing.T) {
 	}
 }
 
+// TestHotKeyRegistrationAnswers: the headless platform registers an app's global shortcuts, answers a combination the app holds already as taken, and those HotKeyTaken and HotKeyUnsupported list as they say, so a test sees what the app shows for each.
 func TestHotKeyRegistrationAnswers(t *testing.T) {
-	var registered *core.HotKey
-	Start(t, func(cx *core.Scope) core.Node {
-		registered = cx.RegisterHotKey("Ctrl+Alt+K", nil)
-		return core.View{}
-	})
-	if registered.State() != core.HotKeyRegistered {
-		t.Fatalf("default hot key state %v, want registered", registered.State())
+	if Target() != "" {
+		t.Skip("a platform answers the shortcuts itself")
 	}
-	var taken *core.HotKey
-	Start(t, func(cx *core.Scope) core.Node {
-		taken = cx.RegisterHotKey("Ctrl+Alt+K", nil)
-		return core.View{}
-	}, HotKeyTaken("ctrl+alt+k"))
-	if taken.State() != core.HotKeyTaken {
-		t.Fatalf("taken hot key state %v", taken.State())
+	recorder := func(cx *core.Scope) core.Node {
+		first := cx.RegisterHotKey("Ctrl+Alt+K", nil)
+		again := cx.RegisterHotKey("ctrl+alt+k", nil)
+		other := cx.RegisterHotKey("Alt+Space", nil)
+		return core.View{Children: []core.Node{
+			core.Text{ContentFunc: func() string { return "first " + first.State().String() }},
+			core.Text{ContentFunc: func() string { return "again " + again.State().String() }},
+			core.Text{ContentFunc: func() string { return "other " + other.State().String() }},
+		}}
 	}
-	var unsupported *core.HotKey
-	Start(t, func(cx *core.Scope) core.Node {
-		unsupported = cx.RegisterHotKey("Ctrl+Alt+K", nil)
-		return core.View{}
-	}, HotKeyUnsupported("ctrl+alt+k"))
-	if unsupported.State() != core.HotKeyUnsupported {
-		t.Fatalf("unsupported hot key state %v", unsupported.State())
-	}
+	app := Start(t, recorder)
+	app.Find("text:first registered")
+	app.Find("text:again taken")
+	app.Find("text:other registered")
+
+	app = Start(t, recorder, HotKeyTaken("ctrl+alt+k"), HotKeyUnsupported("alt + space"))
+	app.Find("text:first taken")
+	app.Find("text:again taken")
+	app.Find("text:other unsupported")
 }
 
 // Headless there are no native pixels: Capture and CapturePNG skip the test, and Screenshot only logs, but still fails on a name that leaves the screenshots directory.

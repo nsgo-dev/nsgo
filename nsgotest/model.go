@@ -347,11 +347,16 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemNativeCommand:
 			v.NativeCommands = append(v.NativeCommands, NativeCommand{it.Value, it.Data})
 		case driver.ItemHotKeys:
+			// As the desktop platforms do, a combination the app registered already is taken.
+			held := map[string]bool{}
 			for _, key := range it.Keys {
 				state := core.HotKeyRegistered
 				if configured, ok := a.hotKeyStates[key.Key]; ok {
 					state = configured
+				} else if held[key.Key] {
+					state = core.HotKeyTaken
 				}
+				held[key.Key] = true
 				a.post(driver.Event{Kind: driver.EventHotKeyState, Count: key.ID, Index: int(state)})
 			}
 		case driver.ItemCanvas:

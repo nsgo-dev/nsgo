@@ -92,11 +92,15 @@ func (s *surface) hotKeys(keys []driver.KeyBinding) {
 		}
 		var ref uintptr
 		// EventHotKeyID is its signature and the ID, passed in one register.
-		if carbon.registerEventHotKey(code, mods, signature|uint64(k.ID)<<32, carbon.getApplicationEventTarget(), 0, &ref) == 0 {
+		// Carbon refuses a combination this app has registered, or another has registered exclusively, with eventHotKeyExistsErr; it does not see other apps' ordinary registrations.
+		switch status := carbon.registerEventHotKey(code, mods, signature|uint64(k.ID)<<32, carbon.getApplicationEventTarget(), 0, &ref); status {
+		case 0:
 			registered[k.ID] = hotKey{ref, s}
 			s.hotKeyState(k.ID, driver.HotKeyRegistered)
-		} else {
+		case eventHotKeyExistsErr:
 			s.hotKeyState(k.ID, driver.HotKeyTaken)
+		default:
+			s.hotKeyState(k.ID, driver.HotKeyUnsupported)
 		}
 	}
 }
@@ -114,6 +118,9 @@ func unregisterHotKeys() {
 		delete(registered, id)
 	}
 }
+
+// eventHotKeyExistsErr is RegisterEventHotKey's OSStatus for a combination already registered.
+const eventHotKeyExistsErr = -9878
 
 // Carbon's modifiers.
 const carbonCmd, carbonShift, carbonOption, carbonControl = 1 << 8, 1 << 9, 1 << 11, 1 << 12

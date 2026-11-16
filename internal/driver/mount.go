@@ -267,8 +267,7 @@ const (
 	// ItemTrayMenu shows Menu at the place of tray icon Tray.ID, numbered
 	// Count as ItemPopupMenu's menus are.
 	ItemTrayMenu
-	// ItemHotKeys replaces the app's global shortcuts (Keys, each with its
-	// ID), which fire whichever app has the focus with EventHotKey.
+	// ItemHotKeys replaces the app's global shortcuts (Keys, each with its ID), which fire whichever app has the focus with EventHotKey. The platform answers each key with EventHotKeyState once it knows whether the key registered.
 	ItemHotKeys
 	// ItemDock shows the app in the Dock and the app switcher (On), or
 	// leaves it to its tray icon and windows.

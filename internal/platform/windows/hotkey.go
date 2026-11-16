@@ -23,13 +23,22 @@ const (
 	modShift    = 0x0004
 	modWin      = 0x0008
 	modNoRepeat = 0x4000
+
+	// errHotKeyAlreadyRegistered is ERROR_HOTKEY_ALREADY_REGISTERED: a window or thread on the desktop, this app's or another's, holds the combination.
+	errHotKeyAlreadyRegistered = 1409
 )
 
 // hotKeysApply replaces the app's global shortcuts. RegisterHotKey sends
 // WM_HOTKEY to this window even when another app has the focus.
 func (w *window) hotKeysApply(keys []driver.KeyBinding) {
 	w.unregisterHotKeys()
-	if len(keys) == 0 || w.hwnd == 0 {
+	if w.hwnd == 0 {
+		for _, key := range keys {
+			w.hotKeyState(key.ID, driver.HotKeyUnsupported)
+		}
+		return
+	}
+	if len(keys) == 0 {
 		return
 	}
 	if w.hotKeys == nil {
@@ -44,7 +53,7 @@ func (w *window) hotKeysApply(keys []driver.KeyBinding) {
 		if r, _, err := registerHotKey.Call(w.hwnd, uintptr(key.ID), uintptr(mods|modNoRepeat), vk); r != 0 {
 			w.hotKeys[key.ID] = struct{}{}
 			w.hotKeyState(key.ID, driver.HotKeyRegistered)
-		} else if err == syscall.Errno(1409) { // ERROR_HOTKEY_ALREADY_REGISTERED
+		} else if err == syscall.Errno(errHotKeyAlreadyRegistered) {
 			w.hotKeyState(key.ID, driver.HotKeyTaken)
 		} else {
 			w.hotKeyState(key.ID, driver.HotKeyUnsupported)

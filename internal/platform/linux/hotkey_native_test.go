@@ -5,12 +5,16 @@ package linux
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
 
+	"github.com/ebitengine/purego"
+
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/engine"
 )
 
 // TestGlobalShortcutsReachTheBackend runs an app that registers a global shortcut in a real GTK window: the shortcut reaches X11's grabs, a grabbed press runs it, and so does the portal's activation of its session.
@@ -86,5 +90,106 @@ func TestGlobalShortcutsReachTheBackend(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	if got := w.titleOf(t); got != title+"|2" {
 		t.Errorf("another session's activation ran the shortcut: %q", got)
+	}
+}
+
+// holdX11Combo grabs combo, a trigger as portalTrigger writes it, on a display connection of its own, as another client would, until the test ends.
+func holdX11Combo(t *testing.T, combo string) {
+	t.Helper()
+	lib, err := purego.Dlopen("libX11.so.6", purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		t.Skip("no libX11")
+	}
+	var (
+		openDisplay  func(name *byte) uintptr
+		closeDisplay func(display uintptr) int32
+		defaultRoot  func(display uintptr) uintptr
+		stringToSym  func(name *byte) uintptr
+		symToCode    func(display, keysym uintptr) uint8
+		grabKey      func(display uintptr, keycode int32, modifiers uint32, root uintptr, ownerEvents, pointerMode, keyboardMode int32) int32
+		syncDisplay  func(display uintptr, discard int32) int32
+	)
+	purego.RegisterLibFunc(&openDisplay, lib, "XOpenDisplay")
+	purego.RegisterLibFunc(&closeDisplay, lib, "XCloseDisplay")
+	purego.RegisterLibFunc(&defaultRoot, lib, "XDefaultRootWindow")
+	purego.RegisterLibFunc(&stringToSym, lib, "XStringToKeysym")
+	purego.RegisterLibFunc(&symToCode, lib, "XKeysymToKeycode")
+	purego.RegisterLibFunc(&grabKey, lib, "XGrabKey")
+	purego.RegisterLibFunc(&syncDisplay, lib, "XSync")
+	display := openDisplay(nil)
+	if display == 0 {
+		t.Skip("no X11 display")
+	}
+	t.Cleanup(func() { closeDisplay(display) })
+	parts := strings.Split(combo, "+")
+	mods, ok := x11TriggerModifiers(parts[:len(parts)-1])
+	keycode := symToCode(display, stringToSym(cstr(parts[len(parts)-1])))
+	if !ok || keycode == 0 {
+		t.Fatalf("no grab for %s", combo)
+	}
+	grabKey(display, int32(keycode), mods, defaultRoot(display), 0, x11GrabModeAsync, x11GrabModeAsync)
+	syncDisplay(display, 0)
+}
+
+// hotKeyStatesApp registers keys as global shortcuts and shows their states in the window's title, after title and each separated by |.
+func hotKeyStatesApp(title string, keys ...string) engine.App {
+	return func(cx *core.Scope) core.Node {
+		handles := make([]*core.HotKey, len(keys))
+		for i, key := range keys {
+			handles[i] = cx.RegisterHotKey(key, nil)
+		}
+		cx.Effect(func() {
+			states := []string{title}
+			for _, h := range handles {
+				states = append(states, h.State().String())
+			}
+			cx.SetTitle(strings.Join(states, "|"))
+		})
+		return core.View{Style: core.Style{Background: driver.RGB(0xffffff)}}
+	}
+}
+
+// TestGlobalShortcutAnswers registers global shortcuts on an X11 display where another client grabbed one of them: that one is taken, as a second registration of the app's own is, a free one registers, and a key X11 has no keysym for is unsupported.
+func TestGlobalShortcutAnswers(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("WAYLAND_DISPLAY") != "" || os.Getenv("DISPLAY") == "" {
+		t.Skip("grabs keys on an X11 display")
+	}
+	holdX11Combo(t, "CTRL+ALT+j")
+	title := "nsgo-hotkey-answers"
+	w := startTestWindow(t, hotKeyStatesApp(title, "ctrl+alt+j", "ctrl+alt+k", "ctrl+alt+k", "ctrl+alt+nosuchkey"),
+		Options{Title: title, Width: 200, Height: 100})
+	waitForTitle(t, w, title+"|taken|registered|taken|unsupported")
+}
+
+// TestGlobalShortcutTakenWithoutPortal registers only a combination another X11 client grabbed: with no grab of its own the backend tries the portal, and a portal that cannot take it either, such as GNOME's before 48, reports it taken rather than unsupported.
+func TestGlobalShortcutTakenWithoutPortal(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("WAYLAND_DISPLAY") != "" || os.Getenv("DISPLAY") == "" {
+		t.Skip("grabs keys on an X11 display")
+	}
+	holdX11Combo(t, "CTRL+ALT+j")
+	title := "nsgo-hotkey-portal"
+	w := startTestWindow(t, hotKeyStatesApp(title, "ctrl+alt+j"), Options{Title: title, Width: 200, Height: 100})
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		switch got := w.titleOf(t); got {
+		case title + "|taken":
+			return
+		case title + "|pending":
+			if time.Now().After(deadline) {
+				t.Skip("the portal is asking the user to bind the shortcut")
+			}
+			time.Sleep(20 * time.Millisecond)
+		default:
+			if strings.HasPrefix(got, title+"|") {
+				t.Fatalf("the held combination answered %q, want taken", got)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
 }

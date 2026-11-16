@@ -157,12 +157,24 @@ if err == nil {
 }
 ```
 
-`cx.Env().Lifecycle()` says whether the app is active, inactive or in the background: on desktops the window `cx` is in, so a minimized window's content can pause while another window shows, and in the app's own scope all its windows together. `desktop.Minimized(cx)` says whether that window is minimized. `cx.OnQuit` cleans up as it quits, however it does, with 200 ms for its work. `desktop.OnQuitRequest` hears a quit the user asks for on macOS, such as Cmd+Q, and may cancel it or defer it while it asks the user. `cx.SetAppearance` forces light or dark, `cx.SetLocale` chooses the language, `cx.OnKey` binds a keyboard shortcut, which rests while what its owner shows is hidden or under a dialog unless `core.KeyOptions{OverModals: true}` keeps it, `cx.RegisterHotKey` binds one while any app is frontmost, and `cx.OnOpenFiles` hears the documents a macOS app opens.
+`cx.Env().Lifecycle()` says whether the app is active, inactive or in the background: on desktops the window `cx` is in, so a minimized window's content can pause while another window shows, and in the app's own scope all its windows together. `desktop.Minimized(cx)` says whether that window is minimized. `cx.OnQuit` cleans up as it quits, however it does, with 200 ms for its work. `desktop.OnQuitRequest` hears a quit the user asks for on macOS, such as Cmd+Q, and may cancel it or defer it while it asks the user. `cx.SetAppearance` forces light or dark, `cx.SetLocale` chooses the language, `cx.OnKey` binds a keyboard shortcut, which rests while what its owner shows is hidden or under a dialog unless `core.KeyOptions{OverModals: true}` keeps it, and `cx.OnOpenFiles` hears the documents a macOS app opens.
 
 ```go
 cx.OnKey("mod+k", func() { palette.Set(true) })
 cx.SetLocale("de")
 cx.OnQuit(func(ctx context.Context) { saveDraft(ctx) })
+```
+
+`desktop.RegisterHotKey` binds a global shortcut, which works while any app is frontmost, on macOS, on Linux and in a Windows app run with `nsgo.Run(App)`. Its handle's `State` says whether the system took it: `HotKeyPending` until it answers, then `HotKeyRegistered`, `HotKeyTaken` when another registration holds the combination, or `HotKeyUnsupported` for a key or a platform without global shortcuts, so a shortcut recorder can ask for another combination. On macOS a combination counts as taken only when the app holds it already or another app registered it exclusively. On Wayland the compositor asks the user to bind the shortcut, and it is registered once they have. In tests, `nsgotest.HotKeyTaken` and `nsgotest.HotKeyUnsupported` make combinations answer so.
+
+```go
+shortcut := desktop.RegisterHotKey(cx, "alt+space", launcher.Toggle)
+warning := core.Text{ContentFunc: func() string {
+	if shortcut.State() == desktop.HotKeyTaken {
+		return "Another app uses Alt+Space"
+	}
+	return ""
+}}
 ```
 
 ## Biometrics

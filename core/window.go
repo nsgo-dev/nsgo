@@ -648,14 +648,12 @@ const (
 	HotKeyUnsupported = driver.HotKeyUnsupported
 )
 
-// HotKey is a global shortcut registration. State reads the latest answer
-// from the platform and can be read inside a reactive computation.
+// HotKey is the core's part of desktop.HotKey: a global shortcut's registration, whose State follows the platform's answers.
 type HotKey struct {
 	state *Signal[HotKeyState]
 }
 
-// State returns the registration state. It starts Pending and changes when
-// the platform answers the latest registration.
+// State returns the registration state and subscribes the running computation to it. It is Pending until the platform answers, and again each time the app's set of shortcuts changes and the platform registers them anew; where the platform has no global shortcuts it is Unsupported from the start.
 func (h *HotKey) State() HotKeyState {
 	if h == nil || h.state == nil {
 		return HotKeyUnsupported
@@ -663,9 +661,7 @@ func (h *HotKey) State() HotKeyState {
 	return h.state.Get()
 }
 
-// RegisterHotKey is the core's part of desktop.RegisterHotKey, which apps
-// use: fn runs when key, in OnKey's form, is pressed whichever app has
-// the focus, while the current owner lives.
+// RegisterHotKey is the core's part of desktop.RegisterHotKey, which apps use: fn runs when key, in OnKey's form, is pressed whichever app has the focus, while the current owner lives. The handle it returns says whether the platform registered it.
 func (cx *Scope) RegisterHotKey(key string, fn func()) *HotKey {
 	rt := cx.rt
 	if rt.windows == nil && !rt.takesHotKeys {

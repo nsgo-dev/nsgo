@@ -106,7 +106,7 @@ type RootOptions struct {
 	// window's options (SetMainView): the first tree is then the app's
 	// own surface, which shows no view.
 	Windows *WindowOptions
-	// HotKeys, set where the platform registers global shortcuts but opens no windows, sends RegisterHotKey's shortcuts to the first tree, as a platform that opens windows has them sent to the app's own surface.
+	// HotKeys, set where the platform registers global shortcuts but opens no windows, sends RegisterHotKey's shortcuts to the first tree, as a platform that opens windows has them sent to the app's own surface. The platform answers each with EventHotKeyState; elsewhere RegisterHotKey's handles are unsupported at once.
 	HotKeys bool
 	// Tray is set where the platform supports app-level tray icons without
 	// opening additional windows.

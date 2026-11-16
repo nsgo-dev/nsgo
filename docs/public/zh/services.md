@@ -157,12 +157,24 @@ if err == nil {
 }
 ```
 
-`cx.Env().Lifecycle()` 说明应用处于前台、非活动还是后台：在桌面上是 `cx` 所在窗口的状态，所以一个窗口最小化时其内容可以暂停，而其他窗口照常显示；在应用自身的作用域里则是所有窗口合起来的状态。`desktop.Minimized(cx)` 说明该窗口是否最小化。`cx.OnQuit` 在应用退出时做清理，无论以何种方式退出，最多有 200 毫秒完成工作。`desktop.OnQuitRequest` 在 macOS 上听到用户发起的退出，例如 Cmd+Q，可以取消它，或推迟到询问过用户再答复。`cx.SetAppearance` 强制浅色或深色，`cx.SetLocale` 选择语言，`cx.OnKey` 绑定键盘快捷键，它的所有者显示的内容被隐藏或被对话框盖住时不生效，除非用 `core.KeyOptions{OverModals: true}` 保留，`cx.RegisterHotKey` 绑定任何应用在前台时都生效的快捷键，`cx.OnOpenFiles` 听到 macOS 应用打开的文件。
+`cx.Env().Lifecycle()` 说明应用处于前台、非活动还是后台：在桌面上是 `cx` 所在窗口的状态，所以一个窗口最小化时其内容可以暂停，而其他窗口照常显示；在应用自身的作用域里则是所有窗口合起来的状态。`desktop.Minimized(cx)` 说明该窗口是否最小化。`cx.OnQuit` 在应用退出时做清理，无论以何种方式退出，最多有 200 毫秒完成工作。`desktop.OnQuitRequest` 在 macOS 上听到用户发起的退出，例如 Cmd+Q，可以取消它，或推迟到询问过用户再答复。`cx.SetAppearance` 强制浅色或深色，`cx.SetLocale` 选择语言，`cx.OnKey` 绑定键盘快捷键，它的所有者显示的内容被隐藏或被对话框盖住时不生效，除非用 `core.KeyOptions{OverModals: true}` 保留，`cx.OnOpenFiles` 听到 macOS 应用打开的文件。
 
 ```go
 cx.OnKey("mod+k", func() { palette.Set(true) })
 cx.SetLocale("de")
 cx.OnQuit(func(ctx context.Context) { saveDraft(ctx) })
+```
+
+`desktop.RegisterHotKey` 绑定全局快捷键，无论哪个应用在前台都生效，支持 macOS、Linux，以及用 `nsgo.Run(App)` 运行的 Windows 应用。它返回的句柄的 `State` 说明系统是否接受了它：系统答复前是 `HotKeyPending`，之后是 `HotKeyRegistered`；组合键已被其他注册占用时是 `HotKeyTaken`；按键或平台不支持全局快捷键时是 `HotKeyUnsupported`。快捷键录制器据此可以请用户换一个组合。在 macOS 上，只有应用自己已注册、或其他应用以独占方式注册的组合键才算被占用。在 Wayland 上由合成器请用户绑定快捷键，用户绑定后才是已注册。测试中用 `nsgotest.HotKeyTaken` 和 `nsgotest.HotKeyUnsupported` 让组合键这样答复。
+
+```go
+shortcut := desktop.RegisterHotKey(cx, "alt+space", launcher.Toggle)
+warning := core.Text{ContentFunc: func() string {
+	if shortcut.State() == desktop.HotKeyTaken {
+		return "Alt+Space 已被其他应用使用"
+	}
+	return ""
+}}
 ```
 
 ## Android 上的悬浮窗
