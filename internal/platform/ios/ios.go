@@ -600,6 +600,7 @@ func (s *surface) environment() driver.Environment {
 		OSVersion:        osVersion(),
 		Idiom:            idiom,
 		Speech:           apple.SpeechAvailable(),
+		Speak:            apple.SpeakAvailable(),
 		Camera:           cameraAvailable(),
 		CanSendInput:     false,
 		HasWebView:       idiom != driver.IdiomTV,
@@ -894,6 +895,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemAuthSession:
 			apple.HandleAuthSession(it.Count, *it.Auth, s.uiWindow, s.engine.Dispatch)
+			continue
+		case driver.ItemSpeak:
+			apple.HandleSpeak(it.Count, *it.Speak, s.engine.Dispatch)
 			continue
 		case driver.ItemSetClipboard:
 			objc.ID(apple.Class("UIPasteboard")).Send(sel("generalPasteboard")).Send(sel("setString:"), apple.NSString(it.Value))

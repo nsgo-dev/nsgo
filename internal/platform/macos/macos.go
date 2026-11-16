@@ -976,6 +976,7 @@ func (s *surface) environment() driver.Environment {
 		ScreenReader:     objc.Send[bool](ws, sel("isVoiceOverEnabled")),
 		ScreenColor:      true,
 		Speech:           apple.SpeechAvailable(),
+		Speak:            apple.SpeakAvailable(),
 		CanSendInput:     true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
@@ -1489,6 +1490,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemAuthSession:
 			s.authSession(it.Count, *it.Auth)
+			continue
+		case driver.ItemSpeak:
+			apple.HandleSpeak(it.Count, *it.Speak, s.engine.Dispatch)
 			continue
 		case driver.ItemSetClipboard:
 			pb := objc.ID(apple.Class("NSPasteboard")).Send(sel("generalPasteboard"))
