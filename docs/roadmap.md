@@ -263,7 +263,7 @@ watchOS runs in a SwiftUI host, its views nodes Go draws into ([platforms](../AR
 | The Digital Crown and native touches | — | A view that pans or turns a value takes the crown's rotation, and the test host posts touches SwiftUI sees, so tests reach its scrolls and text fields as a finger does |
 | Leaving views animated | `animation.md` | A commit's layout animation takes views out with its Delete, which leave at once on a watch now |
 | What watchOS has not | — | Web views, video, native components and shaders (no WebKit, AVKit views or Metal), the clipboard, pickers, files, sharing and speech report `ErrUnsupported`, each checked from the gallery; the views show empty boxes and the services answer unsupported now |
-| Permissions on Apple Watch | `services.md` (Permissions) | The SwiftUI host tells and asks for the microphone (`AVAudioSession`'s record permission), calendars, reminders and Bluetooth, which answer unknown now, and answers the notification permission, which it leaves unanswered now |
+| Permissions on Apple Watch | `services.md` (Permissions) | The SwiftUI host tells and asks for the microphone (`AVAudioSession`'s record permission), calendars, reminders and Bluetooth, which answer unknown now, and shows notifications through `UNUserNotificationCenter` with its permission, which answers unavailable now |
 
 ## Mini programs
 
@@ -279,7 +279,7 @@ Go apps run in a mini program through a runtime checked in a stand-in host alone
 | Larger apps | — | An app of `ui`'s common components fits the platforms' 2 MB, by what the module links (encoding/json, CLDR's data, unused components) rather than by turning inlining off |
 | What WeChat draws | — | The app's font files (`loadFontFace`), images tinted with `TintColor`, inline views aligned off the baseline, selection areas and videos (`<video>`) |
 | What a mini program has not | — | Web views (`<web-view>` fills a page of its own), native components, shaders and TSX report `ErrUnsupported` or refuse to build, each checked |
-| Permissions in mini programs | `services.md` (Permissions) | `wx.getSetting` and `wx.authorize` tell and ask for `scope.record`, `scope.camera` and `scope.bluetooth`, `wx.openSetting` opens their settings, the other platforms' counterparts do the same, and the notification permission is answered, which it is not now |
+| Permissions in mini programs | `services.md` (Permissions) | `wx.getSetting` and `wx.authorize` tell and ask for `scope.record`, `scope.camera` and `scope.bluetooth`, `wx.openSetting` opens their settings, the other platforms' counterparts do the same |
 
 ## Installers
 

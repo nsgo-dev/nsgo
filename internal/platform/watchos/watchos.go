@@ -463,10 +463,11 @@ func (s *surface) apply(b *driver.MountBatch) {
 			driver.AnswerPermission(it.Count, *it.Permission, watchPermission, s.engine.Dispatch)
 			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification:
+			// The SwiftUI host reaches no UNUserNotificationCenter yet (docs/roadmap.md): the permission answers unavailable and nothing shows.
 			s.engine.Dispatch(driver.NoNotification(it))
 			continue
 		case driver.ItemCloseNotification, driver.ItemBadge:
-			// watchOS has no notification center or app badge API.
+			// Nothing shows to close, and a watch app's icon has no badge.
 			continue
 		case driver.ItemReadClipboard, driver.ItemPickImages, driver.ItemTakePhoto, driver.ItemPickFiles,
 			driver.ItemPickDirectories, driver.ItemOpenFile, driver.ItemRevealFile, driver.ItemTrashFile, driver.ItemShare, driver.ItemSaveFile:

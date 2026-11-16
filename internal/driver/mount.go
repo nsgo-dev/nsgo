@@ -406,8 +406,7 @@ const (
 	NotificationsUnavailable
 )
 
-// NoNotification answers a notification request on a target without a
-// notification API: permission is unavailable, and showing it fails.
+// NoNotification is how a platform that shows no notifications answers ItemNotificationPermission and ItemShowNotification: the permission is unavailable, and the notification is not shown.
 func NoNotification(it *MountItem) Event {
 	if it.Kind == ItemNotificationPermission {
 		return Event{Kind: EventNotification, Count: it.Count, Index: NotificationsUnavailable}
