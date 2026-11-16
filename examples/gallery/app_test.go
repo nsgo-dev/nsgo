@@ -1691,6 +1691,8 @@ func TestTerminal(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("runs a Unix shell")
 	}
+	// A plain sh rather than the user's shell, whose prompt may set a title of its own over the test's.
+	t.Setenv("SHELL", "/bin/sh")
 	app := startDesktop(t)
 	open(app, "Terminal")
 	app.Find("id:terminal")
