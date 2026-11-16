@@ -11,7 +11,7 @@ import (
 // its app.
 func newEmbedded(t *testing.T, ch *Host, app func(cx *Scope) Node) *host {
 	h := &host{t: t, clock: NewManualClock(time.Unix(0, 0))}
-	h.root = NewRoot(RootOptions{
+	h.root = testRoot(RootOptions{
 		Post: func(fn func()) {
 			h.mu.Lock()
 			h.posts = append(h.posts, fn)

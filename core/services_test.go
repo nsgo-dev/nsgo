@@ -141,7 +141,7 @@ func TestOpenURL(t *testing.T) {
 	})
 	var posts []func()
 	var mu sync.Mutex
-	root := NewRoot(RootOptions{Host: host, Post: func(fn func()) { mu.Lock(); posts = append(posts, fn); mu.Unlock() }})
+	root := testRoot(RootOptions{Host: host, Post: func(fn func()) { mu.Lock(); posts = append(posts, fn); mu.Unlock() }})
 	tree := NewTree(root, ApproxTextEngine{})
 	tree.Mount(func(c *Scope) Node { cx = c; return View{} })
 	tree.Commit()

@@ -83,6 +83,10 @@ func (rt *runtime) unpark(p *parking) {
 
 // RootOptions connect a graph to its host, an engine or a test driver.
 type RootOptions struct {
+	// CheckCommits compares incremental commits with a full layout and
+	// panics on changes the incremental pass missed. Tests enable it;
+	// performance measurements leave it off for their own graph.
+	CheckCommits bool
 	// Post runs fn on the graph's goroutine later. It must be safe to
 	// call from any goroutine and must not block.
 	Post func(fn func())
@@ -122,7 +126,7 @@ func NewRoot(opts RootOptions) *Scope {
 	if opts.Clock == nil {
 		opts.Clock = SystemClock{}
 	}
-	rt := &runtime{post: opts.Post, clock: opts.Clock, report: opts.Report,
+	rt := &runtime{post: opts.Post, clock: opts.Clock, report: opts.Report, checkCommits: opts.CheckCommits,
 		store: opts.Storage, secrets: opts.Secrets, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
 		requestFrame: opts.RequestFrame, windows: opts.Windows, takesHotKeys: opts.HotKeys, tray: opts.Tray}
 	rt.root = &Scope{rt: rt}
@@ -138,6 +142,11 @@ func NewRoot(opts RootOptions) *Scope {
 const maxRuns = 1_000_000
 
 type runtime struct {
+	checkCommits bool
+	classCache   parseCache[classSource, *classList]
+	templates    parseCache[GridTracks, *gridTemplate]
+	reported     parseCache[string, bool]
+
 	owner    *Scope       // the owner of what running code creates
 	observer *computation // the computation reads subscribe
 	batch    int

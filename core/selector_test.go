@@ -3,7 +3,7 @@ package core
 import "testing"
 
 func TestSelectorRunsOnlyTheRowsThatChange(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	selected := NewSignal(cx, 2)
 	is := NewSelector(cx, selected.Get)
 	runs := make([]int, 5)
@@ -50,7 +50,7 @@ func TestSelectorRunsOnlyTheRowsThatChange(t *testing.T) {
 }
 
 func TestSelectorForgetsKeysNobodyReads(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	selected := NewSignal(cx, 0)
 	s := newSelector(cx, selected.Get)
 	rows := make([]*Scope, 100)

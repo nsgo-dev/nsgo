@@ -16,7 +16,10 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-func init() { driver.CheckCommits = true }
+func testRoot(opts RootOptions) *Scope {
+	opts.CheckCommits = true
+	return NewRoot(opts)
+}
 
 // host runs a tree headless: posts queue until drain, text is approximate.
 type host struct {
@@ -33,7 +36,7 @@ type host struct {
 
 func newHost(t *testing.T, size Size, app func(cx *Scope) Node) *host {
 	h := &host{t: t, clock: NewManualClock(time.Unix(0, 0))}
-	h.root = NewRoot(RootOptions{
+	h.root = testRoot(RootOptions{
 		Post: func(fn func()) {
 			h.mu.Lock()
 			h.posts = append(h.posts, fn)
@@ -130,7 +133,7 @@ func kinds(b *driver.MountBatch) map[driver.ItemKind]int {
 }
 
 func TestSignalsMemosAndEffects(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	count := NewSignal(cx, 1)
 	doubled := NewMemo(cx, func() int { return count.Get() * 2 })
 	parity := NewMemo(cx, func() bool { return doubled.Get()%4 == 0 })
@@ -156,7 +159,7 @@ func TestSignalsMemosAndEffects(t *testing.T) {
 }
 
 func TestSignalFuncNotifiesSlices(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	list := NewSignalFunc(cx, []int{1}, nil)
 	runs := 0
 	cx.Effect(func() { list.Get(); runs++ })
@@ -170,7 +173,7 @@ func TestSignalFuncNotifiesSlices(t *testing.T) {
 // orders other than they came, each move of a reader into a freed slot
 // keeping its place in the others' lists.
 func TestReadersUnlinkInAnyOrder(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	a, b, gate := NewSignal(cx, 0), NewSignal(cx, 0), NewSignal(cx, true)
 	runs := make([]int, 6)
 	for i := range runs {
@@ -202,7 +205,7 @@ func TestReadersUnlinkInAnyOrder(t *testing.T) {
 }
 
 func TestOwnersDisposeAndCleanUp(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	on := NewSignal(cx, true)
 	n := NewSignal(cx, 0)
 	var log []string
@@ -224,7 +227,7 @@ func TestOwnersDisposeAndCleanUp(t *testing.T) {
 
 func TestDisposalBatchesCleanupWrites(t *testing.T) {
 	theme := NewKey("theme during dispose", "none")
-	root := NewRoot(RootOptions{})
+	root := testRoot(RootOptions{})
 	theme.Provide(root, "dark")
 	page := root.Child()
 	flag := NewSignal(page, true)
@@ -245,7 +248,7 @@ func TestDisposalBatchesCleanupWrites(t *testing.T) {
 // An effect outside the disposed subtree runs once for all the cleanups' writes, after the subtree is gone, with its context values.
 func TestDisposalFlushesOutsideEffectsAfterCleanup(t *testing.T) {
 	theme := NewKey("theme after dispose", "none")
-	root := NewRoot(RootOptions{})
+	root := testRoot(RootOptions{})
 	page := root.Child()
 	theme.Provide(page, "dark")
 	n := NewSignal(page, 0)
@@ -295,7 +298,7 @@ func TestDisposalBuildsNoBranch(t *testing.T) {
 
 // A memo read outside a batch disposes what it built before it runs again; a cleanup's write there runs its readers only after the memo has run, never the memo inside its own run.
 func TestMemoRerunBatchesCleanupWrites(t *testing.T) {
-	root := NewRoot(RootOptions{})
+	root := testRoot(RootOptions{})
 	src := NewSignal(root, 0)
 	n := NewSignal(root, 0)
 	runs := 0
@@ -322,7 +325,7 @@ func TestMemoRerunBatchesCleanupWrites(t *testing.T) {
 }
 
 func TestEffectRerunsOnOwnWrite(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	n := NewSignal(cx, 0)
 	cx.Effect(func() {
 		if v := n.Get(); v < 3 {

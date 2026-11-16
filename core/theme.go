@@ -5,7 +5,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"sync"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -82,29 +81,16 @@ func (p *Palette) SetColor(name string, c Color) {
 		p.Colors = map[string]Color{}
 	}
 	p.Colors[name] = c
-	if _, known := themeColors.LoadOrStore(name, struct{}{}); !known {
-		// Classes parsed before it was a color name read it now.
-		classCache.Clear()
-	}
 }
 
-// themeColors are the names of colors themes added to their palettes,
-// which classes name: bg-inset, text-muted-foreground.
-var themeColors sync.Map
-
-// noteColors makes the colors a theme holds names classes know, whether
-// SetColor or a literal Colors added them.
-func (t *Theme) noteColors() {
+// hasColor reports names defined by this theme in either appearance.
+func (t *Theme) hasColor(name string) bool {
 	if t == nil {
-		return
+		return false
 	}
-	for _, p := range []*Palette{&t.Light, &t.Dark} {
-		for name := range p.Colors {
-			if _, known := themeColors.LoadOrStore(name, struct{}{}); !known {
-				classCache.Clear()
-			}
-		}
-	}
+	_, light := t.Light.Color(name)
+	_, dark := t.Dark.Color(name)
+	return light || dark
 }
 
 // clone returns p with a Colors of its own.
@@ -434,7 +420,6 @@ type (
 // Called at the app's root it is the app's theme; a deeper call wins
 // for its subtree, so a sidebar or a panel can take another.
 func (cx *Scope) SetTheme(t *Theme) {
-	t.noteColors()
 	o := cx
 	if s, ok := o.values[scopeTheme{}].(*Signal[*Theme]); ok {
 		s.Set(t)

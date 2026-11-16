@@ -14,7 +14,7 @@ import (
 func TestCommitsRecordWhatTheyFollowFrom(t *testing.T) {
 	driver.TraceCauses = true
 	defer func() { driver.TraceCauses = false }()
-	root := core.NewRoot(core.RootOptions{Post: func(func()) {}, Clock: core.NewManualClock(time.Unix(0, 0))})
+	root := core.NewRoot(core.RootOptions{CheckCommits: true, Post: func(func()) {}, Clock: core.NewManualClock(time.Unix(0, 0))})
 	tree := core.NewTree(root, core.ApproxTextEngine{})
 	tree.Resize(core.Size{Width: 100, Height: 100}, core.Geometry{})
 	var count *core.Signal[int]
@@ -57,7 +57,7 @@ func TestCommitsRecordWhatTheyFollowFrom(t *testing.T) {
 }
 
 func TestCommitsRecordNothingUnlessTraced(t *testing.T) {
-	root := core.NewRoot(core.RootOptions{Post: func(func()) {}})
+	root := core.NewRoot(core.RootOptions{CheckCommits: true, Post: func(func()) {}})
 	tree := core.NewTree(root, core.ApproxTextEngine{})
 	tree.Resize(core.Size{Width: 100, Height: 100}, core.Geometry{})
 	var count *core.Signal[int]

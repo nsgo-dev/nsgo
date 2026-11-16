@@ -102,7 +102,7 @@ Layout is incremental, as NSH's layout tree:
 - Sizes and offsets are counted in whole pixels before they become points (`span`), each edge snapped to a 64th of a pixel first, so the same pixels give the same `float32` wherever a scroll puts them and a frame that stays on its pixels is not sent again, as NSH's `#617`.
 - Rounding goes only under a node laid out again since its children were rounded, or carried from another place than whole pixels away from the last: a box scrolled by whole pixels rounds itself, not its subtree (`roundLayout`). Frames are taken again only under a view whose children were rounded since (`syncFrames`), as NSH's `#637`: a positioned view is the containing block of what is absolute in it, so all of its subtree is rounded through it, and the frames under a static one are always taken, since its absolute views are placed by its ancestors.
 
-Tests keep the marks honest: with `driver.CheckCommits`, which `nsgotest` and the core's tests set, each commit is followed by one that lays every node out anew and compares every node, and panics on what the first missed.
+Tests keep the marks honest: with `RootOptions.CheckCommits`, which `nsgotest` and the core's tests enable for their own graphs, each commit is followed by one that lays every node out anew and compares every node, and panics on what the first missed. An engine passes this setting to every surface it opens; a performance measurement disables only its own engine's checks.
 
 `layout.go` maps styles with React Native's defaults, as NSH does:
 

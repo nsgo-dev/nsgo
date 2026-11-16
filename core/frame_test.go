@@ -54,7 +54,7 @@ func TestRequestAnimationFrameStops(t *testing.T) {
 // and again only when one of them waits for the next.
 func TestRequestAnimationFrameAsksOncePerFrame(t *testing.T) {
 	requests := 0
-	root := NewRoot(RootOptions{
+	root := testRoot(RootOptions{
 		Post:         func(func()) {},
 		Clock:        NewManualClock(time.Unix(0, 0)),
 		RequestFrame: func() { requests++ },
@@ -84,7 +84,7 @@ func TestRequestAnimationFrameAsksOncePerFrame(t *testing.T) {
 // A callback that registers another during a frame waits for the next
 // one, and a callback stopped during a frame does not come back in it.
 func TestRequestAnimationFrameChangesDuringAFrame(t *testing.T) {
-	root := NewRoot(RootOptions{
+	root := testRoot(RootOptions{
 		Post:         func(func()) {},
 		Clock:        NewManualClock(time.Unix(0, 0)),
 		RequestFrame: func() {},

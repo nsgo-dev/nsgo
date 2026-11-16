@@ -257,7 +257,7 @@ func TestResourceNeedsAHost(t *testing.T) {
 			t.Fatal("a resource without a host did not panic")
 		}
 	}()
-	NewResource[int](NewRoot(RootOptions{}), nil, func(context.Context, int, ResourceInfo) (string, error) { return "", nil })
+	NewResource[int](testRoot(RootOptions{}), nil, func(context.Context, int, ResourceInfo) (string, error) { return "", nil })
 }
 
 func TestResourceStateNames(t *testing.T) {

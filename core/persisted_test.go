@@ -13,7 +13,7 @@ type settings struct {
 }
 
 func TestPersistedStoresAndFollowsItsEntry(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	def := settings{Theme: "light", FontSize: 13}
 	p := NewPersisted(cx, "settings", def, PersistOptions{})
 	var seen []settings
@@ -45,7 +45,7 @@ func TestPersistedStoresAndFollowsItsEntry(t *testing.T) {
 }
 
 func TestPersistedReadsTheDefaultForWhatItCannotRead(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	p := NewPersisted(cx, "n", 7, PersistOptions{Version: 2})
 	for _, raw := range []string{`not json`, `{"version":2,"value":"seven"}`, `{"version":3,"value":1}`, `{"version":1,"value":1}`} {
 		cx.Storage().SetItem("n", raw)
@@ -60,7 +60,7 @@ func TestPersistedReadsTheDefaultForWhatItCannotRead(t *testing.T) {
 }
 
 func TestPersistedMigratesOlderVersions(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	// Version 1 kept the font size as a string.
 	cx.Storage().SetItem("settings", `{"version":1,"value":{"theme":"dark","fontSize":"16"}}`)
 	var versions []int
@@ -94,7 +94,7 @@ func TestPersistedMigratesOlderVersions(t *testing.T) {
 }
 
 func TestPersistedSetReportsAFullStorage(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	part := cx.Child()
 	part.ProvideStorage("small", 64)
 	p := NewPersisted(part, "big", "", PersistOptions{})

@@ -5,6 +5,9 @@ import "time"
 // tailwindTheme is what classes resolve against: Tailwind CSS 4's default
 // theme (theme.css), as NSH's tailwind/theme.rs has it, in points.
 type tailwindTheme struct {
+	// palette is set only on a parser's local copy, never on the shared
+	// Tailwind theme. It supplies the current subtree's color names.
+	palette     *Theme
 	spacing     Points // one spacing step: p-1
 	rem         Points
 	colors      map[string]Color

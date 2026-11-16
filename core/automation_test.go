@@ -120,7 +120,7 @@ func TestAgentFollowsEverySurfaceThroughTheRegistry(t *testing.T) {
 
 func TestAgentKeepsSharedBatches(t *testing.T) {
 	a := automate(t)
-	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0))})
+	root := testRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0))})
 	defer root.Dispose()
 	tree := NewTree(root, ApproxTextEngine{})
 	tree.Resize(Size{Width: 100, Height: 100}, Geometry{})

@@ -10,7 +10,7 @@ import (
 // newOverlays runs app on a platform that opens no windows, as Android's: the first tree is the app's view, and the surfaces it opens commit on their own.
 func newOverlays(t *testing.T, os OS, app func(cx *Scope) Node) *windows {
 	w := &windows{t: t, items: map[uint32][]driver.MountItem{}}
-	w.root = NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0))})
+	w.root = testRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0))})
 	w.app = NewTree(w.root, ApproxTextEngine{})
 	w.app.SetEnvironment(Environment{OS: os})
 	w.app.Mount(app)

@@ -7,7 +7,7 @@ import (
 )
 
 func TestHistoryUndoesAndRedoes(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	h := NewHistory(cx, "", HistoryOptions{})
 	var can [][2]bool
 	cx.renderEffect(func() { can = append(can, [2]bool{h.CanUndo(), h.CanRedo()}) })
@@ -40,7 +40,7 @@ func TestHistoryUndoesAndRedoes(t *testing.T) {
 
 func TestHistoryMergesChangesWithinMerge(t *testing.T) {
 	clock := NewManualClock(time.Unix(0, 0))
-	cx := NewRoot(RootOptions{Clock: clock})
+	cx := testRoot(RootOptions{Clock: clock})
 	h := NewHistory(cx, "", HistoryOptions{Merge: time.Second})
 	for _, s := range []string{"h", "he", "hel"} {
 		h.Set(s)
@@ -67,7 +67,7 @@ func TestHistoryMergesChangesWithinMerge(t *testing.T) {
 }
 
 func TestHistoryGroupIsOneStep(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	h := NewHistoryFunc(cx, []int{}, nil, HistoryOptions{})
 	h.Set([]int{1})
 	h.Group(func() {
@@ -86,7 +86,7 @@ func TestHistoryGroupIsOneStep(t *testing.T) {
 }
 
 func TestHistoryKeepsItsLimit(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	h := NewHistory(cx, 0, HistoryOptions{Limit: 3})
 	for i := 1; i <= 10; i++ {
 		h.Set(i)
@@ -112,7 +112,7 @@ func TestHistoryKeepsItsLimit(t *testing.T) {
 }
 
 func TestHistoryStepRunsItsReadersOnce(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	h := NewHistory(cx, 0, HistoryOptions{})
 	runs := 0
 	cx.renderEffect(func() { h.Get(); h.CanUndo(); runs++ })

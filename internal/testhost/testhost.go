@@ -26,7 +26,9 @@ type Host interface {
 
 // Options are what a test opens an app with.
 type Options struct {
-	Size driver.Size
+	// CheckCommits enables full-layout diagnostics for this app only.
+	CheckCommits bool
+	Size         driver.Size
 	// Environment pins what the test sets over what the platform reports
 	// (Pin's fields), from the first frame.
 	Environment *driver.Environment

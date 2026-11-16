@@ -231,9 +231,6 @@ func TestAgentFailures(t *testing.T) {
 	if err := json.Unmarshal(g.Do([]byte("{")), &a); err != nil || a.Error == nil || a.Error.Code != automation.InvalidRequest {
 		t.Errorf("bad JSON answered %+v", a)
 	}
-	if !driver.CheckCommits {
-		t.Error("tests must keep checking commits: only an automation build turns it off")
-	}
 }
 
 // fakeSurface is a surface of graph 1 as DevTools' registry hands it the agent, which follows it.

@@ -84,7 +84,7 @@ func (t *Tree) commit(shared bool) *driver.MountBatch {
 	}
 	t.paceLater()
 	t.timeTransitionEnds()
-	if driver.CheckCommits && !t.changed {
+	if t.rt.checkCommits && !t.changed {
 		t.checkCommit()
 	}
 	var causes *driver.Causes

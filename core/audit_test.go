@@ -255,7 +255,7 @@ func TestAuditNumbersDropAWholeDecimal(t *testing.T) {
 }
 
 func TestAuditGridStartsAtItsSmallestStep(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	for grid, want := range map[Points]Points{0: 0, 2: minAuditGrid, 12: 12, Points(math.NaN()): 0, -8: 0} {
 		if got := newLayoutAudit(cx, LayoutAudit{Grid: grid}).grid.GetUntracked(); got != want {
 			t.Errorf("a grid of %v starts at %v, want %v", grid, got, want)

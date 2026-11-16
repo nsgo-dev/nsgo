@@ -34,7 +34,7 @@ type graph struct {
 
 func newGraph(store *Store) *graph {
 	g := &graph{}
-	g.root = NewRoot(RootOptions{Post: func(fn func()) { g.posts = append(g.posts, fn) }, Storage: store})
+	g.root = testRoot(RootOptions{Post: func(fn func()) { g.posts = append(g.posts, fn) }, Storage: store})
 	return g
 }
 

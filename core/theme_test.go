@@ -236,7 +236,7 @@ func TestShadcnThemesNameTokens(t *testing.T) {
 		t.Errorf("brand-tint %#x", c)
 	}
 	env := classEnv{palette: &th.Light}
-	s, _, _ := parseClasses("bg-brand text-muted-foreground/50 border-(--brand-fill)").resolve(&env)
+	s, _, _ := th.tailwind().parseFor("bg-brand text-muted-foreground/50 border-(--brand-fill)", th).resolve(&env)
 	if s.Background != RGB(0x4f6e0c) || s.Color != RGBA(0x5f636a, 0.5) || s.BorderColor != RGB(0xc8f26d) {
 		t.Errorf("classes %#x %#x %#x", s.Background, s.Color, s.BorderColor)
 	}

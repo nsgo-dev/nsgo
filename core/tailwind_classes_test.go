@@ -38,7 +38,11 @@ func tw(t *testing.T, classes string, env ...classEnv) (Style, classProps) {
 	if len(env) > 0 {
 		e = env[0]
 	}
-	l := e.tw.parse(classes)
+	theme := e.theme
+	if theme == nil {
+		theme = &Theme{Light: *e.palette, Dark: *e.palette}
+	}
+	l := e.tw.parseFor(classes, theme)
 	if len(l.unknown) > 0 {
 		t.Fatalf("%q: unknown classes %q", classes, l.unknown)
 	}

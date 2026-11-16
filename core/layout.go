@@ -338,22 +338,22 @@ func (n *node) layoutStyle() layout.Style {
 	l.Overflow = layout.Point[layout.Overflow]{X: x.layout(), Y: y.layout()}
 
 	if t := s.GridTemplateColumns; t != "" {
-		if g, err := parseTemplate(t); err == nil {
+		if g, err := n.owner.rt.parseTemplate(t); err == nil {
 			l.GridTemplateColumns, l.GridTemplateColumnNames = g.tracks, g.names
 		}
 	}
 	if t := s.GridTemplateRows; t != "" {
-		if g, err := parseTemplate(t); err == nil {
+		if g, err := n.owner.rt.parseTemplate(t); err == nil {
 			l.GridTemplateRows, l.GridTemplateRowNames = g.tracks, g.names
 		}
 	}
 	if t := s.GridAutoColumns; t != "" {
-		if g, err := parseTemplate(t); err == nil {
+		if g, err := n.owner.rt.parseTemplate(t); err == nil {
 			l.GridAutoColumns = g.auto
 		}
 	}
 	if t := s.GridAutoRows; t != "" {
-		if g, err := parseTemplate(t); err == nil {
+		if g, err := n.owner.rt.parseTemplate(t); err == nil {
 			l.GridAutoRows = g.auto
 		}
 	}

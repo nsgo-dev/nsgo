@@ -180,18 +180,7 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 	})
 	a.seed()
 	a.anim = driver.NewAnimator(func(driver.Event) {})
-	// A nil clock is the system's; a nil *ManualClock would not be.
-	var clock core.Clock = a.Clock
-	if a.measure {
-		clock = nil
-		driver.CheckCommits = false
-	}
-	s, err := h.Open(app, testhost.Options{
-		Size: a.size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
-		FPS:     os.Getenv("NSGO_TEST_FPS") != "",
-		Observe: t.observe,
-		Event:   t.event,
-	})
+	s, err := h.Open(app, a.targetOptions(t))
 	if err != nil {
 		a.t.Fatalf("nsgotest: the platform cannot open the app: %v", err)
 	}
@@ -207,6 +196,21 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 		}
 	}
 	t.settle()
+}
+
+func (a *App) targetOptions(t *target) testhost.Options {
+	// A nil clock is the system's; a nil *ManualClock would not be.
+	var clock core.Clock = a.Clock
+	if a.measure {
+		clock = nil
+	}
+	return testhost.Options{
+		CheckCommits: !automationBuild && !a.measure,
+		Size:         a.size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
+		FPS:     os.Getenv("NSGO_TEST_FPS") != "",
+		Observe: t.observe,
+		Event:   t.event,
+	}
 }
 
 // drain applies what came since the last call, reporting whether

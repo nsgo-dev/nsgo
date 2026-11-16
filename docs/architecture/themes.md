@@ -22,7 +22,7 @@ Overlays (muted and faint text, hover, press, edges, scroll bars, switch tracks)
 
 ## Scope
 
-- `cx.SetTheme(t)` gives `cx` and what it builds from then on `t`; at the root it is the app's. A deeper call wins for its subtree, so a sidebar can carry another theme. Calling it again changes it.
+- `cx.SetTheme(t)` gives `cx` and what it builds from then on `t`; at the root it is the app's. A deeper call wins for its subtree, so a sidebar can carry another theme. Calling it again changes it. Classes recognize custom color names from that subtree's theme in either appearance; another theme or engine cannot register names for it or clear its cache. `core.UnknownClasses`, which has no scope, always checks the default theme.
 - `cx.SetSubtreeAppearance(a)` forces light or dark for `cx` and what it builds from then on; `AppearanceSystem` follows the appearance above. `cx.SetAppearance` keeps forcing the app's, with its window chrome.
 - `cx.Theme()`, `cx.Palette()` and `cx.Dark()` read the nearest theme, its palette in the appearance its subtree shows, and that appearance. They are tracked, so a `StyleFunc` that reads them follows every change without a rebuild.
 - Both setters keep a signal in the scope's values, as `core.Key` does; a node made under a forced subtree binds the nearest one, so lookups cost nothing until an app forces one.

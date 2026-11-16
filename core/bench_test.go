@@ -16,9 +16,6 @@ import (
 // benchTree mounts app in a size surface and commits it once, without
 // the tests' check of every commit.
 func benchTree(b *testing.B, size Size, app func(cx *Scope) Node) *Tree {
-	check := driver.CheckCommits
-	driver.CheckCommits = false
-	b.Cleanup(func() { driver.CheckCommits = check })
 	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), RequestFrame: func() {}})
 	tree := NewTree(root, ApproxTextEngine{})
 	tree.Resize(size, Geometry{})

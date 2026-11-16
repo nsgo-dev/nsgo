@@ -6,14 +6,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
 // Tailwind CSS classes (`flex-row gap-4 p-4 bg-white dark:bg-zinc-900`),
-// ported from NSH's nsh-core tailwind module: each distinct class string
-// is parsed once into rules, and a node resolves them for its
+// ported from NSH's nsh-core tailwind module: class strings are parsed
+// into cached rules, and a node resolves them for its
 // environment and states. Utilities and variants mean what they mean in
 // Tailwind CSS 4; what has no native meaning is an unknown class.
 //
@@ -492,6 +491,7 @@ type classRule struct {
 // classList is a parsed class string.
 type classList struct {
 	tw    *tailwindTheme
+	theme *Theme
 	class string
 	rules []classRule
 	// env is set when the rules depend on the environment: the
@@ -525,37 +525,44 @@ type classEnv struct {
 	fontSize Points
 }
 
-var classCache sync.Map // classSource → *classList
-
-// classSource is a class string and the Tailwind theme it is read with.
+// classSource is a class string and its subtree's themes.
 type classSource struct {
 	tw    *tailwindTheme
+	theme *Theme
 	class string
 }
 
 // parseClasses parses a class string for Tailwind's default theme.
-func parseClasses(s string) *classList { return defaultTailwind.classes(s) }
+func parseClasses(s string) *classList { return defaultTailwind.parse(s) }
 
 // UnknownClasses returns the classes of s that are no utility of
 // Tailwind's default theme, in order: what an element would log and
 // ignore. A tool checks classes written for it with it before they draw.
 func UnknownClasses(s string) []string { return slices.Clone(parseClasses(s).unknown) }
 
-// classes parses a class string, once per distinct string.
-func (t *tailwindTheme) classes(s string) *classList {
-	key := classSource{t, s}
-	if v, ok := classCache.Load(key); ok {
-		return v.(*classList)
+// parseClasses caches a class string on its graph, with its own theme's
+// color names. A theme is read-only after SetTheme.
+func (rt *runtime) parseClasses(theme *Theme, s string) *classList {
+	t := theme.tailwind()
+	key := classSource{t, theme, s}
+	if l, ok := rt.classCache.get(key); ok {
+		return l
 	}
-	l := t.parse(s)
-	classCache.Store(key, l)
+	l := t.parseFor(s, theme)
+	rt.classCache.put(key, l)
 	return l
 }
 
 func (t *tailwindTheme) parse(s string) *classList {
-	l := &classList{tw: t, class: s}
+	return t.parseFor(s, DefaultTheme())
+}
+
+func (t *tailwindTheme) parseFor(s string, theme *Theme) *classList {
+	parser := *t
+	parser.palette = theme
+	l := &classList{tw: t, theme: theme, class: s}
 	for _, token := range strings.Fields(s) {
-		if !t.parseToken(l, token) {
+		if !parser.parseToken(l, token) {
 			l.unknown = append(l.unknown, token)
 		}
 	}

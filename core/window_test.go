@@ -21,7 +21,7 @@ type windows struct {
 
 func newWindows(t *testing.T, app func(cx *Scope)) *windows {
 	w := &windows{t: t, items: map[uint32][]driver.MountItem{}}
-	w.root = NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)),
+	w.root = testRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)),
 		Windows: &WindowOptions{Width: 400, Height: 300}})
 	w.app = NewTree(w.root, ApproxTextEngine{})
 	w.app.Mount(AppRoot(app))
@@ -470,7 +470,7 @@ func TestHotKeysWithoutWindows(t *testing.T) {
 	for _, takes := range []bool{false, true} {
 		fired := 0
 		w := &windows{t: t, items: map[uint32][]driver.MountItem{}}
-		w.root = NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), HotKeys: takes})
+		w.root = testRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), HotKeys: takes})
 		w.app = NewTree(w.root, ApproxTextEngine{})
 		w.app.Resize(Size{Width: 100, Height: 100}, Geometry{})
 		w.app.Mount(AppRoot(func(cx *Scope) {
@@ -574,7 +574,7 @@ func TestHotKeyRegistrationState(t *testing.T) {
 }
 
 func TestTrayWithoutWindows(t *testing.T) {
-	root := NewRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), Tray: true})
+	root := testRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)), Tray: true})
 	tree := NewTree(root, ApproxTextEngine{})
 	var tray *Tray
 	tree.Mount(AppRoot(func(cx *Scope) {
@@ -702,7 +702,7 @@ func TestOpenLinksWaitForAHandlerApartFromFiles(t *testing.T) {
 
 func TestOpenFilesWaitForAHandler(t *testing.T) {
 	var posted []func()
-	root := NewRoot(RootOptions{Post: func(fn func()) { posted = append(posted, fn) }, Clock: NewManualClock(time.Unix(0, 0))})
+	root := testRoot(RootOptions{Post: func(fn func()) { posted = append(posted, fn) }, Clock: NewManualClock(time.Unix(0, 0))})
 	tree := NewTree(root, ApproxTextEngine{})
 	var opened [][]string
 	handle := NewSignal(root, false)

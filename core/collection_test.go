@@ -15,7 +15,7 @@ type task struct {
 func taskID(t task) int { return t.id }
 
 func TestCollectionReadersFollowTheirOwnItem(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	c := NewCollection(cx, taskID, []task{{1, "a", false}, {2, "b", false}, {3, "c", false}})
 	runs := map[int]int{}
 	for _, id := range []int{1, 2, 3} {
@@ -56,7 +56,7 @@ func TestCollectionReadersFollowTheirOwnItem(t *testing.T) {
 }
 
 func TestCollectionMissingItemFollowsTheOrder(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	c := NewCollection(cx, taskID, nil)
 	var seen []bool
 	cx.renderEffect(func() { _, ok := c.Get(7); seen = append(seen, ok) })
@@ -67,7 +67,7 @@ func TestCollectionMissingItemFollowsTheOrder(t *testing.T) {
 }
 
 func TestCollectionReplaceNotifiesOnlyWhatChanged(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	c := NewCollection(cx, taskID, []task{{1, "a", false}, {2, "b", false}, {3, "c", false}})
 	keys := c.Keys()
 	runs := map[int]int{}
@@ -97,7 +97,7 @@ func TestCollectionReplaceNotifiesOnlyWhatChanged(t *testing.T) {
 }
 
 func TestCollectionFuncWithoutEqualNotifiesEverySet(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	type tagged struct {
 		id   int
 		tags []string
@@ -113,7 +113,7 @@ func TestCollectionFuncWithoutEqualNotifiesEverySet(t *testing.T) {
 }
 
 func TestCollectionPanicsOnDuplicateAndChangedKeys(t *testing.T) {
-	cx := NewRoot(RootOptions{})
+	cx := testRoot(RootOptions{})
 	panics := func(name string, fn func()) {
 		t.Helper()
 		defer func() {

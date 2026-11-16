@@ -32,6 +32,7 @@ func (p *TestPin) apply(env driver.Environment) driver.Environment {
 // storage and observers, pin's environment over the platform's, and data
 // and cache directories of its own, so a test never sees the app's.
 func (o *Options) UseTest(t testhost.Options, pin *TestPin) {
+	o.CheckCommits = t.CheckCommits
 	if t.Size.Width > 0 && t.Size.Height > 0 {
 		// A geometry measured at the surface's size is not the test's.
 		o.Size, o.Geometry = t.Size, driver.Geometry{}

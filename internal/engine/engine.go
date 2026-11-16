@@ -94,6 +94,8 @@ type App = func(cx *core.Scope) core.Node
 
 // Options configure an engine.
 type Options struct {
+	// CheckCommits enables full-layout diagnostics for this engine only.
+	CheckCommits bool
 	// Size is the surface's size at start.
 	Size driver.Size
 	// Geometry is the fold geometry measured at Size, which the first commit is laid out with (Engine.Resize); the zero Geometry is a surface without a fold.
@@ -387,8 +389,9 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		p.RequestFrame()
 	}
 	root := core.NewRoot(core.RootOptions{
-		Post:  func(fn func()) { e.push(message{fn: fn}) },
-		Clock: opts.Clock,
+		CheckCommits: opts.CheckCommits,
+		Post:         func(fn func()) { e.push(message{fn: fn}) },
+		Clock:        opts.Clock,
 		Report: func(err error) {
 			log.Printf("nsgo: the app failed: %v", err)
 			if opts.Host.OnError != nil {

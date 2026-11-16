@@ -1883,11 +1883,11 @@ func (t *tailwindTheme) colorDecl(v string, style func(s *Style, c Color), props
 		role = strings.TrimPrefix(strings.TrimSuffix(v, ")"), "color:")
 		if paletteRoles[camel(role)] != nil {
 			role = camel(role)
-		} else if _, ok := themeColors.Load(role); !ok {
+		} else if !t.palette.hasColor(role) {
 			return nil, false
 		}
 	} else if paletteRoles[role] == nil {
-		if _, ok := themeColors.Load(name); !ok {
+		if !t.palette.hasColor(name) {
 			return nil, false
 		}
 		role = name

@@ -80,7 +80,7 @@ func TestFromNeedsAHost(t *testing.T) {
 			t.Fatal("From without a host did not panic")
 		}
 	}()
-	From(NewRoot(RootOptions{}), 0, func(func(int)) func() { return nil })
+	From(testRoot(RootOptions{}), 0, func(func(int)) func() { return nil })
 }
 
 func TestFromTakesTheValueHandedAsItSubscribes(t *testing.T) {

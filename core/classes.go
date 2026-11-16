@@ -3,7 +3,6 @@ package core
 import (
 	"log"
 	"slices"
-	"sync"
 )
 
 // A node's Tailwind classes (NSH's core/classes.rs): resolved for the
@@ -31,21 +30,21 @@ func (t *Tree) setClasses(n *node, class string) {
 		}
 		class = " "
 	}
-	var tw *tailwindTheme
-	Untracked(n.owner, func() bool { tw = n.owner.Theme().tailwind(); return true })
-	l := tw.classes(class)
+	var env classEnv
+	Untracked(n.owner, func() bool { env = t.classEnv(n); return true })
+	l := t.rt.parseClasses(env.theme, class)
 	if n.cls != nil && n.cls.list == l {
 		return
 	}
-	reportUnknown(l)
-	c := &nodeClasses{list: l}
+	t.rt.reportUnknown(l)
+	c := &nodeClasses{list: l, env: env}
 	if old := n.cls; old != nil {
 		c.bound = old.bound
 	}
 	n.cls = c
-	Untracked(n.owner, func() bool { c.env = t.classEnv(n); return true })
 	t.resolveClasses(n)
-	if (l.env || hasEnvSpans(n)) && !c.bound {
+	// A replacement theme may define a previously unknown color.
+	if (l.env || len(l.unknown) > 0 || hasEnvSpans(n)) && !c.bound {
 		c.bound = true
 		t.followEnv(n)
 	}
@@ -96,8 +95,9 @@ func (t *Tree) followSpanClasses(n *node) {
 		return
 	}
 	if n.cls == nil {
-		n.cls = &nodeClasses{list: parseClasses(" ")}
-		Untracked(n.owner, func() bool { n.cls.env = t.classEnv(n); return true })
+		var env classEnv
+		Untracked(n.owner, func() bool { env = t.classEnv(n); return true })
+		n.cls = &nodeClasses{list: t.rt.parseClasses(env.theme, " "), env: env}
 	}
 	if !n.cls.bound {
 		n.cls.bound = true
@@ -126,9 +126,9 @@ func (t *Tree) followEnv(n *node) {
 			if n.created {
 				c.env.rtl = n.rtl
 			}
-			if c.list.tw != env.tw {
-				c.list = env.tw.classes(c.list.class)
-				reportUnknown(c.list)
+			if c.list.tw != env.tw || c.list.theme != env.theme {
+				c.list = t.rt.parseClasses(env.theme, c.list.class)
+				t.rt.reportUnknown(c.list)
 			}
 			t.resolveClasses(n)
 			t.resolveSpanClasses(n)
@@ -343,8 +343,8 @@ func (t *Tree) spanStyle(n *node, class string, style Style) (Style, *spanClasse
 	}
 	var env classEnv
 	Untracked(n.owner, func() bool { env = t.classEnv(n); return true })
-	l := env.tw.classes(class)
-	reportUnknown(l)
+	l := t.rt.parseClasses(env.theme, class)
+	t.rt.reportUnknown(l)
 	sc := &spanClasses{list: l, base: style}
 	return sc.resolve(&env), sc
 }
@@ -361,7 +361,7 @@ func hasEnvSpans(n *node) bool {
 		return false
 	}
 	for _, sp := range n.text.spans {
-		if sp.cls != nil && sp.cls.list.env {
+		if sp.cls != nil && (sp.cls.list.env || len(sp.cls.list.unknown) > 0) {
 			return true
 		}
 	}
@@ -377,9 +377,9 @@ func (t *Tree) resolveSpanClasses(n *node) {
 	changed := false
 	for i := range n.text.spans {
 		sp := &n.text.spans[i]
-		if sp.cls != nil && sp.cls.list.tw != env.tw {
-			sp.cls.list = env.tw.classes(sp.cls.list.class)
-			reportUnknown(sp.cls.list)
+		if sp.cls != nil && (sp.cls.list.tw != env.tw || sp.cls.list.theme != env.theme) {
+			sp.cls.list = t.rt.parseClasses(env.theme, sp.cls.list.class)
+			t.rt.reportUnknown(sp.cls.list)
 			sp.style = sp.cls.resolve(&env)
 			changed = true
 		} else if sp.cls != nil && sp.cls.list.env {
@@ -393,12 +393,11 @@ func (t *Tree) resolveSpanClasses(n *node) {
 	}
 }
 
-var reported sync.Map // class → true
-
-// reportUnknown logs each class that is not a known utility, once.
-func reportUnknown(l *classList) {
+// reportUnknown logs unknown classes once while this graph caches them.
+func (rt *runtime) reportUnknown(l *classList) {
 	for _, u := range l.unknown {
-		if _, seen := reported.LoadOrStore(u, true); !seen {
+		if _, seen := rt.reported.get(u); !seen {
+			rt.reported.put(u, true)
 			log.Printf("core: unknown class %q", u)
 		}
 	}
