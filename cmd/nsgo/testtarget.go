@@ -453,30 +453,50 @@ var testLine = regexp.MustCompile(`^--- (PASS|FAIL|SKIP): (\S+) \(([0-9.]+)s\)`)
 func parseTestOutput(name string, depth int, out string, code int, runErr error) *testResult {
 	t := &testResult{Name: name, Output: out, whole: true}
 	// Results by name across in-process repetitions: elapsed times add up, a failure outweighs a pass and a pass a skip.
-	type result struct {
-		status  string
-		elapsed time.Duration
-	}
-	results := map[string]*result{}
+	results := map[string]*testResult{}
+	outputs := map[string]string{}
+	current := ""
 	var subtests []string
 	for _, line := range strings.Split(out, "\n") {
+		if fields := strings.Fields(line); len(fields) >= 3 && fields[0] == "===" && (fields[1] == "RUN" || fields[1] == "CONT" || fields[1] == "NAME") {
+			current = fields[2]
+			continue
+		}
 		m := testLine.FindStringSubmatch(strings.TrimLeft(line, " \t"))
 		if m == nil || m[2] != name && !strings.HasPrefix(m[2], name+"/") {
+			if current == name || strings.HasPrefix(current, name+"/") {
+				outputs[current] += line + "\n"
+			}
 			continue
 		}
 		s, _ := strconv.ParseFloat(m[3], 64)
 		status := strings.ToLower(m[1])
 		r := results[m[2]]
 		if r == nil {
-			r = &result{status: status}
+			r = &testResult{Name: m[2], Status: status}
 			results[m[2]] = r
 			if m[2] != name {
 				subtests = append(subtests, m[2])
 			}
-		} else if status == "fail" || r.status == "skip" {
-			r.status = status
+		} else if status == "fail" || r.Status == "skip" {
+			r.Status = status
 		}
-		r.elapsed += time.Duration(s * float64(time.Second))
+		r.Elapsed += time.Duration(s * float64(time.Second))
+	}
+	for key, r := range results {
+		if r.Status == "skip" {
+			r.Message = skipMessage(outputs[key])
+		}
+	}
+	for _, sub := range subtests {
+		if i := strings.LastIndex(sub, "/"); i >= 0 {
+			if parent := results[sub[:i]]; parent != nil {
+				parent.children = append(parent.children, results[sub])
+			}
+		}
+	}
+	if top := results[name]; top != nil {
+		top.summarizeSkips()
 	}
 	// A run whose -run reached exactly one subtest at the depth it selects, as Test/sub or Test/sub/leaf does, reports that subtest, not its own subtests, unless the test failed outside it; otherwise the top-level result covers every subtest, so a test with several is never reported as its first.
 	matched := name
@@ -486,11 +506,12 @@ func parseTestOutput(name string, depth int, out string, code int, runErr error)
 			selected = append(selected, sub)
 		}
 	}
-	if top := results[name]; len(selected) == 1 && (top == nil || top.status != "fail" || results[selected[0]].status == "fail") {
+	if top := results[name]; len(selected) == 1 && (top == nil || top.Status != "fail" || results[selected[0]].Status == "fail") {
 		matched = selected[0]
 	}
 	if r := results[matched]; r != nil {
-		t.Name, t.Status, t.Elapsed = matched, r.status, r.elapsed
+		r.summarizeSkips()
+		t.Name, t.Status, t.Elapsed, t.Message = matched, r.Status, r.Elapsed, r.Message
 	}
 	if t.Status == "" || runErr != nil || t.Status != "fail" && code != 0 {
 		why := fmt.Sprintf("the test process exited with %d", code)

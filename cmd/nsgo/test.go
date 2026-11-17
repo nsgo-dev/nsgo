@@ -58,11 +58,35 @@ type testResult struct {
 	Status        string // pass, fail or skip
 	Elapsed       time.Duration
 	Output        string
-	// Message is why the tool failed a test that passed or skipped, as one whose screenshot it cannot save, and the failure's message in place of the output's first line.
+	// Message is a skip's reason or why the tool failed a test after it ran, used in place of the output's first line.
 	Message  string
 	reported int // how much of a benchmark's Output it reported
 	// whole marks the result of one target test process, which counts in the tally whatever its name, a selected subtest's included, since no parent result is reported beside it.
-	whole bool
+	whole    bool
+	children []*testResult
+}
+
+// summarizeSkips counts a successful group with only skipped children as skipped, preserving their reasons. A group's own failure always wins.
+func (t *testResult) summarizeSkips() {
+	for _, child := range t.children {
+		child.summarizeSkips()
+	}
+	if t.Status != "pass" || len(t.children) == 0 {
+		return
+	}
+	for _, child := range t.children {
+		if child.Status != "skip" {
+			return
+		}
+	}
+	t.Status = "skip"
+	reasons := []string{"all subtests skipped"}
+	for _, child := range t.children {
+		if child.Message != "" {
+			reasons = append(reasons, child.Name+": "+child.Message)
+		}
+	}
+	t.Message = strings.Join(reasons, "\n")
 }
 
 // failFor fails t for why, a reason the tool found after the test ran, and adds why to its output.
@@ -481,6 +505,15 @@ func (r *testRun) event(ev testEvent) {
 		}
 	case "pass", "fail", "skip":
 		t.Status, t.Elapsed = ev.Action, time.Duration(ev.Elapsed*float64(time.Second))
+		if t.Status == "skip" {
+			t.Message = skipMessage(t.Output)
+		}
+		t.summarizeSkips()
+		if i := strings.LastIndex(ev.Test, "/"); i >= 0 {
+			if parent := r.running[ev.Package+"\x00"+ev.Test[:i]]; parent != nil {
+				parent.children = append(parent.children, t)
+			}
+		}
 		delete(r.running, key)
 		r.results = append(r.results, t)
 		r.print(t)
@@ -638,7 +671,11 @@ type junitCase struct {
 	Name    string        `xml:"name,attr"`
 	Time    string        `xml:"time,attr"`
 	Failure *junitFailure `xml:"failure,omitempty"`
-	Skipped *struct{}     `xml:"skipped,omitempty"`
+	Skipped *junitSkipped `xml:"skipped,omitempty"`
+}
+
+type junitSkipped struct {
+	Message string `xml:"message,attr"`
 }
 
 type junitFailure struct {
@@ -675,7 +712,11 @@ func writeJUnit(path string, results []*testResult, packages map[string]*testRes
 			s.Failures++
 			failures++
 		case "skip":
-			c.Skipped = &struct{}{}
+			msg := t.Message
+			if msg == "" {
+				msg = skipMessage(t.Output)
+			}
+			c.Skipped = &junitSkipped{Message: msg}
 			s.Skipped++
 		}
 		s.Tests++
@@ -724,6 +765,17 @@ func firstLine(output string) string {
 		}
 	}
 	return ""
+}
+
+// skipMessage keeps the test's diagnostics, including multiline Skip reasons, without Go's progress and result lines.
+func skipMessage(output string) string {
+	var lines []string
+	for _, line := range strings.Split(output, "\n") {
+		if line = strings.TrimSpace(line); line != "" && !goTestLine(line) {
+			lines = append(lines, line)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // goTestLine reports whether line is go test -v's own rather than the test's: a test's start or result, or the process's closing PASS or FAIL.
