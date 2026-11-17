@@ -269,7 +269,6 @@ var (
 	pangoFontDescriptionNew        func() uintptr
 	pangoFontDescriptionFree       func(uintptr)
 	pangoFontDescriptionSetFamily  func(uintptr, *byte)
-	pangoFontDescriptionSetSize    func(uintptr, int32)
 	pangoFontDescriptionSetWeight  func(uintptr, int32)
 	pangoFontDescriptionSetStyle   func(uintptr, int32)
 	pangoAttrListNew               func() uintptr
@@ -278,7 +277,6 @@ var (
 	pangoAttrFamilyNew             func(*byte) uintptr
 	pangoLanguageFromString        func(*byte) uintptr
 	pangoAttrLanguageNew           func(uintptr) uintptr
-	pangoAttrSizeNew               func(int32) uintptr
 	pangoAttrWeightNew             func(int32) uintptr
 	pangoAttrStyleNew              func(int32) uintptr
 	pangoAttrForegroundNew         func(uint16, uint16, uint16) uintptr
@@ -353,6 +351,12 @@ var (
 	cairoSetOperator           func(uintptr, int32)
 	cairoSetSourceSurface      func(uintptr, uintptr, float64, float64)
 	cairoSurfaceWriteToPNG     func(uintptr, *byte) int32
+)
+
+// Pango's absolute sizes are in Pango units of a logical pixel, the units of every NSGo size, where its point sizes would scale by the context's resolution.
+var (
+	pangoFontDescriptionSetAbsoluteSize func(uintptr, float64)
+	pangoAttrSizeNewAbsolute            func(int32) uintptr
 )
 
 type gdkMonitorRectangle struct{ X, Y, Width, Height int32 }
@@ -632,7 +636,7 @@ func bind() {
 	purego.RegisterLibFunc(&pangoFontDescriptionNew, pangoLib, "pango_font_description_new")
 	purego.RegisterLibFunc(&pangoFontDescriptionFree, pangoLib, "pango_font_description_free")
 	purego.RegisterLibFunc(&pangoFontDescriptionSetFamily, pangoLib, "pango_font_description_set_family")
-	purego.RegisterLibFunc(&pangoFontDescriptionSetSize, pangoLib, "pango_font_description_set_size")
+	purego.RegisterLibFunc(&pangoFontDescriptionSetAbsoluteSize, pangoLib, "pango_font_description_set_absolute_size")
 	purego.RegisterLibFunc(&pangoFontDescriptionSetWeight, pangoLib, "pango_font_description_set_weight")
 	purego.RegisterLibFunc(&pangoFontDescriptionSetStyle, pangoLib, "pango_font_description_set_style")
 	purego.RegisterLibFunc(&pangoAttrListNew, pangoLib, "pango_attr_list_new")
@@ -641,7 +645,7 @@ func bind() {
 	purego.RegisterLibFunc(&pangoAttrFamilyNew, pangoLib, "pango_attr_family_new")
 	purego.RegisterLibFunc(&pangoLanguageFromString, pangoLib, "pango_language_from_string")
 	purego.RegisterLibFunc(&pangoAttrLanguageNew, pangoLib, "pango_attr_language_new")
-	purego.RegisterLibFunc(&pangoAttrSizeNew, pangoLib, "pango_attr_size_new")
+	purego.RegisterLibFunc(&pangoAttrSizeNewAbsolute, pangoLib, "pango_attr_size_new_absolute")
 	purego.RegisterLibFunc(&pangoAttrWeightNew, pangoLib, "pango_attr_weight_new")
 	purego.RegisterLibFunc(&pangoAttrStyleNew, pangoLib, "pango_attr_style_new")
 	purego.RegisterLibFunc(&pangoAttrForegroundNew, pangoLib, "pango_attr_foreground_new")

@@ -596,7 +596,7 @@ func fontDescription(font driver.Font) uintptr {
 	if font.Family != "" {
 		pangoFontDescriptionSetFamily(desc, cstr(pangoFamilies(font.Family)))
 	}
-	pangoFontDescriptionSetSize(desc, int32(float64(font.Size)*pangoScale+0.5))
+	pangoFontDescriptionSetAbsoluteSize(desc, float64(font.Size*pangoScale))
 	if font.Weight != 0 {
 		pangoFontDescriptionSetWeight(desc, int32(font.Weight))
 	}

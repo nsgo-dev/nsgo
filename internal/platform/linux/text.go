@@ -11,7 +11,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Pango units per point. Pango sizes, widths and spacing use these.
+// Pango units per logical pixel. Pango's widths and spacing and its absolute font sizes use these, so a text's size means what a view's does; its point sizes would scale by the context's resolution.
 const pangoScale = 1024
 
 const (
@@ -341,7 +341,7 @@ func addStyle(list uintptr, textLen, start, end int, s driver.TextStyle, holes [
 		add(pangoAttrFamilyNew(cstr(pangoFamilies(f.Family))))
 	}
 	if f.Size > 0 {
-		add(pangoAttrSizeNew(int32(f.Size*pangoScale + 0.5)))
+		add(pangoAttrSizeNewAbsolute(int32(f.Size*pangoScale + 0.5)))
 	}
 	if f.Weight > 0 {
 		add(pangoAttrWeightNew(int32(f.Weight)))

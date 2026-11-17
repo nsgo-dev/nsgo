@@ -89,6 +89,38 @@ func drawText(t *testing.T, l *textLayout, width, height int) (uintptr, int) {
 
 var textStyle = driver.TextStyle{Font: driver.Font{Size: 16}, Color: driver.RGB(0x000000)}
 
+// TestFontSizesAreLogicalPixels measures a text's size in logical pixels, as a view's: Pango's point sizes would grow it by 96/72 at its default resolution. A 20-point M is under an em wide, so four fit in 80 points where they took about 92, and a line is under 30 points high where it was about 31. The span checks a span's size attribute and the canvas its font description.
+func TestFontSizesAreLogicalPixels(t *testing.T) {
+	if err := openLibs(); err != nil {
+		t.Skip(err)
+	}
+	w := &window{}
+	font := driver.Font{Family: "Sans", Size: 20}
+	measure := func(text *driver.AttributedText) driver.Size {
+		p := w.Prepare(text)
+		defer p.Release()
+		return p.Measure(driver.Auto)
+	}
+	if size := measure(&driver.AttributedText{Text: "MMMM", Style: driver.TextStyle{Font: font, Color: driver.RGB(0)}}); size.Width <= 40 || size.Width > 80 || size.Height > 30 {
+		t.Errorf("20-point text measured %v; want it in logical pixels", size)
+	}
+	small := driver.TextStyle{Font: driver.Font{Family: "Sans", Size: 10}, Color: driver.RGB(0)}
+	if size := measure(&driver.AttributedText{Text: "xxMMMM", Style: small, Spans: []driver.TextSpan{{Start: 2, End: 6, Style: driver.TextStyle{Font: font, Color: driver.RGB(0)}}}}); size.Width > 80+20 || size.Height > 30 {
+		t.Errorf("a 20-point span measured %v; want it in logical pixels", size)
+	}
+
+	surface := cairoImageSurfaceCreate(0, 1, 1)
+	cr := cairoCreate(surface)
+	defer func() { cairoDestroy(cr); cairoSurfaceDestroy(surface) }()
+	l := canvasLayout(cr, "MMMM", font)
+	defer gObjectUnref(l)
+	var width, height int32
+	pangoLayoutGetPixelSize(l, &width, &height)
+	if width <= 40 || width > 80 || height > 30 {
+		t.Errorf("a canvas's 20-point text measured %dx%d; want it in logical pixels", width, height)
+	}
+}
+
 // TestSpanBackgroundsBoxEachLine draws a span's background from its
 // font's ascent to its descent, a box per line, without its line's
 // hanging space.

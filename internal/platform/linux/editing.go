@@ -152,8 +152,9 @@ func entryStyle(v *view) string {
 	if f.Family != "" {
 		fmt.Fprintf(&b, "%s { font-family: %s; }\n", all, gtkFamilies(f.Family))
 	}
+	// GTK scales CSS points by gtk-xft-dpi over 72, where pixels stay as they are; the size is already in logical pixels and carries the user's text size.
 	if f.Size > 0 {
-		fmt.Fprintf(&b, "%s { font-size: %.3fpt; }\n", all, float64(f.Size))
+		fmt.Fprintf(&b, "%s { font-size: %.3fpx; }\n", all, float64(f.Size))
 	}
 	if f.Weight > 0 {
 		fmt.Fprintf(&b, "%s { font-weight: %d; }\n", all, int(f.Weight))

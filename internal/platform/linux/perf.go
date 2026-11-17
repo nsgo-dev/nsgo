@@ -176,7 +176,7 @@ func perfLayout(cr uintptr, text string) uintptr {
 	layout := pangoCairoCreateLayout(cr)
 	font := pangoFontDescriptionFromString(cstr("Monospace"))
 	const pangoScale = 1024
-	pangoFontDescriptionSetSize(font, int32(engine.PerfFontSize*pangoScale))
+	pangoFontDescriptionSetAbsoluteSize(font, float64(engine.PerfFontSize*pangoScale))
 	pangoLayoutSetFontDescription(layout, font)
 	pangoFontDescriptionFree(font)
 	pangoLayoutSetText(layout, cstr(text), -1)
