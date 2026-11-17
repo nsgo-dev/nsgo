@@ -46,7 +46,7 @@ type Tree struct {
 	touches  touchState
 	size     Size
 	changed  bool
-	deleted  []NodeID
+	deleted  []NodeID // retired nodes kept for command cancellation, created or not
 	commands []driver.MountItem
 	moves    []move
 	items    []driver.MountItem
@@ -1034,14 +1034,9 @@ func (t *Tree) discard(n *node) {
 		t.markAll() // the inputs naming it
 	}
 	if n.kind != 0 {
-		if n.created {
-			t.deleted = append(t.deleted, n.id)
-			if n.match != "" {
-				t.matchGone = append(t.matchGone, n)
-			}
-		} else {
-			t.nodes[n.id] = nil
-			t.free = append(t.free, n.id)
+		t.deleted = append(t.deleted, n.id)
+		if n.created && n.match != "" {
+			t.matchGone = append(t.matchGone, n)
 		}
 	}
 	if n.text != nil {

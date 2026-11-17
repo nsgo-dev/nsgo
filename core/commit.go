@@ -1084,15 +1084,21 @@ func (t *Tree) emitMatches() {
 // its new parent first; one taken out of the tree is removed before.
 func (t *Tree) emitDeletes() {
 	for _, id := range t.deleted {
-		for _, c := range t.nodes[id].sent.children {
-			if !c.deleted && c.sent.parent == t.nodes[id] {
+		n := t.nodes[id]
+		if !n.created {
+			continue
+		}
+		for _, c := range n.sent.children {
+			if !c.deleted && c.sent.parent == n {
 				c.sent.parent, c.sent.removed = nil, true
 				t.items = append(t.items, driver.MountItem{Kind: driver.ItemRemove, ID: c.id})
 			}
 		}
 	}
 	for _, id := range t.deleted {
-		t.items = append(t.items, driver.MountItem{Kind: driver.ItemDelete, ID: id})
+		if t.nodes[id].created {
+			t.items = append(t.items, driver.MountItem{Kind: driver.ItemDelete, ID: id})
+		}
 	}
 }
 
