@@ -243,8 +243,20 @@ func TestMenuYieldFollowsNativeFocus(t *testing.T) {
 			held[vkControl] |= 0x80
 			setState.Call(uintptr(unsafe.Pointer(&held)))
 			defer setState.Call(uintptr(unsafe.Pointer(&saved)))
-			// What the message loop does with a WM_KEYDOWN of R.
-			if !w.shortcut('R', 1) {
+			// What the message loop or a focused WebView2 page does with
+			// Control+R. The latter must use AcceleratorKeyPressed rather
+			// than the top-level window's message loop.
+			took := false
+			for wv := range w.webs {
+				if wv.focused {
+					took = wv.acceleratorKey(0, 'R', 1)
+					break
+				}
+			}
+			if !took {
+				took = w.shortcut('R', 1)
+			}
+			if !took {
 				t.Error("nothing took Control+R")
 			}
 		})

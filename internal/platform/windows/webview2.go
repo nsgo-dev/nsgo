@@ -71,6 +71,8 @@ var (
 	iidCursorChanged                  = parseGUID("9da43ccc-26e1-4dad-b56c-d8961c94c571")
 	iidFocusChanged                   = parseGUID("05ea24bd-6452-4926-9014-4b82b498135d")
 	iidMoveFocusRequested             = parseGUID("69035451-6dc7-4cb8-9bce-b2bd70ad289f")
+	iidAcceleratorKeyPressed          = parseGUID("b29c7e28-fa79-41a8-8e44-65811c76dcb2")
+	iidAcceleratorKeyPressedArgs      = parseGUID("9f760f8a-fb79-42be-9990-7b56900fa9c7")
 	iidDevToolsCompleted              = parseGUID("5c4889f0-5ef6-4c5a-952c-d8f1b92d0574")
 	iidExecuteScriptCompleted         = parseGUID("49511172-cc67-4bca-9923-137112f4c4cc")
 	iidAddScriptCompleted             = parseGUID("b99369f3-9b11-47b5-bc6f-8e7895fcea17")
@@ -107,6 +109,7 @@ const (
 	controllerAddMoveFocusRequested              = 13
 	controllerAddGotFocus                        = 15
 	controllerAddLostFocus                       = 17
+	controllerAddAcceleratorKeyPressed           = 19
 	controllerNotifyParentPositionChanged        = 23
 	controllerClose                              = 24
 	controllerGetCoreWebView2                    = 25
@@ -191,6 +194,12 @@ const (
 
 	// ICoreWebView2MoveFocusRequestedEventArgs
 	moveFocusPutHandled = 5
+
+	// ICoreWebView2AcceleratorKeyPressedEventArgs
+	acceleratorArgsGetKeyEventKind = 3
+	acceleratorArgsGetVirtualKey   = 4
+	acceleratorArgsGetLParam       = 5
+	acceleratorArgsPutHandled      = 8
 
 	// ICoreWebView2WebResourceRequestedEventArgs, ICoreWebView2WebResourceRequest
 	resourceArgsGetRequest  = 3
