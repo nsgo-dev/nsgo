@@ -73,53 +73,52 @@ func TestSelectionAreaSelectsAcrossTexts(t *testing.T) {
 	})
 }
 
-// TestModalSlidesIn opens a modal, which slides up from below its frame
-// and rests there.
+// TestModalSlidesIn mounts a modal and checks its first frame, midpoint and resting frame on the GTK thread, before its timer can advance.
 func TestModalSlidesIn(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
 	}
 	title := "nsgo-modal"
-	var open *core.Signal[bool]
-	var root *core.Scope
 	app := func(cx *core.Scope) core.Node {
-		root = cx
-		open = core.NewSignal(cx, false)
 		cx.SetTitle(title + "|ready")
-		return core.View{Style: core.Style{Width: driver.Pt(320), Height: driver.Pt(200), Background: driver.RGB(0xffffff)}, Children: []core.Node{
-			core.Show{When: open.Get, Then: func(*core.Scope) core.Node {
-				return core.Modal{Children: []core.Node{core.View{Style: core.Style{FlexGrow: 1, Background: driver.RGB(0x2563eb)}}}}
-			}},
-		}}
+		return core.View{Style: core.Style{Width: driver.Pt(320), Height: driver.Pt(200)}}
 	}
 	w := startTestWindow(t, app, Options{Title: title, Width: 320, Height: 200})
 	waitForTitle(t, w, title+"|ready")
-	var modal *view
-	root.Post(func() { open.Set(true) })
-	deadline := time.Now().Add(3 * time.Second)
-	for modal == nil && time.Now().Before(deadline) {
-		w.onLoop(t, func() {
-			for _, v := range w.views {
-				if v != nil && v.kind == driver.KindModal {
-					modal = v
-				}
-			}
-		})
-		time.Sleep(10 * time.Millisecond)
-	}
-	if modal == nil {
-		t.Fatal("no modal")
-	}
-	var shown, rest driver.Bounds
-	w.onLoop(t, func() { shown, rest = modal.shownFrame(), modal.frame })
-	if shown.Origin.Y <= rest.Origin.Y {
-		t.Errorf("the modal shows at %v as it opens, want below %v", shown, rest)
-	}
-	time.Sleep(500 * time.Millisecond)
-	w.onLoop(t, func() { shown = modal.shownFrame() })
-	if shown != rest {
-		t.Errorf("the modal rests at %v, want %v", shown, rest)
-	}
+	w.onLoop(t, func() {
+		// Mount and sample in one callback: the test goroutine may not resume until a real 300 ms animation has already finished.
+		id := driver.NodeID(len(w.views))
+		rest := driver.Bounds{Size: driver.Size{Width: 320, Height: 200}}
+		w.apply(&driver.MountBatch{Root: w.root, Items: []driver.MountItem{
+			{Kind: driver.ItemCreate, ID: id, View: driver.KindModal},
+			{Kind: driver.ItemModal, ID: id, Modal: &driver.ModalConfig{Animation: driver.ModalSlide}},
+			{Kind: driver.ItemFrame, ID: id, Frame: rest},
+			{Kind: driver.ItemInsert, ID: id, Parent: w.root},
+		}})
+		modal := w.view(id)
+		if modal.layout == nil || modal.layout.move == nil {
+			t.Error("inserting the modal started no slide")
+			return
+		}
+		shown := modal.shownFrame()
+		if shown.Origin.Y != rest.Origin.Y+rest.Size.Height {
+			t.Errorf("the modal starts at %v, want below %v", shown, rest)
+		}
+		start, duration := modal.layout.moveStart, modal.layout.move.Duration
+		if !w.stepLayout(start.Add(duration / 2)) {
+			t.Error("the modal stopped moving before its midpoint")
+		}
+		shown = modal.shownFrame()
+		if shown.Origin.Y <= rest.Origin.Y || shown.Origin.Y >= rest.Origin.Y+rest.Size.Height {
+			t.Errorf("the modal's midpoint is %v, want between its start and %v", shown, rest)
+		}
+		if w.stepLayout(start.Add(duration)) {
+			t.Error("the modal keeps animating after its duration")
+		}
+		if shown = modal.shownFrame(); shown != rest {
+			t.Errorf("the modal rests at %v, want %v", shown, rest)
+		}
+	})
 }
 
 // TestBlendModeMixesWithItsParent draws a cyan view multiplied over its
