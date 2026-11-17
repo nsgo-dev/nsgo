@@ -36,7 +36,7 @@ Keep each graph on the goroutine that created it, cleanup included. Signal write
 
 ## Steps
 
-Use `app.Post(func() { signal.Set(value) })` from a test or stubbed worker to queue work on the app's graph goroutine, then `app.Settle()` or a wait before reading views. It runs on the test goroutine headless and the engine goroutine on a target, so the same test may set signals on both.
+Use `app.Post(func() { signal.Set(value) })` from a test or stubbed worker to queue work on the app's graph goroutine, then `app.Settle()` or a wait before reading views. It runs on the test goroutine headless and the engine goroutine on a target, so the same test may set signals on both; the function takes no steps and does not call `t.Fatal`.
 
 - Pointer and touch: `Press`, `PressWith`, `PressAt`, `PressAtWith`, `LongPress`, `RightClick`, `Hover`, `Drag`, `Scroll`, `ScrollTo`, `PullToRefresh`, `Pinch`, `Wheel`.
 - Keyboard and text: `Focus`, `Type`, `Clear`, `Submit`, `KeyPress`, `Paste`, `Select`, `Compose`.

@@ -53,6 +53,8 @@ go tool nsgo test
 
 测试会检查响应式图的 goroutine 归属：信号和作用域应在应用的 goroutine 上访问，工作 goroutine 通过 `cx.Post` 调度。在应用空闲时从其他 goroutine 发起的调用会 panic，并提示使用 `Scope.Post`；其余情况由 `-race` 检出。引擎内部 panic 仍会使测试失败；发布的应用则停止受影响的引擎，并把堆栈报告给宿主。开发构建也检查归属，发布构建不包含这项检查；WebAssembly 的开发构建和测试构建不使用 goroutine ID 检查，因为浏览器回调可能在浏览器管理的 goroutine 上恢复；其他测试检查照常进行。
 
+`app.Post(func() { state.Set(value) })` 把工作排到应用的响应式图所在的 goroutine 上，在下一个步骤或等待稳定时运行：无头运行时是测试 goroutine，在目标平台上是引擎 goroutine。可以从测试或桩出来的工作 goroutine 调用它，再用 `app.Settle()` 或等待读取结果视图。函数可以继续投递，同一个步骤会一并运行；它不执行步骤，也不调用 `t.Fatal`，因为在目标平台上它不在测试 goroutine 上运行。
+
 ## 在平台上运行
 
 测试可以在真实窗口中、用平台自己的输入运行。测试发现遵循目标平台的构建标签，即使包中也有跨平台文件，仍会包含仅适用于该目标的测试文件：

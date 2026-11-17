@@ -54,6 +54,8 @@ func MainFunc(run func() int) {
 	os.Exit(run())
 }
 
+func init() { testhost.PostToTest = func(app any, fn func()) { app.(*App).postTest(fn) } }
+
 // onTarget reports whether `nsgo test -target` runs the tests.
 func onTarget() bool { return os.Getenv("NSGO_TEST_TARGET") != "" }
 
@@ -68,8 +70,7 @@ func Target() string { return os.Getenv("NSGO_TEST_TARGET") }
 type target struct {
 	a       *App
 	surface testhost.Surface
-	// appScope belongs to the real app's graph; a.root is the test's
-	// separate graph for storage and other model-side callbacks.
+	// appScope is the scope the platform renders the app under, on the engine's graph, which App.Post posts to; a.root is the test's own graph, for storage and the model's callbacks.
 	appScope *core.Scope
 	// live is set for a running app's surface the automation follows (automation.go), whose model also drops the alerts the user answers.
 	live bool
@@ -331,8 +332,9 @@ func (t *target) settleUntil(deadline time.Time) {
 	}
 	quiet := time.Now()
 	for {
-		t.runPosts()
-		if t.drain() || t.surface.Animating() {
+		// Posts handed to the engine are work in flight, as a batch is.
+		posted := t.runPosts()
+		if t.drain() || posted || t.surface.Animating() {
 			quiet = time.Now()
 		}
 		if time.Now().After(deadline) {
@@ -346,7 +348,8 @@ func (t *target) settleUntil(deadline time.Time) {
 				t.quiet = false
 				return
 			}
-			if t.drain() || t.surface.Animating() {
+			// What the engine ran at the barrier may have posted more, as an App.Post function posting another does.
+			if t.drain() || t.pending() || t.surface.Animating() {
 				quiet = time.Now()
 				continue
 			}
@@ -357,8 +360,8 @@ func (t *target) settleUntil(deadline time.Time) {
 	}
 }
 
-// runPosts runs what the test's own graph posted.
-func (t *target) runPosts() {
+// runPosts runs what the test's own graph posted and hands App.Post's functions to the engine, reporting whether there were any.
+func (t *target) runPosts() bool {
 	t.a.mu.Lock()
 	posts := t.a.posts
 	t.a.posts = nil
@@ -366,6 +369,14 @@ func (t *target) runPosts() {
 	for _, fn := range posts {
 		fn()
 	}
+	return len(posts) > 0
+}
+
+// pending reports whether posts wait for the next runPosts.
+func (t *target) pending() bool {
+	t.a.mu.Lock()
+	defer t.a.mu.Unlock()
+	return len(t.a.posts) > 0
 }
 
 func (t *target) check(err error) {
