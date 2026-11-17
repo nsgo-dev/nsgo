@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -287,12 +286,6 @@ func readSession(dir string) (*automationSession, error) {
 		return nil, fmt.Errorf("%s: %w", sessionPath(dir), err)
 	}
 	return &s, nil
-}
-
-// processAlive reports whether a process runs as pid.
-func processAlive(pid int) bool {
-	p, err := os.FindProcess(pid)
-	return err == nil && pid > 0 && p.Signal(syscall.Signal(0)) == nil
 }
 
 // sessionLive reports whether the nsgo dev -automation s names runs: its process does, and its server answers status with the session's token, which a process that took a crashed one's ID never does.

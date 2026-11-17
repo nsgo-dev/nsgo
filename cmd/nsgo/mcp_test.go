@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -58,6 +59,48 @@ func connectMCP(t *testing.T, b mcpBridge) *mcp.ClientSession {
 	}
 	t.Cleanup(func() { cs.Close() })
 	return cs
+}
+
+func TestMCPSessionBridge(t *testing.T) {
+	h := startHub(t)
+	dir := t.TempDir()
+	if err := h.writeSession(dir); err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	if code := <-fakeApp(ctx, t, h, func(req automation.Request) automation.Answer {
+		if req.Method != automation.Snapshot {
+			return automation.Reply(req.ID, nil, automation.Errorf(automation.InvalidRequest, "unexpected method %s", req.Method))
+		}
+		return automation.Reply(req.ID, automation.SnapshotResult{Text: "- button \"Add\" [view:3]"}, nil)
+	}); code != http.StatusOK {
+		t.Fatalf("app connection: %d", code)
+	}
+	b := &sessionBridge{dir: dir}
+	if s, ok := b.live(); !ok || s.Token != h.bridgeToken {
+		t.Fatalf("running session was not found: %+v, %v", s, ok)
+	}
+	cs := connectMCP(t, b)
+	for _, method := range []string{automation.Status, automation.Snapshot} {
+		result, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: method, Arguments: map[string]any{}})
+		if err != nil || result.IsError {
+			t.Fatalf("%s: %+v, %v", method, result, err)
+		}
+		if method == automation.Snapshot && result.Content[0].(*mcp.TextContent).Text != "window 0\n- button \"Add\" [view:3]" {
+			t.Errorf("snapshot: %+v", result.Content)
+		}
+	}
+	if b.child != nil {
+		t.Error("MCP started another dev process instead of reusing the session")
+	}
+	s, err := readSession(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Token = "wrong-token"
+	if sessionLive(s) {
+		t.Error("a live PID bypassed the session token check")
+	}
 }
 
 func TestMCPTools(t *testing.T) {

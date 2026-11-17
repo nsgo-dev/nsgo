@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -300,7 +302,11 @@ func TestAutomationSessionFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(sessionPath(dir))
-	if err != nil || info.Mode().Perm() != 0o600 {
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Windows reports writable files as 0666; chmod only controls read-only.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("the session file: %v %v", info, err)
 	}
 	s, err := readSession(dir)
@@ -309,11 +315,15 @@ func TestAutomationSessionFile(t *testing.T) {
 	}
 	// Another live nsgo dev -automation keeps its session.
 	other := startHub(t)
+	pid, _ := idleProcess(t)
 	data, _ := os.ReadFile(sessionPath(dir))
-	theirs := bytes.Replace(data, []byte("pid: "+strconv.Itoa(os.Getpid())), []byte("pid: "+strconv.Itoa(os.Getppid())), 1)
+	theirs := bytes.Replace(data, []byte("pid: "+strconv.Itoa(os.Getpid())), []byte("pid: "+strconv.Itoa(pid)), 1)
 	os.WriteFile(sessionPath(dir), theirs, 0o600)
-	if err := other.writeSession(dir); err == nil || !strings.Contains(err.Error(), errSessionTaken.Error()) {
+	if err := other.writeSession(dir); !errors.Is(err, errSessionTaken) {
 		t.Errorf("a second session over a live one: %v", err)
+	}
+	if got, err := os.ReadFile(sessionPath(dir)); err != nil || !bytes.Equal(got, theirs) {
+		t.Fatalf("a second session replaced the live session: %v", err)
 	}
 	other.removeSession()
 	if _, err := os.Stat(sessionPath(dir)); err != nil {
