@@ -1080,8 +1080,7 @@ func (v *View) center() (local, page driver.Point) {
 	return local, v.pagePoint(local)
 }
 
-// pointerMatrix is the transform the model draws, including animated
-// bindings and the parent's perspective, in the view's own coordinates.
+// pointerMatrix is the transform the model draws, including animated bindings and the parent's perspective, in the view's own coordinates.
 func (v *View) pointerMatrix() driver.Matrix3D {
 	s := v.Animated.Apply(v.Style)
 	m := s.Matrix(v.Frame.Size)
@@ -1111,8 +1110,7 @@ func (v *View) localPoint(p driver.Point) driver.Point {
 	return local
 }
 
-// Bounds is v's layout frame in surface points, as its ancestors and
-// their scroll offsets place it, before transforms: what Ref.Bounds reports.
+// Bounds is v's layout frame in surface points, as its ancestors and their scroll offsets place it, before transforms: what Ref.Bounds reports.
 func (v *View) Bounds() core.Bounds { return v.surfaceFrame() }
 
 // surfaceFrame is v's frame in surface points, as its ancestors and their

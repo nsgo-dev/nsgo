@@ -37,8 +37,7 @@ func TestPointerCoordinatesUndoNestedCSS(t *testing.T) {
 	if math.Abs(x-10) > .001 || math.Abs(y-10) > .001 {
 		t.Fatalf("local = (%g,%g), want (10,10)", x, y)
 	}
-	// Individual properties are used by NSGo's keyframes as well as the
-	// transform property. They must be composed in CSS's order.
+	// Individual properties are used by NSGo's keyframes as well as the transform property. They must be composed in CSS's order.
 	child.Get("style").Set("translate", "10px 0px")
 	x, y = clientPoint(child, 330, 130)
 	if math.Abs(x-10) > .001 || math.Abs(y-10) > .001 {

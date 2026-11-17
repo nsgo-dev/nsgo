@@ -1,10 +1,4 @@
-// Package camera is a plane the user pans and zooms, such as a design
-// canvas or a board of diagrams: the app lays its content out at its own
-// size on the plane, and the view shows it through a camera that moves
-// and scales it on the platform's frame clock. The view owns the camera
-// and its gestures; what the content holds and what pressing it means
-// stay the app's. Content receives input where the camera draws it; the
-// app also hears presses on the plane at points of the content.
+// Package camera is a plane the user pans and zooms, such as a design canvas or a board of diagrams: the app lays its content out at its own size on the plane, and the view shows it through a camera that moves and scales it on the platform's frame clock. The view owns the camera and its gestures; what the content holds and what pressing it means stay the app's. Content receives input where the camera draws it; the app also hears presses on the plane at points of the content.
 package camera
 
 import (
@@ -408,9 +402,7 @@ func (v *view) glide(vx, vy float64) {
 	v.run = v.cx.StartAnimation(core.Parallel(core.Decay(v.x, x), core.Decay(v.y, y)), nil)
 }
 
-// pointerLayer surrounds the content: it pans when
-// dragged, zooms on pinches and the wheel, and tells the app of presses
-// and hovers at points of the content.
+// pointerLayer surrounds the content: it pans when dragged, zooms on pinches and the wheel, and tells the app of presses and hovers at points of the content.
 func (v *view) pointerLayer(content core.Node) core.Node {
 	press := func(e core.PressEvent) {
 		if v.spec.OnPress != nil && v.spec.OnPress(v.s.ToContent(e.Position), e) {

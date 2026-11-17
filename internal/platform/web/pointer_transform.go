@@ -11,9 +11,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// layoutOrigin is the untransformed border-box origin in document
-// coordinates. offsetParent can skip static containers, so subtracting
-// two such origins also works for an embedding page's wrappers.
+// layoutOrigin is the untransformed border-box origin in document coordinates. offsetParent can skip static containers, so subtracting two such origins also works for an embedding page's wrappers.
 func layoutOrigin(el js.Value) (x, y float64) {
 	for el.Truthy() {
 		x += el.Get("offsetLeft").Float()
@@ -36,8 +34,7 @@ func cssNumber(s string, size float64) float64 {
 	return v
 }
 
-// elementMatrix reads the browser's current values, including CSS
-// transitions and Web Animations, rather than a style's destination.
+// elementMatrix reads the browser's current values, including CSS transitions and Web Animations, rather than a style's destination.
 func elementMatrix(el js.Value) driver.Matrix3D {
 	cs := js.Global().Call("getComputedStyle", el)
 	m := driver.Identity3D

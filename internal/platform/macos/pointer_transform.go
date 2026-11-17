@@ -25,9 +25,7 @@ func (v *view) pointerMatrix() driver.Matrix3D {
 	return m
 }
 
-// windowPoint undoes the transforms AppKit's view conversion leaves
-// out. Converting between a view and its container still supplies the
-// native scroll bounds origin, holder frame and flipped coordinates.
+// windowPoint undoes the transforms AppKit's view conversion leaves out. Converting between a view and its container still supplies the native scroll bounds origin, holder frame and flipped coordinates.
 func (v *view) windowPoint(at apple.CGPoint) apple.CGPoint {
 	var p apple.CGPoint
 	if parent := v.up; parent != nil {

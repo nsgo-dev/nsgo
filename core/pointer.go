@@ -110,8 +110,7 @@ func (n *node) mayTransform() bool {
 	return false
 }
 
-// pointerMatrix is the transform sent to the platform, with a parent's
-// perspective about the same viewport center the backend uses.
+// pointerMatrix is the transform sent to the platform, with a parent's perspective about the same viewport center the backend uses.
 func (n *node) pointerMatrix() driver.Matrix3D {
 	m := n.sent.viewStyle.Matrix(n.frame.Size)
 	if parent := n.nativeParent(); parent != nil {

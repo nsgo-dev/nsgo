@@ -2217,8 +2217,7 @@ func reach(self objc.ID, cmd objc.SEL, p apple.CGPoint) objc.ID {
 	}
 	own, children := driver.ReachView(frame.Size, &v.props, v.overflow, v.transformedKids, local)
 	at := apple.CGPoint{X: float64(local.X), Y: float64(local.Y)}
-	// Test native children ourselves: AppKit clips the search to layout
-	// frames and does not undo their layer transforms.
+	// Test native children ourselves: AppKit clips the search to layout frames and does not undo their layer transforms.
 	var hit objc.ID
 	if children {
 		b := objc.Send[apple.CGRect](self, selBounds)

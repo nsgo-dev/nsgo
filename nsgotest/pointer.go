@@ -481,8 +481,7 @@ func (a *App) hoverAt(selector string, local *driver.Point) {
 	a.done()
 }
 
-// reveal brings the middle of a named view into its scroll viewports
-// before picking at it, as a target's native steps do.
+// reveal brings the middle of a named view into its scroll viewports before picking at it, as a target's native steps do.
 func (a *App) reveal(v *View) driver.Point {
 	if a.target != nil {
 		return a.target.reveal(v)

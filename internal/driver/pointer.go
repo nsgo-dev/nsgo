@@ -2,10 +2,7 @@ package driver
 
 import "math"
 
-// Unproject returns the point of the plane z=0 that m draws at p. It
-// inverts the plane's homography, rather than applying the 4D inverse
-// to a screen point whose depth is unknown. A collapsed plane, a point
-// at infinity or behind the viewer has no hit.
+// Unproject returns the point of the plane z=0 that m draws at p. It inverts the plane's homography, rather than applying the 4D inverse to a screen point whose depth is unknown. A collapsed plane, a point at infinity or behind the viewer has no hit.
 func (m Matrix3D) Unproject(p Point) (Point, bool) {
 	if m == Identity3D {
 		return p, true
@@ -25,8 +22,7 @@ func (m Matrix3D) Unproject(p Point) (Point, bool) {
 	return Point{X: Points(u), Y: Points(v)}, true
 }
 
-// IntoView maps p in the parent's content into a view's viewport. m
-// acts about the view's top left, after its frame places it.
+// IntoView maps p in the parent's content into a view's viewport. m acts about the view's top left, after its frame places it.
 func IntoView(frame Bounds, m Matrix3D, p Point) (Point, bool) {
 	return m.Unproject(Point{X: p.X - frame.Origin.X, Y: p.Y - frame.Origin.Y})
 }

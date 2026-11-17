@@ -9,8 +9,7 @@ import (
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
-// This same test runs in the model and through a target's native input.
-// Aim through the root so selecting the child cannot bypass hit testing.
+// This same test runs in the model and through a target's native input. Aim through the root so selecting the child cannot bypass hit testing.
 func TestPointersFollowNestedTransforms(t *testing.T) {
 	var presses []core.PressEvent
 	var hovered, panned bool

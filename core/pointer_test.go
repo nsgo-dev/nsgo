@@ -26,8 +26,7 @@ func TestHitTestsFollowNestedTransformsAndClips(t *testing.T) {
 				}}}}
 			})
 			h.commit()
-			// Child (10, 10) is drawn at (330, 110): first translated
-			// above its parent, then rotated and scaled about its center.
+			// Child (10, 10) is drawn at (330, 110): first translated above its parent, then rotated and scaled about its center.
 			at := Point{X: 330, Y: 110}
 			id := h.tree.HitTest(at)
 			if clipped {

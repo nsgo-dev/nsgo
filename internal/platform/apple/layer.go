@@ -259,9 +259,7 @@ func SetTransform(layer objc.ID, t driver.Transform) {
 	setLayerTransform(layer, m)
 }
 
-// PointerMatrix returns the transform currently drawn by layer, around
-// its top left. Presentation values include style transitions and
-// additive keyframes, which a view's layout coordinates do not know.
+// PointerMatrix returns the transform currently drawn by layer, around its top left. Presentation values include style transitions and additive keyframes, which a view's layout coordinates do not know.
 func PointerMatrix(layer objc.ID) driver.Matrix3D {
 	if layer == 0 {
 		return driver.Identity3D

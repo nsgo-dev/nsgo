@@ -8,8 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// local uses the same placement GTK draws and picks, including native
-// animation values, the current frame and a parent's perspective.
+// local uses the same placement GTK draws and picks, including native animation values, the current frame and a parent's perspective.
 func (v *view) local(p driver.Point) driver.Point {
 	local, ok := v.placement(0, 0).Unproject(p)
 	if !ok {
