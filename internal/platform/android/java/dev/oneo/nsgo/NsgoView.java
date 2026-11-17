@@ -311,6 +311,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         super(context, attrs);
         primary = first;
         this.surface = surface;
+        // Holds the window's focus while no app control does, as NSH's host does.
+        setFocusable(true);
+        setFocusableInTouchMode(true);
+        setDescendantFocusability(FOCUS_BEFORE_DESCENDANTS);
+        setDefaultFocusHighlightEnabled(false);
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         if (first == null) {
             // Alarms a force stop cleared, which the boot receiver cannot set again.
             Notifications.rearm(context);
@@ -426,6 +432,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        // Embedded hosts may already have a focused sibling; keep it there.
+        if (getRootView().findFocus() == null) requestFocus();
         accessibility.addTouchExplorationStateChangeListener(screenReader);
         if (Build.VERSION.SDK_INT >= 34 && uiMode != null && contrast == null) listenContrast();
         getContext().getContentResolver().registerContentObserver(
@@ -2515,8 +2523,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 break;
             case Protocol.ITEM_BLUR:
                 if (n != null && n.field != null && n.field.hasFocus()) {
-                    n.field.clearFocus();
-                    ime.hideSoftInputFromWindow(n.field.getWindowToken(), 0);
+                    blurInput(n.field);
                 }
                 break;
             case Protocol.ITEM_IMAGE: {
@@ -2540,8 +2547,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.ITEM_DISMISS_KEYBOARD: {
                 View focused = findFocus();
                 if (focused != null) {
-                    ime.hideSoftInputFromWindow(focused.getWindowToken(), 0);
-                    focused.clearFocus();
+                    blurInput(focused);
                 }
                 break;
             }
@@ -4185,8 +4191,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
             @Override public void blur() {
                 if (n.field.hasFocus()) {
-                    n.field.clearFocus();
-                    ime.hideSoftInputFromWindow(n.field.getWindowToken(), 0);
+                    blurInput(n.field);
                 }
             }
         });
@@ -4197,6 +4202,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             report(n, focused ? Protocol.EVENT_FOCUS : Protocol.EVENT_BLUR);
         });
         return field;
+    }
+
+    /** Hides the IME and gives focus back to the host, so keys still reach it and no other field takes focus. */
+    private void blurInput(View field) {
+        ime.hideSoftInputFromWindow(field.getWindowToken(), 0);
+        if (!requestFocus()) field.clearFocus();
     }
 
     /**
@@ -5286,8 +5297,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             public boolean dismissKeyboard() {
                 View focused = findFocus();
                 if (!(focused instanceof EditText)) return false;
-                ime.hideSoftInputFromWindow(focused.getWindowToken(), 0);
-                focused.clearFocus();
+                blurInput(focused);
                 return true;
             }
 
