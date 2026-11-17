@@ -19,7 +19,7 @@ func TestOnMainExitPropagation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"fatal", "failnow", "skip", "panic", "goexit"} {
+	for _, mode := range []string{"fatal", "failnow", "skip", "panic", "goexit", "fatal-then-panic"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 			defer cancel()
@@ -38,26 +38,35 @@ func TestOnMainExitPropagation(t *testing.T) {
 			if strings.Contains(text, "ON_MAIN_CONTINUED") || strings.Contains(text, "test timed out") || ctx.Err() != nil {
 				t.Fatalf("the test continued after an exit or hung: %v\n%s", err, text)
 			}
-			if mode != "panic" && mode != "goexit" && !strings.Contains(text, "PASS: TestOnMainSurvivorChild") {
+			if mode != "panic" && mode != "goexit" && mode != "fatal-then-panic" && !strings.Contains(text, "PASS: TestOnMainSurvivorChild") {
 				t.Fatalf("later test did not run on the main thread: %v\n%s", err, text)
 			}
-			if mode == "panic" && !strings.Contains(text, "exitOnMain.func1") {
+			if (mode == "panic" || mode == "fatal-then-panic") && !strings.Contains(text, "exitOnMain.func1") {
 				t.Fatalf("panic lost the originating main-thread stack:\n%s", text)
+			}
+			// A panic on the main thread after an earlier exit still reaches its own test: the earlier exit left the loop serving from a deferred call.
+			if mode == "fatal-then-panic" && (!strings.Contains(text, "--- FAIL: TestOnMainExitChild") || !strings.Contains(text, "main-thread fatal-then-panic again")) {
+				t.Fatalf("the panic after an exit was not reported:\n%s", text)
 			}
 		})
 	}
 }
 
-func TestOnMainExitChild(t *testing.T)      { exitOnMain(t) }
-func TestOnMainExitAgainChild(t *testing.T) { exitOnMain(t) }
+func TestOnMainExitChild(t *testing.T)      { exitOnMain(t, false) }
+func TestOnMainExitAgainChild(t *testing.T) { exitOnMain(t, true) }
 
-func exitOnMain(t *testing.T) {
+func exitOnMain(t *testing.T, again bool) {
 	mode := os.Getenv("NSGO_MAIN_EXIT_CASE")
 	if mode == "" {
 		t.Skip("subprocess helper")
 	}
 	onMain(func() {
 		switch mode {
+		case "fatal-then-panic":
+			if again {
+				panic("main-thread fatal-then-panic again")
+			}
+			t.Fatal("main-thread fatal-then-panic")
 		case "fatal":
 			t.Fatal("main-thread fatal")
 		case "failnow":

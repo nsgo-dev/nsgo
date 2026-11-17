@@ -383,7 +383,7 @@ These items wait for community contributions, and a change to one backend record
 
 | Item | NSH reference | Done when |
 | --- | --- | --- |
-| Windows test-thread exits | [#410](https://github.com/nsgo-dev/nsgo/issues/410) | A native test's `onMain` propagates `Fatal`, `FailNow` and `SkipNow` to the test goroutine while preserving the window's thread, as macOS's does; Windows' helper currently waits for its five-second timeout if the posted closure exits |
+| Windows and Linux test-thread exits | [#410](https://github.com/nsgo-dev/nsgo/issues/410) | A native test's `onMain` (Windows) or `onLoop` (Linux) propagates `Fatal`, `FailNow` and `SkipNow` to the test goroutine while preserving the window's thread, as macOS's does; Windows' helper currently waits for its five-second timeout if the posted closure exits, and Linux's lets the test carry on past the exit while the GTK thread it shares with later windows stops |
 | Shader effects on Android | `shaders.md` (Effects, transitions and pictures) | The Java runtime pictures an effect's or a transition's children and the surface into textures its GL thread reads, draws the shader over them and runs pages' and dialogs' `TransitionShader`, and shader lanes read a color node's channels, with `classes.dex` rebuilt; today its backend leaves effects out |
 | Backdrops on Windows and Linux | `shaders.md` (Effects, transitions and pictures) | `sample_backdrop` reads what the window drew behind the view, as it does on macOS, iOS and the web, rather than transparency |
 | The rest of WGSL | `shaders.md` (Validation and limits) | `var<private>` globals, structs of the app's own, non-square matrices and the bit-counting, packing, `modf` and `frexp` built-ins compile into `shaderir` |
