@@ -397,3 +397,35 @@ func TestRelationalSourcesOnlyResolveInTheirScope(t *testing.T) {
 		t.Fatalf("sourcesFor=%d sources, want the icon's own button", len(sources))
 	}
 }
+
+func TestRelationalSelectorsReadVisibleLabelStates(t *testing.T) {
+	control := new(Ref)
+	var disabled *Signal[bool]
+	h := newHost(t, Size{Width: 400, Height: 300}, func(cx *Scope) Node {
+		disabled = NewSignal(cx, false)
+		return View{Children: []Node{
+			View{TestID: "row", Class: "p-8 has-[:disabled]:p-3 [&_[aria-invalid=true]]:opacity-50", Children: []Node{
+				Text{TestID: "label", Content: "Email", LabelFor: control},
+			}},
+			View{TestID: "control", Ref: control, OnPress: func(PressEvent) {}, Disabled: disabled.Get, Invalid: disabled.Get},
+		}}
+	})
+	h.commit()
+	if got := h.find("row").style.Padding.Top; got != 32 {
+		t.Fatalf("enabled control: row padding=%v, want 32", got)
+	}
+	disabled.Set(true)
+	h.commit()
+	// The label shows its control's Disabled and Invalid states, so selectors around the label read them as the label's own.
+	if got := h.find("row").style.Padding.Top; got != 12 {
+		t.Fatalf("disabled control: row padding=%v, want 12", got)
+	}
+	if got := h.find("label").style.Opacity; got != Alpha(.5) {
+		t.Fatalf("invalid control: label opacity=%v, want .5", got)
+	}
+	disabled.Set(false)
+	h.commit()
+	if got, op := h.find("row").style.Padding.Top, h.find("label").style.Opacity; got != 32 || op == Alpha(.5) {
+		t.Fatalf("re-enabled control: row padding=%v, label opacity=%v", got, op)
+	}
+}
