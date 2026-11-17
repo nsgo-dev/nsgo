@@ -27,15 +27,18 @@ const (
 type Spinner struct {
 	Variant SpinnerVariant
 	Size    core.Points
-	Label   string
-	TestID  string
-	Style   core.Style
+	// Tint colors the spinner. Ring spinners follow the accent when nil;
+	// spokes retain their muted text color when nil.
+	Tint   func() core.Color
+	Label  string
+	TestID string
+	Style  core.Style
 }
 
 // Render implements core.Node.
 func (s Spinner) Render(cx *core.Scope) core.Node {
 	if s.Variant != SpinnerSpokes {
-		return ProgressRing{Indeterminate: func() bool { return true }, Size: s.Size, Label: s.Label, TestID: s.TestID, Style: s.Style}
+		return ProgressRing{Indeterminate: func() bool { return true }, Size: s.Size, Tint: s.Tint, Label: s.Label, TestID: s.TestID, Style: s.Style}
 	}
 	size := s.Size
 	if size <= 0 {
@@ -47,11 +50,15 @@ func (s Spinner) Render(cx *core.Scope) core.Node {
 		cx.StartAnimation(core.ValueKeyframes(turn, core.KeyframeTiming{Duration: 900 * time.Millisecond, Iterations: core.Forever,
 			Easing: core.StepsEasing(12, core.JumpEnd)}, core.Stops(0, 360)...), nil)
 	}
+	tint := s.Tint
+	if tint == nil {
+		tint = ColorsOf(cx).Muted
+	}
 	return base.Progress{TestID: s.TestID, Label: s.Label, Indeterminate: func() bool { return true }, TrackStyle: core.Style{Display: core.DisplayNone},
 		Style:     core.Style{Width: core.Pt(size), Height: core.Pt(size), FlexShrink: 0}.Merge(s.Style),
 		StyleFunc: func() core.Style { return core.Style{Animated: &core.AnimatedStyle{Rotate: turn}} },
 		Children: []core.Node{core.Icon{SVG: spokes(), Style: core.Style{Width: core.Pct(100), Height: core.Pct(100)},
-			StyleFunc: Colored(ColorsOf(cx).Muted)}}}
+			StyleFunc: Colored(tint)}}}
 }
 
 // spokes are the twelve spokes, fading behind the one at twelve o'clock,

@@ -35,6 +35,9 @@ type Button struct {
 	// to a button of an icon alone.
 	Label    string
 	Disabled func() bool
+	// Busy says the button's action is still loading and shows a spinner in
+	// the button's foreground color.
+	Busy func() bool
 	// AutoFocus moves the keyboard focus here once it mounts, as base.Button's.
 	AutoFocus bool
 	// Flex grows it to share a row with its siblings.
@@ -59,7 +62,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 	if b.OnPress != nil {
 		press = func(core.PressEvent) { b.OnPress() }
 	}
-	return base.Button{OnPress: press, Disabled: b.Disabled, AutoFocus: b.AutoFocus, Label: b.label(), TestID: b.TestID,
+	return base.Button{OnPress: press, Disabled: b.Disabled, Busy: b.Busy, AutoFocus: b.AutoFocus, Label: b.label(), TestID: b.TestID,
 		Style: style, StyleFunc: focus, Children: []core.Node{face}}
 }
 
@@ -104,7 +107,9 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 		return 0, colors.Hover(), colors.Pressed(), colors.Border()
 	}
 	var children []core.Node
-	if b.Icon != nil {
+	if is(b.Busy) {
+		children = append(children, Spinner{Size: b.Size.glyph(), Tint: fg})
+	} else if b.Icon != nil {
 		glyph, tint := b.IconSize, b.Tint
 		if glyph == 0 {
 			glyph = b.Size.glyph()
@@ -114,7 +119,7 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 		}
 		children = append(children, Icon(b.Icon, glyph, tint))
 	}
-	if b.Text != "" || b.Icon == nil {
+	if !is(b.Busy) && (b.Text != "" || b.Icon == nil) {
 		children = append(children, Text(b.Text, b.Size.text().FontSize, Regular, fg))
 	}
 	shape := core.Style{Height: core.Pt(b.Size.Height()), Padding: core.Symmetric(0, b.Size.inset())}

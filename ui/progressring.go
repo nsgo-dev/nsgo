@@ -21,6 +21,8 @@ type ProgressRing struct {
 	Value         func() float32
 	Indeterminate func() bool
 	Size          core.Points
+	// Tint colors the progress arc. It follows the accent when nil.
+	Tint func() core.Color
 	// Label names the task for assistive technology.
 	Label  string
 	TestID string
@@ -30,6 +32,10 @@ type ProgressRing struct {
 // Render implements core.Node.
 func (p ProgressRing) Render(cx *core.Scope) core.Node {
 	colors := ColorsOf(cx)
+	tint := p.Tint
+	if tint == nil {
+		tint = colors.Accent
+	}
 	size := p.Size
 	if size <= 0 {
 		size = ringSize
@@ -67,7 +73,7 @@ func (p ProgressRing) Render(cx *core.Scope) core.Node {
 		if sweep <= 0 {
 			return
 		}
-		d.BeginPath().Arc(x, y, r, start, start+sweep, false).SetStrokeColor(c.Accent).Stroke()
+		d.BeginPath().Arc(x, y, r, start, start+sweep, false).SetStrokeColor(tint()).Stroke()
 	}
 	// The ring is drawn; base's bar is its semantics.
 	return base.Progress{TestID: p.TestID, Label: p.Label, Value: value, Indeterminate: p.Indeterminate,

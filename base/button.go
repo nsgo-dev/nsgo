@@ -18,6 +18,8 @@ type Button struct {
 	OnPressUp   func(core.PressEvent)
 	// Disabled stops presses and is reported to assistive technology.
 	Disabled func() bool
+	// Busy says the button's action is still loading.
+	Busy func() bool
 	// Selected marks a toggled trigger or the current item: assistive
 	// technology says so, and Style.Selected applies.
 	Selected func() bool
@@ -77,6 +79,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 		OnPressDown:                 b.OnPressDown,
 		OnPressUp:                   b.OnPressUp,
 		Disabled:                    b.Disabled,
+		Busy:                        b.Busy,
 		Selected:                    b.Selected,
 		Expanded:                    b.Expanded,
 		Role:                        role,

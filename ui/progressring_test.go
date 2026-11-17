@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
@@ -32,4 +33,45 @@ func TestProgressRing(t *testing.T) {
 			t.Fatal("the spinners stand still")
 		}
 	})
+}
+
+func TestProgressRingTint(t *testing.T) {
+	want := core.RGB(0x123456)
+	app, _ := start(t, desktopEnv, func(cx *core.Scope) core.Node {
+		return ProgressRing{TestID: "ring", Value: func() float32 { return 50 }, Tint: func() core.Color { return want }}
+	})
+	if got := canvasStrokeColor(app.Find("id:ring")); got != want {
+		t.Fatalf("progress ring tint = %x, want %x", got, want)
+	}
+}
+
+func TestButtonBusyUsesForegroundTint(t *testing.T) {
+	app, colors := start(t, desktopEnv, func(cx *core.Scope) core.Node {
+		return Button{Text: "Save", TestID: "save", Busy: func() bool { return true }}
+	})
+	button := app.Find("id:save")
+	if !button.Props.Busy {
+		t.Fatal("busy button is not reported busy")
+	}
+	if got := canvasStrokeColor(button); got != colors.OnAccent {
+		t.Fatalf("busy button spinner tint = %x, want %x", got, colors.OnAccent)
+	}
+}
+
+func canvasStrokeColor(v *nsgotest.View) core.Color {
+	for _, child := range views(v) {
+		if child.Kind != driver.KindCanvas {
+			continue
+		}
+		var got core.Color
+		for _, op := range child.Ops {
+			if op.Kind == driver.DrawStrokeColor {
+				got = op.Color
+			}
+		}
+		if got != 0 {
+			return got
+		}
+	}
+	return 0
 }
