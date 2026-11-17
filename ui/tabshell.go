@@ -19,13 +19,7 @@ type ShellTab struct {
 	TestID  string
 }
 
-// TabShell is an app's top-level sections over a drawn tab bar, which
-// keeps clear of the bottom safe area, or on iOS and Android the system's
-// where every tab has a SystemIcon. iOS's floats over the sections, which
-// keep what they must show clear of it with TabBarInset. The Selected
-// tab's content fills the rest; Selected is the app's, set from OnChange.
-// The bar hides while the software keyboard shows, so content padded by
-// core.EnvKeyboard meets the keyboard without an offset.
+// TabShell is an app's top-level sections over a drawn tab bar, which keeps clear of the bottom safe area, or on iOS and Android the system's where every tab has a SystemIcon. iOS's floats over the sections, which keep what they must show clear of it with TabBarInset. Every other bar takes room of its own, and the bottom safe area of the sections above it (core.Insets, core.EnvSafeArea) is 0 while it shows. The Selected tab's content fills the rest; Selected is the app's, set from OnChange. The bar hides while the software keyboard shows, so content padded by core.EnvKeyboard meets the keyboard without an offset.
 type TabShell struct {
 	Tabs     []ShellTab
 	Selected func() int
@@ -61,6 +55,8 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 			s.OnChange(i)
 		}
 	}
+	env := cx.Env()
+	floating := env.OS() == core.OSIOS && s.systemItems(cx) != nil
 	var sections []core.Node
 	for i, tab := range s.Tabs {
 		// A section is built when first selected, then hidden while others
@@ -72,6 +68,17 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 				if tab.Content == nil {
 					return nil
 				}
+				if !floating {
+					// A bar that takes room of its own keeps clear of the bottom safe area itself, so the section ends above it; while the keyboard hides the bar, the section reaches the bottom again.
+					outer := core.InsetsFunc(cx)
+					core.ProvideInsets(cx, func() core.Edges {
+						in := outer()
+						if env.KeyboardHeight() == 0 {
+							in.Bottom = 0
+						}
+						return in
+					})
+				}
 				return tab.Content(cx)
 			}}},
 			StyleFunc: func() core.Style {
@@ -82,8 +89,6 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 				return s
 			}})
 	}
-	env := cx.Env()
-	floating := env.OS() == core.OSIOS && s.systemItems(cx) != nil
 	height := core.NewSignal(cx, core.Points(0))
 	if floating {
 		tabBarInsetKey.Provide(cx, func() core.Points {

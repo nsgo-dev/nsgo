@@ -33,7 +33,7 @@ ui.Tabs[string]{Variant: ui.TabsUnderline, Equal: true, Size: ui.SizeSmall, Opti
 
 ## 标签栏
 
-`ui.TabShell` 在宽窗口把同一批标签放进侧边栏，在窄窗口放进底部栏。`mobile.TabBar` 是 iOS 和 Android 的系统标签栏，使用 `mobile.TabBarItem{Title, Icon}`、`Selected` 和 `OnChange`；其他平台上它不占空间，因此在那里显示 `ui.Tabs`。
+`ui.TabShell` 在宽窗口把同一批标签放进侧边栏，在窄窗口放进底部栏。它自己绘制的底部栏会避开底部安全区域，因此其上方分区（包括 `base.Nav` 的页面）底部的 `core.EnvSafeArea` 为 0；在 iOS 浮动的系统标签栏下，用 `ui.TabBarInset` 让内容避开它。`mobile.TabBar` 是 iOS 和 Android 的系统标签栏，使用 `mobile.TabBarItem{Title, Icon}`、`Selected` 和 `OnChange`；其他平台上它不占空间，因此在那里显示 `ui.Tabs`。
 
 ## 无障碍
 

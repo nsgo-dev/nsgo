@@ -8,9 +8,7 @@ type EnvInset uint8
 
 const (
 	EnvNone EnvInset = iota
-	// EnvSafeArea is the inset on the edge of the root view the node
-	// renders in: the surface's safe area, a dialog's, or a page's below
-	// its header.
+	// EnvSafeArea is the inset on the edge of the root view the node renders in (Insets): the surface's safe area, a dialog's, a page's below its header, or a tab section's above a drawn tab bar.
 	EnvSafeArea
 	// EnvKeyboard is the software keyboard's height over the surface, 0
 	// while it is hidden or on a hardware keyboard. As a view's bottom

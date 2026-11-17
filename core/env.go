@@ -461,12 +461,10 @@ func (e *Env) WindowMaterial() WindowMaterial { return e.material.Get() }
 // Desktop reports whether the device is a desktop.
 func (e *Env) Desktop() bool { return e.idiom.Get() == IdiomDesktop }
 
-// insetsKey is provided by screens and modals: the insets their content
-// keeps clear of, below their headers.
+// insetsKey is provided by screens, modals and what keeps part of the safe area clear itself, such as ui.TabShell's tab bar: the insets their content keeps clear of.
 var insetsKey = NewKey[func() Edges]("insets", nil)
 
-// Insets returns what content under cx must keep clear of: the insets of
-// the nearest screen or modal, or the surface's safe area.
+// Insets returns what content under cx must keep clear of: the insets of the nearest screen, modal or ProvideInsets, or the surface's safe area.
 func Insets(cx *Scope) Edges { return InsetsFunc(cx)() }
 
 // InsetsFunc returns what reads Insets of cx's place, found now and
@@ -478,3 +476,6 @@ func InsetsFunc(cx *Scope) func() Edges {
 	env := cx.Env()
 	return env.SafeArea
 }
+
+// ProvideInsets makes insets, read tracked, what content built under cx keeps clear of (Insets, EnvSafeArea), screens below it included: a component that keeps its own part of the safe area clear, such as ui.TabShell's drawn tab bar, takes that part away from its content.
+func ProvideInsets(cx *Scope, insets func() Edges) { insetsKey.Provide(cx, insets) }

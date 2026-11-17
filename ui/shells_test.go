@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
@@ -343,6 +344,58 @@ func TestTabShellSystemBar(t *testing.T) {
 	}
 	wide, _ := shell(t, desktopEnv, tabs)
 	wide.Find("role:tablist Sections")
+}
+
+// TestTabShellSafeArea leaves no bottom safe area to the sections above a drawn bar, a nav page's included, following the safe area and giving it back while the keyboard hides the bar; under iOS's floating bar the sections keep it.
+func TestTabShellSafeArea(t *testing.T) {
+	var in core.Edges
+	run := func(e core.Environment, icon string) *nsgotest.App {
+		app, _ := shell(t, e, func(cx *core.Scope) core.Node {
+			return TabShell{Label: "Sections", TestID: "shell", Tabs: []ShellTab{{Text: "Home", SystemIcon: icon, Content: func(cx *core.Scope) core.Node {
+				nav := base.NewNav(cx, "home")
+				return nav.Stack(core.Style{FlexGrow: 1}, func(cx *core.Scope, _ string, _ func() int) base.NavPage {
+					return base.NavPage{Title: "Home", Children: []core.Node{core.Func(func(cx *core.Scope) core.Node {
+						return core.View{TestID: "actions", Style: core.Style{PaddingEnv: core.EnvEdges{Bottom: core.EnvSafeArea}},
+							StyleFunc: func() core.Style { in = core.Insets(cx); return core.Style{} }}
+					})}}
+				})
+			}}}}
+		})
+		return app
+	}
+	check := func(app *nsgotest.App, name string, bottom core.Points) {
+		t.Helper()
+		if in.Bottom != bottom {
+			t.Fatalf("%s: a page's bottom inset = %v, want %v", name, in.Bottom, bottom)
+		}
+		if got := within(app.Find("shell"), "actions").Frame.Size.Height; got != bottom {
+			t.Fatalf("%s: a bottom padding of the safe area = %v, want %v", name, got, bottom)
+		}
+	}
+	e := desktopEnv
+	e.SafeArea = core.Edges{Bottom: 34}
+	app := run(e, "")
+	check(app, "drawn bar", 0)
+	if bar := app.Find("role:tablist Sections").Parent; bar.Frame.Size.Height <= 34 {
+		t.Fatalf("drawn bar height = %v, want it to keep clear of the safe area", bar.Frame.Size.Height)
+	}
+	e.SafeArea.Left = 20
+	app.SetEnvironment(e)
+	if in.Left != 20 {
+		t.Fatalf("a page's left inset = %v after the safe area changed, want 20", in.Left)
+	}
+	check(app, "drawn bar, safe area changed", 0)
+	e.KeyboardHeight = 300
+	app.SetEnvironment(e)
+	check(app, "keyboard over the bar", 34)
+
+	android := e
+	android.OS, android.Idiom, android.KeyboardHeight, android.SafeArea = core.OSAndroid, core.IdiomPhone, 0, core.Edges{Top: 47, Bottom: 34}
+	check(run(android, ""), "Android", 0)
+	ios := android
+	ios.OS = core.OSIOS
+	check(run(ios, ""), "iOS drawn bar", 0)
+	check(run(ios, "house"), "iOS system bar", 34)
 }
 
 // TestTabShell switches sections, keeping the first built while hidden,

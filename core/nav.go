@@ -135,14 +135,14 @@ func (t *Tree) mountScreen(cx *Scope, parent *node, s Screen) {
 		header = true
 		t.mount(cx, n, s.Header)
 	}
-	// Content below a header keeps clear of the safe area's sides and
-	// bottom only; under a transparent one, of the header too.
+	// Content below a header keeps clear of the sides and bottom of what the screen's place keeps clear of (Insets), such as a tab section's that leaves out the bottom; under a transparent header, of the header too.
 	inner := cx.Child()
+	outer := InsetsFunc(cx)
 	insets := func() Edges {
 		if r := sn.reported.Get(); r != nil {
 			return *r
 		}
-		in := cx.Env().SafeArea()
+		in := outer()
 		switch {
 		case header:
 			in.Top = 0

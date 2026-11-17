@@ -310,6 +310,34 @@ func TestAndroidModalStartsBelowTheStatusBar(t *testing.T) {
 	}
 }
 
+// TestScreenInsetsFollowTheirPlace starts a screen's insets from what its place keeps clear of, not the surface's safe area: a part of the safe area something around it took (ProvideInsets) or a modal's.
+func TestScreenInsetsFollowTheirPlace(t *testing.T) {
+	var provided, modal Edges
+	env := Environment{OS: OSAndroid, SafeArea: Edges{Top: 24, Bottom: 16}}
+	h := newPhone(t, env, func(cx *Scope) Node {
+		stack := func(dst *Edges) Node {
+			return Stack{Style: Style{FlexGrow: 1}, Children: []Node{Screen{HeaderHidden: true, Children: []Node{
+				Func(func(cx *Scope) Node { cx.Effect(func() { *dst = Insets(cx) }); return nil }),
+			}}}}
+		}
+		return View{Style: Style{FlexGrow: 1}, Children: []Node{
+			Func(func(cx *Scope) Node {
+				outer := InsetsFunc(cx)
+				ProvideInsets(cx, func() Edges { in := outer(); in.Bottom = 0; return in })
+				return stack(&provided)
+			}),
+			Modal{Children: []Node{stack(&modal)}},
+		}}
+	})
+	h.commit()
+	if provided != (Edges{Top: 24}) {
+		t.Errorf("screen under provided insets = %v, want its place's, without the bottom", provided)
+	}
+	if modal != (Edges{Bottom: 16}) {
+		t.Errorf("screen in a modal below the status bar = %v, want the modal's", modal)
+	}
+}
+
 func TestBackPreviewNamesTheScreenBackPops(t *testing.T) {
 	var cx0 *Scope
 	var open *Signal[bool]

@@ -33,7 +33,7 @@ An option can carry an `Icon`, a `Disabled` function, a `Content` node and a `Te
 
 ## Tab bars
 
-`ui.TabShell` puts the same tabs in a sidebar on wide windows and a bar on narrow ones. `mobile.TabBar` is the system's tab bar on iOS and Android, with `mobile.TabBarItem{Title, Icon}`, `Selected` and `OnChange`; elsewhere it takes no room, so show `ui.Tabs` there.
+`ui.TabShell` puts the same tabs in a sidebar on wide windows and a bar on narrow ones. A bar it draws keeps clear of the bottom safe area itself, so `core.EnvSafeArea` at the bottom of a section above it, a `base.Nav` page's included, is 0; under iOS's floating system bar, keep content clear with `ui.TabBarInset`. `mobile.TabBar` is the system's tab bar on iOS and Android, with `mobile.TabBarItem{Title, Icon}`, `Selected` and `OnChange`; elsewhere it takes no room, so show `ui.Tabs` there.
 
 ## Accessibility
 
