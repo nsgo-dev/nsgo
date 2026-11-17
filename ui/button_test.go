@@ -26,7 +26,7 @@ func TestButton(t *testing.T) {
 		})
 		wantHeight := ButtonHeight
 		if e.Idiom != core.IdiomDesktop && e.Idiom != core.IdiomTV {
-			wantHeight = SizeDefault.heightFor(true)
+			wantHeight = 44
 		}
 		for _, n := range names {
 			app.Press(n)

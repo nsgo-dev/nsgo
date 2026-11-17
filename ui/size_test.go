@@ -39,7 +39,7 @@ func TestSizedControls(t *testing.T) {
 			})
 			buttonWant := size.Height()
 			if e.Idiom != core.IdiomDesktop && e.Idiom != core.IdiomTV {
-				buttonWant = size.heightFor(true)
+				buttonWant = map[Size]core.Points{SizeDefault: 44, SizeSmall: 40, SizeLarge: 48}[size]
 			}
 			for _, id := range []string{"button", "icon", "tab"} {
 				want := buttonWant
