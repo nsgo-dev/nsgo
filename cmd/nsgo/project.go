@@ -197,8 +197,9 @@ type project struct {
 			PublisherName string `yaml:"publisher_name"`
 		} `yaml:"store"`
 	} `yaml:"windows"`
-	// Linux is the Linux target's: Maintainer is who its Debian and Arch packages name as theirs, "Name <email>", else the app's name. Depends and Recommends add to those packages' Depends and Recommends, and depend and optdepend lines, after NSGo's own (linuxpkg.go). Summary, License, an SPDX expression, and FlatpakRuntime, GNOME's runtime version, are what a store build's AppStream metadata and Flatpak manifest say (flatpak.go).
+	// Linux is the Linux target's: Categories are its desktop entry's freedesktop menu categories, which file it in application menus and need a main one (validateLinuxCategories). Maintainer is who its Debian and Arch packages name as theirs, "Name <email>", else the app's name. Depends and Recommends add to those packages' Depends and Recommends, and depend and optdepend lines, after NSGo's own (linuxpkg.go). Summary, License, an SPDX expression, and FlatpakRuntime, GNOME's runtime version, are what a store build's AppStream metadata and Flatpak manifest say (flatpak.go).
 	Linux struct {
+		Categories     []string  `yaml:"categories"`
 		Maintainer     string    `yaml:"maintainer"`
 		Summary        string    `yaml:"summary"`
 		License        string    `yaml:"license"`
@@ -404,6 +405,9 @@ func load(dir string) (*project, error) {
 		return nil, fmt.Errorf("nsgo.yaml: %w", err)
 	}
 	if err := p.validateLinuxDeps(); err != nil {
+		return nil, fmt.Errorf("nsgo.yaml: %w", err)
+	}
+	if err := p.validateLinuxCategories(); err != nil {
 		return nil, fmt.Errorf("nsgo.yaml: %w", err)
 	}
 	for _, path := range []*string{&p.Sign.Profile, &p.Sign.WidgetsProfile, &p.Sign.ClipProfile, &p.Sign.MacOSProfile, &p.Sign.Keystore, &p.Sign.Certificate} {

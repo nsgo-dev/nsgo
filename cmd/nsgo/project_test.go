@@ -115,6 +115,39 @@ func TestLinuxPackageDependencies(t *testing.T) {
 	}
 }
 
+// linux.categories takes what desktop-file-validate accepts and asks for a main category, without which menus file the app under Other.
+func TestLinuxCategories(t *testing.T) {
+	dir := t.TempDir()
+	write := func(categories string) {
+		if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: Test\nlinux:\n  categories: "+categories+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, ok := range []string{"[Office, Dictionary]", "[AudioVideo, Audio, Player]", "[Utility, X-GNOME-Utilities, X-a_b.c]", "[]"} {
+		write(ok)
+		if _, err := load(dir); err != nil {
+			t.Errorf("%s: %v", ok, err)
+		}
+	}
+	for _, tc := range []struct{ categories, want string }{
+		{"[Office, Bogus]", `nsgo.yaml: linux.categories entry 2, "Bogus", is not a freedesktop category; an extension starts with X- and holds letters, digits, '-', '_' and '.'`},
+		{"[Office, '']", `nsgo.yaml: linux.categories entry 2, "", is not a freedesktop category; an extension starts with X- and holds letters, digits, '-', '_' and '.'`},
+		{"['Office;Game']", `nsgo.yaml: linux.categories entry 1, "Office;Game", is not a freedesktop category; an extension starts with X- and holds letters, digits, '-', '_' and '.'`},
+		{"[Office, 'X-a;b']", `nsgo.yaml: linux.categories entry 2, "X-a;b", is not a freedesktop category; an extension starts with X- and holds letters, digits, '-', '_' and '.'`},
+		{"[Office, \"X-a\\nName=b\"]", `nsgo.yaml: linux.categories entry 2, "X-a\nName=b", is not a freedesktop category; an extension starts with X- and holds letters, digits, '-', '_' and '.'`},
+		{"[Office, X-]", `nsgo.yaml: linux.categories entry 2, "X-", is not a freedesktop category; an extension starts with X- and holds letters, digits, '-', '_' and '.'`},
+		{"[Utility, TrayIcon]", `nsgo.yaml: linux.categories entry 2, "TrayIcon", is reserved for desktop components`},
+		{"[Office, Office]", `nsgo.yaml: linux.categories names "Office" twice`},
+		{"[Audio, Player]", "nsgo.yaml: linux.categories names Audio without AudioVideo, which it belongs to"},
+		{"[Dictionary, X-Words]", "nsgo.yaml: linux.categories names no main category, so menus would file the app under Other; add one of AudioVideo, Audio, Video, Development, Education, Game, Graphics, Network, Office, Science, Settings, System, Utility"},
+	} {
+		write(tc.categories)
+		if _, err := load(dir); err == nil || err.Error() != tc.want {
+			t.Errorf("%s: load error = %v, want %q", tc.categories, err, tc.want)
+		}
+	}
+}
+
 func TestBuildOpen(t *testing.T) {
 	for _, tt := range []struct {
 		yaml string

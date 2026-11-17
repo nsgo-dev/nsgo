@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -58,6 +59,59 @@ func (p *project) validateLinuxDeps() error {
 				return fmt.Errorf("linux.%s entry %d contains a line break", key.name, i+1)
 			}
 		}
+	}
+	return nil
+}
+
+// linuxMainCategories are the freedesktop Desktop Menu Specification's main categories, by which menus file an app; an entry naming none of them lands under Other.
+var linuxMainCategories = []string{"AudioVideo", "Audio", "Video", "Development", "Education", "Game", "Graphics", "Network", "Office", "Science", "Settings", "System", "Utility"}
+
+// linuxAdditionalCategories are the specification's additional categories, which refine a main one.
+var linuxAdditionalCategories = []string{
+	"Building", "Debugger", "IDE", "GUIDesigner", "Profiling", "RevisionControl", "Translation",
+	"Calendar", "ContactManagement", "Database", "Dictionary", "Chart", "Email", "Finance", "FlowChart", "PDA", "ProjectManagement", "Presentation", "Spreadsheet", "WordProcessor",
+	"2DGraphics", "VectorGraphics", "RasterGraphics", "3DGraphics", "Scanning", "OCR", "Photography", "Publishing", "Viewer",
+	"TextTools", "DesktopSettings", "HardwareSettings", "Printing", "PackageManager",
+	"Dialup", "InstantMessaging", "Chat", "IRCClient", "Feed", "FileTransfer", "HamRadio", "News", "P2P", "RemoteAccess", "Telephony", "TelephonyTools", "VideoConference", "WebBrowser", "WebDevelopment",
+	"Midi", "Mixer", "Sequencer", "Tuner", "TV", "AudioVideoEditing", "Player", "Recorder", "DiscBurning",
+	"ActionGame", "AdventureGame", "ArcadeGame", "BoardGame", "BlocksGame", "CardGame", "KidsGame", "LogicGame", "RolePlaying", "Shooter", "Simulation", "SportsGame", "StrategyGame",
+	"Art", "Construction", "Music", "Languages", "ArtificialIntelligence", "Astronomy", "Biology", "Chemistry", "ComputerScience", "DataVisualization", "Economy", "Electricity", "Geography", "Geology", "Geoscience", "History", "Humanities", "ImageProcessing", "Literature", "Maps", "Math", "NumericalAnalysis", "MedicalSoftware", "Physics", "Robotics", "Spirituality", "Sports", "ParallelComputing",
+	"Amusement", "Archiving", "Compression", "Electronics", "Emulator", "Engineering", "FileTools", "FileManager", "TerminalEmulator", "Filesystem", "Monitor", "Security", "Accessibility", "Calculator", "Clock", "TextEditor", "Documentation", "Adult",
+	"Core", "KDE", "GNOME", "XFCE", "DDE", "LXQt", "GTK", "Qt", "Motif", "Java", "ConsoleOnly",
+}
+
+// linuxReservedCategories are for desktop components, and desktop-file-validate accepts them only beside an OnlyShowIn key, which an app's entry does not have.
+var linuxReservedCategories = []string{"Screensaver", "TrayIcon", "Applet", "Shell"}
+
+// validateLinuxCategories accepts the desktop entry's categories that desktop-file-validate does: each registered, or an extension starting with X- of letters, digits, '-', '_' and '.', once each, with AudioVideo beside Audio or Video. It also asks for a main category, without which menus file the app under Other, the case the setting exists to avoid.
+func (p *project) validateLinuxCategories() error {
+	categories := p.Linux.Categories
+	if len(categories) == 0 {
+		return nil
+	}
+	main := false
+	for i, c := range categories {
+		switch {
+		case slices.Contains(linuxMainCategories, c):
+			main = true
+		case slices.Contains(linuxAdditionalCategories, c):
+		case slices.Contains(linuxReservedCategories, c):
+			return fmt.Errorf("linux.categories entry %d, %q, is reserved for desktop components", i+1, c)
+		case strings.HasPrefix(c, "X-") && len(c) > 2 && strings.Trim(c[2:], "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.") == "":
+		default:
+			return fmt.Errorf("linux.categories entry %d, %q, is not a freedesktop category; an extension starts with X- and holds letters, digits, '-', '_' and '.'", i+1, c)
+		}
+		if slices.Index(categories, c) < i {
+			return fmt.Errorf("linux.categories names %q twice", c)
+		}
+	}
+	for _, c := range []string{"Audio", "Video"} {
+		if slices.Contains(categories, c) && !slices.Contains(categories, "AudioVideo") {
+			return fmt.Errorf("linux.categories names %s without AudioVideo, which it belongs to", c)
+		}
+	}
+	if !main {
+		return fmt.Errorf("linux.categories names no main category, so menus would file the app under Other; add one of %s", strings.Join(linuxMainCategories, ", "))
 	}
 	return nil
 }
@@ -169,7 +223,7 @@ func linuxPackageFiles(p *project, dir string) ([]linuxPackageEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID, MIMETypes: types}
+	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID, MIMETypes: types, Categories: p.Linux.Categories}
 	if n != nil {
 		entry.Name = n.names[n.source]
 		for _, lang := range n.languages()[1:] {

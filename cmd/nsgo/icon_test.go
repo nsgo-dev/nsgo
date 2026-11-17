@@ -248,3 +248,54 @@ func TestLinuxDesktopEntryNamesTheWindowClass(t *testing.T) {
 		t.Errorf("desktop entry:\n%s", entry)
 	}
 }
+
+// linux.categories reach the desktop entry beside the executable, which the AppImage and the Flatpak install, and the one the Debian and Arch packages install, as the freedesktop list desktop-file-validate accepts; without them the entries have no Categories key.
+func TestLinuxDesktopEntryCategories(t *testing.T) {
+	entries := func(p *project) []string {
+		t.Helper()
+		dir := t.TempDir()
+		writeFiles(t, dir, map[string]string{p.Name: "binary"})
+		p.Dir = dir
+		if err := writeLinuxIcon(p, dir); err != nil {
+			t.Fatal(err)
+		}
+		beside, err := os.ReadFile(filepath.Join(dir, p.ID+".desktop"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files, err := linuxPackageFiles(p, dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range files {
+			if f.name == "usr/share/applications/"+p.ID+".desktop" {
+				return []string{string(beside), string(f.data)}
+			}
+		}
+		t.Fatal("the packages install no desktop entry")
+		return nil
+	}
+	p := &project{Name: "App", ID: "dev.example.app", Version: "1.0.0"}
+	for _, entry := range entries(p) {
+		if strings.Contains(entry, "Categories=") {
+			t.Errorf("desktop entry without linux.categories:\n%s", entry)
+		}
+	}
+	p.Linux.Categories = []string{"Office", "Dictionary"}
+	validate, _ := exec.LookPath("desktop-file-validate")
+	for _, entry := range entries(p) {
+		if !strings.Contains(entry, "\nCategories=Office;Dictionary;\n") {
+			t.Errorf("desktop entry:\n%s", entry)
+		}
+		if validate == "" {
+			continue
+		}
+		path := filepath.Join(t.TempDir(), p.ID+".desktop")
+		if err := os.WriteFile(path, []byte(entry), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if out, err := exec.CommandContext(t.Context(), validate, path).CombinedOutput(); err != nil || len(out) > 0 {
+			t.Errorf("desktop-file-validate: %v\n%s\n%s", err, out, entry)
+		}
+	}
+}

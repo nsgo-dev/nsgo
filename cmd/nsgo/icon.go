@@ -621,7 +621,7 @@ func writeLinuxIcon(p *project, dir string) error {
 	if err != nil {
 		return err
 	}
-	entry := desktopData{Name: p.Name, Exec: p.Name, ID: p.ID, MIMETypes: types}
+	entry := desktopData{Name: p.Name, Exec: p.Name, ID: p.ID, MIMETypes: types, Categories: p.Linux.Categories}
 	if n != nil {
 		entry.Name = n.names[n.source]
 		for _, lang := range n.languages()[1:] {
@@ -641,6 +641,7 @@ type desktopData struct {
 	Name, Exec, ID string
 	Names          [][2]string
 	MIMETypes      []string
+	Categories     []string
 }
 
 // desktopString escapes a Desktop Entry string, before Exec's separate argument parsing. Keep field codes out of the executable's name.
@@ -673,6 +674,9 @@ Terminal=false
 MimeType={{range .MIMETypes}}{{.}};{{end}}
 {{- end}}
 StartupWMClass={{.ID}}
+{{- if .Categories}}
+Categories={{range .Categories}}{{.}};{{end}}
+{{- end}}
 `))
 
 // writeWindowsResources writes the app's resources, its icon and its version, as an object into the app's package directory, so go build links it into the executable, and returns the object and the function that removes it again. Go only links .syso files from the package's own directory, and its linker takes resources from one object alone: when an object of the app's own holds resources, the executable takes those instead, and the object returned is nil.
