@@ -4,13 +4,13 @@ Every place a component in `base` or `ui` changes on its own by device, without 
 
 ## Rules
 
-- Keep a control's look the same on every device. `ui`'s Button, OtpInput and form rows may use touch-sized layout on touch idioms; a resize handle's 3-point band is the [other exception](#touch-input). Core and base never change a size by device.
+- Keep a control's look the same on every device, and its size but for the touch targets listed under [touch input](#touch-input): `ui`'s buttons, code cells and form rows, and a resize handle's 3-point band, which a finger cannot take. `core` and `base` never change a size by device.
 - Let the app ask for a different size or form through a field or style.
 - Branch only for what a device cannot do, such as hover without a pointer, for the touch sizes above, or for a form listed under [presentation](#presentation).
 - Never branch by device in `core` or `base` ([principles](../../AGENTS.md#principles)); the branches of `base` below follow what an input can do, such as hover or a held finger.
 - Use `ui.Touch` for a branch on input. Use `Env.Idiom` or `Env.OS` only when touch is not the reason. A TV takes no touches: its remote moves a focus, so `ui.Touch` is false there and `ui` presents as on a desktop.
 
-Desktop sizes remain constants: `ui.ButtonHeight` is 28 points, [`Button` and `Tabs`](themes.md#variants-and-sizes) taking another size when an app asks for one, and `ui.RowHeight` 36. Touch-sized controls are the explicit `ui` exception: Button, OtpInput and form rows grow to meet a finger's target, while an app can still provide a style or explicit cell size.
+Other sizes are constants: `ui.ButtonHeight` is a desktop button's 28 points, [`Button` and `Tabs`](themes.md#variants-and-sizes) taking another size when an app asks for one, and `ui.RowHeight` 36 on every device. `ui.Input`, `ui.Select` and the other fields stay 28 points tall on phones, so a field beside a button is shorter than the button there unless the app sizes one of them; `Button.Style` and `OtpInput.Size` take an app's own size on any device.
 
 ## Presentation
 
@@ -44,6 +44,9 @@ Touch screens have no pointer, so these exist on desktops alone.
 | Component | Desktop | Touch screen |
 | --- | --- | --- |
 | `base.ResizeHandle`, `base.ResizablePanelGroup` | 3-point band | 10 more points either side, since 3 points cannot take a finger |
+| `ui.Button`, and `ui.Menu` and `ui.Popover` triggers drawn by one | 24, 28 and 32 points tall for `SizeSmall`, `SizeDefault` and `SizeLarge` | 40, 44 and 48 points, the platforms' touch targets |
+| `ui.OtpInput` | 36-point cells | 44-point cells |
+| `ui.FormRow`, `ui.FormField` and `ui.Settings` rows | At least 40 points tall | At least 48 points tall |
 | `base.Popover` | A press outside closes and goes on | A transparent backdrop takes the press |
 | `base/dock` tab drag | Starts after moving | Starts after a long press |
 | `base/editor` | Press places the caret, drag selects | Tap, long press and selection handles |

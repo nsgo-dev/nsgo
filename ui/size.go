@@ -2,8 +2,7 @@ package ui
 
 import "github.com/nsgo-dev/nsgo/core"
 
-// Size is a control's size. Its zero value is the standard size. Buttons
-// use larger heights on touch devices; the measures below are desktops'.
+// Size is a control's size. Its zero value is the standard size. The measures below are desktops' and TVs'; a Button is taller on touch devices (Size.heightFor).
 type Size uint8
 
 const (
@@ -26,13 +25,10 @@ func sized[T any](s Size, standard, small, large T) T {
 	return standard
 }
 
-// Height is the desktop height of a control of the size, to line others up
-// with it. Buttons use 44, 40 and 48 points on touch devices instead.
+// Height is the desktop height of a control of the size, to line others up with it. On touch devices a Button is 44, 40 and 48 points tall instead.
 func (s Size) Height() core.Points { return sized[core.Points](s, ButtonHeight, 24, 32) }
 
-// heightFor is the size's height on a device where controls are reached by
-// touch. The larger hit area belongs to ui, so core and base keep one size on
-// every device.
+// heightFor is a Button's height at the size, taller where controls are reached by touch, to meet the platforms' 44-point targets. The larger target belongs to ui: core and base keep one size on every device.
 func (s Size) heightFor(touch bool) core.Points {
 	if !touch {
 		return s.Height()

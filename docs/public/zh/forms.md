@@ -75,7 +75,7 @@ ui.Select[string]{
 }
 ```
 
-`ui.NumberInput` 带边界地步进和拖动数字，`ui.DatePicker` 和 `ui.TimeField` 编辑日期和时间，`ui.ColorPicker` 编辑颜色，`ui.OtpInput` 输入一次性验证码，`ui.TagInput` 编辑一组标签。
+`ui.NumberInput` 带边界地步进和拖动数字，`ui.DatePicker` 和 `ui.TimeField` 编辑日期和时间，`ui.ColorPicker` 编辑颜色，`ui.OtpInput` 在方格中输入一次性验证码，方格边长在桌面上为 36 点、在触屏上为 44 点，可用 `Size` 另行指定，`ui.TagInput` 编辑一组标签。
 
 ```go
 quantity := core.NewSignal(cx, 1.0)

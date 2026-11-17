@@ -24,8 +24,7 @@ func TestReadIcon(t *testing.T) {
 	}
 }
 
-// TestTouchControlSizingFromTSX exercises the styled controls' public props,
-// including custom cell sizes and the face filling a button's styled bounds.
+// TestTouchControlSizingFromTSX sizes a Button through its style, filling the column or at a percentage width and a height of the app's, with the face filling it, and an OtpInput's cells through size, on phones of both platforms.
 func TestTouchControlSizingFromTSX(t *testing.T) {
 	files := fstest.MapFS{"App.tsx": {Data: []byte(`import { mount, View } from "nsgo";
 import { Button, OtpInput } from "nsgo/ui";

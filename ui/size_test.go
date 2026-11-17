@@ -26,8 +26,7 @@ func TestSize(t *testing.T) {
 	}
 }
 
-// TestSizedControls lays Button and Tabs out at each size, with larger button
-// targets on touch devices and an icon's button as a square.
+// TestSizedControls lays Button and Tabs out at each size, a Button taller on touch devices, an icon's button as a square.
 func TestSizedControls(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		for _, size := range []Size{SizeDefault, SizeSmall, SizeLarge} {

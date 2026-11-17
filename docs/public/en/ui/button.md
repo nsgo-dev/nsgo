@@ -22,7 +22,7 @@ ui.Button{Text: "Continue", Size: ui.SizeLarge, OnPress: next}
 ui.Button{Text: "Save", Icon: lucide.Check, Flex: 1, OnPress: save}
 ```
 
-`Color` fills the button with a color of the app's instead of a variant's, and `Tint` its icon. `Flex` gives it a share of a row, while `Style` can make it fill a container or set an app-specific size; `TestID` names it for tests.
+`Color` fills the button with a color of the app's instead of a variant's, and `Tint` its icon. `Flex` gives it a share of a row, while `Style` lays it out: it can make the button fill its container, set a size of the app's, add margins or round its corners; `TestID` names it for tests.
 
 ```go
 ui.Button{Text: "Continue", Size: ui.SizeLarge,

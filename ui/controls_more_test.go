@@ -154,8 +154,7 @@ func TestOtpInput(t *testing.T) {
 	})
 }
 
-// TestTouchControlSizes checks the issue's layout on both mobile backends,
-// tablets and desktop targets, including a six-digit code in a phone column.
+// TestTouchControlSizes lays out a full-width Button, OtpInputs and form rows on phones and tablets of both mobile platforms, where they reach touch sizes and a six-digit code fits a phone's column, and on desktops and a TV, which keep the compact sizes; each still takes presses and typing.
 func TestTouchControlSizes(t *testing.T) {
 	headless(t)
 	for _, c := range []struct {

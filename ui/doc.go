@@ -3,13 +3,7 @@
 // style.go, and a component to a file. A complex component has a package
 // below this one, as chat has. Icons are Lucide's accessors.
 //
-// The look is NSGo's: a neutral page, flat bordered cards under bold
-// titles, flat bordered controls 28 pt tall in 13 pt text by default,
-// 8 pt corners and one blue accent. Touch idioms enlarge Button, OtpInput
-// and form-row targets while desktop sizes remain compact. Its
-// colors are core.DefaultTheme's, which holds every role it reads.
-// A component takes its look from Variant; the few of several sizes take
-// Size, in size.go, or points where they are one shape at any scale.
+// The look is NSGo's: a neutral page, flat bordered cards under bold titles, flat bordered controls 28 pt tall in 13 pt text by default, 8 pt corners and one blue accent. On touch devices Button, OtpInput's cells and form rows grow to touch targets; desktops and TVs keep the compact sizes. Its colors are core.DefaultTheme's, which holds every role it reads. A component takes its look from Variant; the few of several sizes take Size, in size.go, or points where they are one shape at any scale.
 //
 // Components are structs with a Render method: the app sets the fields
 // and handles changes. Each reads its colors where it is built (ColorsOf,

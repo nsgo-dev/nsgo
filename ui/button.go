@@ -42,8 +42,7 @@ type Button struct {
 	// Flex grows it to share a row with its siblings.
 	Flex float32
 	Size Size
-	// Style is merged onto the pressable, whose face fills it. Use it for a full-row
-	// button (for example, Width: core.Pct(100)) or an app-specific size.
+	// Style is merged onto the pressable, whose face fills its content box: use it for a full-row button (for example, Width: core.Pct(100)), an app-specific size or margins. The face keeps the variant's look, its corners following Style's CornerRadius.
 	Style core.Style
 	// Side is the square of a button of an icon alone, its height when 0,
 	// to line it up with what is not a control's height. IconSize is its
@@ -153,13 +152,12 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 	}
 	style := core.Style{Group: "button", FlexGrow: b.Flex, FlexShrink: b.Flex, CornerRadius: RadiusControl,
 		Height: shape.Height, Width: shape.Width, Disabled: &core.Style{Opacity: core.Alpha(0.4)}}.Merge(b.Style)
-	// Only the pressable takes the app's layout style: repeating a percentage
-	// width, margin or padding on the face would size or space it twice.
+	// Only the pressable takes the app's layout style: repeating a percentage width, margin or padding on the face would size or space it twice. The face's corners follow the pressable's, so the focus ring and the fill agree.
 	shape.Height, shape.Width = core.Length{}, core.Length{}
 	shape.FlexGrow, shape.FlexShrink, shape.MinHeight = 1, 1, core.Pt(0)
 	face := func() core.Style {
 		rest, hover, pressed, border := fill()
-		return shape.Merge(core.Style{CornerRadius: RadiusControl, BorderCurve: core.BorderCurveContinuous,
+		return shape.Merge(core.Style{CornerRadius: style.CornerRadius, BorderCurve: core.BorderCurveContinuous,
 			Direction: core.Row, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Gap: 6,
 			Background: rest, BorderWidth: 1, BorderColor: border,
 			GroupStyle: &core.GroupStyle{Hover: &core.Style{Background: hover}, Active: &core.Style{Background: pressed}, Expanded: &core.Style{Background: hover}}})

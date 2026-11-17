@@ -8,8 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// TestButton presses each variant, with a touch target on touch devices, and
-// an icon's button as a square.
+// TestButton presses each variant, 28 points tall on desktops and TVs and 44 on touch devices, and an icon's button as a square.
 func TestButton(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		var pressed []string
@@ -112,15 +111,15 @@ func TestButtonBusy(t *testing.T) {
 	})
 }
 
-// TestButtonStyleSizesTheFaceOnce keeps percentage widths, margins and padding
-// on the pressable, with the face covering its content box.
+// TestButtonStyleSizesTheFaceOnce keeps a Style's percentage width, margins and padding on the pressable, with the face covering its content box, and rounds the face by the Style's CornerRadius.
 func TestButtonStyleSizesTheFaceOnce(t *testing.T) {
 	headless(t)
 	app, _ := start(t, phoneEnv, func(*core.Scope) core.Node {
 		return core.View{Style: core.Style{Width: core.Pt(320), AlignItems: core.AlignStart}, Children: []core.Node{
 			Button{Text: "Custom", TestID: "custom", Style: core.Style{
-				Width: core.Pct(50), Height: core.Pt(50), Margin: core.All(8), Padding: core.Symmetric(4, 6),
+				Width: core.Pct(50), Height: core.Pt(50), Margin: core.All(8), Padding: core.Symmetric(4, 6), CornerRadius: 25,
 			}},
+			Button{Text: "Plain", TestID: "plain"},
 		}}
 	})
 	button := app.Find("custom")
@@ -130,5 +129,11 @@ func TestButtonStyleSizesTheFaceOnce(t *testing.T) {
 	face := button.Children[0]
 	if got := face.Frame.Size; got.Width != 148 || got.Height != 42 || face.Frame.Origin.X != 6 || face.Frame.Origin.Y != 4 {
 		t.Fatalf("face = %+v, want 148 x 42 at (6, 4)", face.Frame)
+	}
+	if got := face.Style.CornerRadius; got != 25 {
+		t.Fatalf("face corners = %v, want the Style's 25", got)
+	}
+	if got := app.Find("plain").Children[0].Style.CornerRadius; got != RadiusControl {
+		t.Fatalf("plain face corners = %v, want %v", got, RadiusControl)
 	}
 }

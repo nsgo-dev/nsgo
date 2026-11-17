@@ -75,7 +75,7 @@ ui.Select[string]{
 }
 ```
 
-`ui.NumberInput` steps and scrubs a number with bounds, `ui.DatePicker` and `ui.TimeField` edit dates and times, `ui.ColorPicker` edits a color, `ui.OtpInput` takes a one-time code, and `ui.TagInput` edits a list of tags.
+`ui.NumberInput` steps and scrubs a number with bounds, `ui.DatePicker` and `ui.TimeField` edit dates and times, `ui.ColorPicker` edits a color, `ui.OtpInput` takes a one-time code in square cells, 36 points on desktops and 44 on touch screens unless its `Size` says otherwise, and `ui.TagInput` edits a list of tags.
 
 ```go
 quantity := core.NewSignal(cx, 1.0)

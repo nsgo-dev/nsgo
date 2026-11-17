@@ -40,8 +40,7 @@ func (m Menu) Render(cx *core.Scope) core.Node {
 	style, focus, face := m.Trigger.parts(cx)
 	if m.Face != nil {
 		face = m.Face
-		// A custom face supplies its own measures, rather than the button's
-		// default size. Explicit trigger layout still belongs to the app.
+		// A custom face brings its own measures rather than the button's height; a size the app gave the trigger's Style still applies.
 		style.Width, style.Height = m.Trigger.Style.Width, m.Trigger.Style.Height
 	}
 	sheet := m.Presentation == base.PresentSheet

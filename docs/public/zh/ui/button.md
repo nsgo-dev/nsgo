@@ -22,7 +22,7 @@ ui.Button{Text: "继续", Size: ui.SizeLarge, OnPress: next}
 ui.Button{Text: "保存", Icon: lucide.Check, Flex: 1, OnPress: save}
 ```
 
-`Color` 用应用自己的颜色代替变体的颜色填充按钮，`Tint` 设置图标的颜色。`Flex` 让它分得一行中的一份宽度，`Style` 可以让它填满容器或指定应用需要的尺寸；`TestID` 为测试命名。
+`Color` 用应用自己的颜色代替变体的颜色填充按钮，`Tint` 设置图标的颜色。`Flex` 让它分得一行中的一份宽度，`Style` 决定它的布局：可以让按钮填满容器、指定应用需要的尺寸、加外边距或改圆角；`TestID` 为测试命名。
 
 ```go
 ui.Button{Text: "继续", Size: ui.SizeLarge,

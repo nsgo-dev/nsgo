@@ -51,6 +51,7 @@ const (
 	formIconTile  core.Points = 24
 )
 
+// formRowHeightFor is a row's least height: formRowHeight, or 48 points where it is reached by touch.
 func formRowHeightFor(cx *core.Scope) core.Points {
 	if Touch(cx) {
 		return 48

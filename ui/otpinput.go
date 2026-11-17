@@ -17,8 +17,7 @@ type OtpInput struct {
 	Disabled     func() bool
 	// Groups is how many groups the cells split into.
 	Groups int
-	// Size is each square cell's side in points: 36 on desktops and TVs,
-	// 44 on touch devices when zero.
+	// Size is each square cell's side in points: 36 on desktops and TVs, 44 on touch devices when zero.
 	Size                 core.Points
 	OnChange, OnComplete func(value string)
 	// Label is what assistive technology says for the field.
