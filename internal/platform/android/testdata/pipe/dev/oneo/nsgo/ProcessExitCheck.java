@@ -21,8 +21,7 @@ public final class ProcessExitCheck {
     }
 
     private static void child(String scenario) throws Exception {
-        // Let the protocol reader finish before stderr arrives, as can happen
-        // when a Go panic closes stdout while its stack is still being read.
+        // Let the protocol reader finish before stderr arrives, as can happen when a Go panic closes stdout while its stack is still being read.
         System.out.close();
         Thread.sleep(100);
         switch (scenario) {
