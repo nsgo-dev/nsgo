@@ -616,6 +616,32 @@ func TestWindowConstraints(t *testing.T) {
 	}
 }
 
+// A window opens on the workspaces its options name, and SetWindowWorkspaces sends the new ones apart from the level, so a later level keeps them.
+func TestWindowWorkspaces(t *testing.T) {
+	var cx *Scope
+	w := newWindows(t, func(app *Scope) {
+		app.OpenWindow(WindowOptions{Workspaces: WindowWorkspacesAll}, func(c *Scope) Node { cx = c; return View{} })
+		app.OpenWindow(WindowOptions{}, func(*Scope) Node { return View{} })
+	})
+	opened := w.take(0, driver.ItemOpenSurface)
+	if len(opened) != 2 || opened[0].Surface.Workspaces != WindowWorkspacesAll ||
+		opened[1].Surface.Workspaces != WindowWorkspacesCurrent {
+		t.Fatalf("windows opened with %+v", opened)
+	}
+	cx.SetWindowWorkspaces(WindowWorkspacesCurrent)
+	cx.SetWindowLevel(WindowLevelFloating)
+	w.commit()
+	var got []WindowCommand
+	for _, it := range w.take(opened[0].Surface.ID, driver.ItemWindow) {
+		got = append(got, *it.Window)
+	}
+	want := []WindowCommand{{Action: WindowSetWorkspaces, Workspaces: WindowWorkspacesCurrent},
+		{Action: WindowSetLevel, Level: WindowLevelFloating}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("the window was sent %+v; want %+v", got, want)
+	}
+}
+
 func TestWindowConstraintsClamp(t *testing.T) {
 	c := WindowConstraints{MinWidth: 300, MaxHeight: 500}.Normalized()
 	for _, tc := range []struct{ in, want Size }{

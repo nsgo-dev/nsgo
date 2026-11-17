@@ -374,6 +374,8 @@ type (
 	WindowFrame = driver.WindowFrame
 	// WindowLevel is where a window stacks among the others.
 	WindowLevel = driver.WindowLevel
+	// WindowWorkspaces are the workspaces a window shows on.
+	WindowWorkspaces = driver.WindowWorkspaces
 	// WindowConstraints limit a window's size and what the user may do
 	// to it.
 	WindowConstraints = driver.WindowConstraints
@@ -489,6 +491,11 @@ const (
 	WindowLevelNormal   = driver.WindowLevelNormal
 	WindowLevelFloating = driver.WindowLevelFloating
 	WindowLevelDesktop  = driver.WindowLevelDesktop
+)
+
+const (
+	WindowWorkspacesCurrent = driver.WindowWorkspacesCurrent
+	WindowWorkspacesAll     = driver.WindowWorkspacesAll
 )
 
 const (
@@ -902,6 +909,7 @@ const (
 	WindowSetMenuBar       = driver.WindowSetMenuBar
 	WindowSetControls      = driver.WindowSetControls
 	WindowSetMaterial      = driver.WindowSetMaterial
+	WindowSetWorkspaces    = driver.WindowSetWorkspaces
 )
 
 const (

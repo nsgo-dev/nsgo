@@ -29,6 +29,8 @@ export interface WindowFrame { origin?: Partial<Point>; size?: Partial<Size>; an
 export interface WindowConstraints { minWidth?: number; minHeight?: number; maxWidth?: number; maxHeight?: number; resizable?: boolean; minimizable?: boolean; maximizable?: boolean }
 /** Where the window sits among the others. */
 export type WindowLevel = "normal" | "floating" | "desktopIcon";
+/** The workspaces the window shows on: the one it opened on, or every one (macOS's Spaces and other apps' full screen spaces, virtual desktops on X11). */
+export type WindowWorkspaces = "current" | "all";
 export interface WindowModule {
   setTitle(title: string): void;
   setTitleBar(style: TitleBarStyle, height?: number | null): void;
@@ -39,6 +41,7 @@ export interface WindowModule {
   setFrame(frame: WindowFrame): void;
   setConstraints(constraints: WindowConstraints): void;
   setLevel(level: WindowLevel): void;
+  setWorkspaces(workspaces: WindowWorkspaces): void;
   orderFront(): void;
   close(): void;
 }

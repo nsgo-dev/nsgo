@@ -46,6 +46,11 @@ func (cx *Scope) SetWindowLevel(level WindowLevel) {
 	cx.window(WindowCommand{Action: WindowSetLevel, Level: level})
 }
 
+// SetWindowWorkspaces is the core's part of desktop.SetWindowWorkspaces, which apps use.
+func (cx *Scope) SetWindowWorkspaces(w WindowWorkspaces) {
+	cx.window(WindowCommand{Action: WindowSetWorkspaces, Workspaces: w})
+}
+
 // SetWindowConstraints is the core's part of desktop.SetWindowConstraints, which apps use.
 func (cx *Scope) SetWindowConstraints(c WindowConstraints) {
 	cx.window(WindowCommand{Action: driver.WindowSetConstraints, Constraints: c.Normalized()})

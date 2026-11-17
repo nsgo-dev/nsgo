@@ -108,6 +108,11 @@ func (o *surface) openSurface(cfg driver.SurfaceConfig) {
 	s := newSurface(opts, false)
 	s.id, s.kind, s.hideOnBlur, s.noActivate = cfg.ID, cfg.Kind, cfg.HideOnBlur, cfg.NoActivate
 	s.window = window
+	// A panel is on every space from the start (newPanel); setConstraints applies a window's.
+	s.workspaces = cfg.Workspaces
+	if cfg.Kind == driver.SurfacePanel {
+		s.workspaces = driver.WindowWorkspacesAll
+	}
 	s.setWindowDelegate()
 	window.Send(sel("setContentView:"), s.native)
 	if cfg.Kind == driver.SurfacePanel {

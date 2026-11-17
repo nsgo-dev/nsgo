@@ -85,7 +85,7 @@ var exempt = map[string][]string{
 		"ServeScheme"},
 	"the app's windows, menus, lifecycle and hand-offs to the system, which no capability holds": {"SetTitleBar",
 		"MinimizeWindow", "ToggleMaximize", "ToggleFullScreen", "CloseWindow", "SetWindowFrame", "SetWindowLevel",
-		"SetWindowConstraints", "OrderFront", "SetMenuBar", "SetWindowControls", "SetWindowMaterial",
+		"SetWindowWorkspaces", "SetWindowConstraints", "OrderFront", "SetMenuBar", "SetWindowControls", "SetWindowMaterial",
 		"SetApplicationMenu", "ExitApp", "OnQuitRequest", "OnQuit", "Quit", "Restart", "OpenWindow", "OpenPanel",
 		"SetShutdownMode", "SetMainWindow", "SetMainView", "OnReopen", "NewTray", "RegisterHotKey", "SetDockVisible",
 		"SetLaunchAtLogin", "OnOpenFiles", "OnOpenLinks", "CheckForUpdates", "InstallPackage", "CanInstallPackages",

@@ -36,6 +36,9 @@ type chrome struct {
 	placed bool
 	// constraints are the app's limits on the window.
 	constraints driver.WindowConstraints
+	// level and workspaces are where the app put the window (setLevel, setWorkspaces), which applySpaces reads with constraints.
+	level      driver.WindowLevel
+	workspaces driver.WindowWorkspaces
 
 	appName     string
 	menu        objc.ID // the app's menu bar
@@ -146,6 +149,8 @@ func (s *surface) command(c *driver.WindowCommand) {
 		s.setWindowFrame(c.Frame)
 	case driver.WindowSetLevel:
 		s.setLevel(c.Level)
+	case driver.WindowSetWorkspaces:
+		s.setWorkspaces(c.Workspaces)
 	case driver.WindowOrderFront:
 		if s.kind == driver.SurfacePanel {
 			s.showPanel(s.anchor, s.anchorBounds, s.placement)
@@ -211,11 +216,7 @@ func (s *surface) setConstraints(c driver.WindowConstraints) {
 		return math.MaxFloat32
 	}
 	w.Send(sel("setContentMaxSize:"), apple.CGSize{Width: limit(c.MaxWidth), Height: limit(c.MaxHeight)})
-	behavior := objc.Send[uint](w, sel("collectionBehavior")) &^ fullScreenNone
-	if c.NoMaximize {
-		behavior |= fullScreenNone
-	}
-	w.Send(sel("setCollectionBehavior:"), behavior)
+	s.applySpaces()
 	mask := objc.Send[uint](w, selStyleMask)
 	style := mask | styleResizable | styleMiniaturizable
 	if c.NoResize {

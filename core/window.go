@@ -51,6 +51,8 @@ type WindowOptions struct {
 	// Constraints limit the window's size, which Width and Height keep
 	// to, and what the user may do to it.
 	Constraints WindowConstraints
+	// Workspaces are the workspaces the window shows on (desktop.SetWindowWorkspaces).
+	Workspaces WindowWorkspaces
 }
 
 // PanelOptions are a panel's: the core's part of desktop.PanelOptions,
@@ -134,7 +136,8 @@ func (cx *Scope) OpenWindow(opts WindowOptions, content func(cx *Scope) Node) *W
 	limits := opts.Constraints.Normalized()
 	size := limits.Clamp(Size{Width: opts.Width, Height: opts.Height})
 	w := rt.openSurface(cx.current(), driver.SurfaceConfig{Kind: driver.SurfaceWindow, Title: opts.Title,
-		Width: size.Width, Height: size.Height, Frame: opts.Frame, Hidden: opts.Hidden, Material: opts.Material, Constraints: limits}, content)
+		Width: size.Width, Height: size.Height, Frame: opts.Frame, Hidden: opts.Hidden, Material: opts.Material, Constraints: limits,
+		Workspaces: opts.Workspaces}, content)
 	if opts.Key != "" {
 		w.key = opts.Key
 		if rt.keyed == nil {

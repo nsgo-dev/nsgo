@@ -183,6 +183,10 @@ func (r *runtime) windowModule() js.Value {
 		desktop.SetWindowLevel(r.cx, map[string]core.WindowLevel{"normal": core.WindowLevelNormal,
 			"floating": core.WindowLevelFloating, "desktopIcon": core.WindowLevelDesktop}[stringOf(arg(call, 0))])
 	})
+	set("setWorkspaces", func(call js.FunctionCall) {
+		desktop.SetWindowWorkspaces(r.cx, map[string]core.WindowWorkspaces{"current": core.WindowWorkspacesCurrent,
+			"all": core.WindowWorkspacesAll}[stringOf(arg(call, 0))])
+	})
 	set("setConstraints", func(call js.FunctionCall) {
 		c := r.options(arg(call, 0))
 		desktop.SetWindowConstraints(r.cx, core.WindowConstraints{MinWidth: core.Points(c.float("minWidth", 0)),

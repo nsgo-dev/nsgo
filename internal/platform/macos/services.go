@@ -545,22 +545,21 @@ func usableScreens() []driver.Bounds {
 	return screens
 }
 
-// The window levels and collection behaviors of setLevel.
+// The window levels and the collection behaviors of applySpaces.
 const (
 	levelNormal, levelFloating = 0, 3
 	desktopIconLevelKey        = 18 // kCGDesktopIconWindowLevelKey
 	joinAllSpaces              = 1 << 0
+	moveToActiveSpace          = 1 << 1
 	stationary                 = 1 << 4
 	ignoresCycle               = 1 << 6
 )
 
 var cgWindowLevelForKey func(key int32) int32
 
-// setLevel puts the window at level. The desktop's level keeps it on
-// every space, out of Mission Control and Cmd-`, as desktop widgets are.
+// setLevel puts the window at level, on the spaces applySpaces keeps it on.
 func (s *surface) setLevel(level driver.WindowLevel) {
 	w := s.window
-	behavior := objc.Send[uint](w, sel("collectionBehavior")) &^ (joinAllSpaces | stationary | ignoresCycle)
 	switch level {
 	case driver.WindowLevelFloating:
 		w.Send(sel("setLevel:"), levelFloating)
@@ -573,9 +572,39 @@ func (s *surface) setLevel(level driver.WindowLevel) {
 			purego.RegisterLibFunc(&cgWindowLevelForKey, cg, "CGWindowLevelForKey")
 		}
 		w.Send(sel("setLevel:"), int(cgWindowLevelForKey(desktopIconLevelKey)))
-		behavior |= joinAllSpaces | stationary | ignoresCycle
 	default:
 		w.Send(sel("setLevel:"), levelNormal)
+	}
+	s.level = level
+	s.applySpaces()
+}
+
+// setWorkspaces puts the window on every space or on one (desktop.SetWindowWorkspaces).
+func (s *surface) setWorkspaces(ws driver.WindowWorkspaces) {
+	s.workspaces = ws
+	s.applySpaces()
+}
+
+// applySpaces sets the window's collection behavior from its level, workspaces and constraints together, so that none undoes another. The desktop's level keeps it on every space, out of Mission Control and Cmd-`, as desktop widgets are. Every workspace puts a window at any other level on every space and over other apps' full screen spaces as an auxiliary window, out of Cmd-`. NoMaximize keeps any other window from full screen, which an auxiliary one never enters.
+func (s *surface) applySpaces() {
+	w := s.window
+	if w == 0 {
+		return
+	}
+	behavior := objc.Send[uint](w, sel("collectionBehavior")) &^
+		(joinAllSpaces | stationary | ignoresCycle | fullScreenAuxiliary | fullScreenNone)
+	switch {
+	case s.level == driver.WindowLevelDesktop:
+		behavior |= joinAllSpaces | stationary | ignoresCycle
+	case s.workspaces == driver.WindowWorkspacesAll:
+		behavior |= joinAllSpaces | fullScreenAuxiliary | ignoresCycle
+	}
+	if behavior&joinAllSpaces != 0 {
+		// AppKit refuses a window that both joins every space and moves to the active one.
+		behavior &^= moveToActiveSpace
+	}
+	if s.constraints.NoMaximize && behavior&fullScreenAuxiliary == 0 {
+		behavior |= fullScreenNone
 	}
 	w.Send(sel("setCollectionBehavior:"), behavior)
 }

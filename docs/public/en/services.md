@@ -201,6 +201,8 @@ cx.SetLocale("de")
 cx.OnQuit(func(ctx context.Context) { saveDraft(ctx) })
 ```
 
+`desktop.SetWindowLevel` floats a window above the others, and `desktop.SetWindowWorkspaces(cx, desktop.WindowWorkspacesAll)` or `WindowOptions.Workspaces` keeps it on every workspace, as a desktop pet, a HUD or a timer is: on macOS on every Space and over other apps' full screen spaces, out of Cmd-`, and on Linux on every virtual desktop of an X11 window manager. Windows and Wayland leave it on the one it opened on. In tests, `nsgotest.App.Window` lists the requests.
+
 `desktop.RegisterHotKey` binds a global shortcut, which works while any app is frontmost, on macOS, on Linux and in a Windows app run with `nsgo.Run(App)`. Its handle's `State` says whether the system took it: `HotKeyPending` until it answers, then `HotKeyRegistered`, `HotKeyTaken` when another registration holds the combination, or `HotKeyUnsupported` for a key or a platform without global shortcuts, so a shortcut recorder can ask for another combination. On macOS a combination counts as taken only when the app holds it already or another app registered it exclusively. On Wayland the compositor asks the user to bind the shortcut, and it is registered once they have. In tests, `nsgotest.HotKeyTaken` and `nsgotest.HotKeyUnsupported` make combinations answer so.
 
 ```go

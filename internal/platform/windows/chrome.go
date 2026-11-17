@@ -297,6 +297,8 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 		w.setWindowFrame(c.Frame)
 	case driver.WindowSetLevel:
 		w.setLevel(c.Level)
+	case driver.WindowSetWorkspaces:
+		// Windows has no public API that shows a window on every virtual desktop: IVirtualDesktopManager only moves one to another, so it stays on its own.
 	case driver.WindowOrderFront:
 		w.visible, w.focused = true, false
 		if w.kind == driver.SurfacePanel {

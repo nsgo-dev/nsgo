@@ -166,6 +166,8 @@ const (
 	WindowDestroy
 	// WindowSetAnchor places a panel beside AnchorBounds on Placement's side, moving it at once if it shows, and keeps the placement for later shows; it changes neither whether it shows nor the focus.
 	WindowSetAnchor
+	// WindowSetWorkspaces puts the window on the workspaces Workspaces says.
+	WindowSetWorkspaces
 )
 
 // SurfaceKind is what an opened surface shows in.
@@ -216,6 +218,8 @@ type SurfaceConfig struct {
 	NoActivate bool
 	// Tray is the tray icon a SurfaceTrayIcon draws.
 	Tray uint32
+	// Workspaces are the workspaces a window shows on (WindowSetWorkspaces).
+	Workspaces WindowWorkspaces
 }
 
 // TrayConfig is a tray icon (ItemTray).
@@ -253,6 +257,8 @@ type WindowCommand struct {
 	// AnchorBounds is the rectangle, in the screen coordinates of DisplayInfo, that WindowShow and WindowSetAnchor place a panel beside, on Placement's side; WindowPlaceDefault places none.
 	AnchorBounds Bounds
 	Placement    WindowPlacement
+	// Workspaces are what WindowSetWorkspaces sets.
+	Workspaces WindowWorkspaces
 }
 
 // WindowControls is how a hidden title bar shows the system's window
@@ -383,6 +389,16 @@ const (
 	WindowLevelFloating
 	// WindowLevelDesktop sits with the desktop's icons on macOS, on every space and out of Mission Control; Windows puts the window at the bottom of the others, where activating it raises it again, and X11 below the others (_NET_WM_STATE_BELOW).
 	WindowLevelDesktop
+)
+
+// WindowWorkspaces are the workspaces a window shows on: macOS's Spaces, the virtual desktops of Windows and Linux.
+type WindowWorkspaces uint8
+
+const (
+	// WindowWorkspacesCurrent keeps the window on the workspace it opened on, as windows are.
+	WindowWorkspacesCurrent WindowWorkspaces = iota
+	// WindowWorkspacesAll shows it on every workspace, and over other apps' full screen spaces on macOS.
+	WindowWorkspacesAll
 )
 
 // MenuBarMode says when Windows and Linux show the menu bar the window
