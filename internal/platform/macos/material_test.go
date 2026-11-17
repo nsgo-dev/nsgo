@@ -5,7 +5,10 @@ package macos
 import (
 	"testing"
 
+	"github.com/ebitengine/purego/objc"
+
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
 func TestMaterialCode(t *testing.T) {
@@ -93,5 +96,86 @@ func TestViewsClipInAHolderToKeepTheirShadow(t *testing.T) {
 		if got := c.v.clipsInHolder(&c.vs); got != c.want {
 			t.Errorf("%s: clipsInHolder = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+// TestABareBackdropBlurFollowsItsRadius draws a blur with no material named as CSS does: a Gaussian blur of the style's radius, which the pointer goes through, with the view's background drawn once, over it, and not again in the view's own layer under the blur. A named material keeps AppKit's.
+func TestABareBackdropBlurFollowsItsRadius(t *testing.T) {
+	onMain(func() { aBareBackdropBlurFollowsItsRadius(t) })
+}
+
+func aBareBackdropBlurFollowsItsRadius(t *testing.T) {
+	loadAppKit()
+	native := objc.ID(classView).Send(selNew)
+	defer native.Send(selRelease)
+	native.Send(selSetWantsLayer, true)
+	native.Send(selSetFrame, apple.Rect(0, 0, 200, 120))
+	v := &view{kind: driver.KindView, native: native, content: native, surface: &surface{}}
+	views[native] = v
+	defer delete(views, native)
+	defer v.setBackdrop(&driver.ViewStyle{})
+
+	apply := func(blur float32, m driver.BackdropMaterial) {
+		vs := driver.ViewStyle{Background: driver.RGBA(0, 0.4), CornerRadius: 12, Material: m,
+			Effects: &driver.Effects{BackdropFilters: []driver.Filter{{Kind: driver.FilterBlur, Amount: blur}}}}
+		v.style = vs
+		v.styleLayer(&vs)
+		v.setBackdrop(&vs)
+	}
+	isA := func(o objc.ID, class objc.Class) bool { return o != 0 && objc.Send[bool](o, sel("isKindOfClass:"), class) }
+	radius := func() float64 {
+		filters := v.backdropLayer.Send(sel("filters"))
+		if apple.Msg(filters, selCount) != 1 {
+			return -1
+		}
+		f := filters.Send(selObjectAtIndex, uint(0))
+		return objc.Send[float64](f.Send(sel("valueForKey:"), apple.NSString("inputRadius")), sel("doubleValue"))
+	}
+	ownBackground := func() bool { return native.Send(selLayer).Send(sel("backgroundColor")) != 0 }
+
+	apply(6, driver.BackdropUltraThin)
+	if !isA(v.backdrop, classOverlay) || !isA(v.backdropLayer, apple.Class("CABackdropLayer")) {
+		t.Fatalf("a bare blur's backdrop is %v holding %v, want a holder the pointer goes through holding a CABackdropLayer", v.backdrop, v.backdropLayer)
+	}
+	if got := radius(); got != 6 {
+		t.Fatalf("a blur of 6 blurs by %v", got)
+	}
+	if got := v.backdrop.Send(sel("hitTest:"), apple.CGPoint{X: 100, Y: 60}); got != 0 {
+		t.Fatalf("the blur took the pointer: %v", got)
+	}
+	if ownBackground() {
+		t.Fatal("the view's own layer draws its background under the blur, which blurs it and shows it twice")
+	}
+	if v.tint == 0 || v.tint.Send(selLayer).Send(sel("backgroundColor")) == 0 {
+		t.Fatal("the background is not drawn over the blur")
+	}
+	if got, want := objc.Send[apple.CGRect](v.backdropLayer, selFrame), objc.Send[apple.CGRect](v.backdrop, selBounds); got != want {
+		t.Fatalf("the blur's layer is at %v, want the holder's bounds %v", got, want)
+	}
+
+	held := v.backdrop
+	apply(30, driver.BackdropUltraThin)
+	if v.backdrop != held {
+		t.Fatal("a new radius made a new backdrop")
+	}
+	if got := radius(); got != 30 {
+		t.Fatalf("a blur of 30 blurs by %v", got)
+	}
+
+	apply(30, driver.BackdropThin)
+	if !isA(v.backdrop, classMaterial) || v.backdropLayer != 0 {
+		t.Fatalf("a named material's backdrop is %v, want AppKit's material", v.backdrop)
+	}
+	if !ownBackground() {
+		t.Fatal("the view's own layer gave up its background under a material, which hides it")
+	}
+
+	apply(8, driver.BackdropUltraThin)
+	if !isA(v.backdrop, classOverlay) || radius() != 8 || ownBackground() {
+		t.Fatal("going back from a material does not blur by the radius again")
+	}
+	apply(0, driver.BackdropUltraThin)
+	if v.backdrop != 0 || v.backdropLayer != 0 || v.tint != 0 || !ownBackground() {
+		t.Fatal("taking the blur away left its backdrop or kept the background off the view's layer")
 	}
 }

@@ -351,6 +351,12 @@ func (v *view) styleLayer(vs *driver.ViewStyle) {
 		drawn.Clip = false
 		vs = &drawn
 	}
+	if blursByRadius(vs, drawsGlass(vs)) && vs.Background != 0 {
+		// The tint draws the background over the blur, which would blur the layer's own and show it twice.
+		drawn := *vs
+		drawn.Background = 0
+		vs = &drawn
+	}
 	v.followScale(vs)
 	// A view created by an earlier batch shows the default style.
 	var shown *driver.ViewStyle

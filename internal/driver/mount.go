@@ -671,7 +671,7 @@ type ViewStyle struct {
 	// the function).
 	ChildPerspective Points
 	BlendMode        BlendMode
-	// Material and Glass are how iOS draws a backdrop blur.
+	// Material and Glass are how iOS draws a backdrop blur, and macOS one of a material other than BackdropUltraThin or of glass.
 	Material BackdropMaterial
 	// Elevation is Android's: how high the view floats, which casts the
 	// system's shadow under it where the style casts none.

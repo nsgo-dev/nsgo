@@ -134,7 +134,7 @@ sign:
 
 Without `sign.macos_profile` the Mac package is unsigned: it runs sandboxed on your Mac, which tests the sandbox, but uploads nowhere. A sandboxed app reaches only its own container, the network and the files the user picks; widgets cannot share timelines from the sandbox yet, so a store build refuses them. Upload the `.pkg` with Transporter, the `.msix` in Partner Center, the `.aab` in Play Console, and submit `flatpak/<id>.yml` to Flathub once the release holds the archives it names; `flatpak-builder` builds it locally too. Windows installs an MSIX outside the Store only when it is signed, which the Store does.
 
-On macOS, a scroll view's edge effects (`Scroll.EdgeEffects`) blur through Core Animation's private `CABackdropLayer` and `CAFilter`, as AppKit's own edge effects do, since no public API varies a blur across a view. App Store review may reject apps that use private APIs: NSGo calls them only for scroll views with edge bars, but every macOS build contains their names.
+On macOS, a scroll view's edge effects (`Scroll.EdgeEffects`) and a backdrop `Blur` with no `IOS.BackdropMaterial` blur through Core Animation's private `CABackdropLayer` and `CAFilter`, as AppKit's own edge effects and materials do, since no public API blurs by a radius or varies a blur across a view. App Store review may reject apps that use private APIs: NSGo calls them only for scroll views with edge bars and those blurs, but every macOS build contains their names.
 
 ## Publish on GitHub
 

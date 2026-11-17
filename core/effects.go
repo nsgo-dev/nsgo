@@ -35,9 +35,7 @@ type (
 	FilterKind = driver.FilterKind
 	// BlendMode is how a view's pixels mix with what is behind it.
 	BlendMode = driver.BlendMode
-	// BackdropMaterial is the system material iOS draws a backdrop blur
-	// with. On macOS, the zero value leaves Blur as a radius-based backdrop;
-	// a non-zero value selects the matching system material.
+	// BackdropMaterial is the system material iOS draws a backdrop blur with. macOS draws its closest material for one other than BackdropUltraThin, the zero value, and blurs by the radius for that.
 	BackdropMaterial = driver.BackdropMaterial
 	// GlassEffect is Apple's Liquid Glass.
 	GlassEffect = driver.GlassEffect

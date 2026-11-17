@@ -141,12 +141,7 @@ type Style struct {
 	Shadows []BoxShadow
 	// Filters change what the node and its children draw, in order.
 	Filters []Filter
-	// BackdropFilters change what is behind the node, seen through its
-	// background: Blur frosts it by its radius on macOS, iOS and the web,
-	// with a view's IOS.BackdropMaterial selecting iOS's system material and
-	// a non-zero value selecting macOS's material. GlassEffect draws Liquid
-	// Glass in its place on iOS and macOS 26; give a glass view a blur to
-	// fall back to.
+	// BackdropFilters change what is behind the node, seen through its background: Blur frosts it by its radius, but for iOS, which draws the system material a view's IOS.BackdropMaterial names, and macOS, which draws its closest material for one other than BackdropUltraThin. GlassEffect draws Liquid Glass in its place on iOS and macOS 26; give a glass view a blur to fall back to.
 	BackdropFilters []Filter
 	GlassEffect     GlassEffect
 	// Mask draws the node, backdrop included, as much as the gradient's

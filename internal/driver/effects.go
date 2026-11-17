@@ -226,8 +226,7 @@ func (b BlendMode) Name() string {
 	return blendNames[0]
 }
 
-// BackdropMaterial is the system material iOS draws a backdrop blur
-// with, from the thinnest.
+// BackdropMaterial is the system material iOS draws a backdrop blur with, from the thinnest. macOS draws its closest material for one other than BackdropUltraThin, and blurs by the radius for that.
 type BackdropMaterial uint8
 
 const (

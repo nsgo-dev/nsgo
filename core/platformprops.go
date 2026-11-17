@@ -6,8 +6,7 @@ package core
 
 // IOSViewProps are a View's props only iOS has.
 type IOSViewProps struct {
-	// BackdropMaterial is the system material iOS draws the view's
-	// backdrop blur with.
+	// BackdropMaterial is the system material iOS draws the view's backdrop blur with. macOS draws its closest material for one other than BackdropUltraThin, and blurs by the radius for that.
 	BackdropMaterial BackdropMaterial
 }
 
