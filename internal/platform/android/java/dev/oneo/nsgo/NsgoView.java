@@ -4682,7 +4682,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             if (action == MotionEvent.ACTION_DOWN) routed = route(e);
             if (routed != null) {
                 if (action != MotionEvent.ACTION_DOWN) deliver(routed, e);
-                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) routed = null;
+                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    routed = null;
+                    childrenOnly = false;
+                }
                 return true;
             }
             if (node != null && node.followsGestures()) {
@@ -4721,6 +4724,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 if (!slop && !area) continue;
                 if (child instanceof Group) ((Group) child).childrenOnly = !slop;
                 if (deliver(child, e)) return child;
+                // A declined down has no up or cancel to clear this flag.
+                if (child instanceof Group) ((Group) child).childrenOnly = false;
             }
             return null;
         }
