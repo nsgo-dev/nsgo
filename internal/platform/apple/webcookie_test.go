@@ -13,8 +13,11 @@ import (
 
 // TestHTTPCookieCarriesEveryAttribute builds the NSHTTPCookie SetWebCookies hands WebKit and reads its attributes back, HttpOnly, which Foundation has no key for, among them.
 func TestHTTPCookieCarriesEveryAttribute(t *testing.T) {
-	pool := objc.ID(Class("NSAutoreleasePool")).Send(sel("new"))
-	defer pool.Send(sel("drain"))
+	// withPool keeps the goroutine on the pool's OS thread: a pool drained on another thread, after the scheduler moved the goroutine, crashes in Foundation.
+	withPool(func() { testHTTPCookieCarriesEveryAttribute(t) })
+}
+
+func testHTTPCookieCarriesEveryAttribute(t *testing.T) {
 	// Foundation keeps a cookie at most 400 days, as RFC 6265bis says.
 	expires := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second)
 	for _, c := range []struct {
