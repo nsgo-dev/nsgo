@@ -53,10 +53,15 @@ func TestOverlayMovesHidesAndCloses(t *testing.T) {
 		t.Fatalf("opened %+v", ov)
 	}
 	var frame core.WindowFrame
-	app.Post(func() { frame = o.inside.Env().WindowFrame() })
+	var placed bool
+	app.Post(func() { frame, placed = o.inside.Env().WindowFrame(), o.inside.Env().CanPlaceWindows() })
 	app.Settle()
 	if frame != ov.Frame {
 		t.Errorf("its content sees the frame %+v, the platform applied %+v", frame, ov.Frame)
+	}
+	// SetWindowFrame moves it, as below.
+	if !placed {
+		t.Error("its content sees CanPlaceWindows false")
 	}
 
 	app.Post(func() { o.inside.SetWindowFrame(core.WindowFrame{X: 20, Y: 900, Move: true}) })

@@ -98,7 +98,8 @@ func (s *surface) surfaceReport(r *reader) {
 		size := driver.Size{Width: r.points(), Height: r.points()}
 		frame := driver.WindowFrame{X: r.points(), Y: r.points(), Move: true, Width: size.Width, Height: size.Height}
 		env := readEnvironment(r)
-		env.WindowFrame = frame
+		// SetWindowFrame places an overlay, kept on the screen (Overlays.java).
+		env.WindowFrame, env.CanPlaceWindows = frame, true
 		e.ResizeWithEnvironment(size, driver.Geometry{}, env)
 	case surfaceEnded:
 		reason := int(r.byte())

@@ -271,7 +271,7 @@ func (e *Env) WindowFrame() WindowFrame { return e.windowFrame.Get() }
 // CanSetWindowLevel reports whether SetWindowLevel stacks the scope's desktop window: the core's part of desktop.CanSetWindowLevel, which apps use.
 func (e *Env) CanSetWindowLevel() bool { return e.level.Get() }
 
-// CanPlaceWindows reports whether SetWindowFrame places the scope's desktop window where it says, false for an Android overlay, which mobile places: the core's part of desktop.CanPlaceWindows, which apps use.
+// CanPlaceWindows reports whether SetWindowFrame places the scope's window where it says, an Android overlay's included: the core's part of desktop.CanPlaceWindows, which apps use.
 func (e *Env) CanPlaceWindows() bool { return e.place.Get() }
 
 // KeyboardDuration returns how long the keyboard takes to move.

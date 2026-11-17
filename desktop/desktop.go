@@ -163,7 +163,7 @@ func SetWindowLevel(cx *core.Scope, level WindowLevel) { cx.SetWindowLevel(level
 // CanSetWindowLevel reports whether SetWindowLevel stacks the scope's window: on macOS, Windows and Linux on X11, but not for a view a host embeds, the app's own scope or a tray icon's, which show in no window, a Linux panel no window manager manages, or on Wayland.
 func CanSetWindowLevel(cx *core.Scope) bool { return cx.Env().CanSetWindowLevel() }
 
-// CanPlaceWindows reports whether SetWindowFrame moves the scope's window to the position it gives: on macOS and Windows, but not for a view a host embeds, the app's own scope or a tray icon's, which show in no window, on Linux, or for an Android overlay, which mobile places.
+// CanPlaceWindows reports whether SetWindowFrame moves the scope's window to the position it gives: on macOS and Windows, and for an Android overlay (mobile.OpenOverlay), which it keeps on the screen, but not for a view a host embeds, the app's own scope or a tray icon's, which show in no window, or on Linux.
 func CanPlaceWindows(cx *core.Scope) bool { return cx.Env().CanPlaceWindows() }
 
 // SetWindowConstraints limits the window's content size and says whether

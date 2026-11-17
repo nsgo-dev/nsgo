@@ -38,7 +38,7 @@ The runtime adds the overlay's window first and starts the foreground service on
 
 The service may survive an activity rotation, task removal or a detached `NsgoView`, but not the end of the process: as the process ends the runtime removes the overlay's window and stops the service. A standalone app's `NsgoActivity` that ends while an overlay shows, as when the user removes its task, keeps its view's process running off screen unless the app quit, and the next `NsgoActivity` shows that view again, as the engine serves only its first view; the process ends with the last overlay if no activity took it back. Process death does not restore it; the app opens it again as it starts, as nothing tells it from an app that never opened one.
 
-The app hears the overlay shown and hidden through `Visible`, focused through its tree's `Env().Lifecycle`, active only while the window has the focus, its frame through `Env().WindowFrame`, and its end through `OnEnd`. Every callback runs on the engine's goroutine, never on the service's binder or window-manager thread.
+The app hears the overlay shown and hidden through `Visible`, focused through its tree's `Env().Lifecycle`, active only while the window has the focus, its frame through `Env().WindowFrame`, with `Env().CanPlaceWindows` true as `SetWindowFrame` places it, and its end through `OnEnd`. Every callback runs on the engine's goroutine, never on the service's binder or window-manager thread.
 
 ## Layout and input
 
