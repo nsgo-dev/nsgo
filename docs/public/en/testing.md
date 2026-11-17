@@ -47,7 +47,7 @@ An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, is tested
 go tool nsgo test
 ```
 
-`test` prints a line per test. `-run` picks tests as `go test`'s does, including subtests such as `-run 'TestGallery/dark-home'`. On a target, `-timeout` sets the per-test deadline (three minutes by default; `0` disables it) and the result reports when that deadline is reached. `-junit report.xml` writes a JUnit report, `-trace` prints each step's mount items and commit times and `-bench` runs benchmarks instead, a line per result. Headless runs forward flags after `--` to `go test`; target runs accept the runtime flags below.
+`test` prints a line per test. `-run` picks tests as `go test`'s does, including subtests such as `-run 'TestGallery/dark-home'`. On a target, `-timeout` sets the per-test deadline (three minutes by default; `0` disables it) and the result reports when that deadline is reached. A test whose subtests all skipped counts as skipped. `-junit report.xml` writes a JUnit report that keeps each skip's reason, `-trace` prints each step's mount items and commit times and `-bench` runs benchmarks instead, a line per result. Headless runs forward flags after `--` to `go test`; target runs accept the runtime flags below.
 
 Given a directory without `nsgo.yaml`, such as a library or the module's root, `test` takes every package under it; a directory may also end in `/...`, as Go's patterns do. It takes one directory, and stops with an error at a second: to test several, give it a directory above them, or run it once for each. `go tool nsgo check` takes packages the same way and vets them.
 

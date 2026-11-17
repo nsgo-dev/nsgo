@@ -458,15 +458,21 @@ func parseTestOutput(name string, depth int, out string, code int, runErr error)
 	current := ""
 	var subtests []string
 	for _, line := range strings.Split(out, "\n") {
-		if fields := strings.Fields(line); len(fields) >= 3 && fields[0] == "===" && (fields[1] == "RUN" || fields[1] == "CONT" || fields[1] == "NAME") {
+		// Each of Go's own lines, RUN, PAUSE, CONT, NAME and the rest, names the test the lines after it belong to, as its verbose printer tracks it.
+		if fields := strings.Fields(line); len(fields) >= 3 && fields[0] == "===" {
 			current = fields[2]
 			continue
 		}
 		m := testLine.FindStringSubmatch(strings.TrimLeft(line, " \t"))
-		if m == nil || m[2] != name && !strings.HasPrefix(m[2], name+"/") {
+		if m == nil {
 			if current == name || strings.HasPrefix(current, name+"/") {
 				outputs[current] += line + "\n"
 			}
+			continue
+		}
+		// Go names a test again before any later output of it, so what follows a result line without a new name, as the closing PASS or the host's own logs, belongs to no test.
+		current = ""
+		if m[2] != name && !strings.HasPrefix(m[2], name+"/") {
 			continue
 		}
 		s, _ := strconv.ParseFloat(m[3], 64)

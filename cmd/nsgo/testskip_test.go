@@ -59,6 +59,34 @@ PASS
 	}
 }
 
+// A skip's reason is what the test printed under its own name, not what the process printed after its result, and parallel subtests keep their own reasons.
+func TestTargetSkipReasonsFollowTestNames(t *testing.T) {
+	const direct = "=== RUN   TestDirect\n    skip_test.go:3: direct reason\n--- SKIP: TestDirect (0.00s)\nPASS\nnsgo: host closed\n"
+	if got := parseTestOutput("TestDirect", 0, direct, 0, nil); got.Status != "skip" || got.Message != "skip_test.go:3: direct reason" {
+		t.Errorf("direct skip: status %s, message %q", got.Status, got.Message)
+	}
+	const parallel = `=== RUN   TestP
+=== RUN   TestP/a
+=== PAUSE TestP/a
+=== RUN   TestP/b
+=== PAUSE TestP/b
+=== CONT  TestP/a
+=== CONT  TestP/b
+    skip_test.go:8: b reason
+=== NAME  TestP/a
+    skip_test.go:7: a reason
+--- SKIP: TestP/b (0.00s)
+--- SKIP: TestP/a (0.00s)
+--- PASS: TestP (0.00s)
+PASS
+nsgo: host closed
+`
+	got := parseTestOutput("TestP", 0, parallel, 0, nil)
+	if want := "all subtests skipped\nTestP/b: skip_test.go:8: b reason\nTestP/a: skip_test.go:7: a reason"; got.Status != "skip" || got.Message != want {
+		t.Errorf("parallel skips: status %s, message %q, want %q", got.Status, got.Message, want)
+	}
+}
+
 func TestHeadlessAllSkippedSubtests(t *testing.T) {
 	var out bytes.Buffer
 	r := &testRun{out: &out, running: map[string]*testResult{}, packages: map[string]*testResult{}}

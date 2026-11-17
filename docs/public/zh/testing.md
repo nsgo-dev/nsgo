@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 go tool nsgo test
 ```
 
-`test` 每个测试输出一行。`-run` 像 `go test` 一样筛选测试，`-junit report.xml` 写出 JUnit 报告，`-trace` 打印每一步的挂载项和提交耗时，`-bench` 改为运行基准测试，每个结果输出一行。`--` 之后的参数交给 `go test`。
+`test` 每个测试输出一行。`-run` 像 `go test` 一样筛选测试。子测试全部跳过的测试计为跳过。`-junit report.xml` 写出保留每个跳过原因的 JUnit 报告，`-trace` 打印每一步的挂载项和提交耗时，`-bench` 改为运行基准测试，每个结果输出一行。`--` 之后的参数交给 `go test`。
 
 传入没有 `nsgo.yaml` 的目录（例如库或模块根目录）时，`test` 会处理其下的所有包；目录也可以像 Go 的包模式那样以 `/...` 结尾。它只接受一个目录，遇到第二个会报错退出：要测试多个目录，就传入它们共同的上级目录，或逐个运行。`go tool nsgo check` 以同样的方式选取并检查包。
 
