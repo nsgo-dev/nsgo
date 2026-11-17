@@ -343,8 +343,8 @@ func (w *window) updateAccess(v *view) bool {
 			// GTK reads a tristate as an int.
 			gValueInit(uintptr(unsafe.Pointer(&val)), gTypeInt)
 			gValueSetInt(&val, enumValue("tristate", [...]string{"false", "true", "mixed"}[s]))
-		case "invalid":
-			// And GtkAccessibleInvalidState, whose true is 1.
+		case "selected", "expanded", "invalid":
+			// GTK collects a boolean state that may be undefined (selected and expanded) with g_value_get_int, as it does GtkAccessibleInvalidState, whose true is 1; a boolean GValue there is rejected and read as false.
 			gValueInit(uintptr(unsafe.Pointer(&val)), gTypeInt)
 			gValueSetInt(&val, int32(s))
 		default:
