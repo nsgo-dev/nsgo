@@ -21,8 +21,7 @@ type Checkbox struct {
 	// and indeterminate, false from checked. The checkbox shows what
 	// Checked returns.
 	OnChange func(checked bool)
-	// OnChangeEvent receives the requested value and the originating press,
-	// including its modifier keys. When set, it replaces OnChange.
+	// OnChangeEvent receives the requested value and the originating press, including its modifier keys. When set, it replaces OnChange.
 	OnChangeEvent func(checked bool, press core.PressEvent)
 	// Role is what it is for assistive technology; RoleCheckbox when 0.
 	Role core.Role

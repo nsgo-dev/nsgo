@@ -75,8 +75,7 @@ func focusMethods() []objc.MethodDef {
 	}
 }
 
-// activates reports whether a key event is Return, the keypad's Enter or
-// Space. The keymap has already had the modified key.
+// activates reports whether a key event is Return, the keypad's Enter or Space, with any modifiers: the keymap has already had the key.
 func activates(event objc.ID) bool {
 	code := objc.Send[uint16](event, sel("keyCode"))
 	return code == 36 || code == 76 || code == 49

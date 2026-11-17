@@ -16,11 +16,7 @@ const (
 	MouseButtonForward = driver.MouseButtonForward
 )
 
-// PressEvent is where the pointer was at a press. Backends that know them
-// report the modifier keys held when the press began and the click count;
-// a keyboard press keeps its modifiers where the platform reports them.
-// Keyboard and assistive-technology presses are at the view's origin
-// with one click.
+// PressEvent is where the pointer was at a press. Backends that know them report the modifier keys held when the press began and the click count; a keyboard press keeps its modifiers where the platform reports them. Keyboard and assistive-technology presses are at the view's origin with one click.
 type PressEvent struct {
 	// Position is in the pressed view, its transforms undone; for a
 	// pressed span, in its text's view.

@@ -106,8 +106,7 @@ func clickPressedCallback(gesture uintptr, n int32, x, y float64, data uintptr) 
 // pointerDown follows a press of button at surface point at, the clicks'
 // press in a row, with modifiers state.
 func (w *window) pointerDown(at driver.Point, button uint32, device uintptr, state uint32, clicks int) {
-	// Test input enters here without GTK's legacy controller. A press
-	// after a key must still report pointer input and hide focus rings.
+	// Test input enters here without GTK's legacy controller. A press after a key must still report pointer input and hide focus rings.
 	w.engine.InputModality(driver.ModalityPointer)
 	w.lastPointer, w.pressConsumed = at, false
 	w.down = driver.Event{Modifiers: modifiers(state), Count: uint32(max(clicks, 1)), Page: at}

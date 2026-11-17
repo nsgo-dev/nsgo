@@ -20,8 +20,7 @@ type Checkbox struct {
 	Disabled      func() bool
 	// OnChange receives the value a press asks for.
 	OnChange func(checked bool)
-	// OnChangeEvent receives the requested value and the originating press,
-	// including its modifier keys. When set, it replaces OnChange.
+	// OnChangeEvent receives the requested value and the originating press, including its modifier keys. When set, it replaces OnChange.
 	OnChangeEvent func(checked bool, press core.PressEvent)
 	Text          string
 	// Children replace Text.
