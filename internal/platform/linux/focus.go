@@ -77,9 +77,6 @@ func (w *window) focusView(v *view) {
 }
 
 func (w *window) setControlFocus(v *view) {
-	if v != nil {
-		w.restoreControl = nil
-	}
 	old := w.controlFocus
 	if old == v {
 		return
@@ -109,21 +106,31 @@ func controlFocusCallback(widget, pspec, data uintptr) {
 	}
 }
 
-func (w *window) checkControlFocus() {
-	v := w.controlFocus
-	switch {
-	case v != nil && (v.deleted || v.style.Hidden || !v.props.FocusStop(v.events)):
-		w.setControlFocus(nil)
-		w.restoreControl = nil
-	case v != nil && !w.focusableView(v):
-		w.setControlFocus(nil)
-		w.restoreControl = v
-	case w.controlFocus == nil && w.restoreControl != nil:
-		r := w.restoreControl
-		if r.deleted || r.style.Hidden || !r.props.FocusStop(r.events) {
-			w.restoreControl = nil
-		} else if w.focusableView(r) {
-			w.focusView(r)
+// keyboardStop reports whether v is a keyboard stop whatever modal shows: in the window, not hidden, an enabled field or a stop view.
+func (w *window) keyboardStop(v *view) bool { return w.focusableIn(v, w.view(w.root)) }
+
+// coverFocus takes the focus off a field or stop that is no longer a keyboard stop. One a modal covers is kept in covered to get it back as the modal goes. A batch runs it before its focus requests, so a modal that focuses its own stop as it comes still gives the focus back to the stop it covered.
+func (w *window) coverFocus() {
+	v := w.focusedView()
+	if v == nil || w.focusableView(v) {
+		return
+	}
+	w.focusEntry(nil)
+	if w.keyboardStop(v) {
+		w.covered = append(w.covered, v)
+	}
+}
+
+// checkFocus runs after each batch's focus requests. Covered views that went, hid or stopped being stops are forgotten; one a closed modal uncovered gets the focus back if nothing has it by then, else it is forgotten too. The newest is checked first, so modals closing one after another each give back what they covered.
+func (w *window) checkFocus() {
+	w.coverFocus()
+	w.covered = slices.DeleteFunc(w.covered, func(v *view) bool { return !w.keyboardStop(v) })
+	scope := w.focusScope()
+	for n := len(w.covered); n > 0 && w.focusableIn(w.covered[n-1], scope); n-- {
+		v := w.covered[n-1]
+		w.covered = w.covered[:n-1]
+		if w.focusedView() == nil {
+			w.focusView(v)
 		}
 	}
 }

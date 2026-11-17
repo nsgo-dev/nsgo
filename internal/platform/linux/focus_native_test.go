@@ -4,6 +4,8 @@ package linux
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -200,63 +202,274 @@ func TestEmbeddedClickKeepsControlFocus(t *testing.T) {
 	})
 }
 
-func TestControlFocusReturnsAfterModal(t *testing.T) {
-	const title = "nsgo-modal-focus"
-	var open *core.Signal[bool]
-	var root *core.Scope
-	var button core.Ref
-	app := func(cx *core.Scope) core.Node {
-		root = cx
-		open = core.NewSignal(cx, false)
-		cx.SetTitle(title)
-		cx.OnKeyWith("mod+b", core.KeyOptions{When: core.KeyAlways}, button.Focus)
-		return core.View{Style: core.Style{Width: core.Pt(240), Height: core.Pt(180)}, Children: []core.Node{
-			core.View{TestID: "opener", Ref: &button, Style: core.Style{Width: core.Pt(120), Height: core.Pt(40)},
-				Focusable: func() bool { return true },
-				OnFocus:   func() { cx.SetTitle(title + "|focused") }},
-			core.Show{When: open.Get, Then: func(*core.Scope) core.Node {
-				return core.Modal{Children: []core.Node{core.View{Style: core.Style{Width: core.Pt(120), Height: core.Pt(60)}}}}
+// modalFocus is an app with an opener before a field and a dialog the opener's press shows, with a stop that closes it, one that opens a second dialog over it, and an optional field that focuses itself as it mounts.
+type modalFocus struct {
+	root                                           *core.Scope
+	open, nested, autoField, removed, hidden, stop *core.Signal[bool]
+}
+
+func (m *modalFocus) app(title string) func(*core.Scope) core.Node {
+	return func(cx *core.Scope) core.Node {
+		m.root = cx
+		m.open, m.nested, m.autoField = core.NewSignal(cx, false), core.NewSignal(cx, false), core.NewSignal(cx, false)
+		m.removed, m.hidden, m.stop = core.NewSignal(cx, false), core.NewSignal(cx, false), core.NewSignal(cx, true)
+		var opener, field core.Ref
+		focused, presses := core.NewSignal(cx, "none"), core.NewSignal(cx, 0)
+		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%s|%d", title, focused.Get(), presses.Get())) })
+		cx.OnKeyWith("mod+b", core.KeyOptions{When: core.KeyAlways}, opener.Focus)
+		cx.OnKeyWith("mod+f", core.KeyOptions{When: core.KeyAlways}, field.Focus)
+		// OnFocus names the view that took the focus, OnBlur the one that lost it.
+		heard := func(id string) (func(), func()) {
+			return func() { focused.Set(id) }, func() { focused.Set("-" + id) }
+		}
+		stop := func(id string, press func()) core.Node {
+			onFocus, onBlur := heard(id)
+			return core.View{TestID: id, Style: core.Style{Width: core.Pt(80), Height: core.Pt(30)},
+				OnFocus: onFocus, OnBlur: onBlur, OnPress: func(core.PressEvent) { press() }}
+		}
+		openerFocus, openerBlur := heard("opener")
+		fieldFocus, fieldBlur := heard("field")
+		autoFocus, autoBlur := heard("auto")
+		return core.View{Style: core.Style{Width: core.Pt(240), Height: core.Pt(240)}, Children: []core.Node{
+			core.View{StyleFunc: func() core.Style {
+				if m.hidden.Get() {
+					return core.Style{Display: core.DisplayNone}
+				}
+				return core.Style{}
+			}, Children: []core.Node{
+				core.Show{When: func() bool { return !m.removed.Get() }, Then: func(*core.Scope) core.Node {
+					return core.View{TestID: "opener", Ref: &opener, Style: core.Style{Width: core.Pt(120), Height: core.Pt(40)},
+						Focusable: m.stop.Get, OnFocus: openerFocus, OnBlur: openerBlur,
+						OnPress: func(core.PressEvent) {
+							presses.Update(func(n int) int { return n + 1 })
+							m.open.Set(true)
+						}}
+				}},
+			}},
+			core.Input{TestID: "field", Ref: &field, Style: core.Style{Height: core.Pt(30)}, OnFocus: fieldFocus, OnBlur: fieldBlur},
+			core.Show{When: m.open.Get, Then: func(*core.Scope) core.Node {
+				return core.Modal{Children: []core.Node{core.View{Style: core.Style{Width: core.Pt(200), Height: core.Pt(140)}, Children: []core.Node{
+					stop("close", func() { m.open.Set(false) }),
+					stop("inner", func() { m.nested.Set(true) }),
+					core.Show{When: m.autoField.Get, Then: func(*core.Scope) core.Node {
+						return core.Input{TestID: "auto", AutoFocus: true, Style: core.Style{Height: core.Pt(30)}, OnFocus: autoFocus, OnBlur: autoBlur}
+					}},
+				}}}}
+			}},
+			core.Show{When: m.nested.Get, Then: func(*core.Scope) core.Node {
+				return core.Modal{Children: []core.Node{stop("close2", func() { m.nested.Set(false) })}}
 			}},
 		}}
 	}
-	w := startTestWindow(t, app, Options{Title: title, Width: 240, Height: 180})
-	waitForTitle(t, w, title)
+}
+
+func (m *modalFocus) set(s *core.Signal[bool], on bool) { m.root.Post(func() { s.Set(on) }) }
+
+// startModalFocus opens the app and waits for it to show.
+func startModalFocus(t *testing.T, name string) (*window, *modalFocus, func(string)) {
+	t.Helper()
+	title := "nsgo-modal-focus-" + name
+	m := &modalFocus{}
+	w := startTestWindow(t, m.app(title), Options{Title: title, Width: 240, Height: 240})
+	waitForTitle(t, w, title+"|none|0")
+	return w, m, func(want string) { t.Helper(); waitForTitle(t, w, title+"|"+want) }
+}
+
+// bound reports a key binding by its ID, as the platform reports a matched press.
+func (w *window) bound(t *testing.T, name string) {
+	t.Helper()
 	w.onLoop(t, func() {
 		for _, b := range w.keys {
-			if b.Key == "mod+b" {
+			if b.Key == name {
 				w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: b.ID})
 				return
 			}
 		}
-		t.Fatal("no focus binding")
+		t.Errorf("no binding of %s", name)
 	})
-	waitForTitle(t, w, title+"|focused")
-	root.Post(func() { open.Set(true) })
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		var covered bool
-		w.onLoop(t, func() {
-			covered = w.controlFocus == nil && w.restoreControl != nil && w.restoreControl.props.TestID == "opener"
-		})
-		if covered {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+}
+
+// pressReturn presses and releases Return on the window's key controller.
+func (w *window) pressReturn(t *testing.T) {
+	t.Helper()
 	w.onLoop(t, func() {
-		if w.controlFocus != nil || w.restoreControl == nil {
-			t.Fatal("opening a modal did not retain the opener")
-		}
+		keyPressedCallback(0, gdkReturn, gdkReturn, 0, w.handle)
+		keyReleasedCallback(0, gdkReturn, gdkReturn, 0, w.handle)
 	})
-	root.Post(func() { open.Set(false) })
-	deadline = time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		var restored bool
-		w.onLoop(t, func() { restored = w.controlFocus != nil && w.controlFocus.props.TestID == "opener" })
-		if restored {
+}
+
+// focusedID returns the test ID of the view with the keyboard focus, checked against the GTK window's own focus.
+func (w *window) focusedID(t *testing.T) string {
+	t.Helper()
+	var id string
+	w.onLoop(t, func() {
+		v := w.focusedView()
+		if v == nil {
 			return
 		}
+		id = v.props.TestID
+		// A field's focus is on the text widget inside its editor.
+		for f := gtkWindowGetFocus(w.toplevel()); f != v.widget; f = gtkWidgetGetParent(f) {
+			if f == 0 {
+				t.Errorf("%s has the focus but not its GTK widget", id)
+				return
+			}
+		}
+	})
+	return id
+}
+
+// coveredIDs returns the test IDs of the views kept to get the focus back.
+func (w *window) coveredIDs(t *testing.T) []string {
+	t.Helper()
+	var ids []string
+	w.onLoop(t, func() {
+		for _, v := range w.covered {
+			ids = append(ids, v.props.TestID)
+		}
+	})
+	return ids
+}
+
+// waitForModals waits until n modals show.
+func (w *window) waitForModals(t *testing.T, n int) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var got int
+		w.onLoop(t, func() {
+			var walk func(*view)
+			walk = func(v *view) {
+				if v.kind == driver.KindModal && !v.deleted {
+					got++
+				}
+				for _, c := range v.children {
+					walk(c)
+				}
+			}
+			if r := w.view(w.root); r != nil {
+				walk(r)
+			}
+		})
+		if got == n {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d modals show, want %d", got, n)
+		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("the opener did not regain focus after the modal closed")
+}
+
+func TestControlFocusReturnsAfterModal(t *testing.T) {
+	w, m, want := startModalFocus(t, "control")
+	w.bound(t, "mod+b")
+	want("opener|0")
+	// Return presses the focused opener, whose dialog covers it.
+	w.pressReturn(t)
+	want("-opener|1")
+	if id, covered := w.focusedID(t), w.coveredIDs(t); id != "" || !slices.Equal(covered, []string{"opener"}) {
+		t.Fatalf("under the dialog the focus is on %q and %q are kept, want none and the opener", id, covered)
+	}
+	// Tab reaches the dialog's own stop, and Return on it closes the dialog.
+	w.onLoop(t, func() { w.tab(false) })
+	want("close|1")
+	w.pressReturn(t)
+	want("opener|1")
+	if id, covered := w.focusedID(t), w.coveredIDs(t); id != "opener" || len(covered) != 0 {
+		t.Fatalf("after the dialog the focus is on %q and %q are kept, want the opener and none", id, covered)
+	}
+	// Return presses the opener again.
+	w.pressReturn(t)
+	want("-opener|2")
+	m.set(m.open, false)
+	want("opener|2")
+}
+
+func TestFocusReturnsThroughNestedModals(t *testing.T) {
+	w, m, want := startModalFocus(t, "nested")
+	w.bound(t, "mod+b")
+	want("opener|0")
+	w.pressReturn(t)
+	want("-opener|1")
+	w.onLoop(t, func() { w.tab(false); w.tab(false) })
+	want("inner|1")
+	w.pressReturn(t)
+	want("-inner|1")
+	if covered := w.coveredIDs(t); !slices.Equal(covered, []string{"opener", "inner"}) {
+		t.Fatalf("under two dialogs %q are kept, want the opener and the inner stop", covered)
+	}
+	w.onLoop(t, func() { w.tab(false) })
+	want("close2|1")
+	w.pressReturn(t)
+	want("inner|1")
+	m.set(m.open, false)
+	want("opener|1")
+	if id := w.focusedID(t); id != "opener" {
+		t.Fatalf("after both dialogs the focus is on %q", id)
+	}
+}
+
+func TestFocusReturnsPastAModalThatFocusesItsField(t *testing.T) {
+	w, m, want := startModalFocus(t, "autofocus")
+	w.bound(t, "mod+b")
+	want("opener|0")
+	m.root.Post(func() { m.autoField.Set(true); m.open.Set(true) })
+	want("auto|0")
+	if covered := w.coveredIDs(t); !slices.Equal(covered, []string{"opener"}) {
+		t.Fatalf("a dialog that focused its field kept %q, want the opener", covered)
+	}
+	m.set(m.open, false)
+	want("opener|0")
+}
+
+func TestFieldFocusReturnsAfterModal(t *testing.T) {
+	w, m, want := startModalFocus(t, "field")
+	w.bound(t, "mod+f")
+	want("field|0")
+	m.set(m.open, true)
+	want("-field|0")
+	if id := w.focusedID(t); id != "" {
+		t.Fatalf("under the dialog the focus is on %q, want none: keys would reach the covered field", id)
+	}
+	m.set(m.open, false)
+	want("field|0")
+	if id := w.focusedID(t); id != "field" {
+		t.Fatalf("after the dialog the focus is on %q", id)
+	}
+}
+
+func TestCoveredFocusIsForgottenWhenItGoes(t *testing.T) {
+	for _, gone := range []string{"removed", "hidden", "no stop"} {
+		t.Run(gone, func(t *testing.T) {
+			w, m, want := startModalFocus(t, strings.ReplaceAll(gone, " ", "-"))
+			w.bound(t, "mod+b")
+			want("opener|0")
+			m.set(m.open, true)
+			want("-opener|0")
+			m.root.Post(func() {
+				switch gone {
+				case "removed":
+					m.removed.Set(true)
+				case "hidden":
+					m.hidden.Set(true)
+				default:
+					m.stop.Set(false)
+				}
+			})
+			deadline := time.Now().Add(10 * time.Second)
+			for len(w.coveredIDs(t)) != 0 {
+				if time.Now().After(deadline) {
+					t.Fatalf("the %s opener is still kept", gone)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			m.root.Post(func() { m.open.Set(false); m.hidden.Set(false); m.stop.Set(true) })
+			w.waitForModals(t, 0)
+			want("-opener|0")
+			if id := w.focusedID(t); id != "" {
+				t.Fatalf("the %s opener's dialog gave the focus to %q", gone, id)
+			}
+		})
+	}
 }

@@ -247,19 +247,20 @@ type window struct {
 	wheelMotion *scrollbar.Motion
 	// roles are the accessible roles of the views the batch being applied
 	// creates (access.go).
-	roles          map[driver.NodeID]int32
-	longPress      uint64 // counts long presses waited for, to cancel the last
-	focus          *view  // the entry with keyboard focus
-	controlFocus   *view  // the ordinary widget with keyboard focus
-	restoreControl *view  // a control covered by a modal, to restore when it closes
-	pinchTimeout   uint32
-	alerts         []driver.AlertConfig
-	alerting       bool
-	alertingID     uint32
-	alertShown     driver.AlertConfig // the alert showing, for a test host
-	menuCounter    uint32
-	actionGroup    uintptr
-	actionRefs     map[uintptr]menuRef
+	roles        map[driver.NodeID]int32
+	longPress    uint64 // counts long presses waited for, to cancel the last
+	focus        *view  // the entry with keyboard focus
+	controlFocus *view  // the ordinary widget with keyboard focus
+	// covered are the fields and stops modals covered while they had the keyboard focus, oldest first (focus.go).
+	covered      []*view
+	pinchTimeout uint32
+	alerts       []driver.AlertConfig
+	alerting     bool
+	alertingID   uint32
+	alertShown   driver.AlertConfig // the alert showing, for a test host
+	menuCounter  uint32
+	actionGroup  uintptr
+	actionRefs   map[uintptr]menuRef
 	// building names the action group, prefix and refs the menu being
 	// built registers its actions in, when not the menu bar's.
 	building menuBuild
@@ -1189,6 +1190,7 @@ func (w *window) apply(b *driver.MountBatch) {
 			w.load(v, &v.source, true)
 		}
 	}
+	w.coverFocus()
 	for _, f := range focus {
 		switch {
 		case f.v == nil:
@@ -1204,7 +1206,7 @@ func (w *window) apply(b *driver.MountBatch) {
 			}
 		}
 	}
-	w.checkControlFocus()
+	w.checkFocus()
 	// Views that moved, appeared or went under a still pointer.
 	w.hoverViews()
 	w.updatePointerCursor()
