@@ -58,6 +58,12 @@ func TestRefreshingBoundsRetainRoomWithoutExtendingTheEnd(t *testing.T) {
 			if got := KeepStart(RestInset(c, true), RestInset(c, true), driver.Point{Y: tc.wantTop}); got.Y != tc.wantTop {
 				t.Fatalf("confirmation: %v, want %v", got.Y, tc.wantTop)
 			}
+			// A larger top inset keeps a view resting at its start there, with the refresh room above it.
+			moved := *c
+			moved.Behavior.ContentInset.Top += 10
+			if got := KeepStart(RestInset(c, true), RestInset(&moved, true), driver.Point{Y: tc.wantTop}); got.Y != tc.wantTop-10 {
+				t.Fatalf("inset change: %v, want %v", got.Y, tc.wantTop-10)
+			}
 		})
 	}
 }
