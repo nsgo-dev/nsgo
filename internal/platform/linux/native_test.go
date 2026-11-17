@@ -850,10 +850,10 @@ func TestWebPageNavigationReportsDestinationAtStart(t *testing.T) {
 					// A blob: URL is unique to its page, so it is written by its scheme alone.
 					if i := strings.Index(event, "blob:"); i >= 0 {
 						rest := ""
-					if j := strings.IndexByte(event[i:], ' '); j >= 0 {
-						rest = event[i+j:]
-					}
-					event = event[:i] + "blob" + rest
+						if j := strings.IndexByte(event[i:], ' '); j >= 0 {
+							rest = event[i+j:]
+						}
+						event = event[:i] + "blob" + rest
 					}
 					events.Update(func(v string) string { return v + event + ";" })
 				}
