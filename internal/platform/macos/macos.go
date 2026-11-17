@@ -1062,6 +1062,8 @@ func (s *surface) environment() driver.Environment {
 		// An embedding host owns its window.
 		CanSetWindowLevel: !s.embedded && s.window != 0,
 		CanPlaceWindows:   !s.embedded && s.window != 0,
+		// An embedding host owns its window, and the app's own surface and a tray icon's show in none.
+		CanSetWindowWorkspaces: !s.embedded && s.window != 0,
 	}
 }
 

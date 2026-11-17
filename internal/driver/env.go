@@ -57,6 +57,8 @@ type Environment struct {
 	// CanSetWindowLevel says WindowSetLevel reaches the window's stacking, and CanPlaceWindows that WindowSetFrame's position moves it; false without a desktop window of the surface's own (an embedded view, the app's own hidden surface, a tray icon), the first for an Android overlay, which has no level, and the second on Linux, whose window manager or compositor places windows.
 	CanSetWindowLevel bool
 	CanPlaceWindows   bool
+	// CanSetWindowWorkspaces says WindowSetWorkspaces reaches the window's workspaces: on macOS, and on X11 where the window manager lists _NET_WM_DESKTOP in _NET_SUPPORTED; false without a desktop window of the surface's own (an embedded view, the app's own hidden surface, a tray icon, an unmanaged X11 panel), on Windows, which has no public API for it, on Wayland, phones and the web.
+	CanSetWindowWorkspaces bool
 	// HasWebView says this target provides a web view host.
 	HasWebView bool
 	// SignInWithApple says ItemSignInWithApple and ItemAppleCredentialState reach Sign in with Apple here.

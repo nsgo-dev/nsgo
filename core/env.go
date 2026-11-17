@@ -27,6 +27,7 @@ type Env struct {
 	camera               *Signal[bool]
 	canSendInput         *Signal[bool]
 	level, place         *Signal[bool]
+	workspaces           *Signal[bool]
 	hasWebView           *Signal[bool]
 	appleSignIn          *Signal[bool]
 	purchases            *Signal[bool]
@@ -92,6 +93,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		canSendInput:     NewSignal(cx, false),
 		level:            NewSignal(cx, false),
 		place:            NewSignal(cx, false),
+		workspaces:       NewSignal(cx, false),
 		hasWebView:       NewSignal(cx, false),
 		appleSignIn:      NewSignal(cx, false),
 		purchases:        NewSignal(cx, false),
@@ -199,6 +201,7 @@ func (e *Env) set(v Environment) {
 	e.canSendInput.Set(v.CanSendInput)
 	e.level.Set(v.CanSetWindowLevel)
 	e.place.Set(v.CanPlaceWindows)
+	e.workspaces.Set(v.CanSetWindowWorkspaces)
 	e.hasWebView.Set(v.HasWebView)
 	e.appleSignIn.Set(v.SignInWithApple)
 	e.purchases.Set(v.Purchases)
@@ -273,6 +276,9 @@ func (e *Env) CanSetWindowLevel() bool { return e.level.Get() }
 
 // CanPlaceWindows reports whether SetWindowFrame places the scope's window where it says, an Android overlay's included: the core's part of desktop.CanPlaceWindows, which apps use.
 func (e *Env) CanPlaceWindows() bool { return e.place.Get() }
+
+// CanSetWindowWorkspaces reports whether SetWindowWorkspaces puts the scope's desktop window on the workspaces it names: the core's part of desktop.CanSetWindowWorkspaces, which apps use.
+func (e *Env) CanSetWindowWorkspaces() bool { return e.workspaces.Get() }
 
 // KeyboardDuration returns how long the keyboard takes to move.
 func (e *Env) KeyboardDuration() time.Duration { return e.keyboardDuration.Get() }

@@ -4,7 +4,7 @@
 
 - Add HarmonyOS as a preview target, whose ArkTS host runs the engine in ArkWeb and draws it with ArkUI views, in `nsgo build`, `nsgo run` and `nsgo test -target harmonyos` (#79 by @togotop).
 - Add in-app purchases on macOS, iOS and tvOS through StoreKit 2: the store's products and prices, purchases answering cancelled and pending apart from failed with the signed transaction, updates made outside the app, finishing, current entitlements and restoring, in Go, TSX and `nsgotest`, when `nsgo.yaml` sets `apple.purchases` (#353 by @houko).
-- Add `desktop.SetWindowWorkspaces` and `WindowOptions.Workspaces`, which keep a window on every Space and over other apps' full screen spaces on macOS, at any level but the desktop's, which stays behind them, and on every virtual desktop on X11 (#572 by @houko).
+- Add `desktop.SetWindowWorkspaces` and `WindowOptions.Workspaces`, which keep a window on every Space and over other apps' full screen spaces on macOS, at any level but the desktop's, which stays behind them, and on every virtual desktop on X11, with `desktop.CanSetWindowWorkspaces`, which says whether it takes effect (#572 by @houko).
 - Add `SidebarShell.Fixed`, a sidebar the user cannot resize.
 - Add `Scope.SetWebCookies`, which writes cookies, HttpOnly ones included, to the persistent store the app's web views share on Apple platforms, Windows, Linux and Android, so they can carry the sign-in of the user's own browser (#387 by @houko).
 - Add `desktop.CanSetWindowLevel` and `desktop.CanPlaceWindows`, and keep a floating window above the others on Linux under X11, so a Wayland app can tell that its window is neither stacked nor placed (#573 by @houko).
