@@ -16,8 +16,7 @@ type SpinnerVariant uint8
 const (
 	// SpinnerRing is an indeterminate ProgressRing. It is the default.
 	SpinnerRing SpinnerVariant = iota
-	// SpinnerSpokes is twelve fading spokes that step around in the
-	// muted text's color.
+	// SpinnerSpokes is twelve fading spokes that step around in the muted text's color, or Tint.
 	SpinnerSpokes
 )
 
@@ -27,8 +26,7 @@ const (
 type Spinner struct {
 	Variant SpinnerVariant
 	Size    core.Points
-	// Tint colors the spinner. Ring spinners follow the accent when nil;
-	// spokes retain their muted text color when nil.
+	// Tint colors it, as ProgressRing's: the ring the accent when nil, the spokes the muted text.
 	Tint   func() core.Color
 	Label  string
 	TestID string

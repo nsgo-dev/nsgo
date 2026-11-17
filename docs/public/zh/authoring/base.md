@@ -21,7 +21,7 @@ base.Button{
 }
 ```
 
-`Disabled`、`Selected` 和 `Expanded` 把状态报告给应用、样式和辅助技术：开关按钮或列表的当前项用 `Selected`，展开控件用 `Expanded`。行或列表以其他方式到达按钮时，`NoFocus` 把它移出 Tab 停靠点。
+`Disabled`、`Busy`、`Selected` 和 `Expanded` 把状态报告给应用、样式和辅助技术：仍在进行的操作用 `Busy`（以 `aria-busy:` 设置样式），开关按钮或列表的当前项用 `Selected`，展开控件用 `Expanded`。行或列表以其他方式到达按钮时，`NoFocus` 把它移出 Tab 停靠点。
 
 ## Checkbox
 

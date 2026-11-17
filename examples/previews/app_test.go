@@ -41,6 +41,22 @@ func TestButtonSays(t *testing.T) {
 	app.WaitFor("text:Saved", time.Second)
 }
 
+// TestButtonBusy shows a save running, its button busy until it is saved.
+func TestButtonBusy(t *testing.T) {
+	app := start(t, "button/busy")
+	// The demo's words follow the locale, which a target's is.
+	const save, saved = "role:button /^(Save|保存)$/ >> nth=0", "text:/^(Saved|已保存)$/"
+	app.Press(save)
+	if !app.Find(save).Props.Busy {
+		t.Fatal("the saving button is not busy")
+	}
+	app.Advance(2500 * time.Millisecond)
+	app.Find(saved)
+	if app.Find(save).Props.Busy {
+		t.Fatal("the button stays busy once saved")
+	}
+}
+
 func TestPickerWithoutHost(t *testing.T) {
 	app := nsgotest.Start(t, Root, nsgotest.Size(480, 320))
 	app.Find("text:button/basic")

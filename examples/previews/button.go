@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/icons/lucide"
 	"github.com/nsgo-dev/nsgo/ui"
@@ -26,6 +28,20 @@ func init() {
 		), core.View{Style: core.Style{Direction: core.Row, Width: core.Pt(240)}, Children: []core.Node{
 			ui.Button{Text: tr("Save", "保存"), Icon: lucide.Check, Flex: 1, OnPress: save},
 		}}, l)
+	})
+	add("button/busy", func(cx *core.Scope) core.Node {
+		tr := words(cx)
+		l := newLog(cx)
+		saving := core.NewSignal(cx, false)
+		saved := l.says(tr("Saved", "已保存"))
+		save := func() {
+			saving.Set(true)
+			cx.AfterFunc(2*time.Second, func() { saving.Set(false); saved() })
+		}
+		return column(row(
+			ui.Button{Text: tr("Save", "保存"), Busy: saving.Get, OnPress: save},
+			ui.Button{Text: tr("Save", "保存"), Variant: ui.ButtonOutline, Busy: saving.Get, OnPress: save},
+		), l)
 	})
 	add("button/icon", func(cx *core.Scope) core.Node {
 		tr := words(cx)

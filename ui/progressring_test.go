@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -35,43 +36,36 @@ func TestProgressRing(t *testing.T) {
 	})
 }
 
+// TestProgressRingTint draws the arc in Tint and the track in a quarter of it, and the theme's line and accent without one.
 func TestProgressRingTint(t *testing.T) {
 	want := core.RGB(0x123456)
-	app, _ := start(t, desktopEnv, func(cx *core.Scope) core.Node {
-		return ProgressRing{TestID: "ring", Value: func() float32 { return 50 }, Tint: func() core.Color { return want }}
+	app, p := start(t, desktopEnv, func(cx *core.Scope) core.Node {
+		return core.View{Children: []core.Node{
+			ProgressRing{TestID: "tinted", Value: func() float32 { return 50 }, Tint: func() core.Color { return want }},
+			ProgressRing{TestID: "plain", Value: func() float32 { return 50 }},
+			Spinner{TestID: "spinner", Tint: func() core.Color { return want }},
+		}}
 	})
-	if got := canvasStrokeColor(app.Find("id:ring")); got != want {
-		t.Fatalf("progress ring tint = %x, want %x", got, want)
+	for id, strokes := range map[string][]core.Color{"tinted": {Alpha(want, 0.25), want}, "plain": {p.Line, p.Accent}, "spinner": {Alpha(want, 0.25), want}} {
+		if got := canvasStrokes(app.Find(id)); !slices.Equal(got, strokes) {
+			t.Errorf("%s strokes %x, want %x", id, got, strokes)
+		}
 	}
 }
 
-func TestButtonBusyUsesForegroundTint(t *testing.T) {
-	app, colors := start(t, desktopEnv, func(cx *core.Scope) core.Node {
-		return Button{Text: "Save", TestID: "save", Busy: func() bool { return true }}
-	})
-	button := app.Find("id:save")
-	if !button.Props.Busy {
-		t.Fatal("busy button is not reported busy")
-	}
-	if got := canvasStrokeColor(button); got != colors.OnAccent {
-		t.Fatalf("busy button spinner tint = %x, want %x", got, colors.OnAccent)
-	}
-}
-
-func canvasStrokeColor(v *nsgotest.View) core.Color {
+// canvasStrokes are the stroke colors of the first canvas from v down, in order.
+func canvasStrokes(v *nsgotest.View) []core.Color {
 	for _, child := range views(v) {
 		if child.Kind != driver.KindCanvas {
 			continue
 		}
-		var got core.Color
+		var out []core.Color
 		for _, op := range child.Ops {
 			if op.Kind == driver.DrawStrokeColor {
-				got = op.Color
+				out = append(out, op.Color)
 			}
 		}
-		if got != 0 {
-			return got
-		}
+		return out
 	}
-	return 0
+	return nil
 }

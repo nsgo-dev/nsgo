@@ -40,6 +40,14 @@ ui.Button{Text: "Saving…", Disabled: saving.Get, OnPress: save}
 
 `Disabled` takes a function, so the button follows a signal: a disabled button takes neither presses nor the keyboard focus, and its look is the disabled state, not a color the app picks.
 
+`Busy` is for an action still running. While it returns true, a spinner in the button's text color shows over the content, so it shows on a primary button's accent too, the button keeps its size, presses do nothing, and assistive technology hears that it is busy. It keeps the keyboard focus, unlike `Disabled`.
+
+```go preview=button/busy
+ui.Button{Text: "Save", Busy: saving.Get, OnPress: save}
+```
+
+`ui.Spinner` and `ui.ProgressRing` take a `Tint` of their own for any other surface their accent would vanish on.
+
 ## Links
 
 `ui.Link{Text: "Docs", Href: "/docs"}` opens a destination with the link role. Its text and hover underline use the accent unless `Style.Color` sets another color; `Style.Hover.Color` sets the hover color.

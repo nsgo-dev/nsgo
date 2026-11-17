@@ -21,7 +21,7 @@ base.Button{
 }
 ```
 
-`Disabled`, `Selected` and `Expanded` report a state to the app, the style and assistive technology: a toggle or the current item of a list uses `Selected`, a disclosure `Expanded`. `NoFocus` takes a button out of the Tab stops when a row or a list reaches it another way.
+`Disabled`, `Busy`, `Selected` and `Expanded` report a state to the app, the style and assistive technology: an action still running uses `Busy` (styled with `aria-busy:`), a toggle or the current item of a list `Selected`, a disclosure `Expanded`. `NoFocus` takes a button out of the Tab stops when a row or a list reaches it another way.
 
 ## Checkbox
 

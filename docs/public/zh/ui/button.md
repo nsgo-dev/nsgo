@@ -40,6 +40,14 @@ ui.Button{Text: "正在保存…", Disabled: saving.Get, OnPress: save}
 
 `Disabled` 接受一个函数，所以按钮可以跟随 signal：禁用的按钮既不接受按压也不获得键盘焦点，它的外观是禁用状态，而不是应用挑选的颜色。
 
+`Busy` 用于仍在进行的操作。它返回 true 时，按钮内容上方显示一个按钮文字颜色的旋转指示器，所以在主按钮的强调色上也看得见；按钮保持原来的尺寸，按压不起作用，辅助技术会读出它正忙。与 `Disabled` 不同，它仍保留键盘焦点。
+
+```go preview=button/busy
+ui.Button{Text: "保存", Busy: saving.Get, OnPress: save}
+```
+
+在强调色会看不见的其他表面上，`ui.Spinner` 和 `ui.ProgressRing` 也可以用各自的 `Tint` 指定颜色。
+
 ## 链接
 
 `ui.Link{Text: "文档", Href: "/docs"}` 以链接角色打开目标。文字和悬停下划线默认使用强调色；`Style.Color` 可设置其他颜色，`Style.Hover.Color` 可设置悬停颜色。

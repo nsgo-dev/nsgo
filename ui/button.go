@@ -35,8 +35,7 @@ type Button struct {
 	// to a button of an icon alone.
 	Label    string
 	Disabled func() bool
-	// Busy says the button's action is still loading and shows a spinner in
-	// the button's foreground color.
+	// Busy says the button's action is still loading, for assistive technology too: while it returns true a spinner in the button's text color shows over its content, which keeps its room, and presses do nothing, so the action does not start twice.
 	Busy func() bool
 	// AutoFocus moves the keyboard focus here once it mounts, as base.Button's.
 	AutoFocus bool
@@ -60,7 +59,11 @@ func (b Button) Render(cx *core.Scope) core.Node {
 	style, focus, face := b.parts(cx)
 	var press func(core.PressEvent)
 	if b.OnPress != nil {
-		press = func(core.PressEvent) { b.OnPress() }
+		press = func(core.PressEvent) {
+			if !is(b.Busy) {
+				b.OnPress()
+			}
+		}
 	}
 	return base.Button{OnPress: press, Disabled: b.Disabled, Busy: b.Busy, AutoFocus: b.AutoFocus, Label: b.label(), TestID: b.TestID,
 		Style: style, StyleFunc: focus, Children: []core.Node{face}}
@@ -107,9 +110,7 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 		return 0, colors.Hover(), colors.Pressed(), colors.Border()
 	}
 	var children []core.Node
-	if is(b.Busy) {
-		children = append(children, Spinner{Size: b.Size.glyph(), Tint: fg})
-	} else if b.Icon != nil {
+	if b.Icon != nil {
 		glyph, tint := b.IconSize, b.Tint
 		if glyph == 0 {
 			glyph = b.Size.glyph()
@@ -119,8 +120,24 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 		}
 		children = append(children, Icon(b.Icon, glyph, tint))
 	}
-	if !is(b.Busy) && (b.Text != "" || b.Icon == nil) {
+	if b.Text != "" || b.Icon == nil {
 		children = append(children, Text(b.Text, b.Size.text().FontSize, Regular, fg))
+	}
+	if b.Busy != nil {
+		// The content stays, unseen, so the button keeps its size while the spinner shows over it.
+		children = []core.Node{
+			core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, FlexShrink: 1}, Children: children,
+				StyleFunc: func() core.Style {
+					if b.Busy() {
+						return core.Style{Opacity: core.Alpha(0)}
+					}
+					return core.Style{}
+				}},
+			core.Show{When: b.Busy, Then: func(*core.Scope) core.Node {
+				return core.View{Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Right: core.Pt(0), Bottom: core.Pt(0), Left: core.Pt(0),
+					AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter}, Children: []core.Node{Spinner{Size: b.Size.glyph(), Tint: fg}}}
+			}},
+		}
 	}
 	shape := core.Style{Height: core.Pt(b.Size.Height()), Padding: core.Symmetric(0, b.Size.inset())}
 	if b.Text == "" && b.Icon != nil {
