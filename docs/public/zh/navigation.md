@@ -27,6 +27,8 @@ return nav.Stack(core.Style{FlexGrow: 1}, func(cx *core.Scope, route string, dep
 
 在 iOS 和 Android 上，平台根据页面标题和标题栏的按钮绘制系统标题栏，带返回按钮和转场；在 macOS、Windows、Linux 和 Web 上由 `ui` 绘制。
 
+给页面设置自己的 `Header` 即可取代 `ui.NavHeader`。在 iOS 和 Android 上，它成为系统标题栏的标题视图，取代 `HeaderTitle`，旁边保留页面的 `HeaderLeft`、`HeaderRight` 和返回按钮；它在那里按内容大小显示，所以搜索框等会伸展的视图要给出宽度。在其他平台上，它绘制在内容上方。`ui.NavHeader.Scroll` 仍然把 iOS 页面的滚动连接到标题栏的模糊效果。
+
 `NoPopOnBack` 在按下返回时保留页面，`OnBackPress` 听到返回，`NoPopOnSwipe` 关闭 iOS 的边缘滑动返回。`cx.OnBackPress(func() bool)` 在栈之前给应用一个处理器，用于未保存的更改。`OnDismiss` 报告用户已经弹出页面，栈会把页面移除。
 
 ## 模态

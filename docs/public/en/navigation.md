@@ -9,8 +9,6 @@ order: 56
 
 `base.NewNav` keeps a stack of routes of one type: `Push` adds a page, `Pop` removes the top page, `PopToRoot` returns to the first and `Replace` swaps the top. Its `Stack` renders every route as a page, keeping the pages below mounted with their state while the top one shows. `ui.NavPage` gives each page `ui`'s background and a `ui.NavHeader` with its title, back button and buttons.
 
-Give a page its own `Header` to replace `ui.NavHeader`. On iOS and Android it appears in the system header's title area, in place of `HeaderTitle`, keeping the page's `HeaderLeft`, `HeaderRight` and system back button. Elsewhere it is drawn above the content. `ui.NavHeader.Scroll` still connects an iOS page's scrolling to its header blur.
-
 ```go
 nav := base.NewNav(cx, "inbox")
 
@@ -28,6 +26,8 @@ return nav.Stack(core.Style{FlexGrow: 1}, func(cx *core.Scope, route string, dep
 ```
 
 On iOS and Android the platform draws the system's header from the page's title and the header's buttons, with its back button and its transition; on macOS, Windows, Linux and the web `ui` draws it.
+
+Give a page its own `Header` to replace `ui.NavHeader`. On iOS and Android it becomes the system header's title view, in place of `HeaderTitle`, beside the page's `HeaderLeft`, `HeaderRight` and the back button; it takes its content's size there, so give a search field or other growing view a width. Elsewhere it is drawn above the content. `ui.NavHeader.Scroll` still connects an iOS page's scrolling to its header's blur.
 
 `NoPopOnBack` keeps a page when back is pressed, `OnBackPress` hears the press and `NoPopOnSwipe` turns off iOS's swipe back. `cx.OnBackPress(func() bool)` gives the app a handler before the stack, for unsaved changes. `OnDismiss` reports that the user popped the page, and the stack removes it.
 
