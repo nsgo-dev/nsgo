@@ -75,18 +75,23 @@ type target struct {
 	// syncing is the one outstanding engine barrier, retained when a settle times out so a blocked engine never accumulates waiters.
 	syncing chan struct{}
 
-	mu      sync.Mutex
-	batches []*driver.MountBatch
-	events  []driver.Event
+	mu sync.Mutex
+	// updates preserves arrival order: a native edit must precede the controlled value the app commits in response to it.
+	updates []targetUpdate
 	// lost says why a live model stopped following its surface: a batch it could not apply. It queues nothing after.
 	lost string
+}
+
+type targetUpdate struct {
+	batch *driver.MountBatch
+	event driver.Event
 }
 
 // observe queues a batch the app's engine sent, which the next drain applies.
 func (t *target) observe(b *driver.MountBatch) {
 	t.mu.Lock()
 	if t.lost == "" {
-		t.batches = append(t.batches, b)
+		t.updates = append(t.updates, targetUpdate{batch: b})
 	}
 	t.mu.Unlock()
 }
@@ -104,7 +109,7 @@ func (t *target) event(ev driver.Event) {
 	}
 	t.mu.Lock()
 	if t.lost == "" {
-		t.events = append(t.events, ev)
+		t.updates = append(t.updates, targetUpdate{event: ev})
 	}
 	t.mu.Unlock()
 }
@@ -129,7 +134,7 @@ func (t *target) applyLive(b *driver.MountBatch) {
 		}
 		why, _, _ = strings.Cut(strings.TrimPrefix(why, "nsgotest: "), "\n")
 		t.mu.Lock()
-		t.lost, t.batches, t.events = why, nil, nil
+		t.lost, t.updates = why, nil
 		t.mu.Unlock()
 		log.Printf("nsgo: the automation stopped following a surface: %s", why)
 		fail(automation.Failed, "the automation stopped following the window: "+why)
@@ -189,7 +194,7 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 	// as on Windows, where the window opens first.
 	for deadline := time.Now().Add(settleWait); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		t.mu.Lock()
-		came := len(t.batches) > 0
+		came := slices.ContainsFunc(t.updates, func(u targetUpdate) bool { return u.batch != nil })
 		t.mu.Unlock()
 		if came {
 			break
@@ -218,26 +223,28 @@ func (a *App) targetOptions(t *target) testhost.Options {
 // drainEvents is drain, reporting only whether events came.
 func (t *target) drainEvents() bool {
 	t.mu.Lock()
-	events := len(t.events)
+	events := slices.ContainsFunc(t.updates, func(u targetUpdate) bool { return u.batch == nil })
 	t.mu.Unlock()
 	t.drain()
-	return events > 0
+	return events
 }
 
 func (t *target) drain() bool {
 	t.mu.Lock()
-	batches, events := t.batches, t.events
-	t.batches, t.events = nil, nil
+	updates := t.updates
+	t.updates = nil
 	t.mu.Unlock()
-	for _, b := range batches {
-		t.a.traceBatch(b, 0)
-		if t.live {
-			t.applyLive(b)
-		} else {
-			t.a.apply(b)
+	for _, u := range updates {
+		if b := u.batch; b != nil {
+			t.a.traceBatch(b, 0)
+			if t.live {
+				t.applyLive(b)
+			} else {
+				t.a.apply(b)
+			}
+			continue
 		}
-	}
-	for _, ev := range events {
+		ev := u.event
 		if ev.Kind == driver.EventAlert {
 			// The user answered it, or the app's own code did.
 			t.a.alerts = slices.DeleteFunc(t.a.alerts, func(c driver.AlertConfig) bool { return c.ID == ev.Count })
@@ -256,10 +263,11 @@ func (t *target) drain() bool {
 		case driver.EventFocus, driver.EventBlur:
 			v.Focused = ev.Kind == driver.EventFocus
 		case driver.EventChangeText:
+			t.a.edits[ev.ID] = max(t.a.edits[ev.ID], ev.Count)
 			v.Text = ev.Text
 		}
 	}
-	return len(batches)+len(events) > 0
+	return len(updates) > 0
 }
 
 // sync waits for the engine's pending commit within the step's deadline.

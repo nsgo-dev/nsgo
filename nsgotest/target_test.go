@@ -16,6 +16,43 @@ type settlingSurface struct {
 	animating func() bool
 }
 
+// Native edits precede the app's controlled value; applying the two in separate groups used to put the old native text back over that value.
+func TestTargetModelKeepsEventsAndCommitsInOrder(t *testing.T) {
+	a := Start(t, func(*core.Scope) core.Node { return core.Input{TestID: "field"} })
+	v := a.Find("id:field")
+	tg := &target{a: a}
+	tg.event(driver.Event{Kind: driver.EventChangeText, ID: v.ID, Text: "loud", Count: 1})
+	tg.observe(&driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "LOUD", Count: 1}}})
+	tg.drain()
+	if v.Text != "LOUD" {
+		t.Fatalf("controlled text = %q, want LOUD", v.Text)
+	}
+	// A subsequent native edit wins over a preceding commit.
+	tg.observe(&driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "OTHER", Count: 1}}})
+	tg.event(driver.Event{Kind: driver.EventChangeText, ID: v.ID, Text: "OTHER!", Count: 2})
+	tg.drain()
+	if v.Text != "OTHER!" {
+		t.Fatalf("subsequent edit = %q, want OTHER!", v.Text)
+	}
+	// A slow response to an earlier edit must be rejected just as the native field rejects an ItemInputValue with an old edit count.
+	tg.event(driver.Event{Kind: driver.EventChangeText, ID: v.ID, Text: "OTHER!!", Count: 3})
+	tg.observe(&driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "STALE", Count: 2}}})
+	tg.drain()
+	if v.Text != "OTHER!!" {
+		t.Fatalf("a stale controlled value replaced the latest edit with %q", v.Text)
+	}
+	// An old view's focus must not reach a new view reusing its ID.
+	tg.event(driver.Event{Kind: driver.EventFocus, ID: v.ID})
+	tg.observe(&driver.MountBatch{Items: []driver.MountItem{
+		{Kind: driver.ItemDelete, ID: v.ID},
+		{Kind: driver.ItemCreate, ID: v.ID, View: driver.KindInput},
+	}})
+	tg.drain()
+	if a.views[v.ID].Focused {
+		t.Fatal("a focus event for the deleted field reached its replacement")
+	}
+}
+
 func (s settlingSurface) Sync() { s.sync() }
 func (s settlingSurface) Animating() bool {
 	return s.animating != nil && s.animating()

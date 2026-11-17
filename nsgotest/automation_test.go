@@ -310,7 +310,7 @@ func TestAgentFollowsALiveSurface(t *testing.T) {
 		f := g.surfaces[1]
 		g.mu.Unlock()
 		f.app.target.mu.Lock()
-		left := len(f.app.target.batches)
+		left := len(f.app.target.updates)
 		f.app.target.mu.Unlock()
 		if left == 0 {
 			break
@@ -531,7 +531,7 @@ func TestAgentLosesAModelRatherThanTheApp(t *testing.T) {
 	live.surface.follow.Batch(&driver.MountBatch{Root: 1})
 	live.surface.follow.Event(driver.Event{Kind: driver.EventFocus, ID: 1})
 	f.app.target.mu.Lock()
-	queued := len(f.app.target.batches) + len(f.app.target.events)
+	queued := len(f.app.target.updates)
 	f.app.target.mu.Unlock()
 	if queued != 0 {
 		t.Errorf("a lost model still queues %d batches and events", queued)
