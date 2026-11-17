@@ -4,6 +4,8 @@ package macos
 
 import (
 	"context"
+	"os"
+	"os/exec"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +16,15 @@ import (
 
 // TestTerminateAsksTheAppAndReturnsFromRun sends AppKit's terminate: as Cmd+Q, the Dock and a tray menu do, each from a block on the main queue as a tray menu's Quit is: the first request is canceled, the second deferred while a third terminate: comes and then approved, and Run returns with OnQuit run.
 func TestTerminateAsksTheAppAndReturnsFromRun(t *testing.T) {
+	// Run registers the app's AppKit classes once a process, so each run of the test, -count's included, gets a process of its own.
+	if os.Getenv("NSGO_TEST_QUIT_PROCESS") != t.Name() {
+		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		cmd.Env = append(os.Environ(), "NSGO_TEST_QUIT_PROCESS="+t.Name(), "GOTRACEBACK=all")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		return
+	}
 	t.Setenv("HOME", t.TempDir())
 	var terminate func()
 	terminate = func() {
