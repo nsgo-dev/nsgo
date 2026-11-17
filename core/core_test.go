@@ -945,8 +945,8 @@ func TestActiveStyleInsideAButton(t *testing.T) {
 	if m := h.find("face").events(); m.Has(driver.EventPressDown) || m.Has(driver.EventPressUp) {
 		t.Errorf("the face inside the button follows presses: %b", m)
 	}
-	if m := h.find("alone").events(); !m.Has(driver.EventPressDown) {
-		t.Errorf("a view outside any button does not follow presses for its Active style: %b", m)
+	if m := h.find("alone").events(); m.Has(driver.EventPressDown) || m.Has(driver.EventPressUp) {
+		t.Errorf("an Active style made a plain view outside the button take presses: %b", m)
 	}
 }
 

@@ -64,6 +64,11 @@ type Button struct {
 
 // Render implements core.Node.
 func (b Button) Render(cx *core.Scope) core.Node {
+	// A button remains a press target and keyboard stop without an action; its look must not decide its behavior.
+	press := b.OnPress
+	if press == nil {
+		press = func(core.PressEvent) {}
+	}
 	role := b.Role
 	if role == core.RoleNone {
 		role = core.RoleButton
@@ -78,7 +83,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 		Style:                       b.Style,
 		StyleFunc:                   b.StyleFunc,
 		Children:                    b.Children,
-		OnPress:                     b.OnPress,
+		OnPress:                     press,
 		OnLongPress:                 b.OnLongPress,
 		OnPressDown:                 b.OnPressDown,
 		OnPressUp:                   b.OnPressUp,

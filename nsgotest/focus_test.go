@@ -7,6 +7,45 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+func TestTabSkipsStyleOnlyGroupsAndActiveViews(t *testing.T) {
+	for _, os := range []driver.OS{driver.OSMacOS, driver.OSWindows, driver.OSLinux, driver.OSWeb} {
+		t.Run(string(os), func(t *testing.T) {
+			var presses int
+			a := Start(t, func(*core.Scope) core.Node {
+				row := core.Style{Height: core.Pt(30)}
+				return core.View{Children: []core.Node{
+					core.Input{TestID: "first", Style: row},
+					core.View{Class: "group", Style: row},
+					core.View{Class: "group/card", Style: row},
+					core.View{Style: core.Style{Height: core.Pt(30), Group: "card"}},
+					core.View{Class: "active:opacity-50", Style: row},
+					core.View{Style: core.Style{Height: core.Pt(30), Active: &core.Style{Opacity: core.Alpha(.5)}}},
+					core.View{TestID: "button", Class: "group", Style: row, OnPress: func(core.PressEvent) { presses++ }},
+					core.Input{TestID: "last", Style: row},
+				}}
+			}, Environment(driver.Environment{OS: os}))
+			a.Key("Tab")
+			a.Key("Tab")
+			if !a.Find("id:button").Focused {
+				t.Fatalf("Tab stopped on a style-only view\n%s", a.Dump())
+			}
+			a.Key("Space")
+			if presses != 1 {
+				t.Fatal("a pressable group no longer activates from the keyboard")
+			}
+			a.Key("Tab")
+			if !a.Find("id:last").Focused {
+				t.Fatal("Tab did not reach the next input")
+			}
+			a.Key("shift+Tab")
+			a.Key("shift+Tab")
+			if !a.Find("id:first").Focused {
+				t.Fatal("reverse Tab stopped on a style-only view")
+			}
+		})
+	}
+}
+
 // Ref.Focus goes through mount commands, unlike the Focus test step, which uses Tab. This catches a model that promises focus the native command handler cannot give.
 func TestRefFocusMatchesThePlatformsKeyboardStops(t *testing.T) {
 	for _, env := range []driver.Environment{

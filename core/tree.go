@@ -2768,17 +2768,6 @@ func (n *node) takesPresses() bool {
 	return h.press != nil || h.longPress != nil || h.pressDown != nil || h.pressUp != nil || n.labelTarget() != nil
 }
 
-// insidePressable reports whether a view around n in its layer takes
-// presses.
-func (n *node) insidePressable() bool {
-	for p := n.parent; p != nil && n.hoist == nil; n, p = p, p.parent {
-		if p.takesPresses() {
-			return true
-		}
-	}
-	return false
-}
-
 func (n *node) events() driver.EventMask {
 	var m driver.EventMask
 	bit := func(k driver.EventKind, on bool) {
@@ -2790,8 +2779,8 @@ func (n *node) events() driver.EventMask {
 	// Groups and peers report the states other views follow.
 	group := s.Group != ""
 	peer := n.peerMarked()
-	// Presses a view follows only for its styles go to a view around it that takes them, as a press on a button's face is the button's. A peer reports the presses of a view that already takes them: asking for presses would make any other marker a Tab stop and, on the web, take presses and text selection from its contents.
-	pressStyled := (s.Active != nil || group) && (n.takesPresses() || !n.insidePressable()) || peer && n.takesPresses()
+	// Style tracking must not turn a plain view into a press target or Tab stop. Only a view with press handlers requests presses for its own, group or peer active styles.
+	pressStyled := (s.Active != nil || group || peer) && n.takesPresses()
 	bit(driver.EventPress, h.press != nil || n.labelTarget() != nil)
 	bit(driver.EventLongPress, h.longPress != nil)
 	// A press hides the tooltip of a view that takes presses.

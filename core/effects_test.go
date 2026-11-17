@@ -110,8 +110,8 @@ func TestStateBackgroundReplacesGradients(t *testing.T) {
 
 func TestGroupStylesFollowTheGroup(t *testing.T) {
 	h := newHost(t, Size{Width: 200, Height: 200}, func(cx *Scope) Node {
-		return View{TestID: "card", Style: Style{Group: "card"}, Children: []Node{
-			View{TestID: "inner", Style: Style{Group: "row"}, Children: []Node{
+		return View{TestID: "card", Style: Style{Group: "card"}, OnPress: press, Children: []Node{
+			View{TestID: "inner", Style: Style{Group: "row"}, OnPress: press, Children: []Node{
 				View{TestID: "icon", Style: Style{Opacity: Alpha(0.5),
 					GroupStyle: &GroupStyle{Name: "card", Hover: &Style{Opacity: Alpha(1)}}}},
 				View{TestID: "any", Style: Style{GroupStyle: &GroupStyle{Active: &Style{Background: RGB(0xff0000)}}}},
@@ -135,6 +135,10 @@ func TestGroupStylesFollowTheGroup(t *testing.T) {
 	h.tree.Dispatch(driver.Event{Kind: driver.EventPressDown, ID: inner.id})
 	if anyGroup.style.Background != RGB(0xff0000) {
 		t.Errorf("background = %x while the nearest group is pressed", anyGroup.style.Background)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPressUp, ID: inner.id})
+	if anyGroup.style.Background != 0 {
+		t.Error("the group member stays active after release")
 	}
 	h.tree.Dispatch(driver.Event{Kind: driver.EventMouseLeave, ID: card.id})
 	if icon.style.Opacity.Value() != 0.5 {
