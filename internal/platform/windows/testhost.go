@@ -475,16 +475,30 @@ func (t *testSurface) ChooseDockMenu(id uint32) error {
 	return err
 }
 
-// ChoosePopup implements testhost.Surface: the context menu tracking
-// ends, and its item id is carried out after, as a click on it would.
+// ChoosePopup implements testhost.Surface: the context menu tracking ends, and its item id is carried out after, as a click on it would. For 0 the menu tracking and those queued to show are cancelled, and it returns once the tracking has ended, so the next input reaches a window; with none showing it does nothing.
 func (t *testSurface) ChoosePopup(id uint32) error {
 	if id == 0 {
+		tracking := true
 		t.onMain(func() {
-			if t.w.popupTracking {
-				t.w.popupChoice = &id
+			w := t.w
+			// Queued menus would track once the one tracking returns; they close unshown, as one replaced before it showed does.
+			for _, p := range w.popups {
+				w.engine.Dispatch(driver.Event{Kind: driver.EventMenuClosed, Count: p.id})
+			}
+			w.popups = nil
+			if w.popupTracking {
+				w.popupChoice = &id
 				endMenu.Call()
 			}
+			tracking = w.popupTracking
 		})
+		for deadline := time.Now().Add(3 * time.Second); tracking && time.Now().Before(deadline); {
+			time.Sleep(10 * time.Millisecond)
+			t.onMain(func() { tracking = t.w.popupTracking })
+		}
+		if tracking {
+			return errors.New("the context menu kept tracking after it was cancelled")
+		}
 		return nil
 	}
 	deadline := time.Now().Add(3 * time.Second)

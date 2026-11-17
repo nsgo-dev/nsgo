@@ -566,11 +566,21 @@ func (t *testSurface) ChooseDockMenu(id uint32) error {
 	return err
 }
 
-// ChoosePopup implements testhost.Surface: the tracking context menu's
-// item sends its action and the menu closes, as a click on it does.
+// ChoosePopup implements testhost.Surface: the tracking context menu's item sends its action and the menu closes, as a click on it does. For 0 the menu showing or about to show is cancelled, and it returns once AppKit's tracking loop has ended, so the next input reaches a window; with none showing it does nothing.
 func (t *testSurface) ChoosePopup(id uint32) error {
 	if id == 0 {
-		onMainSync(t.s.closePopup)
+		tracking := true
+		onMainSync(func() {
+			t.s.closePopup()
+			tracking = t.s.tracking
+		})
+		for deadline := time.Now().Add(3 * time.Second); tracking && time.Now().Before(deadline); {
+			time.Sleep(10 * time.Millisecond)
+			onMainSync(func() { tracking = t.s.tracking })
+		}
+		if tracking {
+			return errors.New("the context menu kept tracking after it was cancelled")
+		}
 		return nil
 	}
 	var err error
