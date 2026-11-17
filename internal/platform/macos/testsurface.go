@@ -169,7 +169,10 @@ func loadCG() {
 	purego.RegisterLibFunc(&cgEventCreateScrollWheelEvent2, cg, "CGEventCreateScrollWheelEvent2")
 	purego.RegisterLibFunc(&cgEventSetIntegerValueField, cg, "CGEventSetIntegerValueField")
 	purego.RegisterLibFunc(&cgEventSetLocation, cg, "CGEventSetLocation")
-	purego.RegisterLibFunc(&cgWindowListCreateImage, cg, "CGWindowListCreateImage")
+	// Deprecated since macOS 14; a system without it captures through AppKit instead of failing to load.
+	if _, err := purego.Dlsym(cg, "CGWindowListCreateImage"); err == nil {
+		purego.RegisterLibFunc(&cgWindowListCreateImage, cg, "CGWindowListCreateImage")
+	}
 }
 
 // Scroll is a trackpad gesture: it begins, moves 20 points at most every
@@ -488,7 +491,9 @@ func (t *testSurface) composited(bounds apple.CGRect) []byte {
 	if number <= 0 {
 		return nil
 	}
-	loadCG()
+	if loadCG(); cgWindowListCreateImage == nil {
+		return nil
+	}
 	// screenPoint is in the global top-left coordinates CGWindowListCreateImage takes.
 	origin := t.screenPoint(driver.Point{})
 	const (
