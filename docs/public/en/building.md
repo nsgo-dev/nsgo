@@ -31,7 +31,7 @@ Each file is named `<name>-<version>-<system>-<arch>`, such as `hello-1.2.0-wind
 
 ```yaml
 name: Hello
-id: dev.example.hello
+id: dev.example.hello   # the bundle ID; without it, dev.nsgo. and the name's letters and digits
 version: 0.1.0
 build_number: 1         # CFBundleVersion and Android's versionCode; else from version
 # copyright: © 2026 Example  # the Windows executable's details and installer, and the macOS About panel

@@ -481,7 +481,7 @@ func TestLoadForTestTakesBareTrees(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !p.bare || p.Dir != dir || p.ID != bareID(filepath.Base(dir)) || !p.idDefault {
+	if !p.bare || p.Dir != dir || p.ID != generatedID(filepath.Base(dir)) || !p.idDefault {
 		t.Fatalf("loadForTest = %+v, want a bare project with generated ID at %s", p, dir)
 	}
 	if _, err := loadForTest(filepath.Join(dir, "missing"), nil); err == nil {

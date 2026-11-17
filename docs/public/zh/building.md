@@ -31,7 +31,7 @@ go tool nsgo build
 
 ```yaml
 name: Hello
-id: dev.example.hello
+id: dev.example.hello   # 应用的 ID；省略时为 dev.nsgo. 加上 name 中的字母和数字
 version: 0.1.0
 build_number: 1         # CFBundleVersion 和 Android 的 versionCode；省略时由 version 推出
 # copyright: © 2026 Example  # Windows 可执行文件的详细信息和安装程序，以及 macOS 的“关于”面板

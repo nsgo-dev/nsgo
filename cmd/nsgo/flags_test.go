@@ -31,6 +31,61 @@ func TestLoadAndOverride(t *testing.T) {
 	}
 }
 
+func TestLoadAndOverrideSanitizeGeneratedID(t *testing.T) {
+	for name, want := range map[string]string{
+		"My App": "dev.nsgo.MyApp",
+		"my-app": "dev.nsgo.myapp",
+		"ui_kit": "dev.nsgo.uikit",
+	} {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: "+name+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		p, err := load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.ID != want || !androidPackage.MatchString(p.ID) || !appleBundleID.MatchString(p.ID) {
+			t.Errorf("load of name %q: ID %q, want %q", name, p.ID, want)
+		}
+
+		if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: App\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if p, err = load(dir); err != nil {
+			t.Fatal(err)
+		}
+		fs := flag.NewFlagSet("dev", flag.ContinueOnError)
+		f := bindDevFlags(fs)
+		if err := fs.Parse([]string{"-name", name}); err != nil {
+			t.Fatal(err)
+		}
+		f.apply(p)
+		if p.ID != want {
+			t.Errorf("-name %q: ID %q, want %q", name, p.ID, want)
+		}
+	}
+
+	// An ID nsgo.yaml gives stays as written.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: my-app\nid: com.example.my-app\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs := flag.NewFlagSet("dev", flag.ContinueOnError)
+	f := bindDevFlags(fs)
+	if err := fs.Parse([]string{"-name", "ui_kit"}); err != nil {
+		t.Fatal(err)
+	}
+	f.apply(p)
+	if p.ID != "com.example.my-app" {
+		t.Errorf("explicit id: got %q, want com.example.my-app", p.ID)
+	}
+}
+
 func TestLoadRefusesWindow(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: App\nwindow: {width: 420, height: 560}\n"), 0o644); err != nil {

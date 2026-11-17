@@ -310,7 +310,7 @@ func loadOrDir(dir string) (*project, error) {
 		return nil, fmt.Errorf("no directory %s", dir)
 	}
 	name := filepath.Base(abs)
-	return &project{Dir: abs, Name: name, ID: bareID(name), idDefault: true, bare: true}, nil
+	return &project{Dir: abs, Name: name, ID: generatedID(name), idDefault: true, bare: true}, nil
 }
 
 func load(dir string) (*project, error) {
@@ -429,13 +429,8 @@ func load(dir string) (*project, error) {
 	return p, nil
 }
 
-// generatedID is the bundle ID of a project whose nsgo.yaml gives none.
+// generatedID is the bundle ID of a project whose nsgo.yaml gives none, or of a bare project, made from its name: "dev.nsgo." and the name's ASCII letters and digits, after "app" when they are none or start with a digit, so that a phone takes it as an Android package and an Apple bundle ID whatever the name, as My App, my-lib, ui_kit or 2d. Android's packages refuse spaces and hyphens, and Apple's bundle IDs spaces and underscores.
 func generatedID(name string) string {
-	return "dev.nsgo." + name
-}
-
-// bareID is the bundle ID of a bare project in the directory name: generatedID of the name's ASCII letters and digits, after "app" when they are none or start with a digit, so that a phone takes it as an Android package and an Apple bundle ID whatever the directory is called, as my-lib, ui_kit or 2d. Android's packages refuse hyphens and Apple's bundle IDs underscores.
-func bareID(name string) string {
 	part := strings.Map(func(r rune) rune {
 		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
 			return r
@@ -445,7 +440,7 @@ func bareID(name string) string {
 	if part == "" || part[0] >= '0' && part[0] <= '9' {
 		part = "app" + part
 	}
-	return generatedID(part)
+	return "dev.nsgo." + part
 }
 
 // resolve makes a path from nsgo.yaml or a flag absolute against the app's

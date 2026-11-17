@@ -8,13 +8,17 @@ import (
 	"testing"
 )
 
-func TestBareID(t *testing.T) {
-	// Android's PackageParser takes segments of letters, digits and underscores that start with a letter; Apple's CFBundleIdentifier takes letters, digits, hyphens and dots.
-	android := regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$`)
-	apple := regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
+// Android's PackageParser takes segments of letters, digits and underscores that start with a letter; Apple's CFBundleIdentifier takes letters, digits, hyphens and dots.
+var (
+	androidPackage = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$`)
+	appleBundleID  = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
+)
+
+func TestGeneratedID(t *testing.T) {
 	for name, want := range map[string]string{
 		"formula": "dev.nsgo.formula",
 		"Chat":    "dev.nsgo.Chat",
+		"My App":  "dev.nsgo.MyApp",
 		"my-lib":  "dev.nsgo.mylib",
 		"ui_kit":  "dev.nsgo.uikit",
 		"v1.2":    "dev.nsgo.v12",
@@ -24,12 +28,12 @@ func TestBareID(t *testing.T) {
 		"/":       "dev.nsgo.app",
 		"テスト":     "dev.nsgo.app",
 	} {
-		got := bareID(name)
+		got := generatedID(name)
 		if got != want {
-			t.Errorf("bareID(%q) = %q, want %q", name, got, want)
+			t.Errorf("generatedID(%q) = %q, want %q", name, got, want)
 		}
-		if !android.MatchString(got) || !apple.MatchString(got) {
-			t.Errorf("bareID(%q) = %q, not an Android package and an Apple bundle ID", name, got)
+		if !androidPackage.MatchString(got) || !appleBundleID.MatchString(got) {
+			t.Errorf("generatedID(%q) = %q, not an Android package and an Apple bundle ID", name, got)
 		}
 	}
 }

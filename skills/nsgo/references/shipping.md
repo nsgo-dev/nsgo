@@ -20,7 +20,7 @@ Keep packages the app imports in the same module; `go tool nsgo check` and `test
 
 ```yaml
 name: Hello
-id: dev.example.hello
+id: dev.example.hello          # without it, dev.nsgo. and the name's letters and digits
 version: 0.1.0
 icon:
   apple: assets/AppIcon.icon   # macOS, iOS and watchOS
