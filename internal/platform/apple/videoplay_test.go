@@ -4,6 +4,7 @@ package apple
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -158,5 +159,33 @@ func TestVideoRepeatKeepsTheControlsPlay(t *testing.T) {
 
 // ended is the player reaching its end, repeating or not.
 func ended(repeat bool) func(p *videoPlayback) (driver.Event, bool) {
-	return func(p *videoPlayback) (driver.Event, bool) { p.ended(repeat); return driver.Event{}, false }
+	return func(p *videoPlayback) (driver.Event, bool) {
+		p.ended(repeat, time.Second)
+		return driver.Event{}, false
+	}
+}
+
+// A completed video starts over only while the player is still where it ended: the controls' scrubber moves it back without telling the backend, and the app's next play resumes there. The end the player reached is the mark, even short of the item's duration.
+func TestVideoReplayResumesWhereTheControlsScrubbed(t *testing.T) {
+	var p videoPlayback
+	if p.rewinds(0) {
+		t.Fatal("a video that never ended starts over")
+	}
+	p.ended(false, 990*time.Millisecond)
+	for _, c := range []struct {
+		at   time.Duration
+		want bool
+	}{{990 * time.Millisecond, true}, {time.Second, true}, {400 * time.Millisecond, false}, {0, false}} {
+		if got := p.rewinds(c.at); got != c.want {
+			t.Fatalf("completed at 990ms, at %v: rewinds %v, want %v", c.at, got, c.want)
+		}
+	}
+	p.applied(true)
+	if p.rewinds(time.Second) {
+		t.Fatal("a replayed video starts over again")
+	}
+	p.ended(true, time.Second)
+	if p.rewinds(time.Second) {
+		t.Fatal("a repeating end starts over through the app")
+	}
 }

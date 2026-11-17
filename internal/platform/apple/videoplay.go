@@ -2,7 +2,11 @@
 
 package apple
 
-import "github.com/nsgo-dev/nsgo/internal/driver"
+import (
+	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+)
 
 // videoPlayback follows who decides whether a video's player plays. The app's Paused applies when it changes and when a source opens; between changes the platform's controls and the system may pause or play the player, and the player then keeps their state, not Paused, until Paused changes. Each such change is reported once, as EventVideoPause with its reason or EventVideoPlay.
 type videoPlayback struct {
@@ -10,6 +14,8 @@ type videoPlayback struct {
 	playing bool
 	// completed holds a non-repeating end until an explicit replay or seek.
 	completed bool
+	// end is where that end left the player.
+	end time.Duration
 	// held says the player's play state is the platform's, not the app's Paused.
 	held bool
 	// reason is why the system is about to pause the player, given before the player says it stopped; ok when there is one.
@@ -34,14 +40,19 @@ func (p *videoPlayback) applied(playing bool) {
 	}
 }
 
-// ended records that the player reached its end, which EventEnd reports. A video that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while Paused is true goes on; one that does not stops, leaves the play state to Paused again, and stays at its end through unrelated configuration until Paused changes, a seek or the controls play it.
-func (p *videoPlayback) ended(repeat bool) {
+// ended records that the player reached its end, which EventEnd reports. A video that repeats plays on from its start, and whoever held its play state keeps it, so a play from the controls while Paused is true goes on; one that does not stops, leaves the play state to Paused again, and stays at its end through unrelated configuration until Paused changes, a seek or the controls play it; at is where it stopped.
+func (p *videoPlayback) ended(repeat bool, at time.Duration) {
 	if repeat {
 		p.playing = true
 		return
 	}
 	p.playing, p.held, p.ok, p.resumable = false, false, false, false
-	p.completed = true
+	p.completed, p.end = true, at
+}
+
+// rewinds says whether the app's play of a completed video starts over from the beginning, with at the player's position: it does while the player is still where it ended, and resumes where the platform's controls scrubbed it back to otherwise. The end the player reached is the mark, not the item's duration, which a player's end may fall short of.
+func (p *videoPlayback) rewinds(at time.Duration) bool {
+	return p.completed && at >= p.end
 }
 
 // expect records why the system is about to pause the player, before the player says it stopped.

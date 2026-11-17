@@ -173,8 +173,8 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 			v.status.asked()
 			v.player.Send(sel("pause"))
 		default:
-			// The native scrubber may have moved a completed player.
-			if v.atEnd() {
+			// The controls' scrubber may have moved a completed player back: it plays on from there.
+			if play.rewinds(v.position()) || v.atEnd() {
 				v.player.Send(sel("seekToTime:"), cmTimeOf(0))
 			}
 			play.applied(true)
@@ -272,7 +272,7 @@ func (v *Video) open() {
 		if v.status != st || v.player == 0 {
 			return
 		}
-		st.play.ended(v.config.Repeat)
+		st.play.ended(v.config.Repeat, v.position())
 		v.Dispatch(driver.Event{Kind: driver.EventEnd})
 		if v.config.Repeat {
 			st.asked()
@@ -593,7 +593,12 @@ func (v *Video) rateChanged(reason int) {
 // atEnd reports whether the player is at the end of a finite item.
 func (v *Video) atEnd() bool {
 	d := v.itemDuration()
-	return d > 0 && objc.Send[cmTime](v.player, sel("currentTime")).duration() >= d
+	return d > 0 && v.position() >= d
+}
+
+// position is the player's current time.
+func (v *Video) position() time.Duration {
+	return objc.Send[cmTime](v.player, sel("currentTime")).duration()
 }
 
 // followAudio holds the video's audio session while it plays, and lets it go when it does not: the session follows what plays, not what is mounted.

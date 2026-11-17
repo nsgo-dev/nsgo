@@ -92,8 +92,7 @@ func TestFinishedVideoWaitsForReplay(t *testing.T) {
 	config.Paused = false
 	s.setVideo(v, &config)
 	wait(4)
-	// Move the native scrubber without using Ref.Seek. Cover both a
-	// settled seek and a play before the browser dispatches seeked.
+	// The controls' scrubber moves the element without Ref.Seek: the next play resumes there, both once the seek settled and before the browser dispatches seeked.
 	seeked := 0
 	v.listeners.on(v.video.el, "seeked", func(js.Value) { seeked++ })
 	for i, settle := range []bool{true, false} {

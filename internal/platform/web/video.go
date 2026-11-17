@@ -151,8 +151,7 @@ func (s *surface) setVideo(v *view, c *driver.VideoConfig) {
 		el.Call("pause")
 	} else if url != "" && el.Get("paused").Bool() && (!vd.completed || playChanged) {
 		if vd.completed {
-			// Read the position directly: the native scrubber updates it
-			// before the browser dispatches seeked.
+			// The controls' scrubber may have moved it back, which plays on from there. The position is read here, as the scrubber sets it before the browser dispatches seeked.
 			if d := vd.seconds("duration"); d > 0 && vd.seconds("currentTime") >= d {
 				el.Set("currentTime", 0)
 			}
