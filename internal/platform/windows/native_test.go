@@ -1317,7 +1317,7 @@ func TestVideoLoadsDrawsSeeksAndEnds(t *testing.T) {
 	}
 }
 
-// TestVideoRefusesAlphaItCannotKeep opens VP9 with alpha in WebM, whose alpha Media Foundation does not decode: the video reports an error that says so instead of showing an opaque picture.
+// TestVideoRefusesAlphaItCannotKeep opens VP9 with alpha in WebM, whose alpha Windows does not draw until Media Foundation's output is checked: the video reports an error with MediaErrorAlphaUnsupported that says so instead of showing an opaque picture.
 func TestVideoRefusesAlphaItCannotKeep(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -1331,11 +1331,17 @@ func TestVideoRefusesAlphaItCannotKeep(t *testing.T) {
 		state := core.NewSignal(cx, "waiting")
 		cx.Effect(func() { cx.SetTitle(title + "|" + state.Get()) })
 		return core.Video{Source: source, Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100)},
-			OnLoad:  func(core.VideoInfo) { state.Set("load") },
-			OnError: func(err error) { state.Set("error " + err.Error()) }}
+			OnLoad: func(core.VideoInfo) { state.Set("load") },
+			OnError: func(err error) {
+				var reason core.MediaErrorReason
+				if me, ok := err.(*core.MediaError); ok {
+					reason = me.Reason
+				}
+				state.Set("error " + reason.String() + " " + err.Error())
+			}}
 	}
 	hwnd := startApp(t, title+"|waiting", app, 200, 200)
-	want := title + "|error " + source + ": " + alphaRefused(videoalpha.VP9)
+	want := title + "|error alpha-unsupported " + source + ": " + alphaRefused(videoalpha.VP9)
 	if got := waitForTitle(t, hwnd, want, 10*time.Second); got != want {
 		t.Fatalf("title = %q, want %q", got, want)
 	}

@@ -1136,7 +1136,7 @@ func TestVideoReportsWhatGStreamerCannotPlay(t *testing.T) {
 	}
 }
 
-// TestVideoShowsWhatIsBehindItsTransparentPixels plays a VP9 WebM with alpha, transparent around a blue square, over a red view: the red shows through around the square. Without GStreamer's codecalpha plug-in it reports an error instead.
+// TestVideoShowsWhatIsBehindItsTransparentPixels plays a VP9 WebM with alpha, transparent around a blue square, over a red view: the red shows through around the square. Without GStreamer's codecalpha plug-in it reports an error with MediaErrorAlphaUnsupported instead, and the test skips.
 func TestVideoShowsWhatIsBehindItsTransparentPixels(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -1151,9 +1151,15 @@ func TestVideoShowsWhatIsBehindItsTransparentPixels(t *testing.T) {
 		cx.Effect(func() { cx.SetTitle(title + "|" + state.Get()) })
 		return core.View{Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100), Background: driver.RGB(0xff0000)},
 			Children: []core.Node{core.Video{Source: path, Repeat: true, Muted: true,
-				Style:   core.Style{Width: driver.Pt(100), Height: driver.Pt(100)},
-				OnLoad:  func(core.VideoInfo) { state.Set("load") },
-				OnError: func(err error) { state.Set("error " + err.Error()) }}},
+				Style:  core.Style{Width: driver.Pt(100), Height: driver.Pt(100)},
+				OnLoad: func(core.VideoInfo) { state.Set("load") },
+				OnError: func(err error) {
+					var reason core.MediaErrorReason
+					if me, ok := err.(*core.MediaError); ok {
+						reason = me.Reason
+					}
+					state.Set("error " + reason.String() + " " + err.Error())
+				}}},
 		}
 	}
 	w := startTestWindow(t, app, Options{Title: title, Width: 360, Height: 240})
@@ -1162,8 +1168,8 @@ func TestVideoShowsWhatIsBehindItsTransparentPixels(t *testing.T) {
 		if gstFeature("vp9alphadecodebin") {
 			t.Fatalf("title = %q, but GStreamer has vp9alphadecodebin", got)
 		}
-		if !strings.Contains(got, "codecalpha") {
-			t.Fatalf("title = %q, want the missing plug-in named", got)
+		if !strings.Contains(got, "|error alpha-unsupported ") || !strings.Contains(got, "codecalpha") {
+			t.Fatalf("title = %q, want the alpha refused and the missing plug-in named", got)
 		}
 		t.Skip(got)
 	}
@@ -1608,7 +1614,7 @@ func TestStickyListRowsStayPinned(t *testing.T) {
 	})
 }
 
-// TestVideoRefusesAlphaItCannotKeep opens HEVC with alpha, whose alpha layer GStreamer cannot decode: the video reports an error that says so instead of showing an opaque picture.
+// TestVideoRefusesAlphaItCannotKeep opens HEVC with alpha, whose alpha layer GStreamer cannot decode: the video reports an error with MediaErrorAlphaUnsupported that says so instead of showing an opaque picture.
 func TestVideoRefusesAlphaItCannotKeep(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -1622,12 +1628,18 @@ func TestVideoRefusesAlphaItCannotKeep(t *testing.T) {
 		state := core.NewSignal(cx, "")
 		cx.Effect(func() { cx.SetTitle(title + "|" + state.Get()) })
 		return core.Video{Source: path, Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100)},
-			OnLoad:  func(core.VideoInfo) { state.Set("load") },
-			OnError: func(err error) { state.Set("error " + err.Error()) }}
+			OnLoad: func(core.VideoInfo) { state.Set("load") },
+			OnError: func(err error) {
+				var reason core.MediaErrorReason
+				if me, ok := err.(*core.MediaError); ok {
+					reason = me.Reason
+				}
+				state.Set("error " + reason.String() + " " + err.Error())
+			}}
 	}
 	w := startTestWindow(t, app, Options{Title: title, Width: 360, Height: 240})
 	got := waitTitle(t, w, func(s string) bool { return strings.Contains(s, "|error ") || strings.HasSuffix(s, "|load") })
-	if !strings.Contains(got, "|error "+path+": GStreamer cannot decode the alpha channel of HEVC with alpha") {
+	if !strings.Contains(got, "|error alpha-unsupported "+path+": GStreamer cannot decode the alpha channel of HEVC with alpha") {
 		t.Fatalf("title = %q, want the alpha refused", got)
 	}
 }

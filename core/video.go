@@ -8,7 +8,7 @@ import (
 
 // Video plays a video in the platform's player, filling the view: the picture fits it by ResizeMode, and Controls shows playback controls. It plays unless Paused; Ref.Seek jumps to a time.
 //
-// A video with an alpha channel shows what is behind its transparent pixels where the platform decodes the alpha: HEVC with alpha in a QuickTime or MPEG-4 file on macOS (iOS uses the same player layer but is unchecked), and VP8 or VP9 with alpha in WebM on Linux with GStreamer's codecalpha plug-in (gst-plugins-bad). On macOS, iOS, Windows and Linux, a local file whose alpha the platform cannot keep (WebM with alpha on Apple platforms; any clip with alpha on Windows, whose decoders no Windows machine has yet checked for alpha; HEVC with alpha on Linux, and VP8 or VP9 with alpha there without codecalpha) reports OnError instead of showing an opaque picture. Android and the web, and a remote source anywhere, play such clips as their decoder outputs them, which may be opaque. With Controls, AVKit's player draws black behind the picture.
+// A video with an alpha channel shows what is behind its transparent pixels where the platform decodes the alpha: HEVC with alpha in a QuickTime or MPEG-4 file on macOS (iOS uses the same player layer but is unchecked), and VP8 or VP9 with alpha in WebM on Linux with GStreamer's codecalpha plug-in (gst-plugins-bad). On macOS, iOS, Windows and Linux, a local file whose alpha the platform cannot keep (WebM with alpha on Apple platforms; any clip with alpha on Windows, until a Windows machine has checked what Media Foundation's decoders output for it; HEVC with alpha on Linux, and VP8 or VP9 with alpha there without codecalpha) reports OnError, a *MediaError whose Reason is MediaErrorAlphaUnsupported, instead of showing an opaque picture. Android and the web, and a remote source anywhere, play such clips as their decoder outputs them, which may be opaque. With Controls, AVKit's player draws black behind the picture.
 type Video struct {
 	// Source is a URL, a file path or an "asset:" path in the app's resources.
 	Source     string
@@ -224,7 +224,7 @@ func (t *Tree) dispatchVideo(n *node, ev driver.Event) bool {
 		}
 	case driver.EventError:
 		if vn.loadError != nil {
-			call(func() { vn.loadError(&MediaError{Message: ev.Text}) })
+			call(func() { vn.loadError(&MediaError{Message: ev.Text, Reason: MediaErrorReason(ev.Index)}) })
 		}
 	default:
 		return false
@@ -251,12 +251,35 @@ func (vn *videoNode) events() driver.EventMask {
 	return m
 }
 
-// MediaError is a video that failed to open or play.
+// MediaError is a video that failed to open or play. Message is the platform's words; Reason says why for the failures an app can act on.
 type MediaError struct {
 	Message string
+	Reason  MediaErrorReason
 }
 
 func (e *MediaError) Error() string { return e.Message }
+
+// MediaErrorReason says why a video failed (MediaError.Reason).
+type MediaErrorReason uint8
+
+const (
+	// MediaErrorOther is any failure without a reason of its own: a missing file, a network error, a codec the platform lacks.
+	MediaErrorOther MediaErrorReason = iota
+	// MediaErrorAlphaUnsupported is a local file that declares an alpha channel the platform's player cannot keep, so it did not play rather than show an opaque picture; an app can decode such a clip itself and draw its frames with their alpha.
+	MediaErrorAlphaUnsupported
+)
+
+// String names a media error reason for logs and diagnostics.
+func (r MediaErrorReason) String() string {
+	switch r {
+	case MediaErrorOther:
+		return "other"
+	case MediaErrorAlphaUnsupported:
+		return "alpha-unsupported"
+	default:
+		return "unknown"
+	}
+}
 
 // Seek jumps the video r names to position. In the update that unpauses a video that played to its end, the video plays again from position.
 func (r *Ref) Seek(position time.Duration) {

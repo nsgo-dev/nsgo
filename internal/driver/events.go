@@ -36,7 +36,7 @@ const (
 	// ItemScrollTo and ItemScrollBy items it applied since it was made
 	// (Count) and, when it zooms, its zoom scale (Value).
 	EventScroll
-	// EventLoadStart, EventProgress (Loaded, Total), EventLoad (Size, the source's pixels), EventError (Text) and EventLoadEnd follow an image view's loading. A web view reports EventLoadStart and EventLoad with its Navigation, and EventError with the URL in Navigation and a *WebFailure in Data when the platform supplies a domain and code. A video reports EventLoadStart, EventLoad (Duration and Size, in points), EventProgress (Time and Duration) and EventError.
+	// EventLoadStart, EventProgress (Loaded, Total), EventLoad (Size, the source's pixels), EventError (Text) and EventLoadEnd follow an image view's loading. A web view reports EventLoadStart and EventLoad with its Navigation, and EventError with the URL in Navigation and a *WebFailure in Data when the platform supplies a domain and code. A video reports EventLoadStart, EventLoad (Duration and Size, in points), EventProgress (Time and Duration) and EventError, with why it failed in Index (VideoErrorOther, ...).
 	EventLoadStart
 	EventProgress
 	EventLoad
@@ -290,6 +290,14 @@ const (
 	VideoPauseInterruption = iota
 	VideoPauseRouteLost
 	VideoPauseControls
+)
+
+// Why a video's EventError says it failed, in Index, as core.MediaErrorReason.
+const (
+	// VideoErrorOther is any failure without a reason of its own.
+	VideoErrorOther = iota
+	// VideoErrorAlphaUnsupported is a local file that declares an alpha channel the platform's player cannot keep.
+	VideoErrorAlphaUnsupported
 )
 
 // What EventInputModality reports.

@@ -262,7 +262,7 @@ func (v *Video) open() {
 	}
 	if c := videoalpha.Source(source, imageload.ResourceRoot); c == videoalpha.VP8 || c == videoalpha.VP9 {
 		st.failed = true
-		v.Dispatch(driver.Event{Kind: driver.EventError, Text: source + ": " + webmRefused(c)})
+		v.Dispatch(driver.Event{Kind: driver.EventError, Text: source + ": " + webmRefused(c), Index: driver.VideoErrorAlphaUnsupported})
 		return
 	}
 	asset := videoAsset(source)

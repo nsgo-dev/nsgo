@@ -98,8 +98,12 @@ func TestVideoConfiguresSeeksAndReports(t *testing.T) {
 		len(pauses) != 1 || pauses[0] != VideoPauseRouteLost || plays != 1 {
 		t.Fatalf("info %v, positions %v, ended %d, buffering %d, pauses %v, plays %d", info, positions, ended, buffering, pauses, plays)
 	}
-	if me, ok := failed.(*MediaError); !ok || me.Message != "no decoder" {
+	if me, ok := failed.(*MediaError); !ok || me.Message != "no decoder" || me.Reason != MediaErrorOther {
 		t.Fatalf("error %#v", failed)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventError, ID: id, Text: "alpha refused", Index: driver.VideoErrorAlphaUnsupported})
+	if me, ok := failed.(*MediaError); !ok || me.Message != "alpha refused" || me.Reason != MediaErrorAlphaUnsupported {
+		t.Fatalf("error %#v, want the alpha reason", failed)
 	}
 }
 

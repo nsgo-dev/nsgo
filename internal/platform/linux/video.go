@@ -118,7 +118,7 @@ func (w *window) openVideo(v *view) {
 	if msg := alphaRefused(videoalpha.Source(source, imageload.ResourceRoot)); msg != "" {
 		vd.failed = true
 		log.Printf("nsgo: video %s: %s", source, msg)
-		w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: source + ": " + msg})
+		w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: source + ": " + msg, Index: driver.VideoErrorAlphaUnsupported})
 		return
 	}
 	file := videoFile(source)

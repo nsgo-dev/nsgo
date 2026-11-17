@@ -10,7 +10,7 @@ package windows
 //
 // Events follow core's Video: EventLoadStart when a source opens, EventLoad with its duration and size once its metadata is known, EventProgress every ProgressInterval while playing, EventBuffer, EventEnd (not for a repeating video: the engine loops without ending), EventError. Controls draws a control bar of the window's own (play and pause, a scrubber, the time) that drives the engine directly, as the platforms' controls do.
 //
-// A local file that declares alpha (videoalpha) reports EventError instead of playing, on the assumption that Media Foundation's decoders output its frames without the alpha, so the bitmap would be opaque. No Windows machine has checked that assumption; drawing the frames premultiplied where a decoder keeps the alpha is the alternative.
+// A local file that declares alpha (videoalpha) reports EventError, with VideoErrorAlphaUnsupported, instead of playing. What Media Foundation's decoders output for VP8's and VP9's alpha stream and HEVC's alpha layer has not been checked on a Windows machine: the bitmap is drawn with its alpha ignored, so a decoder that drops it would show the video opaque, and drawing the frames premultiplied would rest on the unchecked assumption that it keeps it. Until a machine has checked it, such a clip goes through the app's own decoder (#107).
 
 import (
 	"fmt"
@@ -220,7 +220,7 @@ func (vd *video) open() {
 	}
 	if c := videoalpha.Source(source, imageload.ResourceRoot); c != videoalpha.None {
 		vd.failed = true
-		vd.report(driver.Event{Kind: driver.EventError, Text: source + ": " + alphaRefused(c)})
+		vd.report(driver.Event{Kind: driver.EventError, Text: source + ": " + alphaRefused(c), Index: driver.VideoErrorAlphaUnsupported})
 		return
 	}
 	engine, err := newMediaEngine(vd.w, vd.v.id, vd.serial)
@@ -260,9 +260,9 @@ func videoURL(source, root string) (location string, ok bool) {
 	return (&url.URL{Scheme: "file", Path: "/" + filepath.ToSlash(path)}).String(), true
 }
 
-// alphaRefused says why a video whose file declares alpha c does not play: Media Foundation's decoders are taken to output VP8 and VP9 without the alpha stream in the blocks' additions and HEVC without its alpha layer, so the picture would show opaque (unchecked on Windows).
+// alphaRefused says why a video whose file declares alpha c does not play: whether Media Foundation's decoders keep the alpha of VP8 and VP9 (a stream in the blocks' additions) and of HEVC (an alpha layer) has not been checked on Windows, so NSGo does not draw them rather than risk an opaque picture.
 func alphaRefused(c videoalpha.Codec) string {
-	return "Media Foundation cannot decode the alpha channel of " + c.String() + ", so Windows would show the video opaque."
+	return "NSGo does not play " + c.String() + " on Windows yet, as Media Foundation's alpha output is unchecked; decode the clip in the app to keep its alpha."
 }
 
 // stop shuts the engine down and forgets the source; the last frame

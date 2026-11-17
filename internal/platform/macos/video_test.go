@@ -193,6 +193,9 @@ func TestVideoKeepsHEVCAlphaAndRefusesWebM(t *testing.T) {
 					mu.Lock()
 					defer mu.Unlock()
 					refused = err.Error()
+					if me, ok := err.(*core.MediaError); !ok || me.Reason != core.MediaErrorAlphaUnsupported {
+						refused = "no alpha reason: " + refused
+					}
 					done()
 				}},
 		}}
@@ -205,7 +208,7 @@ func TestVideoKeepsHEVCAlphaAndRefusesWebM(t *testing.T) {
 	if loaded != (core.Size{Width: 64, Height: 64}) {
 		t.Errorf("HEVC with alpha loaded at %v, want 64x64", loaded)
 	}
-	if !strings.Contains(refused, "AVFoundation cannot open WebM, so VP9 with alpha does not play") {
+	if !strings.HasPrefix(refused, webm+": AVFoundation cannot open WebM, so VP9 with alpha does not play") {
 		t.Errorf("WebM with alpha reported %q", refused)
 	}
 	switch pixels {
