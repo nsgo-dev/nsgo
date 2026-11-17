@@ -3,7 +3,9 @@
 package linux
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +14,68 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
+
+// TestEditorsFollowTheUIFont reads each live editor's CSS after GTK's setting changes, without reconfiguring its input. Both GTK editor types must follow system families in a list while explicit families keep their CSS.
+func TestEditorsFollowTheUIFont(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	families := []string{"system-ui", "sans-serif", "ui-sans-serif", "ui-rounded", "serif, system-ui", "serif", `"system-ui"`, ""}
+	title := "nsgo-editor-ui-font"
+	w := startTestWindow(t, func(cx *core.Scope) core.Node {
+		cx.SetTitle(title + "|ready")
+		var children []core.Node
+		for _, multiline := range []bool{false, true} {
+			for i, family := range families {
+				children = append(children, core.Input{TestID: fmt.Sprintf("%t-%d", multiline, i), Multiline: multiline,
+					Style: core.Style{Width: core.Pt(200), Height: core.Pt(24), FontFamily: family}})
+			}
+		}
+		return core.View{Children: children}
+	}, Options{Title: title, Width: 240, Height: 420})
+	waitForTitle(t, w, title+"|ready")
+	var setSetting func(object uintptr, name, value *byte, end uintptr)
+	var providerString func(provider uintptr) uintptr
+	purego.RegisterLibFunc(&setSetting, gobjectLib, "g_object_set")
+	purego.RegisterLibFunc(&providerString, gtkLib, "gtk_css_provider_to_string")
+	var before string
+	w.onLoop(t, func() { before = settingString(gtkSettingsGetDefault(), "gtk-font-name") })
+	t.Cleanup(func() {
+		w.onLoop(t, func() { setSetting(gtkSettingsGetDefault(), cstr("gtk-font-name"), cstr(before), 0) })
+	})
+	styles := func() map[string]string {
+		out := map[string]string{}
+		w.onLoop(t, func() {
+			for _, v := range w.entries {
+				if v.provider != 0 {
+					p := providerString(v.provider)
+					out[v.props.TestID] = goString(p)
+					gFree(p)
+				}
+			}
+		})
+		return out
+	}
+	original := styles()
+	if len(original) != 2*len(families) {
+		t.Fatalf("editor styles = %d, want %d", len(original), 2*len(families))
+	}
+	for _, next := range []string{"Monospace", "Serif"} {
+		w.onLoop(t, func() { setSetting(gtkSettingsGetDefault(), cstr("gtk-font-name"), cstr(next+" 11"), 0) })
+		for id, css := range styles() {
+			var multiline bool
+			var index int
+			fmt.Sscanf(id, "%t-%d", &multiline, &index)
+			if index < 5 {
+				if !strings.Contains(css, next) {
+					t.Errorf("%s (%q) kept old CSS after the UI font became %s:\n%s", id, families[index], next, css)
+				}
+			} else if css != original[id] {
+				t.Errorf("%s (%q) changed its explicit/inherited CSS", id, families[index])
+			}
+		}
+	}
+}
 
 // TestFontNameFamilyIsPangosParse reads gtk-font-name's family as GTK does: styles, weights and the size are not words of it.
 func TestFontNameFamilyIsPangosParse(t *testing.T) {

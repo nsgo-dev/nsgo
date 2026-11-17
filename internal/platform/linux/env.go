@@ -373,7 +373,7 @@ func settingsChangedCallback(settings, pspec, data uintptr) {
 	}
 }
 
-// uiFontChanged has every app showing prepare its text again in the UI font GTK's settings changed to, and every canvas draw its text in it.
+// uiFontChanged has every app prepare text again in GTK's new UI font, reloads editors' resolved families and redraws canvases.
 func uiFontChanged() {
 	windowHandles.Range(func(_, v any) bool {
 		w := v.(*window)
@@ -384,7 +384,14 @@ func uiFontChanged() {
 			w.engine.FontsChanged()
 		}
 		for _, cv := range w.views {
-			if cv != nil && cv.drawing != nil && cv.widget != 0 {
+			if cv == nil {
+				continue
+			}
+			// A named system family, including one in a fallback list, was resolved to the old UI font in the editor's CSS. Unset families inherit GTK's own changing default.
+			if cv.entry != 0 && cv.input.Style.Font.Family != "" {
+				w.styleEntry(cv)
+			}
+			if cv.drawing != nil && cv.widget != 0 {
 				gtkWidgetQueueDraw(cv.widget)
 			}
 		}

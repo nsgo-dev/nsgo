@@ -44,7 +44,7 @@ The engines draw the rest:
 
 Italic runs keep color emoji upright, in spans of their own (`driver.UprightEmoji`): emoji fonts have no italic face, and Chrome and Android would slant them where CoreText does not.
 
-A text with no family, and the system's families in a list (`system-ui`, `sans-serif`), take the platform's UI font: CoreText's system font, Segoe UI on Windows, Android's default and, on Linux, the family of GTK's `gtk-font-name`, which a `GtkLabel` shows. Linux reads it on the main thread, measures and draws each text in the one it was prepared with, and has the app prepare its text again when the desktop changes it (`TestTextFollowsTheUIFont`).
+A text with no family, and the system's families in a list (`system-ui`, `sans-serif`), take the platform's UI font: CoreText's system font, Segoe UI on Windows, Android's default and, on Linux, the family of GTK's `gtk-font-name`, which a `GtkLabel` shows. Linux reads it on the main thread, measures and draws each text in the one it was prepared with, and has the app prepare its text again when the desktop changes it (`TestTextFollowsTheUIFont`). Its editor CSS resolves each system family to that same name, preserving its place in a fallback list, and reloads when the setting changes; an unset family inherits GTK's default (`TestEditorsFollowTheUIFont`).
 
 The family `FontMonospace` is each platform's fixed-pitch font: CoreText's user fixed-pitch font, CSS's `ui-monospace` stack, Consolas on Windows, Pango's `monospace` on Linux, Android's `monospace`.
 
