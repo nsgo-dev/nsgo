@@ -3,6 +3,8 @@
 package linux
 
 import (
+	"image"
+	"image/color"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -55,6 +57,79 @@ func TestImageDrawsItsPixels(t *testing.T) {
 	data, stride := cairoImageSurfaceGetData(surface), int(cairoImageSurfaceGetStride(surface))
 	if got := pixelAt(data, stride, 10, 10); got[2] != 0xff || got[0] != 0 || got[1] != 0 {
 		t.Fatalf("picture pixel = %v, want red", got)
+	}
+}
+
+// halfClear returns w by h pixels whose left half is transparent and right half c, premultiplied as image.RGBA is, as the core copies them.
+func halfClear(w, h int, c color.RGBA) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := w / 2; x < w; x++ {
+			img.SetRGBA(x, y, c)
+		}
+	}
+	return img
+}
+
+// TestPixelsDrawWithTheirAlphaAndSwapInPlace shows an image view's pixels over blue: the transparent half shows the blue, and a new version replaces the frame with none blank in between.
+func TestPixelsDrawWithTheirAlphaAndSwapInPlace(t *testing.T) {
+	if err := openLibs(); err != nil {
+		t.Skip(err)
+	}
+	surface := cairoImageSurfaceCreate(0, 40, 20)
+	defer cairoSurfaceDestroy(surface)
+	cr := cairoCreate(surface)
+	defer cairoDestroy(cr)
+	w := &window{}
+	v := &view{}
+	draw := func() {
+		cairoSetSourceRGBA(cr, 0, 0, 1, 1)
+		cairoPaint(cr)
+		(&painter{w: w, cr: cr}).drawImage(v, 0, rect{w: 40, h: 20})
+		cairoSurfaceFlush(surface)
+	}
+	red := halfClear(40, 20, color.RGBA{R: 0xff, A: 0xff})
+	if w.setImage(v, &driver.ImageConfig{Source: driver.ImageSource{Pixels: red, Version: 1}, ResizeMode: driver.Stretch}) {
+		t.Fatal("pixels asked for a load")
+	}
+	draw()
+	data, stride := cairoImageSurfaceGetData(surface), int(cairoImageSurfaceGetStride(surface))
+	if got := pixelAt(data, stride, 5, 10); got[0] != 0xff || got[2] != 0 {
+		t.Fatalf("transparent half = %v, want the blue under it", got)
+	}
+	if got := pixelAt(data, stride, 35, 10); got[2] != 0xff || got[0] != 0 {
+		t.Fatalf("opaque half = %v, want red", got)
+	}
+	green := halfClear(40, 20, color.RGBA{G: 0xff, A: 0xff})
+	w.setImage(v, &driver.ImageConfig{Source: driver.ImageSource{Pixels: green, Version: 2}, ResizeMode: driver.Stretch})
+	if v.source.pic == nil || v.source.load != nil || v.source.fade != 0 {
+		t.Fatal("a new version blanked, loaded or faded")
+	}
+	draw()
+	if got := pixelAt(data, stride, 35, 10); got[1] != 0xff || got[2] != 0 {
+		t.Fatalf("second frame = %v, want green", got)
+	}
+}
+
+// TestCanvasDrawsPixelsAtOnce draws pixels on a canvas the first time it plays, with no load to wait for.
+func TestCanvasDrawsPixelsAtOnce(t *testing.T) {
+	if err := openLibs(); err != nil {
+		t.Skip(err)
+	}
+	surface := cairoImageSurfaceCreate(0, 40, 20)
+	defer cairoSurfaceDestroy(surface)
+	cr := cairoCreate(surface)
+	defer cairoDestroy(cr)
+	d := &driver.Drawing{}
+	d.DrawImageIn(driver.ImageSource{Pixels: halfClear(4, 2, color.RGBA{R: 0xff, A: 0xff}), Version: 1}, 0, 0, 40, 20)
+	(&window{animator: driver.NewAnimator(nil)}).playCanvas(&view{drawing: d}, cr, rect{w: 40, h: 20})
+	cairoSurfaceFlush(surface)
+	data, stride := cairoImageSurfaceGetData(surface), int(cairoImageSurfaceGetStride(surface))
+	if got := pixelAt(data, stride, 27, 10); got[2] != 0xff || got[3] != 0xff {
+		t.Fatalf("drawn pixel = %v, want red", got)
+	}
+	if got := pixelAt(data, stride, 5, 10); got[3] != 0 {
+		t.Fatalf("transparent pixel = %v, want transparent", got)
 	}
 }
 

@@ -3,6 +3,7 @@
 package windows
 
 import (
+	"image"
 	"math"
 	"testing"
 	"time"
@@ -1340,5 +1341,25 @@ func TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn(t *testing.T) {
 		if got := c.w.showsOwnWindow(); got != c.want {
 			t.Errorf("%s: showsOwnWindow = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+func TestPixelsReplaceThePictureInPlace(t *testing.T) {
+	s := &imageSlot{}
+	frame := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	copy(frame.Pix, []byte{0, 0, 0, 0, 0xff, 0, 0, 0xff})
+	s.showPixels(driver.ImageSource{Pixels: frame, Version: 1})
+	if s.pic == nil || s.pic.width != 2 || s.pic.height != 1 || s.load != nil || s.fade != 0 {
+		t.Fatalf("slot = %+v, want the frame's picture at once", s)
+	}
+	// Premultiplied BGRA, as Direct2D takes it, alpha kept.
+	if got := s.pic.frames[0].Pix; got[3] != 0 || got[4] != 0 || got[6] != 0xff || got[7] != 0xff {
+		t.Fatalf("pixels = %v", got)
+	}
+	if got := natural(s); got != (driver.Size{Width: 2, Height: 1}) {
+		t.Fatalf("natural size = %v, want a point a pixel", got)
+	}
+	if !sameSource(s.src, driver.ImageSource{Pixels: frame, Version: 1}) || sameSource(s.src, driver.ImageSource{Pixels: frame, Version: 2}) {
+		t.Fatal("a source is the same frame only at its version")
 	}
 }

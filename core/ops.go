@@ -443,7 +443,7 @@ func (t *Tree) setImage(n *node, v Image) {
 	if n.image == nil {
 		n.image = &imageNode{}
 	}
-	if src.Size != n.image.config.Source.Size {
+	if naturalOf(src) != naturalOf(n.image.config.Source) {
 		t.markLayout(n)
 	}
 	n.image.config = driver.ImageConfig{Source: src, Placeholder: v.Placeholder, ResizeMode: v.ResizeMode,

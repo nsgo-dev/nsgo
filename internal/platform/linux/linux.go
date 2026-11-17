@@ -177,6 +177,9 @@ type window struct {
 	// canvases to draw again when one loads.
 	canvasImages  canvasImages
 	canvasWaiting map[string][]*view
+	// canvasFrames are the pictures of the pixels canvases drew last (canvasFrame).
+	canvasFrames      []*imageSlot
+	canvasFramePixels int // the pixels of canvasFrames together
 	// hiddenCanvases wait out of sight to be drawn (raster.go), and
 	// revealDue says a layout since the last frame may have shown some.
 	hiddenCanvases []*view

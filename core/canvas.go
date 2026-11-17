@@ -1,6 +1,7 @@
 package core
 
 import (
+	"image"
 	"reflect"
 	"slices"
 
@@ -92,6 +93,43 @@ type canvasNode struct {
 	paintKey canvasPaintKey
 	// em sizes a canvas with Em or EmFunc.
 	em *emNode
+	// frames are the copies of the pixels the drawing last sent draws, by the app's buffer and version.
+	frames map[pixelKey]*image.RGBA
+}
+
+type pixelKey struct {
+	from    *image.RGBA
+	version uint64
+}
+
+// withFrames returns d with the pixels it draws copied, as an image view's are (pixelFrame): those the last drawing sent at the same version keep their copies, so the platform keeps its images.
+func (cn *canvasNode) withFrames(d *Drawing) *Drawing {
+	if !slices.ContainsFunc(d.Ops, func(op driver.DrawOp) bool { return op.Image != nil && op.Image.Pixels != nil }) {
+		cn.frames = nil
+		return d
+	}
+	out := *d
+	out.Ops = slices.Clone(d.Ops)
+	frames := map[pixelKey]*image.RGBA{}
+	for i := range out.Ops {
+		op := &out.Ops[i]
+		if op.Image == nil || op.Image.Pixels == nil {
+			continue
+		}
+		k := pixelKey{op.Image.Pixels, op.Image.Version}
+		c := frames[k]
+		if c == nil {
+			if c = cn.frames[k]; c == nil {
+				c = driver.CopyPixels(k.from)
+			}
+			frames[k] = c
+		}
+		img := *op.Image
+		img.Pixels = c
+		op.Image = &img
+	}
+	cn.frames = frames
+	return &out
 }
 
 // canvasPaintKey is what a canvas's view paints are resolved from.

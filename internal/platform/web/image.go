@@ -58,7 +58,8 @@ func (s *surface) createImage(v *view) {
 	v.listeners.on(src.img, "load", func(js.Value) {
 		src.loaded, src.pixels = true, naturalSize(src.img)
 		im.draw(v.size)
-		if fade := int(im.config.FadeDuration.Milliseconds()); fade > 0 {
+		// Pixels fade nothing in.
+		if fade := int(im.config.FadeDuration.Milliseconds()); fade > 0 && src.src.Pixels == nil {
 			animate(src.layer, map[string]any{"opacity": 0}, fade, "linear")
 			// The placeholder stays under the source until it is opaque.
 			ph.layer.Call("animate", []any{
@@ -118,12 +119,15 @@ func (p *picture) load(src driver.ImageSource) bool {
 }
 
 func sameSource(a, b driver.ImageSource) bool {
-	return a.URI == b.URI && len(a.Data) == len(b.Data) && (len(a.Data) == 0 || &a.Data[0] == &b.Data[0])
+	return a.URI == b.URI && len(a.Data) == len(b.Data) && (len(a.Data) == 0 || &a.Data[0] == &b.Data[0]) &&
+		a.Pixels == b.Pixels && a.Version == b.Version
 }
 
-// imageURL returns where the browser loads src from: an object URL for
-// bytes, and "asset:" paths beside the page.
+// imageURL returns where the browser loads src from: an object URL for bytes, a PNG's data URL for pixels, and "asset:" paths beside the page.
 func imageURL(src driver.ImageSource) (url string, object bool) {
+	if src.Pixels != nil {
+		return pixelsURL(src.Pixels), false
+	}
 	if len(src.Data) > 0 {
 		g := js.Global()
 		data := g.Get("Uint8Array").New(len(src.Data))

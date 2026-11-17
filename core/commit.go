@@ -833,12 +833,14 @@ func (t *Tree) emitParts(n *node) bool {
 		c.Position = n.style.ObjectPosition
 		c.Source = t.pickScale(c.Source)
 		c.Placeholder = t.pickScale(c.Placeholder)
+		c.Placeholder.Pixels = nil // a placeholder shows while a source loads, which pixels never do
 		if t.rt.restricted {
 			t.refuseImage(n, &c.Source, &im.refused, n.h.loadError)
 			t.refuseImage(n, &c.Placeholder, &im.refusedPlaceholder, n.h.loadError)
 		}
 		if first || !c.Same(im.sent) {
 			im.sent = c
+			c.Source.Pixels = im.frame.of(c.Source)
 			add(driver.MountItem{Kind: driver.ItemImage, ID: n.id, Image: &c})
 		}
 	case n.hoist != nil && n.hoist.modal != nil:
@@ -852,7 +854,7 @@ func (t *Tree) emitParts(n *node) bool {
 	case n.canvas != nil:
 		if cn := n.canvas; cn.fresh && cn.drawing != nil {
 			cn.fresh = false
-			add(driver.MountItem{Kind: driver.ItemCanvas, ID: n.id, Drawing: cn.drawing.Painted(&cn.paint, cn.color)})
+			add(driver.MountItem{Kind: driver.ItemCanvas, ID: n.id, Drawing: cn.withFrames(cn.drawing.Painted(&cn.paint, cn.color))})
 		}
 	case n.shader != nil:
 		if sn := n.shader; sn.fresh {

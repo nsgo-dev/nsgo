@@ -281,13 +281,7 @@ func decodeSVG(data []byte, r request) (decoded, error) {
 	if err != nil {
 		return decoded{}, err
 	}
-	pix := img.Frames[0].Pix
-	cfData := cfDataCreate(0, &pix[0], len(pix))
-	defer Release(cfData)
-	provider := cgDataProviderCreateWithData(cfData)
-	defer Release(provider)
-	const premultipliedLast = 1
-	cg := cgImageCreate(img.Width, img.Height, 8, 32, img.Width*4, srgb, premultipliedLast, provider, 0, true, 0)
+	cg := rgbaImage(img.Frames[0].Pix, img.Width, img.Height)
 	if cg == 0 {
 		return decoded{}, errors.New("apple: cannot make the SVG's image")
 	}
@@ -302,6 +296,40 @@ func decodeSVG(data []byte, r request) (decoded, error) {
 	}
 	return decoded{image: cg, width: math.Round(float64(img.Size.Width)), height: math.Round(float64(img.Size.Height)),
 		scale: scale, points: img.Size}, nil
+}
+
+// rgbaImage returns a CGImage of a copy of pix, premultiplied RGBA rows of w pixels, or 0.
+func rgbaImage(pix []byte, w, h int) uintptr {
+	if w <= 0 || h <= 0 || len(pix) < w*h*4 {
+		return 0
+	}
+	cfData := cfDataCreate(0, &pix[0], w*h*4)
+	defer Release(cfData)
+	provider := cgDataProviderCreateWithData(cfData)
+	defer Release(provider)
+	const premultipliedLast = 1
+	return cgImageCreate(w, h, 8, 32, w*4, srgb, premultipliedLast, provider, 0, true, 0)
+}
+
+// pixelsImage makes a CGImage of src's pixels, as the core copied them, blurred as r asks: at once, on the main thread, with no load or decode. Its natural size is the one src declares, else a point a pixel.
+func pixelsImage(src driver.ImageSource, r request) decoded {
+	p := src.Pixels
+	w, h := p.Rect.Dx(), p.Rect.Dy()
+	img := rgbaImage(p.Pix, w, h)
+	if img == 0 {
+		return decoded{}
+	}
+	if r.blur > 0 {
+		radius := r.blur * r.ratio
+		if ppp := (request{mode: r.mode, view: r.view, scale: 1}).pointsPerPixel(float64(w), float64(h)); ppp > 0 {
+			radius = r.blur / ppp
+		}
+		if out := blur(img, radius); out != 0 {
+			Release(img)
+			img = out
+		}
+	}
+	return decoded{image: img, width: float64(w), height: float64(h), scale: 1, points: pointsOf(float64(w), float64(h), 1)}
 }
 
 // pointsOf returns the natural size of a w×h image whose pixels per point
@@ -397,10 +425,11 @@ func uriScale(uri string) float64 {
 	return 1
 }
 
-func hasSource(s driver.ImageSource) bool { return s.URI != "" || len(s.Data) > 0 }
+func hasSource(s driver.ImageSource) bool { return !s.Empty() }
 
 func sameSource(a, b driver.ImageSource) bool {
-	return a.URI == b.URI && len(a.Data) == len(b.Data) && (len(a.Data) == 0 || &a.Data[0] == &b.Data[0])
+	return a.URI == b.URI && len(a.Data) == len(b.Data) && (len(a.Data) == 0 || &a.Data[0] == &b.Data[0]) &&
+		a.Pixels == b.Pixels && a.Version == b.Version
 }
 
 // ImageView shows an image view's source, and its placeholder until the
@@ -417,10 +446,10 @@ type ImageView struct {
 	// changed is a drawn image's (NewDrawnImage), which has no layers.
 	changed func()
 	config  driver.ImageConfig
-	tint                 driver.Color
-	corners              driver.ViewStyle // its corners: CornerRadius, Corners, ContinuousCorners
-	bounds               CGSize
-	ratio                float64
+	tint    driver.Color
+	corners driver.ViewStyle // its corners: CornerRadius, Corners, ContinuousCorners
+	bounds  CGSize
+	ratio   float64
 
 	image   uintptr // the CGImage shown, retained
 	shown   decoded // what image was decoded from
@@ -529,6 +558,12 @@ func (iv *ImageView) Start(ratio float64) {
 		iv.cancel()
 	}
 	iv.load++
+	if src := iv.config.Source; src.Pixels != nil {
+		// A frame replaces the one shown in place: no blank, no events, no fade.
+		iv.cancel = nil
+		iv.show(pixelsImage(src, iv.request(ratio)), true, 0)
+		return
+	}
 	n := iv.load
 	ctx, cancel := context.WithCancel(context.Background())
 	iv.cancel = cancel

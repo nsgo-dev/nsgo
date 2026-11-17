@@ -4,8 +4,10 @@ package apple
 
 import (
 	"context"
+	"image"
 	"log"
 	"math"
+	"slices"
 	"structs"
 	"unsafe"
 
@@ -796,6 +798,9 @@ const maxCanvasImages = 64
 // canvasImage returns src's image, or nil while it loads, and has the
 // host draw again once it has loaded.
 func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
+	if src.Pixels != nil {
+		return canvasFrame(src)
+	}
 	key := src.Key()
 	canvasImageUse++
 	if im := canvasImages[key]; im != nil {
@@ -847,6 +852,48 @@ func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
 		})
 	}()
 	return nil
+}
+
+// canvasFrames are the images canvases drew last from pixels, by the core's copy, the most recently drawn last: a few stay, so a canvas that draws again at the same versions makes none anew, and the rest go, as each version is a copy of its own; main thread only.
+var canvasFrames []pixelFrame
+
+type pixelFrame struct {
+	pixels *image.RGBA
+	image  *loadedImage
+}
+
+// maxCanvasFrames and maxCanvasFramePixels bound the images kept from pixels, by count and by their pixels together (8 Mi, four 1920x1080 frames): a stream's older versions are never drawn again.
+const (
+	maxCanvasFrames      = 8
+	maxCanvasFramePixels = 1 << 23
+)
+
+// canvasFramePixels counts the pixels of canvasFrames.
+var canvasFramePixels int
+
+func pixelCount(p *image.RGBA) int { return p.Rect.Dx() * p.Rect.Dy() }
+
+// canvasFrame returns the image of src's pixels, made at once.
+func canvasFrame(src driver.ImageSource) *loadedImage {
+	for i, f := range canvasFrames {
+		if f.pixels == src.Pixels {
+			canvasFrames = append(append(canvasFrames[:i:i], canvasFrames[i+1:]...), f)
+			return f.image
+		}
+	}
+	d := pixelsImage(src, request{})
+	im := &loadedImage{image: d.image, width: d.width, height: d.height, points: d.points, failed: d.image == 0}
+	if size := src.Size; size.Width > 0 && size.Height > 0 {
+		im.points = size
+	}
+	for len(canvasFrames) > 0 && (len(canvasFrames) >= maxCanvasFrames || canvasFramePixels+pixelCount(src.Pixels) > maxCanvasFramePixels) {
+		canvasFramePixels -= pixelCount(canvasFrames[0].pixels)
+		Release(canvasFrames[0].image.image)
+		canvasFrames = slices.Delete(canvasFrames, 0, 1)
+	}
+	canvasFramePixels += pixelCount(src.Pixels)
+	canvasFrames = append(canvasFrames, pixelFrame{src.Pixels, im})
+	return im
 }
 
 // Tint paints c over what ctx holds in r, where it holds anything: a

@@ -1,6 +1,6 @@
 ---
 title: 图片与图标
-description: 显示来自 URL、应用资源或字节的图片，并绘制 Lucide 图标和 SVG。
+description: 显示来自 URL、应用资源、字节或应用自己绘制的像素的图片，并绘制 Lucide 图标和 SVG。
 group: 核心概念
 order: 54
 ---
@@ -20,6 +20,31 @@ core.Image{
 `core.Cover` 填满盒子并裁掉溢出部分；`core.Contain` 完整放下图片，`core.Center` 保持自然尺寸，`core.ScaleDown` 在图片大于盒子时缩小。`BlurRadius` 按点模糊，`TintColor` 重新给不透明像素上色，`ObjectPosition` 决定图片在盒子中的位置。
 
 `Source` 声明布局使用的尺寸：知道一边可以推出另一边，两边都不知道时图片在样式给出尺寸前是 0×0。`core.ImageSource{Data: data, Size: core.Size{Width: 24, Height: 24}}` 显示用 `go:embed` 嵌入的字节，`Size` 也给 SVG 一个固有尺寸。
+
+## 应用绘制的帧
+
+`Pixels` 显示应用自己绘制的 `*image.RGBA`，例如视频播放器或模拟器的帧，不经过编码、加载或解码。把每一帧写进同一个缓冲区，再增加 `Version`：视图显示新帧时不触发加载事件，也不淡入，透明度保持不变；在 macOS、iOS、tvOS、watchOS、Windows 和 Linux 上原地换上新帧，中间没有空白帧。没有 `Size` 时，它按像素数以点为单位测量。
+
+```go
+frame := image.NewRGBA(image.Rect(0, 0, 960, 540))
+version := core.NewSignal(cx, uint64(0))
+var tick func(time.Time)
+tick = func(at time.Time) {
+	if decoder.WriteDue(at, frame) { // writes the next frame into frame.Pix
+		version.Set(version.Get() + 1)
+	}
+	cx.RequestAnimationFrame(tick)
+}
+cx.RequestAnimationFrame(tick)
+
+core.Image{ResizeMode: core.Contain, SourceFunc: func() core.ImageSource {
+	return core.ImageSource{Pixels: frame, Version: version.Get()}
+}}
+```
+
+NSGo 在带着新 `Version` 的提交运行时复制像素，所以应用可以在下一次 `RequestAnimationFrame` 回调中写下一帧；在自己的 goroutine 上解码的解码器应写入第二个缓冲区，再把交换投递过来。相同的 `Version` 不会重新绘制。`cx.ImageSize` 对像素来源立即返回缓冲区的尺寸。`core.Canvas` 用 `DrawImage` 绘制像素，复制方式相同，除 Android、HarmonyOS 和小程序外的平台都支持。`core.Shader` 的 `Images` 不接受像素。
+
+macOS、iOS、tvOS、watchOS、Windows 和 Linux 直接绘制像素。Android 和 Web 的图片视图通过每个版本生成一次的 PNG 显示像素，并把它当作新图片加载，所以两个版本之间视图会空白，直到新图片加载完成；Web 的画布直接绘制像素。HarmonyOS 和小程序暂不显示像素。
 
 ## 资源与像素密度
 

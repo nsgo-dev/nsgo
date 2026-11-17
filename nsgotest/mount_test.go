@@ -2,6 +2,7 @@ package nsgotest
 
 import (
 	"fmt"
+	"image"
 	"strings"
 	"testing"
 
@@ -97,5 +98,26 @@ func TestScrollEffectOnReplacedView(t *testing.T) {
 	app.Settle()
 	if effects != 1 {
 		t.Fatalf("temporary view effect ran %d times, want 1", effects)
+	}
+}
+
+func TestImageReportsThePixelsItShows(t *testing.T) {
+	frame := image.NewRGBA(image.Rect(0, 0, 32, 18))
+	var version *core.Signal[uint64]
+	app := Start(t, func(cx *core.Scope) core.Node {
+		version = core.NewSignal(cx, uint64(1))
+		return core.Image{TestID: "video", SourceFunc: func() core.ImageSource {
+			return core.ImageSource{Pixels: frame, Version: version.Get()}
+		}}
+	})
+	v := app.Find("video")
+	if src := v.Image.Source; src.Version != 1 || src.Pixels == nil || src.Pixels.Rect.Size() != (image.Point{X: 32, Y: 18}) {
+		t.Fatalf("image shows %+v, want 32x18 pixels at version 1", src)
+	}
+	frame.Pix[0] = 7
+	app.Post(func() { version.Set(2) })
+	app.Settle()
+	if src := app.Find("video").Image.Source; src.Version != 2 || src.Pixels.Pix[0] != 7 {
+		t.Fatalf("image shows version %d, pixel %d, want the second frame", src.Version, src.Pixels.Pix[0])
 	}
 }

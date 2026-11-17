@@ -676,3 +676,38 @@ func TestSVGPathologicalGeometry(t *testing.T) {
 	</svg>`, Options{Scale: 1})
 	_ = img
 }
+
+func TestFromPixelsSwapsToBGRA(t *testing.T) {
+	p := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	copy(p.Pix, []byte{10, 20, 30, 40, 1, 2, 3, 255})
+	img := FromPixels(p, BGRA)
+	if img.Width != 2 || img.Height != 1 || img.Size != (driver.Size{Width: 2, Height: 1}) {
+		t.Fatalf("image is %dx%d, %v", img.Width, img.Height, img.Size)
+	}
+	if got := img.Frames[0].Pix; !bytes.Equal(got, []byte{30, 20, 10, 40, 3, 2, 1, 255}) {
+		t.Fatalf("pixels = %v", got)
+	}
+	if p.Pix[0] != 10 {
+		t.Fatal("the source's pixels changed")
+	}
+}
+
+func TestAsPNGKeepsAlpha(t *testing.T) {
+	p := image.NewRGBA(image.Rect(0, 0, 2, 1))
+	// Left transparent, right half-transparent red, premultiplied.
+	copy(p.Pix, []byte{0, 0, 0, 0, 128, 0, 0, 128})
+	src := AsPNG(driver.ImageSource{Pixels: p, Version: 3})
+	if src.Pixels != nil || len(src.Data) == 0 || src.Version != 3 {
+		t.Fatalf("source = %+v, want PNG data", src)
+	}
+	img, err := Decode(src.Data, Options{Layout: RGBA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := img.Frames[0].Pix; got[3] != 0 || got[7] != 128 || got[4] < 126 || got[4] > 130 {
+		t.Fatalf("decoded pixels = %v, want the alpha kept", got)
+	}
+	if same := AsPNG(driver.ImageSource{URI: "a.png"}); same.URI != "a.png" || same.Data != nil {
+		t.Fatalf("a URI source became %+v", same)
+	}
+}

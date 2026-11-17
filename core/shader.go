@@ -175,8 +175,7 @@ type Shader struct {
 	// set, says so as the graph changes.
 	Paused     bool
 	PausedFunc func() bool
-	// Images are what the program's image0At to image3At read, in order,
-	// loaded as an Image loads its source.
+	// Images are what the program's image0At to image3At read, in order, loaded as an Image loads its source. They take no Pixels: an image that names only pixels reads as an empty one.
 	Images     []ImageSource
 	ImagesFunc func() []ImageSource
 	// Class is Tailwind CSS classes, as View's.
@@ -229,6 +228,8 @@ func (t *Tree) mountShader(cx *Scope, parent *node, s Shader) {
 		s.Program.builtins(d, clock, nil, 0)
 		for _, img := range images {
 			img = t.pickScale(img)
+			// Shaders take no pixels: the core copies none for them, and the platform would otherwise read the app's buffer as the app writes it.
+			img.Pixels, img.Version = nil, 0
 			if t.rt.restricted {
 				var refused string
 				t.refuseImage(n, &img, &refused, nil)

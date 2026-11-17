@@ -15,6 +15,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"image"
 	"io"
 	"log"
 	"math"
@@ -939,6 +940,25 @@ type imageView struct {
 	request             uint32
 	cancel              context.CancelFunc
 	size                driver.Size // the view's, which an SVG is drawn for
+	// pixels is the core's copy of the pixels the view shows last, and png their PNG: the core sends the same copy again when only the look changes, and the view keeps no other.
+	pixels *image.RGBA
+	png    []byte
+}
+
+// asPNG returns c with its source's pixels as a PNG Java decodes, made once for each copy the core sends (imagedecode.AsPNG), or c itself when it has none.
+func (v *imageView) asPNG(c *driver.ImageConfig) *driver.ImageConfig {
+	if c == nil || c.Source.Pixels == nil {
+		v.pixels, v.png = nil, nil
+		return c
+	}
+	if c.Source.Pixels != v.pixels {
+		v.pixels, v.png = c.Source.Pixels, imagedecode.AsPNG(c.Source).Data
+	}
+	out := *c
+	out.Source.Pixels, out.Source.URI, out.Source.Data = nil, "", v.png
+	// Pixels fade nothing in, and Java fades over its default for 0: a millisecond, the least the message carries, shows each frame at once.
+	out.FadeDuration = time.Millisecond
+	return &out
 }
 
 func (v *imageView) stop() {
@@ -993,6 +1013,8 @@ func (s *surface) trackImages(tv *treeView, b *driver.MountBatch) ([]uint32, []i
 				v = &imageView{}
 				images[it.ID] = v
 			}
+			// Java shows pixels as a PNG made once for each version the core copied.
+			it.Image = v.asPNG(it.Image)
 			c := it.Image
 			if v.request == 0 || !sameSource(v.source, c.Source) || !sameSource(v.placeholder, c.Placeholder) {
 				v.stop()
@@ -1014,7 +1036,8 @@ func (s *surface) trackImages(tv *treeView, b *driver.MountBatch) ([]uint32, []i
 }
 
 func sameSource(a, b driver.ImageSource) bool {
-	return a.URI == b.URI && len(a.Data) == len(b.Data) && (len(a.Data) == 0 || &a.Data[0] == &b.Data[0])
+	return a.URI == b.URI && len(a.Data) == len(b.Data) && (len(a.Data) == 0 || &a.Data[0] == &b.Data[0]) &&
+		a.Pixels == b.Pixels && a.Version == b.Version
 }
 
 func isEmpty(src driver.ImageSource) bool { return src.URI == "" && len(src.Data) == 0 }
@@ -1588,7 +1611,8 @@ func (s *surface) loadCanvasImages(d *driver.Drawing) {
 	}
 	var srcs []driver.ImageSource
 	for i := range d.Ops {
-		if op := &d.Ops[i]; op.Kind == driver.DrawImage && op.Image != nil {
+		// Java keeps every canvas image it decodes, so pixels, a copy each version, would pile up there: canvases draw none yet.
+		if op := &d.Ops[i]; op.Kind == driver.DrawImage && op.Image != nil && op.Image.Pixels == nil {
 			srcs = append(srcs, *op.Image)
 		}
 	}

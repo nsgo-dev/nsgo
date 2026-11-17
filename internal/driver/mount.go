@@ -2,6 +2,7 @@ package driver
 
 import (
 	"fmt"
+	"image"
 	"strconv"
 	"strings"
 	"time"
@@ -1145,11 +1146,14 @@ const (
 	SelectableOff
 )
 
-// ImageSource is where an image comes from: a URI (https, file path,
-// file:, data:) or bytes, such as a file embedded with go:embed.
+// ImageSource is where an image comes from: a URI (https, file path, file:, data:), bytes, such as a file embedded with go:embed, or pixels the app draws.
 type ImageSource struct {
 	URI  string
 	Data []byte
+	// Pixels, when set, is the image itself, premultiplied as image.RGBA is: nothing loads or decodes, and the view fires no load events and fades nothing in. The core copies it when the commit that carries a new Pixels or Version runs, so the app may write the next frame into the same buffer from then on, from its next RequestAnimationFrame callback for one. Without Size it measures its pixels in points. An Image's Source and a canvas's images take pixels; a Placeholder, which shows while a source loads, and a Shader's Images ignore them.
+	Pixels *image.RGBA
+	// Version tells frames written into the same Pixels apart: the same Pixels with another Version is shown again in place, the previous frame staying until the new one is drawn.
+	Version uint64
 	// Size is the image's size in points, when known up front.
 	Size Size
 	// Scales are the pixel densities an "asset:" image ships in (a.png,
@@ -1182,20 +1186,43 @@ func (s ImageSource) Density() float32 {
 	return float32(d)
 }
 
-// Key returns a string naming the image s loads, for caches: its URI, or
-// where its bytes are.
+// Key returns a string naming the image s loads, for caches: its URI, or where its bytes or pixels are.
 func (s ImageSource) Key() string {
+	if s.Pixels != nil {
+		return fmt.Sprintf("pixels:%p:%d", s.Pixels, s.Version)
+	}
 	if len(s.Data) > 0 {
 		return fmt.Sprintf("data:%p:%d", &s.Data[0], len(s.Data))
 	}
 	return s.URI
 }
 
-// Same reports whether s and o load the same image: inline data must
-// be the same bytes, not equal ones.
+// Same reports whether s and o load the same image: inline data must be the same bytes, not equal ones, and pixels the same buffer at the same Version.
 func (s ImageSource) Same(o ImageSource) bool {
 	return s.URI == o.URI && s.Size == o.Size && s.Scales == o.Scales && len(s.Data) == len(o.Data) &&
-		(len(s.Data) == 0 || &s.Data[0] == &o.Data[0])
+		(len(s.Data) == 0 || &s.Data[0] == &o.Data[0]) && s.Pixels == o.Pixels && s.Version == o.Version
+}
+
+// Empty reports whether s names no image.
+func (s ImageSource) Empty() bool { return s.URI == "" && len(s.Data) == 0 && s.Pixels == nil }
+
+// CopyPixels returns a copy of img's pixels in a buffer of its own, at the origin with rows of 4 bytes a pixel, as the core hands them to a platform; nil for nil.
+func CopyPixels(img *image.RGBA) *image.RGBA {
+	if img == nil {
+		return nil
+	}
+	b := img.Rect
+	out := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	row := 4 * b.Dx()
+	if img.Stride == row && len(img.Pix) >= row*b.Dy() {
+		copy(out.Pix, img.Pix[:row*b.Dy()])
+		return out
+	}
+	for y := range b.Dy() {
+		at := img.PixOffset(b.Min.X, b.Min.Y+y)
+		copy(out.Pix[y*row:(y+1)*row], img.Pix[at:at+row])
+	}
+	return out
 }
 
 // ResizeMode fits an image or a video into its view. The zero value is

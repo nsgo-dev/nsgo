@@ -313,10 +313,9 @@ func (t *Tree) refuseSource(n *node, permission string, uri, refused *string, re
 	*refused, *uri = *uri, ""
 }
 
-// refuseImage empties the image sources n's Access refuses; one the app
-// holds the bytes of loads nothing.
+// refuseImage empties the image sources n's Access refuses; one the app holds the bytes or pixels of loads nothing.
 func (t *Tree) refuseImage(n *node, src *ImageSource, refused *string, report func(error)) {
-	if len(src.Data) > 0 {
+	if len(src.Data) > 0 || src.Pixels != nil {
 		return
 	}
 	t.refuseSource(n, AccessNetwork, &src.URI, refused, report)

@@ -4,8 +4,10 @@ package linux
 
 import (
 	"context"
+	"image"
 	"log"
 	"math"
+	"slices"
 	"strings"
 	"unsafe"
 
@@ -672,6 +674,9 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 // canvasImage returns src's picture slot, loading it the first time and
 // drawing v again when it loads.
 func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
+	if src.Pixels != nil {
+		return w.canvasFrame(src)
+	}
 	key := src.Key()
 	if s := w.canvasImages[key]; s != nil {
 		if s.pic == nil && s.load != nil {
@@ -716,6 +721,37 @@ func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
 			delete(w.canvasWaiting, key)
 		})
 	}()
+	return s
+}
+
+// maxCanvasFrames and maxCanvasFramePixels bound the pictures a window keeps of the pixels its canvases draw, by count and by their pixels together (8 Mi, four 1920x1080 frames): a stream's older versions are never drawn again.
+const (
+	maxCanvasFrames      = 8
+	maxCanvasFramePixels = 1 << 23
+)
+
+func pixelCount(p *image.RGBA) int { return p.Rect.Dx() * p.Rect.Dy() }
+
+// canvasFrame returns the slot of src's pixels, made at once. The window keeps the latest few, by the core's copy, the most recently drawn last: a canvas that draws again at the same versions makes none anew, and the rest go, as each version is a copy of its own.
+func (w *window) canvasFrame(src driver.ImageSource) *imageSlot {
+	for i, s := range w.canvasFrames {
+		if s.src.Pixels == src.Pixels {
+			w.canvasFrames = append(append(w.canvasFrames[:i:i], w.canvasFrames[i+1:]...), s)
+			return s
+		}
+	}
+	s := &imageSlot{}
+	s.showPixels(src)
+	for len(w.canvasFrames) > 0 && (len(w.canvasFrames) >= maxCanvasFrames || w.canvasFramePixels+pixelCount(src.Pixels) > maxCanvasFramePixels) {
+		w.canvasFramePixels -= pixelCount(w.canvasFrames[0].src.Pixels)
+		if old := w.canvasFrames[0]; old.surface != 0 {
+			cairoSurfaceDestroy(old.surface)
+			old.surface = 0
+		}
+		w.canvasFrames = slices.Delete(w.canvasFrames, 0, 1)
+	}
+	w.canvasFramePixels += pixelCount(src.Pixels)
+	w.canvasFrames = append(w.canvasFrames, s)
 	return s
 }
 

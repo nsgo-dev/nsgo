@@ -69,7 +69,7 @@ What the ops before the first bound one paint is the same whatever the nodes hol
 
 ## Players
 
-Each backend plays the operations in order on the main thread; on macOS into a context Core Animation may draw on its own threads ([animated arguments](#animated-arguments)). Images load as image views' do, cached by `ImageSource.Key` (Apple keeps the 64 drawn last); a canvas draws again when one arrives and draws nothing in its place until then. Android's Go side reads each image once and sends its bytes for Java to decode.
+Each backend plays the operations in order on the main thread; on macOS into a context Core Animation may draw on its own threads ([animated arguments](#animated-arguments)). Images load as image views' do, cached by `ImageSource.Key` (Apple keeps the 64 drawn last); a canvas draws again when one arrives and draws nothing in its place until then. Pixels load nothing and draw in the same play ([pixel buffers](images.md#pixel-buffers)). Android's Go side reads each image once and sends its bytes for Java to decode.
 
 | Target | Plays into | Composites | Shadows | Conic gradients | Stroked text |
 | --- | --- | --- | --- | --- | --- |

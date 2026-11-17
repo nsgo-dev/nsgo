@@ -156,6 +156,9 @@ type surface struct {
 	gestures       gestures
 	// canvasImages are the images canvases draw, by ImageSource.Key.
 	canvasImages map[string]*canvasImage
+	// canvasFrames are the canvases of the pixels canvases drew last (canvasFrame).
+	canvasFrames      []canvasFrame
+	canvasFramePixels int // the pixels of canvasFrames together
 	// stickyBound are the sticky cells whose insets follow animated
 	// values.
 	stickyBound map[*view]bool

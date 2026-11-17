@@ -174,8 +174,7 @@ type (
 	// ImageScales is a set of ImageScaleValues: the variants an image asset
 	// ships in.
 	ImageScales = driver.ImageScales
-	// ImageSource is where an image comes from: a URI (https, file path, file:,
-	// data:) or bytes, such as a file embedded with go:embed.
+	// ImageSource is where an image comes from: a URI (https, file path, file:, data:), bytes, such as a file embedded with go:embed, or pixels the app draws (Pixels and Version).
 	ImageSource = driver.ImageSource
 	// Interpolation maps a node through piecewise-linear ranges.
 	Interpolation = driver.Interpolation

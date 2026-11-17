@@ -23,6 +23,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 
 ## Using them well
 
+- Show frames the app decodes or renders (video, emulators, previews) in a `core.Image` with `ImageSource{Pixels: frame, Version: n}`, bumping `Version` after writing each frame into the same `*image.RGBA`; never encode a PNG per frame ([images](https://nsgo.dev/docs/images.md)).
 - Drive a native `core.WebView` through its `core.Ref` (`Reload`, `GoBack`, `GoForward`); app-owned history entries keep their `core.AccessWebSchemes` exemption, while new page-created navigations remain restricted.
 - A component's look comes from its `Variant`, a type of its own whose zero value is the default (`ui.ButtonVariant`), and a few take `Size` (`ui.SizeDefault`, small or large). Do not fake a variant with styles over the default.
 - For validation in `base` controls, pass `Invalid: rejected.Get`; style it with `aria-invalid:` classes or `Style.AriaInvalid`. Custom controls pass it to their actual input or root and use `core.PartStates.Invalid` on decorative parts to avoid duplicate accessibility state.

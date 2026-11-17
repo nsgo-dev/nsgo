@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"image"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,6 +15,27 @@ type imageNode struct {
 	sent   driver.ImageConfig // as resolved for the pixel ratio
 	// refused and refusedPlaceholder are the URIs Access refused last.
 	refused, refusedPlaceholder string
+	// frame is the copy of the source's pixels the platform was sent last.
+	frame pixelFrame
+}
+
+// pixelFrame is the copy the core made of an app's pixels at a version, which the platform owns once sent: the app may write its buffer again once the commit that copied it ran.
+type pixelFrame struct {
+	from    *image.RGBA
+	version uint64
+	copy    *image.RGBA
+}
+
+// of returns the copy of src's pixels to send: the one made last while src names the same buffer at the same version, so a platform keeps its frame when only the look changes, else a new one.
+func (f *pixelFrame) of(src ImageSource) *image.RGBA {
+	if src.Pixels == nil {
+		*f = pixelFrame{}
+		return nil
+	}
+	if f.from != src.Pixels || f.version != src.Version || f.copy == nil {
+		*f = pixelFrame{from: src.Pixels, version: src.Version, copy: driver.CopyPixels(src.Pixels)}
+	}
+	return f.copy
 }
 
 func (t *Tree) mountImage(cx *Scope, parent *node, v Image) {
@@ -30,7 +52,7 @@ func (t *Tree) mountImage(cx *Scope, parent *node, v Image) {
 		cx.renderEffect(func() {
 			src := v.SourceFunc()
 			if !src.Same(n.image.config.Source) {
-				if src.Size != n.image.config.Source.Size {
+				if naturalOf(src) != naturalOf(n.image.config.Source) {
 					t.markLayout(n)
 				}
 				n.image.config.Source = src
@@ -41,7 +63,16 @@ func (t *Tree) mountImage(cx *Scope, parent *node, v Image) {
 }
 
 // naturalSize is what an image measures without a style size.
-func (im *imageNode) naturalSize() Size { return im.config.Source.Size }
+func (im *imageNode) naturalSize() Size { return naturalOf(im.config.Source) }
+
+// naturalOf is the size src declares, or its pixels in points.
+func naturalOf(src ImageSource) Size {
+	if src.Size == (Size{}) && src.Pixels != nil {
+		b := src.Pixels.Rect
+		return Size{Width: Points(b.Dx()), Height: Points(b.Dy())}
+	}
+	return src.Size
+}
 
 // Positions along an axis.
 var (
@@ -54,10 +85,14 @@ var (
 // as Image's OnLoad reports it, or the error loading or reading it (NSH's
 // Image.getSize). The platform loads it as an Image would, the variant of
 // an "asset:" source with Scales included, and keeps its bytes for the
-// views that show it next.
+// views that show it next. A source with Pixels loads nothing: done is called at once with the buffer's size.
 func (cx *Scope) ImageSize(src ImageSource, done func(pixels Size, err error)) {
 	t := cx.tree()
 	if t == nil {
+		return
+	}
+	if p := src.Pixels; p != nil {
+		done(Size{Width: Points(p.Rect.Dx()), Height: Points(p.Rect.Dy())}, nil)
 		return
 	}
 	if len(src.Data) == 0 {

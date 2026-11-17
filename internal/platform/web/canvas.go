@@ -81,6 +81,9 @@ type canvasImage struct {
 // loadImage returns src's image, loading it the first time, and has v
 // draw again once it loads: a canvas plays again, a shader draws.
 func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
+	if src.Pixels != nil {
+		return s.canvasFrame(src)
+	}
 	key := src.Key()
 	im := s.canvasImages[key]
 	if im == nil {

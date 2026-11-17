@@ -63,7 +63,24 @@ func (s *imageSlot) alpha(now time.Time) float64 {
 	return min(float64(now.Sub(s.fadeAt))/float64(s.fade), 1)
 }
 
-func (s *imageSlot) empty() bool { return s.src.URI == "" && len(s.src.Data) == 0 }
+func (s *imageSlot) empty() bool { return s.src.Empty() }
+
+// showPixels makes src's pixels the slot's picture, in place of the one it shows: no load, no blank, no fade. The surface is made again when it is drawn.
+func (s *imageSlot) showPixels(src driver.ImageSource) {
+	if s.load != nil {
+		s.load.cancel()
+		s.load = nil
+	}
+	if s.surface != 0 {
+		cairoSurfaceDestroy(s.surface)
+		s.surface = 0
+	}
+	img := imagedecode.FromPixels(src.Pixels, imagedecode.BGRA)
+	s.pic = &picture{width: img.Width, height: img.Height, pix: img.Frames[0].Pix, size: img.Size}
+	s.src = src
+	s.frame, s.played, s.frameAt = 0, 0, time.Time{}
+	s.fade = 0
+}
 
 // reset stops the slot's load and frees its picture, for src.
 func (s *imageSlot) reset(src driver.ImageSource) {
@@ -83,7 +100,7 @@ func (s *imageSlot) reset(src driver.ImageSource) {
 
 func sameSource(a, b driver.ImageSource) bool {
 	return a.URI == b.URI && a.Size == b.Size && len(a.Data) == len(b.Data) &&
-		(len(a.Data) == 0 || &a.Data[0] == &b.Data[0])
+		(len(a.Data) == 0 || &a.Data[0] == &b.Data[0]) && a.Pixels == b.Pixels && a.Version == b.Version
 }
 
 // setImage applies an image view's configuration and reports whether a
@@ -91,7 +108,11 @@ func sameSource(a, b driver.ImageSource) bool {
 func (w *window) setImage(v *view, c *driver.ImageConfig) bool {
 	v.image = *c
 	changed := false
-	if !sameSource(v.source.src, c.Source) {
+	switch {
+	case sameSource(v.source.src, c.Source):
+	case c.Source.Pixels != nil:
+		v.source.showPixels(c.Source)
+	default:
 		v.source.reset(c.Source)
 		changed = true
 	}

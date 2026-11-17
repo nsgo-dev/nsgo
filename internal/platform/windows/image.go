@@ -91,7 +91,7 @@ type imageSlot struct {
 
 type imageLoad struct{ cancel context.CancelFunc }
 
-func (s *imageSlot) empty() bool { return s.src.URI == "" && len(s.src.Data) == 0 }
+func (s *imageSlot) empty() bool { return s.src.Empty() }
 
 // reset stops the slot's load and frees its picture, for src.
 func (s *imageSlot) reset(src driver.ImageSource) {
@@ -101,6 +101,20 @@ func (s *imageSlot) reset(src driver.ImageSource) {
 	}
 	releaseAll(&s.bitmap, &s.blur)
 	s.pic = nil
+	s.src = src
+	s.frame, s.playing, s.ended = 0, false, false
+	s.fade = 0
+}
+
+// showPixels makes src's pixels the slot's picture, in place of the one it shows: no load, no blank, no fade. The bitmap is made again when it is drawn.
+func (s *imageSlot) showPixels(src driver.ImageSource) {
+	if s.load != nil {
+		s.load.cancel()
+		s.load = nil
+	}
+	releaseAll(&s.bitmap)
+	img := imagedecode.FromPixels(src.Pixels, imagedecode.BGRA)
+	s.pic = &picture{width: img.Width, height: img.Height, frames: img.Frames, size: img.Size}
 	s.src = src
 	s.frame, s.playing, s.ended = 0, false, false
 	s.fade = 0
@@ -116,7 +130,7 @@ func (s *imageSlot) alpha(now time.Time) float32 {
 
 func sameSource(a, b driver.ImageSource) bool {
 	return a.URI == b.URI && a.Size == b.Size && len(a.Data) == len(b.Data) &&
-		(len(a.Data) == 0 || &a.Data[0] == &b.Data[0])
+		(len(a.Data) == 0 || &a.Data[0] == &b.Data[0]) && a.Pixels == b.Pixels && a.Version == b.Version
 }
 
 // setImage applies an image view's configuration and reports whether a
@@ -125,7 +139,12 @@ func sameSource(a, b driver.ImageSource) bool {
 func (w *window) setImage(v *view, c *driver.ImageConfig) bool {
 	v.image = *c
 	changed := false
-	if !sameSource(v.source.src, c.Source) {
+	switch {
+	case sameSource(v.source.src, c.Source):
+	case c.Source.Pixels != nil:
+		v.source.showPixels(c.Source)
+		w.redrawView(v)
+	default:
 		v.source.reset(c.Source)
 		changed = true
 	}

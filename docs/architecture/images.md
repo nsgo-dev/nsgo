@@ -1,6 +1,6 @@
 # Images
 
-`Image` shows a picture the platform loads: a URL, a file, an `asset:` path in the app's resources, or bytes the app holds. Bitmaps, animated GIF and WebP files and SVG documents all load as images, as in NSH's `docs/dev/images.md`. An `asset:` source lists the `@Nx` variants it ships in `Scales`, and the core sends the one for the pixel ratio, as NSH's does; without `Scales` the plain file loads. Read this before changing how a backend loads, decodes or plays images.
+`Image` shows a picture the platform loads: a URL, a file, an `asset:` path in the app's resources, or bytes the app holds; or the pixels the app draws, which load nothing ([pixel buffers](#pixel-buffers)). Bitmaps, animated GIF and WebP files and SVG documents all load as images, as in NSH's `docs/dev/images.md`. An `asset:` source lists the `@Nx` variants it ships in `Scales`, and the core sends the one for the pixel ratio, as NSH's does; without `Scales` the plain file loads. Read this before changing how a backend loads, decodes or plays images.
 
 ## Fit, position, blur and fade
 
@@ -13,6 +13,27 @@
 - Windows and Linux draw a blurred image enlarged under a clip to its own rectangle, so its edges stay opaque.
 - A source that loads fades in over its placeholder for `FadeDuration`: 0 by default, as NSH's iOS, except Android's 300 ms. Windows and Linux fade on their frame clocks, even when the bytes came from the cache.
 - Videos fit with `Fit` on Windows and Android; Apple's `AVPlayerLayer` and GTK's `GtkPicture` have no natural-size fit, so `Center` there shrinks as `ScaleDown` does, and Android's video shows both as `Contain`.
+
+## Pixel buffers
+
+`ImageSource.Pixels` is an `*image.RGBA` the app draws, premultiplied as Go's type is, with `Version` telling frames written into the same buffer apart (#107, NSH's `ImageSrc::rgba`). `Image` and `Canvas` show it with nothing loaded or decoded:
+
+- The core copies the pixels when the commit that carries a new buffer or `Version` runs, on the engine goroutine, into a buffer of the platform's at the origin with rows of 4 bytes a pixel (`driver.CopyPixels`). The app may write the next frame into the same buffer once that commit ran, from its next `RequestAnimationFrame` callback for one; a decoder on another goroutine writes into a second buffer and posts the swap. A commit that resends the view for another reason, such as its position, sends the same copy, so the platform keeps its frame; the same `Version` is not drawn again, however the buffer changed.
+- Versions set between two commits coalesce into the last. The core copies each version it commits, a hidden or minimized window's too, although #107 asks that such a window copy nothing; the roadmap records it.
+- On Apple platforms, Windows and Linux the platform swaps the frame in place: the previous one stays until the new one is drawn. Android and the web load each version's PNG as a new image, so the view is blank until it decodes, as the table says. Wherever they show, pixels come with no `OnLoadStart`, `OnProgress`, `OnLoad`, `OnError` or `OnLoadEnd` (the core drops any a backend reports for pixels), no `FadeDuration`, no placeholder and no cache entry. `ResizeMode`, `ObjectPosition`, corners, tint and blur apply as to any image. Without `Size` a buffer measures its pixels in points.
+- It is an ordinary view, so views mounted after it, texts and controls and backdrop blurs, draw above it, unlike a `Native` component's child window on Windows.
+- A canvas's `DrawImage`, `DrawImageIn` and `DrawImageFrom` copy the pixels they draw in the same way (`canvasNode.withFrames`), and draw them in the same play, never waiting for a load. Each backend keeps the images of the latest copies its canvases drew, at most 8 and 8 Mi pixels together, so a canvas drawn again at the same versions makes none anew while a stream's older versions go.
+
+| Target | Image | Canvas |
+| --- | --- | --- |
+| Apple | A `CGImage` over a copy of the pixels (`pixelsImage`), set as the layer's contents on the main thread | The same image (`canvasFrame`) |
+| Windows | Premultiplied BGRA (`imagedecode.FromPixels`), a Direct2D bitmap with premultiplied alpha | The same |
+| Linux | Premultiplied BGRA, a Cairo ARGB32 surface | The same |
+| Web | A `<canvas>` the pixels are put into, straight, and its PNG data URL, which the browser loads as a new image: blank until it loads | That `<canvas>` |
+| Android | A PNG without compression made once per copy, the view keeping only its latest (`imageView.asPNG`), decoded by Java as a new request: blank until it decodes, with a 1 ms fade | Not drawn: Java keeps every canvas image it decodes |
+| HarmonyOS, mini programs | Not shown | Not drawn |
+
+Shaders' `Images` do not take pixels: the core drops them, copying none, so an image that names only pixels reads as an empty one. `Scope.ImageSize` answers a pixel source at once with its buffer's size, and `PrefetchImage` with success, without asking the platform.
 
 ## Size and prefetch
 
@@ -55,4 +76,4 @@ Its scanline rasterizer computes exact coverage across each row with 16 samples 
 
 ## Verification
 
-`go tool nsgo test ./internal/driver` checks the paths of Windows and other targets' file URLs on every host; `go tool nsgo test ./internal/platform/imageload` reads local files through their file URLs with `Load` and checks the disk cache's policy against a test server; each backend's tests hold its HTTP client to the same checks (`imageloadtest.CheckHTTP`). `go tool nsgo test ./internal/platform/imagedecode` checks decoded frames, rasterized pixels and the bounds; the Windows and Linux native tests check animated GIFs and SVG pixels in a window. The Windows and Linux native tests also check a fit at a position, `Center`'s natural size, blur, fade and `ImageSize` in a window. The gallery's Images page shows every resize mode, blur, placeholders and fades, `ImageSize`, `PrefetchImage` and progress, an animated GIF and WebP, and SVG, plain and tinted.
+`go tool nsgo test ./internal/driver` checks the paths of Windows and other targets' file URLs on every host; `go tool nsgo test ./internal/platform/imageload` reads local files through their file URLs with `Load` and checks the disk cache's policy against a test server; each backend's tests hold its HTTP client to the same checks (`imageloadtest.CheckHTTP`). `go tool nsgo test ./internal/platform/imagedecode` checks decoded frames, rasterized pixels and the bounds, and pixel buffers' BGRA and PNGs; `go tool nsgo test ./core` checks that pixels are copied once per version, for image views and canvases, and fire no load events; the Apple tests check an image view swapping pixels in place, and the Linux tests draw pixels' alpha over a color in an image view and a canvas; the Windows and Linux native tests check animated GIFs and SVG pixels in a window. The Windows and Linux native tests also check a fit at a position, `Center`'s natural size, blur, fade and `ImageSize` in a window. The gallery's Images page shows every resize mode, blur, placeholders and fades, `ImageSize`, `PrefetchImage` and progress, an animated GIF and WebP, and SVG, plain and tinted.

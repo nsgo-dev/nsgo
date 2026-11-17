@@ -463,6 +463,9 @@ type window struct {
 	epoch    time.Time
 	// canvasImages are the images canvases draw, by ImageSource.Key.
 	canvasImages map[string]*imageSlot
+	// canvasFrames are the pictures of the pixels canvases drew last (canvasFrame).
+	canvasFrames      []*imageSlot
+	canvasFramePixels int // the pixels of canvasFrames together
 	// stickyBound are the scroll views with sticky cells whose insets
 	// follow animated values.
 	stickyBound map[*view]bool
