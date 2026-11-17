@@ -163,6 +163,9 @@ func TestInputElementAccessibilityMatchesMountedInput(t *testing.T) {
 			LabelFunc: func() string { return "" }, AccessibilityDescriptionFunc: func() string { return "" },
 			Expanded: func() bool { return false }}},
 		{"states", Input{Invalid: func() bool { return true }, Disabled: func() bool { return true }}},
+		{"state-styles", Input{Invalid: func() bool { return true }, Expanded: func() bool { return true },
+			OnAccessibilityAction: func(string) {}, AccessibilityActions: []AccessibilityAction{{Name: "clear", Label: "Clear"}},
+			Style: Style{Opacity: Alpha(0.5), Expanded: &Style{BorderWidth: 2}, AriaInvalid: &Style{Background: RGB(0xff0000)}}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
@@ -178,6 +181,14 @@ func TestInputElementAccessibilityMatchesMountedInput(t *testing.T) {
 			want.TestID, got.TestID = "", ""
 			if !reflect.DeepEqual(got, want) {
 				t.Errorf("element props = %+v, want mounted input's %+v", got, want)
+			}
+			// The states the props carry style the field, and its handlers set its events, as a mounted input's.
+			m, e := h.find("mounted"), h.find("element")
+			if !reflect.DeepEqual(e.style, m.style) {
+				t.Errorf("element style = %+v, want mounted input's %+v", e.style, m.style)
+			}
+			if e.sent.events != m.sent.events {
+				t.Errorf("element events = %v, want mounted input's %v", e.sent.events, m.sent.events)
 			}
 		})
 	}
