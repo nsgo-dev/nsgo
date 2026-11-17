@@ -37,8 +37,8 @@ func TestEveryDemoShows(t *testing.T) {
 
 func TestButtonSays(t *testing.T) {
 	app := start(t, "button/basic")
-	app.Press("text:Save")
-	app.WaitFor("text:Saved", time.Second)
+	app.Press("text:/^(Save|保存)$/")
+	app.WaitFor("text:/^(Saved|已保存)$/", time.Second)
 }
 
 // TestButtonBusy shows a save running, its button busy until it is saved.
@@ -60,7 +60,7 @@ func TestButtonBusy(t *testing.T) {
 func TestPickerWithoutHost(t *testing.T) {
 	app := nsgotest.Start(t, Root, nsgotest.Size(480, 320))
 	app.Find("text:button/basic")
-	app.Find("text:Save")
+	app.Find("text:/^(Save|保存)$/")
 }
 
 // previewMark is a code block's preview mark in the docs.
