@@ -515,13 +515,10 @@ func keyPressedCallback(controller uintptr, keyval, keycode, state uint32, data 
 		w.engine.InputModality(driver.ModalityKeyboard)
 	}
 	w.menuBarKey(keyval, state, true)
-	if w.controlKey(keyval, state, repeat) {
-		return 1
-	}
 	if w.selectKey(keyval, state) {
 		return 1
 	}
-	if w.shortcut(keyval, state, repeat) {
+	if w.shortcut(keyval, state, repeat) || w.controlKey(keyval, state, repeat) {
 		return 1
 	}
 	if (keyval == 0xff09 || keyval == 0xfe20) && state&(gdkControl|gdkAlt|gdkSuper|gdkMeta) == 0 && w.focusedWeb() == nil && w.tab(state&gdkShift != 0 || keyval == 0xfe20) {
@@ -804,10 +801,11 @@ func (w *window) shortcut(keyval, state uint32, repeat bool) bool {
 		}
 		names = append(names, strings.Join(append(parts, name), "+"))
 	}
-	// Only fields and pages take the keyboard focus here (#266), so the focus uses a text input's keys or none.
 	var focus driver.KeyUse
 	if editing {
 		focus = driver.KeyUseText
+	} else if v := w.controlFocus; v != nil && !v.deleted {
+		focus = driver.FocusKeyUse(v.kind, v.props.Role, v.events.Pressable())
 	}
 	if id, consumed := driver.FindKey(w.keys, names, focus, repeat); consumed {
 		if id != 0 {

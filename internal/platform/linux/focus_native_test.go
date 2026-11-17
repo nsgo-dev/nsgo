@@ -52,6 +52,17 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 		if button == nil || button.props.TestID != "button" || gtkWindowGetFocus(w.toplevel()) != button.widget {
 			t.Error("Ref.Focus did not grab the button's GTK widget")
 		}
+		// The keymap has Return before the focused button: a binding that yields it to the button leaves it, one that does not takes it.
+		keys := w.keys
+		w.keys = []driver.KeyBinding{{Key: "enter", Yields: driver.KeyUsePress}}
+		if w.shortcut(gdkReturn, 0, false) {
+			t.Error("a binding that yields Return to a focused button took it")
+		}
+		w.keys = []driver.KeyBinding{{Key: "enter"}}
+		if !w.shortcut(gdkReturn, 0, false) {
+			t.Error("a binding that does not yield Return left it to the focused button")
+		}
+		w.keys = keys
 		for _, key := range []uint32{gdkSpace, gdkReturn} {
 			keyPressedCallback(0, key, key, 0, w.handle)
 			// Repeated keydowns must not press again.

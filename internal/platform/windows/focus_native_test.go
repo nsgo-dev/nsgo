@@ -52,6 +52,17 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 		if v == nil || v.props.TestID != "button" || w.focusedField() != nil {
 			t.Error("Ref.Focus did not move the surface's keyboard focus to the button")
 		}
+		// The keymap has Return before the focused button: a binding that yields it to the button leaves it, one that does not takes it.
+		keys := w.keys
+		w.keys = []driver.KeyBinding{{Key: "enter", Yields: driver.KeyUsePress}}
+		if w.shortcut(vkReturn, 1) {
+			t.Error("a binding that yields Return to a focused button took it")
+		}
+		w.keys = []driver.KeyBinding{{Key: "enter"}}
+		if !w.shortcut(vkReturn, 1) {
+			t.Error("a binding that does not yield Return left it to the focused button")
+		}
+		w.keys = keys
 		for _, key := range []uintptr{vkSpace, vkReturn} {
 			postMessageW.Call(hwnd, wmKeyDown, key, 1)
 			postMessageW.Call(hwnd, wmKeyDown, key, 1<<30|1)

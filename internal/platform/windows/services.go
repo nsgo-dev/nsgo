@@ -113,9 +113,6 @@ func (w *window) setKeymap(keys []driver.KeyBinding) { w.keys = keys }
 // the app's own first, as driver.FindKey decides for a focused field and a
 // held key (lParam's repeat bit), then the application menu's.
 func (w *window) shortcut(vk, lParam uintptr) bool {
-	if w.controlKey(vk, lParam) {
-		return true
-	}
 	if len(w.keys) == 0 && len(w.chrome.keys) == 0 {
 		return false
 	}
@@ -142,12 +139,7 @@ func (w *window) shortcut(vk, lParam uintptr) bool {
 		}
 		names = append(names, strings.Join(append(parts, name), "+"))
 	}
-	// Only fields and pages take the keyboard focus here (#266), so the focus uses a text input's keys or none.
-	var focus driver.KeyUse
-	if w.editing() {
-		focus = driver.KeyUseText
-	}
-	if id, consumed := driver.FindKey(w.keys, names, focus, repeated(lParam)); consumed {
+	if id, consumed := driver.FindKey(w.keys, names, w.focusKeyUse(), repeated(lParam)); consumed {
 		if id != 0 {
 			w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
 		}

@@ -8,9 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Focus stays in the newest modal. Ordinary widgets become focusable
-// only when Tab or an explicit command chooses them, so GTK's automatic
-// focus on mapping a window does not focus a button on the app's behalf.
+// Focus stays in the newest modal. Ordinary widgets become focusable only when Tab or an explicit command chooses them, so GTK's automatic focus on mapping a window does not focus a button on the app's behalf.
 func (w *window) focusScope() *view {
 	root := w.view(w.root)
 	scope := root
@@ -59,8 +57,7 @@ func (w *window) focusedView() *view {
 	return w.focusedEntry()
 }
 
-// focusView grabs the actual GTK widget; focus reports then drive the
-// engine's focus and focus-visible styles as they do for text fields.
+// focusView grabs the actual GTK widget; focus reports then drive the engine's focus and focus-visible styles as they do for text fields.
 func (w *window) focusView(v *view) {
 	if !w.focusableView(v) {
 		return
@@ -150,9 +147,10 @@ func (w *window) tab(back bool) bool {
 	return true
 }
 
+// controlKey presses the focused pressable stop on Return or Space, once per physical press, after the keymap has had the key. A focusable view without press handlers leaves the key alone.
 func (w *window) controlKey(keyval, state uint32, repeat bool) bool {
 	v := w.controlFocus
-	if !w.focusableView(v) || !v.events.Has(driver.EventPress) && !v.events.Has(driver.EventPressDown) ||
+	if !w.focusableView(v) || !v.events.Pressable() ||
 		(keyval != gdkReturn && keyval != gdkKPEnter && keyval != gdkSpace) || state&(gdkShift|gdkControl|gdkAlt|gdkSuper|gdkMeta) != 0 {
 		return false
 	}

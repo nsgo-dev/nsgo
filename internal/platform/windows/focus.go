@@ -4,8 +4,7 @@ package windows
 
 import "github.com/nsgo-dev/nsgo/internal/driver"
 
-// focusedView is the keyboard's field or ordinary view. Windows gives
-// the native focus to the surface; the backend routes it within the tree.
+// focusedView is the keyboard's field or ordinary view. Windows gives the native focus to the surface; the backend routes it within the tree.
 func (w *window) focusedView() *view {
 	if in := w.focusedField(); in != nil {
 		return in.v
@@ -23,8 +22,7 @@ func (w *window) focusableView(v *view) bool {
 	return v.props.FocusStop(v.events)
 }
 
-// focusView handles Ref.Focus and accessibility focus for either kind
-// of stop, without moving to an invalid target or through a modal.
+// focusView handles Ref.Focus and accessibility focus for either kind of stop, without moving to an invalid target or through a modal.
 func (w *window) focusView(v *view) {
 	if !w.focusableView(v) || w.focusedView() == v {
 		return
@@ -51,8 +49,7 @@ func (w *window) blurControl() {
 	w.restoreControl = nil
 }
 
-// checkControlFocus follows stops hidden, disabled or covered by a
-// modal. A modal gives back the stop it covered when it closes.
+// checkControlFocus follows stops hidden, disabled or covered by a modal. A modal gives back the stop it covered when it closes.
 func (w *window) checkControlFocus() {
 	v := w.controlFocus
 	switch {
@@ -71,11 +68,21 @@ func (w *window) checkControlFocus() {
 	}
 }
 
-// controlKey activates only a focused pressable stop, once per physical
-// press. A focusable view without press handlers keeps its key bindings.
+// focusKeyUse returns the keys the view with the keyboard focus uses itself, which the keymap's bindings that yield them leave it (driver.FindKey).
+func (w *window) focusKeyUse() driver.KeyUse {
+	if w.editing() {
+		return driver.KeyUseText
+	}
+	if v := w.controlFocus; v != nil && !v.deleted {
+		return driver.FocusKeyUse(v.kind, v.props.Role, v.events.Pressable())
+	}
+	return 0
+}
+
+// controlKey presses the focused pressable stop on Return or Space, once per physical press, after the keymap has had the key. A focusable view without press handlers leaves the key alone.
 func (w *window) controlKey(vk, lParam uintptr) bool {
 	v := w.controlFocus
-	if !w.focusableView(v) || !v.events.Has(driver.EventPress) && !v.events.Has(driver.EventPressDown) ||
+	if !w.focusableView(v) || !v.events.Pressable() ||
 		(vk != vkReturn && vk != vkSpace) || keyDown(vkControl) || keyDown(vkShift) || keyDown(vkMenu) || keyDown(vkLWin) || keyDown(vkRWin) {
 		return false
 	}
