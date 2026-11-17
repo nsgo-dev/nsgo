@@ -721,9 +721,7 @@ func (w *window) destroy() {
 	w.releaseSurface()
 }
 
-// releaseSurface releases a stopped surface's tree, process-wide
-// registrations and native references. An embedded surface leaves its
-// parent widget and the host's window to the host.
+// releaseSurface releases a stopped surface's tree, process-wide registrations and native references. An embedded surface leaves its parent widget and the host's window to the host.
 func (w *window) releaseSurface() {
 	for _, v := range w.views {
 		if v != nil {

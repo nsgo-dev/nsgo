@@ -49,8 +49,7 @@ func nativeApp(title string) engine.App {
 	}
 }
 
-// testWindowCalls keeps consecutive windows on GTK's initialization
-// thread. The native tests open one primary window at a time.
+// testWindowCalls keeps consecutive windows on GTK's initialization thread. The native tests open one primary window at a time.
 var testWindowCalls = sync.OnceValue(func() chan func() {
 	calls := make(chan func())
 	go func() {
@@ -62,8 +61,7 @@ var testWindowCalls = sync.OnceValue(func() chan func() {
 	return calls
 })
 
-// startTestWindow opens the window on the shared GTK thread and returns
-// it once its engine runs. The test skips where no display can open one.
+// startTestWindow opens the window on the shared GTK thread and returns it once its engine runs. The test skips where no display can open one.
 func startTestWindow(t *testing.T, app engine.App, opts Options) *window {
 	t.Helper()
 	type result struct {

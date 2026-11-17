@@ -140,8 +140,7 @@ func (w *window) measureContext(rtl bool) uintptr {
 	return w.measureMap[i]
 }
 
-// newTextContext gives the context a font map of its own. The context
-// retains the map, so the map's initial reference belongs here only.
+// newTextContext gives the context a font map of its own. The context retains the map, so the map's initial reference belongs here only.
 func newTextContext(rtl bool) uintptr {
 	fontMap := pangoCairoFontMapNew()
 	context := pangoFontMapCreateContext(fontMap)
@@ -150,8 +149,7 @@ func newTextContext(rtl bool) uintptr {
 	return context
 }
 
-// releaseTextContexts drops both threads' contexts once their users
-// have stopped, or before they prepare text again with new fonts.
+// releaseTextContexts drops both threads' contexts once their users have stopped, or before they prepare text again with new fonts.
 func (w *window) releaseTextContexts() {
 	for i, context := range w.measureMap {
 		if context != 0 {

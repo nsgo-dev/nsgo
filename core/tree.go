@@ -697,8 +697,7 @@ func newTree(root *Scope, text driver.TextEngine, id uint32) *Tree {
 	}
 	t.view = t.newNode(driver.KindView, nil, root)
 	t.view.style = Style{Direction: Column}
-	// Prepared texts belong to this tree even when its platform will
-	// receive no final commit, as when an embedded engine stops.
+	// Prepared texts belong to this tree even when its platform will receive no final commit, as when an embedded engine stops.
 	root.addCleanup(func() { t.discard(t.view) })
 	if root.rt.dev != nil {
 		// An app that opens windows has a first tree of its own that shows no view (RootOptions.Windows): DevTools pages leave it out, while the automation's agent follows it for the app's alerts and main menu.
