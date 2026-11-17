@@ -40,8 +40,7 @@ func TestViewCleanupWithInheritedHangupIgnored(t *testing.T) {
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		shown = core.NewSignal(cx, true)
 		return core.Show{When: shown.Get, Then: func(cx *core.Scope) core.Node {
-			// The owner closes its terminal when its view is removed, as
-			// the gallery does; a terminal can also outlive a view.
+			// The owner closes its terminal when its view is removed, as the gallery does; a terminal can also outlive a view.
 			cx.Cleanup(func() { term.Close() })
 			return View{Terminal: term, TestID: "terminal", Style: core.Style{Width: core.Pct(100), Height: core.Pct(100)}}
 		}}

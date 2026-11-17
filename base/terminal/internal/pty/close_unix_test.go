@@ -12,6 +12,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,8 +21,7 @@ import (
 	"time"
 )
 
-// closeProcess starts a real child and waits until it has installed its
-// signal handling, so a hang-up cannot race the shell's startup.
+// closeProcess starts a real child and waits until it has installed its signal handling, so a hang-up cannot race the shell's startup.
 func closeProcess(t *testing.T, script string) *PTY {
 	t.Helper()
 	p, err := Start(Options{Path: "/bin/sh", Args: []string{"sh", "-c", script}, Env: os.Environ()})
@@ -80,22 +81,29 @@ func closedProcess(t *testing.T, p *PTY, want int) {
 	}
 }
 
-func TestCloseInheritedHangupIgnored(t *testing.T) {
-	if os.Getenv("NSGO_TEST_INHERITED_HUP") != "1" {
-		ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
-		defer cancel()
-		// Unlike signal.Ignore in this test, this makes even the Go test
-		// process start with an inherited SIG_IGN, as under nohup.
-		cmd := exec.CommandContext(ctx, "/bin/sh", "-c", `trap '' HUP; exec "$@"`, "sh",
-			os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
-		cmd.Env = append(os.Environ(), "NSGO_TEST_INHERITED_HUP=1")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("inherited SIGHUP: %v\n%s", err, out)
+// inheritHangupIgnored runs the calling test again in a process started with SIGHUP ignored, as under nohup, and reports whether this is that process. Unlike signal.Ignore in the test itself, the re-run test process starts with an inherited SIG_IGN, which its children inherit.
+func inheritHangupIgnored(t *testing.T) bool {
+	t.Helper()
+	if os.Getenv("NSGO_TEST_INHERITED_HUP") == "1" {
+		if !signal.Ignored(syscall.SIGHUP) {
+			t.Fatal("helper did not inherit an ignored SIGHUP")
 		}
-		return
+		return true
 	}
-	if !signal.Ignored(syscall.SIGHUP) {
-		t.Fatal("helper did not inherit an ignored SIGHUP")
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", `trap '' HUP; exec "$@"`, "sh",
+		os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+	cmd.Env = append(os.Environ(), "NSGO_TEST_INHERITED_HUP=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("inherited SIGHUP: %v\n%s", err, out)
+	}
+	return false
+}
+
+func TestCloseInheritedHangupIgnored(t *testing.T) {
+	if !inheritHangupIgnored(t) {
+		return
 	}
 	p := closeProcess(t, "printf 'ready\\n'; exec sleep 30")
 	if err := p.Close(); err != nil {
@@ -150,8 +158,7 @@ func TestCloseEndsGroupAfterLeaderExits(t *testing.T) {
 	defer cancel()
 	go func() { <-ctx.Done(); listener.Close() }()
 	p, err := Start(Options{Path: os.Args[0], Args: []string{os.Args[0], "-test.run=^TestPTYGroupProcess$"},
-		// The race runtime otherwise sleeps for a second in os.Exit,
-		// which would keep the leader alive beyond the SIGTERM deadline.
+		// The race runtime otherwise sleeps for a second in os.Exit, which would keep the leader alive beyond the SIGTERM deadline.
 		Env: append(os.Environ(), "NSGO_TEST_PTY_GROUP=leader", "NSGO_TEST_PTY_ADDRESS="+listener.Addr().String(),
 			"GORACE="+os.Getenv("GORACE")+" atexit_sleep_ms=0")})
 	if err != nil {
@@ -174,13 +181,86 @@ func TestCloseEndsGroupAfterLeaderExits(t *testing.T) {
 	if err := p.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// The leader exits on HUP; its child ignores HUP and TERM. EOF on
-	// this independent connection proves the child was killed too, even
-	// where the container's init leaves orphaned zombies unreaped.
+	// The leader exits on HUP; its child ignores HUP and TERM. EOF on this independent connection proves the child was killed too, even where the container's init leaves orphaned zombies unreaped.
 	if _, err := r.ReadByte(); !errors.Is(err, io.EOF) {
 		t.Fatalf("group member survived close: %v", err)
 	}
 	closedProcess(t, p, 0)
+}
+
+// An interactive shell runs each job in a process group of its own, so signalling the shell's group alone leaves its jobs, which inherit the ignored SIGHUP, running after the shell is killed.
+func TestCloseEndsShellJobsInheritedHangupIgnored(t *testing.T) {
+	if !inheritHangupIgnored(t) {
+		return
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	go func() { <-ctx.Done(); listener.Close() }()
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "ENV=") && !strings.HasPrefix(kv, "PS1=") {
+			env = append(env, kv)
+		}
+	}
+	env = append(env, "PS1=$ ", "HISTFILE=/dev/null", "NSGO_TEST_PTY_GROUP=job",
+		"NSGO_TEST_PTY_ADDRESS="+listener.Addr().String())
+	p, err := Start(Options{Path: "/bin/sh", Args: []string{"sh", "-i"}, Env: env})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupProcess(t, p)
+	go io.Copy(io.Discard, p)
+	job := "'" + strings.ReplaceAll(os.Args[0], "'", `'\''`) + "' -test.run='^TestPTYGroupProcess$'"
+	// A background job and a foreground one, each in its own group.
+	if _, err := p.Write([]byte(job + " &\n" + job + "\n")); err != nil {
+		t.Fatal(err)
+	}
+	var conns []*bufio.Reader
+	for range 2 {
+		conn, err := listener.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		r := bufio.NewReader(conn)
+		line, err := r.ReadString('\n')
+		group, ok := strings.CutPrefix(strings.TrimSpace(line), "ready ")
+		if !ok || err != nil {
+			t.Fatalf("job readiness: %q, %v", line, err)
+		}
+		if group == strconv.Itoa(p.Pid()) {
+			t.Fatal("the shell ran a job in its own process group; job control is off")
+		}
+		conns = append(conns, r)
+	}
+	if err := p.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for i, r := range conns {
+		if _, err := r.ReadByte(); !errors.Is(err, io.EOF) {
+			t.Fatalf("job %d survived close: %v", i, err)
+		}
+	}
+	select {
+	case <-p.Exited():
+	case <-time.After(5 * time.Second):
+		t.Fatal("the shell outlived its terminal")
+	}
+}
+
+func TestSessionGroups(t *testing.T) {
+	p := closeProcess(t, "printf 'ready\\n'; exec sleep 30")
+	if got := sessionGroups(p.Pid()); !slices.Equal(got, []int{p.Pid()}) {
+		t.Fatalf("session groups = %v, want [%d]", got, p.Pid())
+	}
 }
 
 func TestPTYGroupProcess(t *testing.T) {
@@ -206,6 +286,15 @@ func TestPTYGroupProcess(t *testing.T) {
 		}
 		defer conn.Close()
 		fmt.Fprintln(conn, "ready")
+		io.Copy(io.Discard, conn)
+	case "job":
+		// A job keeps the signal handling it inherited from the shell.
+		conn, err := net.Dial("tcp", os.Getenv("NSGO_TEST_PTY_ADDRESS"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		fmt.Fprintln(conn, "ready", syscall.Getpgrp())
 		io.Copy(io.Discard, conn)
 	default:
 		t.Skip("child-process helper")

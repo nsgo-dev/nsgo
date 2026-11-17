@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"slices"
 	"syscall"
 	"unsafe"
 )
@@ -37,8 +38,7 @@ func openMaster() (*os.File, string, error) {
 	return master, string(name[:n]), nil
 }
 
-// waitForExit observes exit without reaping, as Linux's WNOWAIT does.
-// Darwin's waitid can also return for stopped children despite WEXITED.
+// waitForExit observes exit without reaping, as Linux's WNOWAIT does. Darwin's waitid can also return for stopped children despite WEXITED.
 func waitForExit(pid int) error {
 	fd, err := syscall.Kqueue()
 	if err != nil {
@@ -76,4 +76,61 @@ func waitForExit(pid int) error {
 			return nil
 		}
 	}
+}
+
+// The sysctl listing the processes of a real user ID (sys/sysctl.h), and the layout of the kinfo_proc entries it returns on 64-bit Darwin: the size of the struct and the offset of kp_proc.p_pid. Darwin answers KERN_PROC_SESSION with ENOENT.
+const (
+	ctlKern            = 1
+	kernProc           = 14
+	kernProcRUID       = 6
+	kinfoProcSize      = 648
+	kinfoProcPidOffset = 40
+)
+
+// sessionGroups returns the process groups of this user's processes in session sid; nil if the kernel does not list them. Processes of other users could not be signalled anyway.
+func sessionGroups(sid int) []int {
+	mib := [4]int32{ctlKern, kernProc, kernProcRUID, int32(syscall.Getuid())}
+	buf := userProcs(mib[:])
+	var groups []int
+	for off := 0; off+kinfoProcSize <= len(buf); off += kinfoProcSize {
+		pid := int(*(*int32)(unsafe.Pointer(&buf[off+kinfoProcPidOffset])))
+		// Only a process still in session sid is the terminal's; getsid(0) and getpgid(0) would name this process's own.
+		if s, err := syscall.Getsid(pid); pid <= 0 || err != nil || s != sid {
+			continue
+		}
+		if g, err := syscall.Getpgid(pid); err == nil && !slices.Contains(groups, g) {
+			groups = append(groups, g)
+		}
+	}
+	return groups
+}
+
+// userProcs returns the kinfo_proc entries the sysctl mib lists.
+func userProcs(mib []int32) []byte {
+	for range 4 {
+		var n uintptr
+		if sysctl(mib, nil, &n) != nil || n == 0 {
+			return nil
+		}
+		n += n / 4 // Room for processes started since.
+		buf := make([]byte, n)
+		switch err := sysctl(mib, &buf[0], &n); err {
+		case nil:
+			return buf[:n]
+		case syscall.ENOMEM:
+			continue // More processes started than there was room for.
+		default:
+			return nil
+		}
+	}
+	return nil
+}
+
+func sysctl(mib []int32, old *byte, n *uintptr) error {
+	_, _, errno := syscall.Syscall6(syscall.SYS___SYSCTL, uintptr(unsafe.Pointer(&mib[0])), uintptr(len(mib)),
+		uintptr(unsafe.Pointer(old)), uintptr(unsafe.Pointer(n)), 0, 0)
+	if errno != 0 {
+		return errno
+	}
+	return nil
 }

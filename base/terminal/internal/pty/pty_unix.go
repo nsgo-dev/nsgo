@@ -17,8 +17,7 @@ import (
 type sys struct {
 	master *os.File
 	cmd    *exec.Cmd
-	// mu keeps group signals and reaping together: a reaped PID could
-	// name an unrelated process group by the next escalation.
+	// mu keeps group signals and reaping together: a reaped PID could name an unrelated process group or session by the next escalation.
 	mu        sync.Mutex
 	reaped    bool
 	closing   bool
@@ -58,13 +57,11 @@ func (p *PTY) start(o Options) error {
 }
 
 func (p *PTY) wait() (int, error) {
-	// Observe exit without reaping. Once Close starts, keep the child's
-	// PID reserved until the last group signal has been sent.
+	// Observe exit without reaping. Once Close starts, keep the child's PID reserved until the last group signal has been sent.
 	readyErr := waitForExit(p.cmd.Process.Pid)
 	p.mu.Lock()
 	if readyErr != nil {
-		// If the kernel cannot watch exit, os.Process still signals its
-		// child safely. Disable raw group signals before Wait may reap it.
+		// If the kernel cannot watch exit, os.Process still signals its child safely. Disable raw group signals before Wait may reap it.
 		p.groupSafe = false
 	}
 	if p.closing {
@@ -126,9 +123,7 @@ func (p *PTY) ClearScreen() error { return nil }
 // Pid returns the process's ID.
 func (p *PTY) Pid() int { return p.cmd.Process.Pid }
 
-// Close hangs up the terminal and its process group. A group ignoring
-// SIGHUP gets SIGTERM after a grace period, then SIGKILL. It does not
-// wait for exit; Wait includes the group's shutdown.
+// Close hangs up the terminal and the process groups of its session: the process's and those of the jobs it started. Groups ignoring SIGHUP get SIGTERM after a grace period, then SIGKILL. It does not wait for exit; Wait includes the session's shutdown.
 func (p *PTY) Close() error {
 	p.closeOnce.Do(func() {
 		p.mu.Lock()
@@ -156,7 +151,7 @@ func (p *PTY) Close() error {
 
 const closeGrace = 250 * time.Millisecond
 
-// Kill kills the process and those of its process group, which it leads.
+// Kill kills the process and the process groups of its session, which it leads.
 func (p *PTY) Kill() error {
 	return p.signal(syscall.SIGKILL)
 }
@@ -168,7 +163,15 @@ func (p *PTY) signal(sig syscall.Signal) error {
 		return os.ErrProcessDone
 	}
 	if p.groupSafe {
-		if err := syscall.Kill(-p.cmd.Process.Pid, sig); err != syscall.ESRCH {
+		pid := p.cmd.Process.Pid
+		err := syscall.Kill(-pid, sig)
+		// An interactive shell runs each job in a process group of its own, in its session. The unreaped leader keeps the session's ID, its PID, from naming anything else.
+		for _, g := range sessionGroups(pid) {
+			if g != pid && g > 1 {
+				_ = syscall.Kill(-g, sig)
+			}
+		}
+		if err != syscall.ESRCH {
 			return err
 		}
 	}
