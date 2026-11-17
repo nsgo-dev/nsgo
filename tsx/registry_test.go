@@ -1,6 +1,7 @@
 package tsx
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/base"
@@ -30,5 +31,25 @@ func TestFuncPackage(t *testing.T) {
 		if got := funcPackage(name); got != want {
 			t.Errorf("funcPackage(%q) = %q, want %q", name, got, want)
 		}
+	}
+}
+
+// A default must be of the type its field, or its getter, gives.
+func TestDefaultOfTheWrongTypePanics(t *testing.T) {
+	type gauge struct {
+		Max     float64
+		MaxFunc func() float64
+		Step    func() float64
+	}
+	planFields(reflect.TypeFor[gauge](), newSpec([]Option{Default("Max", float64(100)), Default("Step", float64(1))}))
+	for _, opt := range []Option{Default("Max", 100), Default("Step", "1")} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("a default of the wrong type planned without a panic")
+				}
+			}()
+			planFields(reflect.TypeFor[gauge](), newSpec([]Option{opt}))
+		}()
 	}
 }

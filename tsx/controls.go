@@ -71,6 +71,7 @@ func init() {
 		}, "children?: JSX.Element | readonly JSX.Element[]"))...)
 	Register("nsgo/base", map[string]core.Node{"Pagination": base.Pagination{}}, options(Event("OnChange", "page"))...)
 	Register("nsgo/base", map[string]core.Node{"Slider": base.Slider{}}, options(
+		Default("Max", float64(100)), Default("Step", float64(1)),
 		typed("Value", custom("Value", func(p *props, v reflect.Value) {
 			if p.has("value") {
 				v.Set(reflect.ValueOf(func() base.SliderValue { return sliderValue(p.r, p.get("value")) }))

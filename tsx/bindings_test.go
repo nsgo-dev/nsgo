@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
 // Each binding of nsgo/base in an app: what TSX passes reaches the Go
@@ -314,5 +315,29 @@ mount(() => <List each={[1, 2]} empty="None" style={{ height: 200 }}>{(item) => 
 	app.Find("text:row 2")
 	if app.Exists("role:option") {
 		t.Fatal("a list with no selection props has options")
+	}
+}
+
+func TestBaseSliderUndefinedBoundsUseDefaults(t *testing.T) {
+	app := run(t, `import { mount, signal, View } from "nsgo";
+import { Slider } from "nsgo/base";
+function Forwarded(props) { return <Slider value={props.value} onChange={props.onChange} min={props.min} max={props.max} step={props.step} thumbTestID="thumb" thumbStyle={{ width: 10, height: 10 }} style={{ width: 200, height: 20 }} />; }
+function App() {
+	const value = signal(30);
+	return <View>
+		<Forwarded value={value()} onChange={(e) => value.set(e.value)} />
+		<Slider testID="plain" value={30} max={undefined} step={undefined} thumbTestID="plain-thumb" thumbStyle={{ width: 10, height: 10 }} />
+	</View>;
+}
+mount(App);`, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	for _, id := range []string{"thumb", "plain-thumb"} {
+		if v := app.Find(id).Props.Value; v.Min != 0 || v.Max != 100 || v.Now != 30 {
+			t.Fatalf("%s: %+v, want 30 in the default 0..100", id, v)
+		}
+	}
+	app.Focus("thumb")
+	app.Key("right")
+	if v := app.Find("thumb").Props.Value; v.Now != 31 {
+		t.Fatalf("the default step moved the slider to %+v, want 31", v)
 	}
 }

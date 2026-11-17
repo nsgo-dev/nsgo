@@ -197,7 +197,7 @@ func videoFace(p *props) core.Node {
 		SourceFunc:       p.strFunc("src"),
 		PausedFunc:       func() bool { return p.bool("paused") },
 		MutedFunc:        func() bool { return p.bool("muted") },
-		VolumeFunc:       func() float32 { return float32(p.float("volume")) },
+		VolumeFunc:       func() float32 { return float32(p.floatOr("volume", 1)) },
 		RateFunc:         func() float32 { return float32(p.float("rate")) },
 		Repeat:           p.bool("repeat"),
 		Controls:         p.bool("controls"),
@@ -214,9 +214,6 @@ func videoFace(p *props) core.Node {
 		Ref:              p.n.ref,
 		Label:            p.str("accessibilityLabel"),
 		TestID:           p.str("testID"),
-	}
-	if !p.has("volume") {
-		v.VolumeFunc = nil
 	}
 	if h := p.handler("onLoad"); h != nil {
 		v.OnLoad = func(info core.VideoInfo) {

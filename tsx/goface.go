@@ -43,6 +43,11 @@ func Rename(field, prop string) Option {
 	return func(s *faceSpec) { s.renames[field] = prop }
 }
 
+// Default gives field the value it has while its TSX prop is absent or undefined, for a field whose default is not its type's zero. For a getter, or an XFunc twin named X or XFunc, value is what the getter returns while the prop reads undefined, so a reactive prop goes back to the default in place.
+func Default(field string, value any) Option {
+	return func(s *faceSpec) { s.defaults[field] = value }
+}
+
 // Enum names the values of an integer type for the props of its type,
 // which read and report them by name.
 func Enum[T ~int | ~uint8 | ~uint16 | ~int32 | ~uint32](names map[string]T) Option {
@@ -94,8 +99,9 @@ func unionTag(iface, t reflect.Type) string {
 }
 
 type faceSpec struct {
-	renames map[string]string
-	custom  map[string]func(p *props, v reflect.Value)
+	renames  map[string]string
+	custom   map[string]func(p *props, v reflect.Value)
+	defaults map[string]any
 	// decls are the declarations of a custom field's props, and types
 	// the types they name, declared with them.
 	decls map[string][]string
@@ -108,7 +114,7 @@ type faceSpec struct {
 
 func newSpec(opts []Option) *faceSpec {
 	spec := &faceSpec{renames: map[string]string{}, custom: map[string]func(p *props, v reflect.Value){},
-		decls: map[string][]string{}, types: map[string][]reflect.Type{}, events: map[string][]string{}}
+		decls: map[string][]string{}, types: map[string][]reflect.Type{}, events: map[string][]string{}, defaults: map[string]any{}}
 	for _, o := range opts {
 		o(spec)
 	}
@@ -734,7 +740,20 @@ func planFields(t reflect.Type, spec *faceSpec) []field {
 		case isEvent(name, ft):
 			plan.set = eventSetter(ft, prop, eventFields(spec, t, name, ft))
 		default:
-			plan.set = setter(ft, prop)
+			fallback, ok := spec.defaults[name]
+			if !ok {
+				fallback, ok = spec.defaults[base]
+			}
+			if ok {
+				want := ft
+				if ft.Kind() == reflect.Func && ft.NumIn() == 0 && ft.NumOut() == 1 {
+					want = ft.Out(0)
+				}
+				if fallback == nil || !reflect.TypeOf(fallback).AssignableTo(want) {
+					panic(fmt.Sprintf("tsx: %s.%s's default is %T, want %s", t.Name(), name, fallback, want))
+				}
+			}
+			plan.set = setter(ft, prop, fallback)
 		}
 		out = append(out, plan)
 	}
@@ -773,7 +792,7 @@ func hasStates(p *props) bool {
 }
 
 // setter returns what sets a field of type t from prop.
-func setter(t reflect.Type, prop string) func(p *props, v reflect.Value) {
+func setter(t reflect.Type, prop string, fallback any) func(p *props, v reflect.Value) {
 	switch {
 	case t == nodeType:
 		return func(p *props, v reflect.Value) {
@@ -785,13 +804,20 @@ func setter(t reflect.Type, prop string) func(p *props, v reflect.Value) {
 		return renderSetter(t, prop)
 	case t.Kind() == reflect.Func && t.NumIn() == 0 && t.NumOut() == 1:
 		out := t.Out(0)
+		def := reflect.Zero(out)
+		if fallback != nil {
+			def = reflect.ValueOf(fallback)
+		}
 		return func(p *props, v reflect.Value) {
-			if !p.has(prop) {
+			if !p.getterProp(prop) && fallback == nil {
 				return
 			}
 			r := p.r
 			v.Set(reflect.MakeFunc(t, func([]reflect.Value) []reflect.Value {
-				return []reflect.Value{r.decode(p.get(prop), out)}
+				if value := p.get(prop); defined(value) {
+					return []reflect.Value{r.decode(value, out)}
+				}
+				return []reflect.Value{def}
 			}))
 		}
 	case t.Kind() == reflect.Func:
@@ -818,6 +844,8 @@ func setter(t reflect.Type, prop string) func(p *props, v reflect.Value) {
 	return func(p *props, v reflect.Value) {
 		if x := p.get(prop); defined(x) {
 			v.Set(p.r.decode(x, t))
+		} else if fallback != nil {
+			v.Set(reflect.ValueOf(fallback))
 		}
 	}
 }

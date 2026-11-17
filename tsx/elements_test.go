@@ -787,3 +787,35 @@ mount(App);`)
 		t.Errorf("the window was sent %+v; want %+v", app.Window, want)
 	}
 }
+
+func TestVideoUndefinedVolumeUsesItsDefault(t *testing.T) {
+	app := run(t, `import { mount, signal, Text, View, Video } from "nsgo";
+function App() {
+    const volume = signal(undefined);
+    return <View>
+        <Video testID="video" src="talk.mp4" volume={volume()} paused style={{height:50}}/>
+        <Video testID="omitted" src="talk.mp4" paused style={{height:50}}/>
+        <Video testID="undefined" src="talk.mp4" volume={undefined} paused style={{height:50}}/>
+        <Text testID="quiet" onPress={() => volume.set(0.25)}>Quiet</Text>
+        <Text testID="full" onPress={() => volume.set(0)}>Full</Text>
+        <Text testID="reset" onPress={() => volume.set(undefined)}>Reset</Text>
+    </View>;
+}
+mount(App);`)
+	id := app.Find("video").ID
+	for _, name := range []string{"video", "omitted", "undefined"} {
+		if v := app.Find(name).Video.Volume; v != 1 {
+			t.Fatalf("%s volume %v, want 1", name, v)
+		}
+	}
+	for _, step := range []struct {
+		button string
+		volume float32
+	}{{"quiet", 0.25}, {"full", 1}, {"reset", 1}} {
+		app.Press(step.button)
+		app.Settle()
+		if v := app.Find("video"); v.ID != id || v.Video.Volume != step.volume {
+			t.Fatalf("%s: ID %v (was %v), volume %v, want %v", step.button, v.ID, id, v.Video.Volume, step.volume)
+		}
+	}
+}

@@ -111,6 +111,32 @@ func (p *props) has(name string) bool {
 	return core.Untracked(p.r.cx, func() bool { return defined(p.get(name)) })
 }
 
+// getterProp reports whether prop name is defined or a getter, untracked: a reactive prop stays a getter while it reads undefined, while a plain undefined value is absent.
+func (p *props) getterProp(name string) bool {
+	if defined(p.peek(name)) {
+		return true
+	}
+	return core.Untracked(p.r.cx, func() bool {
+		object := p.r.vm.Get("Object").ToObject(p.r.vm)
+		hasGetter := func(o *js.Object) bool {
+			if o == nil {
+				return false
+			}
+			desc, ok := p.r.call(object.Get("getOwnPropertyDescriptor"), o, p.r.vm.ToValue(name)).(*js.Object)
+			return ok && isFunction(desc.Get("get"))
+		}
+		if hasGetter(p.obj) {
+			return true
+		}
+		for _, key := range p.r.platformKeys() {
+			if o, ok := p.own(key).(*js.Object); ok && hasGetter(o) {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func (p *props) str(name string) string { return stringOf(p.get(name)) }
 
 func (p *props) bool(name string) bool {
@@ -127,10 +153,14 @@ func (p *props) boolOr(name string, def bool) bool {
 }
 
 func (p *props) float(name string) float64 {
+	return p.floatOr(name, 0)
+}
+
+func (p *props) floatOr(name string, def float64) float64 {
 	if v := p.get(name); defined(v) {
 		return v.ToFloat()
 	}
-	return 0
+	return def
 }
 
 func (p *props) int(name string) int { return int(p.float(name)) }

@@ -150,9 +150,11 @@ func init() {
 		options(tsx.Event("OnChange", "checked"))...)
 	tsx.Register(module, map[string]core.Node{"ToggleButton": ui.ToggleButton{}}, options(tsx.Event("OnChange", "on"))...)
 	tsx.Register(module, map[string]core.Node{
-		"NumberInput": ui.NumberInput{}, "OtpInput": ui.OtpInput{}, "Rating": ui.Rating{}, "Select": ui.Select[string]{}, "Slider": ui.Slider{},
+		"NumberInput": ui.NumberInput{}, "OtpInput": ui.OtpInput{}, "Rating": ui.Rating{}, "Select": ui.Select[string]{},
 		"Combobox": ui.Combobox[string]{}, "Tabs": ui.Tabs[string]{}, "TagInput": ui.TagInput{},
 	}, options(tsx.Omit("Parse", "Ref"))...)
+	tsx.Register(module, map[string]core.Node{"Slider": ui.Slider{}},
+		options(tsx.Omit("Ref"), tsx.Default("Max", float64(100)))...)
 	tsx.Register(module, map[string]core.Node{"Calendar": ui.Calendar{}, "TimeField": ui.TimeField{}},
 		options(tsx.Event("OnChange", "value"))...)
 	tsx.Register(module, map[string]core.Node{"DatePicker": ui.DatePicker{}}, options(tsx.Event("OnChange", "value"), openReason)...)
