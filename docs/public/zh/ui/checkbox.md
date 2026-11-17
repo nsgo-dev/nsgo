@@ -43,7 +43,7 @@ ui.Checkbox{Checked: done.Get, Text: "记住我", OnChangeEvent: func(next bool,
 }}
 ```
 
-设置后，此回调替代 `OnChange`，值仍由应用更新。桌面和 Web 的键盘激活在应用快捷键处理后保留修饰键。TSX 的 `onChangeEvent` 接收 `{ checked, press }`。
+设置后，此回调替代 `OnChange`，值仍由应用更新。桌面和 Web 的键盘激活在应用快捷键处理后保留修饰键；在 Windows 上，Alt 加空格或回车交给窗口菜单。TSX 的 `onChangeEvent` 接收 `{ checked, press }`。
 
 ## 无障碍
 

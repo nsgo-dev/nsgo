@@ -43,7 +43,7 @@ base.Checkbox{
 
 指示器通过 `PartStates` 从框取得状态，所以 `checked:` class 可以给它设置样式，而它不会成为第二个停靠点。
 
-需要修饰键时，设置 `OnChangeEvent func(checked bool, press core.PressEvent)`。它替代 `OnChange`，值仍由应用保存；列表可以用 `press.Modifiers.Shift` 选择范围。桌面和 Web 的空格/回车激活保留修饰键，应用快捷键会先处理按键。在 TSX 中，`onChangeEvent` 接收 `{ checked, press }`。
+需要修饰键时，设置 `OnChangeEvent func(checked bool, press core.PressEvent)`。它替代 `OnChange`，值仍由应用保存；列表可以用 `press.Modifiers.Shift` 选择范围。桌面和 Web 的空格/回车激活保留修饰键，应用快捷键会先处理按键；在 Windows 上，Alt 加空格或回车交给窗口菜单。在 TSX 中，`onChangeEvent` 接收 `{ checked, press }`。
 
 ## Switch
 

@@ -43,7 +43,7 @@ ui.Checkbox{Checked: done.Get, Text: "Remember me", OnChangeEvent: func(next boo
 }}
 ```
 
-When set, this callback replaces `OnChange`; the app still updates the value. Desktop and web keyboard activation preserves modifiers after app shortcuts. TSX's `onChangeEvent` receives `{ checked, press }`.
+When set, this callback replaces `OnChange`; the app still updates the value. Desktop and web keyboard activation preserves modifiers after app shortcuts; on Windows, Alt with Space or Return goes to the window menu instead. TSX's `onChangeEvent` receives `{ checked, press }`.
 
 ## Accessibility
 
