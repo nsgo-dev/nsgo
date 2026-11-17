@@ -853,6 +853,10 @@ func setContentType(f objc.ID, a driver.AutoComplete, masked bool) {
 func inputLayout(self objc.ID, cmd objc.SEL) {
 	apple.Super(self, cmd)
 	v := views[self]
+	// AppKit can lay out a retained native view after unmount.
+	if v == nil || v.input == nil {
+		return
+	}
 	in, box := v.input, v.inset
 	x, w := float64(box.Origin.X), float64(box.Size.Width)
 	if in.multiline {

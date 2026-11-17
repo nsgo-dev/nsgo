@@ -8,8 +8,29 @@ import (
 
 	"github.com/ebitengine/purego/objc"
 
+	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
+
+// TestInputLayoutAfterUnmount lays out an input's native view, single-line and multiline, after the backend has removed it, as AppKit can for a view an outgoing transition still holds.
+func TestInputLayoutAfterUnmount(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		s := &surface{views: make([]*view, 2), animator: driver.NewAnimator(func(driver.Event) {})}
+		for _, multiline := range []bool{false, true} {
+			v := s.create(driver.KindInput, 1)
+			s.views[v.id] = v
+			v.configure(&driver.InputConfig{Multiline: multiline, Content: driver.Bounds{Size: driver.Size{Width: 200, Height: 60}}})
+			native := v.native.Send(sel("retain"))
+			s.delete(v, false)
+			if views[native] != nil {
+				t.Error("the removed input is still registered")
+			}
+			native.Send(sel("layout"))
+			native.Send(selRelease)
+		}
+	})
+}
 
 // TestMultilineEditorWrapsInItsViewport checks a multiline input's text
 // view, its container and the text it lays out against the width the

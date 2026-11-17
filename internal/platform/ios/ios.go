@@ -1415,6 +1415,9 @@ func (s *surface) delete(v *view, kept bool) {
 		v.shader.Release()
 	}
 	delete(views, v.native)
+	if v.input != nil {
+		delete(views, v.input.field)
+	}
 	v.native.Send(selRelease)
 	s.views[v.id] = nil
 }

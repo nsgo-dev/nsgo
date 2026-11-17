@@ -540,6 +540,10 @@ func (v *view) configure(c *driver.InputConfig) {
 func inputLayout(self objc.ID, cmd objc.SEL) {
 	apple.Super(self, cmd)
 	v := views[self]
+	// UIKit can lay out a view an outgoing transition still holds after the engine has unmounted it.
+	if v == nil || v.input == nil {
+		return
+	}
 	in, box := v.input, v.inset
 	frame := apple.Rect(float64(box.Origin.X), float64(box.Origin.Y), float64(box.Size.Width), float64(box.Size.Height))
 	in.field.Send(selSetFrame, frame)
