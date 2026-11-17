@@ -7,8 +7,7 @@ func (n *node) peerMarked() bool {
 	return n.cls != nil && len(n.cls.list.peers) > 0
 }
 
-// matchesPeer follows CSS's subsequent-sibling combinator: any matching
-// preceding sibling suffices, without looking inside it or past the parent.
+// matchesPeer follows CSS's subsequent-sibling combinator: any matching preceding sibling suffices, without looking inside it or past the parent.
 func (t *Tree) matchesPeer(n *node, cond classPeer) bool {
 	p := n.nativeParent()
 	if p == nil {
@@ -44,8 +43,7 @@ func (t *Tree) queuePeerSiblings(n *node) {
 	}
 }
 
-// queuePeerParent coalesces changes until the next resolve. A parent is
-// visited once even when several peers change in the same reactive turn.
+// queuePeerParent coalesces changes until the next resolve. A parent is visited once even when several peers change in the same reactive turn.
 func (t *Tree) queuePeerParent(p *node) {
 	if !t.peerStyled || p == nil || t.refreshingPeers {
 		return

@@ -60,7 +60,7 @@ core.View{Class: "flex items-center gap-3 rounded-xl border border-zinc-200 bg-w
 
 类名合并在样式之下，因此样式字段优先。`ClassFunc` 让类名跟随变化，状态变体（`hover:bg-zinc-100`、`checked:opacity-100`）会成为样式的状态。`group` 和 `group-hover:` 让子元素跟随父元素的状态，`first:` 和 `last:` 跟随子元素的位置，`aria-checked:`、`data-open:` 和 `focus-within:` 跟随控件展示的状态。
 
-用 `peer` 标记控件，就能让后面的同级元素跟随它的状态：例如复选框设置 `Class: "peer"`，后面的标签设置 `Class: "peer-checked:text-accent peer-disabled:opacity-50"`。peer 只影响同一父元素下排在它后面的同级元素（`Show` 和 `Each` 里的也算），不影响前面的同级元素，也不影响它内部的元素。`peer/field` 配合 `peer-checked/field:` 区分命名的标记，`peer-data-invalid:` 跟随控件的布尔 `invalid` 数据状态。标记和状态的变化都会响应式更新。
+用 `peer` 标记控件，就能让后面的同级元素跟随它的状态：例如复选框设置 `Class: "peer"`，后面的标签设置 `Class: "peer-checked:text-accent peer-disabled:opacity-50"`。peer 只影响同一父元素下排在它后面的同级元素（`Show` 和 `Each` 里的也算），不影响前面的同级元素，也不影响它内部的元素。`peer/field` 配合 `peer-checked/field:` 区分命名的标记，`peer-data-invalid:` 跟随控件的布尔 `invalid` 数据状态。标记和状态的变化都会响应式更新。标记本身不会让元素成为 Tab 焦点或接收点按，所以 `peer-active:` 只跟随本身接收点按的 peer，例如按钮。
 
 主题的 `Tailwind` 字段用颜色、断点和工具类扩展默认主题；调色板没有的颜色可以写成 `Palette` 的角色名（`bg-accent`、`text-text-muted/70`），或主题定义的颜色，从节点所在主题的当前外观读取。
 

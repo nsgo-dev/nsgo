@@ -72,9 +72,21 @@ func TestPeerInteractionsAndMixedVariants(t *testing.T) {
 		}}
 	})
 	h.commit()
-	for _, kind := range []driver.EventKind{driver.EventMouseEnter, driver.EventMouseLeave, driver.EventPressDown, driver.EventPressUp} {
+	for _, kind := range []driver.EventKind{driver.EventMouseEnter, driver.EventMouseLeave} {
 		if !h.find("bare").events().Has(kind) {
 			t.Errorf("bare peer does not request %v", kind)
+		}
+	}
+	for _, kind := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp} {
+		if !h.find("source").events().Has(kind) {
+			t.Errorf("pressable peer does not request %v", kind)
+		}
+	}
+	// A marker that takes no presses is not made a Tab stop, on the web a press target, by being a peer.
+	for _, id := range []string{"bare", "wrapper"} {
+		n := h.find(id)
+		if ev := n.events(); ev.Pressable() || n.props.FocusStop(ev) {
+			t.Errorf("%s peer is pressable or a focus stop: %v", id, ev)
 		}
 	}
 	send := func(id string, kind driver.EventKind) {

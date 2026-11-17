@@ -2707,23 +2707,23 @@ func (n *node) events() driver.EventMask {
 	}
 	h, s := &n.h, &n.style
 	// Groups and peers report the states other views follow.
-	group := s.Group != "" || n.peerMarked()
-	// Presses a view follows only for its styles go to a view around it
-	// that takes them, as a press on a button's face is the button's.
-	pressStyled := (s.Active != nil || group) && (n.takesPresses() || !n.insidePressable())
+	group := s.Group != ""
+	peer := n.peerMarked()
+	// Presses a view follows only for its styles go to a view around it that takes them, as a press on a button's face is the button's. A peer reports the presses of a view that already takes them: asking for presses would make any other marker a Tab stop and, on the web, take presses and text selection from its contents.
+	pressStyled := (s.Active != nil || group) && (n.takesPresses() || !n.insidePressable()) || peer && n.takesPresses()
 	bit(driver.EventPress, h.press != nil)
 	bit(driver.EventLongPress, h.longPress != nil)
 	// A press hides the tooltip of a view that takes presses.
 	bit(driver.EventPressDown, h.pressDown != nil || pressStyled || n.tip != nil && h.press != nil)
 	bit(driver.EventPressUp, h.pressUp != nil || pressStyled)
-	bit(driver.EventMouseEnter, h.mouseEnter != nil || s.Hover != nil || group || n.tip != nil)
-	bit(driver.EventMouseLeave, h.mouseLeave != nil || s.Hover != nil || group || n.tip != nil)
+	bit(driver.EventMouseEnter, h.mouseEnter != nil || s.Hover != nil || group || peer || n.tip != nil)
+	bit(driver.EventMouseLeave, h.mouseLeave != nil || s.Hover != nil || group || peer || n.tip != nil)
 	bit(driver.EventMouseMove, h.mouseMove != nil)
 	bit(driver.EventTouch, n.hearsTouches())
 	// The focus of any view that can take it is reported, for the core's
 	// own focus (focusReported).
 	focusable := n.kind == driver.KindInput || n.kind == driver.KindWeb || n.takesPresses() || n.props.Focusable
-	focusStyled := s.Focus != nil || s.FocusVisible != nil || n.peerMarked()
+	focusStyled := s.Focus != nil || s.FocusVisible != nil || peer
 	bit(driver.EventFocus, h.focus != nil || focusStyled || focusable)
 	bit(driver.EventBlur, h.blur != nil || focusStyled || focusable)
 	bit(driver.EventSubmitEditing, h.submit != nil)
