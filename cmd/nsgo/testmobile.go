@@ -12,14 +12,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// iosTestRunner installs the test build in sys's simulator (-device's,
-// else the booted one, else the newest iPhone or Apple TV) and launches
-// it for each test, its output streamed back.
+// iosTestRunner installs the test build in sys's simulator (-device's, else the booted one, else the newest iPhone or Apple TV) and launches it for each test, its output streamed back. A package whose TestMain starts the native test host runs as the app, its result read between the host's marks; any other package, a library's among them, runs as a plain process through simctl spawn.
 func iosTestRunner(ctx context.Context, p *project, sys *appleOS, dir string, opts testOptions) (targetRunner, error) {
 	app, err := buildIOSApp(ctx, p, sys, dir, true)
 	if err != nil {
@@ -33,9 +32,18 @@ func iosTestRunner(ctx context.Context, p *project, sys *appleOS, dir string, op
 		return targetRunner{}, err
 	}
 	simulator := simulatorTest{udid: udid, id: p.ID, timeout: opts.timeout}
-	hosted, err := linksPlatform(ctx, p, sys.target+"_simulator")
+	target := sys.target + "_simulator"
+	hosted, err := linksPlatform(ctx, p, target)
 	if err != nil {
 		return targetRunner{}, err
+	}
+	if hosted {
+		// Only nsgotest.Main starts the host that writes the marks; a package that links it without a TestMain runs its tests as a plain process, as before the marks.
+		funcs, err := testFuncs(ctx, p, target)
+		if err != nil {
+			return targetRunner{}, err
+		}
+		hosted = slices.Contains(funcs, "TestMain")
 	}
 	if !hosted {
 		simulator.binary = filepath.Join(app, p.Name)
@@ -45,13 +53,12 @@ func iosTestRunner(ctx context.Context, p *project, sys *appleOS, dir string, op
 
 type simulatorTest struct {
 	udid, id string
-	binary   string // a library without the native host runs directly in the simulator
+	binary   string // the test binary inside the app, for a package that does not start the native host: it runs as a plain process through simctl spawn
 	timeout  time.Duration
 }
 
 func (s simulatorTest) stop() {
-	// A stalled CoreSimulator must not turn a test timeout into an
-	// unbounded wait during cleanup. The test's context may be cancelled.
+	// A stalled CoreSimulator must not turn a test timeout into an unbounded wait during cleanup. The test's context may be cancelled.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	exec.CommandContext(ctx, "xcrun", "simctl", "terminate", s.udid, s.id).Run()
@@ -95,33 +102,32 @@ func (s simulatorTest) run(ctx context.Context, args, env []string, out io.Write
 		return -1, err
 	}
 	var captured bytes.Buffer
-	reported := true
+	ended := false
 	code, readErr := readMarkedRun(io.TeeReader(logs, &captured), token, out, func() error {
-		reported = false
+		ended = true
 		return errors.New("the simulator app ended without its exit code")
 	})
-	if reported {
-		// The host's result is final. CoreSimulator can keep its console
-		// bridge alive afterwards; it must not consume the test's deadline.
+	if !ended {
+		// The host's result is final. CoreSimulator can keep its console bridge alive afterwards; it must not consume the test's deadline.
 		cmd.Process.Kill()
 	}
 	waitErr := cmd.Wait()
-	if ctx.Err() != nil && !reported {
+	started := bytes.Contains(captured.Bytes(), []byte("nsgo-test-start "+token))
+	if readErr != nil && !started {
+		// readMarkedRun passes on only the run's own output; before the host started, the launcher's diagnostics are all there is.
+		out.Write(captured.Bytes())
+	}
+	if ended && ctx.Err() != nil {
 		s.stop()
-		if !bytes.Contains(captured.Bytes(), []byte("nsgo-test-start "+token)) {
-			out.Write(captured.Bytes())
-		}
 		return -1, testContextError(ctx, s.timeout)
 	}
-	if readErr != nil {
-		if !bytes.Contains(captured.Bytes(), []byte("nsgo-test-start "+token)) {
-			out.Write(captured.Bytes())
-		}
-		if waitErr != nil && !reported {
+	if ended && !started {
+		if waitErr != nil {
 			return -1, fmt.Errorf("launch simulator app: %w", waitErr)
 		}
+		return -1, errors.New("the simulator app ended before the test host started: TestMain must call nsgotest.Main")
 	}
-	// A fast app may report its result before simctl fails to attach.
+	// A fast app may report its result before simctl fails to attach, and a crashed one leaves no exit mark whatever simctl's status.
 	return code, readErr
 }
 

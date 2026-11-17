@@ -867,8 +867,7 @@ func bootSimulator(ctx context.Context, sys *appleOS, wanted string) (string, er
 			return "", err
 		}
 	}
-	// Booted precedes SpringBoard becoming ready, even for a simulator
-	// another process has just booted. Wait before installing or launching.
+	// Booted precedes SpringBoard becoming ready, even for a simulator another process has just booted. Wait before installing or launching.
 	if err := run(ctx, "xcrun", "simctl", "bootstatus", sim.UDID, "-b"); err != nil {
 		return "", err
 	}

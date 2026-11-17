@@ -17,7 +17,7 @@ func TestSimulatorProcessResults(t *testing.T) {
 	if runtime.GOARCH != "arm64" {
 		t.Fatal("NSGo's simulator binaries are arm64; run this check on an Apple silicon Mac")
 	}
-	for _, fixture := range []string{"simulator", "simulatorplain"} {
+	for _, fixture := range []string{"simulator", "simulatorplain", "simulatornohost"} {
 		t.Run(fixture, func(t *testing.T) {
 			p, err := loadForTest(filepath.Join("..", "..", "testdata", fixture), nil)
 			if err != nil {

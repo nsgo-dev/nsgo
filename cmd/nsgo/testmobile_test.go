@@ -67,8 +67,7 @@ func TestReadMarkedRunWithoutAnExitMark(t *testing.T) {
 	}
 }
 
-// Exercise the launcher process itself: simctl can fail after a fast app has
-// already reported its result, or succeed after the app has crashed.
+// Exercise the launcher process itself: simctl can fail after a fast app has already reported its result, or exit either way after the app has crashed.
 func TestSimulatorTestReadsTheAppsExitCode(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, output string
@@ -84,7 +83,12 @@ exit 3
 		{name: "crashed app with successful launcher", body: `printf 'nsgo-test-start %s\n=== RUN   TestCrash\n' "$SIMCTL_CHILD_NSGO_TEST_RUN"
 echo 'panic: simulator crash fixture' >&2
 `, output: "panic: simulator crash fixture", wantCode: -1, wantError: "without its exit code"},
-		{name: "launch failure", body: "echo 'Simulator device failed to launch' >&2\nexit 4\n", wantCode: -1, wantError: "launch"},
+		{name: "crashed app with failing launcher", body: `printf 'nsgo-test-start %s\n=== RUN   TestCrash\n' "$SIMCTL_CHILD_NSGO_TEST_RUN"
+echo 'panic: simulator crash fixture' >&2
+exit 2
+`, output: "panic: simulator crash fixture", wantCode: -1, wantError: "without its exit code"},
+		{name: "launch failure", body: "echo 'Simulator device failed to launch' >&2\nexit 4\n", output: "failed to launch", wantCode: -1, wantError: "launch simulator app"},
+		{name: "host never started", body: "echo 'ok without a host'\n", output: "ok without a host", wantCode: -1, wantError: "nsgotest.Main"},
 		{name: "completed app with lingering launcher", body: `printf 'nsgo-test-start %s\n--- PASS: TestFast (0.00s)\nnsgo-test-exit %s 0\n' "$SIMCTL_CHILD_NSGO_TEST_RUN" "$SIMCTL_CHILD_NSGO_TEST_RUN"
 exec sleep 30
 `, output: "--- PASS: TestFast", wantCode: 0},
@@ -105,6 +109,19 @@ exec sleep 30
 				t.Fatalf("output lost %q: %s", tc.output, output.String())
 			}
 		})
+	}
+}
+
+func TestSimulatorTestSpawnsAPlainProcess(t *testing.T) {
+	checkXcrun(t, `[ "$1 $2 $3 $4" = "simctl spawn simulator /app/Plain" ] || exit 9
+[ "$SIMCTL_CHILD_KEY" = value ] || exit 8
+echo "--- FAIL: TestFast ($5)"
+exit 3
+`)
+	var output strings.Builder
+	code, err := (simulatorTest{udid: "simulator", id: "dev.nsgo.test", binary: "/app/Plain"}).run(t.Context(), []string{"-test.run=^TestFast$"}, []string{"KEY=value"}, &output)
+	if code != 3 || err != nil || !strings.Contains(output.String(), "--- FAIL: TestFast (-test.run=^TestFast$)") {
+		t.Fatalf("code=%d err=%v output=%q", code, err, output.String())
 	}
 }
 
