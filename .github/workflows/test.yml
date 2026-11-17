@@ -1,6 +1,6 @@
 name: Test
 
-# Vets and tests every package on Linux under a virtual display, and Apple's shared code and macOS backend on macOS, with native keyboard-focus regressions on macOS, Windows, Linux and the web. release.yml calls it before publishing a release.
+# Vets and tests every package on Linux under a virtual display, and Apple's shared code and macOS backend on macOS, with native keyboard-focus regressions on macOS, Windows, Linux and the web and document registration on Linux and Windows. release.yml calls it before publishing a release.
 on:
   push:
     branches:
@@ -33,7 +33,7 @@ jobs:
       - name: Install native test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y apparmor libgtk-4-dev libgtk-4-media-gstreamer libwebkitgtk-6.0-4 libsoup-3.0-0 xvfb pulseaudio gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-pulseaudio
+          sudo apt-get install -y apparmor libgtk-4-dev libgtk-4-media-gstreamer libwebkitgtk-6.0-4 libsoup-3.0-0 xvfb pulseaudio gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-pulseaudio desktop-file-utils shared-mime-info libglib2.0-bin
       - name: Allow WebKit's sandbox on the runner
         run: |
           # Ubuntu restricts unprivileged user namespaces. Grant bubblewrap that permission so WebKit can keep its sandbox enabled.
@@ -65,6 +65,7 @@ jobs:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
           PULSE_SINK: nsgo_test
+          NSGO_FILE_ASSOCIATIONS: '1'
         run: xvfb-run -a go tool nsgo test
       - name: Test native radio and tab focus
         env:
@@ -136,3 +137,9 @@ jobs:
         run: go tool nsgo test -target windows -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test instance isolation and file handoff
         run: go tool nsgo test -run '^TestInstance' ./internal/platform/windows
+      - name: Install NSIS
+        run: choco install nsis --yes --no-progress
+      - name: Test document registration
+        env:
+          NSGO_FILE_ASSOCIATIONS: '1'
+        run: go tool nsgo test -run 'FileAssociations|FileTypes|NSIS' ./cmd/nsgo

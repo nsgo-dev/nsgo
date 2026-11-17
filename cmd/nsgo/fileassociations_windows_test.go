@@ -18,7 +18,7 @@ import (
 
 // TestWindowsFileAssociationsNative installs an isolated NSIS package,
 // opens a spaced/Unicode path through its ProgID, upgrades its declarations
-// and uninstalls it. Only the manual CI job opts into writing test keys.
+// and uninstalls it. Only the Test workflow opts into writing test keys.
 func TestWindowsFileAssociationsNative(t *testing.T) {
 	if os.Getenv("NSGO_FILE_ASSOCIATIONS") == "" {
 		t.Skip("set NSGO_FILE_ASSOCIATIONS=1 to test NSIS install and uninstall")
