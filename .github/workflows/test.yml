@@ -81,6 +81,8 @@ jobs:
         run: go tool nsgo test -target web -run '^TestRefFocusUsesNativeKeyboardStops$' ./internal/platform/web
       - name: Test browser radio and tab focus
         run: go tool nsgo test -target web -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
+      - name: Test browser package trust persistence
+        run: go tool nsgo test -target web ./tsx/pkg
 
   apple:
     # Use the Intel pool while hosted arm64 capacity leaves jobs unallocated.

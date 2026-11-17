@@ -78,7 +78,7 @@ func (t *Trust) RequireFreshRevocations(require bool) {
 	t.requireFresh = require
 }
 
-// UpdateRevocations takes list when a trusted root signed it and it is newer than the list of that root the Trust holds. A root's lists replace only its own, so while several roots are trusted, as when they rotate, none undoes what another revoked.
+// UpdateRevocations takes list when a trusted root signed it and it is newer than the list of that root the Trust holds. A root's lists replace only its own, so while several roots are trusted, as when they rotate, none undoes what another revoked. If saving fails, the previous list stays in force and the update may be retried.
 func (t *Trust) UpdateRevocations(list *Revocations) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -87,13 +87,22 @@ func (t *Trust) UpdateRevocations(list *Revocations) error {
 		return err
 	}
 	signer := list.s.Signer
-	if held, ok := t.state.Lists[signer]; ok {
+	held, had := t.state.Lists[signer]
+	if had {
 		if have, err := held.open(t.roots); err == nil && info.Sequence <= have.Sequence {
 			return fmt.Errorf("%w: list %d, where the Trust holds %d of root %s", ErrStale, info.Sequence, have.Sequence, signer)
 		}
 	}
 	t.state.Lists[signer] = list
-	return t.save()
+	if err := t.save(); err != nil {
+		if had {
+			t.state.Lists[signer] = held
+		} else {
+			delete(t.state.Lists, signer)
+		}
+		return err
+	}
+	return nil
 }
 
 // revoked is what the lists of the roots still trusted revoke together.
@@ -164,18 +173,27 @@ func (t *Trust) Verify(data []byte) (*Package, error) {
 	return p, nil
 }
 
-// Accept records a package's build as the oldest its app may run from now on. A host accepts a package once it proved healthy, so until then the app may go back to what it accepted before. A package or key revoked since it was verified is not accepted.
+// Accept records a package's build as the oldest its app may run from now on. A host accepts a package once it proved healthy, so until then the app may go back to what it accepted before. A package or key revoked since it was verified is not accepted. If saving fails, the previous build stays in force and acceptance may be retried.
 func (t *Trust) Accept(p *Package) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if err := t.revoked().check(t.requireFresh, p); err != nil {
 		return err
 	}
-	if have, ok := t.state.Builds[p.App.ID]; ok && p.App.Build <= have {
+	have, had := t.state.Builds[p.App.ID]
+	if had && p.App.Build <= have {
 		return nil
 	}
 	t.state.Builds[p.App.ID] = p.App.Build
-	return t.save()
+	if err := t.save(); err != nil {
+		if had {
+			t.state.Builds[p.App.ID] = have
+		} else {
+			delete(t.state.Builds, p.App.ID)
+		}
+		return err
+	}
+	return nil
 }
 
 // AcceptedBuild is the highest build of app accepted.

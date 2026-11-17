@@ -258,7 +258,7 @@ func TestRevocations(t *testing.T) {
 
 func TestRollback(t *testing.T) {
 	k := newKeys(t)
-	dir := t.TempDir()
+	dir := trustTestDir(t)
 	trust, err := OpenTrust(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -485,7 +485,7 @@ func TestTrustStateMigrates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := t.TempDir()
+	dir := trustTestDir(t)
 	if err := writeState(dir, old); err != nil {
 		t.Fatal(err)
 	}
