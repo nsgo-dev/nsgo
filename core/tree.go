@@ -144,9 +144,7 @@ type Tree struct {
 	// views not made yet whose parents are.
 	views   viewPace
 	waiting []*node
-	// classParents coalesces child-order and spacing changes per parent
-	// until resolve, so invalidating child order never walks siblings.
-	// Its bool keeps spacing that a class replacement removed.
+	// classParents coalesces child-order and spacing changes per parent until resolve, so invalidating child order never walks siblings. Its bool keeps spacing that a class replacement removed.
 	classParents map[*node]bool
 	// peerStyled enables sibling-state tracking; peerParents batches changes per parent.
 	peerStyled      bool
@@ -2685,9 +2683,7 @@ func (t *Tree) command(kind driver.ItemKind, n *node) {
 	t.changed = true
 }
 
-// outOfFlow drops what n's parent cached of its native children while n
-// was made, before it was marked as an attachment or a header view.
-// Resolving a positional class may already have read those children.
+// outOfFlow drops what n's parent cached of its native children while n was made, before it was marked as an attachment or a header view: styling it, as peer classes and its parent's spacing do, may already have read them.
 func outOfFlow(n *node) {
 	if p := n.nativeParent(); p != nil {
 		p.flat = nil

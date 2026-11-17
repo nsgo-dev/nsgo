@@ -15,6 +15,8 @@ type nodeClasses struct {
 	env               classEnv // what they were resolved for
 	normal, important Style
 	props             classProps
+	// position is the node's place among its parent's native children, from the parent's last child walk (classKids). Only positional classes keep it current.
+	position uint8
 	// bound is set once the node follows the environment.
 	bound   bool
 	related bool
@@ -45,10 +47,18 @@ func (t *Tree) setClasses(n *node, class string) {
 	}
 	t.rt.reportUnknown(l)
 	c := &nodeClasses{list: l, env: env}
-	if old := n.cls; old != nil {
+	old := n.cls
+	if old != nil {
 		c.bound = old.bound
+		c.position = old.position
 	}
 	n.cls = c
+	if l.positional && (old == nil || !old.list.positional) {
+		// The node's place is not known yet: its parent's walk resolves it again before the tree resolves, so mounting N positional children never searches N siblings each.
+		if p := n.nativeParent(); p != nil {
+			t.queueClassKids(p)
+		}
+	}
 	if len(l.peers) > 0 || l.peerDependent {
 		t.peerStyled = true
 		t.queuePeerParent(n.nativeParent())
@@ -156,19 +166,15 @@ func (t *Tree) classEnv(n *node) classEnv {
 		palette: &pal, tw: o.Theme().tailwind(), theme: o.Theme(), hostColors: e.tokens.Get()}
 }
 
-// resolveClasses resolves n's classes for their environment and n's
-// place among its siblings.
+// resolveClasses resolves n's classes for their environment and n's place among its siblings, as its parent's last child walk found it.
 func (t *Tree) resolveClasses(n *node) {
-	var position uint8
-	if n.cls.list.positional {
-		position = n.position()
-	}
-	t.resolveClassesAt(n, position)
+	t.resolveClassesAt(n, n.cls.position)
 }
 
-// resolveClassesAt uses a position already known by a sibling walk.
+// resolveClassesAt resolves n's classes at position, found by a walk of its parent's children.
 func (t *Tree) resolveClassesAt(n *node, position uint8) {
 	c := n.cls
+	c.position = position
 	env := c.env
 	if c.list.peerDependent {
 		env.peer = func(p classPeer) bool { return t.matchesPeer(n, p) }
@@ -195,7 +201,7 @@ func (t *Tree) resolveClassesAt(n *node, position uint8) {
 	}
 }
 
-// position returns n's place among the native children of its parent.
+// position returns n's place among the native children of its parent, searched now. Relational selectors read it of the views they match; a node's own positional classes take theirs from its parent's child walk instead.
 func (n *node) position() uint8 {
 	p := n.nativeParent()
 	if p == nil {
@@ -229,9 +235,7 @@ func childPosition(i, count int) uint8 {
 	return pos
 }
 
-// queueClassKids defers sibling work until the tree has finished changing.
-// A parent holds no lasting dependency after its positional children
-// move away or lose their classes.
+// queueClassKids defers sibling work until the tree has finished changing. A parent holds no lasting dependency after its positional children move away or lose their classes.
 func (t *Tree) queueClassKids(p *node) {
 	if t.classParents == nil {
 		t.classParents = make(map[*node]bool)

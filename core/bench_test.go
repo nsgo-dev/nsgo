@@ -58,18 +58,20 @@ func BenchmarkViewTick(b *testing.B) {
 	commitEach(b, tree, func(i int) { tick.Set(i + 1) })
 }
 
-// BenchmarkMountPlainChildren checks that positional classes in another
-// branch do not change the cost of mounting ordinary children (#584).
-func BenchmarkMountPlainChildren(b *testing.B) {
+// BenchmarkMountChildren checks that mounting children stays linear in their count: plain ones whether or not a positional class is in another branch (#584), and striped ones that each follow their place.
+func BenchmarkMountChildren(b *testing.B) {
 	for _, count := range []int{1000, 4000} {
-		for _, elsewhere := range []bool{false, true} {
-			b.Run(fmt.Sprintf("%d/positional=%t", count, elsewhere), func(b *testing.B) {
+		for _, kind := range []string{"plain", "positional-elsewhere", "striped"} {
+			b.Run(fmt.Sprintf("%d/%s", count, kind), func(b *testing.B) {
 				kids := make([]Node, count)
 				for i := range kids {
 					kids[i] = View{Style: Style{Height: Pt(1)}}
+					if kind == "striped" {
+						kids[i] = View{Class: "odd:bg-gray-100", Style: Style{Height: Pt(1)}}
+					}
 				}
 				class := ""
-				if elsewhere {
+				if kind == "positional-elsewhere" {
 					class = "last:hidden"
 				}
 				b.ReportAllocs()
