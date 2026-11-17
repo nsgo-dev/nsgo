@@ -19,6 +19,7 @@ func (t *Tree) trackClassRelations(n *node) {
 	if old := t.relationSources[n]; old != nil {
 		t.queueRelationRoot(old)
 		delete(t.relationSources, n)
+		t.relationScopes = nil
 	}
 	if n.cls != nil && n.cls.list.relational {
 		if t.relationSources == nil {
@@ -26,7 +27,8 @@ func (t *Tree) trackClassRelations(n *node) {
 		}
 		scope := relationScope(n)
 		t.relationSources[n] = scope
-		n.cls.related, n.cls.watch = true, n.cls.list.watch
+		t.relationScopes = nil
+		n.cls.related, n.cls.watch = true, n.cls.list.watch|n.cls.list.reach
 		t.queueRelationRoot(scope)
 	}
 	t.queueRelations(n)
@@ -35,19 +37,9 @@ func (t *Tree) trackClassRelations(n *node) {
 // Descendant selectors stay in their source's subtree. A sibling or
 // ancestor selector expands only that source's matching scope.
 func relationScope(n *node) *node {
-	mode := 0
+	mode := uint8(0)
 	if n.cls != nil {
-		for _, r := range n.cls.list.rules {
-			for _, s := range r.cond.has {
-				mode = max(mode, s.scopeMode())
-			}
-			for _, relation := range r.relations {
-				mode = max(mode, relation.selector.scopeMode())
-				for _, s := range relation.condition.has {
-					mode = max(mode, s.scopeMode())
-				}
-			}
-		}
+		mode = n.cls.list.relationScope
 	}
 	if mode > 0 {
 		if p := n.nativeParent(); p != nil {
@@ -63,8 +55,8 @@ func relationScope(n *node) *node {
 }
 
 // 0 is descendants, 1 includes siblings, and 2 also reads ancestors.
-func (s *classSelector) scopeMode() int {
-	mode := 0
+func (s *classSelector) scopeMode() uint8 {
+	mode := uint8(0)
 	for _, steps := range s.choices {
 		depth := 0
 		for i, step := range steps {
@@ -86,6 +78,35 @@ func (s *classSelector) scopeMode() int {
 		}
 	}
 	return mode
+}
+
+// relationIndex maps each matching scope to the sources whose selectors may match inside it. It is rebuilt only after a source or its scope changes.
+func (t *Tree) relationIndex() map[*node][]*node {
+	if t.relationScopes == nil && len(t.relationSources) > 0 {
+		t.relationScopes = make(map[*node][]*node, len(t.relationSources))
+		for source, scope := range t.relationSources {
+			t.relationScopes[scope] = append(t.relationScopes[scope], source)
+		}
+	}
+	return t.relationScopes
+}
+
+// sourcesFor returns the live sources whose scope holds n, oldest first. It walks n's ancestors rather than every source, so a refresh costs the depth of the tree per node.
+func (t *Tree) sourcesFor(n *node) []*node {
+	index := t.relationIndex()
+	if len(index) == 0 {
+		return nil
+	}
+	var out []*node
+	for a := n; a != nil; a = a.nativeParent() {
+		for _, source := range index[a] {
+			if !source.deleted && source.cls != nil && source.cls.list.relational {
+				out = append(out, source)
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b *node) int { return cmp.Compare(a.id, b.id) })
+	return out
 }
 
 func inRelationScope(n, scope *node) bool {
@@ -118,6 +139,7 @@ func (t *Tree) queueRelations(n *node) {
 		current := relationScope(source)
 		if source.deleted || current != old {
 			t.queueRelationRoot(old)
+			t.relationScopes = nil
 			if source.deleted {
 				delete(t.relationSources, source)
 				continue
@@ -149,12 +171,10 @@ func (t *Tree) updateRelationStyles() {
 		if n.deleted {
 			return
 		}
-		related, watch := false, uint16(0)
-		for source, scope := range t.relationSources {
-			if !source.deleted && inRelationScope(n, scope) {
-				related = true
-				watch |= source.cls.list.watch
-			}
+		sources := t.sourcesFor(n)
+		related, watch := len(sources) > 0, uint16(0)
+		for _, source := range sources {
+			watch |= source.cls.list.reach
 		}
 		if related && n.cls == nil {
 			var env classEnv
@@ -343,14 +363,10 @@ func (t *Tree) resolveRelationClasses(n *node) {
 	for _, r := range c.list.rules {
 		appendRule(r, n)
 	}
-	sources := make([]*node, 0, len(t.relationSources))
-	for source := range t.relationSources {
-		if source != n && !source.deleted {
-			sources = append(sources, source)
+	for _, source := range t.sourcesFor(n) {
+		if source == n {
+			continue
 		}
-	}
-	slices.SortFunc(sources, func(a, b *node) int { return cmp.Compare(a.id, b.id) })
-	for _, source := range sources {
 		for _, r := range source.cls.list.rules {
 			if len(r.relations) > 0 {
 				appendRule(r, source)

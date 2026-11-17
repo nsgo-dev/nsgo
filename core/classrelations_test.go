@@ -330,3 +330,71 @@ func TestRelationalGroupAndImportantStatePrecedence(t *testing.T) {
 		t.Fatalf("group hover did not clear: %v", got)
 	}
 }
+
+func TestRelationalTargetsKeepPeerVariants(t *testing.T) {
+	var checked *Signal[bool]
+	h := newHost(t, Size{Width: 400, Height: 300}, func(cx *Scope) Node {
+		checked = NewSignal(cx, false)
+		return View{Class: "[&_svg]:size-4", Children: []Node{
+			View{TestID: "peer", Class: "peer", Checked: checked.Get},
+			View{TestID: "label", Class: "opacity-100 peer-checked:opacity-50"},
+			Icon{SVG: selectorTestSVG()},
+		}}
+	})
+	h.commit()
+	if !h.find("label").cls.related {
+		t.Fatal("the label is not a selector target")
+	}
+	if got := h.find("label").style.Opacity; got != Alpha(1) {
+		t.Fatalf("unchecked peer opacity=%v", got)
+	}
+	checked.Set(true)
+	h.commit()
+	if got := h.find("label").style.Opacity; got != Alpha(.5) {
+		t.Fatalf("a selector target lost its peer variant: opacity=%v", got)
+	}
+	checked.Set(false)
+	h.commit()
+	if got := h.find("label").style.Opacity; got != Alpha(1) {
+		t.Fatalf("peer variant did not clear: opacity=%v", got)
+	}
+}
+
+func TestRelationalStatesAskOnlyPressableViewsForPresses(t *testing.T) {
+	h := newHost(t, Size{Width: 400, Height: 300}, func(*Scope) Node {
+		return View{TestID: "source", Class: "[&_svg]:active:opacity-50 has-[:active]:p-2", Children: []Node{
+			View{TestID: "plain", Children: []Node{Text{Content: "label"}}},
+			View{TestID: "button", OnPress: func(PressEvent) {}},
+			Icon{SVG: selectorTestSVG()},
+		}}
+	})
+	h.commit()
+	for _, id := range []string{"source", "plain"} {
+		if h.find(id).events().Has(driver.EventPressDown) {
+			t.Errorf("%s asks for presses for a selector it is not pressed for", id)
+		}
+	}
+	if !h.find("button").events().Has(driver.EventPressDown) {
+		t.Error("a pressable view in the selector's scope does not report presses")
+	}
+}
+
+func TestRelationalSourcesOnlyResolveInTheirScope(t *testing.T) {
+	h := newHost(t, Size{Width: 400, Height: 300}, func(*Scope) Node {
+		kids := make([]Node, 50)
+		for i := range kids {
+			id := ""
+			if i == 7 {
+				id = "icon"
+			}
+			kids[i] = View{Class: "[&_svg]:size-4", Children: []Node{Icon{TestID: id, SVG: selectorTestSVG()}}}
+		}
+		return View{Children: kids}
+	})
+	h.commit()
+	icon := h.find("icon")
+	sources := h.tree.sourcesFor(icon)
+	if len(sources) != 1 || sources[0] != icon.nativeParent() {
+		t.Fatalf("sourcesFor=%d sources, want the icon's own button", len(sources))
+	}
+}

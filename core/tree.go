@@ -154,6 +154,7 @@ type Tree struct {
 	// Relational classes coalesce updates within their source's scope.
 	relationSources     map[*node]*node
 	relationRoots       map[*node]struct{}
+	relationScopes      map[*node][]*node // relationSources by scope, nil until needed
 	refreshingRelations bool
 	// bars draws the bars of scroll views that have none of their own,
 	// and watches hear scroll views move (scrollbars.go).

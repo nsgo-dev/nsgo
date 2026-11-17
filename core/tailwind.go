@@ -532,7 +532,10 @@ type classList struct {
 	// spacing is set when the view gives its children margins.
 	spacing    bool
 	relational bool
-	watch      uint16
+	// relationScope is how far the list's selectors reach: 0 its own subtree, 1 its parent's, 2 the whole tree (relationScope).
+	relationScope uint8
+	// watch is the states the rules read of the view itself once matched, reach those they read of the views their selectors reach.
+	watch, reach uint16
 }
 
 // classEnv is what a node's classes are resolved for.
@@ -553,7 +556,7 @@ type classEnv struct {
 	fontSize Points
 	// peer matches a preceding sibling; nil when resolving outside a tree.
 	peer func(classPeer) bool
-	has      func(*classSelector) bool
+	has  func(*classSelector) bool
 }
 
 // classSource is a class string, its subtree's themes and the host token set over them.
@@ -720,12 +723,33 @@ func (t *tailwindTheme) parseToken(l *classList, token string) bool {
 		return false
 	}
 	l.rules = append(l.rules, classRule{cond: cond, decls: decls, rank: rank, important: important, relations: relations})
-	l.watch |= cond.watch()
-	for _, relation := range relations {
-		l.watch |= relation.selector.watch | relation.condition.watch()
+	// The states a rule reads of the view with the classes are its own; the others are read of views its selectors reach.
+	own := &cond
+	if len(relations) > 0 {
+		own = &relations[0].condition
+		l.reach |= cond.watch()
+		for i, relation := range relations {
+			l.reach |= relation.selector.watch
+			if i > 0 {
+				l.reach |= relation.condition.watch()
+			}
+		}
+	}
+	l.watch |= own.states | own.notStates
+	for _, sel := range own.has {
+		l.reach |= sel.watch
 	}
 	if len(relations) > 0 || len(cond.has) > 0 {
 		l.relational, l.env = true, true
+		for _, sel := range cond.has {
+			l.relationScope = max(l.relationScope, sel.scopeMode())
+		}
+		for _, relation := range relations {
+			l.relationScope = max(l.relationScope, relation.selector.scopeMode())
+			for _, sel := range relation.condition.has {
+				l.relationScope = max(l.relationScope, sel.scopeMode())
+			}
+		}
 	}
 	l.env = l.env || env || cond.dark != either || cond.landscape != either || cond.rtl != either ||
 		cond.reduceMotion != either || cond.increaseContrast != either || cond.minWidth != 0 || cond.maxWidth != 0 || cond.platform != ""

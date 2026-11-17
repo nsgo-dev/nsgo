@@ -64,7 +64,7 @@ core.View{Class: "flex items-center gap-3 rounded-xl border border-zinc-200 bg-w
 
 用 `peer` 标记控件，就能让后面的同级元素跟随它的状态：例如复选框设置 `Class: "peer"`，后面的标签设置 `Class: "peer-checked:text-accent peer-disabled:opacity-50"`。peer 只影响同一父元素下排在它后面的同级元素（`Show` 和 `Each` 里的也算），不影响前面的同级元素，也不影响它内部的元素。`peer/field` 配合 `peer-checked/field:` 区分命名的标记，`peer-data-invalid:` 跟随控件的布尔 `invalid` 数据状态。标记和状态的变化都会响应式更新。标记本身不会让元素成为 Tab 焦点或接收点按，所以 `peer-active:` 只跟随本身接收点按的 peer，例如按钮。
 
-`has-[>svg]:px-3` 在父元素有直接图标子元素时改变其内边距；`[&_svg]:size-4 [&_svg]:shrink-0` 设置后代图标的尺寸。`svg` 匹配 `core.Icon` 和 `SVGView`，条件渲染的区域不算一层元素。子元素、类名或状态变化时会重新匹配。`hover:[&_svg]` 跟随父元素的悬停，`[&_svg]:hover` 跟随各图标的悬停。匹配规则先比较选择器优先级，再比较变体顺序；内联样式优先，除非类名标为 important。
+`has-[>svg]:px-3` 在父元素有直接图标子元素时改变其内边距；`[&_svg]:size-4 [&_svg]:shrink-0` 设置后代图标的尺寸。`svg` 匹配 `core.Icon` 和 `SVGView`，条件渲染的区域不算一层元素。子元素、类名或状态变化时会重新匹配。`hover:[&_svg]` 跟随父元素的悬停，`[&_svg]:hover` 跟随各图标的悬停。选择器里的 `active` 只跟随本身接收点按的元素（例如按钮），与 `peer-active:` 相同。匹配规则先比较选择器优先级，再比较变体顺序；内联样式优先，除非类名标为 important。
 
 选择器在所有目标上匹配 NSGo 元素，支持列表、子元素（`>`）、后代（`_`）、相邻（`+`）和后续兄弟（`~`）关系，类名、`data-*` 存在或相等条件、角色、支持的布尔无障碍状态，以及 `:is`、`:where`、`:not`、`:has` 和子元素位置。类型包括 `view`/`div`、`text`/`span`（整个文本节点）、`scroll`、`input`、`textarea`、`image`/`img`、`canvas`、`svg`、`video`、`webview` 和 `native`。任意选择器的每个分支使用一个顶层 `&`；省略时测试元素自身。浏览器专属选择器、伪元素、at-rule、转义和函数内显式的 `&` 均视为未知；选择器不会触及后端实现视图或单独的文本片段。
 
