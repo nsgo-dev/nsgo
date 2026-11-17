@@ -51,7 +51,7 @@ core.View{
 }
 ```
 
-`Expanded` says whether a disclosure or a menu button is open, `Busy` that content is loading, `Invalid` that the app rejected a field's content (styled with `aria-invalid:`), and `Checked`, `Selected` and `Pressed` report a control's state. A control's parts can take its state through `PartStates`, so an indicator follows its checkbox without being a stop of its own.
+`Expanded` says whether a disclosure or a menu button is open, `Busy` that content is loading, `Invalid` that the app rejected a field's content or a control's value (styled with `aria-invalid:`), and `Checked`, `Selected` and `Pressed` report a control's state. A control's parts can take its state through `PartStates`, so an indicator follows its checkbox without being a stop of its own.
 
 ## Live changes
 

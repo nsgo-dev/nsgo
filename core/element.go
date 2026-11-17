@@ -208,8 +208,7 @@ type View struct {
 	// message, what a field expects.
 	AccessibilityDescription     string
 	AccessibilityDescriptionFunc func() string
-	// Invalid marks a field whose content the app rejected, for screen
-	// readers and the aria-invalid: styles (ARIA's aria-invalid).
+	// Invalid marks a field or control whose content or value the app rejected, for screen readers and the aria-invalid: styles (ARIA's aria-invalid).
 	Invalid func() bool
 	// AccessibilityValue is a range's or a textual element's value, as
 	// a slider's or a progress bar's.

@@ -447,6 +447,8 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 			}
 		}}
 	env := cx.Env()
+	// The step buttons and the scrub handle look invalid with the field, which alone reports it.
+	invalidPart := func() core.PartStates { return core.PartStates{Invalid: is(n.Invalid)} }
 	// The buttons step the field and never take the focus; on desktops a
 	// press moves it to the field. Screen readers step the field itself.
 	button := func(up bool, label, class string, style core.Style, content core.Node) core.Node {
@@ -459,7 +461,7 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 			role = core.RoleButton
 		}
 		return core.View{Class: class, Style: style, StyleFunc: n.ButtonLook, Role: role, Label: label, NoFocus: true, Children: children,
-			AccessibilityElementsHidden: func() bool { return label == "" },
+			AccessibilityElementsHidden: func() bool { return label == "" }, PartStates: invalidPart,
 			Disabled: func() bool {
 				if c.locked() {
 					return true
@@ -480,7 +482,7 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 		var from float64
 		distance := float64(cmp.Or(n.ScrubDistance, 4))
 		n.Prefix = core.Group{n.Prefix, core.View{TestID: n.ScrubTestID, Class: n.ScrubClass, Style: n.ScrubStyle, StyleFunc: n.ScrubStyleFunc,
-			ImportantForAccessibility: core.ImportantNoHideDescendants, PanActivation: core.PanActivation{ActiveOffsetX: 2, FailOffsetY: 12},
+			ImportantForAccessibility: core.ImportantNoHideDescendants, PartStates: invalidPart, PanActivation: core.PanActivation{ActiveOffsetX: 2, FailOffsetY: 12},
 			OnPan: func(e core.PanEvent) {
 				if is(n.Disabled) || is(n.Readonly) {
 					return

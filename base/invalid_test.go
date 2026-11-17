@@ -195,3 +195,30 @@ func TestColorPickerSharesInvalidWithItsParts(t *testing.T) {
 		}
 	}
 }
+
+// A number input's step buttons and scrub handle look invalid with its field without reporting it, in either layout.
+func TestNumberInputStepsLookInvalid(t *testing.T) {
+	var bad *core.Signal[bool]
+	look := "bg-[#001122] aria-invalid:bg-[#ff0000]"
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		bad = core.NewSignal(cx, false)
+		number := func(right bool, more, less string) core.Node {
+			return base.NumberInput{Invalid: bad.Get, ControlsRight: right, IncrementLabel: more, DecrementLabel: less,
+				IncrementButtonClass: look, DecrementButtonClass: look, Scrub: core.Text{Content: "drag"}, ScrubTestID: "scrub-" + more, ScrubClass: look}
+		}
+		return core.View{Children: []core.Node{number(false, "More", "Less"), number(true, "Up", "Down")}}
+	})
+	for _, invalid := range []bool{true, false} {
+		bad.Set(invalid)
+		app.Settle()
+		want := core.RGB(0x001122)
+		if invalid {
+			want = core.RGB(0xff0000)
+		}
+		for _, sel := range []string{"label:More", "label:Less", "label:Up", "label:Down", "id:scrub-More", "id:scrub-Up"} {
+			if v := app.FindMounted(sel); v.Props.Invalid || v.Style.Background != want {
+				t.Errorf("invalid=%v: %s reports invalid %v, background %x; want %x", invalid, sel, v.Props.Invalid, v.Style.Background, want)
+			}
+		}
+	}
+}
