@@ -278,19 +278,26 @@ func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 			} else if ev = t.s.filter(ev); ev != 0 {
 				// A background app can have no key window. Its monitors still see queued keys, but AppKit never hands them to the responder: run the same filter and deliver to that responder, without activating the app.
 				r := t.s.window.Send(sel("firstResponder"))
-				if code == 48 && kind == evKeyDown && (r == t.s.window || r == t.s.native || r == 0) {
+				switch {
+				case kind == evKeyDown && flags&(flagCommand|flagControl) != 0 && t.keyEquivalent(ev):
+					// A view or the menu bar took it.
+				case code == 48 && kind == evKeyDown && (r == t.s.window || r == t.s.native || r == 0):
 					t.s.tabFromSurface(flags&flagShift != 0)
-				} else {
-					action := "keyDown:"
-					if kind == evKeyUp {
-						action = "keyUp:"
-					}
-					r.Send(sel(action), ev)
+				case kind == evKeyUp:
+					r.Send(sel("keyUp:"), ev)
+				default:
+					r.Send(sel("keyDown:"), ev)
 				}
 			}
 		})
 	}
 	time.Sleep(10 * time.Millisecond)
+}
+
+// keyEquivalent offers a background window's key down to its views and then the menu bar, as AppKit's own dispatch does before the responder sees the key, and reports whether one took it.
+func (t *testSurface) keyEquivalent(ev objc.ID) bool {
+	return objc.Send[bool](t.s.window, sel("performKeyEquivalent:"), ev) ||
+		objc.Send[bool](nsApp().Send(sel("mainMenu")), sel("performKeyEquivalent:"), ev)
 }
 
 // keyboard gives a live surface's window the keyboard, as the test host gives a test's window as it opens: key within the app, without activating it, so posted keys reach it.
