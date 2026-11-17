@@ -270,7 +270,15 @@ func (v *Video) open() {
 	// The player's rate changes when its controls, the PiP window, Control Center or the system play or pause it (macOS 12 and iOS 15 say why).
 	rated := objcblock.New(func(_ objc.Block, note objc.ID) {
 		if v.status == st && v.player != 0 {
-			v.rateChanged(rateReason(note))
+			// AVPlayer can post while play or pause is still changing its
+			// internal state. Let that operation return before reporting it:
+			// an app reacting immediately must not reenter that operation.
+			reason := rateReason(note)
+			OnMain(func() {
+				if v.status == st && v.player != 0 {
+					v.rateChanged(reason)
+				}
+			})
 		}
 	})
 	v.rateToken = center.Send(selAddObserver, NSString("AVPlayerRateDidChangeNotification"), v.player, queue, rated).Send(sel("retain"))
