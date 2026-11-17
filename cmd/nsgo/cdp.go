@@ -83,6 +83,8 @@ func startBrowser(ctx context.Context) (*cdp, error) {
 		return nil, err
 	}
 	cmd := exec.CommandContext(ctx, path, "--headless=new", "--remote-debugging-port=0", "--user-data-dir="+profile,
+		// Match the browser's device scale to the emulated test viewport: mismatched scales halve DOM wheel deltas while native scrolling still moves the full requested CSS distance.
+		fmt.Sprintf("--force-device-scale-factor=%d", webTestScale),
 		"--no-first-run", "--no-default-browser-check", "--disable-extensions", "--mute-audio",
 		// The DevTools socket takes this tool, which names its origin.
 		"--remote-allow-origins="+cdpOrigin,

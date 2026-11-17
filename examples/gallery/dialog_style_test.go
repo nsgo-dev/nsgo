@@ -23,7 +23,12 @@ func TestDialogStyleUpdatesOpenSurface(t *testing.T) {
 					StyleFunc: func() core.Style {
 						return core.Style{Background: colors.Surface()}
 					},
-					Children: []core.Node{core.View{TestID: "probe", Style: core.Style{Width: core.Pt(120), Height: core.Pt(60)}}}}
+					Children: []core.Node{core.View{TestID: "probe", Style: core.Style{Width: core.Pt(120), Height: core.Pt(60)}, Children: []core.Node{
+						// Recreate a reference swatch in each appearance. Comparing pixels in one capture also works in a display's ICC space, which image/png does not convert to sRGB.
+						core.Dynamic(func(*core.Scope) core.Node {
+							return core.View{TestID: "reference", Style: core.Style{Width: core.Pt(20), Height: core.Pt(20), Background: colors.Surface()}}
+						}),
+					}}}}
 			}, nsgotest.Environment(e), nsgotest.Size(400, 400))
 			id := app.Find("panel").ID
 			for _, dark := range []bool{false, true, false} {
@@ -42,14 +47,18 @@ func TestDialogStyleUpdatesOpenSurface(t *testing.T) {
 				}
 				probe := app.Find("probe").Bounds()
 				img := app.Capture()
-				x := int(float32(img.Bounds().Dx()) * float32(probe.Origin.X+probe.Size.Width/2) / 400)
-				y := int(float32(img.Bounds().Dy()) * float32(probe.Origin.Y+probe.Size.Height/2) / 400)
+				pixel := func(bounds core.Bounds) (int, int) {
+					return int(float32(img.Bounds().Dx()) * float32(bounds.Origin.X+bounds.Size.Width/2) / 400),
+						int(float32(img.Bounds().Dy()) * float32(bounds.Origin.Y+bounds.Size.Height/2) / 400)
+				}
+				x, y := pixel(probe)
 				r, g, b, _ := img.At(x, y).RGBA()
-				wr, wg, wb, _ := palette.Surface.Components()
+				rx, ry := pixel(app.Find("reference").Bounds())
+				wr, wg, wb, _ := img.At(rx, ry).RGBA()
 				for i, got := range []uint32{r, g, b} {
-					want := []float64{wr, wg, wb}[i] * 255
-					if delta := float64(got>>8) - want; delta < -3 || delta > 3 {
-						t.Fatalf("dark=%v: displayed pixel at %d,%d = %d,%d,%d, want %v", dark, x, y, r>>8, g>>8, b>>8, palette.Surface)
+					want := []uint32{wr, wg, wb}[i]
+					if delta := int(got>>8) - int(want>>8); delta < -3 || delta > 3 {
+						t.Fatalf("dark=%v: displayed pixel at %d,%d = %d,%d,%d, reference = %d,%d,%d", dark, x, y, r>>8, g>>8, b>>8, wr>>8, wg>>8, wb>>8)
 					}
 				}
 			}

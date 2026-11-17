@@ -77,8 +77,9 @@ func (h *host) Open(app func(cx *core.Scope) core.Node, o testhost.Options) (tes
 }
 
 type testSurface struct {
-	w    *window
-	test *testOpen
+	w      *window
+	test   *testOpen
+	clicks testhost.Clicks
 	// field is the field a press last focused: GTK reports the focus
 	// only while the window is active, which a test cannot ask.
 	field *view
@@ -137,7 +138,7 @@ func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Mod
 	}
 	t.onLoop(func() {
 		t.focusAt(at)
-		t.w.pointerDown(at, 1, 0, state, 1)
+		t.w.pointerDown(at, 1, 0, state, t.clicks.Press(at, time.Now(), 500*time.Millisecond))
 	})
 	if hold > 0 {
 		time.Sleep(hold + 50*time.Millisecond)
@@ -194,11 +195,23 @@ func absPoints(v driver.Points) driver.Points {
 
 // Scroll turns the wheel 20 points at a time, 16 ms apart.
 func (t *testSurface) Scroll(at driver.Point, delta driver.Point) error {
+	t.onLoop(func() {
+		t.w.stopWheelGlide()
+		t.w.wheelTaker = nil
+	})
 	n := int(max(absPoints(delta.X), absPoints(delta.Y))/20) + 1
 	for range n {
-		t.onLoop(func() { t.w.wheel(at, float64(delta.X)/float64(n), float64(delta.Y)/float64(n)) })
+		t.onLoop(func() { t.w.wheelEvent(0, at, float64(delta.X)/float64(n), float64(delta.Y)/float64(n), true) })
 		time.Sleep(16 * time.Millisecond)
 	}
+	t.onLoop(func() {
+		if v := t.w.wheelTaker; v != nil && !v.deleted {
+			ev := t.w.wheelEventAt(v, at, 0)
+			ev.Phase, ev.Precise = driver.GestureEnded, true
+			t.w.engine.Dispatch(ev)
+		}
+		t.w.wheelTaker = nil
+	})
 	return nil
 }
 

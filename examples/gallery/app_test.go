@@ -107,10 +107,15 @@ func TestTabs(t *testing.T) {
 // TestPhoneTabs shows the tabs and the settings at the bottom, and the
 // settings' theme.
 func TestPhoneTabs(t *testing.T) {
+	iosNavigation(t)
 	app := startPhone(t)
 	bars := app.QueryMounted("id:tab-bar")
-	if len(bars) != 1 || len(bars[0].NativeProps["items"].([]any)) != len(tabs)+1 {
+	if len(bars) != 1 {
 		t.Fatalf("the bars are %v", bars)
+	}
+	items, ok := bars[0].NativeProps["items"].([]any)
+	if !ok || len(items) != len(tabs)+1 {
+		t.Fatalf("tab bar items = %v (%T), want %d items", bars[0].NativeProps["items"], bars[0].NativeProps["items"], len(tabs)+1)
 	}
 	openPhone(app, "Checkbox")
 	app.Back()
@@ -157,6 +162,7 @@ func TestColorThemeChosen(t *testing.T) {
 // TestPhoneLargeTitles titles the indexes, the settings and the demos that
 // scroll with iOS's large title, and leaves the others a compact bar.
 func TestPhoneLargeTitles(t *testing.T) {
+	iosNavigation(t)
 	app := startPhone(t)
 	if !app.Find("id:index").Screen.LargeTitle {
 		t.Fatal("the index has no large title")
@@ -177,6 +183,13 @@ func TestPhoneLargeTitles(t *testing.T) {
 	}
 }
 
+func iosNavigation(t *testing.T) {
+	t.Helper()
+	if target := nsgotest.Target(); target != "" && target != "ios" && target != "ios_simulator" {
+		t.Skipf("checks iOS native navigation; %s keeps its own OS and idiom", target)
+	}
+}
+
 // TestNarrowDesktop shows the stack's header at the window's top, clear of
 // the window controls, with no title bar of the app's.
 func TestNarrowDesktop(t *testing.T) {
@@ -189,7 +202,12 @@ func TestNarrowDesktop(t *testing.T) {
 	if head.Frame.Origin.Y != 0 || head.Props.WindowDrag != core.WindowDragOn {
 		t.Fatalf("the header is at %v, dragging %v", head.Frame.Origin, head.Props.WindowDrag)
 	}
-	if x := app.Find("role:header Settings").Parent.Frame.Origin.X; x < 78 {
+	// A target keeps its actual window decorations, while the model uses the title bar above. Browser windows have no controls in the content.
+	left := core.Points(0)
+	if target := nsgotest.Target(); target == "" || target == "macos" {
+		left = 78
+	}
+	if x := app.Find("role:header Settings").Parent.Frame.Origin.X; x < left {
 		t.Fatalf("the title is at %v, under the window controls", x)
 	}
 	if app.Exists("id:settings") {
@@ -512,6 +530,9 @@ func TestMenus(t *testing.T) {
 // TestNativePopupMenu right-clicks the area that shows the platform's own
 // context menu and chooses an item of its submenu there.
 func TestNativePopupMenu(t *testing.T) {
+	if target := nsgotest.Target(); target != "" && target != "macos" && target != "windows" && target != "linux" {
+		t.Skipf("%s has no native context menus", target)
+	}
 	app := startDesktop(t)
 	open(app, "Menu")
 	app.RightClick("id:popup-area")
@@ -621,8 +642,8 @@ func TestChatStopsAReply(t *testing.T) {
 // fakeCLI puts a CLI on PATH that runs script, reading the prompt first.
 func fakeCLI(t *testing.T, name, script string) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("the fake CLI is a shell script")
+	if runtime.GOOS == "windows" || runtime.GOOS == "js" {
+		t.Skip("the fake CLI needs a local filesystem and a Unix shell")
 	}
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\ncat >/dev/null\n"+script+"\n"), 0o755); err != nil {
@@ -1689,8 +1710,8 @@ func TestPseudoLocales(t *testing.T) {
 // TestTerminal runs the shell, types a command that sets the title, which
 // the panel shows, and restarts the shell.
 func TestTerminal(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("runs a Unix shell")
+	if runtime.GOOS == "windows" || runtime.GOOS == "js" {
+		t.Skip("runs a local Unix shell, unavailable on this target")
 	}
 	// A plain sh rather than the user's shell, whose prompt may set a title of its own over the test's, and with no ENV startup file to run.
 	t.Setenv("SHELL", "/bin/sh")
@@ -1711,8 +1732,13 @@ func TestTerminal(t *testing.T) {
 	if got := app.Find("id:search-dialog >> role:textbox").Text; got != "a" {
 		t.Errorf("Backspace left the search %q: the terminal kept its keys", got)
 	}
+	// A command palette's Escape clears a nonempty query first. Leave it empty so Escape closes it before acting on the terminal again.
+	app.Clear("id:search-dialog >> role:textbox")
 	app.Key("escape")
 	app.FastForward(time.Second)
+	if app.Exists("id:search-dialog") {
+		t.Fatal("the search dialog did not close")
+	}
 	app.Screenshot("terminal")
 	app.Press("text:Dracula")
 	app.Press("text:Bar")

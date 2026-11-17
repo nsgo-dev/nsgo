@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
@@ -32,6 +33,7 @@ func (host) Open(app func(cx *core.Scope) core.Node, o testhost.Options) (testho
 	test := &testWindow{options: o}
 	onMainSync(func() {
 		s = openWindow(app, Options{Title: "NSGo test", Width: o.Size.Width, Height: o.Size.Height, Perf: o.FPS}, test)
+		s.testPointer = &apple.CGPoint{X: -1e6, Y: -1e6}
 		// In front, as a user sees it, but without taking the keyboard
 		// from the app the user works in.
 		s.window.Send(sel("orderFrontRegardless"))

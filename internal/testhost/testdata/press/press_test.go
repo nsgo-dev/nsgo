@@ -2,6 +2,7 @@ package press_test
 
 import (
 	"testing"
+	"time"
 
 	_ "github.com/nsgo-dev/nsgo"
 
@@ -10,6 +11,42 @@ import (
 )
 
 func TestMain(m *testing.M) { nsgotest.Main(m) }
+
+// Consecutive scripted presses must take the same double-click path as real input, including a new sequence after moving to another control.
+func TestPressesCountConsecutiveClicks(t *testing.T) {
+	desktopPointer(t)
+	var got []int
+	app := nsgotest.Start(t, func(*core.Scope) core.Node {
+		button := func(id string) core.Node {
+			return core.View{TestID: id, Style: core.Style{Width: core.Pt(100), Height: core.Pt(60)},
+				OnPress: func(e core.PressEvent) { got = append(got, e.Clicks) }}
+		}
+		return core.View{Style: core.Style{Gap: 30}, Children: []core.Node{button("first"), button("second")}}
+	}, nsgotest.Size(300, 300))
+	app.Press("first")
+	app.Press("first")
+	app.Press("second")
+	if len(got) != 3 || got[0] != 1 || got[1] != 2 || got[2] != 1 {
+		t.Fatalf("press counts = %v, want [1 2 1]", got)
+	}
+	// Target click counts use the system clock; headless uses the manual one.
+	if nsgotest.Target() != "" {
+		time.Sleep(time.Second)
+	} else {
+		app.Advance(time.Second)
+	}
+	app.Press("second")
+	if got[len(got)-1] != 1 {
+		t.Fatalf("press after a pause = %v, want a new sequence", got)
+	}
+}
+
+func desktopPointer(t *testing.T) {
+	t.Helper()
+	if target := nsgotest.Target(); target != "" && target != "macos" && target != "linux" && target != "windows" && target != "web" {
+		t.Skipf("checks a desktop mouse and touchpad, unavailable on %s", target)
+	}
+}
 
 // TestPressModifiersReachTheApp uses the same press steps headless and through the targets' native input, checking every edge and the next tap.
 func TestPressModifiersReachTheApp(t *testing.T) {

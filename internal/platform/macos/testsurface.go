@@ -18,6 +18,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
 // A surface acting as the user does, with events posted to the application's queue, for the test host (testhost.go) and for nsgo dev's automation (automation.go), whose live surfaces are the running app's windows, with no test's options: test is nil.
@@ -66,6 +67,7 @@ type testSurface struct {
 	s       *surface
 	test    *testWindow
 	hovered []objc.ID
+	clicks  testhost.Clicks
 }
 
 // windowPoint is p, in the surface's points from its top left, in the
@@ -95,6 +97,9 @@ func (t *testSurface) mouseWith(kind uint, p driver.Point, clicks int, mods driv
 	}
 	onMainSync(func() {
 		w := t.s.window
+		if t.s.testPointer != nil {
+			*t.s.testPointer = t.windowPoint(p)
+		}
 		ev := objc.ID(apple.Class("NSEvent")).Send(
 			sel("mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:"),
 			kind, t.windowPoint(p), flags, uptime(), objc.Send[int](w, sel("windowNumber")), objc.ID(0), 0, clicks, float32(1))
@@ -104,12 +109,14 @@ func (t *testSurface) mouseWith(kind uint, p driver.Point, clicks int, mods driv
 }
 
 func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	interval := time.Duration(objc.Send[float64](objc.ID(apple.Class("NSEvent")), sel("doubleClickInterval")) * float64(time.Second))
+	clicks := t.clicks.Press(at, time.Now(), interval)
 	t.mouseWith(evMoved, at, 0, mods)
-	t.mouseWith(evLeftDown, at, 1, mods)
+	t.mouseWith(evLeftDown, at, clicks, mods)
 	if hold > 0 {
 		time.Sleep(hold + 50*time.Millisecond)
 	}
-	t.mouseWith(evLeftUp, at, 1, mods)
+	t.mouseWith(evLeftUp, at, clicks, mods)
 	return nil
 }
 
@@ -238,6 +245,9 @@ func (t *testSurface) hit(at driver.Point) objc.ID {
 // report.
 func (t *testSurface) Hover(at driver.Point) error {
 	onMainSync(func() {
+		if t.s.testPointer != nil {
+			*t.s.testPointer = t.windowPoint(at)
+		}
 		t.s.commitPending()
 		var under []objc.ID
 		root := t.s.native

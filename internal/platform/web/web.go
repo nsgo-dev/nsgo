@@ -1297,6 +1297,7 @@ type scrollTo struct {
 	v        *view
 	to       driver.Point
 	animated bool
+	relative bool
 }
 
 // MountsAtOnce implements engine.SharedMounter: Mount applies a batch
@@ -1638,17 +1639,12 @@ func (s *surface) mount(b *driver.MountBatch) {
 				// waits for the batch's other changes: one layout for all.
 				v.sc.applied++
 				s.interruptMomentum(v)
-				scrolls = append(scrolls, scrollTo{v, it.Point, it.Animated})
+				scrolls = append(scrolls, scrollTo{v: v, to: it.Point, animated: it.Animated})
 			}
 		case driver.ItemScrollBy:
-			// After the scrolls it follows.
-			for _, sc := range scrolls {
-				s.scrollTo(sc.v, sc.to, sc.animated)
-			}
-			scrolls = scrolls[:0]
 			if v.kind == driver.KindScroll {
 				v.sc.applied++
-				v.scrollBy(it.Point)
+				scrolls = append(scrolls, scrollTo{v: v, to: it.Point, relative: true})
 			}
 		case driver.ItemStickyCells:
 			if v.kind == driver.KindScroll {
@@ -1716,7 +1712,11 @@ func (s *surface) mount(b *driver.MountBatch) {
 	}
 	s.dom.flush()
 	for _, sc := range scrolls {
-		s.scrollTo(sc.v, sc.to, sc.animated)
+		if sc.relative {
+			sc.v.scrollBy(sc.to)
+		} else {
+			s.scrollTo(sc.v, sc.to, sc.animated)
+		}
 	}
 	s.applyAnimated()
 	s.changedShaders()

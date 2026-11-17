@@ -322,6 +322,8 @@ type surface struct {
 	repick    bool
 	repicking bool
 	repickAt  time.Duration
+	// testPointer is the isolated test host's pointer in window coordinates. Posted NSEvents do not move the physical mouse queried by AppKit.
+	testPointer *apple.CGPoint
 
 	// The gestures in progress.
 	pan             *panTrack
@@ -2639,7 +2641,11 @@ func repickIn(t, at time.Duration, applying bool) time.Duration {
 // pickHere is pick where the mouse is now.
 func (s *surface) pickHere() {
 	if s.window != 0 {
-		s.pick(objc.Send[apple.CGPoint](s.window, sel("mouseLocationOutsideOfEventStream")), false)
+		at := objc.Send[apple.CGPoint](s.window, sel("mouseLocationOutsideOfEventStream"))
+		if s.testPointer != nil {
+			at = *s.testPointer
+		}
+		s.pick(at, false)
 	}
 }
 
