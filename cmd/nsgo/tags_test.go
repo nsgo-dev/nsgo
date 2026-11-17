@@ -191,9 +191,6 @@ func TestBuildTagsReachEveryGoCommand(t *testing.T) {
 		t.Errorf("appPackages leaves out app/extra, which build.tags links: %v", pkgs)
 	}
 
-	if here, err := buildsHere(ctx, p); err != nil || !here {
-		t.Errorf("buildsHere = %v, %v", here, err)
-	}
 	out, err := goListFor(ctx, p, "macos_arm64", "-deps", "-f", "{{.ImportPath}}")
 	if err != nil || !slices.Contains(strings.Fields(string(out)), "app/extra") {
 		t.Errorf("goListFor for macos_arm64 = %q, %v; want app/extra listed", out, err)

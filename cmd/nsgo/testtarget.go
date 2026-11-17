@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/doc"
 	"go/parser"
 	"go/token"
 	"io"
@@ -47,17 +48,8 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 		plain("no tests run (-count=%d)", flags.count)
 		return (&testRun{out: os.Stderr}).finish(opts, nil)
 	}
-	// A package that builds only for its target, as a backend's, is
-	// listed as the target sees it.
-	here, err := buildsHere(ctx, p)
-	if err != nil {
-		return err
-	}
-	seen := opts.target
-	if here {
-		seen = ""
-	}
-	names, err := listTests(ctx, p, seen, opts.run, flags.args...)
+	// Even a package with portable files can have tests that exist only on the target, so discover tests and their host as the target builds them.
+	names, err := listTests(ctx, p, opts.target, opts.run, flags.args...)
 	if err != nil {
 		return err
 	}
@@ -68,12 +60,12 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 		plain("no tests match")
 		return nil
 	}
-	hosted, err := linksPlatform(ctx, p, seen)
+	hosted, err := linksPlatform(ctx, p, opts.target)
 	if err != nil {
 		return err
 	}
 	if needsTestHost(opts.target) {
-		funcs, err := testFuncs(ctx, p, seen)
+		funcs, err := testFuncs(ctx, p, opts.target)
 		if err != nil {
 			return err
 		}
@@ -226,9 +218,18 @@ var hostBackends = []string{
 func goListFor(ctx context.Context, p *project, target string, args ...string) ([]byte, error) {
 	var env []string
 	if target != "" {
-		var err error
-		if env, err = vetEnv(ctx, target); err != nil {
-			return nil, err
+		os, _, _ := strings.Cut(target, "_")
+		switch os {
+		case "ios", "tvos", "watchos":
+			// Listing files needs only the target's build context, not its SDK or compiler, so the test host check runs before the tool looks for Xcode.
+			env = []string{"GOOS=ios", "GOARCH=arm64", "CGO_ENABLED=1"}
+		case "android":
+			env = []string{"GOOS=android", "GOARCH=arm64", "CGO_ENABLED=0"}
+		default:
+			var err error
+			if env, err = vetEnv(ctx, target); err != nil {
+				return nil, err
+			}
 		}
 	}
 	tags, err := goTags(ctx, p, env, append([]string{"nsgotest"}, targetTags(target)...)...)
@@ -361,23 +362,7 @@ func testContextError(ctx context.Context, timeout time.Duration) error {
 	return ctx.Err()
 }
 
-// buildsHere reports whether the package has Go files for this machine.
-func buildsHere(ctx context.Context, p *project) (bool, error) {
-	tags, err := goTags(ctx, p, nil, "nsgotest")
-	if err != nil {
-		return false, err
-	}
-	cmd := exec.CommandContext(ctx, "go", append(append([]string{"list", "-e"}, tagsArgs(tags)...), "-f", "{{if or .GoFiles .TestGoFiles .XTestGoFiles}}yes{{end}}", ".")...)
-	cmd.Dir = p.Dir
-	out, err := cmd.Output()
-	if err != nil {
-		return false, fmt.Errorf("go list: %w", err)
-	}
-	return strings.TrimSpace(string(out)) == "yes", nil
-}
-
-// listTestSources lists the top-level tests that run matches in the
-// package's test files for target.
+// listTestSources lists the top-level tests and the examples with output that run matches in the package's test files for target, as go test -list does.
 func listTestSources(ctx context.Context, p *project, target, run string) ([]string, error) {
 	re, err := regexp.Compile(run)
 	if err != nil {
@@ -390,31 +375,45 @@ func listTestSources(ctx context.Context, p *project, target, run string) ([]str
 	var names []string
 	for _, name := range funcs {
 		// TestMain runs the tests rather than being one.
-		if name != "TestMain" && isTestName(name) && re.MatchString(name) {
+		if name != "TestMain" && (isTestName(name) || strings.HasPrefix(name, "Example")) && re.MatchString(name) {
 			names = append(names, name)
 		}
 	}
 	return names, nil
 }
 
-// testFuncs lists the functions the package's test files declare for target, methods aside.
+// testFuncs lists the functions the package's test files declare for target, methods and examples without output aside, which go test compiles but does not run, with the file of TSX tests the tool adds to every target's test build.
 func testFuncs(ctx context.Context, p *project, target string) ([]string, error) {
 	out, err := goListFor(ctx, p, target, "-f", "{{range .TestGoFiles}}{{$.Dir}}/{{.}}\n{{end}}{{range .XTestGoFiles}}{{$.Dir}}/{{.}}\n{{end}}")
 	if err != nil {
 		return nil, err
 	}
+	paths := strings.Split(strings.TrimSpace(string(out)), "\n")
+	tsxTest, err := p.tsxTestFile()
+	if err != nil {
+		return nil, err
+	}
+	if tsxTest != "" {
+		paths = append(paths, tsxTest)
+	}
 	var names []string
 	fset := token.NewFileSet()
-	for _, path := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for _, path := range paths {
 		if path == "" {
 			continue
 		}
-		f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		f, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution|parser.ParseComments)
 		if err != nil {
 			return nil, err
 		}
+		runs := map[string]bool{}
+		for _, e := range doc.Examples(f) {
+			if e.Output != "" || e.EmptyOutput {
+				runs["Example"+e.Name] = true
+			}
+		}
 		for _, d := range f.Decls {
-			if fn, ok := d.(*ast.FuncDecl); ok && fn.Recv == nil {
+			if fn, ok := d.(*ast.FuncDecl); ok && fn.Recv == nil && (!strings.HasPrefix(fn.Name.Name, "Example") || runs[fn.Name.Name]) {
 				names = append(names, fn.Name.Name)
 			}
 		}

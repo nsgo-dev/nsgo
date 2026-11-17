@@ -697,6 +697,7 @@ func TestTargetTestsNeedTheTestHost(t *testing.T) {
 		name, file, want string
 	}{
 		{"unhosted", "package lib\n\nimport \"testing\"\n\n" + test, "do not link: import github.com/nsgo-dev/nsgo in a test file"},
+		{"target-only", "//go:build ios || android\n\npackage lib\n\nimport \"testing\"\n\n" + test, "do not link: import github.com/nsgo-dev/nsgo in a test file"},
 		{"no TestMain", "package lib\n\nimport (\n\t\"testing\"\n\n\t_ \"github.com/nsgo-dev/nsgo\"\n)\n\n" + test, "add func TestMain(m *testing.M) { nsgotest.Main(m) }"},
 	} {
 		dir := t.TempDir()
@@ -778,6 +779,37 @@ func TestListTestSourcesLeavesOutTestMain(t *testing.T) {
 	names, err := listTestSources(t.Context(), p, "", ".")
 	if err != nil || !slices.Equal(names, []string{"TestChat"}) {
 		t.Fatalf("listTestSources = %q, %v; want [TestChat]", names, err)
+	}
+}
+
+func TestListTestsUsesTargetBuildTags(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod": "module example.com/lib\n\ngo 1.26\n",
+		"lib.go": "package lib\n",
+		// go test runs an example only with an output comment.
+		"lib_test.go":     "package lib\nimport \"testing\"\nfunc TestPortable(t *testing.T) {}\nfunc ExampleShown() {\n\t// Output:\n}\nfunc ExampleCompiled() {}\n",
+		"ios_test.go":     "//go:build ios && nsgotest\n\npackage lib\nimport \"testing\"\nfunc TestIOS(t *testing.T) {}\n",
+		"android_test.go": "//go:build android && nsgotest\n\npackage lib\nimport \"testing\"\nfunc TestAndroid(t *testing.T) {}\n",
+		"desktop_test.go": "//go:build darwin && !ios\n\npackage lib\nimport \"testing\"\nfunc TestDesktop(t *testing.T) {}\n",
+		// The tool adds the TSX tests' file to every target's test build.
+		"app.test.tsx": "",
+	})
+	p, err := loadForTest(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for target, want := range map[string][]string{
+		"ios_simulator": {"ExampleShown", "TestIOS", "TestPortable", "TestTSX"},
+		"android":       {"ExampleShown", "TestAndroid", "TestPortable", "TestTSX"},
+		"macos_arm64":   {"ExampleShown", "TestDesktop", "TestPortable", "TestTSX"},
+		"web":           {"ExampleShown", "TestPortable", "TestTSX"},
+	} {
+		names, err := listTests(t.Context(), p, target, ".")
+		slices.Sort(names)
+		if err != nil || !slices.Equal(names, want) {
+			t.Errorf("listTests(%q) = %q, %v; want %q", target, names, err, want)
+		}
 	}
 }
 

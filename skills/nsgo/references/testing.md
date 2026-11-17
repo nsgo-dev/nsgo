@@ -55,6 +55,8 @@ Keep a test off the network and disk the user owns: inject the fetcher or the `h
 
 Cleanup closes native context menus left open by an app, including between subtests in one process.
 
+Test discovery follows the target's build tags, including target-only tests in packages that also have portable files.
+
 ```sh
 go tool nsgo test -target macos            # windows, linux, web, ios (a connected iPhone), ios_simulator, tvos_simulator, watchos_simulator, android or all
 go tool nsgo test -target macos -run TestAdd

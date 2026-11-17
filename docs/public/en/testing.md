@@ -55,7 +55,7 @@ Tests check reactive graph ownership: access signals and scopes on the app's gor
 
 ## Run on a platform
 
-The same tests run in a real window with the platform's own input:
+Tests run in a real window with the platform's own input. Discovery follows the target's build tags, including target-only test files in otherwise portable packages:
 
 ```sh
 go tool nsgo test -target macos
