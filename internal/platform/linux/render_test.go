@@ -121,6 +121,49 @@ func TestFontSizesAreLogicalPixels(t *testing.T) {
 	}
 }
 
+// TestLetterSpacingFitsAtItsMeasuredWidth lays letter-spaced texts out at the width they measured, with no limit and within a wider or narrower one, and expects the lines they measured: Pango leaves a line's outer letter spacing out of its width but counts it when it breaks lines (#489).
+func TestLetterSpacingFitsAtItsMeasuredWidth(t *testing.T) {
+	if err := openLibs(); err != nil {
+		t.Skip(err)
+	}
+	style := func(spacing driver.Points) driver.TextStyle {
+		return driver.TextStyle{Font: driver.Font{Family: "Sans", Size: 20}, LetterSpacing: spacing, Color: driver.RGB(0)}
+	}
+	title := "悦灵辞书 Lexicon"
+	for _, c := range []struct {
+		name  string
+		text  driver.AttributedText
+		width driver.Points
+	}{
+		{"natural", driver.AttributedText{Text: title, Style: style(2)}, driver.Auto},
+		{"fractional", driver.AttributedText{Text: title, Style: style(1.3)}, driver.Auto},
+		{"wider box", driver.AttributedText{Text: title, Style: style(2)}, 600},
+		{"wrapped", driver.AttributedText{Text: "spaced words wrap across several lines here", Style: style(3)}, 120},
+		{"spaced first span", driver.AttributedText{Text: title, Style: style(0), Spans: []driver.TextSpan{
+			{Start: 0, End: len("悦灵辞书"), Style: style(6)},
+		}}, driver.Auto},
+		{"spaced last span", driver.AttributedText{Text: title, Style: style(0), Spans: []driver.TextSpan{
+			{Start: len(title) - len("Lexicon"), End: len(title), Style: style(4)},
+		}}, driver.Auto},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			w := &window{}
+			p := w.Prepare(&c.text)
+			defer p.Release()
+			at := p.Layout(driver.Size{Width: c.width}).(*textLayout)
+			want := len(at.lines)
+			size := p.Measure(c.width)
+			if !c.width.IsAuto() && size.Width > c.width {
+				t.Fatalf("measured %v within %v", size, c.width)
+			}
+			got := len(p.Layout(size).(*textLayout).lines)
+			if got != want {
+				t.Fatalf("laid out at its measured %v, %d lines; want %d", size, got, want)
+			}
+		})
+	}
+}
+
 // TestSpanBackgroundsBoxEachLine draws a span's background from its
 // font's ascent to its descent, a box per line, without its line's
 // hanging space.

@@ -424,7 +424,69 @@ func (p *preparedText) measure(width driver.Points) driver.Size {
 	}
 	var w, h int32
 	pangoLayoutGetPixelSize(p.layout, &w, &h)
+	if spaced := p.spacedWidth(width); spaced > w {
+		w = spaced
+	}
 	return driver.Size{Width: driver.Points(w), Height: driver.Points(h)}
+}
+
+// spacedWidth returns, in pixels, the width at which the measuring layout breaks its lines as it has at width: Pango leaves the letter spacing before a line's first cluster and after its last out of the line's width, but counts it when it breaks lines, so a text laid out again at its measured width would break once more (#489). It is no wider than width, at which the lines already fit.
+func (p *preparedText) spacedWidth(width driver.Points) int32 {
+	if !p.letterSpaced() {
+		return 0
+	}
+	iter := pangoLayoutGetIter(p.layout)
+	defer pangoLayoutIterFree(iter)
+	var need int32
+	for {
+		line := pangoLayoutIterGetLine(iter)
+		from := int(*(*int32)(unsafe.Add(cPointer(line), 8)))
+		to := min(from+int(*(*int32)(unsafe.Add(cPointer(line), 12))), len(p.text))
+		if from < to {
+			var ink, logical pangoRectangle
+			pangoLayoutIterGetLineExtents(iter, &ink, &logical)
+			_, last := utf8.DecodeLastRuneInString(p.text[from:to])
+			before, _ := letterSpace(p.styleAt(from).LetterSpacing)
+			_, after := letterSpace(p.styleAt(to - last).LetterSpacing)
+			need = max(need, logical.Width+before+after)
+		}
+		if pangoLayoutIterNextLine(iter) == 0 {
+			break
+		}
+	}
+	if limit := p.pangoWidth(width, false); limit >= 0 {
+		need = min(need, limit)
+	}
+	return (need + pangoScale - 1) / pangoScale
+}
+
+// letterSpaced reports whether any of the text has positive letter spacing.
+func (p *preparedText) letterSpaced() bool {
+	if p.text == "" {
+		return false
+	}
+	if p.style.LetterSpacing > 0 {
+		return true
+	}
+	for _, sp := range p.spans {
+		if sp.Style.LetterSpacing > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// letterSpace splits a letter spacing into the Pango units Pango puts before and after a cluster, as its distribute_letter_spacing does; negative spacing counts as none.
+func letterSpace(s driver.Points) (before, after int32) {
+	spacing := int32(s * pangoScale)
+	if spacing <= 0 {
+		return 0, 0
+	}
+	before = spacing / 2
+	if spacing&(pangoScale-1) == 0 {
+		before = (before + pangoScale/2) &^ (pangoScale - 1)
+	}
+	return before, spacing - before
 }
 
 // Measure implements core.PreparedText.
