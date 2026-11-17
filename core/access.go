@@ -114,7 +114,8 @@ func (cx *Scope) ProvideAccess(a Access) {
 
 // CheckAccess returns AccessDenied when the current owner's Access
 // refuses req, for the requests core does not make itself, such as a
-// fetch of tsx's.
+// fetch of tsx's. Call it on the graph's goroutine, as it reads the
+// current owner; Scope.Post enters the receiving scope on that goroutine.
 func (cx *Scope) CheckAccess(req AccessRequest) error {
 	if !cx.rt.restricted {
 		return nil

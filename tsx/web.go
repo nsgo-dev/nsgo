@@ -506,10 +506,6 @@ func (r *runtime) fetch(call js.FunctionCall) js.Value {
 			r.call(fail, r.typeError(err))
 			return r.function(func(js.FunctionCall) js.Value { return js.Undefined() })
 		}
-		// Each hop of a redirect is checked as the request was.
-		opts.check = func(u, m string) error {
-			return r.checkAccess(core.AccessRequest{Permission: core.AccessNetwork, Resource: u, Method: m})
-		}
 		r.sandbox.requests++
 	} else {
 		opts.body = 0
@@ -519,6 +515,26 @@ func (r *runtime) fetch(call js.FunctionCall) js.Value {
 	var ctx context.Context
 	var cancel context.CancelFunc
 	r.cx.Run(func() { ctx, cancel = context.WithCancel(r.cx.Context()) })
+	if r.sandbox != nil && r.sandbox.caps {
+		opts.check = func(u, m string) error {
+			// A redirect arrives on the worker. Ask on the graph's
+			// goroutine, under this runtime's scope and its host's grants.
+			checked := make(chan error, 1)
+			r.cx.Post(func() {
+				if err := ctx.Err(); err != nil {
+					checked <- err
+					return
+				}
+				checked <- r.checkAccess(core.AccessRequest{Permission: core.AccessNetwork, Resource: u, Method: m})
+			})
+			select {
+			case err := <-checked:
+				return err
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
 	finished := false
 	answer := func(fn func()) {
 		r.cx.Post(func() {
