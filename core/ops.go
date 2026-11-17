@@ -202,6 +202,7 @@ func (t *Tree) setView(n *node, v View) {
 	p.Indeterminate = read(v.Indeterminate)
 	p.Pressed = read(v.Pressed)
 	p.Busy = read(v.Busy)
+	p.Invalid = read(v.Invalid)
 	if v.AccessibilityLevel != nil {
 		p.Level = v.AccessibilityLevel()
 	}

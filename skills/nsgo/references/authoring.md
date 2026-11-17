@@ -14,6 +14,7 @@ These are the rules NSGo's own `base` and `ui` follow, for components other apps
 - A component is a type with a `Render` method whose fields' zero values are the usual case. Callbacks are optional: a nil `OnChange` shows a value without changing it.
 - Controlled values come in as functions and leave through callbacks (`On func() bool`, `OnChange func(bool)`), read where they are shown so only that part updates.
 - Each part takes a `Class`, a `Style` and a `StyleFunc` named after it (`DotClass`, `DotStyle`, `DotStyleFunc`). Parts take the control's state through `PartStates`, so `checked:` classes apply while screen readers see one control.
+- For sibling parts that follow a control, mark its view with `peer` and use `peer-checked:`, `peer-disabled:` or `peer-data-invalid:` on later siblings. Use `peer/field` with `peer-checked/field:` for named sources; peers never match ancestors or later siblings.
 - The root says what the control is: `Role`, `Label` when its text does not, `Hint`, and `Checked`, `Selected`, `Disabled` or `Expanded`. Pass a root view's `OnLayout`, `Tooltip` and `TestID` through.
 - Looks come from `Variant`, a type of its own (`ToggleVariant`) whose zero value is the default, never boolean fields or a shared color type. Keep one size; a component that needs more takes `Size`, a `ui.Size` whose zero value is the default, never `Small` or `Compact` booleans. One that is one shape at any scale, such as an avatar, takes `Size` in points.
 

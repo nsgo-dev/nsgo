@@ -194,8 +194,8 @@ func TestImportantClassesAndProps(t *testing.T) {
 }
 
 func TestUnknownClassesAreReported(t *testing.T) {
-	l := defaultTailwind.parse("p-4 order-2 peer-hover:p-1 p-4.3 hover:bogus")
-	if want := []string{"order-2", "peer-hover:p-1", "p-4.3", "hover:bogus"}; !slices.Equal(l.unknown, want) {
+	l := defaultTailwind.parse("p-4 order-2 peer-bogus:p-1 p-4.3 hover:bogus")
+	if want := []string{"order-2", "peer-bogus:p-1", "p-4.3", "hover:bogus"}; !slices.Equal(l.unknown, want) {
 		t.Errorf("unknown %q, want %q", l.unknown, want)
 	}
 }

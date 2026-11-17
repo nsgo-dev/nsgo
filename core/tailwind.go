@@ -41,7 +41,7 @@ var classStates = [stateCount]uint16{classChecked, classIndeterminate, classSele
 	classFocused, classFocusVisible, classPressed, classAriaBusy, classAriaChecked, classExpanded, classAriaInvalid, classAriaPressed,
 	classAriaSelected, classDisabled}
 
-// classVariants are the variants that read one state, group-* too.
+// classVariants are the variants that read one state, group-* and peer-* too.
 var classVariants = map[string]struct {
 	bit   uint16
 	order uint16
@@ -82,6 +82,7 @@ type classCond struct {
 	states, notStates                                    uint16
 	data                                                 string // data-*:'s name
 	group                                                *classGroup
+	peers                                                []classPeer
 	position                                             uint8
 	placeholder, selection                               bool
 }
@@ -92,6 +93,13 @@ type classGroup struct {
 	name   string
 	states uint16
 	data   string
+}
+
+// classPeer is one peer-* condition on a preceding sibling with the marker name.
+type classPeer struct {
+	name              string
+	states, notStates uint16
+	data              string
 }
 
 // classKey is a variant's place in Tailwind's variant order.
@@ -134,6 +142,7 @@ func (a classRank) compare(b classRank) int {
 // The places of the variants in Tailwind's order.
 const (
 	rankGroup         = 1
+	rankPeer          = 2
 	rankSelection     = 10
 	rankPlaceholder   = 11
 	rankFirst         = 20
@@ -501,8 +510,11 @@ type classList struct {
 	positional bool
 	// groups are the groups the view is: "" for `group`, item for
 	// `group/item`.
-	groups  []string
-	unknown []string
+	groups []string
+	peers  []string
+	// peerDependent is set when rules follow preceding siblings.
+	peerDependent bool
+	unknown       []string
 	// spacing is set when the view gives its children margins.
 	spacing bool
 }
@@ -523,6 +535,8 @@ type classEnv struct {
 	hostColors hostColors
 	// fontSize is what em-based utilities (tracking-*) measure against.
 	fontSize Points
+	// peer matches a preceding sibling; nil when resolving outside a tree.
+	peer func(classPeer) bool
 }
 
 // classSource is a class string, its subtree's themes and the host token set over them.
@@ -615,6 +629,14 @@ func (t *tailwindTheme) parseToken(l *classList, token string) bool {
 		utility, important = u, true
 	}
 	if len(variants) == 0 {
+		if utility == "peer" {
+			l.peers = append(l.peers, "")
+			return true
+		}
+		if name, ok := strings.CutPrefix(utility, "peer/"); ok && name != "" {
+			l.peers = append(l.peers, name)
+			return true
+		}
 		if utility == "group" {
 			l.groups = append(l.groups, "")
 			return true
@@ -647,6 +669,7 @@ func (t *tailwindTheme) parseToken(l *classList, token string) bool {
 	l.env = l.env || env || cond.dark != either || cond.landscape != either || cond.rtl != either ||
 		cond.reduceMotion != either || cond.increaseContrast != either || cond.minWidth != 0 || cond.maxWidth != 0 || cond.platform != ""
 	l.positional = l.positional || cond.position != 0
+	l.peerDependent = l.peerDependent || len(cond.peers) > 0
 	l.spacing = l.spacing || strings.HasPrefix(strings.TrimPrefix(utility, "-"), "space-")
 	return true
 }
@@ -742,6 +765,28 @@ func (t *tailwindTheme) variant(v string, c *classCond) (classKey, bool) {
 	if name, ok := dataVariant(v); ok {
 		c.data = name
 		return classKey{order: rankData, name: name}, true
+	}
+	if rest, ok := strings.CutPrefix(v, "peer-"); ok {
+		state, name, named := strings.Cut(rest, "/")
+		if named && name == "" {
+			return classKey{}, false
+		}
+		p := classPeer{name: name}
+		order := uint16(rankEnabled)
+		switch {
+		case state == "enabled":
+			p.notStates = classDisabled
+		default:
+			if b, ok := classVariants[state]; ok {
+				p.states, order = b.bit, b.order
+			} else if data, ok := dataVariant(state); ok {
+				p.data, order = data, rankData
+			} else {
+				return classKey{}, false
+			}
+		}
+		c.peers = append(c.peers, p)
+		return classKey{order: rankPeer, value: int64(order), name: name + "/" + p.data}, true
 	}
 	if rest, ok := strings.CutPrefix(v, "group-"); ok {
 		state, name, _ := strings.Cut(rest, "/")
@@ -857,6 +902,11 @@ func (t *tailwindTheme) length(s string) (Points, bool) {
 
 // matches reports whether cond's environment holds in env.
 func (c *classCond) matches(env *classEnv) bool {
+	for _, p := range c.peers {
+		if env.peer == nil || !env.peer(p) {
+			return false
+		}
+	}
 	w := env.window
 	return c.dark.holds(env.dark) && c.rtl.holds(env.rtl) && c.reduceMotion.holds(env.reduce) && c.increaseContrast.holds(env.contrast) &&
 		c.landscape.holds(w.Width > w.Height) && (c.minWidth == 0 || w.Width >= c.minWidth) &&

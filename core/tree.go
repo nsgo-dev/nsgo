@@ -141,6 +141,10 @@ type Tree struct {
 	// positional is set once a node has classes that follow its place
 	// among its siblings (first:, odd:).
 	positional bool
+	// peerStyled enables sibling-state tracking; peerParents batches changes per parent.
+	peerStyled      bool
+	peerParents     map[*node]struct{}
+	refreshingPeers bool
 	// bars draws the bars of scroll views that have none of their own,
 	// and watches hear scroll views move (scrollbars.go).
 	bars    ScrollbarMaker
@@ -829,6 +833,7 @@ func (t *Tree) childrenChanged(n *node) {
 	}
 	if n != nil {
 		n.flat = nil
+		t.queuePeerParent(n)
 		t.reorder(n)
 		t.markLayout(n)
 		if t.positional || n.cls != nil && n.cls.list.spacing {
@@ -1086,6 +1091,7 @@ func (t *Tree) bindStyle(cx *Scope, n *node, base Style, fn func() Style) {
 // commit resolves and sends, and reports whether what layout reads of it
 // changed: a color does not.
 func (t *Tree) restyle(n *node) bool {
+	t.queuePeerSiblings(n)
 	t.markResolve(n)
 	if n.h.transitionEnd != nil && n.created && !n.restyled {
 		n.restyled = true
@@ -1522,6 +1528,7 @@ func (t *Tree) updatePointerEvents() {
 
 // restyleGroup restyles the nodes inside group n that follow its states.
 func (t *Tree) restyleGroup(n *node) {
+	t.queuePeerSiblings(n)
 	if n.style.Group == "" {
 		return
 	}
@@ -2694,8 +2701,8 @@ func (n *node) events() driver.EventMask {
 		}
 	}
 	h, s := &n.h, &n.style
-	// A group reports the states the styles inside it follow.
-	group := s.Group != ""
+	// Groups and peers report the states other views follow.
+	group := s.Group != "" || n.peerMarked()
 	// Presses a view follows only for its styles go to a view around it
 	// that takes them, as a press on a button's face is the button's.
 	pressStyled := (s.Active != nil || group) && (n.takesPresses() || !n.insidePressable())
@@ -2711,7 +2718,7 @@ func (n *node) events() driver.EventMask {
 	// The focus of any view that can take it is reported, for the core's
 	// own focus (focusReported).
 	focusable := n.kind == driver.KindInput || n.kind == driver.KindWeb || n.takesPresses() || n.props.Focusable
-	focusStyled := s.Focus != nil || s.FocusVisible != nil
+	focusStyled := s.Focus != nil || s.FocusVisible != nil || n.peerMarked()
 	bit(driver.EventFocus, h.focus != nil || focusStyled || focusable)
 	bit(driver.EventBlur, h.blur != nil || focusStyled || focusable)
 	bit(driver.EventSubmitEditing, h.submit != nil)

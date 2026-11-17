@@ -21,6 +21,7 @@ type nodeClasses struct {
 
 // setClasses gives n the classes in class, resolved now.
 func (t *Tree) setClasses(n *node, class string) {
+	t.queuePeerSiblings(n)
 	if class == "" {
 		// A node that follows the environment keeps following it, with
 		// no classes, so classes set again do not follow it twice.
@@ -42,6 +43,10 @@ func (t *Tree) setClasses(n *node, class string) {
 		c.bound = old.bound
 	}
 	n.cls = c
+	if len(l.peers) > 0 || l.peerDependent {
+		t.peerStyled = true
+		t.queuePeerParent(n.nativeParent())
+	}
 	t.resolveClasses(n)
 	// A replacement theme may define a previously unknown color.
 	if (l.env || len(l.unknown) > 0 || hasEnvSpans(n)) && !c.bound {
@@ -154,6 +159,9 @@ func (t *Tree) classEnv(n *node) classEnv {
 func (t *Tree) resolveClasses(n *node) {
 	c := n.cls
 	env := c.env
+	if c.list.peerDependent {
+		env.peer = func(p classPeer) bool { return t.matchesPeer(n, p) }
+	}
 	if c.list.positional {
 		env.position = n.position()
 	}

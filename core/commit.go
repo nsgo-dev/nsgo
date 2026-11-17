@@ -231,6 +231,7 @@ func (t *Tree) commitRound() {
 		}
 	}
 	t.stacks = live
+	t.updatePeerStyles()
 	t.resolve(t.view, textFields{Language: lang}, false)
 	t.timeLayout()
 	// Lists fill their windows from the layout, which may need another.
@@ -238,6 +239,7 @@ func (t *Tree) commitRound() {
 		if !t.updateLists() {
 			break
 		}
+		t.updatePeerStyles()
 		t.resolve(t.view, textFields{Language: lang}, false)
 		t.timeLayout()
 	}
