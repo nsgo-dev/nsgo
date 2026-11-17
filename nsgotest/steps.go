@@ -28,7 +28,7 @@ func focusable(v *View) bool {
 		return false
 	}
 	return v.Kind == driver.KindInput && !v.Input.Readonly ||
-		v.Kind != driver.KindInput && (pressable(v) || v.Props.Focusable)
+		v.Kind != driver.KindInput && v.Props.FocusStop(v.Events)
 }
 
 // systemSwitch returns the system switch (core.SystemSwitch) selector matches headless, where it shows with no size as the platform sizes it, or nil.
@@ -460,7 +460,7 @@ func (a *App) Focus(selector string) {
 	a.t.Helper()
 	a.step("focus(%s)", selector)
 	isInput := func(v *View) bool { return v.Kind == driver.KindInput }
-	isStop := func(v *View) bool { return v.Kind != driver.KindInput && (pressable(v) || v.Props.Focusable) }
+	isStop := func(v *View) bool { return v.Kind != driver.KindInput && (v.Events.Pressable() || v.Props.Focusable) }
 	v := a.pick(selector, "focusable view", func(m *View) (*View, bool) {
 		// A field in the match comes first, as Focus took fields only before it took other stops.
 		t := m.downTo(isInput)

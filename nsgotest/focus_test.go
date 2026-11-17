@@ -46,6 +46,50 @@ func TestTabSkipsStyleOnlyGroupsAndActiveViews(t *testing.T) {
 	}
 }
 
+func TestFocusIncludesEveryPressHandler(t *testing.T) {
+	for _, env := range []core.Environment{
+		{OS: core.OSMacOS}, {OS: core.OSWindows}, {OS: core.OSLinux}, {OS: core.OSWeb},
+		{OS: core.OSIOS, Idiom: core.IdiomTV},
+	} {
+		t.Run(string(env.OS), func(t *testing.T) {
+			for _, handler := range []string{"long", "up"} {
+				t.Run(handler, func(t *testing.T) {
+					presses := 0
+					app := Start(t, func(*core.Scope) core.Node {
+						row := core.Style{Width: core.Pt(100), Height: core.Pt(30)}
+						only := core.View{TestID: "only", Style: row}
+						note := func(core.PressEvent) { presses++ }
+						if handler == "long" {
+							only.OnLongPress = note
+						} else {
+							only.OnPressUp = note
+						}
+						return core.View{Children: []core.Node{
+							core.View{TestID: "first", Style: row, OnPress: note}, only,
+							core.View{TestID: "last", Style: row, OnPress: note},
+						}}
+					}, Environment(env))
+					app.Focus("first")
+					app.Key("Tab")
+					if !app.Find("only").Focused {
+						t.Error("Tab skipped the view's sole press handler")
+					}
+					app.Focus("last")
+					app.Key("Shift+Tab")
+					if !app.Find("only").Focused {
+						t.Error("Shift+Tab skipped the view's sole press handler")
+					}
+					app.Focus("first")
+					app.Focus("only")
+					if !app.Find("only").Focused || presses != 0 {
+						t.Fatalf("Focus: focused %v, presses %d", app.Find("only").Focused, presses)
+					}
+				})
+			}
+		})
+	}
+}
+
 // Ref.Focus goes through mount commands, unlike the Focus test step, which uses Tab. This catches a model that promises focus the native command handler cannot give.
 func TestRefFocusMatchesThePlatformsKeyboardStops(t *testing.T) {
 	for _, env := range []driver.Environment{
