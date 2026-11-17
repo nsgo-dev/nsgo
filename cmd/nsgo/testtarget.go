@@ -169,15 +169,30 @@ func (t traceWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-// linksPlatform reports whether the package's tests link NSGo's root
-// package, which links the platform's test host: as target builds them,
-// or this machine for "".
+// linksPlatform reports whether the package's tests link the platform's test host, as target builds them, or this machine for "": through NSGo's root package, or a backend that registers the host itself, whose own tests cannot import the root package that imports them.
 func linksPlatform(ctx context.Context, p *project, target string) (bool, error) {
 	out, err := goListFor(ctx, p, target, "-test", "-deps", "-f", "{{.ImportPath}}")
 	if err != nil {
 		return false, err
 	}
-	return slices.Contains(strings.Fields(string(out)), "github.com/nsgo-dev/nsgo"), nil
+	for _, dep := range strings.Fields(string(out)) {
+		if dep == "github.com/nsgo-dev/nsgo" || slices.Contains(hostBackends, dep) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// hostBackends are the backends that register their platform's test host (internal/testhost.Register) when built with the nsgotest tag.
+var hostBackends = []string{
+	"github.com/nsgo-dev/nsgo/internal/platform/android",
+	"github.com/nsgo-dev/nsgo/internal/platform/harmonyos",
+	"github.com/nsgo-dev/nsgo/internal/platform/ios",
+	"github.com/nsgo-dev/nsgo/internal/platform/linux",
+	"github.com/nsgo-dev/nsgo/internal/platform/macos",
+	"github.com/nsgo-dev/nsgo/internal/platform/watchos",
+	"github.com/nsgo-dev/nsgo/internal/platform/web",
+	"github.com/nsgo-dev/nsgo/internal/platform/windows",
 }
 
 // goListFor runs go list with args on the package as target's test build

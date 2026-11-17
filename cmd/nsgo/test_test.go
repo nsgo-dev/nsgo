@@ -579,6 +579,39 @@ func TestTestHostError(t *testing.T) {
 	}
 }
 
+// TestBackendTestsLinkTheirHost has the tool see a backend's own tests as linking the test host, which they register without NSGo's root package, which imports the backend and so cannot be imported back; and keeps hostBackends to the backends that register one.
+func TestBackendTestsLinkTheirHost(t *testing.T) {
+	if testing.Short() {
+		t.Skip("lists a package's dependencies")
+	}
+	p, err := loadForTest("../../internal/platform/android", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hosted, err := linksPlatform(t.Context(), p, ""); err != nil || !hosted {
+		t.Errorf("linksPlatform(internal/platform/android) = %v, %v; want true", hosted, err)
+	}
+	files, err := filepath.Glob("../../internal/platform/*/*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registering []string
+	for _, f := range files {
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pkg := "github.com/nsgo-dev/nsgo/internal/platform/" + filepath.Base(filepath.Dir(f))
+		if !strings.HasSuffix(f, "_test.go") && bytes.Contains(src, []byte("testhost.Register(")) && !slices.Contains(registering, pkg) {
+			registering = append(registering, pkg)
+		}
+	}
+	slices.Sort(registering)
+	if !slices.Equal(registering, hostBackends) {
+		t.Errorf("backends registering a test host: %v; hostBackends lists %v", registering, hostBackends)
+	}
+}
+
 func TestListTestSourcesLeavesOutTestMain(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
