@@ -23,17 +23,21 @@ func TestRelationalSelectorsFollowNativeInput(t *testing.T) {
 	if got := app.Find("id:icon").Frame.Size; got.Width != 16 || got.Height != 16 {
 		t.Fatalf("inherited icon size=%v", got)
 	}
-	app.Hover("id:parent")
-	if got := app.Find("id:icon").Style.Opacity; got != .5 {
-		t.Fatalf("native ancestor hover opacity=%v", got)
-	}
-	app.HoverOut()
-	if got := app.Find("id:icon").Style.Opacity; got != 1 {
-		t.Fatalf("native hover exit opacity=%v", got)
-	}
-	app.Focus("id:focus")
-	if got := app.Find("id:parent").Style.Opacity; got != .25 {
-		t.Fatalf("descendant focus-visible opacity=%v", got)
+	// Touch targets have no pointer to hover with, and there only text fields take the keyboard focus, so hover and a pressable view's focus are checked headless and on desktops and the web.
+	switch nsgotest.Target() {
+	case "", "linux", "macos", "windows", "web":
+		app.Hover("id:parent")
+		if got := app.Find("id:icon").Style.Opacity; got != .5 {
+			t.Fatalf("native ancestor hover opacity=%v", got)
+		}
+		app.HoverOut()
+		if got := app.Find("id:icon").Style.Opacity; got != 1 {
+			t.Fatalf("native hover exit opacity=%v", got)
+		}
+		app.Focus("id:focus")
+		if got := app.Find("id:parent").Style.Opacity; got != .25 {
+			t.Fatalf("descendant focus-visible opacity=%v", got)
+		}
 	}
 	app.Press("id:toggle")
 	if got := app.Find("id:focus").Frame.Origin.X; got != 32 {
