@@ -63,9 +63,9 @@ ui.Menu{Trigger: ui.Button{Text: "Actions", Variant: ui.ButtonSecondary}, Childr
 
 ## Tabs
 
-`ui.Tabs[T]` is a segmented control or a tab list, with an indicator that slides to the chosen option. `ui.Sidebar` holds sections and rows for a desktop sidebar, and `ui.TabShell` puts the same tabs in a sidebar on wide windows and a bar on narrow ones.
+`ui.Tabs[T]` is a segmented control or a tab list, with an indicator that slides to the chosen option. `ui.Sidebar` holds sections and rows for a desktop sidebar, and `ui.TabShell` keeps top-level sections over a bottom bar at every window width. It uses the system's bar on iOS when every tab has a `SystemIcon`, and on Android when every tab has a `SystemIcon` or an SVG `Icon`, showing the SVG wherever `SystemIcon` names no Android drawable, such as an SF Symbol's name; otherwise it draws the bar with the SVG icons.
 
-`mobile.TabBar` is the system's tab bar on iOS and Android, with its Liquid Glass or Material look; it takes `Items` of `mobile.TabBarItem{Title, Icon}`, the selected index and `OnChange`. Elsewhere it takes no room, so an app shows `ui.Tabs` there. `mobile.IsAvailable(cx)` says whether the bar shows.
+`mobile.TabBar` is the system's tab bar on iOS and Android, with its Liquid Glass or Material look; it takes `Items` of `mobile.TabBarItem{Title, Icon, SVG}`, the selected index and `OnChange`. Elsewhere it takes no room, so an app shows `ui.Tabs` there. `mobile.IsAvailable(cx)` says whether the bar shows. `Icon` names a platform icon; on Android, `SVG`, such as `lucide.House()`, shows wherever `Icon` names no drawable, tinted by the bar as a drawable is.
 
 ```go
 mobile.TabBar{

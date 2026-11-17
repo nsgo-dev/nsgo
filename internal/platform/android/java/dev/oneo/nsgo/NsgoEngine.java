@@ -129,7 +129,7 @@ public final class NsgoEngine {
         Thread reader = new Thread(() -> read(running), "nsgo-reader");
         reader.setDaemon(true);
         reader.start();
-        Thread logger = new Thread(() -> log(running), "nsgo-log");
+        Thread logger = new Thread(() -> log(running, next), "nsgo-log");
         logger.setDaemon(true);
         logger.start();
     }
@@ -211,14 +211,11 @@ public final class NsgoEngine {
         }
     }
 
-    private void log(Process running) {
+    private void log(Process running, Listener recipient) {
         try (BufferedReader err = new BufferedReader(new InputStreamReader(running.getErrorStream()))) {
             for (String line; (line = err.readLine()) != null; ) {
-                Listener current;
-                synchronized (this) {
-                    current = listener;
-                }
-                if (current != null) current.onLog(line);
+                // stdout may reach EOF before stderr's buffered tail, so this process's recipient keeps hearing its log until it drains, the test host's final result and exit marker included.
+                recipient.onLog(line);
             }
         } catch (IOException ignored) {
             // The process ended.

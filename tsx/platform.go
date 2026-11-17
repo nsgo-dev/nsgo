@@ -49,7 +49,11 @@ func tabBarFace(p *props) core.Node {
 			var items []core.TabBarItem
 			for _, it := range r.arrayItems(p.get("items")) {
 				o := r.options(it)
-				items = append(items, core.TabBarItem{Title: o.str("title", ""), Icon: o.str("icon", "")})
+				tab := core.TabBarItem{Title: o.str("title", ""), Icon: o.str("icon", "")}
+				if doc := o.str("svg", ""); doc != "" {
+					tab.SVG, _ = core.ParseSVG([]byte(doc))
+				}
+				items = append(items, tab)
 			}
 			return items
 		},

@@ -33,7 +33,9 @@ An option can carry an `Icon`, a `Disabled` function, a `Content` node and a `Te
 
 ## Tab bars
 
-`ui.TabShell` puts the same tabs in a sidebar on wide windows and a bar on narrow ones. A bar it draws keeps clear of the bottom safe area itself, so `core.EnvSafeArea` at the bottom of a section above it, a `base.Nav` page's included, is 0; under iOS's floating system bar, keep content clear with `ui.TabBarInset`. `mobile.TabBar` is the system's tab bar on iOS and Android, with `mobile.TabBarItem{Title, Icon}`, `Selected` and `OnChange`; elsewhere it takes no room, so show `ui.Tabs` there.
+`ui.TabShell` keeps top-level sections over a bottom bar at every window width. It uses the system's bar on iOS when every tab supplies `SystemIcon`, and on Android when each supplies `SystemIcon` or an SVG `Icon`; there a `SystemIcon` that names an Android drawable takes precedence, and the SVG shows for any other name, such as an SF Symbol's. Otherwise it draws the bar with the supplied SVG icons. A bar it draws keeps clear of the bottom safe area itself, so `core.EnvSafeArea` at the bottom of a section above it, a `base.Nav` page's included, is 0; under iOS's floating system bar, keep content clear with `ui.TabBarInset`.
+
+`mobile.TabBar` is the system's tab bar on iOS and Android, with `Items`, `Selected` and `OnChange`. Each `mobile.TabBarItem` takes a `Title` and a platform icon name in `Icon`; on Android, `SVG: lucide.House()` shows wherever `Icon` names no drawable, fitted into 24 points and tinted for selection. iOS uses only the SF Symbol in `Icon`. In TSX, `svg` takes an SVG document. Elsewhere `mobile.TabBar` takes no room, so show `ui.Tabs` there.
 
 ## Accessibility
 

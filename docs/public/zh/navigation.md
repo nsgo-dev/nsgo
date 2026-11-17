@@ -63,9 +63,9 @@ ui.Menu{Trigger: ui.Button{Text: "操作", Variant: ui.ButtonSecondary}, Childre
 
 ## 标签页
 
-`ui.Tabs[T]` 是分段控件或标签列表，指示器会滑到选中的选项。`ui.Sidebar` 为桌面侧边栏保存分组和行，`ui.TabShell` 在宽窗口把同一组标签放进侧边栏，在窄窗口放进底部栏。
+`ui.Tabs[T]` 是分段控件或标签列表，指示器会滑到选中的选项。`ui.Sidebar` 为桌面侧边栏保存分组和行，`ui.TabShell` 在所有窗口宽度下都将顶层分区放在底部栏上方。iOS 上每个标签都有 `SystemIcon` 时使用系统标签栏；Android 上每个标签有 `SystemIcon` 或 SVG `Icon` 即可，`SystemIcon` 不是 Android drawable 名称（例如 SF Symbol 名称）时显示 SVG；其他情况由 shell 用 SVG 图标绘制标签栏。
 
-`mobile.TabBar` 是 iOS 和 Android 的系统标签栏，带 Liquid Glass 或 Material 外观；它接收 `mobile.TabBarItem{Title, Icon}` 组成的 `Items`、选中索引和 `OnChange`。其他平台上它不占空间，因此应用在那里显示 `ui.Tabs`。`mobile.IsAvailable(cx)` 说明标签栏是否显示。
+`mobile.TabBar` 是 iOS 和 Android 的系统标签栏，带 Liquid Glass 或 Material 外观；它接收 `mobile.TabBarItem{Title, Icon, SVG}` 组成的 `Items`、选中索引和 `OnChange`。其他平台上它不占空间，因此应用在那里显示 `ui.Tabs`。`mobile.IsAvailable(cx)` 说明标签栏是否显示。`Icon` 是平台图标名；在 Android 上，`Icon` 找不到对应 drawable 时显示 `SVG`（例如 `lucide.House()`），并像 drawable 一样由标签栏着色。
 
 ```go
 mobile.TabBar{

@@ -2,11 +2,7 @@
 
 package android
 
-import (
-	"encoding/json"
-
-	"github.com/nsgo-dev/nsgo/internal/driver"
-)
+import "github.com/nsgo-dev/nsgo/internal/driver"
 
 // tabBar is core.TabBar's component, which the backend registers itself
 // as NSH's TabBarComponent.java: the runtime's TabBar, a Material 3
@@ -32,7 +28,7 @@ func (*tabBar) SetProp(string, any) {}
 func (*tabBar) ViewProps(name string, value any) []driver.AndroidViewProp {
 	switch name {
 	case "items":
-		data, err := json.Marshal(value)
+		data, err := tabBarItems(value)
 		if err != nil {
 			return nil
 		}

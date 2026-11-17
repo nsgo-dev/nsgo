@@ -7,6 +7,10 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Field;
 import java.util.Arrays;
@@ -25,6 +29,42 @@ public final class PipeCheck {
             engine(scenario, true);
         }
         engine("stdout", false);
+        logsAfterProtocolEOF();
+    }
+
+    /** Hold stderr until stdout's EOF has already cleared the engine's listener. */
+    private static void logsAfterProtocolEOF() throws Exception {
+        PipedInputStream stderr = new PipedInputStream();
+        PipedOutputStream tail = new PipedOutputStream(stderr);
+        Process process = new Process() {
+            public InputStream getInputStream() { return new ByteArrayInputStream(new byte[0]); }
+            public InputStream getErrorStream() { return stderr; }
+            public OutputStream getOutputStream() { return new ByteArrayOutputStream(); }
+            public int waitFor() { return 0; }
+            public int exitValue() { return 0; }
+            public void destroy() {}
+        };
+        NsgoEngine engine = new NsgoEngine(new Context());
+        Field field = NsgoEngine.class.getDeclaredField("process");
+        field.setAccessible(true);
+        field.set(engine, process);
+        CountDownLatch logged = new CountDownLatch(1);
+        engine.attach(new NsgoEngine.Listener() {
+            public void onMessage(int kind, byte[] payload) { throw new AssertionError("unexpected message"); }
+            public void onProcessEnded(IOException error) {
+                check(error == null, "clean EOF failed");
+                try {
+                    tail.write("nsgo-test-exit final-run 0\n".getBytes(StandardCharsets.UTF_8));
+                    tail.close();
+                } catch (IOException e) { throw new AssertionError(e); }
+            }
+            public void onLog(String line) {
+                check(line.equals("nsgo-test-exit final-run 0"), "changed final log");
+                logged.countDown();
+            }
+        });
+        check(logged.await(5, TimeUnit.SECONDS), "lost stderr after the protocol ended");
+        engine.destroy();
     }
 
     private static byte[] frame(int kind, int length, byte[] payload) throws IOException {

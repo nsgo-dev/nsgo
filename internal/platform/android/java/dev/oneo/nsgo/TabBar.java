@@ -4,10 +4,14 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
+import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -65,7 +69,7 @@ public final class TabBar extends LinearLayout {
         listener = l;
     }
 
-    /** Makes the tabs from a JSON list of {"title", "icon"}. */
+    /** Makes the tabs from titles, resource icons and optional base64 canvas drawings. */
     public void setItems(String json) {
         removeAllViews();
         JSONArray items;
@@ -77,7 +81,7 @@ public final class TabBar extends LinearLayout {
         for (int i = 0; i < items.length(); i++) {
             JSONObject tab = items.optJSONObject(i);
             if (tab == null) continue;
-            addView(tab(i, tab.optString("title"), tab.optString("icon")),
+            addView(tab(i, tab.optString("title"), icon(tab)),
                     new LayoutParams(0, LayoutParams.MATCH_PARENT, 1));
         }
         restyle();
@@ -94,7 +98,7 @@ public final class TabBar extends LinearLayout {
         restyle();
     }
 
-    private View tab(int index, String title, String icon) {
+    private View tab(int index, String title, Drawable icon) {
         LinearLayout item = new LinearLayout(getContext());
         item.setOrientation(VERTICAL);
         item.setGravity(Gravity.CENTER);
@@ -104,8 +108,7 @@ public final class TabBar extends LinearLayout {
         shape.setCornerRadius(dp(16));
         pill.setBackground(shape);
         ImageView image = new ImageView(getContext());
-        Drawable d = drawable(icon);
-        if (d != null) image.setImageDrawable(d.mutate());
+        if (icon != null) image.setImageDrawable(icon.mutate());
         pill.addView(image, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
         item.addView(pill, new LayoutParams(dp(64), dp(32)));
         TextView label = new TextView(getContext());
@@ -124,6 +127,22 @@ public final class TabBar extends LinearLayout {
             if (listener != null) listener.onChange(index);
         });
         return item;
+    }
+
+    /** The drawable the icon names, else the SVG's drawing rendered at screen density for ImageView to tint. */
+    private Drawable icon(JSONObject tab) {
+        // A name shared with iOS, such as an SF Symbol's, names no drawable here, so the SVG stands in for it.
+        Drawable resource = drawable(tab.optString("icon"));
+        if (resource != null) return resource;
+        String drawing = tab.optString("drawing");
+        if (drawing.isEmpty()) return null;
+        byte[] ops = Base64.decode(drawing, Base64.DEFAULT);
+        int size = Math.max(1, dp(24));
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.scale(size / 24f, size / 24f);
+        CanvasNode.play(canvas, 24, 24, ops);
+        return new BitmapDrawable(getResources(), bitmap);
     }
 
     /** Colors each tab as selected or not. */

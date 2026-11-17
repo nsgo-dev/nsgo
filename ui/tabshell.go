@@ -9,9 +9,9 @@ import (
 // ShellTab is a top-level section of a TabShell.
 type ShellTab struct {
 	Text string
+	// Icon draws the tab's SVG, in Android's native bar too wherever SystemIcon names no drawable there.
 	Icon func() *core.SVG
-	// SystemIcon is the platform's name for the tab's icon on iOS and
-	// Android, as mobile.TabBarItem's Icon.
+	// SystemIcon is the platform's name for the tab's icon on iOS and Android, as mobile.TabBarItem's Icon.
 	SystemIcon string
 	// Content is the section, such as a base.Nav's stack of pages. It is
 	// built when the tab is first selected and kept while others show.
@@ -19,7 +19,7 @@ type ShellTab struct {
 	TestID  string
 }
 
-// TabShell is an app's top-level sections over a drawn tab bar, which keeps clear of the bottom safe area, or on iOS and Android the system's where every tab has a SystemIcon. iOS's floats over the sections, which keep what they must show clear of it with TabBarInset. Every other bar takes room of its own, and the bottom safe area of the sections above it (core.Insets, core.EnvSafeArea) is 0 while it shows. The Selected tab's content fills the rest; Selected is the app's, set from OnChange. The bar hides while the software keyboard shows, so content padded by core.EnvKeyboard meets the keyboard without an offset.
+// TabShell is an app's top-level sections over a drawn tab bar, which keeps clear of the bottom safe area, or the system's on iOS where every tab has a SystemIcon and on Android where every tab has a SystemIcon or an Icon. iOS's floats over the sections, which keep what they must show clear of it with TabBarInset. Every other bar takes room of its own, and the bottom safe area of the sections above it (core.Insets, core.EnvSafeArea) is 0 while it shows. The Selected tab's content fills the rest; Selected is the app's, set from OnChange. The bar hides while the software keyboard shows, so content padded by core.EnvKeyboard meets the keyboard without an offset. It keeps this form at every window width.
 type TabShell struct {
 	Tabs     []ShellTab
 	Selected func() int
@@ -56,7 +56,7 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 		}
 	}
 	env := cx.Env()
-	floating := env.OS() == core.OSIOS && s.systemItems(cx) != nil
+	floating := env.OS() == core.OSIOS && s.hasSystemBar(cx)
 	var sections []core.Node
 	for i, tab := range s.Tabs {
 		// A section is built when first selected, then hidden while others
@@ -119,8 +119,10 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 // bar is the tab bar: the tabs' icons over their text, the selected
 // one in the accent.
 func (s TabShell) bar(cx *core.Scope, selected func() int, change func(int)) core.Node {
-	if items := s.systemItems(cx); items != nil {
-		return mobile.TabBar{Items: items, Selected: selected, OnChange: change, TestID: "tab-bar"}
+	if s.hasSystemBar(cx) {
+		android := cx.Env().OS() == core.OSAndroid
+		return mobile.TabBar{ItemsFunc: func() []mobile.TabBarItem { return s.systemItems(android) },
+			Selected: selected, OnChange: change, TestID: "tab-bar"}
 	}
 	colors := ColorsOf(cx)
 	var tabs []core.Node
@@ -150,18 +152,27 @@ func (s TabShell) bar(cx *core.Scope, selected func() int, change func(int)) cor
 		}}
 }
 
-// systemItems are the tabs for the system's tab bar, nil where it does not
-// show them.
-func (s TabShell) systemItems(cx *core.Scope) []mobile.TabBarItem {
+// hasSystemBar says whether the system's tab bar shows the tabs, checking the icon sources without reading their reactive values.
+func (s TabShell) hasSystemBar(cx *core.Scope) bool {
 	if !mobile.IsAvailable(cx) {
-		return nil
+		return false
 	}
+	for _, tab := range s.Tabs {
+		if tab.SystemIcon == "" && (cx.Env().OS() != core.OSAndroid || tab.Icon == nil) {
+			return false
+		}
+	}
+	return true
+}
+
+// systemItems are the tabs for the system's tab bar. On Android each also carries its SVG, which the bar shows where SystemIcon names no drawable, such as an SF Symbol name shared with iOS.
+func (s TabShell) systemItems(android bool) []mobile.TabBarItem {
 	items := make([]mobile.TabBarItem, len(s.Tabs))
 	for i, tab := range s.Tabs {
-		if tab.SystemIcon == "" {
-			return nil
-		}
 		items[i] = mobile.TabBarItem{Title: tab.Text, Icon: tab.SystemIcon}
+		if android && tab.Icon != nil {
+			items[i].SVG = tab.Icon()
+		}
 	}
 	return items
 }

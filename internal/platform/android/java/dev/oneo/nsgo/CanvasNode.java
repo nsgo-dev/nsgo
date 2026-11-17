@@ -126,8 +126,13 @@ final class CanvasNode extends View {
         int layer = canvas.saveLayer(0, 0, getWidth(), getHeight(), null);
         float density = getResources().getDisplayMetrics().density;
         canvas.scale(density, density);
-        new Player(canvas, getWidth() / density, getHeight() / density).play(ByteBuffer.wrap(ops));
+        play(canvas, getWidth() / density, getHeight() / density, ops);
         canvas.restoreToCount(layer);
+    }
+
+    /** Replays a static drawing, also used by the tab bar's SVG icons. */
+    static void play(Canvas canvas, float width, float height, byte[] ops) {
+        new Player(canvas, width, height).play(ByteBuffer.wrap(ops));
     }
 
     // Assistive technology sees the parts as virtual views.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/icons/lucide"
+	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 	"github.com/nsgo-dev/nsgo/tsx/compiler"
 )
@@ -51,6 +52,28 @@ mount(() => <View style={{width: 320, alignItems: "flex-start"}}>
 			}
 		})
 	}
+}
+
+func TestTabShellSVGFromTSX(t *testing.T) {
+	files := fstest.MapFS{"App.tsx": {Data: []byte(`import { mount, signal, Text } from "nsgo";
+import { TabShell } from "nsgo/ui";
+function App() {
+    const selected = signal(0);
+    return <TabShell selected={selected()} onChange={(e) => selected.set(e.index)} tabs={[
+        { text: "Home", icon: '<svg viewBox="0 0 24 24"><rect width="24" height="24"/></svg>', content: () => <Text>Home page</Text> },
+        { text: "Search", icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>', content: () => <Text>Search page</Text> }
+    ]} />;
+}
+mount(App);`)}}
+	app := nsgotest.Start(t, compiler.App(files, "App.tsx"), nsgotest.Environment(core.Environment{OS: core.OSAndroid}))
+	items := app.FindMounted("id:tab-bar").NativeProps["items"].([]any)
+	for _, item := range items {
+		if d, ok := item.(map[string]any)["drawing"].(*driver.Drawing); !ok || len(d.Ops) == 0 {
+			t.Fatal("TSX shell icon did not reach Android's native bar")
+		}
+	}
+	app.Emit("id:tab-bar", "change", float64(1))
+	app.Find("text:Search page")
 }
 
 func TestAlertDialogActionRolesFromTSX(t *testing.T) {

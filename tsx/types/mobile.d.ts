@@ -6,7 +6,12 @@ import type { JSX, StyleProp, ViewStyle, YNode } from "./types";
 export declare const isAvailable: boolean;
 export interface InputAccessoryViewProps { nativeID: string; style?: StyleProp<ViewStyle>; class?: string; testID?: string; children?: JSX.Element }
 export declare function InputAccessoryView(props: InputAccessoryViewProps): YNode | null;
-export interface TabBarItem { title: string; icon?: string | null }
+export interface TabBarItem {
+    title: string;
+    icon?: string | null;
+    /** An SVG document Android shows, tinted by the bar, where icon names no drawable. */
+    svg?: string | null;
+}
 export interface TabBarProps { items?: TabBarItem[]; selectedIndex?: number; onChange?: (e: { index: number }) => void; style?: StyleProp<ViewStyle>; testID?: string }
 export declare function TabBar(props: TabBarProps): JSX.Element;
 export interface BackHandlerModule {

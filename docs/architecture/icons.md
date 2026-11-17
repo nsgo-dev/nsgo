@@ -37,6 +37,10 @@ Parsing reads the document into a tree first, so references may point forward, t
 - `SVGView` is the same element sized by the document's `width` and `height`, else its `viewBox`, for an SVG drawn as authored, as NSH's `svg()`.
 - `Label` gives the icon the image role and a name for assistive technology; without it the icon is a decoration that technology skips.
 
+## Native tab icons
+
+Android's `mobile.TabBarItem.SVG` records a 24-point drawing through `SVG.Draw`, using white for currentColor. The Android prop mapper encodes the existing canvas wire operations; `TabBar.java` replays them with `CanvasNode` into a bitmap at screen density and supplies a `BitmapDrawable`, so the native bar's selected and idle tints apply as they do to resource icons. A drawable that `Icon` names takes precedence; the SVG shows for any other name, so a tab can share an SF Symbol name with iOS and still show its SVG on Android. `ItemsFunc` and `ShellTab.Icon` keep dynamic SVGs reactive. This extends NSH's resource-name-only API because standalone NSGo apps cannot bundle Android drawable resources. iOS keeps SF Symbols in `Icon`; `TabShell` on other targets keeps its drawn SVG icons.
+
 ## Lucide pack
 
 `icons/lucide` has one accessor per icon of a pinned Lucide release. `upstream.json` records the repository, the full commit and a digest of the license and icons. Each accessor parses its document on first use and returns the same `*core.SVG` afterwards; a zero-value cache keeps unused icons out of package initializers, so a binary carries only the icons it uses.

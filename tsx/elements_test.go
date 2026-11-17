@@ -53,6 +53,29 @@ mount(App);`)
 	}
 }
 
+func TestTabBarSVGFromTSX(t *testing.T) {
+	app := run(t, `import { mount, signal, View, Text } from "nsgo";
+import { TabBar } from "nsgo/mobile";
+function App() {
+    const selected = signal(0);
+    return <View>
+        <TabBar testID="bar" style={{ height: 80 }} selectedIndex={selected()}
+            onChange={(e) => selected.set(e.index)} items={[
+                { title: "Home", svg: '<svg viewBox="0 0 24 24"><rect width="24" height="24"/></svg>' },
+                { title: "Search", icon: "android:ic_menu_search" }
+            ]} />
+        <Text>{() => "selected " + selected()}</Text>
+    </View>;
+}
+mount(App);`, nsgotest.Environment(core.Environment{OS: core.OSAndroid}))
+	items := app.Find("id:bar").NativeProps["items"].([]any)
+	if d, ok := items[0].(map[string]any)["drawing"].(*driver.Drawing); !ok || len(d.Ops) == 0 {
+		t.Fatal("TSX SVG did not reach the native bar")
+	}
+	app.Emit("id:bar", "change", float64(1))
+	app.Find("text:selected 1")
+}
+
 func TestListRendersRowsWithAccessorsAndSlots(t *testing.T) {
 	app := run(t, `import { mount, signal, List, Text } from "nsgo";
 function App() {
