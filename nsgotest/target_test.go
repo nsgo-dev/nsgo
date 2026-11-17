@@ -1,6 +1,9 @@
 package nsgotest
 
 import (
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -154,4 +157,73 @@ func TestTargetSettleBoundsChangingAppsAndPreservesMeasure(t *testing.T) {
 			}
 		})
 	}
+}
+
+// engineFixture is a target whose engine runs posts and barriers in order on a goroutine of its own, which owns the app's graph, as a platform's does.
+func engineFixture(t *testing.T) (tg *target, count *core.Signal[int], ranOnEngine func() bool) {
+	t.Helper()
+	tg, _, _ = settleFixture(t)
+	tg.a.target = tg
+	queue := make(chan func(), 1024)
+	stop := make(chan struct{})
+	ready := make(chan *core.Scope)
+	var engine atomic.Uint64
+	go func() {
+		engine.Store(currentGoroutineForTest())
+		root := core.NewRoot(core.RootOptions{CheckCommits: true, Post: func(fn func()) { queue <- fn }})
+		count = core.NewSignal(root, 0)
+		ready <- root
+		for {
+			select {
+			case fn := <-queue:
+				fn()
+			case <-stop:
+				return
+			}
+		}
+	}()
+	tg.appScope = <-ready
+	t.Cleanup(func() { close(stop) })
+	tg.surface = settlingSurface{sync: func() {
+		done := make(chan struct{})
+		queue <- func() { close(done) }
+		<-done
+	}}
+	return tg, count, func() bool { return engine.Load() == currentGoroutineForTest() }
+}
+
+func TestTargetPostsRunOnTheEngineAndSettleWhatTheyPost(t *testing.T) {
+	tg, count, onEngine := engineFixture(t)
+	var off atomic.Int32
+	var hop func(left int)
+	hop = func(left int) {
+		if !onEngine() {
+			off.Add(1)
+		}
+		count.Update(func(n int) int { return n + 1 })
+		if left > 0 {
+			tg.a.Post(func() { hop(left - 1) })
+		}
+	}
+	tg.a.Post(func() { hop(40) })
+	tg.settle()
+	if !tg.quiet {
+		t.Fatal("Settle did not find the app quiet after the posts")
+	}
+	if off.Load() != 0 {
+		t.Fatalf("%d posted functions ran off the engine's goroutine", off.Load())
+	}
+	var got int
+	tg.a.Post(func() { got = count.Get() })
+	tg.settle()
+	if got != 41 {
+		t.Fatalf("the step ran %d of 41 chained posts", got)
+	}
+}
+
+func currentGoroutineForTest() uint64 {
+	var buf [64]byte
+	fields := strings.Fields(string(buf[:runtime.Stack(buf[:], false)]))
+	id, _ := strconv.ParseUint(fields[1], 10, 64)
+	return id
 }
