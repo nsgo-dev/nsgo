@@ -26,6 +26,42 @@ func TestInsetsScrollWithTheContent(t *testing.T) {
 	}
 }
 
+func TestRefreshingBoundsRetainRoomWithoutExtendingTheEnd(t *testing.T) {
+	frame := driver.Size{Width: 100, Height: 200}
+	for _, tc := range []struct {
+		name       string
+		height     driver.Points
+		indicator  driver.Points
+		horizontal bool
+		wantTop    driver.Points
+		wantEnd    driver.Points
+	}{
+		{name: "long", height: 800, wantTop: -76, wantEnd: 630},
+		{name: "short", height: 100, wantTop: -76, wantEnd: -20},
+		{name: "custom", height: 800, indicator: 80, wantTop: -100, wantEnd: 630},
+		{name: "horizontal", height: 800, horizontal: true, wantTop: -20, wantEnd: 630},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &driver.ScrollConfig{Horizontal: tc.horizontal, Behavior: driver.ScrollBehavior{
+				ContentInset: driver.Edges{Top: 20, Bottom: 30}, RefreshIndicator: tc.indicator,
+			}}
+			content := driver.Size{Width: 100, Height: tc.height}
+			if got := ClampRefreshing(c, frame, content, driver.Point{X: -100, Y: -1000}, true); got != (driver.Point{Y: tc.wantTop}) {
+				t.Fatalf("before start: %v, want {0 %v}", got, tc.wantTop)
+			}
+			if got := ClampRefreshing(c, frame, content, driver.Point{Y: 1000}, true); got.Y != tc.wantEnd {
+				t.Fatalf("past end: %v, want %v", got.Y, tc.wantEnd)
+			}
+			if got := ClampRefreshing(c, frame, content, driver.Point{Y: -1000}, false); got.Y != -20 {
+				t.Fatalf("not refreshing: %v, want -20", got.Y)
+			}
+			if got := KeepStart(RestInset(c, true), RestInset(c, true), driver.Point{Y: tc.wantTop}); got.Y != tc.wantTop {
+				t.Fatalf("confirmation: %v, want %v", got.Y, tc.wantTop)
+			}
+		})
+	}
+}
+
 func TestWheelsSettleOnSnapPoints(t *testing.T) {
 	c := &driver.ScrollConfig{Behavior: driver.ScrollBehavior{Paging: true}}
 	frame, content := driver.Size{Width: 100, Height: 200}, driver.Size{Width: 100, Height: 1000}

@@ -1419,14 +1419,18 @@ func (w *window) apply(b *driver.MountBatch) {
 				v.props = *it.ViewProps
 			}
 		case driver.ItemScrollConfig:
-			to := scrollbar.KeepStart(v.scroll.Behavior.ContentInset, it.Scroll.Behavior.ContentInset, v.offset)
+			old, inset := scrollbar.RestInset(&v.scroll, v.refreshing), scrollbar.RestInset(it.Scroll, v.refreshing)
+			to := v.offset
+			if old != inset {
+				to = scrollbar.KeepStart(old, inset, to)
+			}
 			v.scroll = *it.Scroll
 			if v.scroll.HideIndicator {
 				v.barAlpha = 0
 				w.redrawView(v)
 			}
 			if to != v.offset {
-				w.scrollTo(v, to)
+				w.moveOffset(v, to)
 			}
 			w.refreshChanged(v)
 			rescroll = append(rescroll, v) // insets change the offsets
@@ -1510,8 +1514,11 @@ func (w *window) apply(b *driver.MountBatch) {
 	w.animatedChanged()
 	w.updateDrop()
 	for _, v := range rescroll {
+		// Late commits retain the refresh room even after its animation ends.
 		if !v.deleted {
-			w.scrollTo(v, v.offset)
+			if to := scrollbar.ClampRefreshing(&v.scroll, v.frame.Size, v.size, v.offset, v.refreshing); to != v.offset {
+				w.moveOffset(v, to)
+			}
 		}
 	}
 	for _, v := range loads {

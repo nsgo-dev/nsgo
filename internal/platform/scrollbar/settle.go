@@ -24,6 +24,25 @@ func Clamp(c *driver.ScrollConfig, frame, content driver.Size, offset driver.Poi
 	return offset
 }
 
+// RestInset is the leading inset used to keep a resting view at its start across configuration changes, including the room held by a local refresh that the engine may not have confirmed yet.
+func RestInset(c *driver.ScrollConfig, refreshing bool) driver.Edges {
+	in := c.Behavior.ContentInset
+	if refreshing && !c.Horizontal {
+		in.Top += c.Behavior.RefreshInset()
+	}
+	return in
+}
+
+// ClampRefreshing clamps a resting offset after a configuration or layout change, retaining the refresh room. Explicit scroll commands and reports to the engine use Clamp's ordinary content bounds instead.
+func ClampRefreshing(c *driver.ScrollConfig, frame, content driver.Size, offset driver.Point, refreshing bool) driver.Point {
+	p := Clamp(c, frame, content, offset)
+	if refreshing && !c.Horizontal {
+		lo, hi := Limits(c, frame, content, true)
+		p.Y = min(max(offset.Y, lo), hi)
+	}
+	return p
+}
+
 // KeepStart returns where a view at offset goes when its content inset
 // changes from old to inset: one resting at its start stays at the start,
 // showing the inset, as on NSH's other backends.
