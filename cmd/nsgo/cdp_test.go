@@ -32,8 +32,7 @@ func TestBrowserStartupHonorsCancellation(t *testing.T) {
 		close(done)
 	}()
 	t.Cleanup(func() { cancel(); <-done })
-	// Cancel after the child has started and recorded its profile. Under
-	// load, a fixed deadline can expire before its shell ever runs.
+	// Cancel after the child has started and recorded its profile. Under load, a fixed deadline can expire before its shell ever runs.
 	ready := time.NewTicker(10 * time.Millisecond)
 	defer ready.Stop()
 	timeout := time.NewTimer(10 * time.Second)

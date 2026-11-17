@@ -88,8 +88,7 @@ func TestReportsAcceptanceWriteFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	trust.AddRoot(root)
-	// Verification can read the empty state, but accepting the running
-	// build cannot rename its state file over this directory.
+	// Verification can read the empty state, but accepting the running build cannot rename its state file over this directory.
 	if err := os.Mkdir(filepath.Join(dir, "trust.json"), 0o700); err != nil {
 		t.Fatal(err)
 	}
