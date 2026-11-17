@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
 // Run the shipped reader on the JVM with Android's context and log calls stubbed. A 32 MiB heap makes trusting a corrupt length fail loudly; a real child process verifies that a bad pipe is stopped and reported.
@@ -22,6 +24,7 @@ func TestAndroidProcessReportsExit(t *testing.T) {
 
 func runJavaEngineCheck(t *testing.T, check string) {
 	t.Helper()
+	testhost.RequireSource(t)
 	javac, err := exec.LookPath("javac")
 	if err != nil || exec.Command(javac, "-version").Run() != nil {
 		t.Skip("no JDK")
@@ -47,6 +50,7 @@ func runJavaEngineCheck(t *testing.T, check string) {
 
 // TestJavaReaderTakesWhatGoWrites holds Protocol.readMessage's bounds to android.go's: every Go-to-Java kind passes its kind check, and the largest payload Go's writer lets through is the largest Java reads, so a big image or font fails as its own error rather than ending the process as a corrupt pipe.
 func TestJavaReaderTakesWhatGoWrites(t *testing.T) {
+	testhost.RequireSource(t)
 	read := func(path ...string) string {
 		data, err := os.ReadFile(filepath.Join(path...))
 		if err != nil {

@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
 // javaNames are the driver's names of the kinds Java names otherwise.
@@ -22,6 +23,7 @@ var javaNames = map[string]string{"EventHoverIn": "EventMouseEnter", "EventHover
 
 // TestJavaProtocolMatchesTheDriver holds Protocol.java's item and event kinds, roles and key uses to the driver's of the same names, which the Java runtime reads the batches and writes the events by: a kind the driver gains shifts the ones after it.
 func TestJavaProtocolMatchesTheDriver(t *testing.T) {
+	testhost.RequireSource(t)
 	fset := token.NewFileSet()
 	dir := filepath.Join("..", "..", "driver")
 	pkgs, err := parser.ParseDir(fset, dir, func(fi os.FileInfo) bool { return !strings.HasSuffix(fi.Name(), "_test.go") }, 0)
@@ -72,6 +74,7 @@ func TestJavaProtocolMatchesTheDriver(t *testing.T) {
 
 // TestOverlayProtocolMatchesJava holds Protocol.java's overlay constants to Go's: the window commands writeWindow sends, what a SURFACE message reports, and the driver's permissions and ends; and why a video paused.
 func TestOverlayProtocolMatchesJava(t *testing.T) {
+	testhost.RequireSource(t)
 	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
 	if err != nil {
 		t.Fatal(err)
@@ -135,6 +138,7 @@ func TestOverlayItemsEncode(t *testing.T) {
 
 // TestJavaMessagesMatchTheBackend holds Protocol.java's message types for package microphone's recordings and the web views' cookies to android.go's, which carry them both ways.
 func TestJavaMessagesMatchTheBackend(t *testing.T) {
+	testhost.RequireSource(t)
 	read := func(path ...string) string {
 		data, err := os.ReadFile(filepath.Join(path...))
 		if err != nil {
@@ -154,6 +158,7 @@ func TestJavaMessagesMatchTheBackend(t *testing.T) {
 
 // TestWebCommandsMatchJava holds Protocol.java's web commands to the driver's, which WebNode.command switches on: WebSendInput, which Android does without, sits between them.
 func TestWebCommandsMatchJava(t *testing.T) {
+	testhost.RequireSource(t)
 	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
 	if err != nil {
 		t.Fatal(err)

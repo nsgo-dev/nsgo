@@ -14,6 +14,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
 // animatorBatch is ops applied after the animator steps to at.
@@ -166,6 +167,7 @@ func channels(c driver.Color) string {
 // with the ops android.go encodes and compares what it samples with
 // core.Animator's. It needs a JDK on PATH.
 func TestAnimatorMatchesJava(t *testing.T) {
+	testhost.RequireSource(t)
 	javac, err := exec.LookPath("javac")
 	if err != nil || exec.Command(javac, "-version").Run() != nil {
 		t.Skip("no JDK")

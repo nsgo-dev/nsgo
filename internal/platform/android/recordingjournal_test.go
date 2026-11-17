@@ -7,10 +7,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
 // TestRecordingJournal runs the Java runtime's RecordingJournal on the JVM, one process per step, as the Go processes that hear its records come and go: a repaired recording's record outlives the process it was reported to until the app takes it, a newer record of a file replaces the older, and a deleted file's record is dropped. It needs a JDK on PATH.
 func TestRecordingJournal(t *testing.T) {
+	testhost.RequireSource(t)
 	javac, err := exec.LookPath("javac")
 	if err != nil || exec.Command(javac, "-version").Run() != nil {
 		t.Skip("no JDK")

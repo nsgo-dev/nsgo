@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
 func TestSensorJavaProviderFixtures(t *testing.T) {
+	testhost.RequireSource(t)
 	javac, err := exec.LookPath("javac")
 	if err != nil {
 		t.Skip("JDK not installed")

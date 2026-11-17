@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"testing"
 	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
 // TestTimeZoneReadsTheRuntimesZone reads msgTimeZone as NsgoEngine.timeZone writes it: a zone the system's tzdata has keeps its rules, daylight saving included, and one Go cannot load keeps the offset Java gave.
@@ -91,6 +93,7 @@ func TestTimeZoneTakesAndroidsNewestRules(t *testing.T) {
 
 // TestTimeZoneMessageMatchesJava holds Protocol.java's TIME_ZONE to msgTimeZone, which android.go, built for Android alone, declares.
 func TestTimeZoneMessageMatchesJava(t *testing.T) {
+	testhost.RequireSource(t)
 	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
 	if err != nil {
 		t.Fatal(err)

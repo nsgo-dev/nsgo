@@ -15,6 +15,7 @@ import (
 	"github.com/nsgo-dev/nsgo/base/textview"
 	"github.com/nsgo-dev/nsgo/base/toast"
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
@@ -23,6 +24,7 @@ import (
 // beside it, as NSH pairs them: Style and Class, PopupStyle and
 // PopupClass, Styles and Classes.
 func TestEveryPartStyleHasAClass(t *testing.T) {
+	testhost.RequireSource(t)
 	for _, dir := range []string{".", "datatable", "diff", "dock", "editor", "flow", "plot", "textview", "toast"} {
 		name := dir
 		if dir == "." {
