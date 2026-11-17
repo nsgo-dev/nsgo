@@ -31,7 +31,9 @@ func TestDialogStyleUpdatesOpenSurface(t *testing.T) {
 					}}}}
 			}, nsgotest.Environment(e), nsgotest.Size(400, 400))
 			id := app.Find("panel").ID
-			for _, dark := range []bool{false, true, false} {
+			// The swatch must change with the appearance, or a capture that kept the old frame would match it.
+			var last uint32
+			for step, dark := range []bool{false, true, false} {
 				e.Dark = dark
 				app.SetEnvironment(e)
 				palette := core.DefaultTheme().Light
@@ -55,6 +57,12 @@ func TestDialogStyleUpdatesOpenSurface(t *testing.T) {
 				r, g, b, _ := img.At(x, y).RGBA()
 				rx, ry := pixel(app.Find("reference").Bounds())
 				wr, wg, wb, _ := img.At(rx, ry).RGBA()
+				// Light and dark surfaces differ by far more than any display profile shifts a channel.
+				luma := (wr + wg + wb) / 3 >> 8
+				if step > 0 && max(luma, last)-min(luma, last) < 64 {
+					t.Fatalf("dark=%v: the reference swatch stayed at %d,%d,%d after the appearance changed", dark, wr>>8, wg>>8, wb>>8)
+				}
+				last = luma
 				for i, got := range []uint32{r, g, b} {
 					want := []uint32{wr, wg, wb}[i]
 					if delta := int(got>>8) - int(want>>8); delta < -3 || delta > 3 {
