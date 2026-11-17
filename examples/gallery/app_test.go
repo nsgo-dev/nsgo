@@ -1104,8 +1104,8 @@ func TestToastOptions(t *testing.T) {
 	if x := app.Find("id:toasts").Frame.Origin.X; x != 16 {
 		t.Fatalf("the toasts at the top start are at x %v", x)
 	}
-	shell.toastPlacement.Set(ui.ToastEnd)
-	app.Settle()
+	app.Press("id:knob-Placement")
+	app.Press("id:knob-Placement-4")
 	if at := app.Find("id:toasts").Frame.Origin; at.X < 600 || at.Y < 200 {
 		t.Fatalf("the toasts at the end are at %v, want the middle of the right side", at)
 	}
