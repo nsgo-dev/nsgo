@@ -155,13 +155,16 @@ func LaunchAtLogin(cx *core.Scope, done func(on bool)) { cx.LaunchAtLogin(done) 
 // LaunchedAtLogin reports whether the system started this run as a login item, as a tray app reads it to open no window then. It is known when the app's function first runs and stays the same for the run, reopens included; a restart (Restart) reports false. macOS reads the launch Apple event, or the LaunchAgent's marker on macOS 11 and 12; other platforms report false. Tests set it with nsgotest.Environment(core.Environment{LaunchedAtLogin: true}).
 func LaunchedAtLogin(cx *core.Scope) bool { return cx.Env().LaunchedAtLogin() }
 
-// FrontmostApp is the application in front on the desktop: its ID, its name, its process ID and whether its frontmost window is in full screen.
-type FrontmostApp = core.FrontmostApp
+// FrontmostAppInfo is the application in front on the desktop: its ID, its name, its process ID and whether its frontmost window is in full screen.
+type FrontmostAppInfo = core.FrontmostAppInfo
 
-// Frontmost returns the application in front on the desktop, the app itself included, tracked: an effect or binding reading it runs again when another app comes to the front or the one in front enters or leaves full screen.
+// FrontmostApp returns the application in front on the desktop, the app itself included, tracked: an effect or binding reading it runs again when another app comes to the front or the one in front enters or leaves full screen.
 //
-//	front := desktop.Frontmost(cx)
+//	front := desktop.FrontmostApp(cx)
 //	coding := front.ID == "com.microsoft.VSCode" && !front.FullScreen
 //
-// macOS, Windows and Linux on X11 report it; it is zero on Wayland, which has no portable way to tell, on phones and on the web, and for code whose Access refuses core.AccessFrontmostApp, as it says what else the user runs. Tests set it with nsgotest.Environment(core.Environment{FrontmostApp: ...}).
-func Frontmost(cx *core.Scope) FrontmostApp { return cx.FrontmostApp() }
+// It is zero where CanReadFrontmostApp is false. Tests set it with nsgotest.Environment(core.Environment{FrontmostApp: ..., CanReadFrontmostApp: true}).
+func FrontmostApp(cx *core.Scope) FrontmostAppInfo { return cx.FrontmostApp() }
+
+// CanReadFrontmostApp reports whether FrontmostApp follows the application in front, tracked: on macOS, Windows and Linux on X11, but not on Wayland, which has no portable way to tell, on phones, the web or mini programs, or for code whose Access refuses core.AccessFrontmostApp, as it says what else the user runs.
+func CanReadFrontmostApp(cx *core.Scope) bool { return cx.CanReadFrontmostApp() }

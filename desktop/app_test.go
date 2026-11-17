@@ -1,6 +1,7 @@
 package desktop_test
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -77,20 +78,26 @@ func TestWindowWorkspacesFollowTheEnvironment(t *testing.T) {
 	app.Find("text:Everywhere")
 }
 
-func TestFrontmostFollowsTheAppInFront(t *testing.T) {
-	editor := desktop.FrontmostApp{ID: "com.example.editor", Name: "Editor", PID: 41}
-	player := desktop.FrontmostApp{ID: "com.example.player", Name: "Player", PID: 42, FullScreen: true}
-	var seen []desktop.FrontmostApp
+func TestFrontmostAppFollowsTheAppInFront(t *testing.T) {
+	editor := desktop.FrontmostAppInfo{ID: "com.example.editor", Name: "Editor", PID: 41}
+	player := desktop.FrontmostAppInfo{ID: "com.example.player", Name: "Player", PID: 42, FullScreen: true}
+	var seen []desktop.FrontmostAppInfo
+	var can []bool
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
-		cx.Effect(func() { seen = append(seen, desktop.Frontmost(cx)) })
+		cx.Effect(func() { seen = append(seen, desktop.FrontmostApp(cx)) })
+		cx.Effect(func() { can = append(can, desktop.CanReadFrontmostApp(cx)) })
 		return core.View{}
-	}, nsgotest.Environment(core.Environment{FrontmostApp: editor}))
-	app.SetEnvironment(core.Environment{FrontmostApp: player})
+	}, nsgotest.Environment(core.Environment{FrontmostApp: editor, CanReadFrontmostApp: true}))
+	app.SetEnvironment(core.Environment{FrontmostApp: player, CanReadFrontmostApp: true})
 	// Another change to the environment leaves the app in front alone.
-	app.SetEnvironment(core.Environment{FrontmostApp: player, Dark: true})
-	app.SetEnvironment(core.Environment{})
-	if want := []desktop.FrontmostApp{editor, player, {}}; !slices.Equal(seen, want) {
+	app.SetEnvironment(core.Environment{FrontmostApp: player, CanReadFrontmostApp: true, Dark: true})
+	// As on Wayland: a platform that does not follow the app in front reports none, whatever it holds.
+	app.SetEnvironment(core.Environment{FrontmostApp: player})
+	if want := []desktop.FrontmostAppInfo{editor, player, {}}; !slices.Equal(seen, want) {
 		t.Fatalf("frontmost apps %v, want %v", seen, want)
+	}
+	if want := []bool{true, false}; !slices.Equal(can, want) {
+		t.Fatalf("CanReadFrontmostApp %v, want %v", can, want)
 	}
 }
 
@@ -108,23 +115,24 @@ func (onlyFrontmost) Allows(req core.AccessRequest) bool {
 }
 func (onlyFrontmost) WebHosts() []string { return nil }
 
-func TestFrontmostIsHeldToAccess(t *testing.T) {
+func TestFrontmostAppIsHeldToAccess(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		access core.Access
 		want   string
 	}{
-		{"refused", refuseAll{}, "text:none"},
-		{"granted", onlyFrontmost{}, "text:Editor"},
+		{"refused", refuseAll{}, "text:none false"},
+		{"granted", onlyFrontmost{}, "text:Editor true"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 				cx.ProvideAccess(tc.access)
-				if name := desktop.Frontmost(cx).Name; name != "" {
-					return core.Text{Content: name}
+				name := desktop.FrontmostApp(cx).Name
+				if name == "" {
+					name = "none"
 				}
-				return core.Text{Content: "none"}
-			}, nsgotest.Environment(core.Environment{FrontmostApp: desktop.FrontmostApp{ID: "com.example.editor", Name: "Editor"}}))
+				return core.Text{Content: fmt.Sprintf("%s %v", name, desktop.CanReadFrontmostApp(cx))}
+			}, nsgotest.Environment(core.Environment{FrontmostApp: desktop.FrontmostAppInfo{ID: "com.example.editor", Name: "Editor"}, CanReadFrontmostApp: true}))
 			app.Find(tc.want)
 		})
 	}

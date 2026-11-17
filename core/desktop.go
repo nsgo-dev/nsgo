@@ -72,12 +72,23 @@ func (cx *Scope) SetWindowConstraints(c WindowConstraints) {
 // OrderFront is the core's part of desktop.OrderFront, which apps use.
 func (cx *Scope) OrderFront() { cx.window(WindowCommand{Action: WindowOrderFront}) }
 
-// FrontmostApp is the core's part of desktop.Frontmost, which apps use: the application in front, read tracked, zero where the platform does not say or the current owner's Access refuses AccessFrontmostApp.
-func (cx *Scope) FrontmostApp() FrontmostApp {
+// FrontmostApp is the core's part of desktop.FrontmostApp, which apps use: the application in front, read tracked, zero where the platform does not follow it (CanReadFrontmostApp) or the current owner's Access refuses AccessFrontmostApp.
+func (cx *Scope) FrontmostApp() FrontmostAppInfo {
 	if cx.denied(serviceFrontmostApp, "") {
-		return FrontmostApp{}
+		return FrontmostAppInfo{}
 	}
-	return cx.Env().frontmost.Get()
+	if env := cx.Env(); env.canReadFrontmost.Get() {
+		return env.frontmost.Get()
+	}
+	return FrontmostAppInfo{}
+}
+
+// CanReadFrontmostApp is the core's part of desktop.CanReadFrontmostApp, which apps use: whether FrontmostApp follows the application in front, read tracked, false where the platform does not or the current owner's Access refuses AccessFrontmostApp. Asking logs no refusal.
+func (cx *Scope) CanReadFrontmostApp() bool {
+	if cx.gate(serviceFrontmostApp, "") != nil {
+		return false
+	}
+	return cx.Env().canReadFrontmost.Get()
 }
 
 // SetMenuBar is the core's part of desktop.SetMenuBar, which apps use.

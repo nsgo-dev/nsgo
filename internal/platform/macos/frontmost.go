@@ -13,12 +13,12 @@ import (
 
 var (
 	// frontmost is the application in front as the last activation or change of Space left it, which every surface's environment reports. The main thread alone reads and writes it.
-	frontmost      driver.FrontmostApp
+	frontmost      driver.FrontmostAppInfo
 	frontmostWatch sync.Once
 )
 
 // frontmostApp returns the application in front, following it from the first call on: NSWorkspace says when another app activates, and when the active Space changes, as it does when an app enters or leaves full screen. Main thread.
-func frontmostApp() driver.FrontmostApp {
+func frontmostApp() driver.FrontmostAppInfo {
 	frontmostWatch.Do(func() {
 		frontmost = readFrontmost()
 		center := objc.ID(apple.Class("NSWorkspace")).Send(sel("sharedWorkspace")).Send(sel("notificationCenter"))
@@ -37,7 +37,7 @@ func frontmostApp() driver.FrontmostApp {
 }
 
 // readFrontmost asks NSWorkspace for the application in front, and the window server whether its frontmost window covers a display. An app without a bundle identifier is known by its executable's path.
-func readFrontmost() (app driver.FrontmostApp) {
+func readFrontmost() (app driver.FrontmostAppInfo) {
 	front := objc.ID(apple.Class("NSWorkspace")).Send(sel("sharedWorkspace")).Send(sel("frontmostApplication"))
 	if front == 0 {
 		return app

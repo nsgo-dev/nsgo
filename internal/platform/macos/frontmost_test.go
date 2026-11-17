@@ -67,7 +67,7 @@ func TestFrontmostFollowsWorkspaceNotifications(t *testing.T) {
 			}
 			frontmostApp()
 			center := workspace.Send(sel("notificationCenter"))
-			stale := driver.FrontmostApp{ID: "stale", Name: "stale", PID: -1}
+			stale := driver.FrontmostAppInfo{ID: "stale", Name: "stale", PID: -1}
 			for _, name := range []string{"NSWorkspaceDidActivateApplicationNotification", "NSWorkspaceActiveSpaceDidChangeNotification"} {
 				frontmost = stale
 				center.Send(sel("postNotificationName:object:"), apple.Global(appKitPath, name), workspace)

@@ -36,7 +36,7 @@ const (
 
 // The application in front, which every window's environment reports. Windows says when another window comes to the front (EVENT_SYSTEM_FOREGROUND); a second hook, on the process in front alone, hears its windows move and resize, as they do entering and leaving full screen. Both post to the thread that set them, the main thread, which alone uses these.
 var (
-	frontmost      driver.FrontmostApp
+	frontmost      driver.FrontmostAppInfo
 	frontmostHwnd  uintptr
 	frontmostMoves uintptr // the location hook on frontmost.PID's windows
 	frontmostWatch sync.Once
@@ -47,11 +47,11 @@ var (
 )
 
 // frontmostApp returns the application in front, following it from the first call on.
-func frontmostApp() driver.FrontmostApp {
+func frontmostApp() driver.FrontmostAppInfo {
 	frontmostWatch.Do(func() {
 		frontmostEvent = syscall.NewCallback(frontmostChanged)
 		setWinEventHook.Call(eventSystemForeground, eventSystemForeground, 0, frontmostEvent, 0, 0, winEventOutOfContext)
-		frontmost, frontmostHwnd = readFrontmost(driver.FrontmostApp{})
+		frontmost, frontmostHwnd = readFrontmost(driver.FrontmostAppInfo{})
 		hookFrontmostMoves(frontmost.PID)
 	})
 	return frontmost
@@ -96,14 +96,14 @@ func hookFrontmostMoves(pid int) {
 }
 
 // readFrontmost reads the application whose window is in front, and that window; last is the one read before, whose identity a window of the same process keeps without asking again.
-func readFrontmost(last driver.FrontmostApp) (driver.FrontmostApp, uintptr) {
+func readFrontmost(last driver.FrontmostAppInfo) (driver.FrontmostAppInfo, uintptr) {
 	hwnd, _, _ := getForegroundWindow.Call()
 	if hwnd == 0 {
-		return driver.FrontmostApp{}, 0
+		return driver.FrontmostAppInfo{}, 0
 	}
 	var pid uint32
 	getWindowThreadProcessID.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
-	app := driver.FrontmostApp{PID: int(pid)}
+	app := driver.FrontmostAppInfo{PID: int(pid)}
 	if app.PID != 0 && app.PID == last.PID {
 		app.ID, app.Name = last.ID, last.Name
 	} else if path := processPath(pid); path != "" {

@@ -80,7 +80,7 @@ const (
 	AccessLocation           = "location"
 	AccessBackgroundLocation = "backgroundLocation"
 	AccessMotion             = "motion"
-	// AccessFrontmostApp is the application in front on the desktop (Scope.FrontmostApp), as it says what else the user runs.
+	// AccessFrontmostApp is the application in front on the desktop (Scope.FrontmostApp and Scope.CanReadFrontmostApp), as it says what else the user runs.
 	AccessFrontmostApp = "frontmostApp"
 )
 

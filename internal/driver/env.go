@@ -104,15 +104,16 @@ type Environment struct {
 	OpenedURL string
 	// LaunchedAtLogin says the system started this run as a login item. It stays the same throughout the run, including subsequent reopens.
 	LaunchedAtLogin bool
-	// FrontmostApp is the application in front on the desktop, the app itself included; zero where the platform does not say.
-	FrontmostApp FrontmostApp
+	// FrontmostApp is the application in front on the desktop, the app itself included, and CanReadFrontmostApp says the platform follows it: on macOS, Windows and Linux on X11. FrontmostApp is zero where CanReadFrontmostApp is false.
+	FrontmostApp        FrontmostAppInfo
+	CanReadFrontmostApp bool
 }
 
-// FrontmostApp is the application in front on the desktop.
-type FrontmostApp struct {
-	// ID is the macOS bundle identifier, the Windows executable's path, or on X11 the GTK application ID, else the class of WM_CLASS.
+// FrontmostAppInfo is the application in front on the desktop.
+type FrontmostAppInfo struct {
+	// ID is the macOS bundle identifier, else the executable's path; the Windows executable's path; or on X11 the GTK application ID, else the class of WM_CLASS. "" where the platform will not say, as Windows for a process it refuses to open.
 	ID string
-	// Name is the app's display name: macOS's localized name, the executable's file description on Windows, the class of WM_CLASS on X11.
+	// Name is the app's display name: macOS's localized name, the executable's file description on Windows, else its file name, the class of WM_CLASS on X11.
 	Name string
 	// PID is its process ID, 0 when unknown.
 	PID int

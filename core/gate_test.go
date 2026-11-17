@@ -74,6 +74,7 @@ var gated = map[string]service{
 	"WatchMotion":                   serviceMotion,
 	"SetWebCookies":                 serviceWebCookies,
 	"FrontmostApp":                  serviceFrontmostApp,
+	"CanReadFrontmostApp":           serviceFrontmostApp,
 }
 
 // exempt are the exported Scope methods that do not ask gate, by why.

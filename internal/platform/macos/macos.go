@@ -1093,6 +1093,9 @@ func (s *surface) environment() driver.Environment {
 		CanMakeWindowsTransparent: s.ownWindow(),
 		CanSkipTaskbar:            s.ownWindow(),
 
+		// NSWorkspace says which app is in front to every app.
+		CanReadFrontmostApp: true,
+
 		// The center serves only an app in a bundle.
 		ScheduledNotifications: apple.NotificationsAvailable(),
 

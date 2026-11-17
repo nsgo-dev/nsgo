@@ -102,6 +102,9 @@ func (w *window) environment() driver.Environment {
 		CanMakeWindowsTransparent: w.canTransparent && !w.embedded,
 		CanSkipTaskbar:            w.kind == driver.SurfaceWindow && !w.embedded && !(w.primary && w.opts.Hidden),
 
+		// The foreground window says which app is in front to every app.
+		CanReadFrontmostApp: true,
+
 		// The toast notifier's schedule, which has no repeats.
 		ScheduledNotifications: true,
 

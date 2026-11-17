@@ -20,7 +20,7 @@ var (
 	x11SelectInput         func(display, window uintptr, mask int) int32
 	x11GetWindowAttributes func(display, window uintptr, attributes *x11Attributes) int32
 
-	frontmost      driver.FrontmostApp
+	frontmost      driver.FrontmostAppInfo
 	frontmostX11   *x11Frontmost
 	frontmostWatch sync.Once
 )
@@ -47,7 +47,6 @@ const (
 	x11AtomString          = 31
 	x11AtomWindow          = 33
 	x11AtomWMClass         = 67
-	x11AnyPropertyType     = 0
 	x11PropertyMaxLongs    = 1024
 	x11SizeOfLong          = 8
 	x11PropertyEventWindow = 32 // XPropertyEvent's window, on LP64
@@ -63,14 +62,14 @@ type x11Frontmost struct {
 	atoms   struct{ activeWindow, pid, state, fullScreen, applicationID, utf8 uintptr }
 }
 
-// frontmostApp returns the application in front, following it from the first call on; zero where GDK does not draw on X11.
-func frontmostApp() driver.FrontmostApp {
+// frontmostApp returns the application in front, following it from the first call on, and whether it follows it: not where GDK does not draw on X11.
+func frontmostApp() (driver.FrontmostAppInfo, bool) {
 	frontmostWatch.Do(func() {
 		if frontmostX11 = watchX11Frontmost(); frontmostX11 != nil {
 			frontmost = frontmostX11.read()
 		}
 	})
-	return frontmost
+	return frontmost, frontmostX11 != nil
 }
 
 func watchX11Frontmost() *x11Frontmost {
@@ -138,7 +137,7 @@ func (f *x11Frontmost) unselectProperties(window uintptr) {
 }
 
 // read reads the application in front, following the properties of the window in front from now on.
-func (f *x11Frontmost) read() (app driver.FrontmostApp) {
+func (f *x11Frontmost) read() (app driver.FrontmostAppInfo) {
 	gdkX11DisplayErrorTrapPush(f.gdk)
 	defer func() { _ = gdkX11DisplayErrorTrapPop(f.gdk) }()
 	var active uintptr
