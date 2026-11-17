@@ -695,9 +695,14 @@ func (a *App) yieldToPage() bool {
 	return len(a.posts) > 0
 }
 
-// Post runs fn on the test's goroutine as the next step or wait settles:
-// what another goroutine hands the test, as a stubbed request does.
+// Post runs fn on the app's graph goroutine as the next step or wait
+// settles: the test goroutine headless, the engine goroutine on a target.
+// It is safe to call from any goroutine, and fn may read or set signals.
 func (a *App) Post(fn func()) {
+	if t := a.target; t != nil && !t.live {
+		posted := fn
+		fn = func() { t.appScope.Post(posted) }
+	}
 	a.mu.Lock()
 	a.posts = append(a.posts, fn)
 	a.mu.Unlock()

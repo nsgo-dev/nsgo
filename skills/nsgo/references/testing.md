@@ -36,6 +36,8 @@ Keep each graph on the goroutine that created it, cleanup included. Signal write
 
 ## Steps
 
+Use `app.Post(func() { signal.Set(value) })` from a test or stubbed worker to queue work on the app's graph goroutine, then `app.Settle()` or a wait before reading views. It runs on the test goroutine headless and the engine goroutine on a target, so the same test may set signals on both.
+
 - Pointer and touch: `Press`, `PressWith`, `PressAt`, `PressAtWith`, `LongPress`, `RightClick`, `Hover`, `Drag`, `Scroll`, `ScrollTo`, `PullToRefresh`, `Pinch`, `Wheel`.
 - Keyboard and text: `Focus`, `Type`, `Clear`, `Submit`, `KeyPress`, `Paste`, `Select`, `Compose`.
 - Menus and system UI: `ChooseMenu`, `ChooseDockMenu`, `ChoosePopup`, `ClosePopup`, `HeaderBack`, `Answer` for alerts (start with `nsgotest.PendingAlerts()`), `GrantPermission`, `DropFiles`, `CloseWindow` (with a desktop `Environment`, where the main view shows in the main window as `nsgo.Run` opens one: on macOS, and on Windows and Linux for an app's function).

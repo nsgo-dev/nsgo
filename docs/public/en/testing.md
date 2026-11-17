@@ -53,6 +53,8 @@ Given a directory without `nsgo.yaml`, such as a library or the module's root, `
 
 Tests check reactive graph ownership: access signals and scopes on the app's goroutine, and use `cx.Post` from workers. A call from another goroutine that lands while the app is idle panics with a `Scope.Post` diagnostic; `-race` catches the rest. Internal engine panics still fail tests; in a shipped app they stop the affected engine and report its stack to the host. Development builds also check ownership; release builds omit the check; WebAssembly development and test builds omit the goroutine-ID assertion because browser callbacks may resume on a browser-managed goroutine; the other test checks still run there.
 
+`app.Post(func() { state.Set(value) })` queues work on the app's graph goroutine as the next step or wait settles: the test goroutine headless, the engine goroutine on a target. Call it from a test or a stubbed worker, then use `app.Settle()` or a wait to read the resulting views.
+
 ## Run on a platform
 
 Tests run in a real window with the platform's own input. Discovery follows the target's build tags, including target-only test files in otherwise portable packages:

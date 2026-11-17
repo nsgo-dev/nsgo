@@ -68,6 +68,9 @@ func Target() string { return os.Getenv("NSGO_TEST_TARGET") }
 type target struct {
 	a       *App
 	surface testhost.Surface
+	// appScope belongs to the real app's graph; a.root is the test's
+	// separate graph for storage and other model-side callbacks.
+	appScope *core.Scope
 	// live is set for a running app's surface the automation follows (automation.go), whose model also drops the alerts the user answers.
 	live bool
 	// quiet reports whether the last settle came to quiet before settleWait.
@@ -185,7 +188,10 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 	})
 	a.seed()
 	a.anim = driver.NewAnimator(func(driver.Event) {})
-	s, err := h.Open(app, a.targetOptions(t))
+	s, err := h.Open(func(cx *core.Scope) core.Node {
+		t.appScope = cx
+		return app(cx)
+	}, a.targetOptions(t))
 	if err != nil {
 		a.t.Fatalf("nsgotest: the platform cannot open the app: %v", err)
 	}
