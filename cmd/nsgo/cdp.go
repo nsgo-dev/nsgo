@@ -153,6 +153,10 @@ func startBrowser(ctx context.Context) (*cdp, error) {
 	}
 	ws, err := config.DialContext(startup)
 	if err != nil {
+		// DialError does not unwrap, so name the cancellation or deadline itself for errors.Is.
+		if startup.Err() != nil {
+			err = fmt.Errorf("connecting to the browser's DevTools port: %w", startup.Err())
+		}
 		return failed(err)
 	}
 	ws.MaxPayloadBytes = 256 << 20

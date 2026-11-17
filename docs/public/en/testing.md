@@ -67,6 +67,8 @@ On `android` and `ios` the tests run only in NSGo's test host: Android's runtime
 
 Packages that do not link the platform backend run headless in the target's runtime. With `-target web`, library controls can be tested inside the browser this way. Storage stays in memory, and `DataDir`, `CacheDir` and `LogsDir` are empty because the browser has no filesystem. The file-backed `nsgotest.MicrophoneInput` fake skips there because it needs real WAV files.
 
+On `web` the tests run in a headless Chrome, Chromium or Edge the tool finds, or in the browser executable `NSGO_BROWSER` names. The tool waits up to 30 seconds for it to start, stops waiting when the command is cancelled, and reports the browser's error output if it exits or never answers.
+
 Each step, and `app.Settle()`, waits for the engine's pending commit before counting 100 ms without batches or finite animations. The whole wait stops after five seconds even if the app keeps changing; a slow first dialog needs no extra post or sleep in the test.
 
 To measure rather than check, start with `nsgotest.Measure()`: the app runs on the system's clock, `Advance` waits as long as it moves, and steps wait only for what animates to rest. `app.Mark("name")` names what the readings from there on measure, and `app.Mark("-")` ends it; the marks print with or without `-fps`.

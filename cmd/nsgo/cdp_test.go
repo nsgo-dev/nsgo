@@ -3,12 +3,18 @@ package main
 import (
 	"context"
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/net/websocket"
 )
 
 func TestBrowserStartupReportsExitAndCleansItsProfile(t *testing.T) {
@@ -63,6 +69,100 @@ func TestBrowserStartupHonorsCancellation(t *testing.T) {
 		t.Fatalf("canceled browser took %s to stop", elapsed)
 	}
 	checkBrowserProfileRemoved(t)
+}
+
+func TestBrowserStartupWaitsForTheCompletePortFile(t *testing.T) {
+	srv := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		for {
+			var m cdpMessage
+			if err := websocket.JSON.Receive(ws, &m); err != nil {
+				return
+			}
+			if err := websocket.JSON.Send(ws, map[string]any{"id": m.ID, "result": map[string]any{"product": "fake"}}); err != nil {
+				return
+			}
+			if m.Method == "Browser.close" {
+				profile, _ := os.ReadFile(os.Getenv("NSGO_TEST_BROWSER_PROFILE"))
+				os.WriteFile(filepath.Join(string(profile), "closed"), nil, 0o600)
+				return
+			}
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("NSGO_TEST_BROWSER_PORT", fakeBrowserPort(t, srv))
+	// A browser may create the port file before writing its second line.
+	fakeBrowser(t, `profile=$(cat "$NSGO_TEST_BROWSER_PROFILE")
+printf '%s\n' "$NSGO_TEST_BROWSER_PORT" > "$profile/DevToolsActivePort"
+sleep 0.3
+printf '%s\n/devtools/browser/test\n' "$NSGO_TEST_BROWSER_PORT" > "$profile/DevToolsActivePort"
+while [ ! -e "$profile/closed" ]; do sleep 0.05; done
+`)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	b, err := startBrowser(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := b.call("", "Browser.getVersion", nil)
+	if err != nil || !strings.Contains(string(result), "fake") {
+		t.Fatalf("Browser.getVersion = %s, %v", result, err)
+	}
+	start := time.Now()
+	b.close()
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("closing took %s; the browser was killed rather than closed", elapsed)
+	}
+	if b.browser.ProcessState == nil {
+		t.Error("the browser was not waited for")
+	}
+	checkBrowserProfileRemoved(t)
+}
+
+func TestBrowserStartupCancelsTheHandshake(t *testing.T) {
+	connected := make(chan struct{})
+	var once sync.Once
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() { close(connected) })
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("NSGO_TEST_BROWSER_PORT", fakeBrowserPort(t, srv))
+	fakeBrowser(t, `profile=$(cat "$NSGO_TEST_BROWSER_PROFILE")
+printf '%s\n/devtools/browser/test\n' "$NSGO_TEST_BROWSER_PORT" > "$profile/DevToolsActivePort"
+exec sleep 60
+`)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { _, err := startBrowser(ctx); result <- err }()
+	select {
+	case <-connected:
+	case err := <-result:
+		t.Fatalf("startup ended before its handshake: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the browser handshake did not start")
+	}
+	cancel()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("startup error = %v, want context cancellation", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the browser handshake kept waiting after cancellation")
+	}
+	checkBrowserProfileRemoved(t)
+}
+
+// fakeBrowserPort returns the port srv listens on.
+func fakeBrowserPort(t *testing.T, srv *httptest.Server) string {
+	t.Helper()
+	_, port, err := net.SplitHostPort(srv.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return port
 }
 
 func fakeBrowser(t *testing.T, body string) {
