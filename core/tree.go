@@ -151,6 +151,10 @@ type Tree struct {
 	peerStyled      bool
 	peerParents     map[*node]struct{}
 	refreshingPeers bool
+	// Relational classes coalesce updates within their source's scope.
+	relationSources     map[*node]*node
+	relationRoots       map[*node]struct{}
+	refreshingRelations bool
 	// bars draws the bars of scroll views that have none of their own,
 	// and watches hear scroll views move (scrollbars.go).
 	bars    ScrollbarMaker
@@ -901,6 +905,10 @@ func (t *Tree) childrenChanged(n *node) {
 	if n != nil {
 		n.flat = nil
 		t.queuePeerParent(n)
+		t.queueRelations(n)
+		if len(t.relationSources) > 0 {
+			t.queueRelationRoot(n)
+		}
 		t.reorder(n)
 		t.markLayout(n)
 		if t.positional || n.cls != nil && n.cls.list.spacing {
@@ -1189,6 +1197,9 @@ func (t *Tree) restyle(n *node) bool {
 	was := &n.style
 	lines, overflow, pointer, visibility, display := was.NumberOfLines, was.TextOverflow, was.PointerEvents, was.Visibility, was.Display
 	n.style = merged.withStates(statesOf(t.shownInteraction(n), &p, n.part.Data), g)
+	if n.cls != nil && n.cls.related {
+		n.style = mergeStyles(n.style, n.cls.important)
+	}
 	if p.Disabled {
 		// The platform still follows the states a disabled view's own
 		// styles wait for, which the event mask reads.
@@ -1595,6 +1606,7 @@ func (t *Tree) updatePointerEvents() {
 // restyleGroup restyles the nodes inside group n that follow its states.
 func (t *Tree) restyleGroup(n *node) {
 	t.queuePeerSiblings(n)
+	t.queueRelations(n)
 	if n.style.Group == "" {
 		return
 	}
@@ -2776,24 +2788,30 @@ func (n *node) events() driver.EventMask {
 		}
 	}
 	h, s := &n.h, &n.style
-	// Groups and peers report the states other views follow.
+	// Groups, peers and relational selectors report the states other views follow. own is what n's classes read of n's states after matching; inherited is what selectors of views around n may read of it.
+	var own, inherited uint16
+	if c := n.cls; c != nil && c.related {
+		own = c.list.watch
+		inherited = c.watch &^ own
+	}
 	group := s.Group != ""
 	peer := n.peerMarked()
-	// Style tracking must not turn a plain view into a press target or Tab stop. Only a view with press handlers requests presses for its own, group or peer active styles.
-	pressStyled := (s.Active != nil || group || peer) && n.takesPresses()
+	// Style tracking must not turn a plain view into a press target or Tab stop. Only a view with press handlers requests presses for its own, group or peer active styles, or for the pressed state a relational selector reads of it.
+	watched := own | inherited
+	pressStyled := (s.Active != nil || group || peer || watched&classPressed != 0) && n.takesPresses()
 	bit(driver.EventPress, h.press != nil || n.labelTarget() != nil)
 	bit(driver.EventLongPress, h.longPress != nil)
 	// A press hides the tooltip of a view that takes presses.
 	bit(driver.EventPressDown, h.pressDown != nil || pressStyled || n.tip != nil && h.press != nil)
 	bit(driver.EventPressUp, h.pressUp != nil || pressStyled)
-	bit(driver.EventMouseEnter, h.mouseEnter != nil || s.Hover != nil || group || peer || n.tip != nil)
-	bit(driver.EventMouseLeave, h.mouseLeave != nil || s.Hover != nil || group || peer || n.tip != nil)
+	bit(driver.EventMouseEnter, h.mouseEnter != nil || s.Hover != nil || group || peer || n.tip != nil || watched&classHovered != 0)
+	bit(driver.EventMouseLeave, h.mouseLeave != nil || s.Hover != nil || group || peer || n.tip != nil || watched&classHovered != 0)
 	bit(driver.EventMouseMove, h.mouseMove != nil)
 	bit(driver.EventTouch, n.hearsTouches())
 	// The focus of any view that can take it is reported, for the core's
 	// own focus (focusReported).
 	focusable := n.kind == driver.KindInput || n.kind == driver.KindWeb || n.takesPresses() || n.props.Focusable
-	focusStyled := s.Focus != nil || s.FocusVisible != nil || peer
+	focusStyled := s.Focus != nil || s.FocusVisible != nil || peer || watched&(classFocused|classFocusVisible|classFocusWithin) != 0
 	bit(driver.EventFocus, h.focus != nil || focusStyled || focusable)
 	bit(driver.EventBlur, h.blur != nil || focusStyled || focusable)
 	bit(driver.EventSubmitEditing, h.submit != nil)

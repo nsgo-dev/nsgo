@@ -66,6 +66,7 @@ func (t *Tree) commit(shared bool) *driver.MountBatch {
 		if t.pointersMoved {
 			t.updatePointerEvents()
 		}
+		t.updateRelationStyles()
 		t.commitRound()
 	}
 	// The user's input let its owner move the focus until what it caused was committed.

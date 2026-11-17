@@ -463,6 +463,7 @@ func (t *Tree) setImage(n *node, v Image) {
 // restyled merges n's style again after its parts changed and marks
 // what follows from it.
 func (t *Tree) restyled(n *node) {
+	t.queueRelations(n)
 	t.followEnvTerms(n)
 	if t.restyle(n) {
 		t.markLayout(n)

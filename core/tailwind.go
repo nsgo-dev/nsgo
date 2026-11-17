@@ -83,6 +83,7 @@ type classCond struct {
 	data                                                 string // data-*:'s name
 	group                                                *classGroup
 	peers                                                []classPeer
+	has                                                  []*classSelector
 	position                                             uint8
 	placeholder, selection                               bool
 }
@@ -167,11 +168,12 @@ const (
 	rankAriaPressed   = 44
 	rankAriaSelected  = 45
 	rankData          = 46
-	rankMotionSafe    = 47
-	rankMotionReduce  = 48
-	rankContrastMore  = 49
-	rankMax           = 50
-	rankMin           = 51
+	rankHas           = 47
+	rankMotionSafe    = 48
+	rankMotionReduce  = 49
+	rankContrastMore  = 50
+	rankMax           = 51
+	rankMin           = 52
 	rankPortrait      = 60
 	rankLandscape     = 61
 	rankLTR           = 62
@@ -180,6 +182,7 @@ const (
 	rankIOS           = 70
 	rankAndroid       = 71
 	rankWeb           = 72
+	rankArbitrary     = 100
 )
 
 // classDecl is what a utility sets.
@@ -491,6 +494,17 @@ type classRule struct {
 	decls     []classDecl
 	rank      classRank
 	important bool
+	relations []classRelation
+	// resolvedState preserves state backgrounds when relational matching
+	// has already evaluated the state on its originating element.
+	resolvedState bool
+}
+
+// Each arbitrary variant selects from the preceding variant's target.
+// Its condition belongs to that preceding target, not the final one.
+type classRelation struct {
+	selector  *classSelector
+	condition classCond
 }
 
 // classList is a parsed class string.
@@ -516,7 +530,9 @@ type classList struct {
 	peerDependent bool
 	unknown       []string
 	// spacing is set when the view gives its children margins.
-	spacing bool
+	spacing    bool
+	relational bool
+	watch      uint16
 }
 
 // classEnv is what a node's classes are resolved for.
@@ -537,6 +553,7 @@ type classEnv struct {
 	fontSize Points
 	// peer matches a preceding sibling; nil when resolving outside a tree.
 	peer func(classPeer) bool
+	has      func(*classSelector) bool
 }
 
 // classSource is a class string, its subtree's themes and the host token set over them.
@@ -603,8 +620,17 @@ func (t *tailwindTheme) parseFor(s string, theme *Theme, host hostColors) *class
 func splitVariants(token string) []string {
 	var parts []string
 	depth, start := 0, 0
+	var quote rune
 	for i, c := range token {
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
 		switch c {
+		case '\'', '"':
+			quote = c
 		case '[', '(':
 			depth++
 		case ']', ')':
@@ -648,7 +674,35 @@ func (t *tailwindTheme) parseToken(l *classList, token string) bool {
 	}
 	var cond classCond
 	var rank classRank
+	var relations []classRelation
 	for _, v := range variants {
+		if selector, arbitraryVariant := arbitrary(v); arbitraryVariant {
+			if cond.placeholder || cond.selection {
+				return false
+			}
+			if !strings.Contains(selector, "&") {
+				selector = "&:is(" + selector + ")"
+			}
+			s, ok := parseClassSelector(selector, false)
+			if !ok {
+				return false
+			}
+			for _, steps := range s.choices {
+				anchors := 0
+				for _, step := range steps {
+					if step.part.anchor {
+						anchors++
+					}
+				}
+				if anchors != 1 {
+					return false
+				}
+			}
+			relations = append(relations, classRelation{s, cond})
+			cond = classCond{}
+			rank.add(classKey{order: rankArbitrary, name: selector})
+			continue
+		}
 		k, ok := t.variant(v, &cond)
 		if !ok {
 			return false
@@ -665,7 +719,14 @@ func (t *tailwindTheme) parseToken(l *classList, token string) bool {
 	if (cond.placeholder || cond.selection) && !colorOnly(utility, cond.placeholder) {
 		return false
 	}
-	l.rules = append(l.rules, classRule{cond: cond, decls: decls, rank: rank, important: important})
+	l.rules = append(l.rules, classRule{cond: cond, decls: decls, rank: rank, important: important, relations: relations})
+	l.watch |= cond.watch()
+	for _, relation := range relations {
+		l.watch |= relation.selector.watch | relation.condition.watch()
+	}
+	if len(relations) > 0 || len(cond.has) > 0 {
+		l.relational, l.env = true, true
+	}
 	l.env = l.env || env || cond.dark != either || cond.landscape != either || cond.rtl != either ||
 		cond.reduceMotion != either || cond.increaseContrast != either || cond.minWidth != 0 || cond.maxWidth != 0 || cond.platform != ""
 	l.positional = l.positional || cond.position != 0
@@ -699,6 +760,21 @@ func ignoredUtility(u string) bool {
 // variant applies variant v to cond and returns its place.
 func (t *tailwindTheme) variant(v string, c *classCond) (classKey, bool) {
 	key := func(order uint16) (classKey, bool) { return classKey{order: order}, true }
+	if inner, has := strings.CutPrefix(v, "has-"); has {
+		selector, ok := arbitrary(inner)
+		if !ok {
+			if _, known := classVariants[inner]; !known {
+				return classKey{}, false
+			}
+			selector = ":" + inner
+		}
+		s, ok := parseClassSelector(selector, true)
+		if !ok {
+			return classKey{}, false
+		}
+		c.has = append(c.has, s)
+		return classKey{order: rankHas, name: selector}, true
+	}
 	switch v {
 	case "selection":
 		c.selection = true
@@ -907,6 +983,11 @@ func (c *classCond) matches(env *classEnv) bool {
 			return false
 		}
 	}
+	for _, s := range c.has {
+		if env.has == nil || !env.has(s) {
+			return false
+		}
+	}
 	w := env.window
 	return c.dark.holds(env.dark) && c.rtl.holds(env.rtl) && c.reduceMotion.holds(env.reduce) && c.increaseContrast.holds(env.contrast) &&
 		c.landscape.holds(w.Width > w.Height) && (c.minWidth == 0 || w.Width >= c.minWidth) &&
@@ -920,6 +1001,8 @@ func (c *classCond) matches(env *classEnv) bool {
 func (l *classList) resolve(env *classEnv) (normal, important Style, p classProps) {
 	parts := map[*Style]*classProps{}
 	var order []*Style
+	type stateFill struct{ background, gradient bool }
+	resolvedFills := map[*Style]stateFill{}
 	propsOf := func(s *Style) *classProps {
 		if c := parts[s]; c != nil {
 			return c
@@ -933,6 +1016,9 @@ func (l *classList) resolve(env *classEnv) (normal, important Style, p classProp
 	propsOf(&important)
 	for i := range l.rules {
 		r := &l.rules[i]
+		if len(r.relations) > 0 {
+			continue
+		}
 		if !r.cond.matches(env) {
 			continue
 		}
@@ -970,6 +1056,17 @@ func (l *classList) resolve(env *classEnv) (normal, important Style, p classProp
 			target = stateStyle(c.states, c.data, base.states())
 		}
 		tp := propsOf(target)
+		if r.resolvedState {
+			var probe Style
+			var pp classProps
+			for _, d := range r.decls {
+				d(&probe, &pp, env)
+			}
+			fill := resolvedFills[target]
+			fill.background = fill.background || probe.Background != 0
+			fill.gradient = fill.gradient || probe.Gradients != nil || pp.gradient != (gradientParts{})
+			resolvedFills[target] = fill
+		}
 		for _, d := range r.decls {
 			d(target, tp, env)
 		}
@@ -979,6 +1076,9 @@ func (l *classList) resolve(env *classEnv) (normal, important Style, p classProp
 			parts[s].gradient.inherit(parts[&normal].gradient)
 		}
 		parts[s].finish(s)
+		if fill := resolvedFills[s]; fill.background && !fill.gradient {
+			s.Gradients = []Gradient{}
+		}
 	}
 	// A state's background shows over the view's gradient, as feedback:
 	// the state hides it unless it has one of its own.
