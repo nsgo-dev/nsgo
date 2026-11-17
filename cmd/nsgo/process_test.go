@@ -75,6 +75,14 @@ func TestProcessAlive(t *testing.T) {
 	if !processAlive(os.Getpid()) {
 		t.Fatal("this process is not alive")
 	}
+	// The system's first process, which a test running as an ordinary user may not signal or open: init or launchd on Unix, System on Windows.
+	system := 1
+	if runtime.GOOS == "windows" {
+		system = 4
+	}
+	if !processAlive(system) {
+		t.Errorf("the system process %d is not alive", system)
+	}
 	pid, stop := idleProcess(t)
 	if !processAlive(pid) {
 		t.Fatal("running child is not alive")
