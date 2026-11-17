@@ -9,7 +9,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// check.yml splits -target all between a Linux job and a Mac one, as Apple's targets need Xcode, so a target added to targets must join one of its lists or no workflow vets it.
+// check.yml splits -target all between a Linux job and a Mac one, as Apple's targets need Xcode, so a target added to targets must join one of its lists or no workflow vets it. The Linux job also names the HarmonyOS preview, which all leaves out, so its nsgoharmony backend is vetted too.
 func TestCheckWorkflowVetsEveryTargetOnce(t *testing.T) {
 	data, err := os.ReadFile("../../.github/workflows/check.yml")
 	if err != nil {
@@ -32,9 +32,9 @@ func TestCheckWorkflowVetsEveryTargetOnce(t *testing.T) {
 		}
 	}
 	slices.Sort(got)
-	want := goAndXcodeTargets()
+	want := append(goAndXcodeTargets(), "harmonyos")
 	slices.Sort(want)
 	if !slices.Equal(got, want) {
-		t.Errorf("check.yml vets %v, want each of -target all's %v once", got, want)
+		t.Errorf("check.yml vets %v, want each required target %v once", got, want)
 	}
 }

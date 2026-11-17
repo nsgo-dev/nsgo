@@ -24,6 +24,36 @@ func checkFixture(t *testing.T) *project {
 	return p
 }
 
+func TestCheckTargetCompilesTheRepositoryTestHosts(t *testing.T) {
+	p := checkFixture(t)
+	writeFiles(t, p.Dir, map[string]string{
+		"go.mod": "module " + nsgoModule + "\n\ngo 1.26\n",
+		"internal/platform/harmonyos/testhost.go": `//go:build js && wasm && nsgoharmony && nsgotest
+
+package harmonyos
+
+type surface interface { ChooseDockMenu(uint32) error }
+type testSurface struct{}
+var _ surface = (*testSurface)(nil)
+`,
+	})
+	err := checkTargets(context.Background(), p, "harmonyos")
+	if err == nil || !strings.Contains(err.Error(), "ChooseDockMenu") {
+		t.Fatalf("a broken test host passed the target check: %v", err)
+	}
+	file := filepath.Join(p.Dir, "internal/platform/harmonyos/testhost.go")
+	source, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, append(source, []byte("\nfunc (*testSurface) ChooseDockMenu(uint32) error { return nil }\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkTargets(context.Background(), p, "harmonyos"); err != nil {
+		t.Fatalf("a complete test host failed the target check: %v", err)
+	}
+}
+
 // missingXcode also exercises a Mac whose selected Xcode has no mobile SDKs. The go command remains real, so the tests verify cross-target vetting.
 func missingXcode(t *testing.T) {
 	checkXcrun(t, "echo 'Xcode SDK unavailable' >&2\nexit 1\n")

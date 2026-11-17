@@ -78,6 +78,7 @@ func TestGoTagsMergeEnvironmentAndProject(t *testing.T) {
 
 func TestTargetTags(t *testing.T) {
 	for target, want := range map[string][]string{
+		"harmonyos":          {"nsgoharmony"},
 		"watchos":            {"nsgowatch"},
 		"watchos_simulator":  {"nsgowatch"},
 		"miniprogram_wechat": miniprogramTags,

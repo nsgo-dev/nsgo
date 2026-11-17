@@ -74,6 +74,11 @@ func checkTargets(ctx context.Context, p *project, target string) error {
 	// why is the reason the first target was skipped for, so a Mac whose Xcode lacks an SDK, or fails for another reason, says which.
 	var why string
 	var failures []error
+	repository := false
+	if p != nil {
+		path, err := importPathOf(p.Dir)
+		repository = err == nil && path == nsgoModule
+	}
 	for _, name := range names {
 		if ctx.Err() != nil {
 			failures = append(failures, ctx.Err())
@@ -97,6 +102,13 @@ func checkTargets(ctx context.Context, p *project, target string) error {
 		s := begin("vetting for %s", name)
 		if err == nil {
 			err = goToolWithTags(ctx, p, env, targetTags(name), "vet", "./...")
+		}
+		if err == nil && repository {
+			// The test hosts build only with nsgotest, which no app build sets, and each must implement testhost.Surface, so the repository vets them for every target it checks.
+			err = goToolWithTags(ctx, p, env, slices.Concat(targetTags(name), []string{"nsgotest"}), "vet", "./internal/platform/...")
+			if err != nil {
+				err = fmt.Errorf("test hosts: %w", err)
+			}
 		}
 		if err != nil {
 			s.fail()

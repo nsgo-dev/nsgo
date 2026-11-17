@@ -66,16 +66,16 @@ type testSurface struct {
 }
 
 // touch reports one finger at at.
-func (t *testSurface) touch(phase driver.GesturePhase, at driver.Point) {
-	t.s.dispatch(driver.Event{Kind: driver.EventTouch, Phase: phase, Time: time.Since(t.epoch),
+func (t *testSurface) touch(phase driver.GesturePhase, at driver.Point, mods driver.Modifiers) {
+	t.s.dispatch(driver.Event{Kind: driver.EventTouch, Phase: phase, Modifiers: mods, Time: time.Since(t.epoch),
 		Touches: []driver.Touch{{ID: 0, Position: at, PagePosition: at, Changed: true}}})
 }
 
-func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
+func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
 	// A press goes where the page's own does: to the view under the point,
 	// which a page learns from ArkUI and a test from the frames.
 	if id := t.s.m.pressTarget(at); id != 0 {
-		t.s.m.press(id, driver.EventPress, at)
+		t.s.m.press(id, driver.EventPress, at, mods)
 		// A field takes the keyboard focus as it does when a finger taps
 		// it, which the page reports from ArkUI's own focus.
 		if v := t.s.m.views[id]; v != nil && (v.kind == driver.KindInput || v.kind == driver.KindWeb) {
@@ -84,13 +84,13 @@ func (t *testSurface) Press(at driver.Point, hold time.Duration) error {
 		}
 		return nil
 	}
-	t.touch(driver.GestureBegan, at)
+	t.touch(driver.GestureBegan, at, mods)
 	// A tap keeps the finger down for a moment, as one does.
 	if hold <= 0 {
 		hold = 30 * time.Millisecond
 	}
 	time.Sleep(hold)
-	t.touch(driver.GestureEnded, at)
+	t.touch(driver.GestureEnded, at, mods)
 	return nil
 }
 
@@ -100,13 +100,13 @@ func (t *testSurface) Drag(path []driver.Point) error {
 	if len(path) == 0 {
 		return errors.New("a drag needs a path")
 	}
-	t.touch(driver.GestureBegan, path[0])
+	t.touch(driver.GestureBegan, path[0], driver.Modifiers{})
 	for _, p := range path[1:] {
 		time.Sleep(10 * time.Millisecond)
-		t.touch(driver.GestureChanged, p)
+		t.touch(driver.GestureChanged, p, driver.Modifiers{})
 	}
 	time.Sleep(20 * time.Millisecond)
-	t.touch(driver.GestureEnded, path[len(path)-1])
+	t.touch(driver.GestureEnded, path[len(path)-1], driver.Modifiers{})
 	return nil
 }
 
@@ -122,15 +122,15 @@ func (t *testSurface) Scroll(at driver.Point, delta driver.Point) error {
 	from := at
 	to := driver.Point{X: at.X - delta.X, Y: at.Y - delta.Y}
 	steps := 6
-	t.touch(driver.GestureBegan, from)
+	t.touch(driver.GestureBegan, from, driver.Modifiers{})
 	for i := 1; i <= steps; i++ {
 		f := float32(i) / float32(steps)
 		p := driver.Point{X: from.X + (to.X-from.X)*driver.Points(f), Y: from.Y + (to.Y-from.Y)*driver.Points(f)}
 		time.Sleep(10 * time.Millisecond)
-		t.touch(driver.GestureChanged, p)
+		t.touch(driver.GestureChanged, p, driver.Modifiers{})
 	}
 	time.Sleep(60 * time.Millisecond)
-	t.touch(driver.GestureEnded, to)
+	t.touch(driver.GestureEnded, to, driver.Modifiers{})
 	return nil
 }
 
@@ -202,8 +202,9 @@ func (t *testSurface) Answer(id uint32, index int) error {
 	return nil
 }
 
-func (t *testSurface) ChooseMenu(uint32) error  { return testhost.ErrNoMenu }
-func (t *testSurface) ChoosePopup(uint32) error { return testhost.ErrNoMenu }
+func (t *testSurface) ChooseDockMenu(uint32) error { return testhost.ErrNoMenu }
+func (t *testSurface) ChooseMenu(uint32) error     { return testhost.ErrNoMenu }
+func (t *testSurface) ChoosePopup(uint32) error    { return testhost.ErrNoMenu }
 
 // screenshot requests answers a test's picture: the page snapshots the
 // root view and calls nsgoSnapshotReply with the PNG's base64.

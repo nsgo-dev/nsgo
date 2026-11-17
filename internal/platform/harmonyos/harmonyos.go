@@ -370,13 +370,13 @@ func (s *surface) event(args []js.Value) {
 	pt := driver.Point{X: driver.Points(num(2)), Y: driver.Points(num(3))}
 	switch name {
 	case "tap":
-		s.m.press(id, driver.EventPress, pt)
+		s.m.press(id, driver.EventPress, pt, driver.Modifiers{})
 	case "longpress":
-		s.m.press(id, driver.EventLongPress, pt)
+		s.m.press(id, driver.EventLongPress, pt, driver.Modifiers{})
 	case "pressin":
-		s.m.press(id, driver.EventPressDown, pt)
+		s.m.press(id, driver.EventPressDown, pt, driver.Modifiers{})
 	case "pressout":
-		s.m.press(id, driver.EventPressUp, pt)
+		s.m.press(id, driver.EventPressUp, pt, driver.Modifiers{})
 	case "input":
 		s.m.edited(id, str(4))
 	case "confirm":

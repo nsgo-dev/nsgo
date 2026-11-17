@@ -768,8 +768,8 @@ func (m *mounter) scrollTarget(p driver.Point) driver.NodeID {
 }
 
 // press reports a press on id at page.
-func (m *mounter) press(id driver.NodeID, kind driver.EventKind, page driver.Point) {
-	m.s.dispatch(driver.Event{Kind: kind, ID: id, Point: page, Page: page})
+func (m *mounter) press(id driver.NodeID, kind driver.EventKind, page driver.Point, mods driver.Modifiers) {
+	m.s.dispatch(driver.Event{Kind: kind, ID: id, Point: page, Page: page, Modifiers: mods})
 }
 
 // editing says whether a text input or a web view has the keyboard focus,
