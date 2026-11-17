@@ -563,8 +563,9 @@ func (t *Terminal) SetCursor(s CursorStyle) {
 // ClearScrollback clears the scrollback, leaving the screen as it is.
 func (t *Terminal) ClearScrollback() { t.write([]byte("\x1b[3J")) }
 
-// Close closes the terminal: the program is hung up (SIGHUP), or Conn
-// closed, and the emulator freed.
+// Close closes the terminal and frees the emulator. On Unix it hangs up
+// the program's process group, then escalates to SIGTERM and SIGKILL if
+// needed; on Windows it closes the console. A Conn is closed instead.
 func (t *Terminal) Close() error {
 	t.mu.Lock()
 	if t.closed {

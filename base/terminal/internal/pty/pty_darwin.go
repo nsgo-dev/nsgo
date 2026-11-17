@@ -36,3 +36,44 @@ func openMaster() (*os.File, string, error) {
 	}
 	return master, string(name[:n]), nil
 }
+
+// waitForExit observes exit without reaping, as Linux's WNOWAIT does.
+// Darwin's waitid can also return for stopped children despite WEXITED.
+func waitForExit(pid int) error {
+	fd, err := syscall.Kqueue()
+	if err != nil {
+		return os.NewSyscallError("kqueue", err)
+	}
+	defer syscall.Close(fd)
+	syscall.CloseOnExec(fd)
+	change := syscall.Kevent_t{Ident: uint64(pid), Filter: syscall.EVFILT_PROC,
+		Flags: syscall.EV_ADD | syscall.EV_ONESHOT, Fflags: syscall.NOTE_EXIT}
+	for {
+		_, err = syscall.Kevent(fd, []syscall.Kevent_t{change}, nil, nil)
+		if err != syscall.EINTR {
+			break
+		}
+	}
+	if err == syscall.ESRCH {
+		return nil // The child already exited; no one has reaped it.
+	}
+	if err != nil {
+		return os.NewSyscallError("kevent", err)
+	}
+	var events [1]syscall.Kevent_t
+	for {
+		n, err := syscall.Kevent(fd, nil, events[:], nil)
+		if err == syscall.EINTR {
+			continue
+		}
+		if err != nil {
+			return os.NewSyscallError("kevent", err)
+		}
+		if n > 0 {
+			if events[0].Flags&syscall.EV_ERROR != 0 {
+				return os.NewSyscallError("kevent", syscall.Errno(events[0].Data))
+			}
+			return nil
+		}
+	}
+}

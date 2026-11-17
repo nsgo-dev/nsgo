@@ -27,6 +27,8 @@ The library runs on macOS 13 or later, Linux with glibc 2.28 or later (Debian 10
 
 A terminal no view shows, as a server's for a session, sizes with `Resize` and `ResizePixels` and has `Mirror`s (`mirror.go`): `Frame` returns the VT sequences that bring another terminal, one whose `Conn` reads the frames with `ResizeByConn`, to what this one shows, cell for cell, with its cursor, modes and scrollback. `ClearScreen` clears above the prompt, and programs' OSC 52 writes go on through the frames.
 
+`Close` closes `Conn` or ends the local program. On macOS and Linux it hangs up the terminal and the program's process group, sends SIGTERM after 250 ms and SIGKILL after another 250 ms, so programs inheriting an ignored SIGHUP still exit. Shutdown runs off the caller's goroutine; `Done` waits for it. The PTY keeps the leader's PID reserved until its last group signal, even if the leader exits before its children, so escalation cannot signal a reused PID. Windows closes ConPTY, which ends its attached processes. The app owns the terminal's lifetime and calls `Close` in its view's cleanup when they should end together.
+
 `Search` finds text in the screen and the scrollback, a slice of the search each frame, reports through `OnSearch` and marks the matches the viewport shows.
 
 ## View

@@ -8,13 +8,24 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
 type sys struct {
 	master *os.File
 	cmd    *exec.Cmd
+	// mu keeps group signals and reaping together: a reaped PID could
+	// name an unrelated process group by the next escalation.
+	mu        sync.Mutex
+	reaped    bool
+	closing   bool
+	groupSafe bool
+	shutdown  chan struct{}
+	closeOnce sync.Once
+	closeErr  error
 }
 
 func (p *PTY) start(o Options) error {
@@ -42,18 +53,42 @@ func (p *PTY) start(o Options) error {
 		return err
 	}
 	p.master, p.cmd = master, cmd
+	p.groupSafe, p.shutdown = true, make(chan struct{})
 	return nil
 }
 
 func (p *PTY) wait() (int, error) {
+	// Observe exit without reaping. Once Close starts, keep the child's
+	// PID reserved until the last group signal has been sent.
+	readyErr := waitForExit(p.cmd.Process.Pid)
+	p.mu.Lock()
+	if readyErr != nil {
+		// If the kernel cannot watch exit, os.Process still signals its
+		// child safely. Disable raw group signals before Wait may reap it.
+		p.groupSafe = false
+	}
+	if p.closing {
+		p.mu.Unlock()
+		<-p.shutdown
+		p.mu.Lock()
+	}
+	if readyErr != nil {
+		// Wait may block on this fallback, so allow Close to signal it.
+		p.mu.Unlock()
+	}
 	err := p.cmd.Wait()
+	if readyErr != nil {
+		p.mu.Lock()
+	}
+	p.reaped = true
+	p.mu.Unlock()
 	if e, ok := errors.AsType[*exec.ExitError](err); ok {
 		if ws, ok := e.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
-			return 128 + int(ws.Signal()), nil
+			return 128 + int(ws.Signal()), readyErr
 		}
-		return e.ExitCode(), nil
+		return e.ExitCode(), readyErr
 	}
-	return 0, err
+	return 0, errors.Join(err, readyErr)
 }
 
 // Read reads the output of the process; it returns io.EOF once no process
@@ -91,16 +126,53 @@ func (p *PTY) ClearScreen() error { return nil }
 // Pid returns the process's ID.
 func (p *PTY) Pid() int { return p.cmd.Process.Pid }
 
-// Close closes the terminal, which hangs up the processes that have it:
-// they get SIGHUP. It does not wait for them to exit.
-func (p *PTY) Close() error { return p.master.Close() }
+// Close hangs up the terminal and its process group. A group ignoring
+// SIGHUP gets SIGTERM after a grace period, then SIGKILL. It does not
+// wait for exit; Wait includes the group's shutdown.
+func (p *PTY) Close() error {
+	p.closeOnce.Do(func() {
+		p.mu.Lock()
+		p.closing = !p.reaped
+		active := p.closing
+		p.mu.Unlock()
+		if active {
+			_ = p.signal(syscall.SIGHUP)
+		}
+		p.closeErr = p.master.Close()
+		if !active {
+			return
+		}
+		go func() {
+			defer close(p.shutdown)
+			for _, sig := range []syscall.Signal{syscall.SIGTERM, syscall.SIGKILL} {
+				timer := time.NewTimer(closeGrace)
+				<-timer.C
+				_ = p.signal(sig)
+			}
+		}()
+	})
+	return p.closeErr
+}
+
+const closeGrace = 250 * time.Millisecond
 
 // Kill kills the process and those of its process group, which it leads.
 func (p *PTY) Kill() error {
-	if err := syscall.Kill(-p.cmd.Process.Pid, syscall.SIGKILL); err == nil {
-		return nil
+	return p.signal(syscall.SIGKILL)
+}
+
+func (p *PTY) signal(sig syscall.Signal) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.reaped {
+		return os.ErrProcessDone
 	}
-	return p.cmd.Process.Kill()
+	if p.groupSafe {
+		if err := syscall.Kill(-p.cmd.Process.Pid, sig); err != syscall.ESRCH {
+			return err
+		}
+	}
+	return p.cmd.Process.Signal(sig)
 }
 
 func setSize(f *os.File, cols, rows, width, height int) error {
