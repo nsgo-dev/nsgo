@@ -51,7 +51,7 @@ go tool nsgo test
 
 传入没有 `nsgo.yaml` 的目录（例如库或模块根目录）时，`test` 会处理其下的所有包；目录也可以像 Go 的包模式那样以 `/...` 结尾。它只接受一个目录，遇到第二个会报错退出：要测试多个目录，就传入它们共同的上级目录，或逐个运行。`go tool nsgo check` 以同样的方式选取并检查包。
 
-测试会检查响应式图的 goroutine 归属：信号和作用域应在应用的 goroutine 上访问，工作 goroutine 通过 `cx.Post` 调度。在应用空闲时从其他 goroutine 发起的调用会 panic，并提示使用 `Scope.Post`；其余情况由 `-race` 检出。引擎内部 panic 仍会使测试失败；发布的应用则停止受影响的引擎，并把堆栈报告给宿主。开发构建也检查归属，发布构建不包含这项检查；WebAssembly 开发构建也不使用 goroutine ID 检查，因为浏览器回调可能在浏览器管理的 goroutine 上恢复。
+测试会检查响应式图的 goroutine 归属：信号和作用域应在应用的 goroutine 上访问，工作 goroutine 通过 `cx.Post` 调度。在应用空闲时从其他 goroutine 发起的调用会 panic，并提示使用 `Scope.Post`；其余情况由 `-race` 检出。引擎内部 panic 仍会使测试失败；发布的应用则停止受影响的引擎，并把堆栈报告给宿主。开发构建也检查归属，发布构建不包含这项检查；WebAssembly 的开发构建和测试构建不使用 goroutine ID 检查，因为浏览器回调可能在浏览器管理的 goroutine 上恢复；其他测试检查照常进行。
 
 ## 在平台上运行
 
