@@ -57,6 +57,10 @@ type view struct {
 	props    driver.ViewProps
 	events   driver.EventMask
 	overflow driver.Bounds
+
+	// transformedKids is ItemOverflow's Transformed: a child may be drawn transformed, outside overflow.
+	transformedKids bool
+
 	animated *driver.AnimatedValues
 	moving   *motion     // its frame mid layout animation
 	trans    *transition // its style mid transition
@@ -520,7 +524,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 				s.appear(v, lb)
 			}
 		case driver.ItemOverflow:
-			v.overflow = it.Frame
+			v.overflow, v.transformedKids = it.Frame, it.Transformed
 		case driver.ItemMatch:
 			s.match(v, s.view(it.Before), lb)
 		case driver.ItemFrame:

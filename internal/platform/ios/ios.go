@@ -62,6 +62,9 @@ type view struct {
 	pressAt   driver.Event  // where the press began, and how
 	overflow  driver.Bounds // where its children reach outside it (ItemOverflow)
 
+	// transformedKids is ItemOverflow's Transformed: a child may be drawn transformed, outside overflow.
+	transformedKids bool
+
 	layout *apple.Layout // a text view's
 	box    driver.Bounds
 
@@ -1071,7 +1074,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 			}
 			s.appear(v, lb, it.Parent)
 		case driver.ItemOverflow:
-			v.overflow = it.Frame
+			v.overflow, v.transformedKids = it.Frame, it.Transformed
 		case driver.ItemMatch:
 			s.match(v, s.views[it.Before], lb)
 		case driver.ItemFrame:
@@ -1462,7 +1465,7 @@ func hitTest(self objc.ID, cmd objc.SEL, p apple.CGPoint, event objc.ID) objc.ID
 	b := objc.Send[apple.CGRect](self, selBounds)
 	frame := driver.Bounds{Size: driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}}
 	at := driver.Point{X: driver.Points(p.X - b.Origin.X), Y: driver.Points(p.Y - b.Origin.Y)}
-	own, children := driver.ReachView(frame.Size, &v.props, v.style.Clip || v.kind == driver.KindScroll, at)
+	own, children := driver.ReachView(frame.Size, &v.props, v.overflow, v.transformedKids, at)
 	if !frame.Contains(at) {
 		if objc.Send[bool](self, sel("isHidden")) || !objc.Send[bool](self, sel("isUserInteractionEnabled")) {
 			return 0

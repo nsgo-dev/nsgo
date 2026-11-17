@@ -30,6 +30,8 @@ type view struct {
 	props     driver.ViewProps
 	overflow  driver.Bounds // where its children reach outside it (ItemOverflow)
 	deleted   bool
+	// transformedKids is ItemOverflow's Transformed: a child may be drawn transformed, outside overflow.
+	transformedKids bool
 
 	// A text view's layout and where it goes in the view, its content
 	// and the UTF-16 range of it a selection highlights.
@@ -226,7 +228,7 @@ func (v *view) reach(p driver.Point) (self, children bool) {
 	if math.IsInf(float64(local.X), 0) || math.IsInf(float64(local.Y), 0) {
 		return false, false
 	}
-	return driver.ReachView(v.shownFrame().Size, &v.props, v.shownStyle().Clip || v.kind == driver.KindScroll, local)
+	return driver.ReachView(v.shownFrame().Size, &v.props, v.overflow, v.transformedKids, local)
 }
 
 // under reports whether p reaches v or its children.

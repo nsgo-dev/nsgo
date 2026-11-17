@@ -31,14 +31,10 @@ func IntoView(frame Bounds, m Matrix3D, p Point) (Point, bool) {
 	return m.Unproject(Point{X: p.X - frame.Origin.X, Y: p.Y - frame.Origin.Y})
 }
 
-// ReachView reports what p in a view's viewport may reach. Visible
-// overflow cannot be pruned by ItemOverflow's layout bounds: a child
-// or an animation can transform into this point from outside them.
-// A clip and a scroll viewport still stop children at their bounds;
-// hit slop extends only the view itself, in its own coordinates.
-func ReachView(size Size, props *ViewProps, clip bool, p Point) (self, children bool) {
-	self, children = Reach(Bounds{Size: size}, props, Bounds{}, p)
-	if !clip && (props == nil || props.PointerEvents == PointerEventsAuto || props.PointerEvents == PointerEventsBoxNone) {
+// ReachView is Reach for p in a view's viewport, its transform already undone, with the area and transformed flag ItemOverflow gave the view. A view whose children may be transformed has its children searched at any point, since a child or its animation can draw anywhere; the others keep the search to their bounds and layout area, so a hit test skips untransformed subtrees the point cannot reach. Hit slop extends only the view itself, in its own coordinates.
+func ReachView(size Size, props *ViewProps, area Bounds, transformed bool, p Point) (self, children bool) {
+	self, children = Reach(Bounds{Size: size}, props, area, p)
+	if transformed && !children && (props == nil || props.PointerEvents == PointerEventsAuto || props.PointerEvents == PointerEventsBoxNone) {
 		children = true
 	}
 	return self, children

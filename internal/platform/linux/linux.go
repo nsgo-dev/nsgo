@@ -990,7 +990,7 @@ func (w *window) apply(b *driver.MountBatch) {
 				w.delete(v)
 			}
 		case driver.ItemOverflow:
-			v.overflow = it.Frame
+			v.overflow, v.transformedKids = it.Frame, it.Transformed
 		case driver.ItemMatch:
 			w.match(v, w.view(it.Before), lb)
 		case driver.ItemFrame:

@@ -174,10 +174,7 @@ const (
 	// platforms that report header heights, before the screen is
 	// inserted and when it changes.
 	ItemScreen
-	// ItemOverflow gives the area ID's children cover outside its bounds
-	// (Frame, in its own coordinates), or zero Bounds when they stay
-	// inside, for platforms to look for a touch's target there; see
-	// Reach. Sent only when it changes.
+	// ItemOverflow gives the area ID's children cover outside its bounds by their layout frames (Frame, in its own coordinates), or zero Bounds when they stay inside, for platforms to look for a touch's target there; see Reach. Transformed says a child, or one of theirs, has been drawn transformed and may show anywhere, so a hit test looks in the children wherever the point is; see ReachView. Sent only when either changes.
 	ItemOverflow
 	// ItemBlockNative stops the scroll views around ID, the touch
 	// responder, from taking the touches until they end, or lets them
@@ -499,6 +496,8 @@ type MountItem struct {
 	// Point and Animated are ItemScrollTo's.
 	Point    Point
 	Animated bool
+	// Transformed is ItemOverflow's.
+	Transformed bool
 	// Clipboard is what an ItemReadClipboard reads.
 	Clipboard ClipboardRead
 	// Appearance is ItemAppearance's, RTL, Language and Forced

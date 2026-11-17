@@ -62,15 +62,11 @@ func mouseOf(e driver.Event) MouseEvent {
 	return MouseEvent{Position: e.Point, PagePosition: e.Page, Modifiers: e.Modifiers, PressedButton: e.Button}
 }
 
-// overflowArea returns the area n's children cover outside its bounds,
-// in its own coordinates and holding them, or zero Bounds when they stay
-// inside or n clips them: UIKit, AppKit and Android look for a touch's
-// target only inside a view's bounds, so platforms look in the children
-// of a view with an area too. Their own areas count, transforms do not.
-func (n *node) overflowArea(kids []*node) Bounds {
+// overflowArea returns the area n's children cover outside its bounds, in its own coordinates and holding them, or zero Bounds when they stay inside or n clips them: UIKit, AppKit and Android look for a touch's target only inside a view's bounds, so platforms look in the children of a view with an area too. Their own areas count by layout frames; transformed reports a child, or one of theirs, drawn transformed, which may show anywhere.
+func (n *node) overflowArea(kids []*node) (area Bounds, transformed bool) {
 	x, y := n.style.overflow()
 	if n.scroll != nil || n.confines || x == Hidden || y == Hidden || x == OverflowScroll || y == OverflowScroll || len(kids) == 0 {
-		return Bounds{}
+		return Bounds{}, false
 	}
 	w, h := n.frame.Size.Width, n.frame.Size.Height
 	x0, y0, x1, y1 := Points(0), Points(0), w, h
@@ -82,6 +78,7 @@ func (n *node) overflowArea(kids []*node) Bounds {
 		if c.style.Display == DisplayNone || c.hidden || c.attach != nil {
 			continue
 		}
+		transformed = transformed || c.transformed || c.sent.transformed
 		if c.frame.Size.Width > 0 && c.frame.Size.Height > 0 {
 			grow(c.frame)
 		}
@@ -91,9 +88,26 @@ func (n *node) overflowArea(kids []*node) Bounds {
 	}
 	const epsilon = 0.5
 	if x0 >= -epsilon && y0 >= -epsilon && x1 <= w+epsilon && y1 <= h+epsilon {
-		return Bounds{}
+		return Bounds{}, transformed
 	}
-	return Bounds{Origin: Point{X: x0, Y: y0}, Size: Size{Width: x1 - x0, Height: y1 - y0}}
+	return Bounds{Origin: Point{X: x0, Y: y0}, Size: Size{Width: x1 - x0, Height: y1 - y0}}, transformed
+}
+
+// mayTransform reports whether what n was last sent can draw it away from its frame: a transform, keyframes or a bound transform.
+func (n *node) mayTransform() bool {
+	vs := &n.sent.viewStyle
+	if vs.Transform != (driver.Transform{}) || vs.Animation.Keyframes != 0 {
+		return true
+	}
+	if a := n.anim; a != nil {
+		for _, p := range [...]driver.AnimatedProp{driver.PropTranslateX, driver.PropTranslateY, driver.PropScale, driver.PropScaleX,
+			driver.PropScaleY, driver.PropRotate, driver.PropRotateX, driver.PropRotateY} {
+			if a.sent[p] != 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // pointerMatrix is the transform sent to the platform, with a parent's

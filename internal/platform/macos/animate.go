@@ -360,6 +360,9 @@ func (v *view) styleLayer(vs *driver.ViewStyle) {
 	apple.RestyleLayer(v.native.Send(selLayer), shown, vs, v.native)
 	v.drawn, v.styled = *vs, true
 	v.transform = vs.Transform
+	if vs.Transform != (driver.Transform{}) || vs.Animation.Keyframes != 0 {
+		v.transformed = true
+	}
 }
 
 // animatesStyle reports whether v's style is drawn by restyle rather than

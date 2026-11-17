@@ -11,7 +11,12 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
+// pointerMatrix is the transform v's layer shows now, around its top left, with its parent's perspective.
 func (v *view) pointerMatrix() driver.Matrix3D {
+	if !v.transformed {
+		// A parent's perspective leaves an untransformed plane where it is.
+		return driver.Identity3D
+	}
 	m := apple.PointerMatrix(v.native.Send(selLayer))
 	if p := v.up; p != nil {
 		f := v.nativeFrame()

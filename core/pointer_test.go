@@ -61,6 +61,56 @@ func TestHitTestsFollowNestedTransformsAndClips(t *testing.T) {
 	}
 }
 
+func TestOverflowFlagsChildrenTransformedOutOfTheirParent(t *testing.T) {
+	var shift *Signal[Points]
+	var clip *Signal[bool]
+	pressed := 0
+	h := newHost(t, Size{Width: 400, Height: 400}, func(cx *Scope) Node {
+		shift, clip = NewSignal(cx, Points(0)), NewSignal(cx, false)
+		return View{Children: []Node{
+			View{TestID: "parent", StyleFunc: func() Style {
+				s := Style{Position: Absolute, Left: Pt(100), Top: Pt(100), Width: Pt(40), Height: Pt(40)}
+				if clip.Get() {
+					s.Overflow = Hidden
+				}
+				return s
+			}, Children: []Node{
+				View{TestID: "child", OnPress: func(PressEvent) { pressed++ }, StyleFunc: func() Style {
+					return Style{Width: Pt(20), Height: Pt(20), Transform: Transform{TranslateY: shift.Get()}}
+				}},
+			}},
+		}}
+	})
+	flag := func(b *driver.MountBatch) (sent, transformed bool) {
+		for _, it := range b.Items {
+			if it.Kind == driver.ItemOverflow && it.ID == h.find("parent").id {
+				sent, transformed = true, it.Transformed
+			}
+		}
+		return sent, transformed
+	}
+	// Children laid out inside an untransformed parent are not searched outside it.
+	if sent, _ := flag(h.commit()); sent || h.find("parent").sent.transformed {
+		t.Fatal("untransformed children flagged")
+	}
+	shift.Set(-100)
+	if sent, transformed := flag(h.commit()); !sent || !transformed {
+		t.Fatalf("transformed child: ItemOverflow sent %v, transformed %v", sent, transformed)
+	}
+	if h.tree.PressAt(driver.Event{Page: Point{X: 110, Y: 10}}); pressed != 1 {
+		t.Fatalf("presses where the child is drawn = %d", pressed)
+	}
+	// A transition back to none can still draw it elsewhere, so the flag stays.
+	shift.Set(0)
+	if sent, _ := flag(h.commit()); sent || !h.find("parent").sent.transformed {
+		t.Fatal("the flag went with the transform")
+	}
+	clip.Set(true)
+	if sent, transformed := flag(h.commit()); !sent || transformed {
+		t.Fatalf("clipped parent: ItemOverflow sent %v, transformed %v", sent, transformed)
+	}
+}
+
 func TestPointerEventsCarryPositionsAndModifiers(t *testing.T) {
 	var presses []PressEvent
 	var moves []MouseEvent

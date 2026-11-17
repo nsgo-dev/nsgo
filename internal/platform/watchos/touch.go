@@ -248,7 +248,7 @@ func hit(v *view, p driver.Point, match func(*view) bool) *view {
 	if !mapped {
 		return nil
 	}
-	self, children := driver.ReachView(f.Size, &v.props, v.shownStyle().Clip || v.kind == driver.KindScroll, local)
+	self, children := driver.ReachView(f.Size, &v.props, v.overflow, v.transformedKids, local)
 	if children {
 		local.X += v.offset.X
 		local.Y += v.offset.Y

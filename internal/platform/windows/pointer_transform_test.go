@@ -16,6 +16,8 @@ func TestPointerHitsFollowCurrentTransforms(t *testing.T) {
 	child := &view{id: 3, parent: parent, style: driver.DefaultViewStyle,
 		frame: driver.Bounds{Origin: driver.Point{X: 5, Y: 5}, Size: driver.Size{Width: 20, Height: 20}}}
 	root.children, parent.children = []*view{parent}, []*view{child}
+	// The core flags the views whose children may be drawn transformed.
+	root.transformedKids, parent.transformedKids = true, true
 	// A bound value can move independently of the engine's style.
 	child.animated = driver.AnimatedValues{Set: 1 << driver.PropTranslateY, TranslateY: -100}
 	at := driver.Point{X: 330, Y: 110}
@@ -34,11 +36,12 @@ func TestPointerHitsFollowCurrentTransforms(t *testing.T) {
 	if len(under) != 1 || under[0] != child {
 		t.Errorf("hover/wheel path = %v, want child", under)
 	}
-	parent.style.Clip = true
+	// A clip, or children never transformed, keep the search to the bounds.
+	parent.transformedKids = false
 	if got := hit(root, at, match); got != nil {
-		t.Error("clipped child takes pointer")
+		t.Error("child outside its unflagged parent takes pointer")
 	}
-	parent.style.Clip = false
+	parent.transformedKids = true
 	parent.props.PointerEvents = driver.PointerEventsBoxNone
 	if got := hit(root, at, match); got != child {
 		t.Error("box-none parent hides transformed child")

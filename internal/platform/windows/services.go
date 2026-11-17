@@ -228,7 +228,7 @@ func (v *view) reach(p driver.Point) (self, children bool) {
 	if math.IsInf(float64(local.X), 0) || math.IsInf(float64(local.Y), 0) {
 		return false, false
 	}
-	return driver.ReachView(frameOf(v).Size, &v.props, v.shownStyle().Clip || v.kind == driver.KindScroll, local)
+	return driver.ReachView(frameOf(v).Size, &v.props, v.overflow, v.transformedKids, local)
 }
 
 // under reports whether p reaches v or its children.

@@ -27,20 +27,22 @@ func TestUnprojectFindsTheDrawnPlane(t *testing.T) {
 
 func TestReachTransformedChildrenOutsideTheLayoutBounds(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		mode PointerEvents
-		clip bool
-		want bool
+		name        string
+		mode        PointerEvents
+		transformed bool
+		area        Bounds
+		want        bool
 	}{
-		{"auto", PointerEventsAuto, false, true},
-		{"box-none", PointerEventsBoxNone, false, true},
-		{"box-only", PointerEventsBoxOnly, false, false},
-		{"none", PointerEventsNone, false, false},
-		{"clipped", PointerEventsAuto, true, false},
-		{"clipped-box-none", PointerEventsBoxNone, true, false},
+		{"auto", PointerEventsAuto, true, Bounds{}, true},
+		{"box-none", PointerEventsBoxNone, true, Bounds{}, true},
+		{"box-only", PointerEventsBoxOnly, true, Bounds{}, false},
+		{"none", PointerEventsNone, true, Bounds{}, false},
+		// Untransformed children are pruned by their layout area.
+		{"untransformed", PointerEventsAuto, false, Bounds{}, false},
+		{"untransformed-area", PointerEventsAuto, false, Bounds{Origin: Point{Y: -100}, Size: Size{Width: 40, Height: 140}}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			self, children := ReachView(Size{Width: 40, Height: 40}, &ViewProps{PointerEvents: tc.mode}, tc.clip, Point{X: 10, Y: -90})
+			self, children := ReachView(Size{Width: 40, Height: 40}, &ViewProps{PointerEvents: tc.mode}, tc.area, tc.transformed, Point{X: 10, Y: -90})
 			if self || children != tc.want {
 				t.Fatalf("reach outside bounds = (%v, %v), want (false, %v)", self, children, tc.want)
 			}

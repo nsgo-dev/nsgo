@@ -19,7 +19,8 @@ func TestHitTestsFollowLayerTransforms(t *testing.T) {
 			n := objc.ID(classView).Send(selNew)
 			n.Send(selSetWantsLayer, true)
 			v := &view{native: n, content: n, surface: s, kind: driver.KindView, up: parent,
-				frame: f, framed: true, style: driver.ViewStyle{Opacity: 1, Transform: tr}}
+				frame: f, framed: true, style: driver.ViewStyle{Opacity: 1, Transform: tr}, transformed: tr != (driver.Transform{}),
+				transformedKids: true}
 			views[n] = v
 			n.Send(selSetFrame, apple.Rect(float64(f.Origin.X), float64(f.Origin.Y), float64(f.Size.Width), float64(f.Size.Height)))
 			if parent != nil {
@@ -41,9 +42,10 @@ func TestHitTestsFollowLayerTransforms(t *testing.T) {
 		if got := root.native.Send(sel("hitTest:"), apple.CGPoint{X: 115, Y: 115}); got == child.native {
 			t.Error("old layout position still hits child")
 		}
-		parent.style.Clip = true
+		// A clip, or children never transformed, keep the search to the bounds.
+		parent.transformedKids = false
 		if got := root.native.Send(sel("hitTest:"), apple.CGPoint{X: 330, Y: 110}); got == child.native {
-			t.Error("clipped transformed child still takes pointer")
+			t.Error("child outside its unflagged parent still takes pointer")
 		}
 	})
 }

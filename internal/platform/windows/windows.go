@@ -242,6 +242,8 @@ type view struct {
 	props    driver.ViewProps
 	overflow driver.Bounds // where its children reach outside it (ItemOverflow)
 	deleted  bool
+	// transformedKids is ItemOverflow's Transformed: a child may be drawn transformed, outside overflow.
+	transformedKids bool
 
 	// A text view's layout and where it goes in the view, its content
 	// and the UTF-16 range of it a selection highlights.
@@ -1329,7 +1331,7 @@ func (w *window) apply(b *driver.MountBatch) {
 				w.destroy(v)
 			}
 		case driver.ItemOverflow:
-			v.overflow = it.Frame
+			v.overflow, v.transformedKids = it.Frame, it.Transformed
 		case driver.ItemMatch:
 			w.match(v, w.view(it.Before), lb)
 		case driver.ItemFrame:

@@ -266,7 +266,7 @@ func (a *App) viewAt(p driver.Point, ok func(*View) bool) *View {
 		if !mapped {
 			return nil
 		}
-		self, children := driver.ReachView(v.Frame.Size, &v.Props, s.Clip || v.Kind == driver.KindScroll, local)
+		self, children := driver.ReachView(v.Frame.Size, &v.Props, driver.Bounds{}, !s.Clip && v.Kind != driver.KindScroll, local)
 		if children {
 			inner := driver.Point{X: local.X + v.Offset.X, Y: local.Y + v.Offset.Y}
 			for i := len(v.Children) - 1; i >= 0; i-- {

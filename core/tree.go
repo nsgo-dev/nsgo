@@ -253,6 +253,8 @@ type node struct {
 	hosted   []*node    // the overlays and modals this root view, modal or frame hosts
 	// confines is set on a view that holds views of an owner Confine confined that does not own it: their frame, which clips them and hosts their overlays.
 	confines bool
+	// transformed is set once the view has been sent a transform, keyframes or a bound transform, and stays set: a transition back to none still draws it elsewhere for a while, so its parent's hit tests look for it outside the layout (ItemOverflow).
+	transformed bool
 	// hidden is set, as the last layout found, for a node DisplayNone
 	// hides: its own or a shadow ancestor's, across hoisting too.
 	hidden bool
@@ -674,6 +676,8 @@ type sent struct {
 	children  []*node
 	layout    Bounds
 	overflow  Bounds // the area ItemOverflow last gave
+	// transformed is the flag ItemOverflow last gave.
+	transformed bool
 	// parent is the view the view was last inserted into, nil once
 	// removed; removed is set from then until it is inserted again.
 	parent  *node
@@ -2539,13 +2543,11 @@ func hit(n *node, p Point) (NodeID, Point) {
 // hitWith returns the innermost view at p in n's parent that ok accepts,
 // and p in it.
 func hitWith(n *node, p Point, ok func(*node) bool) (NodeID, Point) {
-	vs := &n.sent.viewStyle
-	m := n.pointerMatrix()
-	local, mapped := driver.IntoView(n.frame, m, p)
+	local, mapped := driver.IntoView(n.frame, n.pointerMatrix(), p)
 	if !mapped {
 		return 0, Point{}
 	}
-	self, inside := driver.ReachView(n.frame.Size, &n.props, vs.Clip || n.scroll != nil, local)
+	self, inside := driver.ReachView(n.frame.Size, &n.props, n.sent.overflow, n.sent.transformed, local)
 	if n.style.Display == DisplayNone || n.style.Visibility == VisibilityHidden || n.hidden || !self && !inside ||
 		(n.attach != nil && n.attach.cut) {
 		return 0, Point{}

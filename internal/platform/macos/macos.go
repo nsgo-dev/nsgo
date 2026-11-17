@@ -95,6 +95,9 @@ type view struct {
 	hover     objc.ID       // the tracking area of a view reporting hovers
 	moves     bool          // whether it reports moves
 	overflow  driver.Bounds // where its children reach outside it (ItemOverflow)
+
+	// transformedKids is ItemOverflow's Transformed: a child may be drawn transformed, outside overflow.
+	transformedKids bool
 	// focusBefore is what had the keyboard focus as a modal came.
 	focusBefore objc.ID
 
@@ -123,6 +126,9 @@ type view struct {
 	// up is the view the batches inserted v in, nil while v is out of
 	// the tree.
 	up *view
+
+	// transformed is set once the layer has drawn a transform or keyframes, and stays set as a transition back to none still plays: until then hit tests take the layer as untransformed without asking Core Animation.
+	transformed bool
 
 	image     *apple.ImageView
 	animation driver.ModalAnimation // a modal's
@@ -1746,7 +1752,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemMatch:
 			s.match(v, s.views[it.Before], lb)
 		case driver.ItemOverflow:
-			v.overflow = it.Frame
+			v.overflow, v.transformedKids = it.Frame, it.Transformed
 		case driver.ItemViewStyle:
 			if v.style.Cursor != it.ViewStyle.Cursor || v.style.Hidden != it.ViewStyle.Hidden {
 				s.repick = true
@@ -2209,7 +2215,7 @@ func reach(self objc.ID, cmd objc.SEL, p apple.CGPoint) objc.ID {
 	if !mapped {
 		return 0
 	}
-	own, children := driver.ReachView(frame.Size, &v.props, v.style.Clip || v.kind == driver.KindScroll, local)
+	own, children := driver.ReachView(frame.Size, &v.props, v.overflow, v.transformedKids, local)
 	at := apple.CGPoint{X: float64(local.X), Y: float64(local.Y)}
 	// Test native children ourselves: AppKit clips the search to layout
 	// frames and does not undo their layer transforms.
@@ -2289,7 +2295,7 @@ func (v *view) misses(at driver.Point) bool {
 	if !ok {
 		return true
 	}
-	own, children := driver.ReachView(frame.Size, &v.props, v.style.Clip || v.kind == driver.KindScroll, local)
+	own, children := driver.ReachView(frame.Size, &v.props, v.overflow, v.transformedKids, local)
 	return !own && !children
 }
 

@@ -713,9 +713,9 @@ func (t *Tree) emit(n *node) bool {
 		kidsMoved = true
 	}
 	if n != t.view && (self || kidsMoved) {
-		if area := n.overflowArea(kids); area != n.sent.overflow {
-			n.sent.overflow = area
-			t.items = append(t.items, driver.MountItem{Kind: driver.ItemOverflow, ID: n.id, Frame: area})
+		if area, transformed := n.overflowArea(kids); area != n.sent.overflow || transformed != n.sent.transformed {
+			n.sent.overflow, n.sent.transformed = area, transformed
+			t.items = append(t.items, driver.MountItem{Kind: driver.ItemOverflow, ID: n.id, Frame: area, Transformed: transformed})
 			moved = true
 		}
 	}
@@ -783,6 +783,10 @@ func (t *Tree) emitParts(n *node) bool {
 	}
 	if n.style.Animated != nil || n.anim != nil {
 		t.bindAnimated(n)
+	}
+	if !n.transformed && n.mayTransform() {
+		// Its parent's hit tests look for it anywhere from now on.
+		n.transformed, styled = true, true
 	}
 	if ev := n.events(); ev != n.sent.events {
 		n.sent.events = ev
