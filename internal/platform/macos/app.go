@@ -321,8 +321,12 @@ func (s *surface) destroy() {
 	}
 	window := s.window
 	if s.embedded {
+		// The host's View holds the native view until its Close releases it, so an embedded surface whose engine ends on a fault only stops.
 		s.native.Send(selRemoveFromSuperview)
-	} else if window != 0 {
+		s.close()
+		return
+	}
+	if window != 0 {
 		s.closePopup()
 		window.Send(selSetDelegate, objc.ID(0))
 		window.Send(sel("orderOut:"), objc.ID(0))
@@ -330,7 +334,7 @@ func (s *surface) destroy() {
 	s.close()
 	delete(views, s.native)
 	s.native.Send(selRelease)
-	if !s.embedded && window != 0 {
+	if window != 0 {
 		// Closed once the batch that destroyed it has returned.
 		apple.OnMain(func() {
 			window.Send(sel("close"))
