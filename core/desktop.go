@@ -72,6 +72,14 @@ func (cx *Scope) SetWindowConstraints(c WindowConstraints) {
 // OrderFront is the core's part of desktop.OrderFront, which apps use.
 func (cx *Scope) OrderFront() { cx.window(WindowCommand{Action: WindowOrderFront}) }
 
+// FrontmostApp is the core's part of desktop.Frontmost, which apps use: the application in front, read tracked, zero where the platform does not say or the current owner's Access refuses AccessFrontmostApp.
+func (cx *Scope) FrontmostApp() FrontmostApp {
+	if cx.denied(serviceFrontmostApp, "") {
+		return FrontmostApp{}
+	}
+	return cx.Env().frontmost.Get()
+}
+
 // SetMenuBar is the core's part of desktop.SetMenuBar, which apps use.
 func (cx *Scope) SetMenuBar(mode MenuBarMode) {
 	cx.window(WindowCommand{Action: WindowSetMenuBar, MenuBar: mode})

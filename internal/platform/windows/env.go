@@ -96,6 +96,7 @@ func (w *window) environment() driver.Environment {
 		WindowFrame:      w.windowFrame(),
 		Lifecycle:        w.lifecycle(),
 		Speak:            speakAvailable(),
+		FrontmostApp:     frontmostApp(),
 
 		// Only a window opened transparent has the composition that shows what is behind it (look.go).
 		CanMakeWindowsTransparent: w.canTransparent && !w.embedded,

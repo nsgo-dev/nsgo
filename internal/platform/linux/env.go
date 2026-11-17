@@ -108,6 +108,7 @@ func (w *window) environment() driver.Environment {
 
 		CanMakeWindowsTransparent: w.ownWindow() && displayComposites(),
 		CanSkipTaskbar:            w.ownWindow() && skipTaskbarHint(),
+		FrontmostApp:              frontmostApp(),
 	}
 }
 

@@ -336,6 +336,19 @@ A playing `Video` keeps the display on only on iOS, where `AVPlayer`'s `prevents
 
 `LocaleSettings` reports `FirstDayOfWeek`, `HourCycle` and `MeasurementSystem` independently of `Env.Locale`, so a localized app can follow the user's calendar, clock and measurement choices. A zero field means the platform did not report that choice.
 
+## The application in front
+
+`desktop.Frontmost`, NSGo's own as NSH has none ([#570](https://github.com/nsgo-dev/nsgo/issues/570)), is the application in front on the desktop, the app itself included: its ID, its name, its process ID and whether its frontmost window covers its display, so a desktop pet, an input method or a time tracker follows what the user works in. Each backend reports it with the environment, every window the same value, as it changes; `Scope.FrontmostApp` reads it from a signal `Env` keeps unexported, so code whose `Access` refuses `AccessFrontmostApp` reads it zero and never tracks it, as it says what else the user runs.
+
+| Target | The app in front | Follows it by | `FullScreen` |
+| --- | --- | --- | --- |
+| macOS | `NSWorkspace.frontmostApplication`: its bundle identifier, else its executable's path, and `localizedName` | `NSWorkspaceDidActivateApplicationNotification`, and `NSWorkspaceActiveSpaceDidChangeNotification` as an app enters or leaves full screen in a Space of its own | Its frontmost window at layer 0 in `CGWindowListCopyWindowInfo`, which needs no permission, covers a display, menu bar included |
+| Windows | `GetForegroundWindow`'s process, its path from `QueryFullProcessImageNameW` and its name from the file description of its version resource | `SetWinEventHook`: `EVENT_SYSTEM_FOREGROUND`, and `EVENT_OBJECT_LOCATIONCHANGE` of the process in front alone | The window covers its monitor and is neither `IsZoomed` with a caption or sizing frame, as a maximized one keeps, nor the desktop's own |
+| Linux on X11 | The root window's `_NET_ACTIVE_WINDOW`: `_GTK_APPLICATION_ID`, else `WM_CLASS`'s class, and `_NET_WM_PID` | `PropertyNotify` on the root window and on the window in front, through `GdkX11Display`'s `xevent` | `_NET_WM_STATE_FULLSCREEN` |
+| Wayland, phones, the web and mini programs | None | | |
+
+A UWP app on Windows reports its frame host, `ApplicationFrameHost.exe`, and a window that covers its display without full screen on macOS, as a zoomed one under a hidden menu bar and Dock, reports `FullScreen`; a full screen of an app's own that changes no Space is heard at the next activation ([roadmap](../roadmap.md#application-and-windows)).
+
 ## Appearance and quitting
 
 `SetAppearance` forces light or dark, and `nsgo.Appearance` starts the app in it. The core keeps the system's appearance beside the forced one and reports the one shown as `Env.Dark`, so platforms may report either. A subtree forces its own with `SetSubtreeAppearance` ([themes](themes.md#scope)).

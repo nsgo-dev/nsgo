@@ -1,6 +1,7 @@
 package desktop_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/core"
@@ -74,4 +75,57 @@ func TestWindowWorkspacesFollowTheEnvironment(t *testing.T) {
 	}
 	app.SetEnvironment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop, CanSetWindowWorkspaces: true})
 	app.Find("text:Everywhere")
+}
+
+func TestFrontmostFollowsTheAppInFront(t *testing.T) {
+	editor := desktop.FrontmostApp{ID: "com.example.editor", Name: "Editor", PID: 41}
+	player := desktop.FrontmostApp{ID: "com.example.player", Name: "Player", PID: 42, FullScreen: true}
+	var seen []desktop.FrontmostApp
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		cx.Effect(func() { seen = append(seen, desktop.Frontmost(cx)) })
+		return core.View{}
+	}, nsgotest.Environment(core.Environment{FrontmostApp: editor}))
+	app.SetEnvironment(core.Environment{FrontmostApp: player})
+	// Another change to the environment leaves the app in front alone.
+	app.SetEnvironment(core.Environment{FrontmostApp: player, Dark: true})
+	app.SetEnvironment(core.Environment{})
+	if want := []desktop.FrontmostApp{editor, player, {}}; !slices.Equal(seen, want) {
+		t.Fatalf("frontmost apps %v, want %v", seen, want)
+	}
+}
+
+// refuseAll is the Access of code that may reach nothing.
+type refuseAll struct{}
+
+func (refuseAll) Allows(core.AccessRequest) bool { return false }
+func (refuseAll) WebHosts() []string             { return nil }
+
+// onlyFrontmost allows the frontmost app alone.
+type onlyFrontmost struct{}
+
+func (onlyFrontmost) Allows(req core.AccessRequest) bool {
+	return req.Permission == core.AccessFrontmostApp
+}
+func (onlyFrontmost) WebHosts() []string { return nil }
+
+func TestFrontmostIsHeldToAccess(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		access core.Access
+		want   string
+	}{
+		{"refused", refuseAll{}, "text:none"},
+		{"granted", onlyFrontmost{}, "text:Editor"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+				cx.ProvideAccess(tc.access)
+				if name := desktop.Frontmost(cx).Name; name != "" {
+					return core.Text{Content: name}
+				}
+				return core.Text{Content: "none"}
+			}, nsgotest.Environment(core.Environment{FrontmostApp: desktop.FrontmostApp{ID: "com.example.editor", Name: "Editor"}}))
+			app.Find(tc.want)
+		})
+	}
 }

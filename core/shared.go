@@ -8,6 +8,8 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 type (
 	// DisplayInfo is one desktop display reported by Env.Displays.
 	DisplayInfo = driver.DisplayInfo
+	// FrontmostApp is the application in front on the desktop, which Scope.FrontmostApp returns: the core's part of desktop.FrontmostApp.
+	FrontmostApp = driver.FrontmostApp
 	// AndroidEventMapper is implemented by an Android component that
 	// receives the listener callbacks of its view itself.
 	AndroidEventMapper = driver.AndroidEventMapper

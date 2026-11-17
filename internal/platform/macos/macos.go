@@ -1087,6 +1087,7 @@ func (s *surface) environment() driver.Environment {
 		WindowFrame:      s.windowFrame(),
 		Lifecycle:        s.lifecycle(),
 		LaunchedAtLogin:  s.opts.LaunchedAtLogin,
+		FrontmostApp:     frontmostApp(),
 
 		// Any window of the surface's own turns transparent and leaves the Window menu (look.go); a panel's look is its own.
 		CanMakeWindowsTransparent: s.ownWindow(),

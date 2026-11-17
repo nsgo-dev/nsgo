@@ -101,6 +101,8 @@ var (
 
 	guideOnce                  sync.Once
 	guideLoaded                bool
+	windowListOnce             sync.Once
+	windowListLoaded           bool
 	cgWindowListCopyWindowInfo func(option, relativeTo uint32) objc.ID
 	cgEventSourceButtonState   func(state int32, button uint32) bool
 	cfRelease                  func(objc.ID)
@@ -109,9 +111,9 @@ var (
 	msgSendFloat               func(objc.ID, objc.SEL) float64
 )
 
-// loadGuide registers what the guide calls and its classes, once, on the main thread.
-func loadGuide() bool {
-	guideOnce.Do(func() {
+// loadWindowList registers what reading the window server's list of windows calls, once: the guide and the frontmost app's full screen read it.
+func loadWindowList() bool {
+	windowListOnce.Do(func() {
 		cg, err1 := purego.Dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", purego.RTLD_NOW|purego.RTLD_GLOBAL)
 		cf, err2 := purego.Dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", purego.RTLD_NOW|purego.RTLD_GLOBAL)
 		lib, err3 := purego.Dlopen("/usr/lib/libobjc.A.dylib", purego.RTLD_NOW|purego.RTLD_GLOBAL)
@@ -124,6 +126,17 @@ func loadGuide() bool {
 		purego.RegisterLibFunc(&objcPoolPush, lib, "objc_autoreleasePoolPush")
 		purego.RegisterLibFunc(&objcPoolPop, lib, "objc_autoreleasePoolPop")
 		purego.RegisterLibFunc(&msgSendFloat, lib, "objc_msgSend")
+		windowListLoaded = true
+	})
+	return windowListLoaded
+}
+
+// loadGuide registers what the guide calls and its classes, once, on the main thread.
+func loadGuide() bool {
+	guideOnce.Do(func() {
+		if !loadWindowList() {
+			return
+		}
 		registerGuideClasses()
 		guideLoaded = true
 	})

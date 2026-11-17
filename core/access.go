@@ -80,6 +80,8 @@ const (
 	AccessLocation           = "location"
 	AccessBackgroundLocation = "backgroundLocation"
 	AccessMotion             = "motion"
+	// AccessFrontmostApp is the application in front on the desktop (Scope.FrontmostApp), as it says what else the user runs.
+	AccessFrontmostApp = "frontmostApp"
 )
 
 // AccessInput is AccessRequest.Method for a web view's trusted input, AccessMedia for the devices its pages capture, and AccessCookies for a cookie written to the store every web view of the app shares, which no TSX capability grants.
@@ -150,27 +152,28 @@ type service string
 
 // The services core holds to Access.
 const (
-	serviceOpenURL         service = "openURL"
-	serviceStatusBar       service = "statusBar"
-	serviceNotifications   service = "notifications"
-	serviceBiometrics      service = "biometrics"
-	serviceSignInWithApple service = "signInWithApple"
-	servicePurchases       service = "purchases"
-	serviceSecrets         service = "secrets"
-	servicePermissions     service = "permissions"
-	serviceHost            service = "host"
-	serviceImage           service = "image"
-	serviceClipboard       service = "clipboard"
-	servicePicker          service = "picker"
-	serviceSpeech          service = "speech"
-	serviceSpeak           service = "speak"
-	serviceOverlay         service = "overlay"
-	serviceAudio           service = "audio"
-	serviceAuthSession     service = "authSession"
+	serviceOpenURL            service = "openURL"
+	serviceStatusBar          service = "statusBar"
+	serviceNotifications      service = "notifications"
+	serviceBiometrics         service = "biometrics"
+	serviceSignInWithApple    service = "signInWithApple"
+	servicePurchases          service = "purchases"
+	serviceSecrets            service = "secrets"
+	servicePermissions        service = "permissions"
+	serviceHost               service = "host"
+	serviceImage              service = "image"
+	serviceClipboard          service = "clipboard"
+	servicePicker             service = "picker"
+	serviceSpeech             service = "speech"
+	serviceSpeak              service = "speak"
+	serviceOverlay            service = "overlay"
+	serviceAudio              service = "audio"
+	serviceAuthSession        service = "authSession"
 	serviceLocation           service = "location"
 	serviceBackgroundLocation service = "backgroundLocation"
 	serviceMotion             service = "motion"
 	serviceWebCookies         service = "webCookies"
+	serviceFrontmostApp       service = "frontmostApp"
 )
 
 // serviceRule is how core holds a kind of service to Access.
@@ -187,27 +190,28 @@ type serviceRule struct {
 
 // services are the kinds of service gate knows, and how it holds each.
 var services = map[service]serviceRule{
-	serviceOpenURL:         {permission: AccessOpenURL},
-	serviceStatusBar:       {permission: AccessStatusBar},
-	serviceNotifications:   {permission: AccessNotifications},
-	serviceBiometrics:      {permission: AccessBiometrics},
-	serviceSignInWithApple: {permission: AccessSignInWithApple},
-	servicePurchases:       {permission: AccessPurchases},
-	serviceSecrets:         {permission: AccessSecrets},
-	servicePermissions:     {permission: AccessPermissions},
-	serviceHost:            {permission: AccessHost},
-	serviceImage:           {permission: AccessNetwork, source: true},
-	serviceClipboard:       {permission: AccessClipboard, runtimeOnly: true},
-	servicePicker:          {permission: AccessPicker, runtimeOnly: true},
-	serviceSpeech:          {permission: AccessSpeech, runtimeOnly: true},
-	serviceSpeak:           {permission: AccessTextToSpeech},
-	serviceOverlay:         {permission: AccessOverlay},
-	serviceAudio:           {permission: AccessAudio},
-	serviceAuthSession:     {permission: AccessAuthSession},
+	serviceOpenURL:            {permission: AccessOpenURL},
+	serviceStatusBar:          {permission: AccessStatusBar},
+	serviceNotifications:      {permission: AccessNotifications},
+	serviceBiometrics:         {permission: AccessBiometrics},
+	serviceSignInWithApple:    {permission: AccessSignInWithApple},
+	servicePurchases:          {permission: AccessPurchases},
+	serviceSecrets:            {permission: AccessSecrets},
+	servicePermissions:        {permission: AccessPermissions},
+	serviceHost:               {permission: AccessHost},
+	serviceImage:              {permission: AccessNetwork, source: true},
+	serviceClipboard:          {permission: AccessClipboard, runtimeOnly: true},
+	servicePicker:             {permission: AccessPicker, runtimeOnly: true},
+	serviceSpeech:             {permission: AccessSpeech, runtimeOnly: true},
+	serviceSpeak:              {permission: AccessTextToSpeech},
+	serviceOverlay:            {permission: AccessOverlay},
+	serviceAudio:              {permission: AccessAudio},
+	serviceAuthSession:        {permission: AccessAuthSession},
 	serviceLocation:           {permission: AccessLocation},
 	serviceBackgroundLocation: {permission: AccessBackgroundLocation},
 	serviceMotion:             {permission: AccessMotion},
 	serviceWebCookies:         {permission: AccessWebView, method: AccessCookies},
+	serviceFrontmostApp:       {permission: AccessFrontmostApp},
 }
 
 // gate is the refusal of a service of kind for resource by the current owner's Access, as services holds it; a kind services lacks is refused.

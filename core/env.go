@@ -51,6 +51,8 @@ type Env struct {
 	appearance     *Signal[Appearance]
 
 	launchedAtLogin *Signal[bool]
+	// frontmost is the application in front, which only Scope.FrontmostApp reads, as Access holds it.
+	frontmost *Signal[FrontmostApp]
 	// systemDark is the system's appearance, which a forced one hides.
 	systemDark bool
 	material   *Signal[WindowMaterial]
@@ -114,6 +116,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		appClip:          NewSignal(cx, false),
 		openedURL:        NewSignal(cx, ""),
 		launchedAtLogin:  NewSignal(cx, false),
+		frontmost:        NewSignal(cx, FrontmostApp{}),
 		appearance:       NewSignal(cx, AppearanceSystem),
 		appleKeys:        NewSignal(cx, false),
 		material:         NewSignal(cx, WindowMaterialNone),
@@ -226,6 +229,7 @@ func (e *Env) set(v Environment) {
 	e.appClip.Set(v.AppClip)
 	e.openedURL.Set(v.OpenedURL)
 	e.launchedAtLogin.Set(v.LaunchedAtLogin)
+	e.frontmost.Set(v.FrontmostApp)
 	e.material.Set(v.WindowMaterial)
 	e.verticalBar.Set(v.VerticalBarEdge)
 	e.headers = [2]Points{v.HeaderHeight, max(v.LargeHeaderHeight, v.HeaderHeight)}
