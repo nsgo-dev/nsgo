@@ -108,8 +108,10 @@ func mountCanvas(s *surface, holder, id, parent driver.NodeID, w, h driver.Point
 }
 
 func TestCanvasScrollZoomReachesNewSubtrees(t *testing.T) {
-	s, _ := canvasZoomSurface(t)
+	s, existing := canvasZoomSurface(t)
 	s.zoomCommand(s.view(2), &driver.ZoomRequest{Scale: 3}, false)
+	// The zoom's replay has run, so it cannot be what sharpens the new canvas.
+	waitCanvasPixels(t, existing, 600)
 	// The canvas draws while its holder is still detached, so only the holder's insert can find the zoom.
 	canvas := mountCanvas(s, 6, 7, 2, 100, 100)
 	waitCanvasPixels(t, canvas, 600)

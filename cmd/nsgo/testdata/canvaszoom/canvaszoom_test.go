@@ -116,7 +116,8 @@ func TestCanvasMountedAfterZoomIsSharp(t *testing.T) {
 		return zoomScroll(&ref, core.Show{When: shown.Get, Then: func(*core.Scope) core.Node { return lineCanvas(&draws) }})
 	}, nsgotest.Size(300, 300))
 	a.Post(func() { ref.ZoomTo(3, &core.Point{}, false) })
-	a.Settle()
+	// Past the zoom's replay, so only the mount can sharpen the new canvas.
+	a.Advance(500 * time.Millisecond)
 	a.Post(func() { shown.Set(true) })
 	checkLine(t, a, 3)
 }
