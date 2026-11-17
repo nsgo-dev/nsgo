@@ -100,6 +100,12 @@ jobs:
         run: go tool nsgo test -run '^TestOnMainExitPropagation$' ./internal/platform/macos -- -race
       - name: Test macOS backend
         run: go tool nsgo test ./internal/platform/macos
+      - name: Test simulator process results
+        env:
+          NSGO_SIMULATOR_E2E: "1"
+        run: |
+          go tool nsgo test -run '^TestSimulatorProcessResults$' ./cmd/nsgo
+          go tool nsgo test -target ios_simulator -timeout 30s -run '^TestFoldGeometry$' ./internal/platform/ios
       - name: Test native input isolation
         run: go tool nsgo test -target macos ./testdata/inputisolation
       - name: Test keyboard activation

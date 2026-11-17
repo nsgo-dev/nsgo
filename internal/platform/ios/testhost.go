@@ -37,7 +37,8 @@ type host struct{}
 func (host) Main(run func() int) {
 	sceneReady = make(chan struct{})
 	runner = newSurface(nil, Options{ID: "dev.nsgo.test"})
-	// On an iPhone, devicectl bridges the app's standard output but not its exit code: the tool's token marks where this run's output starts and what it exits with, as Android's host marks its log.
+	// The launchers bridge output but not the app's exit status: the token
+	// marks this run and its result, including a fast simulator test.
 	token, marked := os.LookupEnv("NSGO_TEST_RUN")
 	if marked {
 		fmt.Printf("nsgo-test-start %s\n", token)

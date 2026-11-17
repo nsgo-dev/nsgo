@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -63,5 +64,49 @@ func TestReadMarkedRunWithoutAnExitMark(t *testing.T) {
 	}
 	if _, err := readMarkedRun(strings.NewReader("nsgo-test-start t1\nnsgo-test-exit t1 x\n"), "t1", &strings.Builder{}, func() error { return ended }); err == nil || err == ended {
 		t.Errorf("a mark without a code: %v", err)
+	}
+}
+
+// Exercise the launcher process itself: simctl can fail after a fast app has
+// already reported its result, or succeed after the app has crashed.
+func TestSimulatorTestReadsTheAppsExitCode(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, output string
+		wantCode           int
+		wantError          string
+	}{
+		{name: "fast app before launch failure", body: `printf 'nsgo-test-start %s\n--- PASS: TestFast (0.00s)\nnsgo-test-exit %s 0\n' "$SIMCTL_CHILD_NSGO_TEST_RUN" "$SIMCTL_CHILD_NSGO_TEST_RUN"
+echo 'The process did launch, but has since exited or crashed' >&2
+exit 3
+`, output: "--- PASS: TestFast", wantCode: 0},
+		{name: "failed app with successful launcher", body: `printf 'nsgo-test-start %s\n--- FAIL: TestFast (0.00s)\nnsgo-test-exit %s 7\n' "$SIMCTL_CHILD_NSGO_TEST_RUN" "$SIMCTL_CHILD_NSGO_TEST_RUN"
+`, output: "--- FAIL: TestFast", wantCode: 7},
+		{name: "crashed app with successful launcher", body: `printf 'nsgo-test-start %s\n=== RUN   TestCrash\n' "$SIMCTL_CHILD_NSGO_TEST_RUN"
+echo 'panic: simulator crash fixture' >&2
+`, output: "panic: simulator crash fixture", wantCode: -1, wantError: "without its exit code"},
+		{name: "launch failure", body: "echo 'Simulator device failed to launch' >&2\nexit 4\n", wantCode: -1, wantError: "launch"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			checkXcrun(t, tc.body)
+			var output strings.Builder
+			code, err := (simulatorTest{udid: "simulator", id: "dev.nsgo.test"}).run(t.Context(), []string{"-test.run=^TestFast$"}, nil, &output)
+			if code != tc.wantCode || tc.wantError == "" && err != nil || tc.wantError != "" && (err == nil || !strings.Contains(err.Error(), tc.wantError)) {
+				t.Fatalf("code=%d err=%v, want code=%d error=%q; output:\n%s", code, err, tc.wantCode, tc.wantError, output.String())
+			}
+			if !strings.Contains(output.String(), tc.output) {
+				t.Fatalf("output lost %q: %s", tc.output, output.String())
+			}
+		})
+	}
+}
+
+func TestSimulatorTestTimeout(t *testing.T) {
+	checkXcrun(t, "case \"$2\" in terminate) exit 0;; esac\nexec sleep 30\n")
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+	defer cancel()
+	var output strings.Builder
+	code, err := (simulatorTest{udid: "simulator", id: "dev.nsgo.test", timeout: 30 * time.Millisecond}).run(ctx, nil, nil, &output)
+	if code != -1 || err == nil || !strings.Contains(err.Error(), "30ms") {
+		t.Fatalf("code=%d err=%v", code, err)
 	}
 }

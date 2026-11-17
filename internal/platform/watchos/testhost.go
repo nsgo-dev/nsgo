@@ -34,9 +34,17 @@ func (host) Main(run func() int) {
 	hostReady = make(chan struct{})
 	ready := hostReady
 	s = newSurface(nil, Options{ID: "dev.nsgo.test"})
+	token, marked := os.LookupEnv("NSGO_TEST_RUN")
+	if marked {
+		fmt.Printf("nsgo-test-start %s\n", token)
+	}
 	go func() {
 		<-ready
-		os.Exit(run())
+		code := run()
+		if marked {
+			fmt.Printf("nsgo-test-exit %s %d\n", token, code)
+		}
+		os.Exit(code)
 	}()
 	runHost()
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -31,27 +32,82 @@ func iosTestRunner(ctx context.Context, p *project, sys *appleOS, dir string, op
 	if err := run(ctx, "xcrun", "simctl", "install", udid, app); err != nil {
 		return targetRunner{}, err
 	}
-	return targetRunner{
-		run: func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
-			cmd := exec.CommandContext(ctx, "xcrun", append([]string{"simctl", "launch", "--console-pty",
-				"--terminate-running-process", udid, p.ID}, args...)...)
-			cmd.Env = os.Environ()
-			for _, kv := range env {
-				cmd.Env = append(cmd.Env, "SIMCTL_CHILD_"+kv)
-			}
-			cmd.Stdout, cmd.Stderr = out, out
-			err := cmd.Run()
-			if ctx.Err() != nil {
-				exec.Command("xcrun", "simctl", "terminate", udid, p.ID).Run()
-				return -1, testContextError(ctx, opts.timeout)
-			}
-			if exit, ok := err.(*exec.ExitError); ok {
-				return exit.ExitCode(), nil
-			}
-			return 0, err
-		},
-		close: func() { exec.Command("xcrun", "simctl", "terminate", udid, p.ID).Run() },
-	}, nil
+	simulator := simulatorTest{udid: udid, id: p.ID, timeout: opts.timeout}
+	hosted, err := linksPlatform(ctx, p, sys.target+"_simulator")
+	if err != nil {
+		return targetRunner{}, err
+	}
+	if !hosted {
+		simulator.binary = filepath.Join(app, p.Name)
+	}
+	return targetRunner{run: simulator.run, close: simulator.stop}, nil
+}
+
+type simulatorTest struct {
+	udid, id string
+	binary   string // a library without the native host runs directly in the simulator
+	timeout  time.Duration
+}
+
+func (s simulatorTest) stop() {
+	exec.Command("xcrun", "simctl", "terminate", s.udid, s.id).Run()
+}
+
+func (s simulatorTest) run(ctx context.Context, args, env []string, out io.Writer) (int, error) {
+	if s.binary != "" {
+		cmd := exec.CommandContext(ctx, "xcrun", append([]string{"simctl", "spawn", s.udid, s.binary}, args...)...)
+		cmd.Env = os.Environ()
+		for _, kv := range env {
+			cmd.Env = append(cmd.Env, "SIMCTL_CHILD_"+kv)
+		}
+		cmd.Stdout, cmd.Stderr = out, out
+		err := cmd.Run()
+		if ctx.Err() != nil {
+			return -1, testContextError(ctx, s.timeout)
+		}
+		if exit, ok := err.(*exec.ExitError); ok {
+			return exit.ExitCode(), nil
+		}
+		if err != nil {
+			return -1, err
+		}
+		return 0, nil
+	}
+	token := strconv.FormatInt(time.Now().UnixNano(), 36)
+	cmd := exec.CommandContext(ctx, "xcrun", append([]string{"simctl", "launch", "--console-pty",
+		"--terminate-running-process", s.udid, s.id}, args...)...)
+	cmd.Env = os.Environ()
+	for _, kv := range env {
+		cmd.Env = append(cmd.Env, "SIMCTL_CHILD_"+kv)
+	}
+	cmd.Env = append(cmd.Env, "SIMCTL_CHILD_NSGO_TEST_RUN="+token)
+	logs, err := cmd.StdoutPipe()
+	if err != nil {
+		return -1, err
+	}
+	cmd.Stderr = cmd.Stdout
+	if err := cmd.Start(); err != nil {
+		return -1, err
+	}
+	var captured bytes.Buffer
+	code, readErr := readMarkedRun(io.TeeReader(logs, &captured), token, out, func() error {
+		return errors.New("the simulator app ended without its exit code")
+	})
+	waitErr := cmd.Wait()
+	if ctx.Err() != nil {
+		s.stop()
+		return -1, testContextError(ctx, s.timeout)
+	}
+	if readErr != nil {
+		if !bytes.Contains(captured.Bytes(), []byte("nsgo-test-start "+token)) {
+			out.Write(captured.Bytes())
+		}
+		if waitErr != nil {
+			return -1, fmt.Errorf("launch simulator app: %w", waitErr)
+		}
+	}
+	// A fast app may report its result before simctl fails to attach.
+	return code, readErr
 }
 
 // iosDeviceTestRunner signs the test build and installs it on an iPhone (-device's, else the only one connected), as nsgo dev -target ios does, and launches it with devicectl for each test, the test's environment as DEVICECTL_CHILD_ variables. devicectl bridges the app's standard output but not its exit code, so the test host marks this run's output and its code with the run's token.
