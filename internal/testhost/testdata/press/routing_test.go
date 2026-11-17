@@ -72,18 +72,18 @@ func TestPressRoutingUsesNestedTransforms(t *testing.T) {
 	var presses []core.PressEvent
 	var backdrop int
 	app := nsgotest.Start(t, func(*core.Scope) core.Node {
-		return core.View{TestID: "root", Style: core.Style{Width: core.Pt(400), Height: core.Pt(400)},
+		return core.View{TestID: "root", Style: core.Style{Width: core.Pt(300), Height: core.Pt(300)},
 			OnPress: func(core.PressEvent) { backdrop++ }, Children: []core.Node{
 				core.View{PointerEvents: core.PointerEventsBoxNone, Style: core.Style{Position: core.Absolute,
 					Left: core.Pt(100), Top: core.Pt(100), Width: core.Pt(40), Height: core.Pt(40),
 					Transform: core.Transform{Rotate: 90, Scale: 2}}, Children: []core.Node{
 					core.View{Style: core.Style{Position: core.Absolute, Left: core.Pt(5), Top: core.Pt(5),
-						Width: core.Pt(20), Height: core.Pt(20), Transform: core.Transform{TranslateY: -100}},
+						Width: core.Pt(20), Height: core.Pt(20), Transform: core.Transform{TranslateY: -60}},
 						OnPress: func(e core.PressEvent) { presses = append(presses, e) }},
 				}},
 			}}
-	}, nsgotest.Size(400, 400))
-	app.PressAt("id:root", core.Point{X: 330, Y: 110})
+	}, nsgotest.Size(300, 300))
+	app.PressAt("id:root", core.Point{X: 250, Y: 110})
 	if len(presses) != 1 || math.Abs(float64(presses[0].Position.X-10)) > .5 || math.Abs(float64(presses[0].Position.Y-10)) > .5 {
 		t.Fatalf("transformed press = %+v, want local (10,10)", presses)
 	}
