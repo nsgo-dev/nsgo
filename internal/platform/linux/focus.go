@@ -175,13 +175,13 @@ func (w *window) tab(back bool) bool {
 func (w *window) controlKey(keyval, state uint32, repeat bool) bool {
 	v := w.controlFocus
 	if !w.focusableView(v) || !v.events.Pressable() ||
-		(keyval != gdkReturn && keyval != gdkKPEnter && keyval != gdkSpace) || state&(gdkShift|gdkControl|gdkAlt|gdkSuper|gdkMeta) != 0 {
+		(keyval != gdkReturn && keyval != gdkKPEnter && keyval != gdkSpace) {
 		return false
 	}
 	if !repeat {
 		for _, kind := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp, driver.EventPress} {
 			if v.events.Has(kind) {
-				w.engine.Dispatch(driver.Event{Kind: kind, ID: v.id, Index: -1, Count: 1})
+				w.engine.Dispatch(driver.Event{Kind: kind, ID: v.id, Index: -1, Count: 1, Modifiers: modifiers(state)})
 			}
 		}
 	}

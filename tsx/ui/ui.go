@@ -147,7 +147,7 @@ func init() {
 		"ToggleGroup": ui.ToggleGroup{}, "Toolbar": ui.Toolbar{}, "ToolbarGroup": ui.ToolbarGroup{}, "ToolbarSeparator": ui.ToolbarSeparator{},
 	}, options(tsx.Omit("Scroll"))...)
 	tsx.Register(module, map[string]core.Node{"Checkbox": ui.Checkbox{}, "Radio": ui.Radio{}, "Switch": ui.Switch{}},
-		options(tsx.Event("OnChange", "checked"))...)
+		options(tsx.Event("OnChange", "checked"), tsx.Event("OnChangeEvent", "checked", "press"))...)
 	tsx.Register(module, map[string]core.Node{"ToggleButton": ui.ToggleButton{}}, options(tsx.Event("OnChange", "on"))...)
 	tsx.Register(module, map[string]core.Node{
 		"NumberInput": ui.NumberInput{}, "OtpInput": ui.OtpInput{}, "Rating": ui.Rating{}, "Select": ui.Select[string]{},

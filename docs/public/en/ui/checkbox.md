@@ -29,6 +29,22 @@ ui.Checkbox{
 }
 ```
 
+## Press modifiers
+
+Use `OnChangeEvent` instead of `OnChange` when a list needs Shift-press range selection:
+
+```go
+ui.Checkbox{Checked: done.Get, Text: "Remember me", OnChangeEvent: func(next bool, press core.PressEvent) {
+	if press.Modifiers.Shift {
+		chooseRange(next)
+		return
+	}
+	done.Set(next)
+}}
+```
+
+When set, this callback replaces `OnChange`; the app still updates the value. Desktop and web keyboard activation preserves modifiers after app shortcuts. TSX's `onChangeEvent` receives `{ checked, press }`.
+
 ## Accessibility
 
 The checkbox reports `RoleCheckbox` and its checked or indeterminate state. Its name is `Text`, `Label` or the children's text. Space toggles it when it has the keyboard focus, and a screen reader announces the new state.

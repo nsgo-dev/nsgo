@@ -29,6 +29,22 @@ ui.Checkbox{
 }
 ```
 
+## 修饰键
+
+列表需要 Shift 按压选择范围时，用 `OnChangeEvent` 替代 `OnChange`：
+
+```go
+ui.Checkbox{Checked: done.Get, Text: "记住我", OnChangeEvent: func(next bool, press core.PressEvent) {
+	if press.Modifiers.Shift {
+		chooseRange(next)
+		return
+	}
+	done.Set(next)
+}}
+```
+
+设置后，此回调替代 `OnChange`，值仍由应用更新。桌面和 Web 的键盘激活在应用快捷键处理后保留修饰键。TSX 的 `onChangeEvent` 接收 `{ checked, press }`。
+
 ## 无障碍
 
 复选框报告 `RoleCheckbox` 及其选中或不确定状态。它的名称是 `Text`、`Label` 或子元素的文字。获得键盘焦点时空格切换它，读屏器会读出新状态。

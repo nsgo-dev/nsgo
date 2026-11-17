@@ -61,8 +61,9 @@ func focusMethods() []objc.MethodDef {
 				return
 			}
 			if !objc.Send[bool](event, sel("isARepeat")) {
+				mods := apple.Modifiers(objc.Send[uint](event, sel("modifierFlags")))
 				for _, k := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp, driver.EventPress} {
-					v.report(driver.Event{Kind: k, Index: -1})
+					v.report(driver.Event{Kind: k, Index: -1, Count: 1, Modifiers: mods})
 				}
 			}
 		}},
@@ -75,12 +76,10 @@ func focusMethods() []objc.MethodDef {
 }
 
 // activates reports whether a key event is Return, the keypad's Enter or
-// Space with no modifier.
+// Space. The keymap has already had the modified key.
 func activates(event objc.ID) bool {
-	const shift, control, option, command = 1 << 17, 1 << 18, 1 << 19, 1 << 20
 	code := objc.Send[uint16](event, sel("keyCode"))
-	return (code == 36 || code == 76 || code == 49) &&
-		objc.Send[uint](event, sel("modifierFlags"))&(shift|control|option|command) == 0
+	return code == 36 || code == 76 || code == 49
 }
 
 // focusable reports whether v may take the keyboard focus.

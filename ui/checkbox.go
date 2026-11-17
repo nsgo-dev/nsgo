@@ -20,7 +20,10 @@ type Checkbox struct {
 	Disabled      func() bool
 	// OnChange receives the value a press asks for.
 	OnChange func(checked bool)
-	Text     string
+	// OnChangeEvent receives the requested value and the originating press,
+	// including its modifier keys. When set, it replaces OnChange.
+	OnChangeEvent func(checked bool, press core.PressEvent)
+	Text          string
 	// Children replace Text.
 	Children []core.Node
 	// Label is what assistive technology reads, Text when empty.
@@ -48,7 +51,7 @@ func (c Checkbox) Render(cx *core.Scope) core.Node {
 	if label == "" {
 		label = c.Text
 	}
-	return base.Checkbox{Ref: c.Ref, LabelledBy: c.LabelledBy, Invalid: c.Invalid, Checked: c.Checked, Indeterminate: c.Indeterminate, Disabled: c.Disabled, OnChange: c.OnChange,
+	return base.Checkbox{Ref: c.Ref, LabelledBy: c.LabelledBy, Invalid: c.Invalid, Checked: c.Checked, Indeterminate: c.Indeterminate, Disabled: c.Disabled, OnChange: c.OnChange, OnChangeEvent: c.OnChangeEvent,
 		Style: selectionRow.Merge(c.Style), StyleFunc: func() core.Style { return core.Style{FocusVisible: FocusRing(cx, 2)} },
 		IndicatorStyle: box, IndicatorStyleFunc: func() core.Style {
 			on := &core.Style{Background: colors.AccentFill(), BorderColor: colors.AccentFill()}

@@ -814,17 +814,20 @@ func (a *App) Key(key string) {
 		return
 	}
 	if a.tabs() {
-		switch k {
-		case "tab", "shift+tab":
+		if k == "tab" || k == "shift+tab" {
 			a.moveFocus(k == "shift+tab")
 			a.done()
 			return
-		case "enter", "space":
-			// Return or Space press the pressable the keyboard focus is on.
+		}
+		parts := strings.Split(k, "+")
+		name := parts[len(parts)-1]
+		if name == "enter" || name == "space" {
+			// The keymap had the key first, including modified activations.
+			mods := a.keyModifiers(parts[:len(parts)-1])
 			for _, v := range a.shown() {
 				if v.Focused && v.Kind != driver.KindInput && pressable(v) {
 					for _, kind := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp, driver.EventPress} {
-						a.send(v, driver.Event{Kind: kind})
+						a.send(v, driver.Event{Kind: kind, Modifiers: mods})
 					}
 					a.done()
 					return
@@ -863,6 +866,32 @@ func (a *App) Key(key string) {
 		a.dispatch(driver.Event{Kind: driver.EventBack, ID: a.rootID})
 	}
 	a.done()
+}
+
+// keyModifiers reads normalized key prefixes; mod is Command on Apple
+// platforms and Control elsewhere, while meta is Command or the system key.
+func (a *App) keyModifiers(names []string) driver.Modifiers {
+	var mods driver.Modifiers
+	apple := a.env != nil && (a.env.OS == driver.OSMacOS || a.env.OS == driver.OSIOS)
+	for _, name := range names {
+		switch name {
+		case "ctrl":
+			mods.Control = true
+		case "alt":
+			mods.Alt = true
+		case "shift":
+			mods.Shift = true
+		case "meta":
+			mods.Platform = true
+		case "mod":
+			if apple {
+				mods.Platform = true
+			} else {
+				mods.Control = true
+			}
+		}
+	}
+	return mods
 }
 
 // focusKeyUse returns the keys the view with the keyboard focus uses itself (driver.FocusKeyUse), which the keymap's bindings that yield them leave it, as on a device.

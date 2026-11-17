@@ -253,7 +253,7 @@ func (d *declarer) file(from string) string {
 		types, index = from+"types", from+"index"
 	}
 	return "\n// Go components, declared from their types.\n" +
-		fmt.Sprintf("import type { ComponentHostProps, JSX, StyleProp, TextStyle, ViewStyle, YNode, Point, Size, Bounds, Edges, ImageAsset } from %q;\n", types) +
+		fmt.Sprintf("import type { ComponentHostProps, JSX, StyleProp, TextStyle, ViewStyle, YNode, Point, Size, Bounds, Edges, ImageAsset, PressEvent } from %q;\n", types) +
 		fmt.Sprintf("import type { AnimatedNode, AnimatedValue, Easing } from %q;\n\n", index) +
 		d.extras.String() + d.b.String()
 }
@@ -412,7 +412,7 @@ func (d *declarer) ts(t reflect.Type) string {
 	case regexpType:
 		return "string | RegExp"
 	case pressType:
-		return "{ position: Point; pagePosition: Point; clickCount: number }"
+		return "PressEvent"
 	case errorType:
 		return "Error | null"
 	}

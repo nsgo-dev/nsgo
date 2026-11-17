@@ -21,6 +21,9 @@ type Checkbox struct {
 	// and indeterminate, false from checked. The checkbox shows what
 	// Checked returns.
 	OnChange func(checked bool)
+	// OnChangeEvent receives the requested value and the originating press,
+	// including its modifier keys. When set, it replaces OnChange.
+	OnChangeEvent func(checked bool, press core.PressEvent)
 	// Role is what it is for assistive technology; RoleCheckbox when 0.
 	Role core.Role
 
@@ -63,9 +66,12 @@ func (c Checkbox) Render(*core.Scope) core.Node {
 	return core.View{Class: c.Class, Style: c.Style, StyleFunc: c.StyleFunc, Ref: c.Ref, LabelledBy: c.LabelledBy, Role: role, Label: c.Label, Hint: c.Hint,
 		TestID: c.TestID, OnLayout: c.OnLayout, Tooltip: c.Tooltip, HitSlop: c.HitSlop, Disabled: c.Disabled, Invalid: c.Invalid, Indeterminate: c.Indeterminate,
 		Checked: func() bool { return is(c.Checked) && !is(c.Indeterminate) },
-		OnPress: func(core.PressEvent) {
-			if c.OnChange != nil {
-				c.OnChange(is(c.Indeterminate) || !is(c.Checked))
+		OnPress: func(e core.PressEvent) {
+			next := is(c.Indeterminate) || !is(c.Checked)
+			if c.OnChangeEvent != nil {
+				c.OnChangeEvent(next, e)
+			} else if c.OnChange != nil {
+				c.OnChange(next)
 			}
 		},
 		Children: append([]core.Node{core.View{Class: c.IndicatorClass, Style: c.IndicatorStyle, StyleFunc: c.IndicatorStyleFunc,

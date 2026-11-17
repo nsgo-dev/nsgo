@@ -148,6 +148,7 @@ var baseRenames = []Option{
 	Rename("CellSelect", "cellSelectable"), Rename("NoResizeColumns", "resizableColumns"),
 	Rename("NoMoveColumns", "movableColumns"), Rename("NoBounce", "bounces"), Rename("Status", "transitionStatus"),
 	Event("OnChange", "checked"), Event("OnOpenChange", "open", "reason"), Event("OnResize", "sizes"),
+	Event("OnChangeEvent", "checked", "press"),
 	Event("OnColumnResize", "key", "width"), Event("OnSelectionChange", "selection"), Event("OnSortChange", "sort"),
 	Omit("Data", "DataStart"),
 	custom("Text", tableText, "data?: readonly unknown[]", "dataStart?: number"),

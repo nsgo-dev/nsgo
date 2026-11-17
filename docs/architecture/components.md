@@ -12,6 +12,8 @@ Each part a component styles takes Tailwind classes beside its style, as NSH's `
 
 `Invalid func() bool` on buttons, choices, value controls and their groups follows the app's validation through `core.View.Invalid`: `aria-invalid:` classes and `Style.AriaInvalid` update without remounting or disabling the control. Composite fields pass it to their native input, sliders to their adjustable thumbs, and decorative parts through `PartStates.Invalid`. `ColorPicker` shares it with its fields, areas, sliders and eyedropper; a part may also mark itself invalid.
 
+`Checkbox.OnChangeEvent` takes the requested value and its `core.PressEvent`, so an app can implement Shift-press range selection without reaching into the rendered view. When set, it replaces `OnChange`; the app still owns the value. `ui.Checkbox` forwards it, and TSX receives `{ checked, press }`.
+
 `Tabs` and `RadioGroup` are one Tab stop (`base/roving.go`, as NSH's `roving.rs`): the item the focus is on, else the selected tab or checked radio, else the first enabled one is `Focusable`. Their arrows, bound in the keymap only while an item has the focus, focus the item they reach and activate it, swapped right to left, and `Tabs` adds Home and End. The items sort in tree order (`Ref.Before`), since an `Each` may mount one between others. `HitSlop` goes to the view of `Button`, `Checkbox`, `Radio` and `Switch`; `Toggle` and `Link` also take `HitSlopFunc`, which follows what it reads.
 
 `Toolbar` and `ToggleGroup` are bars (`barItem`): groups of the same roving focus whose `Button`s, `Toggle`s and `Link`s join them, in a `ToolbarGroup` or a `ToggleGroup` inside a toolbar too, disabled with the bar. An arrow key only moves the focus, along a toolbar's `Axis`, and a toolbar's Tab comes back to the item it left where a toggle group's enters at the first pressed toggle. A `Menu`'s or `Popover`'s trigger is one of a bar's items, with what the app puts in it no item of its own, and with one of a toolbar's menus open the pointer over another's trigger moves there, as a menu bar does.
@@ -40,6 +42,7 @@ Each part a component styles takes Tailwind classes beside its style, as NSH's `
 | `Scrollbar`'s `axis`, vertical by default | `Horizontal` | Go's zero value is the default |
 | `Collapsible` and `AccordionPanel` keep their `reveal` as it changes | `Reveal` read as a `Collapsible` is made | Its two forms are different views |
 | Items ordered by the core's `watch_order` | `Ref.Before` as they are read | One way to order, as `Tabs` has |
+| `Checkbox` reports only the next value | Optional `OnChangeEvent` also reports the press | Apps need modifiers for range selection, while existing `OnChange` calls keep their contract |
 
 ## What only NSGo has
 

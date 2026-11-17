@@ -77,7 +77,7 @@ func pressMethods() []objc.MethodDef {
 			v.pressing.Store(true)
 			v.longFired.Store(false)
 			// A press from the remote is at the view's origin, with no
-			// keys, as one from the keyboard or a screen reader.
+			// keys, as one from a screen reader.
 			v.pressAt = driver.Event{Index: -1, Count: 1}
 			v.beginPress()
 		}},

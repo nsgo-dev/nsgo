@@ -87,12 +87,13 @@ func (w *window) focusKeyUse() driver.KeyUse {
 func (w *window) controlKey(vk, lParam uintptr) bool {
 	v := w.controlFocus
 	if !w.focusableView(v) || !v.events.Pressable() ||
-		(vk != vkReturn && vk != vkSpace) || keyDown(vkControl) || keyDown(vkShift) || keyDown(vkMenu) || keyDown(vkLWin) || keyDown(vkRWin) {
+		(vk != vkReturn && vk != vkSpace) {
 		return false
 	}
 	if !repeated(lParam) {
+		mods := modifiers()
 		for _, kind := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp, driver.EventPress} {
-			w.report(v, driver.Event{Kind: kind, ID: v.id, Index: -1, Count: 1})
+			w.report(v, driver.Event{Kind: kind, ID: v.id, Index: -1, Count: 1, Modifiers: mods})
 		}
 	}
 	return true

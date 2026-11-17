@@ -2737,7 +2737,9 @@ func (s *surface) keyDown(e js.Value) {
 	if e.Get("repeat").Bool() {
 		return // a held key presses once
 	}
-	s.send(v, driver.Event{Kind: driver.EventPressDown})
-	s.send(v, driver.Event{Kind: driver.EventPressUp})
-	s.send(v, driver.Event{Kind: driver.EventPress, Index: index})
+	mods := driver.Modifiers{Control: e.Get("ctrlKey").Bool(), Alt: e.Get("altKey").Bool(),
+		Shift: e.Get("shiftKey").Bool(), Platform: e.Get("metaKey").Bool()}
+	s.send(v, driver.Event{Kind: driver.EventPressDown, Modifiers: mods})
+	s.send(v, driver.Event{Kind: driver.EventPressUp, Modifiers: mods})
+	s.send(v, driver.Event{Kind: driver.EventPress, Index: index, Modifiers: mods})
 }
