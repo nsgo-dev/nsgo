@@ -6,12 +6,11 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Video plays a video in the platform's player, filling the view: the
-// picture fits it by ResizeMode, and Controls shows playback controls.
-// It plays unless Paused; Ref.Seek jumps to a time.
+// Video plays a video in the platform's player, filling the view: the picture fits it by ResizeMode, and Controls shows playback controls. It plays unless Paused; Ref.Seek jumps to a time.
+//
+// A video with an alpha channel shows what is behind its transparent pixels where the platform decodes the alpha: HEVC with alpha in a QuickTime or MPEG-4 file on macOS (iOS uses the same player layer but is unchecked), and VP8 or VP9 with alpha in WebM on Linux with GStreamer's codecalpha plug-in (gst-plugins-bad). On macOS, iOS, Windows and Linux, a local file whose alpha the platform cannot keep (WebM with alpha on Apple platforms; any clip with alpha on Windows, whose decoders no Windows machine has yet checked for alpha; HEVC with alpha on Linux, and VP8 or VP9 with alpha there without codecalpha) reports OnError instead of showing an opaque picture. Android and the web, and a remote source anywhere, play such clips as their decoder outputs them, which may be opaque. With Controls, AVKit's player draws black behind the picture.
 type Video struct {
-	// Source is a URL, a file path or an "asset:" path in the app's
-	// resources.
+	// Source is a URL, a file path or an "asset:" path in the app's resources.
 	Source     string
 	SourceFunc func() string
 	// Paused applies when the source opens and when its value changes. A non-repeating video stays at its end through other prop changes: set Paused true then false to replay it from the start, or Seek before the end, which plays on from there when Paused is false.

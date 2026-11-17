@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -20,6 +21,8 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/engine"
+	"github.com/nsgo-dev/nsgo/internal/platform/videoalpha"
+	alphaclips "github.com/nsgo-dev/nsgo/internal/platform/videoalpha/clips"
 )
 
 var (
@@ -1311,6 +1314,30 @@ func TestVideoLoadsDrawsSeeksAndEnds(t *testing.T) {
 	}
 	if total := int(w/8) * int(h/8); lit < total/4 {
 		t.Fatalf("only %d of %d sampled pixels are lit: the frame is not drawn", lit, total)
+	}
+}
+
+// TestVideoRefusesAlphaItCannotKeep opens VP9 with alpha in WebM, whose alpha Media Foundation does not decode: the video reports an error that says so instead of showing an opaque picture.
+func TestVideoRefusesAlphaItCannotKeep(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	source := filepath.Join(t.TempDir(), "alpha.webm")
+	if err := os.WriteFile(source, alphaclips.VP9Alpha, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	title := "nsgo-video-alpha"
+	app := func(cx *core.Scope) core.Node {
+		state := core.NewSignal(cx, "waiting")
+		cx.Effect(func() { cx.SetTitle(title + "|" + state.Get()) })
+		return core.Video{Source: source, Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100)},
+			OnLoad:  func(core.VideoInfo) { state.Set("load") },
+			OnError: func(err error) { state.Set("error " + err.Error()) }}
+	}
+	hwnd := startApp(t, title+"|waiting", app, 200, 200)
+	want := title + "|error " + source + ": " + alphaRefused(videoalpha.VP9)
+	if got := waitForTitle(t, hwnd, want, 10*time.Second); got != want {
+		t.Fatalf("title = %q, want %q", got, want)
 	}
 }
 

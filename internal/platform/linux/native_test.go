@@ -22,6 +22,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/engine"
+	alphaclips "github.com/nsgo-dev/nsgo/internal/platform/videoalpha/clips"
 )
 
 // nativeApp is the app a native test drives: a button and a field whose
@@ -1135,6 +1136,52 @@ func TestVideoReportsWhatGStreamerCannotPlay(t *testing.T) {
 	}
 }
 
+// TestVideoShowsWhatIsBehindItsTransparentPixels plays a VP9 WebM with alpha, transparent around a blue square, over a red view: the red shows through around the square. Without GStreamer's codecalpha plug-in it reports an error instead.
+func TestVideoShowsWhatIsBehindItsTransparentPixels(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	path := filepath.Join(t.TempDir(), "alpha.webm")
+	if err := os.WriteFile(path, alphaclips.VP9Alpha, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	title := "nsgo-native-" + t.Name()
+	app := func(cx *core.Scope) core.Node {
+		state := core.NewSignal(cx, "")
+		cx.Effect(func() { cx.SetTitle(title + "|" + state.Get()) })
+		return core.View{Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100), Background: driver.RGB(0xff0000)},
+			Children: []core.Node{core.Video{Source: path, Repeat: true, Muted: true,
+				Style:   core.Style{Width: driver.Pt(100), Height: driver.Pt(100)},
+				OnLoad:  func(core.VideoInfo) { state.Set("load") },
+				OnError: func(err error) { state.Set("error " + err.Error()) }}},
+		}
+	}
+	w := startTestWindow(t, app, Options{Title: title, Width: 360, Height: 240})
+	got := waitTitle(t, w, func(s string) bool { return strings.Contains(s, "|error ") || strings.HasSuffix(s, "|load") })
+	if strings.Contains(got, "|error ") {
+		if gstFeature("vp9alphadecodebin") {
+			t.Fatalf("title = %q, but GStreamer has vp9alphadecodebin", got)
+		}
+		if !strings.Contains(got, "codecalpha") {
+			t.Fatalf("title = %q, want the missing plug-in named", got)
+		}
+		t.Skip(got)
+	}
+	// The clip's square covers its middle half: 25 to 75 points here.
+	red := func(p []byte) bool { return p[2] > 200 && p[1] < 60 && p[0] < 60 && p[3] == 255 }
+	blue := func(p []byte) bool { return p[0] > 200 && p[1] < 60 && p[2] < 60 && p[3] == 255 }
+	var last pixels
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		last = w.surfacePixels(t)
+		if red(last.at(8, 8)) && red(last.at(92, 92)) && blue(last.at(50, 50)) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("want red around a blue square, have %v and %v at its corners and %v in its middle (BGRA) in %dx%d", last.at(8, 8), last.at(92, 92), last.at(50, 50), last.width, last.height)
+		}
+	}
+}
+
 // TestWebViewWithoutWebKitShowsAPlaceholder shows a web view where WebKitGTK 6.0 cannot be loaded, as NSH's Linux backend built without it does. It runs in a process of its own in which WebKit counts as missing, so it runs where WebKit is installed too and never loads it into the test process.
 func TestWebViewWithoutWebKitShowsAPlaceholder(t *testing.T) {
 	if testing.Short() {
@@ -1559,4 +1606,28 @@ func TestStickyListRowsStayPinned(t *testing.T) {
 		top, below := p.at(20, 12), p.at(20, 40)
 		return top[2] == 0xff && top[0] == 0 && below[0] == 0xff && below[2] == 0
 	})
+}
+
+// TestVideoRefusesAlphaItCannotKeep opens HEVC with alpha, whose alpha layer GStreamer cannot decode: the video reports an error that says so instead of showing an opaque picture.
+func TestVideoRefusesAlphaItCannotKeep(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	path := filepath.Join(t.TempDir(), "alpha.mov")
+	if err := os.WriteFile(path, alphaclips.HEVCAlpha, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	title := "nsgo-native-" + t.Name()
+	app := func(cx *core.Scope) core.Node {
+		state := core.NewSignal(cx, "")
+		cx.Effect(func() { cx.SetTitle(title + "|" + state.Get()) })
+		return core.Video{Source: path, Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100)},
+			OnLoad:  func(core.VideoInfo) { state.Set("load") },
+			OnError: func(err error) { state.Set("error " + err.Error()) }}
+	}
+	w := startTestWindow(t, app, Options{Title: title, Width: 360, Height: 240})
+	got := waitTitle(t, w, func(s string) bool { return strings.Contains(s, "|error ") || strings.HasSuffix(s, "|load") })
+	if !strings.Contains(got, "|error "+path+": GStreamer cannot decode the alpha channel of HEVC with alpha") {
+		t.Fatalf("title = %q, want the alpha refused", got)
+	}
 }

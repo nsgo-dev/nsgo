@@ -2,29 +2,15 @@
 
 package windows
 
-// Videos, as NSH's native/video.rs: Media Foundation's media engine in
-// frame server mode, through COM over syscall.
+// Videos, as NSH's native/video.rs: Media Foundation's media engine in frame server mode, through COM over syscall.
 //
-// The engine decodes on the window's Direct3D device, shared through a
-// DXGI device manager; Direct3D's multithread protection is on, since
-// Media Foundation's threads use the device too. While a video plays, a
-// frame client of the window (onFrame) asks the engine for a new frame at
-// every display frame (OnVideoStreamTick) and copies it into a texture
-// Direct2D draws as a bitmap (TransferVideoFrame): the picture is
-// ordinary view content, clipped, transformed and covered like any other.
+// The engine decodes on the window's Direct3D device, shared through a DXGI device manager; Direct3D's multithread protection is on, since Media Foundation's threads use the device too. While a video plays, a frame client of the window (onFrame) asks the engine for a new frame at every display frame (OnVideoStreamTick) and copies it into a texture Direct2D draws as a bitmap (TransferVideoFrame): the picture is ordinary view content, clipped, transformed and covered like any other.
 //
-// The engine reports to a notify object on its own threads; each
-// notification is posted to the main thread and finds its video again by
-// node ID, with the serial of the source it was opened for, so a late
-// notification of a replaced source is dropped.
+// The engine reports to a notify object on its own threads; each notification is posted to the main thread and finds its video again by node ID, with the serial of the source it was opened for, so a late notification of a replaced source is dropped.
 //
-// Events follow core's Video: EventLoadStart when a source opens,
-// EventLoad with its duration and size once its metadata is known,
-// EventProgress every ProgressInterval while playing, EventBuffer,
-// EventEnd (not for a repeating video: the engine loops without ending),
-// EventError. Controls draws a control bar of the
-// window's own (play and pause, a scrubber, the time) that drives the
-// engine directly, as the platforms' controls do.
+// Events follow core's Video: EventLoadStart when a source opens, EventLoad with its duration and size once its metadata is known, EventProgress every ProgressInterval while playing, EventBuffer, EventEnd (not for a repeating video: the engine loops without ending), EventError. Controls draws a control bar of the window's own (play and pause, a scrubber, the time) that drives the engine directly, as the platforms' controls do.
+//
+// A local file that declares alpha (videoalpha) reports EventError instead of playing, on the assumption that Media Foundation's decoders output its frames without the alpha, so the bitmap would be opaque. No Windows machine has checked that assumption; drawing the frames premultiplied where a decoder keeps the alpha is the alternative.
 
 import (
 	"fmt"
@@ -39,6 +25,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/videoalpha"
 )
 
 var (
@@ -231,6 +218,11 @@ func (vd *video) open() {
 		vd.report(driver.Event{Kind: driver.EventError, Text: source + ": cannot resolve the video's location"})
 		return
 	}
+	if c := videoalpha.Source(source, imageload.ResourceRoot); c != videoalpha.None {
+		vd.failed = true
+		vd.report(driver.Event{Kind: driver.EventError, Text: source + ": " + alphaRefused(c)})
+		return
+	}
 	engine, err := newMediaEngine(vd.w, vd.v.id, vd.serial)
 	if err != nil {
 		vd.failed = true
@@ -266,6 +258,11 @@ func videoURL(source, root string) (location string, ok bool) {
 		path = abs
 	}
 	return (&url.URL{Scheme: "file", Path: "/" + filepath.ToSlash(path)}).String(), true
+}
+
+// alphaRefused says why a video whose file declares alpha c does not play: Media Foundation's decoders are taken to output VP8 and VP9 without the alpha stream in the blocks' additions and HEVC without its alpha layer, so the picture would show opaque (unchecked on Windows).
+func alphaRefused(c videoalpha.Codec) string {
+	return "Media Foundation cannot decode the alpha channel of " + c.String() + ", so Windows would show the video opaque."
 }
 
 // stop shuts the engine down and forgets the source; the last frame

@@ -20,6 +20,8 @@ core.View{
 
 `core.WebView` 显示网页内容；给它绑定一个 `core.Ref` 即可调用 `Reload`、`GoBack` 和 `GoForward`。在原生目标上，这些命令让应用自己的 HTML 和 data 来源继续不受 `core.AccessWebSchemes` 限制；页面自己发起的新导航仍遵循访问策略。
 
+`core.Video` 用平台的播放器播放文件或 URL。带透明通道的视频会透出它后面的内容：macOS 上用 `.mov` 里带 alpha 的 HEVC（iOS 尚未验证），Linux 上用 WebM 里带 alpha 的 VP9，并需要 GStreamer 的 codecalpha 插件（`gstreamer1.0-plugins-bad`，Linux 安装包可以在 `nsgo.yaml` 里把它列为推荐依赖）。在 macOS、iOS、Windows 和 Linux 上，本地视频的透明通道无法保留时（Apple 平台上的 WebM、Windows 上的任何格式、Linux 上的 HEVC），`OnError` 会说明原因，而不是把视频显示在不透明的方框里。Android 和 Web 平台，以及各平台上的远程 URL，会按解码器的输出播放这类视频，可能是不透明的。
+
 ## 组件
 
 组件是一个接收 scope、返回元素的函数。它只运行一次，之后的变化由 signal 驱动。

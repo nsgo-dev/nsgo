@@ -11,16 +11,10 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
+	"github.com/nsgo-dev/nsgo/internal/platform/videoalpha"
 )
 
-// video is a video view's player, as NSH's Linux backend has it: a
-// GtkMediaFile, which GTK backs with GStreamer, shown by a GtkPicture, or
-// by a GtkVideo with GTK's playback controls when Controls is set, hosted
-// as web views are. GTK streams have no playback rate, so Rate is ignored
-// (warned once); a looping stream starts over without ending, so EventEnd
-// comes only for videos that do not repeat. A stream GStreamer cannot
-// play reports EventError, with a hint when a plug-in is missing, and
-// never EventLoad.
+// video is a video view's player, as NSH's Linux backend has it: a GtkMediaFile, which GTK backs with GStreamer, shown by a GtkPicture, or by a GtkVideo with GTK's playback controls when Controls is set, hosted as web views are. GTK streams have no playback rate, so Rate is ignored (warned once); a looping stream starts over without ending, so EventEnd comes only for videos that do not repeat. A stream GStreamer cannot play reports EventError, with a hint when a plug-in is missing, and never EventLoad. A file that declares alpha keeps it, as GTK composites the picture over what is behind it, where GStreamer decodes it (VP8 and VP9 with alpha, with the codecalpha plug-in), and reports EventError where it cannot rather than show the picture opaque.
 type video struct {
 	hosted
 	stream uintptr // GtkMediaFile, 0 without a source
@@ -119,6 +113,12 @@ func (w *window) openVideo(v *view) {
 	vd.completed = false
 	source := vd.config.Source
 	if source == "" {
+		return
+	}
+	if msg := alphaRefused(videoalpha.Source(source, imageload.ResourceRoot)); msg != "" {
+		vd.failed = true
+		log.Printf("nsgo: video %s: %s", source, msg)
+		w.report(v, driver.Event{Kind: driver.EventError, ID: v.id, Text: source + ": " + msg})
 		return
 	}
 	file := videoFile(source)
@@ -356,6 +356,25 @@ func videoProgressCallback(data uintptr) int32 {
 			Time: micros(gtkMediaStreamGetTimestamp(s)), Duration: micros(gtkMediaStreamGetDuration(s))})
 	}
 	return 1 // G_SOURCE_CONTINUE
+}
+
+// alphaRefused says why a video whose file declares alpha c cannot keep it, or "" when it can or declares none: GStreamer's codecalpha plug-in (gst-plugins-bad) decodes VP8 and VP9 with alpha, and nothing decodes HEVC's alpha layer. Played without it, the picture would show opaque.
+func alphaRefused(c videoalpha.Codec) string {
+	var decoder string
+	switch c {
+	case videoalpha.None:
+		return ""
+	case videoalpha.VP8:
+		decoder = "vp8alphadecodebin"
+	case videoalpha.VP9:
+		decoder = "vp9alphadecodebin"
+	default:
+		return "GStreamer cannot decode the alpha channel of " + c.String() + "; use VP9 with alpha in WebM on Linux."
+	}
+	if gstFeature(decoder) {
+		return ""
+	}
+	return c.String() + " needs GStreamer's codecalpha plug-in (" + decoder + ", in gst-plugins-bad) to keep its alpha channel."
 }
 
 // mediaError is what GStreamer's error says, for apps: its first line

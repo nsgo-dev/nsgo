@@ -20,6 +20,8 @@ core.View{
 
 `core.WebView` shows web content; attach a `core.Ref` to call `Reload`, `GoBack` and `GoForward`. On native targets these commands keep the app's own HTML and data sources exempt from `core.AccessWebSchemes`; pages that create new navigations still follow the access policy.
 
+`core.Video` plays a file or URL in the platform's player. A transparent clip shows what is behind it as HEVC with alpha in a `.mov` on macOS (iOS is not yet checked), and as VP9 with alpha in WebM on Linux with GStreamer's codecalpha plug-in (`gstreamer1.0-plugins-bad`, which a Linux package can recommend in `nsgo.yaml`). On macOS, iOS, Windows and Linux, a local clip whose alpha cannot be kept (WebM on Apple platforms, any on Windows, HEVC on Linux) makes `OnError` say so instead of the video showing in an opaque box. Android and the web, and remote URLs on every platform, play such clips as their decoder outputs them, which may be opaque.
+
 ## Components
 
 A component is a function that takes a scope and returns an element. It runs once; what changes later is driven by signals.

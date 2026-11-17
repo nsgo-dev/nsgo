@@ -3,7 +3,12 @@
 package macos
 
 import (
+	"bytes"
 	"encoding/binary"
+	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,10 +18,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	alphaclips "github.com/nsgo-dev/nsgo/internal/platform/videoalpha/clips"
 )
 
 // silence writes a WAV file of d of silence, which AVPlayer plays as it does a video's sound.
@@ -129,4 +136,158 @@ func TestVideoReportsWhatItsPlayerDidByItself(t *testing.T) {
 	if replayed != 1.5 {
 		t.Errorf("the controls played at %v, want the app's 1.5", replayed)
 	}
+}
+
+// TestVideoKeepsHEVCAlphaAndRefusesWebM plays HEVC with alpha, transparent around a blue square, over a red view, and reads the window as WindowServer composites it: the red shows through around the square. It also reports that WebM with alpha, which AVFoundation cannot open, does not play. Run ends a process's app for good, so the test runs in a process of its own.
+func TestVideoKeepsHEVCAlphaAndRefusesWebM(t *testing.T) {
+	if os.Getenv("NSGO_TEST_VIDEO_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		cmd.Env = append(os.Environ(), "NSGO_TEST_VIDEO_PROCESS="+t.Name(), "HOME="+t.TempDir())
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
+	}
+	dir := t.TempDir()
+	hevc, webm := filepath.Join(dir, "alpha.mov"), filepath.Join(dir, "alpha.webm")
+	for path, b := range map[string][]byte{hevc: alphaclips.HEVCAlpha, webm: alphaclips.VP9Alpha} {
+		if err := os.WriteFile(path, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var mu sync.Mutex
+	var loaded core.Size
+	var refused, pixels string
+	var once sync.Once
+	app := func(cx *core.Scope) core.Node {
+		done := func() {
+			if loaded.Width > 0 && refused != "" {
+				once.Do(func() {
+					go func() {
+						got := videoPixels()
+						mu.Lock()
+						pixels = got
+						mu.Unlock()
+						cx.Post(cx.Quit)
+					}()
+				})
+			}
+		}
+		box := core.Style{Width: core.Pt(64), Height: core.Pt(64)}
+		return core.View{Style: core.Style{Direction: core.Row, Background: core.RGB(0xff0000)}, Children: []core.Node{
+			core.Video{Source: hevc, Muted: true, Repeat: true, Style: box,
+				OnLoad: func(i core.VideoInfo) {
+					mu.Lock()
+					defer mu.Unlock()
+					loaded = i.Size
+					done()
+				},
+				OnError: func(err error) { t.Error(err); cx.Post(cx.Quit) }},
+			core.Video{Source: webm, Muted: true, Style: box,
+				OnLoad: func(core.VideoInfo) { t.Error("WebM loaded"); cx.Post(cx.Quit) },
+				OnError: func(err error) {
+					mu.Lock()
+					defer mu.Unlock()
+					refused = err.Error()
+					done()
+				}},
+		}}
+	}
+	watchdog := time.AfterFunc(30*time.Second, func() { panic("the videos neither loaded nor failed") })
+	defer watchdog.Stop()
+	onMain(func() { Run(app, Options{Title: "Video alpha", Width: 200, Height: 120}) })
+	mu.Lock()
+	defer mu.Unlock()
+	if loaded != (core.Size{Width: 64, Height: 64}) {
+		t.Errorf("HEVC with alpha loaded at %v, want 64x64", loaded)
+	}
+	if !strings.Contains(refused, "AVFoundation cannot open WebM, so VP9 with alpha does not play") {
+		t.Errorf("WebM with alpha reported %q", refused)
+	}
+	switch pixels {
+	case "":
+	case errNoCapture:
+		t.Skip("WindowServer gives no picture of the window here, so the composited pixels are not checked")
+	default:
+		t.Error(pixels)
+	}
+}
+
+const errNoCapture = "no capture"
+
+// videoPixels waits up to five seconds for the app's one video that shows to composite as red around a blue square in its middle half, and returns "" when it does, errNoCapture when WindowServer gave no picture of its window in that time, or what it saw last.
+func videoPixels() string {
+	last := errNoCapture
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
+		shot := make(chan image.Image)
+		apple.OnMain(func() { shot <- captureVideo() })
+		img := <-shot
+		if img == nil {
+			continue
+		}
+		b := img.Bounds()
+		at := func(fx, fy float64) color.RGBA {
+			return color.RGBAModel.Convert(img.At(b.Min.X+int(fx*float64(b.Dx())), b.Min.Y+int(fy*float64(b.Dy())))).(color.RGBA)
+		}
+		red := func(c color.RGBA) bool { return c.R > 200 && c.G < 60 && c.B < 60 }
+		blue := func(c color.RGBA) bool { return c.B > 200 && c.R < 60 && c.G < 60 }
+		corner, far, middle := at(0.08, 0.08), at(0.92, 0.92), at(0.5, 0.5)
+		if red(corner) && red(far) && blue(middle) {
+			return ""
+		}
+		last = fmt.Sprintf("want red around a blue square, have %v and %v at the video's corners and %v in its middle (RGBA) in %dx%d", corner, far, middle, b.Dx(), b.Dy())
+	}
+	return last
+}
+
+// captureVideo is the picture WindowServer composites of the app's one video that shows, nil when the video is not in a window yet or WindowServer gives none.
+func captureVideo() image.Image {
+	var view objc.ID
+	for _, v := range views {
+		if v.video != nil && v.video.View() != 0 {
+			view = v.video.View()
+		}
+	}
+	if view == 0 {
+		return nil
+	}
+	window := view.Send(sel("window"))
+	cg, err := purego.Dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", purego.RTLD_NOW)
+	if err != nil || window == 0 {
+		return nil
+	}
+	// Deprecated since macOS 14, but still the one call that gives a window as WindowServer composites it.
+	if _, err := purego.Dlsym(cg, "CGWindowListCreateImage"); err != nil {
+		return nil
+	}
+	var windowImage func(bounds apple.CGRect, option, window, imageOption uint32) uintptr
+	purego.RegisterLibFunc(&windowImage, cg, "CGWindowListCreateImage")
+	inWindow := objc.Send[apple.CGRect](view, sel("convertRect:toView:"), objc.Send[apple.CGRect](view, selBounds), objc.ID(0))
+	r := objc.Send[apple.CGRect](window, sel("convertRectToScreen:"), inWindow)
+	screens := objc.ID(apple.Class("NSScreen")).Send(sel("screens"))
+	h := objc.Send[apple.CGRect](screens.Send(sel("objectAtIndex:"), uint(0)), sel("frame")).Size.Height
+	const (
+		windowListIncludingWindow    = 1 << 3
+		windowImageBoundsIgnoreFrame = 1 << 0
+		windowImageBestResolution    = 1 << 3
+	)
+	shot := windowImage(apple.Rect(r.Origin.X, h-r.Origin.Y-r.Size.Height, r.Size.Width, r.Size.Height),
+		windowListIncludingWindow, uint32(objc.Send[int](window, sel("windowNumber"))), windowImageBoundsIgnoreFrame|windowImageBestResolution)
+	if shot == 0 {
+		return nil
+	}
+	defer apple.Release(shot)
+	b, err := apple.PNGImage(shot)
+	if err != nil {
+		return nil
+	}
+	img, err := png.Decode(bytes.NewReader(b))
+	if err != nil || img.Bounds().Dx() == 0 {
+		return nil
+	}
+	return img
 }

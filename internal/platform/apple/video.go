@@ -16,12 +16,10 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
 	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
+	"github.com/nsgo-dev/nsgo/internal/platform/videoalpha"
 )
 
-// Video is a video's AVPlayer, filling the view that holds it: in an
-// AVPlayerLayer, or with the platform's controls in an AVPlayerView
-// (macOS) or an AVPlayerViewController (iOS). AVFoundation and AVKit load
-// on the first video, so apps without one do not pay for them.
+// Video is a video's AVPlayer, filling the view that holds it: in an AVPlayerLayer, or with the platform's controls in an AVPlayerView (macOS) or an AVPlayerViewController (iOS). AVFoundation and AVKit load on the first video, so apps without one do not pay for them. The layer is not opaque, so HEVC with alpha shows what is behind it; a local WebM file with alpha, which AVFoundation cannot open, reports EventError saying so.
 type Video struct {
 	// Dispatch reports the video's events.
 	Dispatch func(driver.Event)
@@ -248,6 +246,11 @@ func videoAsset(source string) objc.ID {
 	return objc.ID(Class("AVURLAsset")).Send(sel("URLAssetWithURL:options:"), videoURL(url, path), options)
 }
 
+// webmRefused says why a WebM file with alpha c does not play: AVFoundation opens no WebM, and keeps the alpha of HEVC with alpha in a QuickTime or MPEG-4 file instead, which the player layer composites over what is behind it.
+func webmRefused(c videoalpha.Codec) string {
+	return "AVFoundation cannot open WebM, so " + c.String() + " does not play on Apple platforms; use HEVC with alpha in a QuickTime file."
+}
+
 // open starts playing the source, or nothing.
 func (v *Video) open() {
 	v.close()
@@ -255,6 +258,11 @@ func (v *Video) open() {
 	v.status = st
 	source := v.config.Source
 	if source == "" {
+		return
+	}
+	if c := videoalpha.Source(source, imageload.ResourceRoot); c == videoalpha.VP8 || c == videoalpha.VP9 {
+		st.failed = true
+		v.Dispatch(driver.Event{Kind: driver.EventError, Text: source + ": " + webmRefused(c)})
 		return
 	}
 	asset := videoAsset(source)
