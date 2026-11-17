@@ -297,3 +297,20 @@ func TestSpansFuncKeepsEachAttachment(t *testing.T) {
 		t.Fatalf("the text's views are %v, want a", got)
 	}
 }
+
+// TestAttachmentsBesidePositionalClasses places attachments as their text says once a view anywhere has classes that follow its place among its siblings, which have the tree read a parent's children as each is made, before it knows a child is an attachment.
+func TestAttachmentsBesidePositionalClasses(t *testing.T) {
+	h := newHost(t, Size{Width: 200, Height: 200}, func(cx *Scope) Node {
+		return View{Style: Style{FontSize: 10}, Children: []Node{
+			View{Class: "h-1 last:hidden"},
+			Text{TestID: "text", Spans: []Span{
+				{Content: "a"},
+				{Attachment: View{TestID: "box", Style: Style{Width: Pt(10), Height: Pt(30), VerticalAlign: VerticalAlignMiddle}}},
+			}},
+		}}
+	})
+	h.commit()
+	if got := h.find("box").parent.frame.Origin; got != (Point{X: 6, Y: 0}) {
+		t.Errorf("attachment origin = %v, want 6,0", got)
+	}
+}

@@ -264,6 +264,7 @@ func (t *Tree) setText(cx *Scope, n *node, v Text) {
 		if sp.Attachment != nil {
 			w := t.newNode(driver.KindView, n, cx)
 			w.attach = &attachNode{}
+			outOfFlow(w)
 			w.base = style
 			t.setClasses(w, sp.Class)
 			t.restyle(w)

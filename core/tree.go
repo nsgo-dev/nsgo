@@ -1763,6 +1763,7 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 		if sp.Attachment != nil {
 			w := t.newNode(driver.KindView, n, cx)
 			w.attach = &attachNode{}
+			outOfFlow(w)
 			t.setClasses(w, sp.Class)
 			t.bindStyle(cx, w, sp.Style, sp.StyleFunc)
 			t.mount(cx, w, sp.Attachment)
@@ -1863,6 +1864,7 @@ func (t *Tree) mountText(cx *Scope, parent *node, v Text) {
 					cx.adopt(s)
 					w := t.newNode(driver.KindView, n, s)
 					w.attach = &attachNode{}
+					outOfFlow(w)
 					t.setClasses(w, sp.Class)
 					t.bindStyle(s, w, sp.Style, nil)
 					t.within(s, func() { t.mount(s, w, sp.Attachment) })
@@ -2599,6 +2601,13 @@ func hitWith(n *node, p Point, ok func(*node) bool) (NodeID, Point) {
 func (t *Tree) command(kind driver.ItemKind, n *node) {
 	t.commands = append(t.commands, driver.MountItem{Kind: kind, ID: n.id})
 	t.changed = true
+}
+
+// outOfFlow drops what n's parent cached of its native children while n was made, before n was marked as none of them (an attachment or a header view): classes that follow a view's place among its siblings have the tree read them as each child is made (classKids).
+func outOfFlow(n *node) {
+	if p := n.nativeParent(); p != nil {
+		p.flat = nil
+	}
 }
 
 // flatChildren returns the views laid out as n's children: its children

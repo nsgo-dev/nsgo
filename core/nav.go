@@ -171,6 +171,7 @@ func (t *Tree) mountHeaderView(cx *Scope, screen *node, el Node) *node {
 	}
 	n := t.newNode(driver.KindView, screen, cx)
 	n.headerView = true
+	outOfFlow(n)
 	t.headerViews = append(t.headerViews, n)
 	t.mount(cx, n, el)
 	return n
