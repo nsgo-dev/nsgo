@@ -4692,7 +4692,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 if (c == null) continue;
                 boolean slop = c.slop != null && x >= -c.slop[3] * density && y >= -c.slop[0] * density
                         && x < child.getWidth() + c.slop[1] * density && y < child.getHeight() + c.slop[2] * density;
-                boolean area = child instanceof ViewGroup && !((ViewGroup) child).getClipChildren()
+                // Overflow: Hidden clips by the outline, leaving getClipChildren false.
+                boolean area = child instanceof ViewGroup && !((ViewGroup) child).getClipChildren() && !child.getClipToOutline()
                         || c.area != null && x >= c.area[0] * density && y >= c.area[1] * density
                         && x < (c.area[0] + c.area[2]) * density && y < (c.area[1] + c.area[3]) * density;
                 if (!slop && !area) continue;
