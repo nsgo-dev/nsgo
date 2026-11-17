@@ -821,9 +821,9 @@ func (a *App) Key(key string) {
 		}
 		parts := strings.Split(k, "+")
 		name := parts[len(parts)-1]
-		if name == "enter" || name == "space" {
-			// The keymap had the key first, including modified activations.
-			mods := a.keyModifiers(parts[:len(parts)-1])
+		// The keymap had the key first, including modified activations. Windows sends keys held with Alt as system keys, which go to the window menu rather than the focused view.
+		mods := a.keyModifiers(parts[:len(parts)-1])
+		if (name == "enter" || name == "space") && !(mods.Alt && a.env.OS == driver.OSWindows) {
 			for _, v := range a.shown() {
 				if v.Focused && v.Kind != driver.KindInput && pressable(v) {
 					for _, kind := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp, driver.EventPress} {
@@ -868,8 +868,7 @@ func (a *App) Key(key string) {
 	a.done()
 }
 
-// keyModifiers reads normalized key prefixes; mod is Command on Apple
-// platforms and Control elsewhere, while meta is Command or the system key.
+// keyModifiers reads normalized key prefixes; mod is Command on Apple platforms and Control elsewhere, while meta is Command or the system key.
 func (a *App) keyModifiers(names []string) driver.Modifiers {
 	var mods driver.Modifiers
 	apple := a.env != nil && (a.env.OS == driver.OSMacOS || a.env.OS == driver.OSIOS)
