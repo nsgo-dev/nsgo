@@ -192,9 +192,7 @@ type Style struct {
 	// every frame, over the ones above.
 	Animated *AnimatedStyle
 
-	// Color is the text color, inherited by descendants that set none.
-	// Without an explicit color above, it follows the subtree's Palette.Text,
-	// including changes of theme, appearance and host tokens.
+	// Color is the text color, inherited by descendants that set none. Without an explicit color above, it follows the subtree's Palette.Text, including changes of theme, appearance and host tokens.
 	Color Color
 	// FontFamily names a font family or a CSS list of them, each used for
 	// the characters those before it lack; empty is the system font, and

@@ -522,8 +522,7 @@ func (cx *Scope) Palette() Palette {
 	return p
 }
 
-// textColorBinding shares one palette subscription among an owner's views.
-// Only views that use default ink need resolving when that ink changes.
+// textColorBinding shares one palette subscription among an owner's views. Only views that use default ink need resolving when that ink changes.
 type textColorBinding struct {
 	color Color
 	nodes map[*node]struct{}
