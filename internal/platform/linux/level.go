@@ -66,9 +66,9 @@ func drawsOnX11() bool {
 	return gdk != 0 && gTypeIsA(gdk, gdkX11DisplayGetType()) != 0
 }
 
-// canSetLevel reports whether setLevel reaches a window manager for w: a window of its own on X11 that one manages.
+// canSetLevel reports whether setLevel reaches a window manager for w: a window of its own on X11 that one manages, not the app's own surface (Options.Hidden) or a tray icon's, which show in none, as on macOS.
 func (w *window) canSetLevel() bool {
-	return w.win != 0 && !w.embedded && !w.unmanaged && drawsOnX11()
+	return w.win != 0 && !w.embedded && !w.unmanaged && !(w.primary && w.opts.Hidden) && w.kind != driver.SurfaceTrayIcon && drawsOnX11()
 }
 
 // setLevel puts the window at level, now where it is mapped and again whenever it maps.

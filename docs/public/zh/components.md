@@ -86,4 +86,4 @@ core.Text{Content: "Done", Class: "self-start rounded-full bg-zinc-100 px-3 py-1
 
 `nsgo.Run(Root)` 显示一个根视图。桌面应用也可以自己决定显示什么：`nsgo.Run(App)` 运行一次 `func App(app *core.Scope)`，由它通过 `desktop` 打开窗口、面板、托盘图标和全局快捷键，它们共享它的 signal。目前支持 macOS、Windows 和 Linux；在 macOS 上 `examples/tray` 不出现在程序坞中，只驻留在菜单栏。
 
-`desktop.SetWindowLevel` 让窗口保持在其他窗口之上（比如计时器或桌面宠物），或置于其下；`desktop.SetWindowFrame` 移动窗口并调整大小。`desktop.CanSetWindowLevel` 和 `desktop.CanPlaceWindows` 说明它们是否生效：macOS 和 Windows 上都生效，Linux 在 X11 下只有层级生效，在 Wayland 下都不生效，因为窗口的层叠和位置由合成器决定。
+`desktop.SetWindowLevel` 让窗口保持在其他窗口之上（比如计时器或桌面宠物），或置于其下；`desktop.SetWindowFrame` 移动窗口并调整大小。`desktop.CanSetWindowLevel` 和 `desktop.CanPlaceWindows` 说明它们在窗口的 scope 中是否生效：macOS 和 Windows 上都生效，Linux 在 X11 下只有层级生效，在 Wayland 下都不生效，因为窗口的层叠和位置由合成器决定。

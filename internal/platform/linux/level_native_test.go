@@ -118,3 +118,26 @@ func TestWindowLevelAsksTheWindowManager(t *testing.T) {
 	cx.Post(func() { cx.SetWindowLevel(core.WindowLevelNormal) })
 	expect("normal", [3]int{netWMStateRemove, above, below})
 }
+
+// TestAppSurfaceHasNoWindowLevel checks that the app's own surface, the hidden window an nsgo.Run(App) function runs on, reports neither levels nor placement, as on macOS, where it has no window.
+func TestAppSurfaceHasNoWindowLevel(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if err := openLibs(); err != nil {
+		t.Skip(err)
+	}
+	scopes := make(chan *core.Scope, 1)
+	app := func(cx *core.Scope) core.Node {
+		scopes <- cx
+		return core.View{}
+	}
+	w := startTestWindow(t, app, Options{Title: "nsgo-app-level", Width: 120, Height: 80, Hidden: true})
+	defer w.onLoop(t, w.close)
+	cx := <-scopes
+	env := make(chan [2]bool, 1)
+	cx.Post(func() { env <- [2]bool{cx.Env().CanSetWindowLevel(), cx.Env().CanPlaceWindows()} })
+	if got := <-env; got != [2]bool{} {
+		t.Errorf("CanSetWindowLevel, CanPlaceWindows = %v, want both false", got)
+	}
+}

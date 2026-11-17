@@ -100,9 +100,9 @@ func (w *window) environment() driver.Environment {
 		// The toast notifier's schedule, which has no repeats.
 		ScheduledNotifications: true,
 
-		// An embedding host owns its window.
-		CanSetWindowLevel: !w.embedded,
-		CanPlaceWindows:   !w.embedded,
+		// An embedding host owns its window, and the app's own surface and a tray icon's show in none, as on macOS.
+		CanSetWindowLevel: w.showsOwnWindow(),
+		CanPlaceWindows:   w.showsOwnWindow(),
 	}
 }
 
@@ -397,4 +397,9 @@ func rightToLeft(locale string) bool {
 	r, _, _ := getLocaleInfoEx.Call(uintptr(unsafe.Pointer(wide(locale))), localeIReadingLayout|localeReturnNumber,
 		uintptr(unsafe.Pointer(&layout)), unsafe.Sizeof(layout)/2) // in UTF-16 units
 	return r != 0 && layout == 1
+}
+
+// showsOwnWindow reports whether the surface shows in a top-level window of its own, which SetWindowLevel and SetWindowFrame reach: not a view a host embeds, the app's own surface (Options.Hidden), or a tray icon's.
+func (w *window) showsOwnWindow() bool {
+	return !w.embedded && !(w.primary && w.opts.Hidden) && w.kind != driver.SurfaceTrayIcon
 }

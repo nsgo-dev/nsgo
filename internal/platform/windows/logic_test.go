@@ -1322,3 +1322,23 @@ func TestStatusAndSearchFieldElements(t *testing.T) {
 		t.Errorf("a text field is control %d, type %q", s.control, s.localizedType)
 	}
 }
+
+// TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn checks that the environment reports levels and placement only for a surface with a top-level window of its own, as macOS does: not an embedded view, the app's own hidden surface or a tray icon's.
+func TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		w    *window
+		want bool
+	}{
+		{"window", &window{primary: true}, true},
+		{"opened window", &window{kind: driver.SurfaceWindow}, true},
+		{"panel", &window{kind: driver.SurfacePanel}, true},
+		{"embedded", &window{embedded: true}, false},
+		{"app's own surface", &window{primary: true, opts: Options{Hidden: true}}, false},
+		{"tray icon", &window{kind: driver.SurfaceTrayIcon, opts: Options{Hidden: true}}, false},
+	} {
+		if got := c.w.showsOwnWindow(); got != c.want {
+			t.Errorf("%s: showsOwnWindow = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
