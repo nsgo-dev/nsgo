@@ -890,8 +890,7 @@ func (e *Engine) SetTokens(t core.Tokens) { e.push(message{tokens: &t}) }
 // leave hit testing to the engine.
 func (e *Engine) PressAt(ev driver.Event) { e.push(message{surface: e.surface, at: &ev}) }
 
-// FontsChanged prepares the app's text again, for fonts the platform
-// loaded after they were registered (driver.FontRegistrar).
+// FontsChanged prepares the app's text and records its canvases again, for fonts the platform loaded after they were registered (driver.FontRegistrar).
 func (e *Engine) FontsChanged() { e.push(message{fonts: true}) }
 
 // Close stops the app, running its OnQuit handlers and disposing its

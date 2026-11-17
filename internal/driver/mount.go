@@ -1110,11 +1110,7 @@ type TextEngine interface {
 	Prepare(text *AttributedText) PreparedText
 }
 
-// FontRegistrar is a TextEngine that registers fonts as the app runs, as
-// a TSX module's imports do: RegisterFont makes the families of the font
-// file data (TrueType, OpenType or a collection) available to the text
-// it prepares from then on. A platform that loads a font later tells the
-// engine (FontsChanged), which prepares its text again.
+// FontRegistrar is a TextEngine that registers fonts as the app runs, as a TSX module's imports do: RegisterFont makes the families of the font file data (TrueType, OpenType or a collection) available to the text it prepares from then on. A platform that loads a font later tells the engine (FontsChanged), which prepares its text and records its canvases again.
 type FontRegistrar interface {
 	RegisterFont(data []byte) error
 }

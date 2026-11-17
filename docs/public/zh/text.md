@@ -68,7 +68,7 @@ func main() { nsgo.Run(Root, nsgo.Fonts("fonts/Inter-Regular.ttf", "fonts/Inter-
 cx.RegisterFont(data) // 一个 TrueType 或 OpenType 字体
 ```
 
-字体到达前排版的文本会重新排版。`cx.Env().FontScale()` 是用户的文本大小，文本默认跟随它，`NoFontScaling` 可以关闭，`MaxFontSizeMultiplier` 限制最大倍数。
+字体到达前排版的文本会重新排版，画布也会再次运行 `Draw`，让字形和文本测量使用新加载的字体。`cx.Env().FontScale()` 是用户的文本大小，文本默认跟随它，`NoFontScaling` 可以关闭，`MaxFontSizeMultiplier` 限制最大倍数。
 
 ## 选择与测量
 

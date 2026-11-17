@@ -7,7 +7,7 @@ order: 59
 
 ## 画布
 
-`core.Canvas` 在引擎上记录 2D 绘图，再由平台播放，像网页的 `<canvas>`。`Draw` 会在它读取的 signal 或画布尺寸变化时再次运行，平台在主线程上绘制记录。
+`core.Canvas` 在引擎上记录 2D 绘图，再由平台播放，像网页的 `<canvas>`。`Draw` 会在它读取的 signal、画布尺寸或可用字体变化时再次运行，平台在主线程上绘制记录。用 `cx.RegisterFont` 加载的字体可用后，`Draw` 会再运行一次，文字和按 `TextMetrics` 算出的几何都随之更新。
 
 ```go
 core.Canvas{

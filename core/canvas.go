@@ -8,9 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Canvas draws what Draw records, at the canvas's size, again whenever a
-// signal Draw read, the size or the available fonts change. The platform
-// plays the recording on the main thread; Draw itself runs on the engine.
+// Canvas draws what Draw records, at the canvas's size, again whenever a signal Draw read, the size or the available fonts change. The platform plays the recording on the main thread; Draw itself runs on the engine.
 //
 // The Drawing measures text with the platform's text engine
 // (MeasureText, TextMetrics) and answers hit tests (IsPointInPath,

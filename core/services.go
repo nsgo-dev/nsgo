@@ -235,12 +235,7 @@ func CheckURL(u string) error {
 	return nil
 }
 
-// RegisterFont registers the font file data (TrueType, OpenType or a
-// collection) with the platform, so text finds its families as a Style's
-// FontFamily names them, as nsgo.Fonts' are, and prepares the text shown
-// again: call it before the text that uses it shows. Without a platform
-// that registers fonts as the app runs (a headless test's) it does
-// nothing.
+// RegisterFont registers the font file data (TrueType, OpenType or a collection) with the platform, so text finds its families as a Style's FontFamily names them, as nsgo.Fonts' are, and prepares the text shown and records the canvases shown again once the font is available: call it before the text that uses it shows. Without a platform that registers fonts as the app runs (a headless test's) it does nothing.
 func (cx *Scope) RegisterFont(data []byte) error {
 	t := cx.tree()
 	if t == nil {
@@ -257,8 +252,7 @@ func (cx *Scope) RegisterFont(data []byte) error {
 	return nil
 }
 
-// FontsChanged prepares every text and records every canvas again, with
-// fonts the platform made available since they were prepared.
+// FontsChanged prepares every text and records every canvas again, with fonts the platform made available since they were prepared.
 func (t *Tree) FontsChanged() {
 	t.fonts++
 	for _, n := range t.nodes {
@@ -273,8 +267,7 @@ func (t *Tree) FontsChanged() {
 			n.input.lineH = 0
 			t.markLayout(n)
 		case n.canvas != nil && n.canvas.effect != nil:
-			// Draw can measure text without recording any text operations.
-			// Run it again so both its geometry and glyphs use the new fonts.
+			// Draw can measure text without recording any text operations, so run it again rather than replay its recording: both its geometry and its glyphs take the new fonts.
 			n.canvas.effect.mark(dirty)
 		}
 	}
