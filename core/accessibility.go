@@ -126,6 +126,26 @@ func (n *node) sentProps() driver.ViewProps {
 		n.appendText(&b)
 		p.Label = b.String()
 	}
+	if n.inTooltip() {
+		// A tooltip is a visual description of its trigger, never a second
+		// screen-reader element or a live announcement.
+		p.Accessible, p.ElementsHidden = driver.AccessibleNo, true
+		p.Role, p.LiveRegion = RoleNone, LiveRegionNone
+	} else if p.Description == "" && n.tooltipDescription != "" {
+		name := p.Label
+		if name == "" {
+			var b strings.Builder
+			if n.text != nil {
+				b.WriteString(driver.ShownText(n.text.text.Text, n.text.text.Spans, n.text.attachmentLabels()))
+			} else {
+				n.appendText(&b)
+			}
+			name = b.String()
+		}
+		if tooltipWords(name) != tooltipWords(n.tooltipDescription) {
+			p.Description = n.tooltipDescription
+		}
+	}
 	return p
 }
 

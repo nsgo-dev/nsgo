@@ -75,11 +75,13 @@ type Tree struct {
 	accessories  []*node
 	// labels registers elements declaring label associations; labelled also holds controls named by those labels in the previous round.
 	labels, labelled []*node
-	headerViews      []*node
-	status           statusBars
-	anim             animations
-	layoutAnim       *LayoutAnimation
-	fontScale        float32
+	// tooltips registers anchors; described retains their previous description targets.
+	tooltips, described []*node
+	headerViews         []*node
+	status              statusBars
+	anim                animations
+	layoutAnim          *LayoutAnimation
+	fontScale           float32
 	// ratio is the device pixels per point layout rounds to.
 	ratio       float32
 	alerts      map[uint32]alertWait
@@ -234,6 +236,9 @@ type node struct {
 	// tip is the tooltip's: what shows it as the pointer comes onto the
 	// view or the keyboard's focus into it, and hides it.
 	tip *tooltipHooks
+	// tooltipOwner marks the synthetic root containing an anchor's hint.
+	tooltipOwner       *node
+	tooltipDescription string
 
 	base   Style
 	dyn    *Style // the StyleFunc's, kept once and updated in place
@@ -1749,67 +1754,6 @@ func (t *Tree) setViewParts(n *node, v View) {
 	t.showTrigger(n, &n.props)
 	n.pinching, n.rotating = v.OnPinch != nil || v.PinchValue != nil, v.OnRotation != nil || v.RotationValue != nil
 	t.setRef(n, v.Ref)
-}
-
-// tooltipDelay is how long the pointer rests on a view before its
-// tooltip shows, as NSH's and GPUI's.
-const tooltipDelay = 500 * time.Millisecond
-
-// mountTooltip shows tip in a hint overlay above n while the pointer
-// rests on it, on desktops, or the focus the keyboard moved is on it, at
-// once, until it leaves or Escape is pressed.
-func (t *Tree) mountTooltip(cx *Scope, n *node, tip Node) {
-	if n.ref == nil {
-		t.setRef(n, &Ref{})
-	}
-	anchor := n.ref
-	if h, ok := tip.(HintTooltip); ok {
-		hint, change := h.Hint(cx, anchor)
-		n.tip = &tooltipHooks{show: func() { change(HintHover) }, hide: func() { change(HintLeave) },
-			focus: func(on bool) {
-				if on {
-					change(HintFocus)
-				} else {
-					change(HintBlur)
-				}
-			}}
-		t.mount(cx, n, hint)
-		return
-	}
-	hovered, focused := NewSignal(cx, false), NewSignal(cx, false)
-	var stop func() bool
-	hide := func() {
-		if stop != nil {
-			stop()
-			stop = nil
-		}
-		hovered.Set(false)
-	}
-	n.tip = &tooltipHooks{show: func() {
-		if cx.Env().Desktop() && stop == nil {
-			stop = cx.AfterFunc(tooltipDelay, func() { stop = nil; hovered.Set(true) })
-		}
-	}, hide: hide, focus: focused.Set}
-	t.mount(cx, n, Show{When: func() bool { return hovered.Get() || focused.Get() }, Then: func(cx *Scope) Node {
-		return Group{
-			Overlay{Anchor: anchor, Placement: PlaceTop, Offset: 4, Margin: 4, PointerEvents: PointerEventsNone,
-				Children: []Node{tip}},
-			// Escape hides what the focus shows, while it does.
-			Show{When: focused.Get, Then: func(cx *Scope) Node {
-				cx.OnKey("escape", func() { hide(); focused.Set(false) })
-				return nil
-			}},
-		}
-	}})
-}
-
-// tooltipHooks are what a view's tooltip hears: show as the pointer
-// comes onto the view, hide as it leaves or, where the view takes presses
-// already, presses, and focus as the keyboard moves the focus onto the
-// view or into it (true) and the focus leaves (false).
-type tooltipHooks struct {
-	show, hide func()
-	focus      func(on bool)
 }
 
 func (t *Tree) mountText(cx *Scope, parent *node, v Text) {

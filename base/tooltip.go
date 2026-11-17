@@ -126,11 +126,18 @@ func (t Tooltip) Hint(cx *core.Scope, anchor *core.Ref) (core.Node, func(core.Hi
 			return s
 		}
 	}
+	bubble := m.overlay(core.Overlay{Anchor: anchor, Placement: place, Align: t.Align, Offset: offset, Margin: margin,
+		Children: t.Children, PointerEvents: core.PointerEventsNone}, parts.Of(class, style, fn))
+	look := bubble.StyleFunc
+	bubble.StyleFunc = func() core.Style {
+		s := look()
+		if !m.shown.Get() {
+			s.Display = core.DisplayNone
+		}
+		return s
+	}
 	return core.Group{
-		core.Show{When: m.shown.Get, Then: func(cx *core.Scope) core.Node {
-			return m.overlay(core.Overlay{Anchor: anchor, Placement: place, Align: t.Align, Offset: offset, Margin: margin,
-				Children: t.Children, Role: core.RoleAlert, PointerEvents: core.PointerEventsNone}, parts.Of(class, style, fn))
-		}},
+		bubble,
 		// Escape hides what the keyboard's focus shows (WAI-ARIA's
 		// tooltip pattern), while it shows.
 		core.Show{When: func() bool { return st.open() && focused.Get() }, Then: func(cx *core.Scope) core.Node {

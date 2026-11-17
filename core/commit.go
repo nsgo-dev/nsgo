@@ -252,6 +252,7 @@ func (t *Tree) commitRound() {
 		}
 		t.timeLayout()
 	}
+	t.updateTooltipDescriptions()
 	// System headers cover what the stacks' places decide.
 	for range 2 {
 		if !t.sizeHeaders() {
