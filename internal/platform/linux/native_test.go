@@ -1001,6 +1001,19 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
 	}
+	// GTK and GStreamer keep state beyond a window's lifetime. Exercise this first pipeline independently of the other native tests, as the WebKit regressions do, while retaining every playback assertion.
+	if os.Getenv("NSGO_TEST_GSTREAMER_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		cmd.Env = append(os.Environ(), "NSGO_TEST_GSTREAMER_PROCESS="+t.Name())
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
+	}
 	path := filepath.Join(t.TempDir(), "silence.aiff")
 	if err := os.WriteFile(path, aiff(), 0o644); err != nil {
 		t.Fatal(err)

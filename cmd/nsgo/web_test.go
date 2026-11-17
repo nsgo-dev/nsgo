@@ -81,7 +81,7 @@ func TestWebHostChannel(t *testing.T) {
 	defer b.close()
 
 	open := func(page string) *webPage {
-		raw, err := b.call("", "Target.createTarget", map[string]any{"url": fmt.Sprintf("http://%s/%s", ln.Addr(), page)})
+		raw, err := b.call("", "Target.createTarget", map[string]any{"url": "about:blank"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +93,17 @@ func TestWebHostChannel(t *testing.T) {
 		}
 		var attached struct{ SessionID string }
 		json.Unmarshal(raw, &attached)
-		return &webPage{b: b, session: attached.SessionID}
+		pg := &webPage{b: b, session: attached.SessionID}
+		// The browser's window size is in device pixels. At the test's scale it can leave the order button below the viewport; mouse input cannot reach it even though innerText includes its label.
+		if _, err := pg.call("Emulation.setDeviceMetricsOverride", map[string]any{
+			"width": 800, "height": 600, "deviceScaleFactor": webTestScale, "mobile": false,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pg.call("Page.navigate", map[string]any{"url": fmt.Sprintf("http://%s/%s", ln.Addr(), page)}); err != nil {
+			t.Fatal(err)
+		}
+		return pg
 	}
 	eval := func(pg *webPage, expr string) any {
 		raw, err := pg.call("Runtime.evaluate", map[string]any{"expression": expr, "returnByValue": true, "awaitPromise": true})
