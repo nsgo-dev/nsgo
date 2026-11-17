@@ -36,6 +36,8 @@ core.View{Style: core.Style{
 
 视图的外观可以随状态改变。`Hover`、`Focus`、`FocusWithin`、`Active`、`Selected`、`Checked`、`Disabled` 和 `aria-*` 状态都是 `*Style`，在状态成立时覆盖其余样式。应用通过函数设置 `Selected`、`Checked`、`Disabled` 和 `Expanded`，平台报告按压和焦点。
 
+`Active` 和 `group-active:` 在视图被按下时生效，这需要视图有按压处理函数，或有正持有触摸的 `Responder`。给普通视图加 `Active`、`active:` 或 `group` 不会让它变得可按压，也不会让它成为键盘 Tab 焦点；需要它自己接收焦点时设置 `Focusable`。
+
 ```go
 core.View{
 	OnPress: func(core.PressEvent) { open() },

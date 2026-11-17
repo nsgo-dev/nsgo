@@ -10,9 +10,10 @@ import "github.com/nsgo-dev/nsgo/core"
 // style and children the app gives it, its states included.
 type Button struct {
 	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
-	Invalid     func() bool
-	Ref         *core.Ref
-	LabelledBy  []*core.Ref
+	Invalid    func() bool
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
+	// OnPress is the button's action. Without it the button still takes presses and is a keyboard stop, as a button with no action yet; for a look inside a view that takes the presses itself, such as a Popover's Trigger, use a plain core.View.
 	OnPress     func(core.PressEvent)
 	OnLongPress func(core.PressEvent)
 	// OnPressDown and OnPressUp follow a press going down on the button

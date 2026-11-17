@@ -36,7 +36,7 @@ core.View{Style: core.Style{
 
 A view's look can change with its state. `Hover`, `Focus`, `FocusWithin`, `Active`, `Selected`, `Checked`, `Disabled` and the `aria-*` states are `*Style` values that merge over the rest while the state holds. An app sets `Selected`, `Checked`, `Disabled` and `Expanded` through functions, and the platform reports presses and focus.
 
-`Active` and `group-active:` follow views with press handlers. Styling a plain view with `Active`, `active:` or `group` leaves it out of keyboard Tab navigation; set `Focusable` when it should take focus itself.
+`Active` and `group-active:` follow a view while it is pressed, which needs a press handler or a `Responder` holding the touch. Styling a plain view with `Active`, `active:` or `group` does not make it pressable or a keyboard Tab stop; set `Focusable` when it should take focus itself.
 
 ```go
 core.View{

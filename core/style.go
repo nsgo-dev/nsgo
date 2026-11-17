@@ -290,16 +290,7 @@ type Style struct {
 	// around the node is in their states, under the node's own states.
 	GroupStyle *GroupStyle
 
-	// State styles merge over the rest while the node is in the state, in
-	// NSH's order of precedence, lowest first: checked, indeterminate and
-	// selected, which the app sets; FocusWithin, while the focus is on the
-	// node or inside it; hovered, focused (text fields) and pressed, which
-	// the platform reports; the aria-* states of its accessibility state,
-	// busy, checked, expanded, invalid, pressed (a toggle that is on, not
-	// a press) and selected; the data-* attributes a control's parts show; then
-	// disabled over all. While the node is disabled only Disabled applies
-	// of its own, as NSH's state styles; its classes' variants (checked:,
-	// hover:, ...) apply.
+	// State styles merge over the rest while the node is in the state, in NSH's order of precedence, lowest first: checked, indeterminate and selected, which the app sets; FocusWithin, while the focus is on the node or inside it; hovered, focused (text fields) and pressed, which the platform reports (pressed only for a node with a press handler or a responder holding the touch: Active alone never makes a node pressable or a Tab stop); the aria-* states of its accessibility state, busy, checked, expanded, invalid, pressed (a toggle that is on, not a press) and selected; the data-* attributes a control's parts show; then disabled over all. While the node is disabled only Disabled applies of its own, as NSH's state styles; its classes' variants (checked:, hover:, ...) apply.
 	Hover, Focus, Active, Selected, Checked, Indeterminate, Disabled    *Style
 	FocusWithin, AriaBusy, AriaChecked, Expanded, Pressed, AriaSelected *Style
 	FocusVisible, AriaInvalid                                           *Style
