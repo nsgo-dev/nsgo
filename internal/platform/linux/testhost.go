@@ -138,7 +138,12 @@ func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Mod
 	}
 	t.onLoop(func() {
 		t.focusAt(at)
-		t.w.pointerDown(at, 1, 0, state, t.clicks.Press(at, time.Now(), 500*time.Millisecond))
+		// GTK's click gesture counts presses within the desktop's double-click time, 400 ms by default.
+		interval := 400 * time.Millisecond
+		if settings := gtkSettingsGetDefault(); settings != 0 {
+			interval = time.Duration(settingInt(settings, "gtk-double-click-time")) * time.Millisecond
+		}
+		t.w.pointerDown(at, 1, 0, state, t.clicks.Press(at, time.Now(), interval))
 	})
 	if hold > 0 {
 		time.Sleep(hold + 50*time.Millisecond)

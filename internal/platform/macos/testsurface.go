@@ -191,9 +191,13 @@ func (t *testSurface) Scroll(at driver.Point, delta driver.Point) error {
 	// A trackpad's deltas are continuous, in points.
 	const continuous = 88
 	n := int(max(abs(delta.X), abs(delta.Y))/20) + 1
-	// The gesture finds its view with AppKit's geometry, as the window's
-	// monitor has it do.
-	onMainSync(t.s.commitPending)
+	// The gesture finds its view with AppKit's geometry, as the window's monitor has it do. A trackpad scrolls under the pointer, so the hover pick after the scroll is made there too.
+	onMainSync(func() {
+		if t.s.testPointer != nil {
+			*t.s.testPointer = t.windowPoint(at)
+		}
+		t.s.commitPending()
+	})
 	send := func(phase int64, dx, dy driver.Points) {
 		onMainSync(func() {
 			// The wheel's deltas are the content's way: positive shows what
