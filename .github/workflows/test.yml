@@ -66,7 +66,8 @@ jobs:
           GSK_RENDERER: cairo
           PULSE_SINK: nsgo_test
           NSGO_FILE_ASSOCIATIONS: '1'
-        run: xvfb-run -a go tool nsgo test
+        # examples/gallery runs its tests in sequence for about nine minutes on a hosted runner, beside the other packages, so go test's default ten-minute limit cuts it off.
+        run: xvfb-run -a go tool nsgo test -- -timeout=20m
       - name: Test native radio and tab focus
         env:
           GDK_BACKEND: x11
