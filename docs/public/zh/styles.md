@@ -68,6 +68,8 @@ core.View{Class: "flex items-center gap-3 rounded-xl border border-zinc-200 bg-w
 
 选择器在所有目标上匹配 NSGo 元素，支持列表、子元素（`>`）、后代（`_`）、相邻（`+`）和后续兄弟（`~`）关系，类名、`data-*` 存在或相等条件、角色、支持的布尔无障碍状态，以及 `:is`、`:where`、`:not`、`:has` 和子元素位置。类型包括 `view`/`div`、`text`/`span`（整个文本节点）、`scroll`、`input`、`textarea`、`image`/`img`、`canvas`、`svg`、`video`、`webview` 和 `native`。任意选择器的每个分支使用一个顶层 `&`；省略时测试元素自身。浏览器专属选择器、伪元素、at-rule、转义和函数内显式的 `&` 均视为未知；选择器不会触及后端实现视图或单独的文本片段。
 
+`Span.Class` 和 `Screen.HeaderClass` 里没有可跟随的同级元素，其中的 `peer-*` 变体会被忽略，并按类名和位置各记录一次日志；span 要跟随 peer 时，把变体写在包含它的 `Text` 上。
+
 主题的 `Tailwind` 字段用颜色、断点和工具类扩展默认主题；调色板没有的颜色可以写成 `Palette` 的角色名（`bg-accent`、`text-text-muted/70`），或主题定义的颜色，从节点所在主题的当前外观读取。
 
 ## 主题
