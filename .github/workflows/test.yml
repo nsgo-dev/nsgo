@@ -100,12 +100,6 @@ jobs:
         run: go tool nsgo test -run '^TestOnMainExitPropagation$' ./internal/platform/macos -- -race
       - name: Test macOS backend
         run: go tool nsgo test ./internal/platform/macos
-      - name: Test simulator process results
-        env:
-          NSGO_SIMULATOR_E2E: "1"
-        run: |
-          go tool nsgo test -run '^TestSimulatorProcessResults$' ./cmd/nsgo
-          go tool nsgo test -target ios_simulator -timeout 30s -run '^TestFoldGeometry$' ./internal/platform/ios
       - name: Test native input isolation
         run: go tool nsgo test -target macos ./testdata/inputisolation
       - name: Test keyboard activation
@@ -126,6 +120,27 @@ jobs:
         run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test composited captures
         run: go tool nsgo test -target macos ./internal/testhost/testdata/capture
+
+  apple-simulator:
+    # Simulator packages are arm64; the Intel desktop job cannot run them.
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test simulator process results
+        env:
+          NSGO_SIMULATOR_E2E: "1"
+        run: |
+          go tool nsgo test -run '^TestSimulatorProcessResults$' ./cmd/nsgo
+          go tool nsgo test -target ios_simulator -timeout 30s -run '^TestFoldGeometry$' ./internal/platform/ios
 
   windows:
     runs-on: windows-latest

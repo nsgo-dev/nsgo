@@ -14,6 +14,9 @@ func TestSimulatorProcessResults(t *testing.T) {
 	if runtime.GOOS != "darwin" || os.Getenv("NSGO_SIMULATOR_E2E") != "1" {
 		t.Skip("set NSGO_SIMULATOR_E2E=1 to run tests in an iPhone simulator")
 	}
+	if runtime.GOARCH != "arm64" {
+		t.Fatal("NSGo's simulator binaries are arm64; run this check on an Apple silicon Mac")
+	}
 	for _, fixture := range []string{"simulator", "simulatorplain"} {
 		t.Run(fixture, func(t *testing.T) {
 			p, err := loadForTest(filepath.Join("..", "..", "testdata", fixture), nil)
@@ -28,9 +31,10 @@ func TestSimulatorProcessResults(t *testing.T) {
 			if err == nil {
 				t.Fatal("the panic was reported as a success")
 			}
+			runErr := err
 			data, err := os.ReadFile(report)
 			if err != nil {
-				t.Fatalf("report: %v\n%s", err, output)
+				t.Fatalf("report: %v; run: %v\n%s", err, runErr, output)
 			}
 			var suites junitSuites
 			if err := xml.Unmarshal(data, &suites); err != nil {
