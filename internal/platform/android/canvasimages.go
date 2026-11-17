@@ -7,11 +7,10 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+// maxCanvasImages is the bound of Java's cache (CanvasImages.LIMIT), which a pass of drawing more sources exceeds until a later pass draws others.
 const maxCanvasImages = 64
 
-// canvasRequests keeps sources only while a mounted drawing uses them. Java
-// owns the decoded cache and asks again on a miss; Go retains no sent-key set.
-// Mounts and requests arrive on different goroutines.
+// canvasRequests keeps sources only while a mounted drawing uses them. Java owns the bounded decoded cache and asks again on a miss, and cancels the loads its eviction drops, so the loads under way are at most the pending entries of Java's cache; Go retains no sent-key set. Mounts and requests arrive on different goroutines.
 type canvasRequests struct {
 	mu     sync.Mutex
 	trees  map[uint32]*canvasSources
@@ -22,7 +21,6 @@ type canvasSources struct {
 	nodes   map[driver.NodeID][]string
 	sources map[string]*canvasSource
 	loads   map[string]*canvasLoad
-	use     uint64
 }
 
 type canvasSource struct {
@@ -32,7 +30,6 @@ type canvasSource struct {
 
 type canvasLoad struct {
 	request uint32
-	used    uint64
 	cancel  context.CancelFunc
 }
 
@@ -107,20 +104,9 @@ func (c *canvasRequests) start(surface uint32, key string, request uint32) (cont
 		old.cancel()
 		delete(t.loads, key)
 	}
-	if len(t.loads) >= maxCanvasImages {
-		var oldest string
-		at := ^uint64(0)
-		for k, l := range t.loads {
-			if l.used < at {
-				oldest, at = k, l.used
-			}
-		}
-		t.loads[oldest].cancel()
-		delete(t.loads, oldest)
-	}
-	t.use++
+	// No bound of Go's own: cancelling a load Java still waits for would leave its entry pending, never drawn.
 	ctx, cancel := context.WithCancel(context.Background())
-	l := &canvasLoad{request: request, used: t.use, cancel: cancel}
+	l := &canvasLoad{request: request, cancel: cancel}
 	t.loads[key] = l
 	return ctx, t.sources[key].source, l, true
 }

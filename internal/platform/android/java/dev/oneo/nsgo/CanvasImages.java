@@ -4,7 +4,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** One surface's bounded canvas cache, including loading and failed entries. */
+/**
+ * One surface's bounded canvas cache, including loading and failed entries. The least recently drawn go first, but never one the pass of drawing under way drew: a pass drawing more than the limit keeps them all, as evicting one would request it again at the next pass, forever.
+ */
 final class CanvasImages<T> {
     static final int LIMIT = 64;
 
@@ -35,6 +37,7 @@ final class CanvasImages<T> {
 
     private final class Entry {
         final int generation;
+        long used;
         T value;
         boolean pending = true, retired;
         int refs;
@@ -45,20 +48,37 @@ final class CanvasImages<T> {
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>(LIMIT, .75f, true);
     private final Requester requester;
     private final Consumer<T> dispose;
+    private final Consumer<Runnable> later;
     private int generation;
     private boolean closed;
+    /** use counts acquisitions; pass is its value when the last pass of drawing ended, which passPosted says a posted endPass will end. */
+    private long use, pass;
+    private boolean passPosted;
 
-    CanvasImages(Requester requester, Consumer<T> dispose) {
+    /** later runs a task after the pass of drawing under way, as a post to the UI thread's looper does. */
+    CanvasImages(Requester requester, Consumer<T> dispose, Consumer<Runnable> later) {
         this.requester = requester;
         this.dispose = dispose;
+        this.later = later;
+    }
+
+    private synchronized void endPass() {
+        passPosted = false;
+        pass = use;
     }
 
     synchronized Lease acquire(String key) {
         if (closed) return null;
+        use++;
+        if (!passPosted) {
+            passPosted = true;
+            later.accept(this::endPass);
+        }
         Entry entry = entries.get(key);
         if (entry == null) {
-            if (entries.size() == LIMIT) {
+            while (entries.size() >= LIMIT) {
                 Map.Entry<String, Entry> oldest = entries.entrySet().iterator().next();
+                if (oldest.getValue().used > pass) break;
                 entries.remove(oldest.getKey());
                 retire(oldest.getKey(), oldest.getValue());
             }
@@ -66,6 +86,7 @@ final class CanvasImages<T> {
             entries.put(key, entry);
             requester.request(key, entry.generation, false);
         }
+        entry.used = use;
         return entry.value == null ? null : new Lease(entry);
     }
 

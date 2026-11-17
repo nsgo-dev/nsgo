@@ -791,10 +791,21 @@ type loadedImage struct {
 	cancel        context.CancelFunc
 }
 
-var canvasImageUse uint64
+// canvasImageUse counts the images drawn; canvasPass is its value when the last pass of drawing ended, so images used since are the current pass's, which eviction keeps; canvasPassPosted says an endCanvasPass is posted.
+var (
+	canvasImageUse   uint64
+	canvasPass       uint64
+	canvasPassPosted bool
+)
 
-// maxCanvasImages bounds the images kept; the least recently drawn go.
+// maxCanvasImages bounds the images kept, loaded, loading or failed; the least recently drawn go first, but never one the pass of drawing under way drew, so a pass drawing more keeps them all until a later pass draws others.
 const maxCanvasImages = 64
+
+// endCanvasPass ends the pass of drawing that used the images so far: they may be evicted from now on.
+func endCanvasPass() {
+	canvasPassPosted = false
+	canvasPass = canvasImageUse
+}
 
 // canvasImage returns src's image, or nil while it loads, and has the
 // host draw again once it has loaded.
@@ -804,6 +815,11 @@ func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
 	}
 	key := src.Key()
 	canvasImageUse++
+	if !canvasPassPosted {
+		// Core Animation draws the layers a transaction changed before the main queue runs posted work.
+		canvasPassPosted = true
+		OnMain(endCanvasPass)
+	}
 	if im := canvasImages[key]; im != nil {
 		im.used = canvasImageUse
 		if im.image == 0 && !im.failed && host.Redraw != nil {
@@ -811,7 +827,7 @@ func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
 		}
 		return im
 	}
-	if len(canvasImages) >= maxCanvasImages {
+	for len(canvasImages) >= maxCanvasImages {
 		var oldest string
 		var at uint64 = math.MaxUint64
 		for k, im := range canvasImages {
@@ -819,15 +835,22 @@ func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
 				oldest, at = k, im.used
 			}
 		}
-		if im := canvasImages[oldest]; im != nil {
-			if im.cancel != nil {
-				im.cancel()
-			}
-			Release(im.image)
-			im.image = 0
-			im.waiting = nil
-			delete(canvasImages, oldest)
+		if at > canvasPass {
+			// Every image was drawn by the pass under way: evicting one would load it again at the next pass, forever.
+			break
 		}
+		im := canvasImages[oldest]
+		if im.cancel != nil {
+			im.cancel()
+		}
+		Release(im.image)
+		im.image = 0
+		// What waited for a load it cancels draws again, to ask for it anew: a shader's texture would otherwise never load.
+		for _, fn := range im.waiting {
+			OnMain(fn)
+		}
+		im.waiting = nil
+		delete(canvasImages, oldest)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	im := &loadedImage{used: canvasImageUse, waiting: map[any]func(){}, cancel: cancel}

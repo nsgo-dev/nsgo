@@ -1013,6 +1013,11 @@ func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
 	}
 	key := src.Key()
 	w.canvasImageUse++
+	if !w.canvasPassPosted {
+		// The paint under way ends before the main thread runs posted work.
+		w.canvasPassPosted = true
+		w.post(w.endCanvasPass)
+	}
 	if s := w.canvasImages[key]; s != nil {
 		s.used = w.canvasImageUse
 		return s
@@ -1020,13 +1025,17 @@ func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
 	if w.canvasImages == nil {
 		w.canvasImages = map[string]*imageSlot{}
 	}
-	if len(w.canvasImages) >= maxCanvasImages {
+	for len(w.canvasImages) >= maxCanvasImages {
 		var oldest string
 		var at uint64 = math.MaxUint64
 		for key, slot := range w.canvasImages {
 			if slot.used < at {
 				oldest, at = key, slot.used
 			}
+		}
+		if at > w.canvasPass {
+			// Every image was drawn by the paint under way: evicting one would load it again at the next paint, forever.
+			break
 		}
 		w.canvasImages[oldest].reset(driver.ImageSource{})
 		delete(w.canvasImages, oldest)
@@ -1070,7 +1079,14 @@ func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
 	return s
 }
 
+// maxCanvasImages bounds the encoded sources a window's canvases keep, loaded, loading or failed; the least recently drawn go first, but never one the paint under way drew, so a paint drawing more keeps them all until a later paint draws others.
 const maxCanvasImages = 64
+
+// endCanvasPass ends the paint that drew the images used so far: they may be evicted from now on.
+func (w *window) endCanvasPass() {
+	w.canvasPassPosted = false
+	w.canvasPass = w.canvasImageUse
+}
 
 func (w *window) closeCanvasImages() {
 	w.canvasClosed = true

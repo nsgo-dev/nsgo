@@ -1619,6 +1619,12 @@ func (s *surface) canvasRequest(r *reader) {
 		}
 		return
 	}
+	if src.Pixels != nil {
+		// Android's canvases draw no pixels yet: a failed entry, with no log line for each version.
+		s.canvasRequests.finish(surface, key, load)
+		s.sendCanvasImage(surface, key, request, decodedImage{}, false)
+		return
+	}
 	go func() {
 		data, err := imageload.Load(ctx, src, nil)
 		var img decodedImage
@@ -1631,15 +1637,12 @@ func (s *surface) canvasRequest(r *reader) {
 		if err != nil {
 			log.Printf("nsgo: canvas: image %s: %v", key, err)
 		}
-		// An empty response records a bounded failed entry, avoiding a retry
-		// loop on every redraw. Java rejects obsolete request generations.
+		// An empty response records a bounded failed entry, avoiding a retry loop on every redraw. Java rejects obsolete request generations.
 		s.sendCanvasImage(surface, key, request, img, false)
 	}()
 }
 
-// sendCanvasImage returns bytes, a failed decode (empty bytes), or an obsolete
-// source (unavailable). The latter removes the pending entry so a later drawing
-// of the source can request it after its mount has registered it again.
+// sendCanvasImage returns bytes, a failed decode (empty bytes), or an obsolete source (unavailable). The latter removes the pending entry so a later drawing of the source can request it after its mount has registered it again.
 func (s *surface) sendCanvasImage(surface uint32, key string, request uint32, img decodedImage, unavailable bool) {
 	if err := s.send(msgCanvasImage, func(w *writer) {
 		w.u32(surface)

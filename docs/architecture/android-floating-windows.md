@@ -20,7 +20,7 @@ Phones open no windows, so the first tree is the activity's view and `OpenWindow
 
 1. Every batch, image and event carries its surface's ID, 0 for the activity's view, and `NsgoEngine`'s first view hands an overlay's on to the overlay's own `NsgoView`, with its own nodes, gestures, animations and environment.
 2. The overlay's view reports its size, applied frame and environment with `SURFACE` messages, the first of which attaches its tree, and its end with the reason; a refused overlay is attached only to be ended.
-3. What is the process's, text and fonts, canvas images and shader programs, downloads, folders and the host channel, stays with the first view.
+3. What is the process's, text and fonts, shader programs, downloads, folders and the host channel, stays with the first view. Each view keeps its own canvas images, released as it closes ([canvas](canvas.md#players)).
 
 A second view of an Activity, a fresh Activity attaching to a running engine and the `SurfaceAttach`/`SurfaceResync` protocol remain #12's later stages ([Android engine and view lifetime](android-lifecycle.md)).
 

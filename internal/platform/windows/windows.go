@@ -464,7 +464,10 @@ type window struct {
 	// canvasImages are the images canvases draw, by ImageSource.Key.
 	canvasImages   map[string]*imageSlot
 	canvasImageUse uint64
-	canvasClosed   bool
+	// canvasPass is canvasImageUse when the last paint ended: images used since then are the current paint's, which eviction keeps; canvasPassPosted says an endCanvasPass is posted.
+	canvasPass       uint64
+	canvasPassPosted bool
+	canvasClosed     bool
 	// canvasFrames are the pictures of the pixels canvases drew last (canvasFrame).
 	canvasFrames      []*imageSlot
 	canvasFramePixels int // the pixels of canvasFrames together

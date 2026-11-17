@@ -140,7 +140,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final NsgoView primary;
     /** The surface this view shows, 0 for the first view's, else an overlay's (driver.SurfaceOverlay). */
     private final int surface;
-    final CanvasImages<CanvasNode.Picture> canvasImages = new CanvasImages<>(this::requestCanvasImage, p -> p.bitmap.recycle());
+    final CanvasImages<CanvasNode.Picture> canvasImages = new CanvasImages<>(this::requestCanvasImage, p -> p.bitmap.recycle(), ui::post);
     /** The first view's overlays over other apps, null on an overlay's view. */
     private final Overlays overlays;
     /** Canvas decodes can be removed from the queue when their cache entry is evicted. */

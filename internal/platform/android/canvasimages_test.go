@@ -1,6 +1,7 @@
 package android
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -40,7 +41,8 @@ func canvasSourceBatch(id driver.NodeID, sources ...driver.ImageSource) *driver.
 func TestCanvasRequestsBoundedAndReloadable(t *testing.T) {
 	var c canvasRequests
 	defer c.closeSurface(0)
-	src := driver.ImageSource{URI: "first"}
+	key := func(i int) string { return driver.ImageSource{URI: fmt.Sprintf("image-%d", i)}.Key() }
+	src := driver.ImageSource{URI: "image-0"}
 	c.update(0, canvasSourceBatch(1, src))
 	ctx, _, first, _ := c.start(0, src.Key(), 1)
 	for i := 1; i < 1000; i++ {
@@ -48,6 +50,10 @@ func TestCanvasRequestsBoundedAndReloadable(t *testing.T) {
 		c.update(0, canvasSourceBatch(1, s))
 		if _, got, load, ok := c.start(0, s.Key(), uint32(i+1)); !ok || load == nil || got.URI != s.URI {
 			t.Fatalf("source %d not available", i)
+		}
+		if i >= maxCanvasImages {
+			// Java's cache evicts its oldest pending entry and cancels its request.
+			c.cancel(0, key(i-maxCanvasImages), uint32(i-maxCanvasImages+1))
 		}
 		if n := len(c.trees[0].loads); n > maxCanvasImages {
 			t.Fatalf("%d loads", n)
@@ -66,6 +72,30 @@ func TestCanvasRequestsBoundedAndReloadable(t *testing.T) {
 	}
 	if !c.finish(0, src.Key(), reload) {
 		t.Fatal("reloaded source did not complete")
+	}
+}
+
+// A drawing of more sources than Java's limit keeps them all pending in one pass: Go must not cancel any, or Java would wait for it forever.
+func TestCanvasRequestsKeepAWideDrawingsLoads(t *testing.T) {
+	var c canvasRequests
+	defer c.closeSurface(0)
+	sources := make([]driver.ImageSource, 2*maxCanvasImages)
+	for i := range sources {
+		sources[i] = driver.ImageSource{URI: fmt.Sprintf("image-%d", i)}
+	}
+	c.update(0, canvasSourceBatch(1, sources...))
+	var ctxs []context.Context
+	for i, src := range sources {
+		ctx, _, load, ok := c.start(0, src.Key(), uint32(i+1))
+		if !ok || load == nil {
+			t.Fatalf("source %d not available", i)
+		}
+		ctxs = append(ctxs, ctx)
+	}
+	for i, ctx := range ctxs {
+		if ctx.Err() != nil {
+			t.Fatalf("load %d cancelled without Java asking", i)
+		}
 	}
 }
 

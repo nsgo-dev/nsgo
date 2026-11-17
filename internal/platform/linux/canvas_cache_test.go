@@ -87,11 +87,12 @@ func TestCanvasImageCacheBoundsPendingAndDropsQueuedResults(t *testing.T) {
 	defer w.closeCanvasImages()
 	sources := canvastest.CacheSources(1000)
 	old := w.canvasImage(sources[0], &view{deleted: true})
+	// The paint's end is posted at once; the load's result follows it.
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
 		w.mu.Lock()
 		n := len(w.tasks)
 		w.mu.Unlock()
-		if n > 0 {
+		if n > 1 {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -99,6 +100,7 @@ func TestCanvasImageCacheBoundsPendingAndDropsQueuedResults(t *testing.T) {
 		}
 	}
 	for _, src := range sources[1:] {
+		w.endCanvasPass()
 		w.canvasImage(src, &view{deleted: true})
 		if len(w.canvasImages) > maxCanvasImages || len(w.canvasWaiting) > maxCanvasImages {
 			t.Fatal("pending cache grew beyond limit")
@@ -112,5 +114,55 @@ func TestCanvasImageCacheBoundsPendingAndDropsQueuedResults(t *testing.T) {
 	w.runTasks()
 	if len(w.canvasImages) != 0 || len(w.canvasWaiting) != 0 {
 		t.Fatal("closed cache revived")
+	}
+}
+
+// A frame drawing more sources than the bound keeps them all: evicting one would load it again at every frame, forever.
+func TestCanvasImageCacheKeepsAWideFrame(t *testing.T) {
+	if err := openLibs(); err != nil {
+		t.Skip(err)
+	}
+	w := &window{animator: driver.NewAnimator(nil), env: driver.Environment{PixelRatio: 1}}
+	defer w.closeCanvasImages()
+	sources := canvastest.CacheSources(2 * maxCanvasImages)
+	slots := map[*imageSlot]bool{}
+	for _, src := range sources {
+		slots[w.canvasImage(src, &view{deleted: true})] = true
+	}
+	if len(w.canvasImages) != len(sources) {
+		t.Fatalf("a frame of %d sources kept %d", len(sources), len(w.canvasImages))
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		w.runTasks()
+		loaded := 0
+		for s := range slots {
+			if s.load == nil && s.pic != nil {
+				loaded++
+			}
+		}
+		if loaded == len(slots) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d loaded", loaded, len(slots))
+		}
+	}
+	for _, src := range sources {
+		if s := w.canvasImage(src, &view{deleted: true}); !slots[s] || s.pic == nil {
+			t.Fatal("the next frame loaded a wide frame's image anew")
+		}
+	}
+	w.runTasks()
+	for _, src := range canvastest.CacheSources(maxCanvasImages) {
+		w.canvasImage(src, &view{deleted: true})
+		w.endCanvasPass()
+	}
+	if len(w.canvasImages) > maxCanvasImages || len(w.canvasWaiting) > maxCanvasImages {
+		t.Fatalf("%d cached after later frames", len(w.canvasImages))
+	}
+	for s := range slots {
+		if s.pic != nil || s.surface != 0 {
+			t.Fatal("a wide frame's evicted image kept its resources")
+		}
 	}
 }

@@ -113,3 +113,55 @@ func TestCanvasImageNativeCacheBoundAndReload(t *testing.T) {
 	s.Sync()
 	checkPixels(true)
 }
+
+// A drawing of more sources than the bound keeps them all and draws them all, rather than evicting some at every redraw and loading them again forever.
+func TestCanvasImageNativeCacheKeepsAWideDrawing(t *testing.T) {
+	sources := canvastest.CacheSources(2 * maxCanvasImages)
+	surface, err := testhost.Current().Open(func(cx *core.Scope) core.Node {
+		return core.Canvas{Style: core.Style{Width: core.Pct(100), Height: core.Pct(100)}, Draw: func(d *core.Drawing, size core.Size) {
+			for i, s := range sources {
+				d.DrawImageIn(core.ImageSource{Data: s.Data}, float32(i%16)*4, float32(i/16)*4, 4, 4)
+			}
+		}}
+	}, testhost.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := surface.(*testSurface)
+	s.Sync()
+	state := func(src driver.ImageSource) (int, bool) {
+		t.Helper()
+		data, err := s.ask(map[string]any{"op": "canvas-images", "key": src.Key()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var result struct {
+			Count int
+			Ready bool
+		}
+		if err := json.Unmarshal([]byte(data), &result); err != nil {
+			t.Fatal(err)
+		}
+		return result.Count, result.Ready
+	}
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		ready := 0
+		count := 0
+		for _, src := range sources {
+			n, ok := state(src)
+			count = n
+			if ok {
+				ready++
+			}
+		}
+		if ready == len(sources) {
+			if count != len(sources) {
+				t.Fatalf("%d cached for a drawing of %d", count, len(sources))
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d sources drawn, %d cached", ready, len(sources), count)
+		}
+	}
+}

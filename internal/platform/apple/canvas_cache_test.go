@@ -83,6 +83,7 @@ func TestCanvasImageCacheBoundsPendingAndFailed(t *testing.T) {
 	canvasImage(sources[0], CanvasHost{})
 	old := canvasImages[sources[0].Key()]
 	for _, src := range sources[1:] {
+		endCanvasPass()
 		canvasImage(src, CanvasHost{})
 		if len(canvasImages) > maxCanvasImages {
 			t.Fatal("pending cache grew beyond limit")
@@ -113,5 +114,76 @@ func TestCanvasImageCacheBoundsPendingAndFailed(t *testing.T) {
 			t.Fatal("reload timed out")
 		}
 		time.Sleep(time.Millisecond)
+	}
+}
+
+// A pass drawing more sources than the bound keeps them all: evicting one would load it again at every pass, forever.
+func TestCanvasImageCacheKeepsAWidePass(t *testing.T) {
+	isolatedCanvasImages(t)
+	runMain()
+	sources := canvastest.CacheSources(2 * maxCanvasImages)
+	for _, src := range sources {
+		canvasImage(src, CanvasHost{Ratio: 1})
+	}
+	if len(canvasImages) != len(sources) {
+		t.Fatalf("a pass of %d sources kept %d", len(sources), len(canvasImages))
+	}
+	kept := map[*loadedImage]bool{}
+	for _, src := range sources {
+		kept[canvasImages[src.Key()]] = true
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		runMain()
+		loaded := 0
+		for im := range kept {
+			if im.image != 0 {
+				loaded++
+			}
+		}
+		if loaded == len(kept) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d loaded", loaded, len(kept))
+		}
+	}
+	for _, src := range sources {
+		if im := canvasImage(src, CanvasHost{}); !kept[im] || im.image == 0 {
+			t.Fatal("the next pass loaded a wide pass's image anew")
+		}
+	}
+	runMain()
+	for _, src := range canvastest.CacheSources(maxCanvasImages) {
+		canvasImage(src, CanvasHost{})
+		endCanvasPass()
+	}
+	if len(canvasImages) > maxCanvasImages {
+		t.Fatalf("%d cached after later passes", len(canvasImages))
+	}
+	for im := range kept {
+		if im.image != 0 {
+			t.Fatal("a wide pass's evicted image kept its native image")
+		}
+	}
+}
+
+// What waited for a load that eviction cancels draws again, to ask for it anew: a shader, which draws only when its images arrive, would otherwise never get its texture.
+func TestCanvasImageCacheEvictionRedrawsWaiters(t *testing.T) {
+	isolatedCanvasImages(t)
+	runMain()
+	sources := canvastest.CacheSources(maxCanvasImages + 1)
+	redrawn := 0
+	canvasImage(sources[0], CanvasHost{Owner: t, Redraw: func() { redrawn++ }})
+	im := canvasImages[sources[0].Key()]
+	for _, src := range sources[1:] {
+		endCanvasPass()
+		canvasImage(src, CanvasHost{})
+	}
+	if canvasImages[sources[0].Key()] == im {
+		t.Fatal("oldest pending image not evicted")
+	}
+	runMain()
+	if redrawn != 1 {
+		t.Fatalf("waiter redrawn %d times", redrawn)
 	}
 }
