@@ -1002,8 +1002,7 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 		}}
 	}
 	w := startTestWindow(t, app, Options{Title: title, Width: 360, Height: 240})
-	// A timeout may precede every media callback. Keep the native state
-	// in the failure report so CI distinguishes that from a missed end.
+	// A timeout may precede every media callback. Keep the native state in the failure report so CI distinguishes that from a missed end.
 	t.Cleanup(func() {
 		if !t.Failed() {
 			return
@@ -1016,8 +1015,12 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 				s := v.video.stream
 				t.Logf("video: loaded=%t failed=%t requested=%t prepared=%d playing=%d ended=%d",
 					v.video.loaded, v.video.failed, v.video.playing, gtkMediaStreamIsPrepared(s), gtkMediaStreamGetPlaying(s), gtkMediaStreamGetEnded(s))
-				t.Logf("media: audio=%d video=%d duration=%d time=%d error=%#x",
-					gtkMediaStreamHasAudio(s), gtkMediaStreamHasVideo(s), gtkMediaStreamGetDuration(s), gtkMediaStreamGetTimestamp(s), gtkMediaStreamGetError(s))
+				msg := "none"
+				if e := gtkMediaStreamGetError(s); e != 0 {
+					msg = goString((*gError)(cPointer(e)).message)
+				}
+				t.Logf("media: audio=%d video=%d duration=%d time=%d error=%s",
+					gtkMediaStreamHasAudio(s), gtkMediaStreamHasVideo(s), gtkMediaStreamGetDuration(s), gtkMediaStreamGetTimestamp(s), msg)
 			}
 		})
 	})
