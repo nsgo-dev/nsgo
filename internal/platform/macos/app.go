@@ -244,11 +244,15 @@ func (s *surface) showPanel(anchor uint32, at driver.Bounds, side driver.WindowP
 // movePanel moves a panel where showPanel shows it, without showing it.
 func (s *surface) movePanel(anchor uint32, at driver.Bounds, side driver.WindowPlacement) {
 	w := s.window
+	w.Send(sel("setFrameOrigin:"), panelOrigin(anchor, at, side, objc.Send[apple.CGRect](w, sel("frame")).Size))
+}
+
+// panelOrigin returns the AppKit origin of a panel's frame of size where showPanel shows it.
+func panelOrigin(anchor uint32, at driver.Bounds, side driver.WindowPlacement, size apple.CGSize) apple.CGPoint {
 	if side != driver.WindowPlaceDefault {
-		w.Send(sel("setFrameOrigin:"), placePanel(at, objc.Send[apple.CGRect](w, sel("frame")).Size, side))
-		return
+		return placePanel(at, size, side)
 	}
-	frame := objc.Send[apple.CGRect](w, sel("frame"))
+	frame := apple.CGRect{Size: size}
 	var screen objc.ID
 	if tr := trays[anchor]; tr != nil && tr.item != 0 {
 		bar := tr.item.Send(sel("button")).Send(selWindow)
@@ -281,10 +285,10 @@ func (s *surface) movePanel(anchor uint32, at driver.Bounds, side driver.WindowP
 		frame.Origin.X = max(v.Origin.X+8, min(frame.Origin.X, v.Origin.X+v.Size.Width-frame.Size.Width-8))
 		frame.Origin.Y = max(v.Origin.Y+8, min(frame.Origin.Y, v.Origin.Y+v.Size.Height-frame.Size.Height))
 	}
-	w.Send(sel("setFrameOrigin:"), frame.Origin)
+	return frame.Origin
 }
 
-// fitPanel sizes a panel's content to width by height, the size its content takes (driver.WindowFitSize), keeping its top edge: one that shows beside the rectangle ShowAt placed it at, or under its tray icon, is placed there again at its new size.
+// fitPanel sizes a panel's content to width by height, the size its content takes (driver.WindowFitSize), keeping its top edge: one that shows beside the rectangle ShowAt placed it at, or under its tray icon, takes its new size there in the same move.
 func (s *surface) fitPanel(width, height driver.Points) {
 	w := s.window
 	frame := objc.Send[apple.CGRect](w, sel("frame"))
@@ -293,13 +297,10 @@ func (s *surface) fitPanel(width, height driver.Points) {
 	frame.Size.Width += float64(width) - content.Width
 	frame.Size.Height += float64(height) - content.Height
 	frame.Origin.Y = top - frame.Size.Height
+	if tr := trays[s.anchor]; objc.Send[bool](w, sel("isVisible")) && (s.placement != driver.WindowPlaceDefault || tr != nil && tr.item != 0) {
+		frame.Origin = panelOrigin(s.anchor, s.anchorBounds, s.placement, frame.Size)
+	}
 	w.Send(sel("setFrame:display:"), frame, true)
-	if !objc.Send[bool](w, sel("isVisible")) {
-		return
-	}
-	if tr := trays[s.anchor]; s.placement != driver.WindowPlaceDefault || tr != nil && tr.item != 0 {
-		s.movePanel(s.anchor, s.anchorBounds, s.placement)
-	}
 }
 
 // orderPanelFront shows a panel in front, as the key window unless it never takes the keyboard: then orderFrontRegardless leaves the key window, and the app in front, as they are.
