@@ -59,6 +59,19 @@ func TestEmptyWebSourceLoadsBlank(t *testing.T) {
 	}
 }
 
+func TestBlankWebNavigationHasNoSyntheticTitle(t *testing.T) {
+	var got WebNavigation
+	h := newHost(t, Size{Width: 100, Height: 100}, func(*Scope) Node {
+		return WebView{TestID: "web", OnLoad: func(nav WebNavigation) { got = nav }}
+	})
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventLoad, ID: h.find("web").id,
+		Navigation: &driver.WebNavigation{URL: "about:blank", Title: "about:blank"}})
+	if got.URL != "about:blank" || got.Title != "" {
+		t.Fatalf("blank navigation = %+v, want an empty title", got)
+	}
+}
+
 func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	var ref Ref
 	var src *Signal[WebSource]

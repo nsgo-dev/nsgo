@@ -259,6 +259,12 @@ func (t *Tree) dispatchWeb(n *node, ev driver.Event) {
 	var nav WebNavigation
 	if ev.Navigation != nil {
 		nav = *ev.Navigation
+		// WebView2 exposes its default about:blank title as the URL,
+		// while WebKit and browsers expose no title. Keep the shared
+		// blank-source contract independent of the native web engine.
+		if nav.URL == "about:blank" && nav.Title == "about:blank" {
+			nav.Title = ""
+		}
 	}
 	call := func(fn func(WebNavigation)) {
 		if fn != nil {
