@@ -381,9 +381,7 @@ const (
 	WindowLevelNormal WindowLevel = iota
 	// WindowLevelFloating stays above normal windows, as a palette does.
 	WindowLevelFloating
-	// WindowLevelDesktop sits with the desktop's icons on macOS, on every
-	// space and out of Mission Control; Windows puts the window at the
-	// bottom of the others, where activating it raises it again.
+	// WindowLevelDesktop sits with the desktop's icons on macOS, on every space and out of Mission Control; Windows puts the window at the bottom of the others, where activating it raises it again, and X11 below the others (_NET_WM_STATE_BELOW).
 	WindowLevelDesktop
 )
 

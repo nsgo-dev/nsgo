@@ -26,3 +26,32 @@ func TestLaunchedAtLoginChoosesInitialView(t *testing.T) {
 		})
 	}
 }
+
+func TestWindowLevelAndPlacementFollowTheEnvironment(t *testing.T) {
+	var cx *core.Scope
+	app := nsgotest.Start(t, func(c *core.Scope) core.Node {
+		cx = c
+		text := func(s string) func(*core.Scope) core.Node {
+			return func(*core.Scope) core.Node { return core.Text{Content: s} }
+		}
+		return core.View{Children: []core.Node{
+			core.Show{When: func() bool { return desktop.CanSetWindowLevel(c) }, Then: text("Floats"), Else: text("Stacked")},
+			core.Show{When: func() bool { return desktop.CanPlaceWindows(c) }, Then: text("Placed"), Else: text("Unplaced")},
+		}}
+	}, nsgotest.Environment(core.Environment{OS: core.OSLinux, Idiom: core.IdiomDesktop}))
+	// As on Wayland: the app tells, and the level still goes to the platform, which ignores it.
+	app.Find("text:Stacked")
+	app.Find("text:Unplaced")
+	cx.Post(func() { desktop.SetWindowLevel(cx, desktop.WindowLevelFloating) })
+	app.Settle()
+	if n := len(app.Window); n == 0 || app.Window[n-1] != (core.WindowCommand{Action: core.WindowSetLevel, Level: desktop.WindowLevelFloating}) {
+		t.Fatalf("window commands = %+v", app.Window)
+	}
+	// As on X11, then macOS and Windows.
+	app.SetEnvironment(core.Environment{OS: core.OSLinux, Idiom: core.IdiomDesktop, CanSetWindowLevel: true})
+	app.Find("text:Floats")
+	app.Find("text:Unplaced")
+	app.SetEnvironment(core.Environment{OS: core.OSWindows, Idiom: core.IdiomDesktop, CanSetWindowLevel: true, CanPlaceWindows: true})
+	app.Find("text:Floats")
+	app.Find("text:Placed")
+}

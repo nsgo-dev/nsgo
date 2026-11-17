@@ -54,6 +54,9 @@ type Environment struct {
 	Camera bool
 	// CanSendInput says Ref.SendInput can deliver trusted input to web views.
 	CanSendInput bool
+	// CanSetWindowLevel says WindowSetLevel reaches the window's stacking, and CanPlaceWindows that WindowSetFrame's position moves it; false without a desktop window of the surface's own, and for the second on Linux, whose compositor places windows.
+	CanSetWindowLevel bool
+	CanPlaceWindows   bool
 	// HasWebView says this target provides a web view host.
 	HasWebView bool
 	// SignInWithApple says ItemSignInWithApple and ItemAppleCredentialState reach Sign in with Apple here.

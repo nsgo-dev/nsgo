@@ -753,3 +753,20 @@ func TestRestart(t *testing.T) {
 		t.Fatalf("restart's quit is %+v", it)
 	}
 }
+
+func TestEnvironmentWindowCapabilities(t *testing.T) {
+	var level, place []bool
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		cx.Effect(func() { level = append(level, cx.Env().CanSetWindowLevel()) })
+		cx.Effect(func() { place = append(place, cx.Env().CanPlaceWindows()) })
+		return View{}
+	})
+	h.commit()
+	h.tree.SetEnvironment(Environment{CanSetWindowLevel: true})
+	h.commit()
+	h.tree.SetEnvironment(Environment{CanSetWindowLevel: true, CanPlaceWindows: true})
+	h.commit()
+	if !slices.Equal(level, []bool{false, true}) || !slices.Equal(place, []bool{false, true}) {
+		t.Fatalf("level = %v, place = %v", level, place)
+	}
+}

@@ -99,6 +99,10 @@ func (w *window) environment() driver.Environment {
 
 		// The toast notifier's schedule, which has no repeats.
 		ScheduledNotifications: true,
+
+		// An embedding host owns its window.
+		CanSetWindowLevel: !w.embedded,
+		CanPlaceWindows:   !w.embedded,
 	}
 }
 

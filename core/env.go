@@ -26,6 +26,7 @@ type Env struct {
 	audio, speak         *Signal[bool]
 	camera               *Signal[bool]
 	canSendInput         *Signal[bool]
+	level, place         *Signal[bool]
 	hasWebView           *Signal[bool]
 	appleSignIn          *Signal[bool]
 	purchases            *Signal[bool]
@@ -89,6 +90,8 @@ func newEnv(cx *Scope, app *Env) *Env {
 		speak:            NewSignal(cx, false),
 		camera:           NewSignal(cx, false),
 		canSendInput:     NewSignal(cx, false),
+		level:            NewSignal(cx, false),
+		place:            NewSignal(cx, false),
 		hasWebView:       NewSignal(cx, false),
 		appleSignIn:      NewSignal(cx, false),
 		purchases:        NewSignal(cx, false),
@@ -194,6 +197,8 @@ func (e *Env) set(v Environment) {
 	e.speak.Set(v.Speak)
 	e.camera.Set(v.Camera)
 	e.canSendInput.Set(v.CanSendInput)
+	e.level.Set(v.CanSetWindowLevel)
+	e.place.Set(v.CanPlaceWindows)
 	e.hasWebView.Set(v.HasWebView)
 	e.appleSignIn.Set(v.SignInWithApple)
 	e.purchases.Set(v.Purchases)
@@ -262,6 +267,12 @@ func (e *Env) Minimized() bool { return e.minimized.Get() }
 // WindowFrame returns where the window is and how large: the core's part
 // of desktop.Frame, which apps use.
 func (e *Env) WindowFrame() WindowFrame { return e.windowFrame.Get() }
+
+// CanSetWindowLevel reports whether SetWindowLevel stacks the window: the core's part of desktop.CanSetWindowLevel, which apps use.
+func (e *Env) CanSetWindowLevel() bool { return e.level.Get() }
+
+// CanPlaceWindows reports whether SetWindowFrame moves the window where it says: the core's part of desktop.CanPlaceWindows, which apps use.
+func (e *Env) CanPlaceWindows() bool { return e.place.Get() }
 
 // KeyboardDuration returns how long the keyboard takes to move.
 func (e *Env) KeyboardDuration() time.Duration { return e.keyboardDuration.Get() }

@@ -85,3 +85,5 @@ Themes give `ui`'s components their look in light and dark.
 ## Desktop apps
 
 `nsgo.Run(Root)` shows one root view. A desktop app can open what it shows itself instead: `nsgo.Run(App)` runs `func App(app *core.Scope)` once, and it opens windows, panels, tray icons and global shortcuts with `desktop`, which share its signals. This works on macOS, Windows and Linux; on macOS `examples/tray` keeps out of the Dock and lives in the menu bar.
+
+`desktop.SetWindowLevel` keeps a window above the others, as a timer or a desktop pet does, or below them, and `desktop.SetWindowFrame` moves and sizes it. `desktop.CanSetWindowLevel` and `desktop.CanPlaceWindows` say whether they take effect: both do on macOS and Windows, only the level on Linux under X11, and neither under Wayland, whose compositor stacks and places windows itself.

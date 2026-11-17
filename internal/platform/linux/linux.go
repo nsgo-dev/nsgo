@@ -107,6 +107,9 @@ type window struct {
 	unmanaged    bool
 	anchorBounds driver.Bounds
 	panelSide    driver.WindowPlacement
+	// level is the level SetWindowLevel last asked for, which X11 asks the window manager for again as the window maps once levelWatched.
+	level        driver.WindowLevel
+	levelWatched bool
 	// settingsHandlers are the handlers setupSettings connects to GTK's settings, which outlive the window.
 	settingsHandlers []uint64
 	// contrastHandler is the handler on GNOME's accessibility settings, which are not GTK's.
@@ -1300,7 +1303,7 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 	case driver.WindowSetConstraints:
 		w.setConstraints(c.Constraints)
 	case driver.WindowSetLevel:
-		// Stacking is the compositor's.
+		w.setLevel(c.Level)
 	}
 }
 
