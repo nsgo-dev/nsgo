@@ -52,6 +52,8 @@ tsx.RegisterFunctions("app/native", map[string]any{
 
 `import { Badge, greet } from "app/native"` then takes `Badge`'s fields as props and calls `greet`. Functions taking a `context.Context` become promises, and `tsx.RegisterClass` makes Go types classes TSX creates with `new`.
 
+An optional prop forwarded as `undefined` uses its default. When registering a Go component with a getter whose default differs from its type's zero, add an option such as `tsx.Default("Max", float64(100))`; the same default applies while a reactive prop returns undefined, without replacing the component.
+
 ## Signed packages
 
 An app can run TSX it downloads, such as its own screens delivered anew or plugins, once it verifies the package. Declare what the package's code may reach in its `nsgo.yaml`; it is refused everything else:

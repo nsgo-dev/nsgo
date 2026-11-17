@@ -52,6 +52,8 @@ tsx.RegisterFunctions("app/native", map[string]any{
 
 之后 `import { Badge, greet } from "app/native"` 就会把 `Badge` 的字段当作属性，并能调用 `greet`。接收 `context.Context` 的函数会变成 promise，`tsx.RegisterClass` 则把 Go 类型变成 TSX 可以用 `new` 创建的类。
 
+以 `undefined` 转发的可选属性使用它的默认值。注册的 Go 组件若有默认值不是其类型零值的 getter，加上 `tsx.Default("Max", float64(100))` 这样的选项；响应式属性返回 undefined 时同样使用这个默认值，而且不会替换组件。
+
 ## 签名包
 
 应用可以运行它下载的 TSX，例如重新下发的自身页面或插件，前提是先验证包。在包的 `nsgo.yaml` 中声明它的代码可以访问什么，其余一律拒绝：
