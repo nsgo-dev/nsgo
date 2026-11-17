@@ -60,7 +60,7 @@ core.View{Class: "flex items-center gap-3 rounded-xl border border-zinc-200 bg-w
 
 A class merges under the style, so the style's fields win. Classes can follow what changes with `ClassFunc`, and a state variant (`hover:bg-zinc-100`, `checked:opacity-100`) becomes the style's state. `group` and `group-hover:` style children from a parent's state, `first:` and `last:` follow a child's place, and `aria-checked:`, `data-open:` and `focus-within:` follow the states a control shows.
 
-Mark a control with `peer` to style later siblings from its state, for example a checkbox with `Class: "peer"` followed by a label with `Class: "peer-checked:text-accent peer-disabled:opacity-50"`. Peers share a parent, including through `Show` and `Each`; they do not match earlier siblings or descendants. Use `peer/field` with `peer-checked/field:` to name one set, and `peer-data-invalid:` for a control's boolean `invalid` data state. Markers and states update reactively.
+Mark a control with `peer` to style later siblings from its state, for example a checkbox with `Class: "peer"` followed by a label with `Class: "peer-checked:text-accent peer-disabled:opacity-50"`. A peer styles only the siblings after it under the same parent, `Show` and `Each` included, never earlier siblings or the views inside it. Use `peer/field` with `peer-checked/field:` to name one set, and `peer-data-invalid:` for a control's boolean `invalid` data state. Markers and states update reactively.
 
 The theme's `Tailwind` field extends the default theme with colors, breakpoints and utilities, and a color the palette lacks names a `Palette` role (`bg-accent`, `text-text-muted/70`) or a theme color, read from the node's theme in the appearance it shows.
 
