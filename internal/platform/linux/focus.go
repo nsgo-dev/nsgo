@@ -77,6 +77,9 @@ func (w *window) focusView(v *view) {
 }
 
 func (w *window) setControlFocus(v *view) {
+	if v != nil {
+		w.restoreControl = nil
+	}
 	old := w.controlFocus
 	if old == v {
 		return
@@ -108,11 +111,20 @@ func controlFocusCallback(widget, pspec, data uintptr) {
 
 func (w *window) checkControlFocus() {
 	v := w.controlFocus
-	if v == nil {
-		return
-	}
-	if !w.focusableView(v) {
-		w.focusEntry(nil)
+	switch {
+	case v != nil && (v.deleted || v.style.Hidden || !v.props.FocusStop(v.events)):
+		w.setControlFocus(nil)
+		w.restoreControl = nil
+	case v != nil && !w.focusableView(v):
+		w.setControlFocus(nil)
+		w.restoreControl = v
+	case w.controlFocus == nil && w.restoreControl != nil:
+		r := w.restoreControl
+		if r.deleted || r.style.Hidden || !r.props.FocusStop(r.events) {
+			w.restoreControl = nil
+		} else if w.focusableView(r) {
+			w.focusView(r)
+		}
 	}
 }
 

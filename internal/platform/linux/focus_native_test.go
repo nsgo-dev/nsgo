@@ -199,3 +199,64 @@ func TestEmbeddedClickKeepsControlFocus(t *testing.T) {
 		}
 	})
 }
+
+func TestControlFocusReturnsAfterModal(t *testing.T) {
+	const title = "nsgo-modal-focus"
+	var open *core.Signal[bool]
+	var root *core.Scope
+	var button core.Ref
+	app := func(cx *core.Scope) core.Node {
+		root = cx
+		open = core.NewSignal(cx, false)
+		cx.SetTitle(title)
+		cx.OnKeyWith("mod+b", core.KeyOptions{When: core.KeyAlways}, button.Focus)
+		return core.View{Style: core.Style{Width: core.Pt(240), Height: core.Pt(180)}, Children: []core.Node{
+			core.View{TestID: "opener", Ref: &button, Style: core.Style{Width: core.Pt(120), Height: core.Pt(40)},
+				Focusable: func() bool { return true },
+				OnFocus:   func() { cx.SetTitle(title + "|focused") }},
+			core.Show{When: open.Get, Then: func(*core.Scope) core.Node {
+				return core.Modal{Children: []core.Node{core.View{Style: core.Style{Width: core.Pt(120), Height: core.Pt(60)}}}}
+			}},
+		}}
+	}
+	w := startTestWindow(t, app, Options{Title: title, Width: 240, Height: 180})
+	waitForTitle(t, w, title)
+	w.onLoop(t, func() {
+		for _, b := range w.keys {
+			if b.Key == "mod+b" {
+				w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: b.ID})
+				return
+			}
+		}
+		t.Fatal("no focus binding")
+	})
+	waitForTitle(t, w, title+"|focused")
+	root.Post(func() { open.Set(true) })
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		var covered bool
+		w.onLoop(t, func() {
+			covered = w.controlFocus == nil && w.restoreControl != nil && w.restoreControl.props.TestID == "opener"
+		})
+		if covered {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	w.onLoop(t, func() {
+		if w.controlFocus != nil || w.restoreControl == nil {
+			t.Fatal("opening a modal did not retain the opener")
+		}
+	})
+	root.Post(func() { open.Set(false) })
+	deadline = time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		var restored bool
+		w.onLoop(t, func() { restored = w.controlFocus != nil && w.controlFocus.props.TestID == "opener" })
+		if restored {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("the opener did not regain focus after the modal closed")
+}
