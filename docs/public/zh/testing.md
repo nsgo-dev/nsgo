@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 
 `app.PressWith("id:row", core.Modifiers{Shift: true})` 为一次点击按住修饰键；`PressAtWith(selector, core.Point{X: 20, Y: 10}, mods)` 点击视图中的指定点。`Shift`、`Control`、`Alt` 和 `Platform`（Apple 上为 Command，其他平台为 Windows/Super 键）会通过无头模型和目标的原生输入传给 `OnPressDown`、`OnPressUp` 和 `OnPress`。仍遵循平台的原生约定：例如 macOS 上的 Chrome 会将 Control-click 转为上下文菜单。之后的 `Press` 或 `PressAt` 不带修饰键。watchOS 没有键盘修饰键输入，因此会拒绝带修饰键的点击。
 
-`app.Focus(selector)` 像点击一样聚焦文本框；在桌面或 Web 的 `Environment` 中，或在这些目标上，它用 Tab 走到可按压或 `Focusable` 的视图，之后的 `app.Key("Return")` 会按下它。应用调用的 `Ref.Focus()` 遵循相同的停靠点：文本框在所有平台上都能聚焦，其他视图只在桌面、Web 和 Apple TV 上能聚焦，因此无头测试按钮的焦点需要使用这些环境之一。
+`app.Focus(selector)` 像点击一样聚焦文本框；在桌面或 Web 的 `Environment` 中，或在这些目标上，它用 Tab 走到可按压或 `Focusable` 的视图，之后的 `app.Key("Return")` 会按下它。应用调用的 `Ref.Focus()` 遵循相同的停靠点：文本框在所有平台上都能聚焦，其他视图只在桌面、Web 和 Apple TV 上能聚焦，因此无头测试按钮的焦点需要使用这些环境之一。带有 `OnPress`、`OnPressDown`、`OnPressUp` 或 `OnLongPress` 任意一个的视图都算可按压，与各平台一致；在它上面按 Return 或 Space 会发送它处理的按下、抬起和按压事件，所以只有 `OnLongPress` 的视图能获得焦点，但没有按键能按下它。
 
 ## 运行测试
 

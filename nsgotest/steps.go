@@ -824,8 +824,9 @@ func (a *App) Key(key string) {
 		// The keymap had the key first, including modified activations. Windows sends keys held with Alt as system keys, which go to the window menu rather than the focused view.
 		mods := a.keyModifiers(parts[:len(parts)-1])
 		if (name == "enter" || name == "space") && !(mods.Alt && a.env.OS == driver.OSWindows) {
+			// Return or Space press the pressable the keyboard focus is on, sending the down, up and press events it handles and taking the key even when it handles only a long press, as the platforms do.
 			for _, v := range a.shown() {
-				if v.Focused && v.Kind != driver.KindInput && pressable(v) {
+				if v.Focused && v.Kind != driver.KindInput && v.Events.Pressable() {
 					for _, kind := range []driver.EventKind{driver.EventPressDown, driver.EventPressUp, driver.EventPress} {
 						a.send(v, driver.Event{Kind: kind, Modifiers: mods})
 					}
@@ -898,7 +899,7 @@ func (a *App) focusKeyUse() driver.KeyUse {
 	var use driver.KeyUse
 	for _, v := range a.views {
 		if v.Focused {
-			use |= driver.FocusKeyUse(v.Kind, v.Props.Role, pressable(v) || v.Events.Has(driver.EventLongPress) || v.Events.Has(driver.EventPressUp))
+			use |= driver.FocusKeyUse(v.Kind, v.Props.Role, v.Events.Pressable())
 		}
 	}
 	return use

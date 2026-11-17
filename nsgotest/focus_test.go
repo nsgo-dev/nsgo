@@ -54,15 +54,15 @@ func TestFocusIncludesEveryPressHandler(t *testing.T) {
 		t.Run(string(env.OS), func(t *testing.T) {
 			for _, handler := range []string{"long", "up"} {
 				t.Run(handler, func(t *testing.T) {
-					presses := 0
+					presses, own := 0, 0
 					app := Start(t, func(*core.Scope) core.Node {
 						row := core.Style{Width: core.Pt(100), Height: core.Pt(30)}
 						only := core.View{TestID: "only", Style: row}
 						note := func(core.PressEvent) { presses++ }
 						if handler == "long" {
-							only.OnLongPress = note
+							only.OnLongPress = func(core.PressEvent) { own++ }
 						} else {
-							only.OnPressUp = note
+							only.OnPressUp = func(core.PressEvent) { own++ }
 						}
 						return core.View{Children: []core.Node{
 							core.View{TestID: "first", Style: row, OnPress: note}, only,
@@ -81,8 +81,20 @@ func TestFocusIncludesEveryPressHandler(t *testing.T) {
 					}
 					app.Focus("first")
 					app.Focus("only")
-					if !app.Find("only").Focused || presses != 0 {
-						t.Fatalf("Focus: focused %v, presses %d", app.Find("only").Focused, presses)
+					if !app.Find("only").Focused || presses != 0 || own != 0 {
+						t.Fatalf("Focus: focused %v, presses %d, own %d", app.Find("only").Focused, presses, own)
+					}
+					// Return and Space on the stop send its up event, as the platforms' key handlers do; a long press has no key.
+					want := 1
+					if handler == "long" {
+						want = 0
+					}
+					for _, key := range []string{"Return", "Space"} {
+						own = 0
+						app.Key(key)
+						if own != want || presses != 0 || !app.Find("only").Focused {
+							t.Errorf("%s: own %d (want %d), others %d, focused %v", key, own, want, presses, app.Find("only").Focused)
+						}
 					}
 				})
 			}
