@@ -105,7 +105,7 @@ For `nsgo.Run(App)`, `Run` keeps its root window hidden as the app's own surface
 | `run_app` shows one `AppView` in one window; more windows are a host's, an engine each | One engine with a surface per window, panel and tray view, which the app opens as Avalonia's apps do | Go code is trusted and in one process, so windows share signals instead of crossing a host channel |
 | `keep_alive_on_close`, macOS only | `SetShutdownMode` and a cancelable `OnClosing` | Tray and background apps outlive their windows |
 | No tray, panels, global shortcuts, Dock policy or launch at login | `desktop` has them | Desktop apps need them |
-| File types registered at runtime on Windows | NSIS owns registration and cleanup; Linux infers common MIME types and defines unknown owned extensions | Installers can remove dropped types on upgrade without changing user defaults; a build’s declarations are independent of its host’s MIME database |
+| File types registered at runtime on Windows | NSIS owns registration and cleanup; Linux infers common MIME types and defines unknown owned extensions | Installers can remove dropped types on upgrade without changing user defaults; a build's declarations are independent of its host's MIME database |
 | `nsh.json`'s window size | `nsgo.WindowSize`, `nsgo.WindowConstraints` and `WindowOptions` | An app opens windows of different sizes, or none |
 
 ## Verification

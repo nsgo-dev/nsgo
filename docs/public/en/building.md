@@ -195,7 +195,7 @@ Stores reject apps that update themselves, so upload a `store` build, never a di
 
 ## File types
 
-`file_types` registers the documents an app opens: in Finder on macOS, Explorer’s Open With through NSIS or MSIX on Windows, and Linux desktop entries in deb, Arch, AppImage and Flatpak packages:
+`file_types` registers the documents an app opens: from the Finder, the Dock and Open With on macOS, from Explorer's Open With through the NSIS installer or the MSIX on Windows, and through the desktop entry of the Debian, Arch, AppImage and Flatpak packages on Linux:
 
 ```yaml
 file_types:
@@ -208,7 +208,7 @@ file_types:
     # mime: [application/json]     # existing MIME types; otherwise inferred on Linux
 ```
 
-Windows installers add the app to Open With without replacing the user’s default, and remove their registrations on upgrade or uninstall. Linux uses a fixed table for common extensions; an unknown extension of an app-owned type gets `application/x-<type id>` and a shared MIME-info definition. Set `mime` for an imported type whose extensions are unknown, or to use an existing MIME type instead of inference. The generated app-owned MIME name can also be explicit. AppImage desktop integration must install its bundled desktop entry and any `usr/share/mime/packages` definitions; running an AppImage alone registers nothing.
+The Windows installer adds the app to Open With without replacing the user's default, and removes its registrations on upgrade and uninstall. Linux names the MIME types of common extensions from a fixed table, and gives an unknown extension of the app's own type `application/x-<type id>` with a shared MIME-info definition. `mime` names existing types instead; an imported type whose extension the table lacks needs it. Running an AppImage registers nothing: a desktop integration tool installs its entry and definitions.
 
 The app hears the files with `desktop.OnOpenFiles`, including a later Windows or Linux launch while it is running. Files that launched the app wait for the first handler:
 

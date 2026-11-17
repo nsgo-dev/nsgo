@@ -195,7 +195,7 @@ updates:
 
 ## 文件类型
 
-`file_types` 让 macOS 应用能从访达、程序坞和“打开方式”打开它的文档：
+`file_types` 登记应用能打开的文档：macOS 上从访达、程序坞和“打开方式”打开，Windows 上通过 NSIS 安装程序或 MSIX 出现在资源管理器的“打开方式”里，Linux 上通过 Debian、Arch、AppImage 和 Flatpak 包的桌面项登记：
 
 ```yaml
 file_types:
@@ -205,9 +205,12 @@ file_types:
     # icon: assets/Flow.icns       # 或正方形 PNG
     # role: viewer                 # 默认为 editor
     # conforms: [public.json]      # 默认为 public.data
+    # mime: [application/json]     # 已有的 MIME 类型；省略时 Linux 自行推断
 ```
 
-应用用 `desktop.OnOpenFiles` 接收这些文件，在 Windows 和 Linux 上它也接收命令行中给出的文件。启动应用时带来的文件会等到第一个处理函数注册：
+Windows 安装程序把应用加进“打开方式”，不替换用户的默认程序，并在升级和卸载时移除自己的登记。Linux 用固定的表查出常见扩展名的 MIME 类型；应用自有类型中表里没有的扩展名得到 `application/x-<类型 ID>` 和一份共享 MIME-info 定义。`mime` 改用已有的类型；导入的类型若有表里没有的扩展名，必须写它。只运行 AppImage 不会登记任何东西，要由桌面集成工具安装它的桌面项和定义。
+
+应用用 `desktop.OnOpenFiles` 接收这些文件，在 Windows 和 Linux 上也包括应用运行时再次启动所带的文件。启动应用时带来的文件会等到第一个处理函数注册：
 
 ```go
 desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
