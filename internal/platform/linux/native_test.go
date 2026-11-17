@@ -79,9 +79,7 @@ func startTestWindow(t *testing.T, app engine.App, opts Options) *window {
 		}
 		w.run()
 		w.stop()
-		// Close the window for good: its close request only stops the
-		// loop, and a tiling window manager shares the screen between the
-		// windows left open.
+		// Close the window for good: its close request only stops the loop, and a tiling window manager shares the screen between the windows left open.
 		gtkWindowDestroy(w.win)
 		for gMainContextIteration(0, 0) != 0 {
 		}
