@@ -218,3 +218,42 @@ func TestPeerParser(t *testing.T) {
 		}
 	}
 }
+
+func TestPeersFollowKeyedReorders(t *testing.T) {
+	var first, shown, checked *Signal[bool]
+	h := newHost(t, Size{Width: 390, Height: 844}, func(cx *Scope) Node {
+		first, shown, checked = NewSignal(cx, true), NewSignal(cx, true), NewSignal(cx, true)
+		order := func() []string {
+			if first.Get() {
+				return []string{"peer", "label"}
+			}
+			return []string{"label", "peer"}
+		}
+		return Show{When: shown.Get, Then: func(*Scope) Node {
+			return View{Children: []Node{Each(order, func(s string) string { return s }, func(cx *Scope, item func() string, _ func() int) Node {
+				if item() == "peer" {
+					return View{TestID: "peer", Class: "peer", Checked: checked.Get}
+				}
+				return View{TestID: "label", Class: "peer-checked:bg-[#ff0000]"}
+			})}}
+		}}
+	})
+	check := func(name string, color Color) {
+		t.Helper()
+		h.commit()
+		want(t, name, h.find("label").style.Background, color)
+	}
+	check("peer first", RGB(0xff0000))
+	first.Set(false)
+	check("peer moved after", 0)
+	first.Set(true)
+	check("peer moved back", RGB(0xff0000))
+	// The parent queued by the change is gone before the commit.
+	checked.Set(false)
+	shown.Set(false)
+	h.commit()
+	shown.Set(true)
+	check("remounted unchecked", 0)
+	checked.Set(true)
+	check("rechecked", RGB(0xff0000))
+}
