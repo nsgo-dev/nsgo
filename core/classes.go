@@ -24,6 +24,9 @@ type nodeClasses struct {
 // setClasses gives n the classes in class, resolved now.
 func (t *Tree) setClasses(n *node, class string) {
 	t.queuePeerSiblings(n)
+	if n.cls != nil && n.cls.list.spacing {
+		t.queueClassKids(n)
+	}
 	if class == "" {
 		// A node that follows the environment keeps following it, with
 		// no classes, so classes set again do not follow it twice.
@@ -56,12 +59,6 @@ func (t *Tree) setClasses(n *node, class string) {
 	if (l.env || len(l.unknown) > 0 || hasEnvSpans(n)) && !c.bound {
 		c.bound = true
 		t.followEnv(n)
-	}
-	if l.positional {
-		t.positional = true
-	}
-	if l.spacing {
-		t.classKids(n)
 	}
 }
 
@@ -162,10 +159,22 @@ func (t *Tree) classEnv(n *node) classEnv {
 // resolveClasses resolves n's classes for their environment and n's
 // place among its siblings.
 func (t *Tree) resolveClasses(n *node) {
+	var position uint8
+	if n.cls.list.positional {
+		position = n.position()
+	}
+	t.resolveClassesAt(n, position)
+}
+
+// resolveClassesAt uses a position already known by a sibling walk.
+func (t *Tree) resolveClassesAt(n *node, position uint8) {
 	c := n.cls
 	env := c.env
 	if c.list.peerDependent {
 		env.peer = func(p classPeer) bool { return t.matchesPeer(n, p) }
+	}
+	if c.list.spacing {
+		t.queueClassKids(n)
 	}
 	if c.related {
 		t.resolveRelationClasses(n)
@@ -174,9 +183,7 @@ func (t *Tree) resolveClasses(n *node) {
 	if len(c.list.rules) > 0 && c.list.relational {
 		env.has = func(s *classSelector) bool { return s.has(t, n) }
 	}
-	if c.list.positional {
-		env.position = n.position()
-	}
+	env.position = position
 	c.normal, c.important, c.props = c.list.resolve(&env)
 	if g := c.list.groups; len(g) > 0 {
 		// An unnamed group takes a name, as only named groups are groups
@@ -195,13 +202,11 @@ func (n *node) position() uint8 {
 		return 0
 	}
 	kids := p.flatChildren()
-	i := -1
-	for j, k := range kids {
-		if k == n {
-			i = j
-			break
-		}
-	}
+	return childPosition(slices.Index(kids, n), len(kids))
+}
+
+// childPosition returns the positional variants of child i among count children.
+func childPosition(i, count int) uint8 {
 	if i < 0 {
 		return 0
 	}
@@ -209,10 +214,10 @@ func (n *node) position() uint8 {
 	if i == 0 {
 		pos |= positionFirst
 	}
-	if i == len(kids)-1 {
+	if i == count-1 {
 		pos |= positionLast
 	}
-	if len(kids) == 1 {
+	if count == 1 {
 		pos |= positionOnly
 	}
 	// odd: and even: count from 1, as CSS's nth-child.
@@ -224,17 +229,40 @@ func (n *node) position() uint8 {
 	return pos
 }
 
+// queueClassKids defers sibling work until the tree has finished changing.
+// A parent holds no lasting dependency after its positional children
+// move away or lose their classes.
+func (t *Tree) queueClassKids(p *node) {
+	if t.classParents == nil {
+		t.classParents = make(map[*node]bool)
+	}
+	t.classParents[p] = t.classParents[p] || p.cls != nil && p.cls.list.spacing
+	t.changed = true
+}
+
+func (t *Tree) updateClassKids() {
+	for len(t.classParents) > 0 {
+		for p, spacing := range t.classParents {
+			delete(t.classParents, p)
+			if !p.deleted {
+				t.classKids(p, spacing)
+			}
+		}
+	}
+}
+
 // classKids restyles p's children that follow their place among their
 // siblings or the spacing p gives them, as p's children changed.
-func (t *Tree) classKids(p *node) {
-	spacing := p.cls != nil && p.cls.list.spacing
-	for _, c := range p.flatChildren() {
+func (t *Tree) classKids(p *node, spacing bool) {
+	spacing = spacing || p.cls != nil && p.cls.list.spacing
+	kids := p.flatChildren()
+	for i, c := range kids {
 		positional := c.cls != nil && c.cls.list.positional
 		if !spacing && !positional {
 			continue
 		}
 		if positional {
-			t.resolveClasses(c)
+			t.resolveClassesAt(c, childPosition(i, len(kids)))
 		}
 		if t.restyle(c) {
 			t.markLayout(c)

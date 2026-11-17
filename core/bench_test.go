@@ -58,6 +58,35 @@ func BenchmarkViewTick(b *testing.B) {
 	commitEach(b, tree, func(i int) { tick.Set(i + 1) })
 }
 
+// BenchmarkMountPlainChildren checks that positional classes in another
+// branch do not change the cost of mounting ordinary children (#584).
+func BenchmarkMountPlainChildren(b *testing.B) {
+	for _, count := range []int{1000, 4000} {
+		for _, elsewhere := range []bool{false, true} {
+			b.Run(fmt.Sprintf("%d/positional=%t", count, elsewhere), func(b *testing.B) {
+				kids := make([]Node, count)
+				for i := range kids {
+					kids[i] = View{Style: Style{Height: Pt(1)}}
+				}
+				class := ""
+				if elsewhere {
+					class = "last:hidden"
+				}
+				b.ReportAllocs()
+				for range b.N {
+					tree := benchTree(b, Size{Width: 400, Height: 800}, func(*Scope) Node {
+						return View{Children: []Node{
+							View{Children: []Node{View{Class: class}}},
+							View{Children: kids},
+						}}
+					})
+					tree.root.Dispose()
+				}
+			})
+		}
+	}
+}
+
 // board is NSH's quote board: 80 rows of a mark and five cells, the
 // first cells of 40 rows changing together on each tick. Fixed cells
 // have a size of their own; widening values change width every tick.

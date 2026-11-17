@@ -74,9 +74,6 @@ func (t *Tree) updatePeerStyles() {
 			if t.restyle(k) {
 				t.markLayout(k)
 			}
-			if k.cls.list.spacing {
-				t.classKids(k)
-			}
 		}
 	}
 }

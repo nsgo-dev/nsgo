@@ -233,6 +233,7 @@ func (t *Tree) commitRound() {
 	}
 	t.stacks = live
 	t.updatePeerStyles()
+	t.updateClassKids()
 	t.resolve(t.view, textFields{Language: lang}, false)
 	if t.updateLabels() {
 		t.resolve(t.view, textFields{Language: lang}, false)
@@ -244,6 +245,7 @@ func (t *Tree) commitRound() {
 			break
 		}
 		t.updatePeerStyles()
+		t.updateClassKids()
 		t.resolve(t.view, textFields{Language: lang}, false)
 		if t.updateLabels() {
 			t.resolve(t.view, textFields{Language: lang}, false)
