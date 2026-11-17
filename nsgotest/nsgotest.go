@@ -375,11 +375,12 @@ type App struct {
 	// ImageSizes are the pixel sizes of the images the model's platform
 	// loads, by URI, which answer Scope.ImageSize; others fail to load.
 	ImageSizes map[string]driver.Size
-	// tree is the surface steps act on and the model shows: the app's only one, or with a desktop environment its main window (main) once it opened. appTree is the app's own surface with a desktop environment, which opens the windows, nil without one; surfaces are the windows that have opened.
+	// tree is the surface steps act on and the model shows: the app's only one, or with a desktop environment its main window (main) once it opened. appTree is the app's own surface with a desktop environment, which opens the windows, nil without one; surfaces are the windows that have opened, and clear the windows and panels that are transparent, opened so or made so by SetWindowTransparent, which report it as a compositing desktop does (surfaceEnv).
 	tree     *core.Tree
 	appTree  *core.Tree
 	main     *core.Tree
 	surfaces map[uint32]bool
+	clear    map[uint32]bool
 	root     *core.Scope
 	store    *core.Store
 	Clock    *core.ManualClock
@@ -637,6 +638,7 @@ func (a *App) Settle() {
 			batches++
 			a.traceBatch(b, time.Since(began))
 			a.responseTree = t
+			a.setTransparent(t, b)
 			if t == a.tree {
 				a.apply(b)
 			} else {
@@ -659,7 +661,7 @@ func (a *App) Settle() {
 					a.surfaces[surface.ID()] = true
 					surface.SetViewPacing(false)
 					if a.env != nil {
-						surface.SetEnvironment(*a.env)
+						surface.SetEnvironment(a.surfaceEnv(surface, *a.env))
 					}
 					// The main window, which SetMainView opens, is the one steps act on, from its first batch: not a panel, a tray view or another window the app opened before it.
 					if a.main == nil && surface.Window() != nil && surface.Window() == a.root.MainWindow() {
@@ -861,6 +863,35 @@ func (a *App) WaitUntil(timeout time.Duration, cond func() bool) {
 	}
 }
 
+// surfaceEnv is the app's environment env as the platform reports it to surface: a window or a panel that is transparent reports it, as on a compositing desktop.
+func (a *App) surfaceEnv(surface *core.Tree, env driver.Environment) driver.Environment {
+	env.WindowTransparent = a.clear[surface.ID()]
+	return env
+}
+
+// setTransparent records the transparency a window's batch b asks for (WindowSetTransparent) and reports it in the window's environment, as a compositing desktop does.
+func (a *App) setTransparent(t *core.Tree, b *driver.MountBatch) {
+	if a.appTree == nil || t == a.appTree {
+		return
+	}
+	// A window's own, which a panel keeps as it opened, as the platforms do.
+	if i := slices.IndexFunc(a.Opened, func(s SurfaceConfig) bool { return s.ID == t.ID() }); i < 0 || a.Opened[i].Kind != driver.SurfaceWindow {
+		return
+	}
+	for _, it := range b.Items {
+		if it.Kind != driver.ItemWindow || it.Window.Action != driver.WindowSetTransparent || a.clear[t.ID()] == it.Window.On {
+			continue
+		}
+		if a.clear == nil {
+			a.clear = map[uint32]bool{}
+		}
+		a.clear[t.ID()] = it.Window.On
+		if a.env != nil && a.surfaces[t.ID()] {
+			t.SetEnvironment(a.surfaceEnv(t, *a.env))
+		}
+	}
+}
+
 // SetEnvironment reports env as a platform would and settles.
 func (a *App) SetEnvironment(env driver.Environment) {
 	a.t.Helper()
@@ -874,7 +905,7 @@ func (a *App) SetEnvironment(env driver.Environment) {
 		a.appTree.SetEnvironment(env)
 		for _, surface := range a.appTree.Surfaces() {
 			if !surface.Closed() {
-				surface.SetEnvironment(env)
+				surface.SetEnvironment(a.surfaceEnv(surface, env))
 			}
 		}
 	} else {

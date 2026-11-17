@@ -68,8 +68,7 @@ func materialCode(m driver.WindowMaterial) (int, bool) {
 	return 0, false
 }
 
-// setMaterial puts m behind the app's views, or takes the material away
-// and makes the window opaque again for WindowMaterialNone.
+// setMaterial puts m behind the app's views, or takes the material away and makes the window opaque again for WindowMaterialNone, unless the window or panel is transparent, which stays clear (applyBackground).
 func (s *surface) setMaterial(m driver.WindowMaterial) {
 	code, ok := materialCode(m)
 	if !ok {

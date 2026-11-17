@@ -221,6 +221,13 @@ warning := core.Text{ContentFunc: func() string {
 desktop.OpenPanel(cx, desktop.PanelOptions{Width: 600, Height: 400, PointerEvents: desktop.WindowPointerPainted}, Pet)
 ```
 
+`desktop.OpenPanel` 打开一个面板，供这样的快捷键或托盘图标显示：浮在其他窗口之上的无边框窗口。弹出卡片画在带 `Transparent` 的面板上，面板自己不画背景、边框和阴影，只显示卡片的圆角和 `BoxShadow`，阴影要在面板内留出空间；`FitContent` 让面板在首次显示前、以及内容变化时取内容的大小，最大到 `Width` 和 `Height`。`desktop.Transparent` 说明面板此刻是否不绘制任何自身内容，对透明窗口也一样；`desktop.CanMakeWindowsTransparent` 只说明窗口能否透明。为 false 时，例如没有合成器的 Linux，要给内容加上背景。
+
+```go
+lookup := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 380, Height: 520, Transparent: true, FitContent: true, HideOnBlur: true}, Card)
+desktop.RegisterHotKey(cx, "alt+space", lookup.Toggle)
+```
+
 ## 登录
 
 `cx.AuthSession` 在系统的认证会话里用 OAuth 服务登录，而不是在网页视图里：macOS 和 iOS 用 `ASWebAuthenticationSession`，Windows、Linux 以及没有设置 scheme 的 Mac 用默认浏览器加回环地址重定向，Web 用弹出窗口。协议由应用负责：它生成 PKCE 校验码和 state，为传给它的重定向地址拼出授权 URL，并在用 code 换令牌前检查回调。取消不算失败：`errors.Is(err, core.AuthCancelled)` 表示用户关闭了会话，或返回的 `cancel` 结束了它。

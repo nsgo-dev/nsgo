@@ -63,6 +63,8 @@ type Env struct {
 	geometry    *Signal[Geometry]
 	shown       *Memo[Geometry]
 	verticalBar *Signal[VerticalBarEdge]
+	// clear is whether the window or panel draws nothing of its own now (WindowTransparent), apart from transparent, whether the platform can make the scope's window so.
+	clear *Signal[bool]
 	// headers are the system header's heights, which only the tree reads.
 	headers [2]Points
 }
@@ -122,6 +124,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		appearance:       NewSignal(cx, AppearanceSystem),
 		appleKeys:        NewSignal(cx, false),
 		material:         NewSignal(cx, WindowMaterialNone),
+		clear:            NewSignal(cx, false),
 		tokens:           NewSignalFunc(cx, hostColors{}, nil),
 	}
 	if app != nil {
@@ -234,6 +237,7 @@ func (e *Env) set(v Environment) {
 	e.frontmost.Set(v.FrontmostApp)
 	e.canReadFrontmost.Set(v.CanReadFrontmostApp)
 	e.material.Set(v.WindowMaterial)
+	e.clear.Set(v.WindowTransparent)
 	e.verticalBar.Set(v.VerticalBarEdge)
 	e.headers = [2]Points{v.HeaderHeight, max(v.LargeHeaderHeight, v.HeaderHeight)}
 }
@@ -492,6 +496,9 @@ func (e *Env) AppleKeys() bool { return e.appleKeys.Get() }
 // WindowMaterialNone when the window is opaque: the core's part of
 // desktop.ShowsMaterial, which apps use.
 func (e *Env) WindowMaterial() WindowMaterial { return e.material.Get() }
+
+// WindowTransparent reports whether the scope's window or panel draws nothing of its own now, no background, frame or shadow, so what is behind it shows wherever the content draws nothing: a panel opened with PanelOptions.Transparent, or a window opened with WindowOptions.Transparent or made so by SetWindowTransparent, where the platform could. It is the core's part of desktop.Transparent, which apps use. CanMakeWindowsTransparent is whether a window could be; this is whether it is. Where it is false, give the content a background of its own.
+func (e *Env) WindowTransparent() bool { return e.clear.Get() }
 
 // Desktop reports whether the device is a desktop.
 func (e *Env) Desktop() bool { return e.idiom.Get() == IdiomDesktop }

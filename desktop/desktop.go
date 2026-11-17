@@ -145,7 +145,7 @@ func SetWindowShadow(cx *core.Scope, on bool) { cx.SetWindowShadow(on) }
 // SetSkipTaskbar keeps the window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+`, or puts it back; WindowOptions.SkipTaskbar and nsgo.SkipTaskbar open a window so. On macOS the Dock shows the app rather than its windows, and SetDockVisible takes it out. CanSkipTaskbar says whether it takes effect.
 func SetSkipTaskbar(cx *core.Scope, on bool) { cx.SetSkipTaskbar(on) }
 
-// CanMakeWindowsTransparent reports whether the scope's window shows what is behind it while transparent: on macOS; on Windows in a window opened transparent where DirectComposition draws it, the only one SetWindowTransparent changes; on Linux where the display composites with an RGBA visual, as Wayland always does and X11 with a compositing manager. It is false elsewhere, where a transparent window stays opaque, and for a view a host embeds, the app's own scope, a panel or a tray icon, which show in no window of their own.
+// CanMakeWindowsTransparent reports whether the scope's window shows what is behind it while transparent: on macOS; on Windows in a window opened transparent where DirectComposition draws it, the only one SetWindowTransparent changes; on Linux where the display composites with an RGBA visual, as Wayland always does and X11 with a compositing manager. It is false elsewhere, where a transparent window stays opaque, and for a view a host embeds, the app's own scope, a panel or a tray icon, which show in no window of their own. It is what the window could do, not what it does: Transparent says whether the window or a transparent panel draws nothing of its own now.
 func CanMakeWindowsTransparent(cx *core.Scope) bool { return cx.Env().CanMakeWindowsTransparent() }
 
 // CanSkipTaskbar reports whether SkipTaskbar and SetSkipTaskbar keep the scope's window off the taskbar: on Windows, on Linux under X11, and on macOS, where they keep it out of the Window menu and Cmd+` and SetDockVisible is the Dock's. Wayland has no way for an app to, and it is false there, on phones and the web, and for a view a host embeds, the app's own scope, a panel or a tray icon.
@@ -157,6 +157,9 @@ func CanSkipTaskbar(cx *core.Scope) bool { return cx.Env().CanSkipTaskbar() }
 func ShowsMaterial(cx *core.Scope) bool {
 	return cx.Env().WindowMaterial() != core.WindowMaterialNone
 }
+
+// Transparent reports whether the scope's window or panel draws nothing of its own now, no background, frame or shadow, so what is behind it shows wherever the content draws nothing: a panel opened with PanelOptions.Transparent, or a window opened with WindowOptions.Transparent or nsgo.WindowTransparent or made so by SetWindowTransparent, where the platform could. CanMakeWindowsTransparent says whether a window could be transparent, Transparent whether it is: it turns false as SetWindowTransparent gives the window its frame back, and stays false where the platform could not clear it, as on Linux without a compositor or on Windows in a window not opened transparent. Where it is false, give the content a background of its own.
+func Transparent(cx *core.Scope) bool { return cx.Env().WindowTransparent() }
 
 // Maximized reports whether the window is maximized or zoomed, so a
 // maximize button of the app's own can show restore.

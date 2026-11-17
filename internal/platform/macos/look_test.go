@@ -11,7 +11,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// A window made transparent is borderless and clear, still takes the keyboard and Close's Cmd+W and keeps its content's size; made framed again it has its title bar and opaque background back. Off the taskbar it is out of the Window menu and Cmd+`. Its environment reports both, and a panel's neither.
+// A window made transparent is borderless and clear, still takes the keyboard and Close's Cmd+W and keeps its content's size; made framed again it has its title bar and opaque background back. Off the taskbar it is out of the Window menu and Cmd+`. Its environment reports both, and a panel's neither, and says whether the window is transparent now.
 func TestTransparentWindow(t *testing.T) {
 	onMain(func() {
 		loadAppKit()
@@ -56,6 +56,9 @@ func TestTransparentWindow(t *testing.T) {
 		if s.titleBarArea() != (driver.Edges{}) {
 			t.Errorf("a transparent window reports a title bar of %v", s.titleBarArea())
 		}
+		if !s.environment().WindowTransparent {
+			t.Error("a transparent window's environment says it is not transparent")
+		}
 
 		s.setTransparent(false)
 		if mask := objc.Send[uint](window, selStyleMask); mask&styleTitled == 0 {
@@ -66,6 +69,9 @@ func TestTransparentWindow(t *testing.T) {
 		}
 		if got := content(); got != size {
 			t.Errorf("a framed window's content is %v; want %v kept", got, size)
+		}
+		if s.environment().WindowTransparent {
+			t.Error("a window framed again still says it is transparent")
 		}
 
 		if env := s.environment(); !env.CanMakeWindowsTransparent || !env.CanSkipTaskbar {

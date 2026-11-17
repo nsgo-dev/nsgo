@@ -198,6 +198,10 @@ func (s *surface) command(c *driver.WindowCommand) {
 		if s.kind == driver.SurfaceWindow {
 			s.setSkipTaskbar(c.On)
 		}
+	case driver.WindowFitSize:
+		if s.kind == driver.SurfacePanel {
+			s.fitPanel(c.Frame.Width, c.Frame.Height)
+		}
 	case driver.WindowSetAnchor:
 		if s.kind != driver.SurfacePanel {
 			break

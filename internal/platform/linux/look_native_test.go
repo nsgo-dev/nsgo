@@ -10,7 +10,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// TestTransparentWindowLook opens a window transparent and off the task list: it is undecorated without the theme's background, and its environment says transparency shows where the display composites with alpha and the task list hint exists where GDK draws on X11. Made framed again it has both back.
+// TestTransparentWindowLook opens a window transparent and off the task list: it is undecorated without the theme's background, and its environment says transparency shows where the display composites with alpha and the task list hint exists where GDK draws on X11. It reports WindowTransparent where the display composites. Made framed again it has both back and reports it is not transparent.
 func TestTransparentWindowLook(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -35,7 +35,13 @@ func TestTransparentWindowLook(t *testing.T) {
 			t.Errorf("the environment reports transparency %v and the task list %v; the display composites %v and has the hint %v",
 				env.CanMakeWindowsTransparent, env.CanSkipTaskbar, displayComposites(), skipTaskbarHint())
 		}
+		if env.WindowTransparent != displayComposites() {
+			t.Errorf("a transparent window reports WindowTransparent %v where the display composites %v", env.WindowTransparent, displayComposites())
+		}
 		w.setTransparent(false)
+		if w.environment().WindowTransparent {
+			t.Error("a window made framed again reports WindowTransparent")
+		}
 		if hasCSSClass(w.win, cstr("nsgo-transparent")) != 0 || hasCSSClass(w.win, cstr("background")) == 0 || getDecorated(w.win) == 0 {
 			t.Error("a window made framed again lacks its decorations or its theme's background")
 		}

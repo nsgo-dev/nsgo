@@ -176,6 +176,8 @@ const (
 	WindowSetShadow
 	// WindowSetSkipTaskbar keeps a window off the taskbar when On, or puts it back (SurfaceConfig.SkipTaskbar).
 	WindowSetSkipTaskbar
+	// WindowFitSize sizes a panel's content to Frame's Width and Height, the size its content takes (core.PanelOptions.FitContent), keeping the edge it is placed by: one that shows stays beside the rectangle or under the tray icon it was placed at, else keeps its top edge. It changes neither whether it shows nor the focus.
+	WindowFitSize
 )
 
 // SurfaceKind is what an opened surface shows in.
@@ -226,7 +228,7 @@ type SurfaceConfig struct {
 	NoActivate bool
 	// PointerEvents is where a window or a panel takes the pointer (WindowSetPointerEvents).
 	PointerEvents WindowPointerEvents
-	// Transparent opens a window without a background or frame, showing what is behind it wherever the app draws nothing (WindowSetTransparent).
+	// Transparent opens a window without a background or frame, showing what is behind it wherever the app draws nothing (WindowSetTransparent), or has a panel draw nothing of its own, no background, frame or shadow, so only what the app draws shows; the platform reports whether either is so in Environment.WindowTransparent.
 	Transparent bool
 	// NoShadow opens a window without the system's shadow (WindowSetShadow).
 	NoShadow bool

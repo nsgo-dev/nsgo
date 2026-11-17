@@ -302,6 +302,7 @@ func (t *Tree) commitRound() {
 		t.bumpAudit()
 	}
 	t.sizeBars()
+	t.reportFit()
 	t.reportWatches()
 	reports := t.reports
 	t.reports = nil

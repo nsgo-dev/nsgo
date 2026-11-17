@@ -56,6 +56,10 @@ type Tree struct {
 	reports  []report
 	stacks   []*node
 
+	// fit is the largest size of a panel that takes its content's (PanelOptions.FitContent), zero for a surface of the platform's size; reportedSize is the size its platform last reported, which a fitted size differing from is sent (driver.WindowFitSize), and refit says the environment has yet to hear t.size.
+	fit, reportedSize Size
+	refit             bool
+
 	// textColors shares default ink bindings among each owner's views.
 	textColors map[*Scope]*textColorBinding
 	// matchGone and matchNew are the views with a MatchID the round
@@ -732,6 +736,15 @@ func (t *Tree) Mount(app func(cx *Scope) Node) {
 
 // Resize sets the surface size the root fills and the fold geometry measured at it (Env.Geometry), in one batch, so what reads either sees both new. A geometry without regions is divided at size; the zero Geometry is a surface without a fold. A new geometry at the same size still applies.
 func (t *Tree) Resize(size Size, g Geometry) {
+	if t.fit != (Size{}) {
+		// The content decides the size: what the platform reports only says whether it still has to hear it.
+		if size != t.reportedSize {
+			t.reportedSize = size
+			t.markLayout(t.view)
+			t.changed = true
+		}
+		return
+	}
 	if len(g.Regions) == 0 {
 		g = driver.Divide(size, g.Obstructions)
 	}
@@ -745,6 +758,57 @@ func (t *Tree) Resize(size Size, g Geometry) {
 		e.window.Set(size)
 		if !e.geometry.GetUntracked().Equal(g) {
 			e.geometry.Set(g.Clone())
+		}
+	})
+}
+
+// fitContent has the surface take its content's size, up to largest, from the next commit on.
+func (t *Tree) fitContent(largest Size) {
+	t.fit, t.reportedSize = largest, t.size
+	t.markLayout(t.view)
+	t.changed = true
+}
+
+// fitted lays a surface that takes its content's size out at that size, up to t.fit, and sends its platform the size when it changed.
+func (t *Tree) fitted() {
+	t.layoutRoot(t.view, t.fit, false)
+	l := t.view.lstate.Rounded.Size
+	size := Size{Width: min(max(Points(l.Width), 1), t.fit.Width), Height: min(max(Points(l.Height), 1), t.fit.Height)}
+	if size.Width != Points(l.Width) || size.Height != Points(l.Height) {
+		// Too large, or empty: the content fills the size it gets.
+		t.layoutRoot(t.view, size, true)
+	}
+	if size != t.size {
+		t.size, t.refit = size, true
+	}
+	if size != t.reportedSize {
+		t.reportedSize = size
+		frame := WindowFrame{Width: size.Width, Height: size.Height}
+		// A commit that lays out again, as its lists fill, sends only the last size: the platform would end at an earlier one.
+		if i := slices.IndexFunc(t.commands, func(it driver.MountItem) bool {
+			return it.Kind == driver.ItemWindow && it.Window.Action == driver.WindowFitSize
+		}); i >= 0 {
+			t.commands[i].Window.Frame = frame
+			return
+		}
+		// Ahead of what the commit shows it with.
+		t.commands = slices.Insert(t.commands, 0, driver.MountItem{Kind: driver.ItemWindow,
+			Window: &driver.WindowCommand{Action: driver.WindowFitSize, Frame: frame}})
+	}
+}
+
+// reportFit has the environment hear the size the content gave the surface, once its commit round is done.
+func (t *Tree) reportFit() {
+	if !t.refit {
+		return
+	}
+	t.refit = false
+	e := t.root.Env()
+	g := driver.Divide(t.size, e.geometry.GetUntracked().Obstructions)
+	t.root.Batch(func() {
+		e.window.Set(t.size)
+		if !e.geometry.GetUntracked().Equal(g) {
+			e.geometry.Set(g)
 		}
 	})
 }

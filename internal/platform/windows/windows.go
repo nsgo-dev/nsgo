@@ -484,15 +484,13 @@ type window struct {
 	// behind its content, and composed the web views the last frame drew.
 	composition *composition
 	composed    []*webView
-	// baseComposed draws the window's content through DirectComposition,
-	// with its alpha, for a material behind it; backdrop is the DWM
-	// system backdrop, backdropNone when the material could not be set.
+	// baseComposed draws the window's content through DirectComposition, with its alpha, for a material behind it or a transparent window or panel; backdrop is the DWM system backdrop, backdropNone when the material could not be set.
 	baseComposed bool
 	backdrop     int32
 	// material is the material DWM draws, WindowMaterialNone when the
 	// window is opaque.
 	material driver.WindowMaterial
-	// transparent is set while the window shows what is behind it where the app draws nothing, and canTransparent once it opened so, which only such a window can be (look.go).
+	// transparent is set while the window or panel shows what is behind it where the app draws nothing (SurfaceConfig.Transparent), and canTransparent once it opened so, which only such a window can be (look.go).
 	transparent, canTransparent bool
 	// The page holding the mouse while a button is held on it, the one
 	// under it, those holding touch and pen contacts, and the video whose
@@ -891,8 +889,8 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 		opts.Height = cfg.Height
 	}
 	opts.Frame, opts.Material, opts.Constraints, opts.Hidden = cfg.Frame, cfg.Material, cfg.Constraints, cfg.Hidden
-	// Only a window is transparent or off the taskbar of its own choice; a panel never shows there.
-	opts.Transparent, opts.NoShadow, opts.SkipTaskbar = cfg.Transparent && cfg.Kind == driver.SurfaceWindow, cfg.NoShadow,
+	// A window or a panel is transparent of its own choice, a panel drawing its own corners and shadow (applyBare), and only a window is off the taskbar of its own, as a panel never shows there.
+	opts.Transparent, opts.NoShadow, opts.SkipTaskbar = cfg.Transparent && (cfg.Kind == driver.SurfaceWindow || cfg.Kind == driver.SurfacePanel), cfg.NoShadow,
 		cfg.SkipTaskbar && cfg.Kind == driver.SurfaceWindow
 	if cfg.Kind == driver.SurfaceTrayIcon {
 		// The notification-area icon does not yet host a drawn surface on

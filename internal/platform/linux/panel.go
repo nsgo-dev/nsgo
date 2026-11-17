@@ -156,3 +156,11 @@ func (w *window) placementFailed() {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventWindowPlacementFailed, Text: "Linux places a panel at a screen rectangle on X11 only; a Wayland compositor places its windows itself"})
 	}
 }
+
+// fitPanel sizes a panel to width by height, the size its content takes (driver.WindowFitSize), rounded up to GTK's whole logical pixels so a size the core rounded to device pixels, a half point at scale 2, loses none of the content: GTK keeps its top left corner, and one that shows beside the rectangle ShowAt placed it at is placed there again at its new size, on X11.
+func (w *window) fitPanel(width, height driver.Points) {
+	gtkWindowSetDefaultSize(w.win, int32(math.Ceil(float64(width))), int32(math.Ceil(float64(height))))
+	if w.visible && w.panelSide != driver.WindowPlaceDefault {
+		w.placePanel()
+	}
+}

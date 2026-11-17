@@ -548,7 +548,11 @@ func (t *Tree) layout() {
 		t.layoutHeaderViews()
 		return
 	}
-	t.layoutRoot(t.view, t.size, true)
+	if t.fit != (Size{}) {
+		t.fitted()
+	} else {
+		t.layoutRoot(t.view, t.size, true)
+	}
 	t.setFrame(t.view, Bounds{Size: t.size})
 	t.syncFrames(t.view)
 	t.placeFollowers(true)

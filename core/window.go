@@ -55,7 +55,7 @@ type WindowOptions struct {
 	Workspaces WindowWorkspaces
 	// PointerEvents is where the window takes the pointer (SetWindowPointerEvents), from its first frame.
 	PointerEvents WindowPointerEvents
-	// Transparent leaves the window without a background or frame: what is behind it shows wherever the app draws nothing, as for a desktop pet or a widget, and WindowDrag views move it. desktop.SetWindowTransparent changes it later, which on Windows needs a window opened transparent; desktop.CanMakeWindowsTransparent says in the window's scope whether what is behind it shows; where it does not, the window stays opaque.
+	// Transparent leaves the window without a background or frame: what is behind it shows wherever the app draws nothing, as for a desktop pet or a widget, and WindowDrag views move it. desktop.SetWindowTransparent changes it later, which on Windows needs a window opened transparent; desktop.CanMakeWindowsTransparent says in the window's scope whether what is behind it shows; where it does not, the window stays opaque. desktop.Transparent says whether the window is transparent now.
 	Transparent bool
 	// NoShadow drops the system's shadow around the window; on Windows only a transparent window has none.
 	NoShadow bool
@@ -66,8 +66,12 @@ type WindowOptions struct {
 // PanelOptions are a panel's: the core's part of desktop.PanelOptions,
 // which apps use.
 type PanelOptions struct {
-	// Width and Height are the content's size in points.
+	// Width and Height are the content's size in points, 360 by 420 when either is zero; with FitContent, its largest.
 	Width, Height Points
+	// FitContent sizes the panel to its content, as an overlay sizes, up to Width and Height: before it first shows, and again as the content grows or shrinks, keeping the edge it is placed by, the side of what ShowAt placed it beside, the top under a tray icon or elsewhere.
+	FitContent bool
+	// Transparent has the panel draw nothing of its own: no background, no system frame and no shadow, so only what the content draws shows, its own corners and BoxShadow inside the panel's bounds. Env.WindowTransparent, read in the panel, reports whether the platform could; where it could not, as Linux without a compositor, the panel keeps its background.
+	Transparent bool
 	// HideOnBlur hides the panel as it loses the focus, as a tray icon's
 	// panel or a launcher does.
 	HideOnBlur bool
@@ -170,9 +174,15 @@ func (cx *Scope) OpenPanel(opts PanelOptions, content func(cx *Scope) Node) *Win
 	if opts.Width <= 0 || opts.Height <= 0 {
 		opts.Width, opts.Height = 360, 420
 	}
-	return rt.openSurface(cx.current(), driver.SurfaceConfig{Kind: driver.SurfacePanel, Width: opts.Width,
-		Height: opts.Height, Hidden: true, HideOnBlur: opts.HideOnBlur, NoActivate: opts.NoActivate, Material: opts.Material,
-		PointerEvents: cx.windowPointer(opts.PointerEvents)}, content)
+	cfg := driver.SurfaceConfig{Kind: driver.SurfacePanel, Width: opts.Width, Height: opts.Height, Hidden: true,
+		HideOnBlur: opts.HideOnBlur, NoActivate: opts.NoActivate, Material: opts.Material,
+		PointerEvents: cx.windowPointer(opts.PointerEvents), Transparent: opts.Transparent}
+	w := rt.openSurface(cx.current(), cfg, content)
+	if opts.FitContent {
+		// Its first commit, which lays it out, sizes it before anything shows it.
+		w.t.fitContent(Size{Width: opts.Width, Height: opts.Height})
+	}
+	return w
 }
 
 // openSurface opens a surface of cfg's kind showing content under owner:
@@ -190,6 +200,8 @@ func (rt *runtime) openSurface(owner *Scope, cfg driver.SurfaceConfig, content f
 	// It starts in the app's environment until its platform reports its own.
 	env := app.reported
 	env.TitleBar, env.Maximized, env.FullScreen, env.WindowFrame, env.WindowMaterial = Edges{}, false, false, WindowFrame{}, cfg.Material
+	// A window or a panel opened transparent starts so (WindowOptions.Transparent, PanelOptions.Transparent).
+	env.WindowTransparent = cfg.Transparent
 	t.SetEnvironment(env)
 	t.Resize(Size{Width: cfg.Width, Height: cfg.Height}, Geometry{})
 	app.commands = append(app.commands, driver.MountItem{Kind: driver.ItemOpenSurface, Surface: &cfg})

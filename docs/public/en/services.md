@@ -221,6 +221,13 @@ warning := core.Text{ContentFunc: func() string {
 desktop.OpenPanel(cx, desktop.PanelOptions{Width: 600, Height: 400, PointerEvents: desktop.WindowPointerPainted}, Pet)
 ```
 
+`desktop.OpenPanel` opens a panel such a shortcut or a tray icon shows: a borderless window above the others. A popup card draws itself on a panel with `Transparent`, which has no background, frame or shadow of its own, so the card's rounded corners and `BoxShadow` are all that shows, with room for the shadow inside the panel; `FitContent` sizes the panel to its content, up to `Width` and `Height`, before it first shows and as the content changes. `desktop.Transparent` says whether the panel draws nothing of its own now, as it does for a transparent window, where `desktop.CanMakeWindowsTransparent` only says whether a window could be: where it is false, as on Linux without a compositor, give the content a background.
+
+```go
+lookup := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 380, Height: 520, Transparent: true, FitContent: true, HideOnBlur: true}, Card)
+desktop.RegisterHotKey(cx, "alt+space", lookup.Toggle)
+```
+
 ## Speaking text
 
 `cx.Speak` reads text aloud in the system's voice for a language where `cx.Env().CanSpeak()` says the platform speaks: macOS, iOS, tvOS, Android, Windows, the web and Linux with speech-dispatcher. One utterance speaks at a time: another `Speak` cuts the one speaking, and so do `cx.StopSpeaking` and the end of the scope that spoke it. `done` hears once how it ended: finished, stopped, or failed with a `core.SpeakError`, such as `core.SpeakLanguageUnavailable` when no voice installed speaks the language.

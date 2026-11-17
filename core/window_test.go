@@ -410,6 +410,142 @@ func TestPanelPlacement(t *testing.T) {
 	}
 }
 
+func TestPanelFitsContent(t *testing.T) {
+	var panel *Window
+	var height *Signal[Points]
+	var seen Size
+	w := newWindows(t, func(cx *Scope) {
+		cx.SetShutdownMode(ShutdownOnExplicit)
+		height = NewSignal(cx, Points(100))
+		panel = cx.OpenPanel(PanelOptions{Width: 380, Height: 520, FitContent: true}, func(cx *Scope) Node {
+			cx.Effect(func() { seen = cx.Env().Window() })
+			return View{StyleFunc: func() Style { return Style{Width: Pt(300), Height: Pt(height.Get())} }}
+		})
+		// Shown as it opens: the size goes ahead of the show.
+		panel.Show()
+	})
+	id := panel.t.id
+	fits := func() []driver.WindowCommand {
+		t.Helper()
+		w.commit()
+		var out []driver.WindowCommand
+		for _, it := range w.take(id, driver.ItemWindow) {
+			out = append(out, *it.Window)
+		}
+		return out
+	}
+	opened := w.take(0, driver.ItemOpenSurface)
+	if len(opened) != 1 || opened[0].Surface.Width != 380 || opened[0].Surface.Height != 520 {
+		t.Fatalf("a fitted panel opens at its largest size: %+v", opened)
+	}
+	cmds := fits()
+	if len(cmds) != 2 || cmds[0].Action != driver.WindowFitSize || cmds[1].Action != driver.WindowShow {
+		t.Fatalf("the first commit sent %+v, want the size and then the show", cmds)
+	}
+	want := Size{Width: 300, Height: 100}
+	if got := (Size{Width: cmds[0].Frame.Width, Height: cmds[0].Frame.Height}); got != want || seen != want || panel.t.Size() != want {
+		t.Fatalf("fitted %v, the content sees %v and the tree has %v; want %v", got, seen, panel.t.Size(), want)
+	}
+	// The platform attaching at the size it opened with hears the fitted one again, and once it has it, nothing.
+	panel.t.Resize(Size{Width: 380, Height: 520}, Geometry{})
+	if cmds := fits(); len(cmds) != 1 || cmds[0].Frame.Height != 100 || seen != want {
+		t.Fatalf("a stale size from the platform sent %+v, the content sees %v", cmds, seen)
+	}
+	panel.t.Resize(want, Geometry{})
+	if cmds := fits(); len(cmds) != 0 {
+		t.Fatalf("the platform's own size sent %+v", cmds)
+	}
+	// It follows the content as it grows and shrinks, up to its largest size, at which the content fills it.
+	for _, c := range []struct{ set, want Points }{{240, 240}, {60, 60}, {900, 520}} {
+		height.Set(c.set)
+		cmds := fits()
+		if len(cmds) != 1 || cmds[0].Action != driver.WindowFitSize || cmds[0].Frame.Height != c.want || seen.Height != c.want {
+			t.Fatalf("a content %v tall sent %+v, the content sees %v; want %v", c.set, cmds, seen, c.want)
+		}
+	}
+	if f := panel.t.view.frame; f.Size != (Size{Width: 300, Height: 520}) {
+		t.Errorf("the root of a full panel is %v", f)
+	}
+	// A commit that lays the panel out more than once, as a list filling its rows has it, sends only the last size: the platform applies them in order.
+	height.Set(200)
+	panel.t.timeLayout()
+	height.Set(150)
+	if cmds := fits(); len(cmds) != 1 || cmds[0].Frame.Height != 150 || seen.Height != 150 {
+		t.Fatalf("a content laid out at 200 and then 150 in one commit sent %+v, the content sees %v", cmds, seen)
+	}
+}
+
+func TestTransparentPanel(t *testing.T) {
+	var clear, plain *Window
+	var shown []bool
+	w := newWindows(t, func(cx *Scope) {
+		cx.SetShutdownMode(ShutdownOnExplicit)
+		clear = cx.OpenPanel(PanelOptions{Transparent: true}, func(cx *Scope) Node {
+			cx.Effect(func() { shown = append(shown, cx.Env().WindowTransparent()) })
+			return Text{Content: "card"}
+		})
+		plain = cx.OpenPanel(PanelOptions{}, func(cx *Scope) Node { return Text{Content: "plain"} })
+	})
+	opened := w.take(0, driver.ItemOpenSurface)
+	if len(opened) != 2 || !opened[0].Surface.Transparent || opened[1].Surface.Transparent {
+		t.Fatalf("Transparent does not reach the platform: %+v %+v", opened[0].Surface, opened[1].Surface)
+	}
+	if plain.t.root.Env().WindowTransparent() {
+		t.Error("a panel without Transparent reports it")
+	}
+	// A platform that could not clear the panel says so.
+	clear.t.SetEnvironment(Environment{})
+	w.commit()
+	if len(shown) != 2 || !shown[0] || shown[1] {
+		t.Fatalf("the panel saw transparency %v, want true then false", shown)
+	}
+	// A panel of the platform's size sends none of its own.
+	for _, p := range []*Window{clear, plain} {
+		for _, it := range w.take(p.t.id, driver.ItemWindow) {
+			if it.Window.Action == driver.WindowFitSize {
+				t.Errorf("a panel without FitContent sent %+v", it.Window)
+			}
+		}
+	}
+}
+
+// A window opened Transparent reads WindowTransparent from its first frame, as the main window opened so does, until its platform reports otherwise; it is the window's state, apart from CanMakeWindowsTransparent, whether it could be.
+func TestTransparentWindowReportsIt(t *testing.T) {
+	var pet, plain *Window
+	var shown []bool
+	w := newWindows(t, func(cx *Scope) {
+		cx.SetShutdownMode(ShutdownOnExplicit)
+		pet = cx.OpenWindow(WindowOptions{Transparent: true}, func(cx *Scope) Node {
+			cx.Effect(func() { shown = append(shown, cx.Env().WindowTransparent()) })
+			return View{}
+		})
+		plain = cx.OpenWindow(WindowOptions{}, func(cx *Scope) Node { return View{} })
+	})
+	if plain.t.root.Env().WindowTransparent() {
+		t.Error("a window without Transparent reports it")
+	}
+	// The platform framing it again (SetWindowTransparent) says so, and transparent again, while it can be either way.
+	pet.t.SetEnvironment(Environment{CanMakeWindowsTransparent: true})
+	w.commit()
+	pet.t.SetEnvironment(Environment{CanMakeWindowsTransparent: true, WindowTransparent: true})
+	w.commit()
+	if !slices.Equal(shown, []bool{true, false, true}) || !pet.t.root.Env().CanMakeWindowsTransparent() {
+		t.Fatalf("the window saw transparency %v", shown)
+	}
+
+	var mainShown []bool
+	main := newWindowsWith(t, WindowOptions{Width: 400, Height: 300, Transparent: true}, func(app *Scope) {
+		app.SetMainView(func(cx *Scope) Node {
+			cx.Effect(func() { mainShown = append(mainShown, cx.Env().WindowTransparent()) })
+			return View{}
+		})
+	})
+	main.commit()
+	if !slices.Equal(mainShown, []bool{true}) {
+		t.Fatalf("the main window opened transparent saw %v", mainShown)
+	}
+}
+
 func TestHotKeysDockAndLogin(t *testing.T) {
 	var cx0, owner *Scope
 	fired := 0

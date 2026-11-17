@@ -745,6 +745,12 @@ func (a *App) apply(b *driver.MountBatch) {
 			if it.Surface.Kind == driver.SurfaceOverlay {
 				a.openOverlay(it.Surface)
 			}
+			if it.Surface.Transparent && (it.Surface.Kind == driver.SurfaceWindow || it.Surface.Kind == driver.SurfacePanel) {
+				if a.clear == nil {
+					a.clear = map[uint32]bool{}
+				}
+				a.clear[it.Surface.ID] = true
+			}
 		case driver.ItemOverlayPermission:
 			if it.On && a.OverlayPermission != core.OverlayGranted && a.OverlayPermission != core.OverlayUnavailable {
 				a.OverlaySettings++

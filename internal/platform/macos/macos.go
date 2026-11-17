@@ -256,7 +256,7 @@ type surface struct {
 	// that shows it.
 	material driver.WindowMaterial
 	effect   objc.ID
-	// transparent leaves the window borderless and clear behind the app's views, and skipTaskbar keeps it out of the Window menu and Cmd+` (look.go).
+	// transparent leaves the window borderless and clear behind the app's views (look.go), or has a panel draw nothing of its own (newPanel); skipTaskbar keeps a window out of the Window menu and Cmd+` (look.go).
 	transparent, skipTaskbar bool
 	keys                     []driver.KeyBinding // the keymap's bindings
 	webFocus                 *view               // the page holding the window's first responder
@@ -1104,6 +1104,9 @@ func (s *surface) environment() driver.Environment {
 		CanPlaceWindows:   !s.embedded && s.window != 0,
 		// An embedding host owns its window, and the app's own surface and a tray icon's show in none.
 		CanSetWindowWorkspaces: !s.embedded && s.window != 0,
+
+		// A transparent window or panel draws nothing of its own wherever it is (look.go, newPanel).
+		WindowTransparent: s.transparent,
 	}
 }
 

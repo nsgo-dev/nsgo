@@ -437,6 +437,54 @@ func TestStartOpensWindowsWhereRunDoes(t *testing.T) {
 	}
 }
 
+// A window or a panel opened Transparent reports it, as on a compositing desktop, also after the test reports a new environment, and a window follows SetWindowTransparent; another panel does not report it, and a panel keeps what it opened with.
+func TestTransparentSurfacesReportIt(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var clear, plain, pet, main bool
+	var card, mainScope *core.Scope
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.OpenPanel(cx, desktop.PanelOptions{Width: 300, Height: 400, FitContent: true, Transparent: true}, func(cx *core.Scope) core.Node {
+			card = cx
+			cx.Effect(func() { clear = desktop.Transparent(cx) })
+			return core.Text{Content: "card"}
+		})
+		desktop.OpenPanel(cx, desktop.PanelOptions{}, func(cx *core.Scope) core.Node {
+			cx.Effect(func() { plain = desktop.Transparent(cx) })
+			return core.Text{Content: "plain"}
+		})
+		desktop.OpenWindow(cx, desktop.WindowOptions{Width: 120, Height: 90, Transparent: true}, func(cx *core.Scope) core.Node {
+			cx.Effect(func() { pet = desktop.Transparent(cx) })
+			return core.View{}
+		})
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			mainScope = cx
+			cx.Effect(func() { main = desktop.Transparent(cx) })
+			return core.Text{Content: "main", TestID: "main"}
+		})
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	app.Find("id:main")
+	if !clear || plain || !pet || main {
+		t.Fatalf("the transparent panel reports %v, the other %v, the transparent window %v and the main window %v", clear, plain, pet, main)
+	}
+	desktop.SetWindowTransparent(mainScope, true)
+	desktop.SetWindowTransparent(card, false)
+	app.Settle()
+	if !main || !clear {
+		t.Fatalf("the main window made transparent reports %v, the panel asked to change %v", main, clear)
+	}
+	app.SetEnvironment(core.Environment{OS: core.OSMacOS, Dark: true})
+	if !clear || plain || !pet || !main {
+		t.Fatalf("after a new environment the transparent panel reports %v, the other %v, the transparent window %v and the main window %v", clear, plain, pet, main)
+	}
+	desktop.SetWindowTransparent(mainScope, false)
+	app.Settle()
+	if main {
+		t.Fatal("the main window framed again reports it is transparent")
+	}
+}
+
 // Steps act on the window SetMainView opens, not on one the app opened before it, and on the next one once it closes and the app shows its view again.
 func TestStepsFollowTheMainWindow(t *testing.T) {
 	if Target() != "" {

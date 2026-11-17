@@ -10,11 +10,11 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// GTK 4 draws a window with an alpha channel wherever the display composites, an RGBA visual on X11 and any surface on Wayland, so a transparent window is an undecorated one whose theme background is gone: it loses the style class that paints it, and a style of NSGo's own clears it and the shadow GTK draws. NoShadow clears the shadow GTK draws around its own decorations; a window manager's, as on X11 with server-side ones, stays. Without a compositor, as on X11 without a compositing manager, there is no alpha to show through and the window shows black where the app draws nothing, which the environment says (CanMakeWindowsTransparent). GTK 4 keeps a window off the task list only on X11, through its GdkX11Surface's hint, and Wayland has no such hint, which the environment says too (CanSkipTaskbar).
+// GTK 4 draws a window with an alpha channel wherever the display composites, an RGBA visual on X11 and any surface on Wayland, so a transparent window is an undecorated one whose theme background is gone: it loses the style class that paints it, and a style of NSGo's own clears it and the shadow GTK draws. NoShadow clears the shadow GTK draws around its own decorations; a window manager's, as on X11 with server-side ones, stays. Without a compositor, as on X11 without a compositing manager, there is no alpha to show through and the window shows black where the app draws nothing, which the environment says (CanMakeWindowsTransparent). A transparent panel (SurfaceConfig.Transparent), whose content draws its own corners and shadow, is cleared the same way only where the display composites, keeping its background elsewhere; the environment's WindowTransparent says whether a window or panel shows through now. GTK 4 keeps a window off the task list only on X11, through its GdkX11Surface's hint, and Wayland has no such hint, which the environment says too (CanSkipTaskbar).
 
-// lookCSS clears the theme's background and shadow from windows of the classes NSGo gives them.
+// lookCSS clears the theme's background, border and shadow from windows of the classes NSGo gives them, and from a transparent one's box.
 const lookCSS = `
-window.nsgo-transparent { background: none; box-shadow: none; }
+window.nsgo-transparent, window.nsgo-transparent > box { background: none; border: none; box-shadow: none; }
 window.nsgo-no-shadow, window.nsgo-no-shadow.csd { box-shadow: none; }
 `
 

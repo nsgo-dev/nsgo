@@ -113,6 +113,9 @@ func (w *window) environment() driver.Environment {
 
 		// Only an X11 session says which window is in front.
 		CanReadFrontmostApp: followed,
+
+		// A window or panel cleared of its background shows through only while the display composites (look.go).
+		WindowTransparent: w.transparent && displayComposites(),
 	}
 }
 

@@ -268,7 +268,7 @@ type window struct {
 	popoverID uint32
 	popupRefs map[uintptr]menuRef
 	trays     map[uint32]*linuxTray
-	// transparent is set while the window is undecorated and clear wherever the app draws nothing (look.go).
+	// transparent is set while the window or panel is undecorated and clear wherever the app draws nothing (look.go).
 	transparent bool
 	// appearance is the one the app forces.
 	appearance driver.Appearance
@@ -435,6 +435,10 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 		gtkWindowSetDecorated(child.win, 0)
 		if cfg.NoActivate {
 			child.unmanaged = child.leaveUnmanaged()
+		}
+		// A transparent panel keeps its background where nothing would show through it (SurfaceConfig.Transparent).
+		if cfg.Transparent && displayComposites() {
+			child.setTransparent(true)
 		}
 	}
 	if cfg.Frame.Width > 0 || cfg.Frame.Height > 0 {
@@ -612,8 +616,8 @@ func (w *window) setupSettings() {
 	if settings := gnomeA11ySettingsForWatch(); settings != 0 {
 		w.contrastHandler = gSignalConnect(settings, "changed::high-contrast", cbSettingsChanged, w.handle)
 	}
-	// An X11 compositing manager starting or stopping changes whether a transparent window shows through (CanMakeWindowsTransparent).
-	if display := gdkDisplayGetDefault(); display != 0 && w.kind == driver.SurfaceWindow {
+	// An X11 compositing manager starting or stopping changes whether a transparent window or panel shows through (CanMakeWindowsTransparent, WindowTransparent).
+	if display := gdkDisplayGetDefault(); display != 0 && (w.kind == driver.SurfaceWindow || w.kind == driver.SurfacePanel) {
 		w.compositedHandler = gSignalConnect(display, "notify::composited", cbSettingsChanged, w.handle)
 	}
 }
@@ -1323,6 +1327,10 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 		}
 		w.visible = true
 		gtkWindowPresent(w.win)
+	case driver.WindowFitSize:
+		if w.kind == driver.SurfacePanel {
+			w.fitPanel(c.Frame.Width, c.Frame.Height)
+		}
 	case driver.WindowSetAnchor:
 		if w.kind == driver.SurfacePanel {
 			w.anchorBounds, w.panelSide = c.AnchorBounds, c.Placement

@@ -15,7 +15,7 @@ type (
 	Window = core.Window
 	// WindowOptions are a window's title, size, constraints, key and where it takes the pointer.
 	WindowOptions = core.WindowOptions
-	// PanelOptions are a panel's size, whether it hides as it loses the focus, whether it never takes it, and where it takes the pointer.
+	// PanelOptions are a panel's size, whether it takes its content's, whether it hides as it loses the focus, whether it never takes it, whether it draws anything of its own, and where it takes the pointer.
 	PanelOptions = core.PanelOptions
 	// WindowClosing is a close the user asked for, which
 	// Window.OnClosing may cancel.
@@ -50,6 +50,10 @@ func OpenWindow(cx *core.Scope, opts WindowOptions, content func(cx *core.Scope)
 //
 //	candidates := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 320, Height: 40, NoActivate: true}, Candidates)
 //	candidates.ShowAt(caret, core.PlaceBottom)
+//
+// A popup card draws itself on a Transparent panel, which shows nothing around it, sized to it with FitContent, up to Width and Height:
+//
+//	lookup := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 380, Height: 520, FitContent: true, Transparent: true, HideOnBlur: true}, Card)
 func OpenPanel(cx *core.Scope, opts PanelOptions, content func(cx *core.Scope) core.Node) *Window {
 	return cx.OpenPanel(opts, content)
 }

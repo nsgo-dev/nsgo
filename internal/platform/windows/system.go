@@ -1254,6 +1254,18 @@ func (w *window) placePanel(anchor uint32, beside driver.Bounds, side driver.Win
 	w.movePanel(x, y, width, height)
 }
 
+// fitPanel sizes a panel to width by height points, the size its content takes (driver.WindowFitSize), keeping its top left corner: one that shows beside the rectangle ShowAt placed it at, or beside its tray icon, is placed there again at its new size.
+func (w *window) fitPanel(width, height driver.Points) {
+	setWindowPos.Call(w.hwnd, 0, 0, 0, uintptr(w.px(width)), uintptr(w.px(height)), swpNoMove|swpNoZOrder|swpNoActivate)
+	switch {
+	case !w.visible:
+	case w.placement != driver.WindowPlaceDefault:
+		w.placeBeside(w.anchorBounds, w.placement)
+	case w.anchor != 0:
+		w.placeAtTray(w.anchor)
+	}
+}
+
 // panelPixels returns the panel's size in pixels on monitor: its size in points now, at that monitor's scale, which may not be the one it was laid out at (a panel is made on the primary monitor).
 func (w *window) panelPixels(monitor uintptr) (width, height int32, ok bool) {
 	var client rect

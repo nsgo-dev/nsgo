@@ -21,6 +21,8 @@ type Environment struct {
 	// WindowMaterial is the material behind the window's content; None
 	// when the window is opaque.
 	WindowMaterial WindowMaterial
+	// WindowTransparent is whether the surface's window or panel draws nothing of its own now: a panel opened with SurfaceConfig.Transparent, or a window opened so or made so by WindowSetTransparent; false where the platform could not make it so, and for any other surface. CanMakeWindowsTransparent is whether a window could be.
+	WindowTransparent bool
 	// Maximized is whether the window is maximized or zoomed, so an
 	// app-drawn maximize button can show restore.
 	Maximized bool

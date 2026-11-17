@@ -98,8 +98,8 @@ func (w *window) environment() driver.Environment {
 		Speak:            speakAvailable(),
 		FrontmostApp:     frontmostApp(),
 
-		// Only a window opened transparent has the composition that shows what is behind it (look.go).
-		CanMakeWindowsTransparent: w.canTransparent && !w.embedded,
+		// Only a window opened transparent has the composition that shows what is behind it (look.go); a transparent panel's is its own.
+		CanMakeWindowsTransparent: w.canTransparent && !w.embedded && w.kind == driver.SurfaceWindow,
 		CanSkipTaskbar:            w.kind == driver.SurfaceWindow && !w.embedded && !(w.primary && w.opts.Hidden),
 
 		// The foreground window says which app is in front to every app.
@@ -111,6 +111,9 @@ func (w *window) environment() driver.Environment {
 		// An embedding host owns its window, and the app's own surface and a tray icon's show in none, as on macOS.
 		CanSetWindowLevel: w.showsOwnWindow(),
 		CanPlaceWindows:   w.showsOwnWindow(),
+
+		// A window or a panel opened transparent with DirectComposition draws nothing of its own until SetWindowTransparent frames the window (look.go).
+		WindowTransparent: w.transparent,
 	}
 }
 
