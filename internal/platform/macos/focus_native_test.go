@@ -97,7 +97,12 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 		key := func(name string) {
 			apple.OnMain(func() {
 				if live != nil {
-					live.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: name})
+					// The platform reports a key binding by its ID, as it does a matched press.
+					for _, b := range live.keys {
+						if b.Key == name {
+							live.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: b.ID})
+						}
+					}
 				} else {
 					finish()
 				}

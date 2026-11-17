@@ -42,9 +42,22 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 	const title = "nsgo-ref-focus"
 	w := startTestWindow(t, programmaticFocusApp(title), Options{Title: title, Width: 200, Height: 200})
 	waitForTitle(t, w, title+"|ready|0")
-	w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+f"})
+	// The platform reports a key binding by its ID, as it does a matched press.
+	key := func(name string) {
+		t.Helper()
+		w.onLoop(t, func() {
+			for _, b := range w.keys {
+				if b.Key == name {
+					w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: b.ID})
+					return
+				}
+			}
+			t.Errorf("no binding of %s", name)
+		})
+	}
+	key("mod+f")
 	waitForTitle(t, w, title+"|field|0")
-	w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+b"})
+	key("mod+b")
 	waitForTitle(t, w, title+"|button|0")
 	var button *view
 	w.onLoop(t, func() {
@@ -76,11 +89,11 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 			t.Errorf("focus-visible background = %#x", button.style.Background)
 		}
 	})
-	w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+p"})
-	w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+n"})
-	w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+m"})
+	key("mod+p")
+	key("mod+n")
+	key("mod+m")
 	waitForTitle(t, w, title+"|button-checked|2")
-	w.engine.Dispatch(driver.Event{Kind: driver.EventKey, Text: "mod+v"})
+	key("mod+v")
 	waitForTitle(t, w, title+"|explicit|2")
 	w.onLoop(t, func() {
 		v := w.focusedView()
