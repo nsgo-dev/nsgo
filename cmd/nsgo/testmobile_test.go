@@ -85,11 +85,19 @@ exit 3
 echo 'panic: simulator crash fixture' >&2
 `, output: "panic: simulator crash fixture", wantCode: -1, wantError: "without its exit code"},
 		{name: "launch failure", body: "echo 'Simulator device failed to launch' >&2\nexit 4\n", wantCode: -1, wantError: "launch"},
+		{name: "completed app with lingering launcher", body: `printf 'nsgo-test-start %s\n--- PASS: TestFast (0.00s)\nnsgo-test-exit %s 0\n' "$SIMCTL_CHILD_NSGO_TEST_RUN" "$SIMCTL_CHILD_NSGO_TEST_RUN"
+exec sleep 30
+`, output: "--- PASS: TestFast", wantCode: 0},
+		{name: "runtime error with lingering launcher", body: `printf 'nsgo-test-error %s runtime fixture failure\n' "$SIMCTL_CHILD_NSGO_TEST_RUN"
+exec sleep 30
+`, wantCode: -1, wantError: "runtime fixture failure"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			checkXcrun(t, tc.body)
+			checkXcrun(t, "case \"$2\" in terminate) exit 0;; esac\n"+tc.body)
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
 			var output strings.Builder
-			code, err := (simulatorTest{udid: "simulator", id: "dev.nsgo.test"}).run(t.Context(), []string{"-test.run=^TestFast$"}, nil, &output)
+			code, err := (simulatorTest{udid: "simulator", id: "dev.nsgo.test", timeout: 2 * time.Second}).run(ctx, []string{"-test.run=^TestFast$"}, nil, &output)
 			if code != tc.wantCode || tc.wantError == "" && err != nil || tc.wantError != "" && (err == nil || !strings.Contains(err.Error(), tc.wantError)) {
 				t.Fatalf("code=%d err=%v, want code=%d error=%q; output:\n%s", code, err, tc.wantCode, tc.wantError, output.String())
 			}
@@ -101,12 +109,24 @@ echo 'panic: simulator crash fixture' >&2
 }
 
 func TestSimulatorTestTimeout(t *testing.T) {
-	checkXcrun(t, "case \"$2\" in terminate) exit 0;; esac\nexec sleep 30\n")
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+	checkXcrun(t, "case \"$2\" in terminate) exit 0;; esac\necho 'waiting for SpringBoard' >&2\nexec sleep 30\n")
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	var output strings.Builder
-	code, err := (simulatorTest{udid: "simulator", id: "dev.nsgo.test", timeout: 30 * time.Millisecond}).run(ctx, nil, nil, &output)
-	if code != -1 || err == nil || !strings.Contains(err.Error(), "30ms") {
+	code, err := (simulatorTest{udid: "simulator", id: "dev.nsgo.test", timeout: time.Second}).run(ctx, nil, nil, &output)
+	if code != -1 || err == nil || !strings.Contains(err.Error(), "1s") {
 		t.Fatalf("code=%d err=%v", code, err)
+	}
+	if !strings.Contains(output.String(), "waiting for SpringBoard") {
+		t.Fatalf("timeout lost launcher diagnostics: %s", output.String())
+	}
+}
+
+func TestSimulatorStopIsBounded(t *testing.T) {
+	checkXcrun(t, "exec sleep 30\n")
+	start := time.Now()
+	(simulatorTest{udid: "simulator", id: "dev.nsgo.test"}).stop()
+	if elapsed := time.Since(start); elapsed > 7*time.Second {
+		t.Fatalf("simulator cleanup took %v after its deadline", elapsed)
 	}
 }

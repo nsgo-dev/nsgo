@@ -50,7 +50,11 @@ type simulatorTest struct {
 }
 
 func (s simulatorTest) stop() {
-	exec.Command("xcrun", "simctl", "terminate", s.udid, s.id).Run()
+	// A stalled CoreSimulator must not turn a test timeout into an
+	// unbounded wait during cleanup. The test's context may be cancelled.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	exec.CommandContext(ctx, "xcrun", "simctl", "terminate", s.udid, s.id).Run()
 }
 
 func (s simulatorTest) run(ctx context.Context, args, env []string, out io.Writer) (int, error) {
@@ -85,24 +89,35 @@ func (s simulatorTest) run(ctx context.Context, args, env []string, out io.Write
 	if err != nil {
 		return -1, err
 	}
+	defer logs.Close()
 	cmd.Stderr = cmd.Stdout
 	if err := cmd.Start(); err != nil {
 		return -1, err
 	}
 	var captured bytes.Buffer
+	reported := true
 	code, readErr := readMarkedRun(io.TeeReader(logs, &captured), token, out, func() error {
+		reported = false
 		return errors.New("the simulator app ended without its exit code")
 	})
+	if reported {
+		// The host's result is final. CoreSimulator can keep its console
+		// bridge alive afterwards; it must not consume the test's deadline.
+		cmd.Process.Kill()
+	}
 	waitErr := cmd.Wait()
-	if ctx.Err() != nil {
+	if ctx.Err() != nil && !reported {
 		s.stop()
+		if !bytes.Contains(captured.Bytes(), []byte("nsgo-test-start "+token)) {
+			out.Write(captured.Bytes())
+		}
 		return -1, testContextError(ctx, s.timeout)
 	}
 	if readErr != nil {
 		if !bytes.Contains(captured.Bytes(), []byte("nsgo-test-start "+token)) {
 			out.Write(captured.Bytes())
 		}
-		if waitErr != nil {
+		if waitErr != nil && !reported {
 			return -1, fmt.Errorf("launch simulator app: %w", waitErr)
 		}
 	}

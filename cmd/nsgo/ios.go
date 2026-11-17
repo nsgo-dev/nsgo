@@ -867,6 +867,11 @@ func bootSimulator(ctx context.Context, sys *appleOS, wanted string) (string, er
 			return "", err
 		}
 	}
+	// Booted precedes SpringBoard becoming ready, even for a simulator
+	// another process has just booted. Wait before installing or launching.
+	if err := run(ctx, "xcrun", "simctl", "bootstatus", sim.UDID, "-b"); err != nil {
+		return "", err
+	}
 	// Show the simulator's window; the app runs without it.
 	if xcode, err := output(ctx, "xcode-select", "-p"); err == nil {
 		exec.CommandContext(ctx, "open", filepath.Join(xcode, "Applications", "Simulator.app")).Run()

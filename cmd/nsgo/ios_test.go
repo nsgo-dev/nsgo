@@ -1,9 +1,58 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestBootSimulatorWaitsForReady(t *testing.T) {
+	for _, state := range []string{"Shutdown", "Booted", "NotReady"} {
+		t.Run(state, func(t *testing.T) {
+			commands := filepath.Join(t.TempDir(), "commands")
+			t.Setenv("NSGO_SIMULATOR_COMMANDS", commands)
+			t.Setenv("NSGO_SIMULATOR_STATE", state)
+			checkXcrun(t, `printf '%s\n' "$*" >> "$NSGO_SIMULATOR_COMMANDS"
+case "$2" in
+list) printf '{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-27-0":[{"udid":"test-device","name":"iPhone","state":"%s"}]}}\n' "$NSGO_SIMULATOR_STATE" ;;
+boot) exit 0 ;;
+bootstatus) if [ "$NSGO_SIMULATOR_STATE" = NotReady ]; then exit 7; fi ;;
+*) exit 1 ;;
+esac
+`)
+			// Keep this process fixture independent of the Mac's desktop.
+			bin := t.TempDir()
+			writeFiles(t, bin, map[string]string{"xcode-select": "#!/bin/sh\nexit 1\n"})
+			if err := os.Chmod(filepath.Join(bin, "xcode-select"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			udid, err := bootSimulator(t.Context(), iOS, "test-device")
+			if state == "NotReady" {
+				if err == nil || udid != "" || !strings.Contains(err.Error(), "bootstatus") {
+					t.Fatalf("unready simulator: %q, %v", udid, err)
+				}
+				return
+			}
+			if err != nil || udid != "test-device" {
+				t.Fatalf("boot: %q, %v", udid, err)
+			}
+			data, err := os.ReadFile(commands)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "simctl list devices available -j\n"
+			if state == "Shutdown" {
+				want += "simctl boot test-device\n"
+			}
+			want += "simctl bootstatus test-device -b\n"
+			if string(data) != want {
+				t.Fatalf("simulator commands:\n%s\nwant:\n%s", data, want)
+			}
+		})
+	}
+}
 
 const devicectlJSON = `{
 	"result": {
