@@ -643,7 +643,7 @@ func (w *window) tab(back bool) bool {
 		if v.style.Hidden {
 			return
 		}
-		if w.focusableView(v) {
+		if w.focusableIn(v, scope) {
 			stops = append(stops, v)
 		}
 		for _, c := range v.children {

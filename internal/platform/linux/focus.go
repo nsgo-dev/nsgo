@@ -30,7 +30,11 @@ func (w *window) focusScope() *view {
 	return scope
 }
 
-func (w *window) focusableView(v *view) bool {
+// focusableView reports whether v is a keyboard stop: an enabled field or a stop view that shows within the newest modal.
+func (w *window) focusableView(v *view) bool { return w.focusableIn(v, w.focusScope()) }
+
+// focusableIn is focusableView for a focus scope the caller found once, as Tab does for every view.
+func (w *window) focusableIn(v, scope *view) bool {
 	if v == nil || v.deleted {
 		return false
 	}
@@ -39,7 +43,7 @@ func (w *window) focusableView(v *view) bool {
 		if p.style.Hidden {
 			return false
 		}
-		inside = inside || p == w.focusScope()
+		inside = inside || p == scope
 		if p == w.view(w.root) {
 			if v.kind == driver.KindInput {
 				return inside && !v.props.Disabled && !v.input.Disabled
@@ -113,21 +117,22 @@ func (w *window) checkControlFocus() {
 }
 
 func (w *window) tab(back bool) bool {
+	scope := w.focusScope()
 	var stops []*view
 	var walk func(*view)
 	walk = func(v *view) {
 		if v.style.Hidden {
 			return
 		}
-		if w.focusableView(v) {
+		if w.focusableIn(v, scope) {
 			stops = append(stops, v)
 		}
 		for _, c := range v.children {
 			walk(c)
 		}
 	}
-	if root := w.focusScope(); root != nil {
-		walk(root)
+	if scope != nil {
+		walk(scope)
 	}
 	if len(stops) == 0 {
 		return false

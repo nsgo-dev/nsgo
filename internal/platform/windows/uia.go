@@ -441,7 +441,9 @@ func (e *uiaElement) spec(v *view) uiaSpec {
 	s.expandable, s.expanded = p.Expandable, p.Expanded
 	s.selectable = p.Role == driver.RoleTab || p.Role == driver.RoleRadio || p.Role == driver.RoleOption || p.Selected
 	s.selected = p.Selected || p.Role == driver.RoleRadio && p.Checked
-	s.focusable, s.focused = e.w.focusableView(v), e.w.focusedView() == v
+	if e.w != nil {
+		s.focusable, s.focused = e.w.focusableView(v), e.w.focusedView() == v
+	}
 	if in := v.field; in != nil {
 		s.focusable, s.focused, s.password = true, in.focused, in.masked()
 		if s.name == "" {

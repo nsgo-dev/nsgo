@@ -12,8 +12,12 @@ func (w *window) focusedView() *view {
 	return w.controlFocus
 }
 
-func (w *window) focusableView(v *view) bool {
-	if v == nil || v.deleted || !w.shown(v) || !isAncestor(w.focusScope(), v) {
+// focusableView reports whether v is a keyboard stop: a field or a stop view that shows within the newest modal.
+func (w *window) focusableView(v *view) bool { return w.focusableIn(v, w.focusScope()) }
+
+// focusableIn is focusableView for a focus scope the caller found once, as Tab does for every view.
+func (w *window) focusableIn(v, scope *view) bool {
+	if v == nil || v.deleted || !w.shown(v) || !isAncestor(scope, v) {
 		return false
 	}
 	if v.field != nil {
