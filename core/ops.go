@@ -408,8 +408,15 @@ func (t *Tree) setInput(n *node, v Input) {
 	if v.PlaceholderFunc != nil {
 		placeholder = v.PlaceholderFunc()
 	}
-	in.config = driver.InputConfig{Placeholder: placeholder, Masked: v.Masked, Readonly: v.Readonly,
-		KeyboardType: v.KeyboardType, Multiline: v.Multiline, MaxLength: max(v.MaxLength, 0),
+	readonly, keyboardType := v.Readonly, v.KeyboardType
+	if v.ReadonlyFunc != nil {
+		readonly = v.ReadonlyFunc()
+	}
+	if v.KeyboardTypeFunc != nil {
+		keyboardType = v.KeyboardTypeFunc()
+	}
+	in.config = driver.InputConfig{Placeholder: placeholder, Masked: v.Masked, Readonly: readonly,
+		KeyboardType: keyboardType, Multiline: v.Multiline, MaxLength: max(v.MaxLength, 0),
 		SubmitBehavior: v.SubmitBehavior, ReturnKey: v.ReturnKeyType, AutoCapitalize: v.AutoCapitalize,
 		NoAutoCorrect: v.NoAutoCorrect, AutoComplete: v.AutoComplete, KeyboardAppearance: v.IOS.KeyboardAppearance,
 		HideCaret: v.HideCaret, PasteBehavior: v.PasteBehavior, Disabled: read(v.Disabled)}

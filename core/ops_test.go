@@ -99,3 +99,62 @@ func TestAnElementMountedByGoLeavesWithItsRegion(t *testing.T) {
 		t.Errorf("shown again, the element is not the same view")
 	}
 }
+
+func TestElementInputReadsConfigurationFunctionsOnEachSet(t *testing.T) {
+	var element *Element
+	var readonly *Signal[bool]
+	var keyboard *Signal[KeyboardType]
+	readonlyCalls, keyboardCalls := 0, 0
+	props := func() Input {
+		return Input{TestID: "element",
+			ReadonlyFunc:     func() bool { readonlyCalls++; return readonly.Get() },
+			KeyboardTypeFunc: func() KeyboardType { keyboardCalls++; return keyboard.Get() }}
+	}
+	h := newHost(t, Size{Width: 200, Height: 200}, func(cx *Scope) Node {
+		readonly, keyboard = NewSignal(cx, true), NewSignal(cx, KeyboardNumber)
+		element = NewElement(cx, props())
+		return View{Children: []Node{element,
+			Input{TestID: "mounted",
+				ReadonlyFunc: readonly.Get, KeyboardTypeFunc: keyboard.Get},
+		}}
+	})
+	check := func(batch *driver.MountBatch, wantReadonly bool, wantKeyboard KeyboardType) {
+		t.Helper()
+		configs := map[NodeID]*driver.InputConfig{}
+		for _, item := range batch.Items {
+			if item.Kind == driver.ItemInput {
+				configs[item.ID] = item.Input
+			}
+		}
+		for _, name := range []string{"element", "mounted"} {
+			config := configs[h.find(name).id]
+			if config == nil || config.Readonly != wantReadonly || config.KeyboardType != wantKeyboard {
+				t.Errorf("%s config = %+v, want readonly %v and keyboard %v", name, config, wantReadonly, wantKeyboard)
+			}
+		}
+	}
+	if len(h.errs) > 0 {
+		t.Fatalf("mount: %v", h.errs)
+	}
+	check(h.commit(), true, KeyboardNumber)
+	if readonlyCalls != 1 || keyboardCalls != 1 {
+		t.Fatalf("NewElement called functions %d and %d times, want once each", readonlyCalls, keyboardCalls)
+	}
+	readonly.Set(false)
+	keyboard.Set(KeyboardDefault)
+	// Element functions are snapshots, not bindings: only a later Set picks up the new values, including false and the zero keyboard.
+	if config := h.find("element").input.config; !config.Readonly || config.KeyboardType != KeyboardNumber {
+		t.Fatal("the element changed without Set")
+	}
+	element.Set(props())
+	check(h.commit(), false, KeyboardDefault)
+	if readonlyCalls != 2 || keyboardCalls != 2 {
+		t.Fatalf("Set called functions %d and %d times in total, want twice each", readonlyCalls, keyboardCalls)
+	}
+	// Removing the functions restores the static fields.
+	element.Set(Input{TestID: "element", Readonly: true, KeyboardType: KeyboardEmail})
+	h.commit()
+	if config := h.find("element").input.config; !config.Readonly || config.KeyboardType != KeyboardEmail {
+		t.Fatalf("static configuration after functions removed = %+v", config)
+	}
+}
