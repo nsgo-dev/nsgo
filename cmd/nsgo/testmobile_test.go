@@ -108,6 +108,10 @@ exec sleep 30
 			if !strings.Contains(output.String(), tc.output) {
 				t.Fatalf("output lost %q: %s", tc.output, output.String())
 			}
+			// A lingering launcher must end with the marked result, not hold the run until the test's deadline.
+			if ctx.Err() != nil {
+				t.Fatal("the run waited for the launcher until its deadline")
+			}
 		})
 	}
 }
