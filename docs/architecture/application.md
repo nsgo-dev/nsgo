@@ -107,6 +107,7 @@ For `nsgo.Run(App)`, `Run` keeps its root window hidden as the app's own surface
 | No tray, panels, global shortcuts, Dock policy or launch at login | `desktop` has them | Desktop apps need them |
 | File types registered at runtime on Windows | NSIS owns registration and cleanup; Linux infers common MIME types and defines unknown owned extensions | Installers can remove dropped types on upgrade without changing user defaults; a build's declarations are independent of its host's MIME database |
 | `nsh.json`'s window size | `nsgo.WindowSize`, `nsgo.WindowConstraints` and `WindowOptions` | An app opens windows of different sizes, or none |
+| `transparent` apart from `frame`, `shadow` and `taskbar` on | `Transparent` drops the frame too; `NoShadow` and `SkipTaskbar` are off unless set | A see-through window inside the system's frame draws a box around nothing, and Go's zero values are the defaults ([services](services.md#desktop-windows)) |
 
 ## Verification
 

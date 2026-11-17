@@ -78,6 +78,8 @@ type Options struct {
 	Material driver.WindowMaterial
 	// Constraints limit the window (nsgo.WindowConstraints).
 	Constraints driver.WindowConstraints
+	// Transparent opens the window without a background or frame, NoShadow without DWM's shadow, which only a transparent window lacks, and SkipTaskbar off the taskbar (look.go).
+	Transparent, NoShadow, SkipTaskbar bool
 	// Fonts are font files under the app's resources, registered before
 	// the first view.
 	Fonts []string
@@ -487,6 +489,8 @@ type window struct {
 	// material is the material DWM draws, WindowMaterialNone when the
 	// window is opaque.
 	material driver.WindowMaterial
+	// transparent is set while the window shows what is behind it where the app draws nothing, and canTransparent once it opened so, which only such a window can be (look.go).
+	transparent, canTransparent bool
 	// The page holding the mouse while a button is held on it, the one
 	// under it, those holding touch and pen contacts, and the video whose
 	// control bar holds the mouse.
@@ -614,6 +618,9 @@ func Run(app engine.App, opts Options) {
 	if !opts.Hidden {
 		// A hidden root shows nothing: the windows it opens take the material.
 		w.composeFor(opts.Material)
+		if opts.Transparent {
+			w.composeTransparent()
+		}
 	}
 	if dpi, _, _ := getDpiForSystem.Call(); dpi != 0 {
 		w.scale = float64(dpi) / 96
@@ -624,7 +631,7 @@ func Run(app engine.App, opts Options) {
 	// A first guess at the window around the app's size, which placeNew
 	// corrects.
 	w.chrome.constraints = opts.Constraints
-	style := constrainedStyle(wsOverlappedWindow|wsClipChildren, opts.Constraints)
+	style := w.frameStyle(wsClipChildren)
 	if opts.Hidden {
 		// It only ever shows as an alert's window (showAlertWindow): a caption and a close button, without the main window's limits, which the window the app opens for it takes.
 		w.chrome.constraints = driver.WindowConstraints{}
@@ -634,6 +641,9 @@ func Run(app engine.App, opts Options) {
 	if w.baseComposed {
 		ex = wsExNoRedirect
 	}
+	if opts.SkipTaskbar && !opts.Hidden {
+		ex |= wsExToolWindow
+	}
 	frame := rect{Right: w.px(opts.Width), Bottom: w.px(opts.Height)}
 	adjustWindowRect.Call(uintptr(unsafe.Pointer(&frame)), style, 0)
 	hwnd, _, _ := createWindowExW.Call(ex, uintptr(unsafe.Pointer(className)),
@@ -641,6 +651,9 @@ func Run(app engine.App, opts Options) {
 		cwUseDefault, cwUseDefault, uintptr(frame.Right-frame.Left), uintptr(frame.Bottom-frame.Top),
 		0, 0, instance, 0)
 	w.hwnd = hwnd
+	if w.transparent {
+		w.applyBare()
+	}
 	// Placed before it is the window's, so the sizes this sends do not
 	// reach the engine, which starts at the client area the window has.
 	w.placeNew(opts.Width, opts.Height, opts.test == nil)
@@ -837,7 +850,8 @@ func (w *window) startEngine(app engine.App, opts Options, size driver.Size) {
 	}
 	if opts.Hidden {
 		eopts.Windows = &engine.WindowOptions{Title: opts.Title, Width: opts.Width, Height: opts.Height,
-			Frame: opts.Frame, Material: opts.Material, Constraints: opts.Constraints}
+			Frame: opts.Frame, Material: opts.Material, Constraints: opts.Constraints, Transparent: opts.Transparent,
+			NoShadow: opts.NoShadow, SkipTaskbar: opts.SkipTaskbar}
 	}
 	data, cache, logs := engine.AppDirs(opts.ID)
 	eopts.SetDirs(data, cache, logs)
@@ -874,6 +888,9 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 		opts.Height = cfg.Height
 	}
 	opts.Frame, opts.Material, opts.Constraints, opts.Hidden = cfg.Frame, cfg.Material, cfg.Constraints, cfg.Hidden
+	// Only a window is transparent or off the taskbar of its own choice; a panel never shows there.
+	opts.Transparent, opts.NoShadow, opts.SkipTaskbar = cfg.Transparent && cfg.Kind == driver.SurfaceWindow, cfg.NoShadow,
+		cfg.SkipTaskbar && cfg.Kind == driver.SurfaceWindow
 	if cfg.Kind == driver.SurfaceTrayIcon {
 		// The notification-area icon does not yet host a drawn surface on
 		// Windows, so keep its attached tree out of sight.
@@ -884,10 +901,16 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 	child.visible = !opts.Hidden
 	child.chrome.constraints = opts.Constraints
 	child.composeFor(opts.Material)
-	style := constrainedStyle(wsOverlappedWindow|wsClipChildren, opts.Constraints)
+	if opts.Transparent {
+		child.composeTransparent()
+	}
+	style := child.frameStyle(wsClipChildren)
 	var ex uintptr
 	if child.baseComposed {
 		ex = wsExNoRedirect
+	}
+	if opts.SkipTaskbar {
+		ex |= wsExToolWindow
 	}
 	if cfg.Kind == driver.SurfacePanel {
 		style = wsPopup | wsClipChildren
@@ -917,6 +940,9 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 		return
 	}
 	child.hwnd = hwnd
+	if child.transparent {
+		child.applyBare()
+	}
 	if cfg.Kind == driver.SurfaceWindow {
 		child.placeNew(opts.Width, opts.Height, true)
 		if opts.Frame.Move {

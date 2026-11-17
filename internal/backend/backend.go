@@ -40,6 +40,8 @@ type Options struct {
 	InstanceKey string
 	// HideDock starts the app out of the Dock (macOS).
 	HideDock bool
+	// Transparent, NoShadow and SkipTaskbar are the main window's (core.WindowOptions).
+	Transparent, NoShadow, SkipTaskbar bool
 	// Parent is the window NewView's view is made in (Windows).
 	Parent uintptr
 }

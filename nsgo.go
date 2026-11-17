@@ -137,6 +137,21 @@ func WindowMaterial(material core.WindowMaterial) Option {
 	return func(o *options) { o.platform.Material = material }
 }
 
+// WindowTransparent opens the main window without a background or frame, so what is behind it shows wherever the app draws nothing, on macOS, Windows and Linux: desktop.WindowOptions.Transparent says how, and desktop.SetWindowTransparent changes it later.
+func WindowTransparent() Option {
+	return func(o *options) { o.platform.Transparent = true }
+}
+
+// WindowNoShadow opens the main window without the system's shadow (desktop.WindowOptions.NoShadow); desktop.SetWindowShadow changes it later.
+func WindowNoShadow() Option {
+	return func(o *options) { o.platform.NoShadow = true }
+}
+
+// SkipTaskbar keeps the main window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+` (desktop.WindowOptions.SkipTaskbar); desktop.SetSkipTaskbar changes it later.
+func SkipTaskbar() Option {
+	return func(o *options) { o.platform.SkipTaskbar = true }
+}
+
 // Fonts registers the font files at paths, slash-separated under the
 // app's resources directory (TrueType, OpenType or collections), before
 // the first view: text names them by their families, as Font.Family or a

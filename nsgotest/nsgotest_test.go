@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -461,6 +462,40 @@ func TestStepsFollowTheMainWindow(t *testing.T) {
 	app.Post(show)
 	app.Settle()
 	app.Find("id:main")
+}
+
+// A window the app opens transparent, shadowless and off the taskbar is recorded so, and the main window's changes to them reach Window.
+func TestTransparentWindowsAreRecorded(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var main *core.Scope
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.OpenWindow(cx, desktop.WindowOptions{Width: 120, Height: 90, Transparent: true, NoShadow: true, SkipTaskbar: true},
+			func(cx *core.Scope) core.Node { return core.View{} })
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			main = cx
+			return core.Text{Content: "main", TestID: "main"}
+		})
+	}, Environment(core.Environment{OS: core.OSWindows}))
+	if len(app.Opened) != 2 {
+		t.Fatalf("opened %+v", app.Opened)
+	}
+	if pet := app.Opened[0]; !pet.Transparent || !pet.NoShadow || !pet.SkipTaskbar || pet.Width != 120 {
+		t.Fatalf("the pet's window opened as %+v", pet)
+	}
+	if w := app.Opened[1]; w.Transparent || w.NoShadow || w.SkipTaskbar {
+		t.Fatalf("the main window opened as %+v", w)
+	}
+	desktop.SetWindowTransparent(main, true)
+	desktop.SetWindowShadow(main, false)
+	desktop.SetSkipTaskbar(main, true)
+	app.Settle()
+	want := []driver.WindowCommand{{Action: driver.WindowSetTransparent, On: true}, {Action: driver.WindowSetShadow},
+		{Action: driver.WindowSetSkipTaskbar, On: true}}
+	if !slices.Equal(app.Window, want) {
+		t.Fatalf("the main window was sent %+v; want %+v", app.Window, want)
+	}
 }
 
 // Another window's shortcuts and menu bar leave the main window's, which Key and ChooseMenu reach, and a context menu any window shows chooses on that window.

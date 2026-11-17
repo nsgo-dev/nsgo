@@ -9,11 +9,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// The window's background material is an NSVisualEffectView behind the
-// app's views, blending with what is behind the window. The window itself
-// gives up its opaque background so the material shows where the app draws
-// nothing opaque, and takes it back without one. NSVisualEffectMaterial
-// values follow AppKit's.
+// The window's background material is an NSVisualEffectView behind the app's views, blending with what is behind the window. The window itself gives up its opaque background so the material shows where the app draws nothing opaque, and takes it back without one unless it is transparent (applyBackground). NSVisualEffectMaterial values follow AppKit's.
 
 var (
 	selSetMaterial         = sel("setMaterial:")
@@ -80,8 +76,7 @@ func (s *surface) setMaterial(m driver.WindowMaterial) {
 		if s.effect != 0 {
 			s.effect.Send(sel("removeFromSuperview"))
 			s.effect = 0
-			s.window.Send(selSetOpaque, true)
-			s.window.Send(selSetBackgroundColor, objc.ID(apple.Class("NSColor")).Send(sel("windowBackgroundColor")))
+			s.applyBackground()
 		}
 		s.material = driver.WindowMaterialNone
 		return
@@ -94,8 +89,7 @@ func (s *surface) setMaterial(m driver.WindowMaterial) {
 		s.effect.Send(selSetAutoresizingMask, widthHeightSizable)
 		s.native.Send(selAddSubviewPositioned, s.effect, viewBelow, objc.ID(0))
 		s.effect.Send(selRelease)
-		s.window.Send(selSetOpaque, false)
-		s.window.Send(selSetBackgroundColor, objc.ID(apple.Class("NSColor")).Send(selClearColor))
+		s.applyBackground()
 	}
 	s.effect.Send(selSetMaterial, code)
 	s.material = m

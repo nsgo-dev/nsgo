@@ -478,7 +478,7 @@ func (w *window) frame() {
 		p.split = &split{c: c, width: uint32(client.Right), height: uint32(client.Bottom)}
 	}
 	clear := colorF{1, 1, 1, 1}
-	if w.baseComposed && w.backdrop != backdropNone {
+	if w.baseComposed && (w.transparent || w.backdrop != backdropNone) {
 		clear = colorF{}
 	}
 	// An effect's pictures reach past what a change damages.

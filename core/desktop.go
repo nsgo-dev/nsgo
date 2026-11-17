@@ -87,6 +87,21 @@ func (cx *Scope) SetWindowMaterial(m WindowMaterial) {
 	cx.window(WindowCommand{Action: WindowSetMaterial, Material: m})
 }
 
+// SetWindowTransparent is the core's part of desktop.SetWindowTransparent, which apps use.
+func (cx *Scope) SetWindowTransparent(on bool) {
+	cx.window(WindowCommand{Action: driver.WindowSetTransparent, On: on})
+}
+
+// SetWindowShadow is the core's part of desktop.SetWindowShadow, which apps use.
+func (cx *Scope) SetWindowShadow(on bool) {
+	cx.window(WindowCommand{Action: driver.WindowSetShadow, On: on})
+}
+
+// SetSkipTaskbar is the core's part of desktop.SetSkipTaskbar, which apps use.
+func (cx *Scope) SetSkipTaskbar(on bool) {
+	cx.window(WindowCommand{Action: driver.WindowSetSkipTaskbar, On: on})
+}
+
 // MenuItem is one item of a menu: an action, a submenu when it has
 // Items, or a line between groups when Separator. Apps name it
 // desktop.MenuItem.

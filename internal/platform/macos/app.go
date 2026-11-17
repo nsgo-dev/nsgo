@@ -43,7 +43,8 @@ func startOwn(app engine.App, opts Options) *surface {
 	eopts := engine.Options{Environment: s.env, Perf: ownPerf, Thread: apple.RaiseThread,
 		Appearance: opts.Appearance, Host: opts.Host, Secrets: apple.Keychain{},
 		Windows: &engine.WindowOptions{Title: opts.Title, Width: opts.Width, Height: opts.Height, Frame: opts.Frame,
-			Material: opts.Material, Constraints: opts.Constraints}}
+			Material: opts.Material, Constraints: opts.Constraints, Transparent: opts.Transparent, NoShadow: opts.NoShadow,
+			SkipTaskbar: opts.SkipTaskbar}}
 	eopts.SetDirs(engine.AppDirs(opts.ID))
 	imageload.UseDiskCache(eopts.CacheDir)
 	s.engine = engine.Start(s, app, eopts)
@@ -93,9 +94,12 @@ func (o *surface) openSurface(cfg driver.SurfaceConfig) {
 	if cfg.Kind == driver.SurfacePanel {
 		window = newPanel(cfg)
 	} else {
+		style := uint(styleTitled | styleClosable | styleMiniaturizable | styleResizable)
+		if cfg.Transparent {
+			style = styleMiniaturizable | styleResizable
+		}
 		window = objc.ID(classWindow).Send(selAlloc).Send(sel("initWithContentRect:styleMask:backing:defer:"),
-			apple.Rect(0, 0, float64(cfg.Width), float64(cfg.Height)),
-			uint(styleTitled|styleClosable|styleMiniaturizable|styleResizable), uint(2), false)
+			apple.Rect(0, 0, float64(cfg.Width), float64(cfg.Height)), style, uint(2), false)
 		title := cfg.Title
 		if title == "" {
 			title = opts.Title
@@ -122,6 +126,12 @@ func (o *surface) openSurface(cfg driver.SurfaceConfig) {
 	}
 	s.setMaterial(cfg.Material)
 	s.setPointerEvents(cfg.PointerEvents)
+	if cfg.Kind == driver.SurfaceWindow {
+		s.transparent = cfg.Transparent
+		s.applyBackground()
+		window.Send(selSetHasShadow, !cfg.NoShadow)
+		s.setSkipTaskbar(cfg.SkipTaskbar)
+	}
 	s.attach(o.engine)
 	if cfg.Kind == driver.SurfaceWindow {
 		s.setConstraints(cfg.Constraints)

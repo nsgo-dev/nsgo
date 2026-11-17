@@ -72,6 +72,8 @@ type Options struct {
 	Appearance driver.Appearance
 	// Constraints limit the window (nsgo.WindowConstraints).
 	Constraints driver.WindowConstraints
+	// Transparent opens the window undecorated and clear wherever the app draws nothing, NoShadow without the shadow GTK draws, and SkipTaskbar off the X11 task list (look.go).
+	Transparent, NoShadow, SkipTaskbar bool
 	// Perf shows the performance monitor over the app (perf.go).
 	Perf bool
 	// Updates is how the app updates (updates.go).
@@ -261,6 +263,8 @@ type window struct {
 	popoverID uint32
 	popupRefs map[uintptr]menuRef
 	trays     map[uint32]*linuxTray
+	// transparent is set while the window is undecorated and clear wherever the app draws nothing (look.go).
+	transparent bool
 	// appearance is the one the app forces.
 	appearance driver.Appearance
 }
@@ -330,6 +334,9 @@ func start(app engine.App, opts Options) (*window, error) {
 	w := newWindow(opts, false)
 	w.primary, w.app, w.opts = true, app, opts
 	w.createWindow(opts)
+	if !opts.Hidden {
+		w.applyLook(opts)
+	}
 	w.env = w.environment()
 
 	w.setAppearance(opts.Appearance)
@@ -374,7 +381,7 @@ func (w *window) startEngine(app engine.App, opts Options, size driver.Size) {
 	}
 	if opts.Hidden {
 		eopts.Windows = &engine.WindowOptions{Title: opts.Title, Width: opts.Width, Height: opts.Height,
-			Constraints: opts.Constraints}
+			Constraints: opts.Constraints, Transparent: opts.Transparent, NoShadow: opts.NoShadow, SkipTaskbar: opts.SkipTaskbar}
 	}
 	eopts.SetDirs(engine.AppDirs(opts.ID))
 	if opts.test != nil {
@@ -401,6 +408,9 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 	}
 	opts.Hidden = cfg.Hidden
 	opts.Constraints = cfg.Constraints
+	// Only a window is transparent, shadowless or off the task list of its own choice.
+	window := cfg.Kind == driver.SurfaceWindow
+	opts.Transparent, opts.NoShadow, opts.SkipTaskbar = cfg.Transparent && window, cfg.NoShadow && window, cfg.SkipTaskbar && window
 	if cfg.Kind == driver.SurfaceTrayIcon {
 		// The status item is still registered, but Linux does not yet draw a
 		// surface into it. Keep the attached tree out of sight until that
@@ -412,6 +422,7 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 	// Applied as the window maps (windowMappedCallback).
 	child.workspaces = cfg.Workspaces
 	child.createWindow(opts)
+	child.applyLook(opts)
 	child.setupSettings()
 	child.visible = !opts.Hidden
 	if cfg.Kind == driver.SurfacePanel {
@@ -1253,7 +1264,7 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 	case driver.WindowSetTitleBar:
 		w.chrome.titleBar = c.TitleBar
 		w.chrome.height = c.Height
-		gtkWindowSetDecorated(w.win, boolInt(c.TitleBar == driver.TitleBarDefault))
+		gtkWindowSetDecorated(w.win, boolInt(c.TitleBar == driver.TitleBarDefault && !w.transparent))
 		w.showMenuBar()
 		w.updateEnvironment()
 	case driver.WindowMinimize:
@@ -1313,6 +1324,18 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 		w.setConstraints(c.Constraints)
 	case driver.WindowSetPointerEvents:
 		w.setPointerEvents(c.PointerEvents)
+	case driver.WindowSetTransparent:
+		if w.kind == driver.SurfaceWindow {
+			w.setTransparent(c.On)
+		}
+	case driver.WindowSetShadow:
+		if w.kind == driver.SurfaceWindow {
+			w.setShadow(c.On)
+		}
+	case driver.WindowSetSkipTaskbar:
+		if w.kind == driver.SurfaceWindow {
+			w.setSkipTaskbar(c.On)
+		}
 	case driver.WindowSetLevel:
 		w.setLevel(c.Level)
 	case driver.WindowSetWorkspaces:

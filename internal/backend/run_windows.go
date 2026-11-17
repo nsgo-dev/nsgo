@@ -11,5 +11,6 @@ import (
 func run(root engine.App, app func(*core.Scope), o Options) {
 	windows.Run(rootOf(root, app), windows.Options{Title: name, Width: o.Width, Height: o.Height, Frame: o.Frame, Hidden: app != nil, ID: id,
 		Components: o.Components, Material: o.Material, Constraints: o.Constraints, Fonts: o.Fonts, Appearance: o.Appearance, Perf: o.Monitor,
+		Transparent: o.Transparent, NoShadow: o.NoShadow, SkipTaskbar: o.SkipTaskbar,
 		Updates: updateConfig(), RegisterToast: launch.registerToast, UnregisterToast: launch.unregisterToast, DockTask: launch.dockTask, InstanceKey: o.InstanceKey})
 }

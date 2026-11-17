@@ -190,7 +190,7 @@ type menuRef struct {
 // hidden reports whether the title bar is hidden now: full screen has
 // none.
 func (w *window) hidden() bool {
-	return w.chrome.titleBar == driver.TitleBarHidden && !w.chrome.fullScreen
+	return w.chrome.titleBar == driver.TitleBarHidden && !w.chrome.fullScreen && !w.transparent
 }
 
 // captionHeight is the app's bar height, and at least Windows' own.
@@ -319,6 +319,15 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 		w.setConstraints(c.Constraints)
 	case driver.WindowSetPointerEvents:
 		w.setPointerEvents(c.PointerEvents)
+	case driver.WindowSetTransparent:
+		if w.kind == driver.SurfaceWindow {
+			w.setTransparent(c.On)
+			w.showMenuBar()
+		}
+	case driver.WindowSetSkipTaskbar:
+		if w.kind == driver.SurfaceWindow && !(w.primary && w.opts.Hidden) {
+			w.setSkipTaskbar(c.On)
+		}
 	case driver.WindowSetAnchor:
 		if w.kind == driver.SurfacePanel {
 			w.anchorBounds, w.placement = c.AnchorBounds, c.Placement
@@ -328,6 +337,14 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 			}
 		}
 	}
+}
+
+// constrained returns style with the frame and the buttons the window's constraints leave: a transparent window's popup has no frame to resize by (frameStyle).
+func (w *window) constrained(style uintptr) uintptr {
+	if w.transparent {
+		return w.frameStyle(style)
+	}
+	return constrainedStyle(style, w.chrome.constraints)
 }
 
 // constrainedStyle returns style with the frame and the buttons c leaves.
@@ -351,11 +368,11 @@ func (w *window) setConstraints(c driver.WindowConstraints) {
 	w.chrome.constraints = c
 	w.chrome.hover, w.chrome.pressed = 0, 0
 	if w.chrome.fullScreen {
-		w.chrome.savedStyle = constrainedStyle(w.chrome.savedStyle, c)
+		w.chrome.savedStyle = w.constrained(w.chrome.savedStyle)
 		return
 	}
 	style, _, _ := getWindowLongPtrW.Call(w.hwnd, gwlStyle)
-	setWindowLongPtrW.Call(w.hwnd, gwlStyle, constrainedStyle(style, c))
+	setWindowLongPtrW.Call(w.hwnd, gwlStyle, w.constrained(style))
 	w.frameChanged()
 	w.redrawAll()
 	if w.zoomed() || isIconicWindow(w.hwnd) {
@@ -864,7 +881,7 @@ func (w *window) showMenuBar() {
 	shown := c.menuBar == driver.MenuBarShown || c.revealed || c.menuOpen
 	// A hidden root only ever shows as an app-modal alert's window (showAlertWindow), which must not offer the app's menus while the alert waits.
 	hiddenRoot := w.primary && w.opts.Hidden
-	if c.menu != nil && c.titleBar == driver.TitleBarDefault && !c.fullScreen && shown && !hiddenRoot {
+	if c.menu != nil && c.titleBar == driver.TitleBarDefault && !c.fullScreen && shown && !hiddenRoot && !w.transparent {
 		bar, _, _ = createMenu.Call()
 		if bar != 0 {
 			w.appendMenu(bar, c.menu)

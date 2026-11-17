@@ -188,6 +188,16 @@ func (s *surface) command(c *driver.WindowCommand) {
 		s.setConstraints(c.Constraints)
 	case driver.WindowSetPointerEvents:
 		s.setPointerEvents(c.PointerEvents)
+	case driver.WindowSetTransparent:
+		s.setTransparent(c.On)
+	case driver.WindowSetShadow:
+		if s.kind == driver.SurfaceWindow {
+			w.Send(selSetHasShadow, c.On)
+		}
+	case driver.WindowSetSkipTaskbar:
+		if s.kind == driver.SurfaceWindow {
+			s.setSkipTaskbar(c.On)
+		}
 	case driver.WindowSetAnchor:
 		if s.kind != driver.SurfacePanel {
 			break
@@ -377,7 +387,7 @@ func (s *surface) barHeight() driver.Points {
 // the traffic lights on the left, unless the app hid them.
 func (s *surface) titleBarArea() driver.Edges {
 	w := s.window
-	if w == 0 || s.titleBar != driver.TitleBarHidden {
+	if w == 0 || s.titleBar != driver.TitleBarHidden || s.transparent {
 		return driver.Edges{}
 	}
 	if objc.Send[uint](w, selStyleMask)&maskFullScreen != 0 {

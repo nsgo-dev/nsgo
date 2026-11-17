@@ -55,6 +55,12 @@ type WindowOptions struct {
 	Workspaces WindowWorkspaces
 	// PointerEvents is where the window takes the pointer (SetWindowPointerEvents), from its first frame.
 	PointerEvents WindowPointerEvents
+	// Transparent leaves the window without a background or frame: what is behind it shows wherever the app draws nothing, as for a desktop pet or a widget, and WindowDrag views move it. desktop.SetWindowTransparent changes it later, which on Windows needs a window opened transparent.
+	Transparent bool
+	// NoShadow drops the system's shadow around the window; on Windows only a transparent window has none.
+	NoShadow bool
+	// SkipTaskbar keeps the window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+`; the Dock is the app's (desktop.SetDockVisible), and Wayland has no such hint.
+	SkipTaskbar bool
 }
 
 // PanelOptions are a panel's: the core's part of desktop.PanelOptions,
@@ -141,7 +147,8 @@ func (cx *Scope) OpenWindow(opts WindowOptions, content func(cx *Scope) Node) *W
 	size := limits.Clamp(Size{Width: opts.Width, Height: opts.Height})
 	w := rt.openSurface(cx.current(), driver.SurfaceConfig{Kind: driver.SurfaceWindow, Title: opts.Title,
 		Width: size.Width, Height: size.Height, Frame: opts.Frame, Hidden: opts.Hidden, Material: opts.Material, Constraints: limits,
-		Workspaces: opts.Workspaces, PointerEvents: cx.windowPointer(opts.PointerEvents)}, content)
+		Workspaces: opts.Workspaces, PointerEvents: cx.windowPointer(opts.PointerEvents),
+		Transparent: opts.Transparent, NoShadow: opts.NoShadow, SkipTaskbar: opts.SkipTaskbar}, content)
 	if opts.Key != "" {
 		w.key = opts.Key
 		if rt.keyed == nil {

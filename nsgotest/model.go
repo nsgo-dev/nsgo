@@ -741,6 +741,7 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemWindow:
 			a.Window = append(a.Window, *it.Window)
 		case driver.ItemOpenSurface:
+			a.Opened = append(a.Opened, *it.Surface)
 			if it.Surface.Kind == driver.SurfaceOverlay {
 				a.openOverlay(it.Surface)
 			}

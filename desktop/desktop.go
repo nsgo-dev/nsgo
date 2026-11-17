@@ -136,6 +136,15 @@ func SetWindowControls(cx *core.Scope, c WindowControls) { cx.SetWindowControls(
 // opaque.
 func SetWindowMaterial(cx *core.Scope, m WindowMaterial) { cx.SetWindowMaterial(m) }
 
+// SetWindowTransparent makes the window transparent, without a background or frame, so what is behind it shows wherever the app draws nothing, or gives it back both; WindowOptions.Transparent and nsgo.WindowTransparent open a window so. macOS and Linux change it any time; Windows only in a window opened transparent, which is opaque, white behind the app's views, while framed.
+func SetWindowTransparent(cx *core.Scope, on bool) { cx.SetWindowTransparent(on) }
+
+// SetWindowShadow gives the window the system's shadow, or takes it away; WindowOptions.NoShadow and nsgo.WindowNoShadow open a window without it. Windows draws none around a transparent window and keeps it around a framed one.
+func SetWindowShadow(cx *core.Scope, on bool) { cx.SetWindowShadow(on) }
+
+// SetSkipTaskbar keeps the window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+`, or puts it back; WindowOptions.SkipTaskbar and nsgo.SkipTaskbar open a window so. The Dock is the app's (SetDockVisible), and Wayland has no such hint.
+func SetSkipTaskbar(cx *core.Scope, on bool) { cx.SetSkipTaskbar(on) }
+
 // ShowsMaterial reports whether a material shows behind the window's
 // content, where the app leaves it transparent. Where it is false, give
 // those parts a background of their own.

@@ -14,5 +14,6 @@ func run(root engine.App, app func(*core.Scope), o Options) {
 		Title: name, Width: o.Width, Height: o.Height, Frame: o.Frame, ID: id,
 		Components: o.Components, Perf: o.Monitor, Material: o.Material, Constraints: o.Constraints, Fonts: o.Fonts,
 		Appearance: o.Appearance, HideDock: o.HideDock, LaunchedAtLogin: launch.launchedAtLogin,
+		Transparent: o.Transparent, NoShadow: o.NoShadow, SkipTaskbar: o.SkipTaskbar,
 	})
 }

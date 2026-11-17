@@ -55,6 +55,9 @@ type (
 	ScrollEdge = driver.ScrollEdge
 	// StatusBarConfig is the status bar the platform shows (ItemStatusBar).
 	StatusBarConfig = driver.StatusBarConfig
+	// SurfaceConfig is a window, panel, tray view or overlay as the app opened it (App.Opened), and SurfaceKind which of them it is.
+	SurfaceConfig = driver.SurfaceConfig
+	SurfaceKind   = driver.SurfaceKind
 	// TextStyle is resolved text style: nothing in it is unset.
 	TextStyle = driver.TextStyle
 	// TextSpan styles a byte range of a text over its style.
@@ -77,6 +80,13 @@ type (
 	WebConfig = driver.WebConfig
 	// WebSource is what a web view shows: a URL or HTML.
 	WebSource = driver.WebSource
+)
+
+const (
+	SurfaceWindow   = driver.SurfaceWindow
+	SurfacePanel    = driver.SurfacePanel
+	SurfaceTrayIcon = driver.SurfaceTrayIcon
+	SurfaceOverlay  = driver.SurfaceOverlay
 )
 
 const (

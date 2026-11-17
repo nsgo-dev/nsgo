@@ -606,6 +606,10 @@ func (s *surface) applySpaces() {
 	if s.constraints.NoMaximize && behavior&fullScreenAuxiliary == 0 {
 		behavior |= fullScreenNone
 	}
+	if s.skipTaskbar {
+		// SkipTaskbar keeps the window out of Cmd-` cycling too.
+		behavior |= ignoresCycle
+	}
 	w.Send(sel("setCollectionBehavior:"), behavior)
 }
 

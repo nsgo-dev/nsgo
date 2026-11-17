@@ -32,7 +32,7 @@ func (w *window) showMenuBar() {
 	}
 	clear(w.actionRefs)
 	c := &w.chrome
-	if c.menu == nil || c.titleBar != driver.TitleBarDefault || c.fullScreen ||
+	if c.menu == nil || c.titleBar != driver.TitleBarDefault || c.fullScreen || w.transparent ||
 		c.menuBar == driver.MenuBarAutoHide && !c.revealed {
 		return
 	}

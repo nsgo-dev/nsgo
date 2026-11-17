@@ -370,6 +370,8 @@ type App struct {
 	Menu     []driver.MenuEntry
 	DockMenu []driver.MenuEntry
 	Window   []driver.WindowCommand
+	// Opened are the surfaces the app opened, oldest first, as it opened them: with a desktop environment its windows, panels and tray views, a window's transparency, shadow and taskbar button among what it asked for, and on Android its overlays.
+	Opened []SurfaceConfig
 	// ImageSizes are the pixel sizes of the images the model's platform
 	// loads, by URI, which answer Scope.ImageSize; others fail to load.
 	ImageSizes map[string]driver.Size

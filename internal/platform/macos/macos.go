@@ -47,6 +47,8 @@ type Options struct {
 	// Material is the material behind the app's views, where they draw
 	// nothing opaque (nsgo.WindowMaterial).
 	Material driver.WindowMaterial
+	// Transparent, NoShadow and SkipTaskbar are the main window's (nsgo.WindowTransparent, nsgo.WindowNoShadow, nsgo.SkipTaskbar).
+	Transparent, NoShadow, SkipTaskbar bool
 	// Frame is where the main window opens (nsgo.WindowFrame).
 	Frame driver.WindowFrame
 	// Constraints limit the main window (nsgo.WindowConstraints).
@@ -252,11 +254,13 @@ type surface struct {
 	env driver.Environment
 	// material is the material behind the app's views, effect the view
 	// that shows it.
-	material     driver.WindowMaterial
-	effect       objc.ID
-	keys         []driver.KeyBinding // the keymap's bindings
-	webFocus     *view               // the page holding the window's first responder
-	stopWebFocus func()              // ends first-responder observation in the current window
+	material driver.WindowMaterial
+	effect   objc.ID
+	// transparent leaves the window borderless and clear behind the app's views, and skipTaskbar keeps it out of the Window menu and Cmd+` (look.go).
+	transparent, skipTaskbar bool
+	keys                     []driver.KeyBinding // the keymap's bindings
+	webFocus                 *view               // the page holding the window's first responder
+	stopWebFocus             func()              // ends first-responder observation in the current window
 
 	// What a batch touched, finished once its frames are set.
 	images, presenting []*view
@@ -426,7 +430,32 @@ func loadAppKit() {
 	// NSGo's own windows place the traffic lights again after each layout
 	// pass: macOS 27's AppKit puts them back whenever it lays the title
 	// bar out, which no notification tells.
+	yes := func(objc.ID, objc.SEL) bool { return true }
 	classWindow = register("NsgoWindow", apple.Class("NSWindow"), nil, []objc.MethodDef{{
+		// A transparent window is borderless, which AppKit otherwise keeps from the keyboard.
+		Cmd: sel("canBecomeKeyWindow"), Fn: yes,
+	}, {
+		Cmd: sel("canBecomeMainWindow"), Fn: yes,
+	}, {
+		// AppKit's performClose: only beeps in a window without a close button, as a transparent one is: the app's close and Cmd+W ask the app instead.
+		Cmd: sel("performClose:"),
+		Fn: func(self objc.ID, cmd objc.SEL, sender objc.ID) {
+			if s := windowSurface(self); s != nil && s.transparent && s.id != 0 {
+				s.engine.Dispatch(driver.Event{Kind: driver.EventWindowClose})
+				return
+			}
+			apple.Super(self, cmd, sender)
+		},
+	}, {
+		// AppKit disables a nil-targeted Close item and its Cmd+W in a window without a close button: in a transparent one they reach performClose: above.
+		Cmd: sel("validateMenuItem:"),
+		Fn: func(self objc.ID, cmd objc.SEL, item objc.ID) bool {
+			if s := windowSurface(self); s != nil && s.transparent && s.id != 0 && objc.Send[objc.SEL](item, sel("action")) == sel("performClose:") {
+				return true
+			}
+			return apple.SendSuper[bool](self, cmd, item)
+		},
+	}, {
 		Cmd: sel("sendEvent:"),
 		Fn: func(self objc.ID, cmd objc.SEL, event objc.ID) {
 			if inputAllowed(event) {

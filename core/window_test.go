@@ -20,9 +20,14 @@ type windows struct {
 }
 
 func newWindows(t *testing.T, app func(cx *Scope)) *windows {
+	return newWindowsWith(t, WindowOptions{Width: 400, Height: 300}, app)
+}
+
+// newWindowsWith runs app as newWindows does, its main window opening with main.
+func newWindowsWith(t *testing.T, main WindowOptions, app func(cx *Scope)) *windows {
 	w := &windows{t: t, items: map[uint32][]driver.MountItem{}}
 	w.root = testRoot(RootOptions{Post: func(func()) {}, Clock: NewManualClock(time.Unix(0, 0)),
-		Windows: &WindowOptions{Width: 400, Height: 300}})
+		Windows: &main})
 	w.app = NewTree(w.root, ApproxTextEngine{})
 	w.app.Mount(AppRoot(app))
 	w.commit()
@@ -685,6 +690,47 @@ func TestWindowFrame(t *testing.T) {
 	w.app.Surfaces()[0].SetEnvironment(driver.Environment{FullScreen: true, WindowFrame: moved})
 	if env.WindowFrame() != moved || !env.FullScreen() {
 		t.Fatalf("reported frame %+v", env.WindowFrame())
+	}
+}
+
+// A window opens transparent, without a shadow and off the taskbar as its options ask, the main window as the app's do, and changes them later.
+func TestWindowLook(t *testing.T) {
+	var cx *Scope
+	w := newWindows(t, func(app *Scope) {
+		app.OpenWindow(WindowOptions{Transparent: true, NoShadow: true, SkipTaskbar: true}, func(c *Scope) Node {
+			cx = c
+			return View{}
+		})
+		app.OpenWindow(WindowOptions{}, func(*Scope) Node { return View{} })
+	})
+	opened := w.take(0, driver.ItemOpenSurface)
+	if len(opened) != 2 {
+		t.Fatalf("opened %d surfaces", len(opened))
+	}
+	if s := opened[0].Surface; !s.Transparent || !s.NoShadow || !s.SkipTaskbar {
+		t.Fatalf("a transparent window opened %+v", s)
+	}
+	if s := opened[1].Surface; s.Transparent || s.NoShadow || s.SkipTaskbar {
+		t.Fatalf("a plain window opened %+v", s)
+	}
+	cx.SetWindowTransparent(false)
+	cx.SetWindowShadow(true)
+	cx.SetSkipTaskbar(false)
+	w.commit()
+	var sent []WindowCommand
+	for _, it := range w.take(opened[0].Surface.ID, driver.ItemWindow) {
+		sent = append(sent, *it.Window)
+	}
+	want := []WindowCommand{{Action: driver.WindowSetTransparent}, {Action: driver.WindowSetShadow, On: true}, {Action: driver.WindowSetSkipTaskbar}}
+	if !slices.Equal(sent, want) {
+		t.Fatalf("the window was sent %+v; want %+v", sent, want)
+	}
+
+	main := newWindowsWith(t, WindowOptions{Width: 400, Height: 300, Transparent: true, SkipTaskbar: true}, func(app *Scope) {
+		app.SetMainView(func(*Scope) Node { return View{} })
+	})
+	if s := main.take(0, driver.ItemOpenSurface)[0].Surface; !s.Transparent || s.NoShadow || !s.SkipTaskbar {
+		t.Fatalf("the main window opened %+v", s)
 	}
 }
 
