@@ -86,8 +86,7 @@ public final class PipeCheck {
         }
         System.out.write(bytes);
         System.out.flush();
-        // Broken complete headers are rejected while the child is still alive.
-        // Partial frames close their pipe, as a child exiting mid-write would.
+        // Broken complete headers are rejected while the child is still alive. Partial frames close their pipe, as a child exiting mid-write would.
         if (scenario.equals("header") || scenario.equals("payload") || scenario.equals("valid")) System.out.close();
         Thread.sleep(60_000);
     }

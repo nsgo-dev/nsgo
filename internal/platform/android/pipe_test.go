@@ -11,9 +11,7 @@ import (
 	"testing"
 )
 
-// Run the shipped reader on the JVM with Android's context and log calls
-// stubbed. A 32 MiB heap makes trusting a corrupt length fail loudly;
-// a real child process verifies that a bad pipe is stopped and reported.
+// Run the shipped reader on the JVM with Android's context and log calls stubbed. A 32 MiB heap makes trusting a corrupt length fail loudly; a real child process verifies that a bad pipe is stopped and reported.
 func TestAndroidPipeRejectsCorruptFrames(t *testing.T) {
 	javac, err := exec.LookPath("javac")
 	if err != nil || exec.Command(javac, "-version").Run() != nil {

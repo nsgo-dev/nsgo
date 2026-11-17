@@ -8,9 +8,7 @@ import (
 	"time"
 )
 
-// A malformed Android pipe can end before TestMain starts the host. The
-// marked error must end the run immediately, without waiting for logcat
-// (a stream that stays open) or accepting an earlier run's failure.
+// A malformed Android pipe can end before TestMain starts the host. The marked error must end the run immediately, without waiting for logcat (a stream that stays open) or accepting an earlier run's failure.
 func TestReadMarkedRunReportsRuntimeFailureBeforeStart(t *testing.T) {
 	for _, started := range []bool{false, true} {
 		t.Run(map[bool]string{false: "before start", true: "after start"}[started], func(t *testing.T) {
