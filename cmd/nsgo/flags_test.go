@@ -86,6 +86,20 @@ func TestLoadAndOverrideSanitizeGeneratedID(t *testing.T) {
 	}
 }
 
+func TestLoadBuildLdflags(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: App\nbuild:\n  ldflags:\n    - -X main.releaseDate=2026-11-17\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(p.Build.LDFlags, []string{"-X main.releaseDate=2026-11-17"}) {
+		t.Fatalf("build.ldflags = %q", p.Build.LDFlags)
+	}
+}
+
 func TestLoadRefusesWindow(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: App\nwindow: {width: 420, height: 560}\n"), 0o644); err != nil {
@@ -211,6 +225,19 @@ func TestBuildFlagsApply(t *testing.T) {
 	}
 	if p.Build.Jobs != 3 {
 		t.Errorf("build.jobs: got %d, want 3", p.Build.Jobs)
+	}
+}
+
+func TestBuildFlagsLdflags(t *testing.T) {
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
+	f := bindBuildFlags(fs)
+	if err := fs.Parse([]string{"-ldflags", "-X main.releaseDate=2026-11-17", "-ldflags=-X main.channel=stable"}); err != nil {
+		t.Fatal(err)
+	}
+	p := &project{}
+	f.apply(p)
+	if !slices.Equal(p.Build.LDFlags, []string{"-X main.releaseDate=2026-11-17", "-X main.channel=stable"}) {
+		t.Fatalf("build.ldflags = %q", p.Build.LDFlags)
 	}
 }
 
@@ -345,6 +372,11 @@ func TestIdentityLdflags(t *testing.T) {
 	p.Release = true
 	if !strings.Contains(p.ldflags(), "core.appRelease=1") {
 		t.Errorf("a release's ldflags %s say development", p.ldflags())
+	}
+	p.Build.LDFlags = []string{"-X main.releaseDate=2026-11-17"}
+	flags = p.ldflags()
+	if strings.Index(flags, "main.releaseDate") > strings.Index(flags, "core.appName") {
+		t.Fatalf("app ldflags come after NSGo identity flags: %s", flags)
 	}
 	// go build splits -ldflags at spaces outside quotes and takes no escapes inside them, so a name with a single quote goes in double quotes.
 	p = &project{Name: "Bob's Notes", ID: "com.example.notes", Version: "1.0.0"}

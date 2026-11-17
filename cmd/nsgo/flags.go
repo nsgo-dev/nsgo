@@ -51,6 +51,17 @@ func bindOverride[T any](fs *flag.FlagSet, name, usage string, parse func(string
 	return o
 }
 
+// stringListFlag collects a repeatable string flag, preserving each value's
+// spaces for flags such as -ldflags whose value is parsed by another tool.
+func stringListFlag(fs *flag.FlagSet, name, usage string) *[]string {
+	var values []string
+	fs.Func(name, usage, func(value string) error {
+		values = append(values, value)
+		return nil
+	})
+	return &values
+}
+
 // boolOverride is an override[bool] that -flag alone sets to true.
 type boolOverride struct{ override[bool] }
 
@@ -211,6 +222,7 @@ type buildFlags struct {
 	*overrides
 	targets *override[string]
 	output  *override[string]
+	ldflags *[]string
 	open    *boolOverride
 	install *boolOverride
 	jobs    *override[int]
@@ -227,6 +239,7 @@ func bindBuildFlags(fs *flag.FlagSet) *buildFlags {
 	f := &buildFlags{overrides: bindOverrides(fs)}
 	f.targets = stringFlag(fs, "target", "comma-separated `targets`: all for every platform Go and Xcode build, miniprogram for every mini program, or their names (default: nsgo.yaml's build.targets)")
 	f.output = stringFlag(fs, "output", "the `output` directory (default: nsgo.yaml's build.output)")
+	f.ldflags = stringListFlag(fs, "ldflags", "append app linker `flags` to the build; repeat for more values (default: nsgo.yaml's build.ldflags)")
 	f.open = boolFlag(fs, "open", "open the output directory (default: nsgo.yaml's build.open)")
 	f.install = boolFlag(fs, "installers", "package macOS, Windows and Linux targets for users to install: a disk image, an NSIS installer, Debian and Arch packages (default: nsgo.yaml's build.installers, else true)")
 	f.jobs = intFlag(fs, "jobs", "how many targets build at once (default: nsgo.yaml's build.jobs, else half the CPUs)")
@@ -257,6 +270,7 @@ func (f *buildFlags) apply(p *project) {
 	}
 	f.jobs.replace(&p.Build.Jobs)
 	f.channel.replace(&p.Updates.Channel)
+	p.Build.LDFlags = append(p.Build.LDFlags, (*f.ldflags)...)
 	p.Build.run, p.Build.embed, p.Build.dynamic = f.run, f.embed, f.dynamic
 	p.Build.device, p.Build.team = f.device, f.team
 	f.sign.apply(p)

@@ -227,6 +227,9 @@ type project struct {
 	Build struct {
 		Output  string   `yaml:"output"`
 		Targets []string `yaml:"targets"`
+		// LDFlags are the app's linker flags, placed before NSGo's own flags
+		// so the tool's app identity remains authoritative.
+		LDFlags []string `yaml:"ldflags"`
 		// Tags are the app's Go build tags, which every go command the tool runs for the app takes, the tool's own added to them (goTags).
 		Tags []string `yaml:"tags"`
 		// Open shows the output directory once the build finishes; it
@@ -469,6 +472,12 @@ func xflag(name, value string) string {
 	return "-X '" + name + "=" + value + "'"
 }
 
+// appLdflags joins linker flags supplied by the app or the command line.
+func (p *project) appLdflags(extra ...string) string {
+	flags := append(slices.Clone(p.Build.LDFlags), extra...)
+	return strings.Join(flags, " ")
+}
+
 // corePath is package core's, which holds the app's identity (core.App).
 const corePath = "github.com/nsgo-dev/nsgo/core"
 
@@ -480,6 +489,9 @@ func (p *project) ldflags(extra ...string) string {
 	const devPkg = pkg + "/internal/dev"
 	flags := strings.Join([]string{xflag(corePath+".appName", p.Name), xflag(corePath+".appID", p.ID),
 		xflag(corePath+".appVersion", p.Version), xflag(corePath+".appBuild", p.BundleVersion())}, " ")
+	if app := p.appLdflags(); app != "" {
+		flags = app + " " + flags
+	}
 	if p.Appearance != "" {
 		flags += fmt.Sprintf(" -X %s.appearance=%s", pkg, p.Appearance)
 	}

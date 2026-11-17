@@ -50,6 +50,7 @@ dev:
 build:
   output: dist
   tags: []              # Go build tags every build, test and check of the app takes, such as timetzdata
+  ldflags: []            # app linker flags, such as -X main.releaseDate=2026-11-17
   open: false           # true opens the output directory after building
   installers: true      # false leaves out the disk image, the Windows installer and the Linux packages
   jobs: 0               # how many targets build at once; 0 is half the CPUs, 1 one after another
@@ -69,6 +70,8 @@ build:
 ```
 
 Flags replace the values they name, such as `-target`, `-version` or `-output`; `-h` lists them all.
+
+`build.ldflags` adds the app's linker flags to every build. `-ldflags` on `build` or `test` adds more for that invocation; repeat it for more values. The flags are applied before NSGo's own identity flags, so the app's variables can be stamped while the name and version from `nsgo.yaml` stay authoritative.
 
 Every go command the tool runs for the app takes `build.tags`, in `dev` and its reloads, `build` with `-embed` too, `test` with `-target` too and `check`, on every target. NSGo's own tags, such as `nsgodev` in `dev` or `nsgotest` in target tests, are added to them, as are the tags of `-tags` in `GOFLAGS`, which would otherwise be replaced; the rest of `GOFLAGS` applies as it is.
 
