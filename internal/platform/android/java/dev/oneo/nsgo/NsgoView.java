@@ -3837,6 +3837,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      */
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        return keyBinding(e) || super.dispatchKeyEvent(e);
+    }
+
+    /** The one matcher for hardware keys and Return delivered through an IME. */
+    private boolean keyBinding(KeyEvent e) {
         int code = e.getKeyCode();
         if (e.getAction() == KeyEvent.ACTION_DOWN && !KeyEvent.isModifierKey(code)) modality(Protocol.MODALITY_KEYBOARD);
         if (e.getAction() == KeyEvent.ACTION_UP && consumedKeys.remove(code)) return true;
@@ -3854,7 +3859,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 return true;
             }
         }
-        return super.dispatchKeyEvent(e);
+        return false;
     }
 
     /** The press's names: with "mod" for Control, and with the modifiers as they are. */
@@ -4169,6 +4174,16 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         InputField field = new InputField(getContext(), new InputField.Listener() {
             @Override public boolean has(int kind) {
                 return n.has(kind);
+            }
+
+            @Override public boolean keyBinding(KeyEvent event) {
+                if (event != null) return NsgoView.this.keyBinding(event);
+                // An IME action is one complete Return, with no later release to clear a held key.
+                long now = android.os.SystemClock.uptimeMillis();
+                KeyEvent down = new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0);
+                boolean consumed = NsgoView.this.keyBinding(down);
+                if (consumed) NsgoView.this.keyBinding(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0));
+                return consumed;
             }
 
             @Override public void send(int kind, long count, int index, String text, boolean finished) {

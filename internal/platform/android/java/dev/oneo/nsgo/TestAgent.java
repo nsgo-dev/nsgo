@@ -190,6 +190,22 @@ final class TestAgent {
             case "key":
                 key(op.getString("key"));
                 break;
+            case "editor-action": {
+                View focused = activity().getCurrentFocus();
+                EditorInfo info = new EditorInfo();
+                InputConnection connection = focused == null ? null : focused.onCreateInputConnection(info);
+                if (connection == null) throw new IllegalStateException("no focused input connection");
+                if (op.optBoolean("hardware")) {
+                    // Enter delivered to the field by an IME, after the root's hardware-key stage.
+                    long now = SystemClock.uptimeMillis();
+                    int meta = op.optBoolean("shift") ? KeyEvent.META_SHIFT_ON | KeyEvent.META_SHIFT_LEFT_ON : 0;
+                    focused.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, meta));
+                    focused.dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, meta));
+                } else {
+                    connection.performEditorAction(info.imeOptions & EditorInfo.IME_MASK_ACTION);
+                }
+                break;
+            }
             case "back":
                 view.back();
                 break;

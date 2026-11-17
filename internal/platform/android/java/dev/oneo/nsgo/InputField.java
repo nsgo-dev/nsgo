@@ -34,6 +34,9 @@ final class InputField extends EditText {
 
         void blur();
 
+        /** Offers an IME's Return to the keymap; null is a software action or committed newline. */
+        boolean keyBinding(KeyEvent event);
+
         /** The caret is at (x, y), w by h, in points in the field's parent. */
         void caret(float x, float y, float w, float h);
 
@@ -100,6 +103,7 @@ final class InputField extends EditText {
             }
         });
         setOnEditorActionListener((v, action, event) -> {
+            if (listener.keyBinding(event)) return true;
             // A hardware Enter breaks the line where Return does, and with
             // Shift or Alt in any multiline input.
             if (multiline && event != null
@@ -114,6 +118,7 @@ final class InputField extends EditText {
 
     @Override
     public boolean onKeyDown(int code, KeyEvent event) {
+        if (code == KeyEvent.KEYCODE_ENTER && listener.keyBinding(event)) return true;
         // Hardware keys, and keys the keyboard sends as key events.
         if (code == KeyEvent.KEYCODE_DEL) key("Backspace");
         else if (code == KeyEvent.KEYCODE_ENTER) key("Enter");
@@ -123,6 +128,7 @@ final class InputField extends EditText {
 
     @Override
     public boolean onKeyUp(int code, KeyEvent event) {
+        if (code == KeyEvent.KEYCODE_ENTER && listener.keyBinding(event)) return true;
         // The up of an Enter whose down submitted must not move the focus.
         if (code == KeyEvent.KEYCODE_ENTER && submit != NEWLINE) return true;
         return super.onKeyUp(code, event);
@@ -435,6 +441,7 @@ final class InputField extends EditText {
 
         @Override
         public boolean commitText(CharSequence text, int position) {
+            if (text.toString().equals("\n") && listener.keyBinding(null)) return true;
             String added = text.toString();
             if (composing != null && added.startsWith(composing.toString())) added = added.substring(composing.length());
             composing = null;
