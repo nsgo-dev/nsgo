@@ -62,7 +62,11 @@ func TestEditorsFollowTheUIFont(t *testing.T) {
 	}
 	for _, next := range []string{"Monospace", "Serif"} {
 		w.onLoop(t, func() { setSetting(gtkSettingsGetDefault(), cstr("gtk-font-name"), cstr(next+" 11"), 0) })
-		for id, css := range styles() {
+		after := styles()
+		if len(after) != len(original) {
+			t.Fatalf("editor styles = %d after the UI font became %s, want %d", len(after), next, len(original))
+		}
+		for id, css := range after {
 			var multiline bool
 			var index int
 			fmt.Sscanf(id, "%t-%d", &multiline, &index)
@@ -111,6 +115,25 @@ func TestSystemFamiliesAreTheUIFont(t *testing.T) {
 	} {
 		if got := familyNames(family, ui); !slices.Equal(got, want) {
 			t.Errorf("familyNames(%q) = %q, want %q", family, got, want)
+		}
+	}
+}
+
+// TestOnlySystemFamiliesNameTheUIFont picks the editors whose CSS a UI font change reloads: those naming a system family anywhere in their list, not those with explicit or generic families, quoted names or none.
+func TestOnlySystemFamiliesNameTheUIFont(t *testing.T) {
+	for family, want := range map[string]bool{
+		"system-ui":              true,
+		"sans-serif":             true,
+		"ui-rounded":             true,
+		"Inter, system-ui":       true,
+		"":                       false,
+		"serif":                  false,
+		"Inter":                  false,
+		driver.FontMonospace:     false,
+		`"system-ui", monospace`: false,
+	} {
+		if got := namesUIFont(family); got != want {
+			t.Errorf("namesUIFont(%q) = %t, want %t", family, got, want)
 		}
 	}
 }

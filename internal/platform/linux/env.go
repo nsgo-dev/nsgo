@@ -387,8 +387,8 @@ func uiFontChanged() {
 			if cv == nil {
 				continue
 			}
-			// A named system family, including one in a fallback list, was resolved to the old UI font in the editor's CSS. Unset families inherit GTK's own changing default.
-			if cv.entry != 0 && cv.input.Style.Font.Family != "" {
+			// A system family, also one in a fallback list, was resolved to the old UI font in the editor's CSS. Only those editors reload: each provider is the display's, so reloading one restyles every widget. Unset families inherit GTK's own changing default.
+			if cv.entry != 0 && namesUIFont(cv.input.Style.Font.Family) {
 				w.styleEntry(cv)
 			}
 			if cv.drawing != nil && cv.widget != 0 {

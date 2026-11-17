@@ -70,6 +70,16 @@ func familyNames(family, ui string) []string {
 	return names
 }
 
+// namesUIFont reports whether a fontFamily list names one of the system's families, which gtkFamilies resolves to the UI font. An empty list does not: an editor's CSS leaves its family unset and GTK's own default follows the setting.
+func namesUIFont(family string) bool {
+	for _, f := range driver.FontFamilies(family) {
+		if f.Kind == driver.FamilySystem || f.Kind == driver.FamilyRounded {
+			return true
+		}
+	}
+	return false
+}
+
 // pangoFamilies is a fontFamily list as Pango takes one: separated by
 // commas, so a name with a comma in it cannot be one of its families.
 func pangoFamilies(family, ui string) string {
