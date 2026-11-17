@@ -622,10 +622,13 @@ func TestWebHistoryStepWithinThePageGrantsNothing(t *testing.T) {
 		return core.WebView{Source: core.WebSrc(server.URL + "/own"), Ref: &ref,
 			Style: core.Style{Width: core.Pt(150), Height: core.Pt(100)},
 			OnLoad: func(n core.WebNavigation) {
-				if loads.Get() > 0 {
+				// Refusing about:blank may reload the original page when WebKit cannot restore it from its history cache.
+				if n.URL != server.URL+"/own" {
 					t.Errorf("the page loaded %s", n.URL)
 				}
-				loads.Update(func(n int) int { return n + 1 })
+				if loads.Get() == 0 {
+					loads.Set(1)
+				}
 			},
 			OnError: func(err error) { errors <- err },
 		}
