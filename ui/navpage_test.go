@@ -22,17 +22,29 @@ func TestNavPage(t *testing.T) {
 					NavHeader{TestID: "header", OnBack: func() { popped = true }, BackLabel: "Back"})
 			})
 		})
-		header := app.Find("page-detail >> header")
-		if header.Style.Background != p.Surface {
-			t.Fatalf("%v: header = %x, want the surface", e.OS, header.Style.Background)
-		}
-		if e.OS != core.OSMacOS && header.Frame.Origin.Y != 47 {
-			t.Fatalf("%v: header top = %v, want below the status bar", e.OS, header.Frame.Origin.Y)
+		if e.OS == core.OSAndroid {
+			page := app.Find("id:page-detail")
+			if page.Screen.HeaderHeight == 0 {
+				t.Fatalf("Android page has no native top app bar height: %+v", page.Screen)
+			}
+			if app.Exists("page-detail >> header") {
+				t.Fatal("Android page still draws the desktop header")
+			}
+		} else {
+			header := app.Find("page-detail >> header")
+			if header.Style.Background != p.Surface {
+				t.Fatalf("%v: header = %x, want the surface", e.OS, header.Style.Background)
+			}
+			if e.OS != core.OSMacOS && header.Frame.Origin.Y != 47 {
+				t.Fatalf("%v: header top = %v, want below the status bar", e.OS, header.Frame.Origin.Y)
+			}
 		}
 		app.Find("Detail detail")
-		app.Press("role:button Back")
-		if !popped {
-			t.Fatalf("%v: the back button did nothing", e.OS)
+		if e.OS != core.OSAndroid {
+			app.Press("role:button Back")
+			if !popped {
+				t.Fatalf("%v: the back button did nothing", e.OS)
+			}
 		}
 	}
 }
@@ -48,7 +60,7 @@ func TestNavInset(t *testing.T) {
 		env   core.Environment
 		inset core.Points // past the status bar, when above 0
 		top   core.Points
-	}{{phone, 1, 0}, {android, 0, 47 + 44}, {desktopEnv, 0, 44}} {
+	}{{phone, 1, 0}, {android, 0, 0}, {desktopEnv, 0, 44}} {
 		var inset core.Points
 		app, _ := start(t, c.env, func(cx *core.Scope) core.Node {
 			nav := base.NewNav(cx, "home")

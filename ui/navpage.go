@@ -10,9 +10,10 @@ import (
 
 // NavPage returns p, a page of a base.Nav, on the page's background under
 // header, a NavHeader whose title and ends default to p's, unless p has a
-// Header of its own. On Android the system header hides for it, and it
-// reaches under the status bar. On iOS the system's transparent header shows
-// header's title and trailing views over the page, which scrolls under it.
+// Header of its own. On iOS and Android the platform draws the top app bar;
+// elsewhere NavHeader is drawn above the page. On iOS the system's
+// transparent header shows the title and trailing views over the page, which
+// scrolls under it.
 func NavPage(cx *core.Scope, p base.NavPage, header NavHeader) base.NavPage {
 	colors := ColorsOf(cx)
 	app := p.StyleFunc
