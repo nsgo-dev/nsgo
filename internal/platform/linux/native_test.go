@@ -512,6 +512,19 @@ func TestWebOwnPagesReloadAndReturn(t *testing.T) {
 		for i, src := range []core.WebSource{core.WebHTML("<p>own</p>", ""), core.WebSrc("data:text/html,<p>own</p>")} {
 			views = append(views, core.WebView{Source: src, Ref: &refs[i],
 				Style: core.Style{Width: core.Pt(150), Height: core.Pt(100)},
+				OnLoadStart: func(n core.WebNavigation) {
+					phase := loads.Get()[i] + 1
+					want := src.Src
+					if want == "" {
+						want = "about:blank"
+					}
+					if phase == 3 || phase == 6 {
+						want = server.URL + "/next"
+					}
+					if n.URL != want {
+						t.Errorf("view %d phase %d start URL = %q, want %q", i, phase, n.URL, want)
+					}
+				},
 				OnLoad: func(n core.WebNavigation) {
 					phase := loads.Get()[i] + 1
 					if (phase == 3 || phase == 6) && !n.CanGoBack {
@@ -742,9 +755,8 @@ onload = () => {
 	waitForTitle(t, w, title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;|https://localhost/;https://localhost/;"+
 		"|https://localhost/;https://localhost/;|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;"+
 		"|start about:blank;state about:blank true;load about:blank;state about:blank false;")
-	// A frame's about: action followed by the page's own top-level navigation must not hold that navigation's start: it is reported as it starts, before the response, and the load follows in order. WebKitGTK may still name the page shown as a page's own navigation starts, so its URL is any web page's, never about:.
+	// A frame's about: action followed by the page's own top-level navigation must not hold that navigation's start: both start and loading state name the destination before the response, and the load follows in order.
 	q := regexp.QuoteMeta
-	const web = `https?://[^;|]+`
 	head := q(title + "|first <p>frame</p>;again <p>frame</p>;|about:blank;")
 	own := q("|start about:blank;state about:blank true;load about:blank;state about:blank false;")
 	waitMatch := func(pattern string) {
@@ -764,17 +776,133 @@ document.body.append(f);
 	}
 	frameThen(next.URL + "/next")
 	waitMatch(head + q("|https://localhost/;https://localhost/;") +
-		q("|https://localhost/;https://localhost/;") + web + ";" +
-		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + web + " true;" + own)
+		q("|https://localhost/;https://localhost/;"+next.URL+"/next;") +
+		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + q(next.URL+"/next true;") + own)
 	close(release)
 	waitMatch(head + q("|https://localhost/;https://localhost/;"+next.URL+"/next;") +
-		q("|https://localhost/;https://localhost/;") + web + ";" +
-		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + web + " true;" + q(next.URL+"/next false;") + own)
+		q("|https://localhost/;https://localhost/;"+next.URL+"/next;") +
+		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + q(next.URL+"/next true;") + q(next.URL+"/next false;") + own)
 	// Nor must it swallow the start of a load that fails before commit.
 	frameThen(next.URL + "/fail")
 	waitMatch(q(title+"|first <p>frame</p>;again <p>frame</p>;|about:blank;"+next.URL+"/fail;") + q("|https://localhost/;https://localhost/;"+next.URL+"/next;") +
-		q("|https://localhost/;https://localhost/;") + web + ";" + web + ";" +
-		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + web + " true;" + q(next.URL+"/next false;") + web + " true;" + own)
+		q("|https://localhost/;https://localhost/;"+next.URL+"/next;"+next.URL+"/fail;") +
+		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + q(next.URL+"/next true;") + q(next.URL+"/next false;") + q(next.URL+"/fail true;") + own)
+}
+
+// TestWebPageNavigationReportsDestinationAtStart checks restricted and
+// unrestricted page-made loads before the response, as well as host reload and
+// history commands, and a provisional failure. It runs in a separate process
+// and skips where WebKitGTK 6.0 is missing.
+func TestWebPageNavigationReportsDestinationAtStart(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if os.Getenv("NSGO_TEST_WEBKIT_PROCESS") != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+		dir := t.TempDir()
+		cmd.Env = append(os.Environ(), "NSGO_TEST_WEBKIT_PROCESS="+t.Name(),
+			"XDG_DATA_HOME="+filepath.Join(dir, "data"), "XDG_CACHE_HOME="+filepath.Join(dir, "cache"))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if strings.Contains(string(out), "--- SKIP") {
+			t.Skipf("%s", out)
+		}
+		return
+	}
+	if err := openWebKit(); err != nil {
+		t.Skip(err)
+	}
+	for _, restricted := range []bool{false, true} {
+		t.Run(fmt.Sprintf("restricted=%t", restricted), func(t *testing.T) {
+			release := make(chan struct{})
+			var once sync.Once
+			unblock := func() { once.Do(func() { close(release) }) }
+			server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/next" {
+					select {
+					case <-release:
+					case <-r.Context().Done():
+						return
+					}
+				}
+				if r.URL.Path == "/fail" {
+					conn, _, err := rw.(http.Hijacker).Hijack()
+					if err == nil {
+						conn.Close()
+					}
+					return
+				}
+				rw.Header().Set("Content-Type", "text/html")
+				fmt.Fprint(rw, "<p>page</p>")
+			}))
+			t.Cleanup(server.Close)
+			t.Cleanup(unblock)
+			source, next, failed := server.URL+"/source", server.URL+"/next", server.URL+"/fail"
+			title := fmt.Sprintf("nsgo-native-navigation-%t", restricted)
+			var root *core.Scope
+			var ref core.Ref
+			app := func(cx *core.Scope) core.Node {
+				root = cx
+				if restricted {
+					cx.ProvideAccess(webSchemesAccess{})
+				}
+				events := core.NewSignal(cx, "")
+				add := func(event string) { events.Update(func(v string) string { return v + event + ";" }) }
+				cx.Effect(func() { cx.SetTitle(title + "|" + events.Get()) })
+				return core.WebView{Source: core.WebSrc(source), Ref: &ref,
+					Style:       core.Style{Width: core.Pt(200), Height: core.Pt(120)},
+					OnLoadStart: func(n core.WebNavigation) { add("start " + n.URL) },
+					OnNavigationStateChange: func(n core.WebNavigation) {
+						add(fmt.Sprintf("state %s %t", n.URL, n.Loading))
+					},
+					OnLoad: func(n core.WebNavigation) { add("load " + n.URL) },
+					OnError: func(err error) {
+						if e, ok := err.(*core.WebError); ok {
+							add("error " + e.URL)
+						} else {
+							add("error " + err.Error())
+						}
+					},
+				}
+			}
+			w := startTestWindow(t, app, Options{ID: title, Title: title, Width: 200, Height: 120})
+			start := func(url string) string { return "start " + url + ";state " + url + " true;" }
+			load := func(url string) string { return "load " + url + ";state " + url + " false;" }
+			want := title + "|" + start(source) + load(source)
+			waitForTitle(t, w, want)
+			// No preceding frame navigation hint: location.href alone must
+			// name the destination while its response is still blocked.
+			root.Post(func() { ref.InjectJavaScript(fmt.Sprintf("location.href = %q", next)) })
+			want += start(next)
+			waitForTitle(t, w, want)
+			unblock()
+			want += load(next)
+			waitForTitle(t, w, want)
+			for _, step := range []struct {
+				command func()
+				url     string
+			}{{ref.Reload, next}, {ref.GoBack, source}, {ref.GoForward, next}, {ref.GoBack, source}} {
+				root.Post(step.command)
+				want += start(step.url) + load(step.url)
+				waitForTitle(t, w, want)
+			}
+			// A host history step within an app-owned document starts no
+			// load. Its source grant must not make the next page-made load
+			// bypass destination tracking, even in an unrestricted view.
+			root.Post(func() {
+				ref.Evaluate(fmt.Sprintf(`addEventListener('popstate', () => { location.href = %q }); history.pushState(null, '', '#step'); 1`, failed), func(_ string, err error) {
+					if err != nil {
+						t.Errorf("pushState: %v", err)
+						return
+					}
+					ref.GoBack()
+				})
+			})
+			waitForTitle(t, w, want+start(failed)+"error "+failed+";")
+		})
+	}
 }
 
 // TestWebViewsOutliveEachOther opens an Incognito web view and one in the app's session, both serving an app-owned scheme, and one that serves none. Each page keeps its scheme and downloads as the others unmount and mount again, the page without a handler gets an error rather than a load that never ends, and a view that unmounts mid-download cancels it. It skips where WebKitGTK 6.0 is missing. It runs in a process of its own, as the other WebKit tests do.

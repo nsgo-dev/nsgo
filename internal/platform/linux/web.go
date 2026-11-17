@@ -66,6 +66,7 @@ var (
 	webkitWebViewEvaluateJavascript      func(uintptr, *byte, int, *byte, *byte, uintptr, uintptr, uintptr)
 	webkitWebViewExecuteEditingCommand   func(uintptr, *byte)
 	webkitWebViewGetURI                  func(uintptr) uintptr
+	webkitWebViewGetMainResource         func(uintptr) uintptr
 	webkitWebViewGetTitle                func(uintptr) uintptr
 	webkitWebViewCanGoBack               func(uintptr) int32
 	webkitWebViewCanGoForward            func(uintptr) int32
@@ -177,6 +178,7 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 	reg(&webkitWebViewEvaluateJavascript, "webkit_web_view_evaluate_javascript")
 	reg(&webkitWebViewExecuteEditingCommand, "webkit_web_view_execute_editing_command")
 	reg(&webkitWebViewGetURI, "webkit_web_view_get_uri")
+	reg(&webkitWebViewGetMainResource, "webkit_web_view_get_main_resource")
 	reg(&webkitWebViewGetTitle, "webkit_web_view_get_title")
 	reg(&webkitWebViewCanGoBack, "webkit_web_view_can_go_back")
 	reg(&webkitWebViewCanGoForward, "webkit_web_view_can_go_forward")
@@ -273,6 +275,7 @@ type web struct {
 	ownStep       string                       // the URI of the entry a history command granted ownNavigation for, until a back-forward action to it; "" for loadWeb's load or a reload
 	aboutPending  bool                         // a refused about: action, possibly a frame's, may start the next top-level load
 	startPending  bool                         // hold that load's start until its top-level URI commits
+	uriPending    bool                         // a page-made load awaits its main resource request to name its destination
 	ownPage       bool                         // the page last committed is the app's source (loadWeb's)
 	ownHistory    map[uintptr]driver.WebSource // retained native history entries created by the app
 	htmlStart     *driver.WebSource            // the initial HTML, which load_html omits from native history
@@ -448,6 +451,7 @@ func (w *window) makeWeb(v *view) {
 	w.host(v, &wv.hosted, wv.widget, true)
 	w.connect(v, wv.widget, "load-changed", cbWebLoadChanged)
 	w.connect(v, wv.widget, "load-failed", cbWebLoadFailed)
+	w.connect(v, wv.widget, "resource-load-started", cbWebResourceStarted)
 	w.connect(v, wv.widget, "decide-policy", cbWebPolicy)
 	w.connect(v, wv.widget, "permission-request", cbWebPermission)
 	w.connect(v, wv.widget, "map", cbWebMap)
@@ -932,14 +936,18 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 		v.web.startPending = v.web.config.Restricted && !v.web.ownNavigation &&
 			(v.web.aboutPending || aboutScheme(uri) && !v.web.config.Navigable(uri))
 		v.web.aboutPending = false
-		if !v.web.startPending {
+		// Page-made loads can still expose the old URI here. The main
+		// resource request identifies the destination without mistaking
+		// a frame's navigation policy action for the top level's.
+		v.web.uriPending = !v.web.ownNavigation
+		if !v.web.startPending && !v.web.uriPending {
 			w.navigated(v, true, driver.EventLoadStart)
 		}
 	case webkitLoadCommitted:
 		uri := goString(webkitWebViewGetURI(page))
 		own, restoring := v.web.ownNavigation && (v.web.ownStep == "" || uri == v.web.ownStep), v.web.restoring
-		start := v.web.startPending
-		v.web.aboutPending, v.web.startPending = false, false
+		start := v.web.startPending || v.web.uriPending
+		v.web.aboutPending, v.web.startPending, v.web.uriPending = false, false, false
 		v.web.ownNavigation, v.web.ownStep, v.web.refused, v.web.restoring = false, "", false, false
 		// An about: page has no response for webPolicyCallback to hold, and WebKit has made its document by the time the top level's load starts, so the top level's is held as it commits, load-changed being only the top level's: it posts nothing and reports no load, and the view goes back to the page before it.
 		if v.web.config.Restricted && !own && aboutScheme(uri) && !v.web.config.Navigable(uri) {
@@ -981,6 +989,20 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 	}
 }
 
+// webResourceStartedCallback reports a page-made load as soon as its main
+// resource request starts, before the response or commit. WebKitGTK sets the
+// main resource before this signal; frame and subresource requests never take
+// the pending start. Loads without a resource (about: pages or cached history)
+// fall back to their committed URI in webLoadChangedCallback.
+func webResourceStartedCallback(page, resource, request, data uintptr) {
+	w, v := webOf(data, page)
+	if v == nil || !v.web.uriPending || v.web.startPending || resource != webkitWebViewGetMainResource(page) {
+		return
+	}
+	v.web.uriPending = false
+	w.navigatedTo(v, goString(webkitURIRequestGetURI(request)), true, driver.EventLoadStart)
+}
+
 // gError is GLib's GError.
 type gError struct {
 	domain  uint32
@@ -993,13 +1015,14 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 	if v == nil {
 		return 0
 	}
-	// A held start, one after a frame's about: action, is still reported before its failure, but never for a refused page.
-	if v.web.startPending && v.web.config.Navigable(goString(uri)) {
+	// A start awaiting the request or commit is still reported before its
+	// failure, but never for a refused page.
+	if (v.web.startPending || v.web.uriPending) && v.web.config.Navigable(goString(uri)) {
 		w.navigatedTo(v, goString(uri), true, driver.EventLoadStart)
 	}
 	v.web.failed = true
 	v.web.ownNavigation, v.web.ownStep = false, ""
-	v.web.aboutPending, v.web.startPending = false, false
+	v.web.aboutPending, v.web.startPending, v.web.uriPending = false, false, false
 	if gerr != 0 {
 		e := (*gError)(cPointer(gerr))
 		// Stopped or replaced by another navigation: not errors.
@@ -1045,14 +1068,14 @@ func (w *window) restore(v *view) {
 // webPolicyCallback refuses the navigations a restricted view's config does not allow: the top level's and new windows'. WebKitGTK asks about every frame's navigation actions without saying which frame's an action is, so a page of the page's own making (driver.PageSchemes), which a frame within the page may load too, is held where the top level's can be told: a data: or blob: page at its main-frame response, and an about: page, which has none, as the top level commits it (webLoadChangedCallback).
 func webPolicyCallback(page, decision uintptr, kind uint32, data uintptr) int32 {
 	w, v := webOf(data, page)
-	if v == nil || !v.web.config.Restricted || kind > webkitResponse {
+	if v == nil || kind > webkitResponse {
 		return 0
 	}
 	var url string
 	allowed := v.web.config.Navigable
 	switch kind {
 	case webkitResponse:
-		if !webkitResponseDecisionIsMainFrame(decision) {
+		if !v.web.config.Restricted || !webkitResponseDecisionIsMainFrame(decision) {
 			return 0
 		}
 		url = goString(webkitURIRequestGetURI(webkitResponseDecisionGetRequest(decision)))
