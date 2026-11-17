@@ -462,8 +462,7 @@ func loadAppKit() {
 		// Keys reach the surface only while it holds a selection; it
 		// takes them, as a text view would, rather than beep.
 		objc.MethodDef{Cmd: sel("keyDown:"), Fn: func(self objc.ID, _ objc.SEL, event objc.ID) {
-			// The content view is outside AppKit's key view loop; enter
-			// through the app's root instead.
+			// The content view is outside AppKit's key view loop; enter through the app's root instead.
 			const tab, shift = 48, 1 << 17
 			if v := views[self]; v != nil && objc.Send[uint16](event, sel("keyCode")) == tab {
 				v.surface.tabFromSurface(objc.Send[uint](event, sel("modifierFlags"))&shift != 0)

@@ -74,9 +74,7 @@ func TestScriptedKeysReachANonKeyWindow(t *testing.T) {
 	app.Find("text:3")
 }
 
-// postForeign posts an AppKit event without going through the test host,
-// as an event from the user's hardware arrives. It targets only this
-// test process's window and never posts a system-wide event.
+// postForeign posts an AppKit event without going through the test host, as an event from the user's hardware arrives. It targets only this test process's window and never posts a system-wide event.
 func postForeign(t *testing.T, kinds ...uint) {
 	t.Helper()
 	withTestWindow(t, func(window objc.ID) {

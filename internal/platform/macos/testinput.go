@@ -8,13 +8,10 @@ import (
 	"github.com/ebitengine/purego/objc"
 )
 
-// testInputFilter is installed only by the native test host, on the main
-// thread. Live automation and ordinary applications leave it nil.
+// testInputFilter is installed only by the native test host, on the main thread. Live automation and ordinary applications leave it nil.
 var testInputFilter func(objc.ID) bool
 
-// inputAllowed keeps AppKit's own window/application events while a test
-// takes only its scripted pointer, keyboard and gesture events. A nil
-// event is the host's direct hover enter/leave, not hardware input.
+// inputAllowed keeps AppKit's own window/application events while a test takes only its scripted pointer, keyboard and gesture events. A nil event is the host's direct hover enter/leave, not hardware input.
 func inputAllowed(event objc.ID) bool {
 	if testInputFilter == nil || event == 0 {
 		return true
@@ -26,10 +23,7 @@ func inputAllowed(event objc.ID) bool {
 	return true
 }
 
-// AppKit can copy a posted event, so object identity and eventNumber do
-// not identify it. Like NSH's synth, keep a bounded history of its type
-// and nanosecond timestamp; also match the window so another window can
-// never use its record. Only the main thread reads or writes this cache.
+// AppKit can copy a posted event, so object identity and eventNumber do not identify it. Like NSH's synth, keep a bounded history of its type and nanosecond timestamp; also match the window so another window can never use its record. Only the main thread reads or writes this cache.
 type scriptedInputs struct {
 	events      [64]scriptedInput
 	next, count int
