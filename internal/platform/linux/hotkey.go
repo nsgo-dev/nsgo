@@ -589,8 +589,36 @@ func globalHotKeyResponse(conn, sender, path, iface, signal, params, data uintpt
 			return []uintptr{gVariantNewObjectPath(cstr(session)), portalShortcuts(specs), gVariantNewString(cstr("")), portalOptions(token)}
 		})
 	case globalHotKeyBinding:
-		// The portal's successful response means the session is active. The Activated signal carries each shortcut ID from here on.
-		w.hotKeyStates(state, driver.HotKeyRegistered)
+		// A successful request may bind only part of the requested set, or none: only the IDs in its shortcuts list are bound, and only they dispatch Activated. A session left with none is closed, as a refused one is.
+		shortcuts := gVariantLookupValue(results, cstr("shortcuts"), 0)
+		if shortcuts == 0 {
+			w.hotKeyStates(state, driver.HotKeyUnsupported)
+			w.closeHotKeys()
+			return
+		}
+		defer gVariantUnref(shortcuts)
+		if goString(gVariantGetTypeString(shortcuts)) != "a(sa{sv})" {
+			w.hotKeyStates(state, driver.HotKeyUnsupported)
+			w.closeHotKeys()
+			return
+		}
+		bound := make(map[string]bool)
+		for i := range gVariantNChildren(shortcuts) {
+			shortcut := gVariantGetChildValue(shortcuts, i)
+			bound[portalTupleText(shortcut, 0)] = true
+			gVariantUnref(shortcut)
+		}
+		for _, spec := range state.specs {
+			status := driver.HotKeyRegistered
+			if !bound[spec.id] {
+				status = driver.HotKeyTaken
+				delete(state.ids, spec.id)
+			}
+			w.hotKeyState(spec.key, status)
+		}
+		if len(state.ids) == 0 {
+			w.closeHotKeys()
+		}
 	}
 }
 
