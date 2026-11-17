@@ -1005,17 +1005,33 @@ func (c *canvasPlayer) image(op *driver.DrawOp) {
 // canvasImage returns src's slot, loading it the first time and painting
 // the window again when it loads.
 func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
+	if w.canvasClosed {
+		return nil
+	}
 	if src.Pixels != nil {
 		return w.canvasFrame(src)
 	}
 	key := src.Key()
+	w.canvasImageUse++
 	if s := w.canvasImages[key]; s != nil {
+		s.used = w.canvasImageUse
 		return s
 	}
 	if w.canvasImages == nil {
 		w.canvasImages = map[string]*imageSlot{}
 	}
-	s := &imageSlot{src: src}
+	if len(w.canvasImages) >= maxCanvasImages {
+		var oldest string
+		var at uint64 = math.MaxUint64
+		for key, slot := range w.canvasImages {
+			if slot.used < at {
+				oldest, at = key, slot.used
+			}
+		}
+		w.canvasImages[oldest].reset(driver.ImageSource{})
+		delete(w.canvasImages, oldest)
+	}
+	s := &imageSlot{src: src, used: w.canvasImageUse}
 	w.canvasImages[key] = s
 	ctx, cancel := context.WithCancel(context.Background())
 	s.load = &imageLoad{cancel: cancel}
@@ -1025,8 +1041,14 @@ func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
 		if err == nil {
 			pic, err = decode(ctx, data)
 		}
+		if ctx.Err() != nil {
+			return
+		}
 		w.post(func() {
 			cancel()
+			if w.canvasImages[key] != s {
+				return
+			}
 			s.load = nil
 			if err != nil {
 				log.Printf("nsgo: canvas: image %s: %v", key, err)
@@ -1046,6 +1068,21 @@ func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
 		})
 	}()
 	return s
+}
+
+const maxCanvasImages = 64
+
+func (w *window) closeCanvasImages() {
+	w.canvasClosed = true
+	for _, s := range w.canvasFrames {
+		s.reset(driver.ImageSource{})
+	}
+	w.canvasFrames = nil
+	w.canvasFramePixels = 0
+	for key, s := range w.canvasImages {
+		s.reset(driver.ImageSource{})
+		delete(w.canvasImages, key)
+	}
 }
 
 // maxCanvasFrames and maxCanvasFramePixels bound the pictures a window keeps of the pixels its canvases draw, by count and by their pixels together (8 Mi, four 1920x1080 frames): a stream's older versions are never drawn again.

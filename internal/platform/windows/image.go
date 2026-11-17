@@ -65,6 +65,7 @@ func (p *picture) frameAt(elapsed time.Duration) (int, bool) {
 // imageSlot is an image view's source or placeholder and what the window
 // keeps for it.
 type imageSlot struct {
+	used uint64 // the last canvas draw that used this slot
 	src  driver.ImageSource
 	load *imageLoad // the load under way, if any
 	pic  *picture

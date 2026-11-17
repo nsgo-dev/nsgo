@@ -18,7 +18,9 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -78,12 +80,15 @@ final class ShaderNode extends TextureView implements TextureView.SurfaceTexture
     private Program frameProgram;
     private String[] frameImages;
     private Bitmap[] frameBitmaps;
+    private List<CanvasImages<CanvasNode.Picture>.Lease> frameLeases;
+    private final CanvasImages<CanvasNode.Picture> pictures;
     private boolean pending;
     // The GL thread's: the images' textures.
-    private final Map<String, Integer> textures = new HashMap<>();
+    private final Map<String, Integer> textures = new LinkedHashMap<>(64, .75f, true);
 
-    ShaderNode(Context context) {
+    ShaderNode(Context context, CanvasImages<CanvasNode.Picture> pictures) {
         super(context);
+        this.pictures = pictures;
         density = context.getResources().getDisplayMetrics().density;
         setOpaque(false);
         setSurfaceTextureListener(this);
@@ -144,9 +149,12 @@ final class ShaderNode extends TextureView implements TextureView.SurfaceTexture
         all[1] = h;
         all[2] = density;
         Bitmap[] bitmaps = new Bitmap[images.length];
+        List<CanvasImages<CanvasNode.Picture>.Lease> leases = new ArrayList<>();
         for (int i = 0; i < images.length; i++) {
-            CanvasNode.Picture pic = CanvasNode.pictures.get(images[i]);
-            if (pic == null) continue;
+            CanvasImages<CanvasNode.Picture>.Lease lease = pictures.acquire(images[i]);
+            if (lease == null) continue;
+            leases.add(lease);
+            CanvasNode.Picture pic = lease.value;
             bitmaps[i] = pic.bitmap;
             if (i < p.images) {
                 all[3 + 2 * i] = pic.bitmap.getWidth();
@@ -169,6 +177,8 @@ final class ShaderNode extends TextureView implements TextureView.SurfaceTexture
             frame = block;
             frameProgram = p;
             frameImages = images.clone();
+            releaseLeases(frameLeases);
+            frameLeases = leases;
             frameBitmaps = bitmaps;
             width = getWidth();
             height = getHeight();
@@ -236,6 +246,10 @@ final class ShaderNode extends TextureView implements TextureView.SurfaceTexture
             synchronized (this) {
                 s = surface;
                 surface = null;
+                releaseLeases(frameLeases);
+                frameLeases = null;
+                frameBitmaps = null;
+                frame = null;
             }
             if (s != null) {
                 // The textures go with it; images come back when it does.
@@ -257,12 +271,17 @@ final class ShaderNode extends TextureView implements TextureView.SurfaceTexture
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture texture) {}
 
+    private static void releaseLeases(List<CanvasImages<CanvasNode.Picture>.Lease> leases) {
+        if (leases != null) for (CanvasImages<CanvasNode.Picture>.Lease lease : leases) lease.close();
+    }
+
     /** Draws the latest frame, on the GL thread. */
     private void render() {
         EGLSurface s;
         ByteBuffer block;
         String[] imgs;
         Bitmap[] bitmaps;
+        List<CanvasImages<CanvasNode.Picture>.Lease> leases;
         int w, h;
         Program p;
         synchronized (this) {
@@ -272,30 +291,38 @@ final class ShaderNode extends TextureView implements TextureView.SurfaceTexture
             p = frameProgram;
             imgs = frameImages;
             bitmaps = frameBitmaps;
+            leases = frameLeases;
+            frameLeases = null;
+            frameBitmaps = null;
+            frame = null;
             w = width;
             h = height;
         }
-        if (failed || s == null || block == null || p == null || w <= 0 || h <= 0) return;
-        if (!EGL14.eglMakeCurrent(display, s, s, context)) return;
-        if (p.id == -1 && !link(p)) p.id = 0;
-        GLES30.glViewport(0, 0, w, h);
-        GLES30.glClearColor(0, 0, 0, 0);
-        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
-        if (p.id > 0) {
-            GLES30.glUseProgram(p.id);
-            GLES30.glUniform1f(p.height, h);
-            for (int i = 0; i < p.images; i++) {
-                GLES30.glActiveTexture(GLES30.GL_TEXTURE0 + i);
-                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, i < imgs.length ? texture(imgs[i], bitmaps[i]) : 0);
+        try {
+            if (failed || s == null || block == null || p == null || w <= 0 || h <= 0) return;
+            if (!EGL14.eglMakeCurrent(display, s, s, context)) return;
+            if (p.id == -1 && !link(p)) p.id = 0;
+            GLES30.glViewport(0, 0, w, h);
+            GLES30.glClearColor(0, 0, 0, 0);
+            GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
+            if (p.id > 0) {
+                GLES30.glUseProgram(p.id);
+                GLES30.glUniform1f(p.height, h);
+                for (int i = 0; i < p.images; i++) {
+                    GLES30.glActiveTexture(GLES30.GL_TEXTURE0 + i);
+                    GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, i < imgs.length ? texture(imgs[i], bitmaps[i]) : 0);
+                }
+                GLES30.glBindBuffer(GLES30.GL_UNIFORM_BUFFER, p.ubo);
+                block.position(0);
+                GLES30.glBufferSubData(GLES30.GL_UNIFORM_BUFFER, 0, block.capacity(), block);
+                GLES30.glBindBufferBase(GLES30.GL_UNIFORM_BUFFER, 0, p.ubo);
+                GLES30.glBindVertexArray(p.vao);
+                GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3);
             }
-            GLES30.glBindBuffer(GLES30.GL_UNIFORM_BUFFER, p.ubo);
-            block.position(0);
-            GLES30.glBufferSubData(GLES30.GL_UNIFORM_BUFFER, 0, block.capacity(), block);
-            GLES30.glBindBufferBase(GLES30.GL_UNIFORM_BUFFER, 0, p.ubo);
-            GLES30.glBindVertexArray(p.vao);
-            GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3);
+            EGL14.eglSwapBuffers(display, s);
+        } finally {
+            releaseLeases(leases);
         }
-        EGL14.eglSwapBuffers(display, s);
     }
 
     /** Returns image key's texture, made from bitmap once it decoded; 0 until then. */
@@ -303,6 +330,10 @@ final class ShaderNode extends TextureView implements TextureView.SurfaceTexture
         Integer t = textures.get(key);
         if (t != null) return t;
         if (bitmap == null) return 0;
+        if (textures.size() == CanvasImages.LIMIT) {
+            String oldest = textures.keySet().iterator().next();
+            GLES30.glDeleteTextures(1, new int[] {textures.remove(oldest)}, 0);
+        }
         int[] id = new int[1];
         GLES30.glGenTextures(1, id, 0);
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, id[0]);

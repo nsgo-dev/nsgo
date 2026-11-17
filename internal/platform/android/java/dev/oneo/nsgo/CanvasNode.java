@@ -28,8 +28,6 @@ import android.view.accessibility.AccessibilityNodeProvider;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * A canvas node: it plays the latest drawing the engine recorded, as
@@ -53,8 +51,7 @@ final class CanvasNode extends View {
         }
     }
 
-    /** The images canvases draw, by core.ImageSource.Key; UI thread only. */
-    static final Map<String, Picture> pictures = new HashMap<>();
+    CanvasImages<Picture> pictures;
 
     /** A named part of the drawing, in points. */
     static final class Part {
@@ -126,13 +123,13 @@ final class CanvasNode extends View {
         int layer = canvas.saveLayer(0, 0, getWidth(), getHeight(), null);
         float density = getResources().getDisplayMetrics().density;
         canvas.scale(density, density);
-        play(canvas, getWidth() / density, getHeight() / density, ops);
+        new Player(canvas, getWidth() / density, getHeight() / density, pictures).play(ByteBuffer.wrap(ops));
         canvas.restoreToCount(layer);
     }
 
     /** Replays a static drawing, also used by the tab bar's SVG icons. */
     static void play(Canvas canvas, float width, float height, byte[] ops) {
-        new Player(canvas, width, height).play(ByteBuffer.wrap(ops));
+        new Player(canvas, width, height, null).play(ByteBuffer.wrap(ops));
     }
 
     // Assistive technology sees the parts as virtual views.
@@ -365,7 +362,10 @@ final class CanvasNode extends View {
         private float curX, curY, startX, startY; // in the canvas's points
         private State state = new State();
 
-        Player(Canvas canvas, float width, float height) {
+        private final CanvasImages<Picture> pictures;
+
+        Player(Canvas canvas, float width, float height, CanvasImages<Picture> pictures) {
+            this.pictures = pictures;
             this.canvas = canvas;
             this.width = width;
             this.height = height;
@@ -795,28 +795,34 @@ final class CanvasNode extends View {
             b.getFloat(); // the density its name gives, which the picture carries
             float x = b.getFloat(), y = b.getFloat(), w = b.getFloat(), h = b.getFloat();
             float sx = b.getFloat(), sy = b.getFloat(), sw = b.getFloat(), sh = b.getFloat();
-            Picture p = pictures.get(key);
-            if (p == null) return;
-            float natW = p.bitmap.getWidth() / p.scale, natH = p.bitmap.getHeight() / p.scale;
-            if (w == 0 && h == 0) {
-                w = natW;
-                h = natH;
+            if (pictures == null) return;
+            CanvasImages<Picture>.Lease lease = pictures.acquire(key);
+            if (lease == null) return;
+            try {
+                Picture p = lease.value;
+                float natW = p.bitmap.getWidth() / p.scale, natH = p.bitmap.getHeight() / p.scale;
+                if (w == 0 && h == 0) {
+                    w = natW;
+                    h = natH;
+                }
+                Rect src = null;
+                if (sw != 0 || sh != 0) {
+                    src = new Rect(Math.round(sx * p.scale), Math.round(sy * p.scale), Math.round((sx + sw) * p.scale),
+                            Math.round((sy + sh) * p.scale));
+                }
+                paint.reset();
+                paint.setAntiAlias(true);
+                paint.setFilterBitmap(true);
+                paint.setAlpha(Math.round(255 * state.alpha));
+                RectF dst = new RectF(x, y, x + w, y + h);
+                Rect from = src;
+                canvas.save();
+                canvas.concat(state.ctm);
+                draw(() -> canvas.drawBitmap(p.bitmap, from, dst, paint), true);
+                canvas.restore();
+            } finally {
+                lease.close();
             }
-            Rect src = null;
-            if (sw != 0 || sh != 0) {
-                src = new Rect(Math.round(sx * p.scale), Math.round(sy * p.scale), Math.round((sx + sw) * p.scale),
-                        Math.round((sy + sh) * p.scale));
-            }
-            paint.reset();
-            paint.setAntiAlias(true);
-            paint.setFilterBitmap(true);
-            paint.setAlpha(Math.round(255 * state.alpha));
-            RectF dst = new RectF(x, y, x + w, y + h);
-            Rect from = src;
-            canvas.save();
-            canvas.concat(state.ctm);
-            draw(() -> canvas.drawBitmap(p.bitmap, from, dst, paint), true);
-            canvas.restore();
         }
 
         /** The color with the global alpha applied. */

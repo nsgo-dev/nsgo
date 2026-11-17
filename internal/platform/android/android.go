@@ -114,6 +114,8 @@ const (
 	msgSensorReport = 20
 	// msgCookiesSet answers a msgCookies (webcookie.go).
 	msgCookiesSet = 21
+	// msgCanvasRequest requests or cancels a canvas image: surface, key, request, cancel.
+	msgCanvasRequest = 22
 )
 
 // The parts of an image view's request msgImage carries.
@@ -147,16 +149,15 @@ type surface struct {
 
 	ratio atomic.Uint32 // the pixel ratio's float32 bits, for rasterizing SVG
 
+	canvasRequests canvasRequests // mounts and cache misses, on separate goroutines
+
 	// On the engine goroutine.
 	// main is the activity's view, the first surface; requests is the last image request number, across surfaces.
 	main     treeView
 	requests uint32
-	// canvasImages are the images canvases and shaders asked for, by their
-	// key; programs the shader programs translated, numbered from
-	// nextProgram.
-	canvasImages map[string]bool
-	programs     map[*driver.ShaderProgram]*glProgram
-	nextProgram  uint32
+	// programs are the shader programs translated, numbered from nextProgram.
+	programs    map[*driver.ShaderProgram]*glProgram
+	nextProgram uint32
 
 	// The native components; cmu guards them, as the reader goroutine
 	// hands them their views' events.
@@ -249,6 +250,7 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			if s.engine != nil {
 				s.engine.Close()
 			}
+			s.canvasRequests.close()
 			s.closeNatives()
 			return
 		}
@@ -420,6 +422,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			time.Local = readTimeZone(&r)
 		case msgRecordingReport:
 			driver.ReportRecording(slices.Clone(payload))
+		case msgCanvasRequest:
+			s.canvasRequest(&r)
 		case msgCookiesSet:
 			s.webCookiesSet(&r)
 		case msgDNS:
@@ -873,6 +877,7 @@ func (s *surface) mount(v *treeView, b *driver.MountBatch) {
 		out.Items = slices.DeleteFunc(slices.Clone(b.Items), fileManager)
 		b = &out
 	}
+	s.canvasRequests.update(v.id, b)
 	requests, loads := s.trackImages(v, b)
 	s.stage(v.id, b)
 	for i := range b.Items {
@@ -1006,8 +1011,6 @@ func (s *surface) trackImages(tv *treeView, b *driver.MountBatch) ([]uint32, []i
 			if v != nil {
 				v.size = it.Frame.Size
 			}
-		case driver.ItemCanvas:
-			s.loadCanvasImages(it.Drawing)
 		case driver.ItemImage:
 			if v == nil {
 				v = &imageView{}
@@ -1602,54 +1605,52 @@ func (s *surface) RegisterFont(data []byte) error {
 	})
 }
 
-// loadCanvasImages loads the images d draws that no canvas asked for
-// yet and hands Java their bytes, which it decodes once for every
-// canvas.
-func (s *surface) loadCanvasImages(d *driver.Drawing) {
-	if d == nil {
+// canvasRequest handles a cache miss or cancellation from one Java surface.
+func (s *surface) canvasRequest(r *reader) {
+	surface, key, request, stop := r.u32(), r.str(), r.u32(), r.byte() != 0
+	if stop {
+		s.canvasRequests.cancel(surface, key, request)
 		return
 	}
-	var srcs []driver.ImageSource
-	for i := range d.Ops {
-		// Java keeps every canvas image it decodes, so pixels, a copy each version, would pile up there: canvases draw none yet.
-		if op := &d.Ops[i]; op.Kind == driver.DrawImage && op.Image != nil && op.Image.Pixels == nil {
-			srcs = append(srcs, *op.Image)
+	ctx, src, load, known := s.canvasRequests.start(surface, key, request)
+	if load == nil {
+		if !known {
+			s.sendCanvasImage(surface, key, request, decodedImage{}, true)
 		}
+		return
 	}
-	s.loadImages(srcs)
+	go func() {
+		data, err := imageload.Load(ctx, src, nil)
+		var img decodedImage
+		if err == nil {
+			img, err = s.prepareImage(ctx, data, src.URI, driver.Size{})
+		}
+		if !s.canvasRequests.finish(surface, key, load) {
+			return
+		}
+		if err != nil {
+			log.Printf("nsgo: canvas: image %s: %v", key, err)
+		}
+		// An empty response records a bounded failed entry, avoiding a retry
+		// loop on every redraw. Java rejects obsolete request generations.
+		s.sendCanvasImage(surface, key, request, img, false)
+	}()
 }
 
-// loadImages loads the images canvases and shaders read that none asked
-// for yet and hands Java their bytes, which it decodes once for all.
-func (s *surface) loadImages(srcs []driver.ImageSource) {
-	for _, src := range srcs {
-		key := src.Key()
-		if s.canvasImages[key] {
-			continue
-		}
-		if s.canvasImages == nil {
-			s.canvasImages = map[string]bool{}
-		}
-		s.canvasImages[key] = true
-		go func() {
-			data, err := imageload.Load(context.Background(), src, nil)
-			var img decodedImage
-			if err == nil {
-				img, err = s.prepareImage(context.Background(), data, src.URI, driver.Size{})
-			}
-			if err != nil {
-				log.Printf("nsgo: canvas: image %s: %v", key, err)
-				return
-			}
-			if err := s.send(msgCanvasImage, func(w *writer) {
-				w.str(key)
-				w.float(img.scale)
-				w.u32(uint32(len(img.data)))
-				w.buf = append(w.buf, img.data...)
-			}); err != nil {
-				log.Printf("nsgo: canvas: image %s: %v", key, err)
-			}
-		}()
+// sendCanvasImage returns bytes, a failed decode (empty bytes), or an obsolete
+// source (unavailable). The latter removes the pending entry so a later drawing
+// of the source can request it after its mount has registered it again.
+func (s *surface) sendCanvasImage(surface uint32, key string, request uint32, img decodedImage, unavailable bool) {
+	if err := s.send(msgCanvasImage, func(w *writer) {
+		w.u32(surface)
+		w.str(key)
+		w.u32(request)
+		w.flags(unavailable)
+		w.float(img.scale)
+		w.u32(uint32(len(img.data)))
+		w.buf = append(w.buf, img.data...)
+	}); err != nil {
+		log.Printf("nsgo: canvas: image %s: %v", key, err)
 	}
 }
 

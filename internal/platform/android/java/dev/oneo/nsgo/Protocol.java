@@ -108,6 +108,8 @@ final class Protocol {
     static final int SENSOR_REPORT = 20;
     /** Answers COOKIES: its surface and count, then an error, "" for none. */
     static final int COOKIES_SET = 21;
+    /** Requests or cancels a canvas image: surface, key, generation, cancel. */
+    static final int CANVAS_REQUEST = 22;
 
     // What a SECRET message asks, as secrets.go has them.
     static final int SECRET_READ = 0;

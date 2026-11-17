@@ -788,6 +788,7 @@ type loadedImage struct {
 	failed        bool
 	waiting       map[any]func()
 	used          uint64
+	cancel        context.CancelFunc
 }
 
 var canvasImageUse uint64
@@ -814,28 +815,41 @@ func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
 		var oldest string
 		var at uint64 = math.MaxUint64
 		for k, im := range canvasImages {
-			if im.image != 0 && im.used < at {
+			if im.used < at {
 				oldest, at = k, im.used
 			}
 		}
 		if im := canvasImages[oldest]; im != nil {
+			if im.cancel != nil {
+				im.cancel()
+			}
 			Release(im.image)
+			im.image = 0
+			im.waiting = nil
 			delete(canvasImages, oldest)
 		}
 	}
-	im := &loadedImage{used: canvasImageUse, waiting: map[any]func(){}}
+	ctx, cancel := context.WithCancel(context.Background())
+	im := &loadedImage{used: canvasImageUse, waiting: map[any]func(){}, cancel: cancel}
 	if host.Redraw != nil {
 		im.waiting[host.Owner] = host.Redraw
 	}
 	canvasImages[key] = im
 	go func() {
-		data, err := imageload.Load(context.Background(), src, nil)
+		data, err := imageload.Load(ctx, src, nil)
 		var d decoded
 		if err == nil {
-			d, err = decode(context.Background(), data, request{mode: driver.Stretch, ratio: max(host.Ratio, 1), scale: uriScale(src.URI)})
+			d, err = decode(ctx, data, request{mode: driver.Stretch, ratio: max(host.Ratio, 1), scale: uriScale(src.URI)})
 		}
 		OnMain(func() {
+			cancel()
+			if canvasImages[key] != im {
+				d.release()
+				return
+			}
+			im.cancel = nil
 			if err != nil || d.image == 0 {
+				d.release()
 				im.failed = true
 				log.Printf("nsgo: canvas: image %s: %v", key, err)
 			} else {

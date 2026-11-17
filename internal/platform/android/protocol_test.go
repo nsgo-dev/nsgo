@@ -87,7 +87,7 @@ func TestOverlayProtocolMatchesJava(t *testing.T) {
 		"OVERLAY_DENIED": driver.OverlayDenied, "OVERLAY_GRANTED": driver.OverlayGranted, "OVERLAY_UNAVAILABLE": driver.OverlayUnavailable,
 		"OVERLAY_END_DENIED": driver.OverlayEndDenied, "OVERLAY_END_UNAVAILABLE": driver.OverlayEndUnavailable,
 		"OVERLAY_END_REVOKED": driver.OverlayEndRevoked, "OVERLAY_END_REMOVED": driver.OverlayEndRemoved,
-		"OVERLAY_END_FAILED": driver.OverlayEndFailed,
+		"OVERLAY_END_FAILED":       driver.OverlayEndFailed,
 		"VIDEO_PAUSE_INTERRUPTION": driver.VideoPauseInterruption, "VIDEO_PAUSE_ROUTE_LOST": driver.VideoPauseRouteLost,
 		"VIDEO_PAUSE_CONTROLS": driver.VideoPauseControls,
 	} {
@@ -143,7 +143,7 @@ func TestJavaMessagesMatchTheBackend(t *testing.T) {
 		return string(data)
 	}
 	goSource, java := read("android.go"), read("java", "dev", "oneo", "nsgo", "Protocol.java")
-	for goName, javaName := range map[string]string{"msgRecording": "RECORDING", "msgRecordingReport": "RECORDING_REPORT", "msgCookies": "COOKIES", "msgCookiesSet": "COOKIES_SET"} {
+	for goName, javaName := range map[string]string{"msgRecording": "RECORDING", "msgRecordingReport": "RECORDING_REPORT", "msgCookies": "COOKIES", "msgCookiesSet": "COOKIES_SET", "msgCanvasImage": "CANVAS_IMAGE", "msgCanvasRequest": "CANVAS_REQUEST"} {
 		g := regexp.MustCompile(`\b` + goName + ` += (\d+)`).FindStringSubmatch(goSource)
 		j := regexp.MustCompile(`static final int ` + javaName + ` = (\d+);`).FindStringSubmatch(java)
 		if g == nil || j == nil || g[1] != j[1] {

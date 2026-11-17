@@ -674,11 +674,16 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 // canvasImage returns src's picture slot, loading it the first time and
 // drawing v again when it loads.
 func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
+	if w.canvasClosed {
+		return nil
+	}
 	if src.Pixels != nil {
 		return w.canvasFrame(src)
 	}
 	key := src.Key()
+	w.canvasImageUse++
 	if s := w.canvasImages[key]; s != nil {
+		s.used = w.canvasImageUse
 		if s.pic == nil && s.load != nil {
 			w.canvasWaiting[key] = appendView(w.canvasWaiting[key], v)
 		}
@@ -688,7 +693,19 @@ func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
 		w.canvasImages = canvasImages{}
 		w.canvasWaiting = map[string][]*view{}
 	}
-	s := &imageSlot{src: src}
+	if len(w.canvasImages) >= maxCanvasImages {
+		var oldest string
+		var at uint64 = math.MaxUint64
+		for key, slot := range w.canvasImages {
+			if slot.used < at {
+				oldest, at = key, slot.used
+			}
+		}
+		w.canvasImages[oldest].reset(driver.ImageSource{})
+		delete(w.canvasImages, oldest)
+		delete(w.canvasWaiting, oldest)
+	}
+	s := &imageSlot{src: src, used: w.canvasImageUse}
 	w.canvasImages[key] = s
 	w.canvasWaiting[key] = []*view{v}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -700,15 +717,23 @@ func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
 		if err == nil {
 			pic, err = decode(ctx, data)
 		}
+		if ctx.Err() != nil {
+			return
+		}
 		w.post(func() {
 			cancel()
+			if w.canvasImages[key] != s {
+				return
+			}
 			s.load = nil
+			waiting := w.canvasWaiting[key]
+			delete(w.canvasWaiting, key)
 			if err != nil {
 				log.Printf("nsgo: canvas: image %s: %v", key, err)
 				return
 			}
 			s.pic = pic
-			for _, v := range w.canvasWaiting[key] {
+			for _, v := range waiting {
 				switch {
 				case v.deleted:
 				case v.shader != nil:
@@ -718,10 +743,25 @@ func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
 					w.redrawCanvas(v)
 				}
 			}
-			delete(w.canvasWaiting, key)
 		})
 	}()
 	return s
+}
+
+const maxCanvasImages = 64
+
+func (w *window) closeCanvasImages() {
+	w.canvasClosed = true
+	for _, s := range w.canvasFrames {
+		s.reset(driver.ImageSource{})
+	}
+	w.canvasFrames = nil
+	w.canvasFramePixels = 0
+	for key, s := range w.canvasImages {
+		s.reset(driver.ImageSource{})
+		delete(w.canvasImages, key)
+	}
+	clear(w.canvasWaiting)
 }
 
 // maxCanvasFrames and maxCanvasFramePixels bound the pictures a window keeps of the pixels its canvases draw, by count and by their pixels together (8 Mi, four 1920x1080 frames): a stream's older versions are never drawn again.

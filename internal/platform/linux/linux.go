@@ -175,8 +175,10 @@ type window struct {
 	animator             *driver.Animator
 	// canvasImages are the images canvases draw, and canvasWaiting the
 	// canvases to draw again when one loads.
-	canvasImages  canvasImages
-	canvasWaiting map[string][]*view
+	canvasImages   canvasImages
+	canvasWaiting  map[string][]*view
+	canvasImageUse uint64
+	canvasClosed   bool
 	// canvasFrames are the pictures of the pixels canvases drew last (canvasFrame).
 	canvasFrames      []*imageSlot
 	canvasFramePixels int // the pixels of canvasFrames together
@@ -738,6 +740,7 @@ func (w *window) close() {
 		return
 	}
 	w.closing = true
+	w.closeCanvasImages()
 	w.closeHotKeys()
 	if w.loop != 0 {
 		// The app ends with this window: every hold goes, sent before the main loop returns.

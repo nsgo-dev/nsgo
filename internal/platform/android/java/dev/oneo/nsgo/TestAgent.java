@@ -216,6 +216,11 @@ final class TestAgent {
             case "signature":
                 view.testReply(id, "", signature());
                 return;
+            case "canvas-images":
+                view.testReply(id, "", new JSONObject()
+                        .put("count", view.canvasImages.size())
+                        .put("ready", view.canvasImages.ready(op.getString("key"))).toString());
+                return;
             default:
                 throw new IllegalArgumentException("unknown step " + op);
         }

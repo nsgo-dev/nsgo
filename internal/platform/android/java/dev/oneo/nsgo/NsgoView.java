@@ -84,6 +84,8 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -91,6 +93,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -134,10 +140,13 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final NsgoView primary;
     /** The surface this view shows, 0 for the first view's, else an overlay's (driver.SurfaceOverlay). */
     private final int surface;
+    final CanvasImages<CanvasNode.Picture> canvasImages = new CanvasImages<>(this::requestCanvasImage, p -> p.bitmap.recycle());
     /** The first view's overlays over other apps, null on an overlay's view. */
     private final Overlays overlays;
+    /** Canvas decodes can be removed from the queue when their cache entry is evicted. */
+    private final Map<Integer, FutureTask<Void>> canvasDecodes = new HashMap<>();
     /** Decodes images off the UI thread, one at a time. */
-    private final ExecutorService decoder = Executors.newSingleThreadExecutor(r -> {
+    private final ThreadPoolExecutor decoder = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
         Thread t = new Thread(r, "nsgo-images");
         t.setDaemon(true);
         return t;
@@ -705,6 +714,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             getContext().getSystemService(ConnectivityManager.class).unregisterNetworkCallback(network);
             network = null;
         }
+        canvasImages.close();
         decoder.shutdownNow();
         folders.shutdownNow();
         // An ended process hears no answer, and a late grant starts nothing.
@@ -722,6 +732,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * Lets go of an overlay's view as its window closes, on the UI thread: its decoders and every node's web view, video and native component, as a closed tree deletes none of its views.
      */
     void releaseOverlay() {
+        canvasImages.close();
         decoder.shutdownNow();
         folders.shutdownNow();
         for (int i = 0; i < nodes.size(); i++) {
@@ -785,9 +796,16 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                     });
                     break;
                 }
-                case Protocol.CANVAS_IMAGE:
-                    canvasImage(message);
+                case Protocol.CANVAS_IMAGE: {
+                    int to = message.readInt();
+                    ui.post(() -> {
+                        NsgoView view = to == 0 ? this : overlays.view(to);
+                        if (view == null) return;
+                        try { view.canvasImage(message); }
+                        catch (IOException e) { Log.w(TAG, "canvas image: " + e); }
+                    });
                     break;
+                }
                 case Protocol.FONTS:
                     fonts(message);
                     break;
@@ -1351,24 +1369,58 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
     }
 
-    /** Decodes an image canvases draw and draws the canvases again. */
+    /** Requests an evicted image again without waiting for another app commit. */
+    private void requestCanvasImage(String key, int generation, boolean cancel) {
+        if (cancel) {
+            FutureTask<Void> task = canvasDecodes.remove(generation);
+            if (task != null) {
+                task.cancel(false);
+                decoder.remove(task);
+            }
+        }
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        try {
+            out.writeInt(surface);
+            Protocol.writeString(out, key);
+            out.writeInt(generation);
+            out.writeBoolean(cancel);
+        } catch (IOException impossible) {
+            throw new AssertionError(impossible);
+        }
+        write(Protocol.CANVAS_REQUEST, bytes.toByteArray());
+    }
+
+    /** Decodes only a current request; a late result cannot revive a closed cache. */
     private void canvasImage(DataInputStream in) throws IOException {
         String key = Protocol.readString(in);
+        int generation = in.readInt();
+        boolean unavailable = in.readBoolean();
         float scale = in.readFloat();
         byte[] data = new byte[in.readInt()];
         in.readFully(data);
-        decoder.execute(() -> {
-            android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
-            if (bitmap == null) {
-                Log.w(TAG, "canvas: image " + key + " cannot be decoded");
-                return;
+        if (unavailable) {
+            if (canvasImages.unavailable(key, generation)) redrawCanvases();
+            return;
+        }
+        if (!canvasImages.wants(key, generation) || canvasDecodes.containsKey(generation)) return;
+        FutureTask<Void> task = new FutureTask<>(() -> {
+            if (!canvasImages.wants(key, generation)) return null;
+            android.graphics.Bitmap bitmap = null;
+            try {
+                if (data.length != 0) bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
+            } catch (RuntimeException | OutOfMemoryError e) {
+                Log.w(TAG, "canvas: image " + key + ": " + e);
             }
+            CanvasNode.Picture picture = bitmap == null ? null : new CanvasNode.Picture(bitmap, scale);
             ui.post(() -> {
-                CanvasNode.pictures.put(key, new CanvasNode.Picture(bitmap, scale));
-                redrawCanvases();
-                overlays.redrawCanvases();
+                canvasDecodes.remove(generation);
+                if (canvasImages.complete(key, generation, picture)) redrawCanvases();
             });
+            return null;
         });
+        canvasDecodes.put(generation, task);
+        decoder.execute(task);
     }
 
     /** Answers ITEM_SPEAK count of this view's tree: an utterance's end, stopped or with error, one of driver's Speak errors, or the voices as JSON. */
@@ -3921,7 +3973,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 : kind == Protocol.KIND_SCROLL ? new FrameLayout(context)
                 : kind == Protocol.KIND_MODAL ? new Layer(context) : new Group(context);
         Node n = new Node(id, view);
-        if (view instanceof CanvasNode) ((CanvasNode) view).presser = this::pressAtScreen;
+        if (view instanceof CanvasNode) {
+            ((CanvasNode) view).presser = this::pressAtScreen;
+            ((CanvasNode) view).pictures = canvasImages;
+        }
         byView.put(view, n);
         if (view instanceof Group) ((Group) view).node = n;
         switch (kind) {
@@ -3988,7 +4043,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.KIND_SHADER:
                 // A TextureView draws no background, so the shader fills the
                 // node's view, which draws its style.
-                n.shader = new ShaderNode(context);
+                n.shader = new ShaderNode(context, canvasImages);
                 n.children = (ViewGroup) view;
                 n.children.addView(n.shader, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
                 break;

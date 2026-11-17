@@ -56,7 +56,7 @@ void main() {
 `
 
 // trackShaders translates the programs a batch's shader items draw, on
-// the engine goroutine, and loads their images.
+// the engine goroutine.
 func (s *surface) trackShaders(b *driver.MountBatch) []shaderItem {
 	var out []shaderItem
 	for i := range b.Items {
@@ -76,7 +76,6 @@ func (s *surface) trackShaders(b *driver.MountBatch) []shaderItem {
 		}
 		out = append(out, shaderItem{prog: p, source: !p.sent})
 		p.sent = true
-		s.loadImages(it.Shader.Images)
 	}
 	return out
 }

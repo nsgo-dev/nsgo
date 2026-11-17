@@ -1,0 +1,108 @@
+//go:build windows
+
+package windows
+
+import (
+	"image"
+	"image/color"
+	"testing"
+	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/platform/canvastest"
+)
+
+func TestCanvasImageCacheBoundAndReload(t *testing.T) {
+	g, err := devices()
+	if err != nil {
+		t.Skip(err)
+	}
+	w := &window{scale: canvastest.Scale, animator: driver.NewAnimator(nil)}
+	defer w.closeCanvasImages()
+	sources := canvastest.CacheSources(1000)
+	load := func(src driver.ImageSource) *imageSlot {
+		t.Helper()
+		s := w.canvasImage(src)
+		for deadline := time.Now().Add(5 * time.Second); s.load != nil; {
+			w.runTasks()
+			if time.Now().After(deadline) {
+				t.Fatal("image load timed out")
+			}
+			time.Sleep(time.Millisecond)
+		}
+		if s.pic == nil || s.bitmapOf(g.dc, 0) == nil {
+			t.Fatal("no decoded bitmap")
+		}
+		return s
+	}
+	first := load(sources[0])
+	old := load(sources[1])
+	for i := 2; i < len(sources); i++ {
+		load(sources[i])
+		if i%32 == 0 {
+			w.canvasImage(sources[0])
+		}
+		if len(w.canvasImages) > maxCanvasImages {
+			t.Fatalf("%d cached images", len(w.canvasImages))
+		}
+	}
+	if w.canvasImages[sources[0].Key()] != first {
+		t.Fatal("recently drawn image evicted")
+	}
+	if old.pic != nil || old.bitmap != nil || old.load != nil {
+		t.Fatal("evicted resources retained")
+	}
+	reloaded := load(sources[1])
+	if reloaded == old {
+		t.Fatal("evicted image slot reused")
+	}
+	d := (&driver.Drawing{}).DrawImageIn(sources[1], 0, 0, 2, 2)
+	img := drawImage(t, g, 2, 2, func(p *painter) { p.canvas(&view{drawing: d}, 2, 2) }, w)
+	if got := img.RGBAAt(1, 1); got != (color.RGBA{R: 255, A: 255}) {
+		t.Fatalf("reloaded pixel %v", got)
+	}
+	pixels := w.canvasImage(driver.ImageSource{Pixels: image.NewRGBA(image.Rect(0, 0, 2, 2))})
+	if pixels.pic == nil {
+		t.Fatal("pixel frame did not draw")
+	}
+	w.closeCanvasImages()
+	if pixels.pic != nil || len(w.canvasFrames) != 0 || w.canvasFramePixels != 0 {
+		t.Fatal("closed cache retained pixel frames")
+	}
+	if reloaded.pic != nil || reloaded.bitmap != nil || len(w.canvasImages) != 0 || w.canvasImage(sources[1]) != nil {
+		t.Fatal("closed cache retained resources")
+	}
+}
+
+func TestCanvasImageCacheBoundsPendingAndDropsQueuedResults(t *testing.T) {
+	w := &window{}
+	defer w.closeCanvasImages()
+	sources := canvastest.CacheSources(1000)
+	old := w.canvasImage(sources[0])
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		w.mu.Lock()
+		n := len(w.tasks)
+		w.mu.Unlock()
+		if n > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("load did not post a result")
+		}
+	}
+	for _, src := range sources[1:] {
+		w.canvasImage(src)
+		if len(w.canvasImages) > maxCanvasImages {
+			t.Fatal("pending cache grew beyond limit")
+		}
+	}
+	w.runTasks()
+	if old.pic != nil || old.load != nil {
+		t.Fatal("queued completion resurrected evicted image")
+	}
+	w.closeCanvasImages()
+	w.runTasks()
+	if len(w.canvasImages) != 0 {
+		t.Fatal("closed cache revived")
+	}
+}
