@@ -51,6 +51,9 @@ func TestMenuFace(t *testing.T) {
 				}},
 			}}
 		})
+		if trigger, face := app.Find("menu"), app.Find("text:UTC"); trigger.Frame.Size != face.Frame.Size {
+			t.Fatalf("custom face = %v in trigger %v; the trigger must fit its face", face.Frame.Size, trigger.Frame.Size)
+		}
 		app.Press("menu")
 		app.Press("role:menuitem Tokyo")
 		app.Find("text:Tokyo")

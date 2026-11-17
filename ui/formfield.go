@@ -29,6 +29,6 @@ func (f FormField) Render(cx *core.Scope) core.Node {
 	title := Text(f.Title, 13, Regular, colors.Text)
 	title.Style.FlexShrink = 0
 	return core.View{TestID: f.TestID, Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: formRowGap,
-		MinHeight: core.Pt(formRowHeight), Padding: core.Symmetric(6, formRowPad)},
+		MinHeight: core.Pt(formRowHeightFor(cx)), Padding: core.Symmetric(6, formRowPad)},
 		Children: []core.Node{title, in}}
 }

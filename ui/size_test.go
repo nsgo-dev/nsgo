@@ -26,8 +26,8 @@ func TestSize(t *testing.T) {
 	}
 }
 
-// TestSizedControls lays Button and Tabs out at each size, as tall as the
-// size says on every device, an icon's button as a square.
+// TestSizedControls lays Button and Tabs out at each size, with larger button
+// targets on touch devices and an icon's button as a square.
 func TestSizedControls(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		for _, size := range []Size{SizeDefault, SizeSmall, SizeLarge} {
@@ -38,14 +38,21 @@ func TestSizedControls(t *testing.T) {
 					Tabs[int]{Size: size, Options: []Option[int]{{Value: 0, Label: "One", TestID: "tab"}}},
 				}}
 			})
-			want := size.Height()
+			buttonWant := size.Height()
+			if e.Idiom != core.IdiomDesktop && e.Idiom != core.IdiomTV {
+				buttonWant = size.heightFor(true)
+			}
 			for _, id := range []string{"button", "icon", "tab"} {
+				want := buttonWant
+				if id == "tab" {
+					want = size.Height()
+				}
 				if h := app.Find(id).Frame.Size.Height; h != want {
 					t.Errorf("size %d: %s is %v tall, want %v", size, id, h, want)
 				}
 			}
-			if f := app.Find("icon").Children[0].Frame.Size; f.Width != want {
-				t.Errorf("size %d: icon's button = %v, want a %v square", size, f, want)
+			if f := app.Find("icon").Children[0].Frame.Size; f.Width != buttonWant {
+				t.Errorf("size %d: icon's button = %v, want a %v square", size, f, buttonWant)
 			}
 		}
 	})

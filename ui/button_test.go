@@ -8,8 +8,8 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// TestButton presses each variant, 28 points tall on every device, and an
-// icon's button as a square.
+// TestButton presses each variant, with a touch target on touch devices, and
+// an icon's button as a square.
 func TestButton(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		var pressed []string
@@ -25,13 +25,17 @@ func TestButton(t *testing.T) {
 				Button{Text: "Off", TestID: "disabled", Disabled: func() bool { return true }, OnPress: func() { pressed = append(pressed, "off") }})
 			return core.View{Style: core.Style{Direction: core.Row, Wrap: core.Wrap, Gap: 8, AlignItems: core.AlignStart}, Children: row}
 		})
+		wantHeight := ButtonHeight
+		if e.Idiom != core.IdiomDesktop && e.Idiom != core.IdiomTV {
+			wantHeight = SizeDefault.heightFor(true)
+		}
 		for _, n := range names {
 			app.Press(n)
-			if h := app.Find(n).Frame.Size.Height; h != ButtonHeight {
-				t.Fatalf("%s takes presses %v tall, want %v", n, h, ButtonHeight)
+			if h := app.Find(n).Frame.Size.Height; h != wantHeight {
+				t.Fatalf("%s takes presses %v tall, want %v", n, h, wantHeight)
 			}
-			if h := app.Find(n).Children[0].Frame.Size.Height; h != ButtonHeight {
-				t.Fatalf("%s face = %v tall, want %v", n, h, ButtonHeight)
+			if h := app.Find(n).Children[0].Frame.Size.Height; h != wantHeight {
+				t.Fatalf("%s face = %v tall, want %v", n, h, wantHeight)
 			}
 		}
 		if len(pressed) != len(names) {
@@ -43,8 +47,8 @@ func TestButton(t *testing.T) {
 		if got := app.Find("ghost").Children[0].Style.Background; got != 0 {
 			t.Fatalf("ghost = %x at rest, want no fill", got)
 		}
-		if f := app.Find("icon").Children[0].Frame.Size; f.Width != ButtonHeight || f.Height != ButtonHeight {
-			t.Fatalf("icon's button = %v, want a %v square", f, ButtonHeight)
+		if f := app.Find("icon").Children[0].Frame.Size; f.Width != wantHeight || f.Height != wantHeight {
+			t.Fatalf("icon's button = %v, want a %v square", f, wantHeight)
 		}
 		if app.Find("role:button Add").Props.Label != "Add" {
 			t.Fatal("the icon's button has no label")
@@ -106,4 +110,25 @@ func TestButtonBusy(t *testing.T) {
 			t.Fatalf("saved %d times, want twice", saves)
 		}
 	})
+}
+
+// TestButtonStyleSizesTheFaceOnce keeps percentage widths, margins and padding
+// on the pressable, with the face covering its content box.
+func TestButtonStyleSizesTheFaceOnce(t *testing.T) {
+	headless(t)
+	app, _ := start(t, phoneEnv, func(*core.Scope) core.Node {
+		return core.View{Style: core.Style{Width: core.Pt(320), AlignItems: core.AlignStart}, Children: []core.Node{
+			Button{Text: "Custom", TestID: "custom", Style: core.Style{
+				Width: core.Pct(50), Height: core.Pt(50), Margin: core.All(8), Padding: core.Symmetric(4, 6),
+			}},
+		}}
+	})
+	button := app.Find("custom")
+	if got := button.Frame.Size; got.Width != 160 || got.Height != 50 {
+		t.Fatalf("custom button = %v, want 160 x 50", got)
+	}
+	face := button.Children[0]
+	if got := face.Frame.Size; got.Width != 148 || got.Height != 42 || face.Frame.Origin.X != 6 || face.Frame.Origin.Y != 4 {
+		t.Fatalf("face = %+v, want 148 x 42 at (6, 4)", face.Frame)
+	}
 }

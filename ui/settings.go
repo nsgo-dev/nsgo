@@ -395,7 +395,7 @@ func (s Settings) formRow(cx *core.Scope, item SettingsItem, testID string) core
 		return FormRow{Title: item.Title, Detail: item.Description, Control: item.Control, TestID: testID}
 	}
 	row := s.row(cx, item, item.Stacked, testID).(core.View)
-	row.Style.MinHeight, row.Style.Padding = core.Pt(formRowHeight), core.Symmetric(8, formRowPad)
+	row.Style.MinHeight, row.Style.Padding = core.Pt(formRowHeightFor(cx)), core.Symmetric(8, formRowPad)
 	row.Style.JustifyContent = core.JustifyCenter
 	return row
 }

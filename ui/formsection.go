@@ -51,6 +51,13 @@ const (
 	formIconTile  core.Points = 24
 )
 
+func formRowHeightFor(cx *core.Scope) core.Points {
+	if Touch(cx) {
+		return 48
+	}
+	return formRowHeight
+}
+
 // formRowLead is where the hairline below row starts: the start of its
 // title, past an icon, as iOS insets a cell's separator.
 func formRowLead(row core.Node) core.Points {

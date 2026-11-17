@@ -4,13 +4,13 @@ Every place a component in `base` or `ui` changes on its own by device, without 
 
 ## Rules
 
-- Keep a control's size and look the same on every device. Never grow a control or its press area for a finger; a resize handle's 3-point band is the [one exception](#touch-input).
+- Keep a control's look the same on every device. `ui`'s Button, OtpInput and form rows may use touch-sized layout on touch idioms; a resize handle's 3-point band is the [other exception](#touch-input). Core and base never change a size by device.
 - Let the app ask for a different size or form through a field or style.
-- Branch only for what a device cannot do, such as hover without a pointer, or for a form listed under [presentation](#presentation).
+- Branch only for what a device cannot do, such as hover without a pointer, for the touch sizes above, or for a form listed under [presentation](#presentation).
 - Never branch by device in `core` or `base` ([principles](../../AGENTS.md#principles)); the branches of `base` below follow what an input can do, such as hover or a held finger.
 - Use `ui.Touch` for a branch on input. Use `Env.Idiom` or `Env.OS` only when touch is not the reason. A TV takes no touches: its remote moves a focus, so `ui.Touch` is false there and `ui` presents as on a desktop.
 
-Sizes are constants for this reason: `ui.ButtonHeight` is 28 points, [`Button` and `Tabs`](themes.md#variants-and-sizes) taking another size when an app asks for one, and `ui.RowHeight` 36 on every device. A phone's controls are therefore smaller than the platforms' 44-point guidance unless the app sizes them.
+Desktop sizes remain constants: `ui.ButtonHeight` is 28 points, [`Button` and `Tabs`](themes.md#variants-and-sizes) taking another size when an app asks for one, and `ui.RowHeight` 36. Touch-sized controls are the explicit `ui` exception: Button, OtpInput and form rows grow to meet a finger's target, while an app can still provide a style or explicit cell size.
 
 ## Presentation
 

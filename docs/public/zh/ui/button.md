@@ -14,7 +14,7 @@ ui.Button{Text: "取消", Variant: ui.ButtonSecondary, OnPress: cancel}
 
 ## 变体与尺寸
 
-`ui.Button.Variant` 可以是 `ButtonPrimary`（默认）、`ButtonSecondary`、`ButtonOutline` 或 `ButtonGhost`。`Size` 可以是 `SizeDefault`（28 点）、`SizeSmall`（24）或 `SizeLarge`（32）。
+`ui.Button.Variant` 可以是 `ButtonPrimary`（默认）、`ButtonSecondary`、`ButtonOutline` 或 `ButtonGhost`。桌面和电视上，`Size` 可以是 `SizeDefault`（28 点）、`SizeSmall`（24）或 `SizeLarge`（32）；触屏设备上分别为 44、40 和 48 点。
 
 ```go preview=button/variants
 ui.Button{Text: "删除", Variant: ui.ButtonOutline, OnPress: remove}
@@ -22,7 +22,12 @@ ui.Button{Text: "继续", Size: ui.SizeLarge, OnPress: next}
 ui.Button{Text: "保存", Icon: lucide.Check, Flex: 1, OnPress: save}
 ```
 
-`Color` 用应用自己的颜色代替变体的颜色填充按钮，`Tint` 设置图标的颜色。`Flex` 让它分得一行中的一份宽度；`TestID` 为测试命名。
+`Color` 用应用自己的颜色代替变体的颜色填充按钮，`Tint` 设置图标的颜色。`Flex` 让它分得一行中的一份宽度，`Style` 可以让它填满容器或指定应用需要的尺寸；`TestID` 为测试命名。
+
+```go
+ui.Button{Text: "继续", Size: ui.SizeLarge,
+    Style: core.Style{Width: core.Pct(100), Height: core.Pt(50)}, OnPress: next}
+```
 
 只有图标的按钮用 `ui.IconButton`，`Variant` 为 `IconButtonGhost` 或 `IconButtonRaised`，`Size` 以点为单位，`Label` 供辅助技术读取。在桌面上，指针停在按钮上时这段文字也会作为提示显示；`Tooltip` 可以换成别的文字，返回 `""` 时不显示提示。设置了 `Icon` 而没有 `Text` 的 `ui.Button` 也是方形的，同样需要 `Label`。
 
@@ -54,13 +59,13 @@ ui.Button{Text: "保存", Busy: saving.Get, OnPress: save}
 
 ## 无障碍
 
-按钮报告 `RoleButton`，以文字作为名称，以 `Hint` 说明按下后会发生什么。`Label` 为辅助技术替换文字。只有图标而没有 `Label` 的按钮无法被读出，请给它命名。
+按钮报告 `RoleButton`，以文字作为名称。`Label` 为辅助技术替换文字。只有图标而没有 `Label` 的按钮无法被读出，请给它命名。
 
 在桌面、Web 和 Apple TV 上，回车和空格会按下获得焦点的按钮；手机的读屏器把它当作点击来按下。
 
 ## 平台
 
-按钮在每个设备上的尺寸相同。它是在各处以同样方式绘制的视图，而不是平台按钮；按压、焦点和无障碍来自平台。
+按钮是在各处以同样方式绘制的视图，而不是平台按钮；按压、焦点和无障碍来自平台。触屏设备采用上面列出的较大尺寸。
 
 ## 相关
 

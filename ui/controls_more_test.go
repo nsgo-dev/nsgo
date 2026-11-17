@@ -154,6 +154,72 @@ func TestOtpInput(t *testing.T) {
 	})
 }
 
+// TestTouchControlSizes checks the issue's layout on both mobile backends,
+// tablets and desktop targets, including a six-digit code in a phone column.
+func TestTouchControlSizes(t *testing.T) {
+	headless(t)
+	for _, c := range []struct {
+		name              string
+		os                core.OS
+		idiom             core.Idiom
+		button, cell, row core.Points
+	}{
+		{"ios", core.OSIOS, core.IdiomPhone, 48, 44, 48},
+		{"android", core.OSAndroid, core.IdiomPhone, 48, 44, 48},
+		{"ipad", core.OSIOS, core.IdiomTablet, 48, 44, 48},
+		{"android-tablet", core.OSAndroid, core.IdiomTablet, 48, 44, 48},
+		{"macos", core.OSMacOS, core.IdiomDesktop, 32, 36, 40},
+		{"windows", core.OSWindows, core.IdiomDesktop, 32, 36, 40},
+		{"linux", core.OSLinux, core.IdiomDesktop, 32, 36, 40},
+		{"web", core.OSWeb, core.IdiomDesktop, 32, 36, 40},
+		{"tv", core.OSAndroid, core.IdiomTV, 32, 36, 40},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			pressed := 0
+			completed := ""
+			app, _ := start(t, core.Environment{OS: c.os, Idiom: c.idiom}, func(*core.Scope) core.Node {
+				return core.View{TestID: "column", Style: core.Style{Width: core.Pt(320), AlignItems: core.AlignStart, Gap: 8}, Children: []core.Node{
+					Button{Text: "Action", Size: SizeLarge, Style: core.Style{Width: core.Pct(100)}, TestID: "button", OnPress: func() { pressed++ }},
+					OtpInput{Length: 6, Groups: 2, TestID: "otp", Label: "Code", OnComplete: func(code string) { completed = code }},
+					OtpInput{Length: 4, Size: 50, TestID: "custom-otp", Label: "Custom code"},
+					FormRow{Title: "Setting", OnPress: func() { pressed++ }, TestID: "row"},
+					FormRow{Title: "Read only", TestID: "plain-row"},
+					FormField{Title: "Name", TestID: "field"},
+				}}
+			})
+			button := app.Find("button")
+			if got := button.Frame.Size; got.Width != 320 || got.Height != c.button || button.Children[0].Frame.Size != got {
+				t.Fatalf("button and face = %v, %v; want 320 x %v", got, button.Children[0].Frame.Size, c.button)
+			}
+			otp := app.Find("otp")
+			for _, group := range otp.Children[:len(otp.Children)-1] {
+				for _, cell := range group.Children {
+					if got := cell.Frame.Size; got.Width != c.cell || got.Height != c.cell {
+						t.Fatalf("OTP cell = %v, want a %v square", got, c.cell)
+					}
+				}
+			}
+			if got := otp.Frame.Size.Width; got > 320 {
+				t.Fatalf("six OTP digits overflow the phone column: %v > 320", got)
+			}
+			if got := app.Find("custom-otp").Children[0].Children[0].Frame.Size; got.Width != 50 || got.Height != 50 {
+				t.Fatalf("custom OTP cell = %v, want a 50 point square", got)
+			}
+			for _, id := range []string{"row", "plain-row", "field"} {
+				if got := app.Find(id).Frame.Size.Height; got != c.row {
+					t.Fatalf("%s height = %v, want %v", id, got, c.row)
+				}
+			}
+			app.Press("button")
+			app.Press("row")
+			app.Type("label:Code", "123456")
+			if pressed != 2 || completed != "123456" {
+				t.Fatal("touch sizing lost a press or OTP editing")
+			}
+		})
+	}
+}
+
 // TestScrollbarTheme replaces the indicators, and the view's own bar goes
 // with the theme.
 func TestScrollbarTheme(t *testing.T) {

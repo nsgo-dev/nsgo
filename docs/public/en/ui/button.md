@@ -14,7 +14,7 @@ ui.Button{Text: "Cancel", Variant: ui.ButtonSecondary, OnPress: cancel}
 
 ## Variants and sizes
 
-`ui.Button.Variant` is `ButtonPrimary` (the default), `ButtonSecondary`, `ButtonOutline` or `ButtonGhost`. `Size` is `SizeDefault` (28 points), `SizeSmall` (24) or `SizeLarge` (32).
+`ui.Button.Variant` is `ButtonPrimary` (the default), `ButtonSecondary`, `ButtonOutline` or `ButtonGhost`. On desktop and TV idioms, `Size` is `SizeDefault` (28 points), `SizeSmall` (24) or `SizeLarge` (32). On touch idioms, the same sizes are 44, 40 and 48 points, so the button can be used without restyling it.
 
 ```go preview=button/variants
 ui.Button{Text: "Delete", Variant: ui.ButtonOutline, OnPress: remove}
@@ -22,7 +22,12 @@ ui.Button{Text: "Continue", Size: ui.SizeLarge, OnPress: next}
 ui.Button{Text: "Save", Icon: lucide.Check, Flex: 1, OnPress: save}
 ```
 
-`Color` fills the button with a color of the app's instead of a variant's, and `Tint` its icon. `Flex` gives it a share of a row; `TestID` names it for tests.
+`Color` fills the button with a color of the app's instead of a variant's, and `Tint` its icon. `Flex` gives it a share of a row, while `Style` can make it fill a container or set an app-specific size; `TestID` names it for tests.
+
+```go
+ui.Button{Text: "Continue", Size: ui.SizeLarge,
+    Style: core.Style{Width: core.Pct(100), Height: core.Pt(50)}, OnPress: next}
+```
 
 A button of an icon alone is `ui.IconButton`, with `Variant` `IconButtonGhost` or `IconButtonRaised`, a `Size` in points and a `Label` for assistive technology. On desktops the label also shows as a tooltip once the pointer rests on the button; `Tooltip` says something else there, and one that returns `""` shows none. A `ui.Button` with `Icon` and no `Text` is a square too, and needs `Label`.
 
@@ -54,13 +59,13 @@ ui.Button{Text: "Save", Busy: saving.Get, OnPress: save}
 
 ## Accessibility
 
-The button reports `RoleButton`, its text as its name, and `Hint` as what pressing it does. `Label` replaces the text for assistive technology. An icon-only button without `Label` is unreadable, so name it.
+The button reports `RoleButton` and its text as its name. `Label` replaces the text for assistive technology. An icon-only button without `Label` is unreadable, so name it.
 
 Return and Space press a focused button on desktops, the web and Apple TV; a phone's screen reader presses it as a click.
 
 ## Platform
 
-The size is the same on every device. The button is a view drawn the same way everywhere, not a platform button; presses, focus and accessibility come from the platform.
+The button is a view drawn the same way everywhere, not a platform button; presses, focus and accessibility come from the platform. Touch idioms use larger layout targets as described above.
 
 ## Related
 

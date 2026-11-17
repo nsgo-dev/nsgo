@@ -5,7 +5,8 @@
 //
 // The look is NSGo's: a neutral page, flat bordered cards under bold
 // titles, flat bordered controls 28 pt tall in 13 pt text by default,
-// 8 pt corners and one blue accent, the same sizes on every device. Its
+// 8 pt corners and one blue accent. Touch idioms enlarge Button, OtpInput
+// and form-row targets while desktop sizes remain compact. Its
 // colors are core.DefaultTheme's, which holds every role it reads.
 // A component takes its look from Variant; the few of several sizes take
 // Size, in size.go, or points where they are one shape at any scale.

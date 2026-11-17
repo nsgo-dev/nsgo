@@ -42,6 +42,9 @@ type Button struct {
 	// Flex grows it to share a row with its siblings.
 	Flex float32
 	Size Size
+	// Style is merged onto the pressable, whose face fills it. Use it for a full-row
+	// button (for example, Width: core.Pct(100)) or an app-specific size.
+	Style core.Style
 	// Side is the square of a button of an icon alone, its height when 0,
 	// to line it up with what is not a control's height. IconSize is its
 	// glyph's, the Size's when 0, and Tint its color, the look's when nil.
@@ -51,7 +54,7 @@ type Button struct {
 	OnPress        func()
 }
 
-// ButtonHeight is a button's height at SizeDefault.
+// ButtonHeight is a desktop button's height at SizeDefault.
 const ButtonHeight core.Points = 28
 
 // Render implements core.Node.
@@ -81,6 +84,7 @@ func (b Button) label() string {
 // which follows the pressable's hover and press: what a popup's trigger
 // takes from a Button.
 func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node) {
+	height := b.Size.heightFor(Touch(cx))
 	colors := ColorsOf(cx)
 	fg := colors.Text
 	switch {
@@ -139,14 +143,20 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 			}},
 		}
 	}
-	shape := core.Style{Height: core.Pt(b.Size.Height()), Padding: core.Symmetric(0, b.Size.inset())}
+	shape := core.Style{Height: core.Pt(height), Padding: core.Symmetric(0, b.Size.inset())}
 	if b.Text == "" && b.Icon != nil {
 		side := b.Side
 		if side == 0 {
-			side = b.Size.Height()
+			side = height
 		}
 		shape = core.Style{Width: core.Pt(side), Height: core.Pt(side)}
 	}
+	style := core.Style{Group: "button", FlexGrow: b.Flex, FlexShrink: b.Flex, CornerRadius: RadiusControl,
+		Height: shape.Height, Width: shape.Width, Disabled: &core.Style{Opacity: core.Alpha(0.4)}}.Merge(b.Style)
+	// Only the pressable takes the app's layout style: repeating a percentage
+	// width, margin or padding on the face would size or space it twice.
+	shape.Height, shape.Width = core.Length{}, core.Length{}
+	shape.FlexGrow, shape.FlexShrink, shape.MinHeight = 1, 1, core.Pt(0)
 	face := func() core.Style {
 		rest, hover, pressed, border := fill()
 		return shape.Merge(core.Style{CornerRadius: RadiusControl, BorderCurve: core.BorderCurveContinuous,
@@ -154,7 +164,5 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 			Background: rest, BorderWidth: 1, BorderColor: border,
 			GroupStyle: &core.GroupStyle{Hover: &core.Style{Background: hover}, Active: &core.Style{Background: pressed}, Expanded: &core.Style{Background: hover}}})
 	}
-	style := core.Style{Group: "button", FlexGrow: b.Flex, FlexShrink: b.Flex, CornerRadius: RadiusControl,
-		Disabled: &core.Style{Opacity: core.Alpha(0.4)}}
 	return style, func() core.Style { return core.Style{FocusVisible: FocusRing(cx, 2)} }, core.View{StyleFunc: face, Children: children}
 }

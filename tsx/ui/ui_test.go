@@ -24,6 +24,36 @@ func TestReadIcon(t *testing.T) {
 	}
 }
 
+// TestTouchControlSizingFromTSX exercises the styled controls' public props,
+// including custom cell sizes and the face filling a button's styled bounds.
+func TestTouchControlSizingFromTSX(t *testing.T) {
+	files := fstest.MapFS{"App.tsx": {Data: []byte(`import { mount, View } from "nsgo";
+import { Button, OtpInput } from "nsgo/ui";
+mount(() => <View style={{width: 320, alignItems: "flex-start"}}>
+    <Button testID="action" size="large" style={{width: "100%"}}>Continue</Button>
+    <Button testID="custom" style={{width: "50%", height: 50}}>Custom</Button>
+    <OtpInput testID="code" length={4} size={50} label="Code" />
+</View>);`)}}
+	for _, os := range []core.OS{core.OSIOS, core.OSAndroid} {
+		t.Run(string(os), func(t *testing.T) {
+			app := nsgotest.Start(t, compiler.App(files, "App.tsx"), nsgotest.Size(390, 844),
+				nsgotest.Environment(core.Environment{OS: os, Idiom: core.IdiomPhone}))
+			for _, c := range []struct {
+				id            string
+				width, height core.Points
+			}{{"action", 320, 48}, {"custom", 160, 50}} {
+				button := app.Find(c.id)
+				if got := button.Frame.Size; got.Width != c.width || got.Height != c.height || button.Children[0].Frame.Size != got {
+					t.Fatalf("%s button and face = %v, %v; want %v x %v", c.id, got, button.Children[0].Frame.Size, c.width, c.height)
+				}
+			}
+			if got := app.Find("code").Children[0].Children[0].Frame.Size; got.Width != 50 || got.Height != 50 {
+				t.Fatalf("OTP size prop was lost: %v", got)
+			}
+		})
+	}
+}
+
 func TestAlertDialogActionRolesFromTSX(t *testing.T) {
 	for _, c := range []struct{ key, want string }{{"Escape", "cancel"}, {"Return", "delete"}} {
 		t.Run(c.key, func(t *testing.T) {

@@ -76,7 +76,7 @@ func (r FormRow) Render(cx *core.Scope) core.Node {
 	if r.OnPress != nil && r.Variant == FormRowDefault {
 		children = append(children, Icon(lucide.ChevronRight, 13, colors.Faint))
 	}
-	style := core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: formRowGap, MinHeight: core.Pt(formRowHeight),
+	style := core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: formRowGap, MinHeight: core.Pt(formRowHeightFor(cx)),
 		Padding: core.Symmetric(6, formRowPad)}
 	if r.OnPress == nil {
 		return core.View{TestID: r.TestID, Style: style, Children: children}
