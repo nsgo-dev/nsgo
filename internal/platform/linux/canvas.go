@@ -575,7 +575,7 @@ func canvasLayout(cr uintptr, text string, font driver.Font) uintptr {
 		font.Size = driver.DefaultFontSize
 	}
 	l := pangoCairoCreateLayout(cr)
-	desc := fontDescription(font)
+	desc := fontDescription(font, uiFontFamily())
 	defer pangoFontDescriptionFree(desc)
 	pangoLayoutSetFontDescription(l, desc)
 	// A description has no OpenType features; an attribute carries them.
@@ -589,13 +589,10 @@ func canvasLayout(cr uintptr, text string, font driver.Font) uintptr {
 	return l
 }
 
-// fontDescription returns a new PangoFontDescription of font, whose size
-// is set. The caller frees it.
-func fontDescription(font driver.Font) uintptr {
+// fontDescription returns a new PangoFontDescription of font, whose size is set and whose system families are the UI font ui. The caller frees it.
+func fontDescription(font driver.Font, ui string) uintptr {
 	desc := pangoFontDescriptionNew()
-	if font.Family != "" {
-		pangoFontDescriptionSetFamily(desc, cstr(pangoFamilies(font.Family)))
-	}
+	pangoFontDescriptionSetFamily(desc, cstr(pangoFamilies(font.Family, ui)))
 	pangoFontDescriptionSetAbsoluteSize(desc, float64(font.Size*pangoScale))
 	if font.Weight != 0 {
 		pangoFontDescriptionSetWeight(desc, int32(font.Weight))

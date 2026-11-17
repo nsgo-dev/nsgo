@@ -47,6 +47,8 @@ type textSource struct {
 	style    driver.TextStyle
 	spans    []driver.TextSpan
 	maxLines int
+	// ui is the UI font when the text was prepared (uiFontFamily), which its system families take on both threads.
+	ui string
 	// ellipsize cuts what maxLines leaves out; a clipped text is measured
 	// as if it ended with an ellipsis and drawn whole, clipped to its box.
 	ellipsize driver.EllipsizeMode
@@ -104,12 +106,12 @@ type preparedText struct {
 // Prepare implements core.TextEngine.
 func (w *window) Prepare(t *driver.AttributedText) driver.PreparedText {
 	src := textSource{text: t.Text, style: t.Style, spans: t.Spans, maxLines: t.MaxLines, ellipsize: t.Ellipsize,
-		shadow: t.Shadow}
+		shadow: t.Shadow, ui: uiFontFamily()}
 	if len(t.Attachments) > 0 {
 		src.atts = append([]driver.TextAttachment(nil), t.Attachments...)
 		src.fonts = make([]driver.FontExtent, len(t.Attachments))
 		for i, at := range t.Attachments {
-			src.fonts[i] = w.fontExtent(src.styleAt(at.Offset).Font)
+			src.fonts[i] = w.fontExtent(src.styleAt(at.Offset).Font, src.ui)
 		}
 	}
 	return &preparedText{w: w, textSource: src}
@@ -176,15 +178,15 @@ func textDirection(rtl bool) int32 {
 }
 
 // fontExtent returns the vertical metrics of f, from a line of "x" in
-// it: its ascent and descent, and the top of the x's ink. The engine
-// thread calls it; it caches what it measured.
-func (w *window) fontExtent(f driver.Font) driver.FontExtent {
-	if e, ok := w.extents[f]; ok {
+// it: its ascent and descent, and the top of the x's ink, its system families in the UI font ui. The engine thread calls it; it caches what it measured.
+func (w *window) fontExtent(f driver.Font, ui string) driver.FontExtent {
+	key := fontKey{f, ui}
+	if e, ok := w.extents[key]; ok {
 		return e
 	}
 	l := pangoLayoutNew(w.measureContext(false))
 	attrs := pangoAttrListNew()
-	addStyle(attrs, 1, 0, 1, driver.TextStyle{Font: f}, nil)
+	addStyle(attrs, 1, 0, 1, driver.TextStyle{Font: f}, ui, nil)
 	pangoLayoutSetAttributes(l, attrs)
 	pangoAttrListUnref(attrs)
 	pangoLayoutSetText(l, cstr("x"), 1)
@@ -198,9 +200,9 @@ func (w *window) fontExtent(f driver.Font) driver.FontExtent {
 		XHeight: fromPango(base - ink.Y),
 	}
 	if w.extents == nil {
-		w.extents = map[driver.Font]driver.FontExtent{}
+		w.extents = map[fontKey]driver.FontExtent{}
 	}
-	w.extents[f] = e
+	w.extents[key] = e
 	return e
 }
 
@@ -293,9 +295,9 @@ func textAttributes(text string, s *textSource) uintptr {
 		}
 	}
 	list := pangoAttrListNew()
-	addStyle(list, len(text), 0, len(text), s.style, holes)
+	addStyle(list, len(text), 0, len(text), s.style, s.ui, holes)
 	for _, sp := range s.spans {
-		addStyle(list, len(text), sp.Start, sp.End, sp.Style, holes)
+		addStyle(list, len(text), sp.Start, sp.End, sp.Style, s.ui, holes)
 	}
 	for i, at := range s.atts {
 		if at.Offset < 0 || at.Offset+placeholderLen > len(text) {
@@ -318,10 +320,8 @@ func textAttributes(text string, s *textSource) uintptr {
 	return list
 }
 
-// addStyle adds s's font, color, spacing and decoration over start:end,
-// clipped to textLen bytes. Its line height leaves out holes, which are
-// in order.
-func addStyle(list uintptr, textLen, start, end int, s driver.TextStyle, holes [][2]int) {
+// addStyle adds s's font, its system families in the UI font ui, and its color, spacing and decoration over start:end, clipped to textLen bytes. Its line height leaves out holes, which are in order.
+func addStyle(list uintptr, textLen, start, end int, s driver.TextStyle, ui string, holes [][2]int) {
 	start, end = min(max(start, 0), textLen), min(max(end, 0), textLen)
 	if end <= start {
 		return
@@ -337,9 +337,7 @@ func addStyle(list uintptr, textLen, start, end int, s driver.TextStyle, holes [
 	if f.Language != "" {
 		add(pangoAttrLanguageNew(pangoLanguageFromString(cstr(f.Language))))
 	}
-	if f.Family != "" {
-		add(pangoAttrFamilyNew(cstr(pangoFamilies(f.Family))))
-	}
+	add(pangoAttrFamilyNew(cstr(pangoFamilies(f.Family, ui))))
 	if f.Size > 0 {
 		add(pangoAttrSizeNewAbsolute(int32(f.Size*pangoScale + 0.5)))
 	}
@@ -624,12 +622,12 @@ func (p *preparedText) placeLines(l *textLayout) {
 		pangoLayoutIterGetLineExtents(iter, &ink, &logical)
 		baseline := pangoLayoutIterGetBaseline(iter)
 		font := p.styleAt(from).Font
-		ext := p.w.fontExtent(font)
+		ext := p.w.fontExtent(font, p.ui)
 		l.lines = append(l.lines, driver.TextLine{Start: min(from, len(p.text)), End: min(to, len(p.text)),
 			Bounds: driver.Bounds{Origin: driver.Point{X: fromPango(logical.X), Y: fromPango(logical.Y)},
 				Size: driver.Size{Width: fromPango(logical.Width), Height: fromPango(logical.Height)}},
 			Ascender: fromPango(baseline - logical.Y), Descender: fromPango(logical.Y + logical.Height - baseline),
-			CapHeight: p.w.capHeight(font), XHeight: ext.XHeight})
+			CapHeight: p.w.capHeight(font, p.ui), XHeight: ext.XHeight})
 		if pangoLayoutIterNextLine(iter) == 0 {
 			break
 		}
@@ -639,15 +637,15 @@ func (p *preparedText) placeLines(l *textLayout) {
 // TextLines implements core.LineLayout.
 func (l *textLayout) TextLines() []driver.TextLine { return l.lines }
 
-// capHeight returns the height of f's capitals, from the ink of an "H".
-// The engine thread calls it; it caches what it measured.
-func (w *window) capHeight(f driver.Font) driver.Points {
-	if h, ok := w.capHeights[f]; ok {
+// capHeight returns the height of f's capitals, from the ink of an "H", its system families in the UI font ui. The engine thread calls it; it caches what it measured.
+func (w *window) capHeight(f driver.Font, ui string) driver.Points {
+	key := fontKey{f, ui}
+	if h, ok := w.capHeights[key]; ok {
 		return h
 	}
 	l := pangoLayoutNew(w.measureContext(false))
 	attrs := pangoAttrListNew()
-	addStyle(attrs, 1, 0, 1, driver.TextStyle{Font: f}, nil)
+	addStyle(attrs, 1, 0, 1, driver.TextStyle{Font: f}, ui, nil)
 	pangoLayoutSetAttributes(l, attrs)
 	pangoAttrListUnref(attrs)
 	pangoLayoutSetText(l, cstr("H"), 1)
@@ -656,9 +654,9 @@ func (w *window) capHeight(f driver.Font) driver.Points {
 	h := fromPango(pangoLayoutGetBaseline(l) - ink.Y)
 	gObjectUnref(l)
 	if w.capHeights == nil {
-		w.capHeights = map[driver.Font]driver.Points{}
+		w.capHeights = map[fontKey]driver.Points{}
 	}
-	w.capHeights[f] = h
+	w.capHeights[key] = h
 	return h
 }
 
@@ -695,7 +693,7 @@ func (p *preparedText) placeBackgrounds(l *textLayout) {
 			if a >= b {
 				continue
 			}
-			font := p.w.fontExtent(sp.Style.Font)
+			font := p.w.fontExtent(sp.Style.Font, p.ui)
 			h := float64(font.Ascent + font.Descent)
 			var ranges uintptr
 			var n int32
@@ -728,13 +726,13 @@ type lineMetrics struct {
 	strike, strikeThickness       driver.Points
 }
 
-// fontLines returns f's decoration lines. The engine thread calls it;
-// it caches what it read.
-func (w *window) fontLines(f driver.Font) lineMetrics {
-	if m, ok := w.lineMetrics[f]; ok {
+// fontLines returns f's decoration lines, its system families in the UI font ui. The engine thread calls it; it caches what it read.
+func (w *window) fontLines(f driver.Font, ui string) lineMetrics {
+	key := fontKey{f, ui}
+	if m, ok := w.lineMetrics[key]; ok {
 		return m
 	}
-	desc := fontDescription(f)
+	desc := fontDescription(f, ui)
 	metrics := pangoContextGetMetrics(w.measureContext(false), desc, 0)
 	pangoFontDescriptionFree(desc)
 	m := lineMetrics{
@@ -743,9 +741,9 @@ func (w *window) fontLines(f driver.Font) lineMetrics {
 	}
 	pangoFontMetricsUnref(metrics)
 	if w.lineMetrics == nil {
-		w.lineMetrics = map[driver.Font]lineMetrics{}
+		w.lineMetrics = map[fontKey]lineMetrics{}
 	}
-	w.lineMetrics[f] = m
+	w.lineMetrics[key] = m
 	return m
 }
 
@@ -795,7 +793,7 @@ func (p *preparedText) placeDecorations(l *textLayout) {
 				continue
 			}
 			st := r.style
-			m := p.w.fontLines(st.Font)
+			m := p.w.fontLines(st.Font, p.ui)
 			color := st.Color
 			if st.DecorationColor != 0 {
 				color = st.DecorationColor
@@ -1066,4 +1064,10 @@ func (l *textLayout) Release() {
 		gObjectUnref(l.layout)
 		l.layout = 0
 	}
+}
+
+// fontKey is what the engine thread's font metrics are cached by: a font, and the UI font its system families took.
+type fontKey struct {
+	font driver.Font
+	ui   string
 }

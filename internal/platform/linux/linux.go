@@ -210,9 +210,9 @@ type window struct {
 	measureMap    [2]uintptr // the engine thread's Pango contexts, left to right and right to left
 	hitMap        [2]uintptr // hit testing's, used under hitMu from either thread
 	hitMu         sync.Mutex
-	extents       map[driver.Font]driver.FontExtent // the engine thread's font metrics
-	capHeights    map[driver.Font]driver.Points     // and capital heights
-	lineMetrics   map[driver.Font]lineMetrics       // and decoration lines
+	extents       map[fontKey]driver.FontExtent // the engine thread's font metrics
+	capHeights    map[fontKey]driver.Points     // and capital heights
+	lineMetrics   map[fontKey]lineMetrics       // and decoration lines
 	pressConsumed bool
 	// selecting is the selection of an area, and selected the texts
 	// that highlight a part of it (selection.go).
@@ -318,6 +318,7 @@ func start(app engine.App, opts Options) (*window, error) {
 	if err := registerViewType(); err != nil {
 		return nil, fmt.Errorf("the Linux backend needs GTK 4: %w", err)
 	}
+	readUIFont()
 	w := newWindow(opts, false)
 	w.primary, w.app, w.opts = true, app, opts
 	w.createWindow(opts)
@@ -455,6 +456,7 @@ func NewView(app engine.App, opts Options) (*View, error) {
 	if err := registerViewType(); err != nil {
 		return nil, fmt.Errorf("the Linux backend needs GTK 4: %w", err)
 	}
+	readUIFont()
 	if opts.Host.Settings == nil {
 		opts.Host.Settings = &engine.HostSettings{}
 	}
@@ -585,7 +587,7 @@ func (w *window) setupSettings() {
 }
 
 func settingsToWatch(colorScheme bool) []string {
-	names := []string{"gtk-theme-name", "gtk-application-prefer-dark-theme", "gtk-xft-dpi", "gtk-enable-animations"}
+	names := []string{"gtk-theme-name", "gtk-font-name", "gtk-application-prefer-dark-theme", "gtk-xft-dpi", "gtk-enable-animations"}
 	if colorScheme {
 		names = append(names, "gtk-interface-color-scheme", "gtk-interface-contrast")
 	}

@@ -348,12 +348,33 @@ func settingString(settings uintptr, name string) string {
 	return s
 }
 
-// settingsChangedCallback rereads the environment after a GTK setting
-// changed.
+// settingsChangedCallback rereads the environment and the UI font after a GTK setting changed.
 func settingsChangedCallback(settings, pspec, data uintptr) {
+	if readUIFont() {
+		uiFontChanged()
+	}
 	if w := windowOf(data); w != nil && !w.closing {
 		w.updateEnvironment()
 	}
+}
+
+// uiFontChanged has every app showing prepare its text again in the UI font GTK's settings changed to, and every canvas draw its text in it.
+func uiFontChanged() {
+	windowHandles.Range(func(_, v any) bool {
+		w := v.(*window)
+		if w.closing {
+			return true
+		}
+		if w.engine != nil {
+			w.engine.FontsChanged()
+		}
+		for _, cv := range w.views {
+			if cv != nil && cv.drawing != nil && cv.widget != 0 {
+				gtkWidgetQueueDraw(cv.widget)
+			}
+		}
+		return true
+	})
 }
 
 // windowStateCallback rereads the environment after the window is

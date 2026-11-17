@@ -182,7 +182,7 @@ func TestSpanBackgroundsBoxEachLine(t *testing.T) {
 	if len(l.under) != 1 {
 		t.Fatalf("background boxes = %v, want one", l.under)
 	}
-	font := w.fontExtent(textStyle.Font)
+	font := w.fontExtent(textStyle.Font, uiFontFamily())
 	box := l.under[0]
 	if !closeTo(box.h, float64(font.Ascent+font.Descent)) || box.r != 4 || box.x <= 0 {
 		t.Fatalf("box = %+v, want the font's %v tall, after the first word", box, font)
@@ -227,7 +227,7 @@ func TestStrikethroughDrawsOnSpansAndTexts(t *testing.T) {
 	ink := func(text *driver.AttributedText) int {
 		l := layoutText(t, w, text, driver.Auto)
 		data, stride := drawText(t, l, int(l.width)+4, int(l.height)+4)
-		font := w.fontExtent(textStyle.Font)
+		font := w.fontExtent(textStyle.Font, uiFontFamily())
 		y := int(font.Ascent - font.XHeight/2)
 		n := 0
 		for x := 0; x < int(l.width); x++ {
@@ -261,7 +261,7 @@ func TestAttachmentsTakeTheirBoxInTheLine(t *testing.T) {
 		t.Skip(err)
 	}
 	w := &window{}
-	font := w.fontExtent(textStyle.Font)
+	font := w.fontExtent(textStyle.Font, uiFontFamily())
 	placeholder := string(driver.AttachmentRune)
 	text := "ab " + placeholder + " cd"
 	at := driver.TextAttachment{Offset: 3, Size: driver.Size{Width: 30, Height: 40}}

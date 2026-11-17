@@ -270,6 +270,7 @@ var (
 	pangoFontDescriptionNew        func() uintptr
 	pangoFontDescriptionFree       func(uintptr)
 	pangoFontDescriptionSetFamily  func(uintptr, *byte)
+	pangoFontDescriptionGetFamily  func(uintptr) uintptr
 	pangoFontDescriptionSetWeight  func(uintptr, int32)
 	pangoFontDescriptionSetStyle   func(uintptr, int32)
 	pangoAttrListNew               func() uintptr
@@ -635,6 +636,7 @@ func bind() {
 	purego.RegisterLibFunc(&pangoLayoutIterGetIndex, pangoLib, "pango_layout_iter_get_index")
 	purego.RegisterLibFunc(&pangoLayoutIterGetClusterExt, pangoLib, "pango_layout_iter_get_cluster_extents")
 	purego.RegisterLibFunc(&pangoFontDescriptionFromString, pangoLib, "pango_font_description_from_string")
+	purego.RegisterLibFunc(&pangoFontDescriptionGetFamily, pangoLib, "pango_font_description_get_family")
 	purego.RegisterLibFunc(&pangoFontDescriptionNew, pangoLib, "pango_font_description_new")
 	purego.RegisterLibFunc(&pangoFontDescriptionFree, pangoLib, "pango_font_description_free")
 	purego.RegisterLibFunc(&pangoFontDescriptionSetFamily, pangoLib, "pango_font_description_set_family")
