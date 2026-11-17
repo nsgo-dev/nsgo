@@ -215,7 +215,7 @@ warning := core.Text{ContentFunc: func() string {
 }}
 ```
 
-`desktop.SetWindowPointerEvents` lets the pointer through a window to the windows below it, of any app: `WindowPointerNone` everywhere, as a heads-up display does, and `WindowPointerPainted` wherever no view draws something or hears the pointer, as around a desktop pet that still takes presses, drags and right clicks on itself. `WindowOptions.PointerEvents` and `PanelOptions.PointerEvents` open a window so. A window that takes no pointer hears no presses, so the app gives it back from a shortcut, a tray icon or another window. Code an `Access` holds needs `core.AccessOverlay`.
+`desktop.SetWindowPointerEvents` lets the pointer through a window to the windows below it, of any app: `WindowPointerNone` everywhere, as a heads-up display does, and `WindowPointerPainted` wherever no view draws something or hears the pointer, as around a desktop pet that still takes presses, drags and right clicks on itself; the title bar the system draws counts as nothing drawn. `WindowOptions.PointerEvents` and `PanelOptions.PointerEvents` open a window so. A window that takes no pointer hears no presses, so the app gives it back from a shortcut, a tray icon or another window. Code an `Access` holds needs `core.AccessOverlay`.
 
 ```go
 desktop.OpenPanel(cx, desktop.PanelOptions{Width: 600, Height: 400, PointerEvents: desktop.WindowPointerPainted}, Pet)

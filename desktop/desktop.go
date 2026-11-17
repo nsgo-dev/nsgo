@@ -196,7 +196,7 @@ func CanSetWindowWorkspaces(cx *core.Scope) bool { return cx.Env().CanSetWindowW
 //
 //	desktop.SetWindowPointerEvents(cx, desktop.WindowPointerPainted)
 //
-// Code held to an Access needs it to grant core.AccessOverlay, else the window takes the pointer. A view whose background fills the window makes a painted window take it everywhere.
+// Code held to an Access needs it to grant core.AccessOverlay, else the window takes the pointer. A view whose background fills the window makes a painted window take it everywhere, and the title bar the system draws, which is no view, lets it through.
 func SetWindowPointerEvents(cx *core.Scope, p WindowPointerEvents) { cx.SetWindowPointerEvents(p) }
 
 // SetWindowConstraints limits the window's content size and says whether
