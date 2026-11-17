@@ -139,8 +139,12 @@ func PNG(data []byte) ([]byte, driver.Size, error) {
 	return Encode(data, 0, false, 0)
 }
 
-// PNGImage encodes an already composited CGImage as a PNG. The caller keeps
-// ownership of image; this function does not retain or release it.
+// ImageSize is a CGImage's width and height in pixels.
+func ImageSize(image uintptr) (width, height int) {
+	return cgImageGetWidth(image), cgImageGetHeight(image)
+}
+
+// PNGImage encodes an already composited CGImage as a PNG. The caller keeps ownership of image; this function does not retain or release it.
 func PNGImage(image uintptr) ([]byte, error) {
 	encodeOnce.Do(loadEncode)
 	if image == 0 {

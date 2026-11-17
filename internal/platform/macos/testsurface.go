@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -476,31 +477,49 @@ func (t *testSurface) Answer(id uint32, index int) error {
 	return err
 }
 
+// composited is the PNG of the view's bounds as WindowServer composites its window, nil when it cannot have them. CGWindowListCreateImage asks for the frame already on screen, so it keeps the Core Animation shadows, masks, filters, presentation layers and insertion point that an AppKit cacheDisplayInRect: redraw omits. Only the surface's own window is asked for: with no window number, kCGNullWindowID would capture whatever other apps show in that rectangle. A window that is not visible on the active Space, ordered out or minimized, is not asked for, so it draws through AppKit as before; nor is an image smaller than the view's pixels kept.
+func (t *testSurface) composited(bounds apple.CGRect) []byte {
+	w := t.s.window
+	if w == 0 || bounds.Size.Width <= 0 || bounds.Size.Height <= 0 ||
+		!objc.Send[bool](w, sel("isVisible")) || !objc.Send[bool](w, sel("isOnActiveSpace")) {
+		return nil
+	}
+	number := objc.Send[int](w, sel("windowNumber"))
+	if number <= 0 {
+		return nil
+	}
+	loadCG()
+	// screenPoint is in the global top-left coordinates CGWindowListCreateImage takes.
+	origin := t.screenPoint(driver.Point{})
+	const (
+		windowListIncludingWindow    = 1 << 3
+		windowImageBoundsIgnoreFrame = 1 << 0
+		windowImageBestResolution    = 1 << 3
+	)
+	image := cgWindowListCreateImage(apple.Rect(origin.X, origin.Y, bounds.Size.Width, bounds.Size.Height),
+		windowListIncludingWindow, uint32(number), windowImageBoundsIgnoreFrame|windowImageBestResolution)
+	if image == 0 {
+		return nil
+	}
+	defer apple.Release(image)
+	scale := objc.Send[float64](w, sel("backingScaleFactor"))
+	width, height := apple.ImageSize(image)
+	if float64(width) < math.Floor(bounds.Size.Width*scale) || float64(height) < math.Floor(bounds.Size.Height*scale) {
+		return nil
+	}
+	png, _ := apple.PNGImage(image)
+	return png
+}
+
 func (t *testSurface) Screenshot() ([]byte, error) {
 	var png []byte
 	onMainSync(func() {
-		loadCG()
-		// CGWindowListCreateImage asks WindowServer for the already composited
-		// frame. This preserves Core Animation shadows, masks, presentation
-		// layers, visual effects and insertion-point drawing that an AppKit
-		// cacheDisplayInRect: redraw omits. screenPoint uses the same global
-		// top-left coordinate space as CGWindowListCreateImage.
 		v := t.s.native
-		bounds := objc.Send[apple.CGRect](v, selBounds)
-		origin := t.screenPoint(driver.Point{})
-		window := uint32(objc.Send[int](t.s.window, sel("windowNumber")))
-		const (
-			windowListIncludingWindow    = 1 << 3
-			windowImageBoundsIgnoreFrame = 1 << 0
-			windowImageBestResolution    = 1 << 3
-		)
-		image := cgWindowListCreateImage(apple.Rect(origin.X, origin.Y, bounds.Size.Width, bounds.Size.Height),
-			windowListIncludingWindow, window, windowImageBoundsIgnoreFrame|windowImageBestResolution)
-		if image != 0 {
-			defer apple.Release(image)
-			png, _ = apple.PNGImage(image)
+		if v == 0 {
+			return
 		}
-		if png != nil {
+		bounds := objc.Send[apple.CGRect](v, selBounds)
+		if png = t.composited(bounds); png != nil {
 			return
 		}
 		screenshotFallbackOnce.Do(func() {

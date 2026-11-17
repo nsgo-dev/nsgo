@@ -112,6 +112,8 @@ jobs:
         run: go tool nsgo test -target macos -run '^TestPressModifiersReachTheApp$' ./internal/testhost/testdata/press
       - name: Test native radio and tab focus
         run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
+      - name: Test composited captures
+        run: go tool nsgo test -target macos ./internal/testhost/testdata/capture
 
   windows:
     runs-on: windows-latest
