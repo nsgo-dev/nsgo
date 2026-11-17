@@ -8,16 +8,12 @@ import (
 	"strings"
 )
 
-// fileType is a kind of document the app opens, which nsgo.yaml's
-// file_types lists and desktop packages register with the system.
-// Opening one reaches desktop.OnOpenFiles.
+// fileType is a kind of document the app opens, which nsgo.yaml's file_types lists and desktop packages register with the system. Opening one reaches desktop.OnOpenFiles.
 type fileType struct {
 	// Name is what the Finder calls such a file.
 	Name       string   `yaml:"name"`
 	Extensions []string `yaml:"extensions"`
-	// MIME names existing media types. Without it Linux uses the built-in
-	// extension table, defining unknown extensions of an owned type as
-	// application/x-<id>.
+	// MIME names existing media types. Without it Linux uses the built-in extension table, defining unknown extensions of an owned type as application/x-<id>.
 	MIME []string `yaml:"mime"`
 	// ID is its uniform type identifier: <app id>.<first extension> by
 	// default. The app declares, and owns, a type under its own ID; any

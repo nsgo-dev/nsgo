@@ -643,16 +643,14 @@ type desktopData struct {
 	MIMETypes      []string
 }
 
-// desktopString escapes a Desktop Entry string, before Exec's separate
-// argument parsing. Keep field codes out of the executable's name.
+// desktopString escapes a Desktop Entry string, before Exec's separate argument parsing. Keep field codes out of the executable's name.
 func desktopString(s string) string {
 	return strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\r", `\r`, "\t", `\t`).Replace(s)
 }
 
 func desktopExec(s string) string {
 	prefix := ""
-	// GIO checks argv[0] exists before expanding %%. Keep a literal '%'
-	// in a command argument, so discovery and launch see the same path.
+	// GIO checks argv[0] exists before expanding %%. Keep a literal '%' in a command argument, so discovery and launch see the same path.
 	if strings.Contains(s, "%") {
 		prefix = "env -- "
 	}

@@ -9,8 +9,7 @@ import (
 	"time"
 )
 
-// TestLinuxFileAssociationsNative registers the generated files in a
-// private XDG data directory, then lets GIO discover and launch the app.
+// TestLinuxFileAssociationsNative registers the generated files in a private XDG data directory, then lets GIO discover and launch the app.
 func TestLinuxFileAssociationsNative(t *testing.T) {
 	for _, name := range []string{"gio", "update-mime-database", "update-desktop-database"} {
 		if _, err := exec.LookPath(name); err != nil {

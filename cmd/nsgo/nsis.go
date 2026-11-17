@@ -189,9 +189,7 @@ type nsisData struct {
 	FileTypes             []nsisFileType
 }
 
-// nsisFileType has an app-specific ProgID, independent of a type's
-// position or display name. Install metadata remembers its extensions
-// so an upgrade can remove declarations that the new version dropped.
+// nsisFileType has an app-specific ProgID, independent of a type's position or display name. Install metadata remembers its extensions so an upgrade can remove declarations that the new version dropped.
 type nsisFileType struct {
 	ProgID, Name string
 	Extensions   []string
@@ -418,9 +416,7 @@ FunctionEnd
 !insertmacro CloseApp ""
 !insertmacro CloseApp "un."
 
-; Remove only this installation's registrations, including types and
-; extensions dropped in an upgrade. A changed command belongs to someone
-; else; preserve it and its Open With entries.
+; Remove only this installation's registrations, including types and extensions dropped in an upgrade. A changed command belongs to someone else; preserve it and its Open With entries.
 !macro RemoveFileTypes un
 Function ${un}RemoveFileTypes
   Push $0

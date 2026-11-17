@@ -1,5 +1,4 @@
-// Package mimeinfo holds the fixed extension table shared by file pickers
-// and packaging. It never reads the build host's MIME database.
+// Package mimeinfo holds the fixed extension table shared by file pickers and packaging. It never reads the build host's MIME database.
 package mimeinfo
 
 import (

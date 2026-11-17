@@ -16,9 +16,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-// TestWindowsFileAssociationsNative installs an isolated NSIS package,
-// opens a spaced/Unicode path through its ProgID, upgrades its declarations
-// and uninstalls it. Only the Test workflow opts into writing test keys.
+// TestWindowsFileAssociationsNative installs an isolated NSIS package, opens a spaced/Unicode path through its ProgID, upgrades its declarations and uninstalls it. Only the Test workflow opts into writing test keys.
 func TestWindowsFileAssociationsNative(t *testing.T) {
 	if os.Getenv("NSGO_FILE_ASSOCIATIONS") == "" {
 		t.Skip("set NSGO_FILE_ASSOCIATIONS=1 to test NSIS install and uninstall")
@@ -120,15 +118,13 @@ func main() {
 	if len(args) != 1 {
 		t.Fatalf("Shell file arguments = %q; want one path", got)
 	}
-	// The Shell may expand a TEMP path's 8.3 directory names. Compare
-	// file identity, rather than the spelling of two paths to one file.
+	// The Shell may expand a TEMP path's 8.3 directory names. Compare file identity, rather than the spelling of two paths to one file.
 	wantInfo, wantErr := os.Stat(path)
 	gotInfo, gotErr := os.Stat(args[0])
 	if wantErr != nil || gotErr != nil || !os.SameFile(wantInfo, gotInfo) {
 		t.Fatalf("Shell opened %q instead of %q: %v, %v", args[0], path, gotErr, wantErr)
 	}
-	// Another program replaces one command; neither upgrade nor uninstall
-	// may remove that registration. The old extension of our type must go.
+	// Another program replaces one command; neither upgrade nor uninstall may remove that registration. The old extension of our type must go.
 	set(`Software\Classes\`+reassigned+`\shell\open\command`, "", `"foreign.exe" "%1"`)
 	p.FileTypes = p.FileTypes[:1]
 	p.FileTypes[0].Extensions = []string{ext}
@@ -137,14 +133,12 @@ func main() {
 		t.Error("upgrade kept a dropped extension")
 	}
 	uninstaller := filepath.Join(installed, "Uninstall.exe")
-	// Use the same silent invocation as the shipped install script. Let Go
-	// quote the spaced executable path and pass /S as a real argument.
+	// Use the same silent invocation as the shipped install script. Let Go quote the spaced executable path and pass /S as a real argument.
 	cmd := exec.CommandContext(t.Context(), uninstaller, "/S")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("uninstall: %v\n%s", err, out)
 	}
-	// NSIS may finish deleting its self-copy just after the process that
-	// launched it exits. Wait briefly for the registry transaction to settle.
+	// NSIS may finish deleting its self-copy just after the process that launched it exits. Wait briefly for the registry transaction to settle.
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		metaKey, metaErr := registry.OpenKey(registry.CURRENT_USER, meta, registry.READ)
@@ -183,8 +177,7 @@ func main() {
 	}
 }
 
-// openAssociation uses Explorer's class selection without changing the
-// user's default handler or showing an Open With chooser.
+// openAssociation uses Explorer's class selection without changing the user's default handler or showing an Open With chooser.
 func openAssociation(t *testing.T, progID, file string) {
 	t.Helper()
 	runtime.LockOSThread()

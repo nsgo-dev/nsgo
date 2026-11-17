@@ -8,10 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/mimeinfo"
 )
 
-// linuxFileTypes returns the desktop entry's media types and the shared
-// MIME-info definitions of unknown extensions the app owns. Explicit
-// MIME entries refer to existing system types; the app's generated
-// application/x-<id> may also be named explicitly.
+// linuxFileTypes returns the desktop entry's media types and the shared MIME-info definitions of unknown extensions the app owns. Explicit MIME entries refer to existing system types; the app's generated application/x-<id> may also be named explicitly.
 func (p *project) linuxFileTypes() (types []string, definitions []byte, err error) {
 	var xml strings.Builder
 	add := func(m string) {
@@ -56,8 +53,7 @@ func (p *project) linuxFileTypes() (types []string, definitions []byte, err erro
 	return types, definitions, nil
 }
 
-// linuxCacheScript refreshes desktop registration after install and
-// uninstall. A machine without a desktop can install the package too.
+// linuxCacheScript refreshes desktop registration after install and uninstall. A machine without a desktop can install the package too.
 const linuxCacheScript = `#!/bin/sh
 set -e
 if command -v update-mime-database >/dev/null 2>&1; then
@@ -68,9 +64,7 @@ if command -v update-desktop-database >/dev/null 2>&1; then
 fi
 `
 
-// Arch normally refreshes these caches through pacman's desktop and MIME
-// hooks. The install script refreshes them when the tools are available,
-// without ever choosing the user's default handler.
+// Arch normally refreshes these caches through pacman's desktop and MIME hooks. The install script refreshes them when the tools are available, without ever choosing the user's default handler.
 const archCacheScript = `post_install() {
   if command -v update-mime-database >/dev/null 2>&1; then
     update-mime-database /usr/share/mime

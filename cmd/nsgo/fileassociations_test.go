@@ -67,11 +67,9 @@ func TestLinuxFileAssociations(t *testing.T) {
 		t.Fatalf("custom type = %+v", custom)
 	}
 
-	// The portable/AppImage and Flatpak payload must have a desktop entry
-	// even when an app has no icon. Both use the staged entry unchanged.
+	// The portable/AppImage and Flatpak payload must have a desktop entry even when an app has no icon. Both use the staged entry unchanged.
 	stage := t.TempDir()
-	// The executable must keep its Linux mode even on a Windows build
-	// host, whose filesystem reports no Unix executable permission bits.
+	// The executable must keep its Linux mode even on a Windows build host, whose filesystem reports no Unix executable permission bits.
 	writeFiles(t, stage, map[string]string{p.Name: "binary"})
 	if err := writeLinuxIcon(p, stage); err != nil {
 		t.Fatal(err)
@@ -180,8 +178,7 @@ func TestLinuxFileAssociationsRequireImportedMIME(t *testing.T) {
 	if _, _, err := p.linuxFileTypes(); err == nil || !strings.Contains(err.Error(), "needs mime") {
 		t.Fatalf("unknown imported type = %v", err)
 	}
-	// An explicit MIME replaces inference, including a known extension;
-	// duplicate declarations produce one desktop association.
+	// An explicit MIME replaces inference, including a known extension; duplicate declarations produce one desktop association.
 	p.FileTypes[2].MIME = []string{"video/mp4", "video/mp4"}
 	types, _, err := p.linuxFileTypes()
 	if err != nil || len(types) != 7 {
