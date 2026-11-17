@@ -78,28 +78,55 @@ func elementMatrix(el js.Value) driver.Matrix3D {
 		Mul(driver.Translate3D(-origin[0], -origin[1], -origin[2]))
 }
 
-// clientMatrix composes element and ancestor transforms with actual DOM
-// placement and scrolling. The browser remains responsible for picking;
-// this supplies coordinates in the picked view's untransformed viewport.
+// clientMatrix maps el's untransformed border box to client coordinates, through its transforms and its ancestors', their DOM placement and scrolling. The browser remains responsible for picking; this supplies coordinates in the picked view's untransformed viewport. Above the topmost transformed element, the placement comes from getBoundingClientRect, which keeps fractions; offsetLeft and offsetTop, whole pixels, place only what a transform holds.
 func clientMatrix(el js.Value) driver.Matrix3D {
-	m := elementMatrix(el)
-	for parent := el.Get("parentElement"); parent.Truthy(); parent = el.Get("parentElement") {
-		x, y := layoutOrigin(el)
-		px, py := layoutOrigin(parent)
-		placed := driver.Translate3D(x-px-parent.Get("scrollLeft").Float(), y-py-parent.Get("scrollTop").Float(), 0).Mul(m)
-		cs := js.Global().Call("getComputedStyle", parent)
-		if depth := cssNumber(cs.Get("perspective").String(), 0); depth > 0 {
-			origin := strings.Fields(cs.Get("perspectiveOrigin").String())
-			if len(origin) >= 2 {
-				ox, oy := cssNumber(origin[0], 0), cssNumber(origin[1], 0)
-				placed = driver.Translate3D(ox, oy, 0).Mul(driver.Perspective3D(depth)).Mul(driver.Translate3D(-ox, -oy, 0)).Mul(placed)
-			}
+	var chain []js.Value
+	var mats []driver.Matrix3D
+	top := -1
+	for e := el; e.Truthy(); e = e.Get("parentElement") {
+		m := elementMatrix(e)
+		if m != driver.Identity3D {
+			top = len(chain)
 		}
-		m = elementMatrix(parent).Mul(placed)
-		el = parent
+		chain, mats = append(chain, e), append(mats, m)
 	}
-	x, y := layoutOrigin(el)
-	return driver.Translate3D(x, y, 0).Mul(m)
+	if top < 0 {
+		r := el.Call("getBoundingClientRect")
+		return driver.Translate3D(r.Get("left").Float(), r.Get("top").Float(), 0)
+	}
+	m := mats[0]
+	for i := 0; i <= top; i++ {
+		if i+1 == len(chain) {
+			x, y := layoutOrigin(chain[i])
+			return driver.Translate3D(x, y, 0).Mul(m)
+		}
+		e, parent := chain[i], chain[i+1]
+		x, y := layoutOrigin(e)
+		px, py := layoutOrigin(parent)
+		sx, sy := parent.Get("scrollLeft").Float(), parent.Get("scrollTop").Float()
+		if i == top && parent.Equal(js.Global().Get("document").Get("scrollingElement")) {
+			// The page's scrolling moves its own box, which the rectangle below has.
+			sx, sy = 0, 0
+		}
+		m = perspectiveOf(parent).Mul(driver.Translate3D(x-px-sx, y-py-sy, 0).Mul(m))
+		if i < top {
+			m = mats[i+1].Mul(m)
+		}
+	}
+	r := chain[top+1].Call("getBoundingClientRect")
+	return driver.Translate3D(r.Get("left").Float(), r.Get("top").Float(), 0).Mul(m)
+}
+
+// perspectiveOf is the perspective parent gives its children's transforms, or the identity.
+func perspectiveOf(parent js.Value) driver.Matrix3D {
+	cs := js.Global().Call("getComputedStyle", parent)
+	depth := cssNumber(cs.Get("perspective").String(), 0)
+	origin := strings.Fields(cs.Get("perspectiveOrigin").String())
+	if depth <= 0 || len(origin) < 2 {
+		return driver.Identity3D
+	}
+	ox, oy := cssNumber(origin[0], 0), cssNumber(origin[1], 0)
+	return driver.Translate3D(ox, oy, 0).Mul(driver.Perspective3D(depth)).Mul(driver.Translate3D(-ox, -oy, 0))
 }
 
 func clientPoint(el js.Value, x, y float64) (float64, float64) {

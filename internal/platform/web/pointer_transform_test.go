@@ -23,6 +23,13 @@ func TestPointerCoordinatesUndoNestedCSS(t *testing.T) {
 	child := doc.Call("createElement", "div")
 	child.Get("style").Set("cssText", "position:absolute;left:5px;top:5px;width:20px;height:20px;transform:translateY(-100px)")
 	parent.Call("appendChild", child)
+	// Untransformed views keep fractional positions, which offsetLeft rounds.
+	plain := doc.Call("createElement", "div")
+	plain.Get("style").Set("cssText", "position:absolute;left:200.5px;top:300.25px;width:20px;height:20px")
+	root.Call("appendChild", plain)
+	if x, y := clientPoint(plain, 210.5, 310.25); math.Abs(x-10) > .001 || math.Abs(y-10) > .001 {
+		t.Errorf("untransformed local = (%g,%g), want (10,10)", x, y)
+	}
 	if hit := doc.Call("elementFromPoint", 330, 110); !hit.Equal(child) {
 		t.Fatal("browser did not pick drawn child")
 	}
