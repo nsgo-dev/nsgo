@@ -116,7 +116,7 @@ func (t *Tree) mountScreen(cx *Scope, parent *node, s Screen) {
 		cx.renderEffect(func() {
 			env := t.classEnv(n)
 			l := t.rt.parseClasses(&env, s.HeaderClass)
-			t.rt.reportUnknown(l)
+			t.rt.reportClassesWithoutPeers(l, "HeaderClass")
 			normal, important, _ := l.resolve(&env)
 			sn.headerClass = mergeStyles(normal, important)
 			t.touch(n)

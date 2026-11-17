@@ -68,6 +68,8 @@ Mark a control with `peer` to style later siblings from its state, for example a
 
 Selectors match NSGo elements on every target. They support lists, child (`>`), descendant (`_`), adjacent (`+`) and following sibling (`~`) combinators, classes, `data-*` presence/equality, roles, supported boolean accessibility states and `:is`, `:where`, `:not`, `:has` and child positions. Types are `view`/`div`, `text`/`span` (whole text nodes), `scroll`, `input`, `textarea`, `image`/`img`, `canvas`, `svg`, `video`, `webview` and `native`. Use one top-level `&` in each arbitrary selector alternative; without it, the selector tests the element itself. Browser-only selectors, pseudo-elements, at-rules, escapes and explicit `&` inside a function are unknown; these selectors do not reach backend implementation views or individual text spans.
 
+`peer-*` variants in `Span.Class` or `Screen.HeaderClass` have no siblings to follow. They are ignored and logged once per class and context; put a span's peer variant on its containing `Text` instead.
+
 The theme's `Tailwind` field extends the default theme with colors, breakpoints and utilities, and a color the palette lacks names a `Palette` role (`bg-accent`, `text-text-muted/70`) or a theme color, read from the node's theme in the appearance it shows.
 
 ## Themes

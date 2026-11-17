@@ -3,6 +3,7 @@ package core
 import (
 	"log"
 	"slices"
+	"strings"
 )
 
 // A node's Tailwind classes (NSH's core/classes.rs): resolved for the
@@ -396,7 +397,7 @@ func (t *Tree) spanStyle(n *node, class string, style Style) (Style, *spanClasse
 	var env classEnv
 	Untracked(n.owner, func() bool { env = t.classEnv(n); return true })
 	l := t.rt.parseClasses(&env, class)
-	t.rt.reportUnknown(l)
+	t.rt.reportClassesWithoutPeers(l, "span classes")
 	sc := &spanClasses{list: l, base: style}
 	return sc.resolve(&env), sc
 }
@@ -431,7 +432,7 @@ func (t *Tree) resolveSpanClasses(n *node) {
 		sp := &n.text.spans[i]
 		if sp.cls != nil && !sp.cls.list.parsedFor(&env) {
 			sp.cls.list = t.rt.parseClasses(&env, sp.cls.list.class)
-			t.rt.reportUnknown(sp.cls.list)
+			t.rt.reportClassesWithoutPeers(sp.cls.list, "span classes")
 			sp.style = sp.cls.resolve(&env)
 			changed = true
 		} else if sp.cls != nil && sp.cls.list.env {
@@ -442,6 +443,28 @@ func (t *Tree) resolveSpanClasses(n *node) {
 	if changed {
 		n.text.stale = true
 		t.markResolve(n)
+	}
+}
+
+// reportClassesWithoutPeers checks classes used without a view's sibling context. Keep the cached list intact: an ordinary view can use the same classes.
+func (rt *runtime) reportClassesWithoutPeers(l *classList, where string) {
+	rt.reportUnknown(l)
+	if !l.peerDependent {
+		return
+	}
+	for _, token := range strings.Fields(l.class) {
+		if slices.Contains(l.unknown, token) {
+			continue
+		}
+		parts := splitVariants(token)
+		if !slices.ContainsFunc(parts[:len(parts)-1], func(v string) bool { return strings.HasPrefix(v, "peer-") }) {
+			continue
+		}
+		key := where + "\x00" + token
+		if _, seen := rt.reported.get(key); !seen {
+			rt.reported.put(key, true)
+			log.Printf("core: class %q is unsupported in %s: peer variants require sibling views", token, where)
+		}
 	}
 }
 
