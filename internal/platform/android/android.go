@@ -322,7 +322,7 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 				break
 			}
 			if ev.Kind == driver.EventTouch {
-				ev.Touches = readTouches(data)
+				ev.Touches, ev.TouchGeometry = readTouchEvent(data)
 			}
 			switch ev.Kind {
 			case driver.EventPaste:

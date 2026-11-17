@@ -22,6 +22,7 @@ var classTracker objc.Class
 
 // fingers are the touches down, in order, with the ids reported.
 type fingers struct {
+	geometry driver.TouchTracker
 	down     []objc.ID
 	ids      []int
 	next     int
@@ -115,8 +116,10 @@ func (s *surface) touched(phase driver.GesturePhase, touches objc.ID) {
 			out = append(out, driver.Touch{ID: f.ids[i], PagePosition: driver.Point{X: driver.Points(p.X), Y: driver.Points(p.Y)},
 				Changed: slices.Contains(changed, t)})
 		}
-		s.engine.Dispatch(driver.Event{Kind: driver.EventTouch, Phase: phase, Touches: out,
-			Time: time.Duration(at * float64(time.Second))})
+		ev := driver.Event{Kind: driver.EventTouch, Phase: phase, Touches: out,
+			Time: time.Duration(at * float64(time.Second))}
+		s.captureTouches(&ev)
+		s.engine.Dispatch(ev)
 	}
 	if phase == driver.GestureEnded || phase == driver.GestureCancelled {
 		for _, t := range changed {
@@ -141,7 +144,54 @@ func (s *surface) touchesTaken() {
 			Changed: true})
 	}
 	f.touching = false
-	s.engine.Dispatch(driver.Event{Kind: driver.EventTouch, Phase: driver.GestureCancelled, Touches: out})
+	ev := driver.Event{Kind: driver.EventTouch, Phase: driver.GestureCancelled, Touches: out}
+	s.captureTouches(&ev)
+	s.engine.Dispatch(ev)
+}
+
+func (s *surface) captureTouches(e *driver.Event) {
+	viewOf := func(native objc.ID) *view {
+		for ; native != 0; native = native.Send(selSuperview) {
+			if v := views[native]; v != nil && v.surface == s {
+				return v
+			}
+			if native == s.native {
+				break
+			}
+		}
+		return nil
+	}
+	s.fingers.geometry.Capture(e, func(p driver.Point) driver.NodeID {
+		native := s.native.Send(sel("hitTest:withEvent:"), apple.CGPoint{X: float64(p.X), Y: float64(p.Y)}, objc.ID(0))
+		if v := viewOf(native); v != nil {
+			return v.id
+		}
+		return 0
+	}, func(id driver.NodeID) (driver.NodeID, driver.EventMask) {
+		v := s.views[id]
+		if v == nil {
+			return 0, 0
+		}
+		var up driver.NodeID
+		if p := viewOf(v.native.Send(selSuperview)); p != nil {
+			up = p.id
+		}
+		return up, v.events
+	}, func(id driver.NodeID, p driver.Point) (driver.Point, bool) {
+		v := s.views[id]
+		if v == nil {
+			return driver.Point{}, false
+		}
+		layer, root := v.native.Send(selLayer), s.native.Send(selLayer)
+		// UIView's conversion reads the model; layer presentations also include a running Core Animation keyframe or layout transition.
+		if a, b := layer.Send(sel("presentationLayer")), root.Send(sel("presentationLayer")); a != 0 && b != 0 {
+			layer, root = a, b
+		}
+		at := objc.Send[apple.CGPoint](layer, sel("convertPoint:fromLayer:"),
+			apple.CGPoint{X: float64(p.X), Y: float64(p.Y)}, root)
+		bounds := objc.Send[apple.CGRect](layer, selBounds)
+		return driver.Point{X: driver.Points(at.X - bounds.Origin.X), Y: driver.Points(at.Y - bounds.Origin.Y)}, true
+	})
 }
 
 // blockNative disables the pans of the scroll views around v, the touch

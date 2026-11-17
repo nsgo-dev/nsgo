@@ -11,6 +11,7 @@ import (
 
 // Mouse follows one mouse's primary button.
 type Mouse struct {
+	driver.TouchTracker
 	down   bool
 	origin time.Time
 }

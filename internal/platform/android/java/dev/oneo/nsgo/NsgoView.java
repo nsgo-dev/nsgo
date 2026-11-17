@@ -2142,6 +2142,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private boolean touching;
     /** The last fingers reported, for a cancel when a scroll view takes them. */
     private String fingers = "";
+    /** Listening paths retained until the last finger lifts, including a former finger's responder. */
+    private final LinkedHashSet<Node> touchViews = new LinkedHashSet<>();
     /** Whether the runtime itself is stopping the scroll views, for the touch responder. */
     private boolean blockingNative;
 
@@ -2152,7 +2154,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      */
     private void touches(MotionEvent e) {
         int action = e.getActionMasked();
-        if (action == MotionEvent.ACTION_DOWN) touching = listensTouches();
+        if (action == MotionEvent.ACTION_DOWN) {
+            touching = listensTouches();
+            touchViews.clear();
+        }
         if (!touching) return;
         int phase;
         int changed = -1; // every finger for a move
@@ -2183,9 +2188,23 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                     .append(e.getY(i) / density).append(' ').append(changed < 0 || changed == i ? 1 : 0);
         }
         fingers = b.toString();
+        StringBuilder targets = new StringBuilder();
+        if (phase == 1) {
+            for (int i = 0; i < e.getPointerCount(); i++) {
+                if (changed >= 0 && changed != i) continue;
+                Node n = touchHit(this, e.getX(i), e.getY(i));
+                targets.append("\nt ").append(e.getPointerId(i)).append(' ').append(n == null ? 0 : n.id);
+                for (; n != null; n = n.up) {
+                    if (n.has(Protocol.EVENT_TOUCH)) touchViews.add(n);
+                }
+            }
+        }
         event(Protocol.EVENT_TOUCH, 0, 0, 0, 0, "", 0, 0, 0, phase, 0, 0, 0, null, e.getEventTime(), 0, false,
-                fingers, false);
-        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) touching = false;
+                touchGeometry(fingers, targets.toString()), false);
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            touching = false;
+            touchViews.clear();
+        }
     }
 
     /** A scroll view took the touches: the nodes hear them cancelled. */
@@ -2193,7 +2212,68 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         if (!touching || blockingNative) return;
         touching = false;
         event(Protocol.EVENT_TOUCH, 0, 0, 0, 0, "", 0, 0, 0, 4, 0, 0, 0, null, android.os.SystemClock.uptimeMillis(), 0,
-                false, fingers.replaceAll(" [01](;|$)", " 1$1"), false);
+                false, touchGeometry(fingers.replaceAll(" [01](;|$)", " 1$1"), ""), false);
+        touchViews.clear();
+    }
+
+    /** Native hit testing, including ancestor transforms, clipping and NSGo's pointer policy. */
+    private Node touchHit(View view, float x, float y) {
+        if (view.getVisibility() != VISIBLE) return null;
+        Node n = byView.get(view);
+        if (n != null && n.pointerEvents == Protocol.POINTER_EVENTS_NONE) return null;
+        boolean inside = x >= 0 && y >= 0 && x < view.getWidth() && y < view.getHeight();
+        boolean slop = n != null && n.slop != null && x >= -n.slop[3] * density && y >= -n.slop[0] * density
+                && x < view.getWidth() + n.slop[1] * density && y < view.getHeight() + n.slop[2] * density;
+        boolean area = n != null && n.area != null && x >= n.area[0] * density && y >= n.area[1] * density
+                && x < (n.area[0] + n.area[2]) * density && y < (n.area[1] + n.area[3]) * density;
+        if (view instanceof ViewGroup && (n == null || n.pointerEvents != Protocol.POINTER_EVENTS_BOX_ONLY)) {
+            ViewGroup group = (ViewGroup) view;
+            if (inside || area || !group.getClipChildren() && !view.getClipToOutline()) {
+                for (int i = group.getChildCount() - 1; i >= 0; i--) {
+                    View child = group.getChildAt(i);
+                    float[] p = intoChild(group, child, x, y);
+                    if (p == null) continue;
+                    Node hit = touchHit(child, p[0], p[1]);
+                    if (hit != null) return hit;
+                }
+            }
+        }
+        return n != null && (inside || slop) && n.pointerEvents != Protocol.POINTER_EVENTS_BOX_NONE ? n : null;
+    }
+
+    /** The surface point in a descendant's viewport, using its current native matrices. */
+    private float[] touchPoint(View view, float x, float y) {
+        if (view == this) return new float[] {x, y};
+        if (!(view.getParent() instanceof ViewGroup)) return null;
+        ViewGroup parent = (ViewGroup) view.getParent();
+        float[] p = touchPoint(parent, x, y);
+        return p == null ? null : intoChild(parent, view, p[0], p[1]);
+    }
+
+    /** Snapshot positions before the pipe reader or a later frame can move these views. */
+    private String touchGeometry(String points, String targets) {
+        String[] fingers = points.split(";");
+        float[][] at = new float[fingers.length][2];
+        for (int i = 0; i < fingers.length; i++) {
+            String[] fields = fingers[i].split(" ");
+            at[i][0] = Float.parseFloat(fields[1]) * density;
+            at[i][1] = Float.parseFloat(fields[2]) * density;
+        }
+        StringBuilder b = new StringBuilder(points).append(targets);
+        // A newline also marks a snapshot with no listening views or no hit.
+        b.append('\n');
+        for (Node n : touchViews) {
+            if (nodes.get(n.id) != n) continue;
+            StringBuilder line = new StringBuilder("p ").append(n.id);
+            boolean valid = true;
+            for (float[] p : at) {
+                float[] local = touchPoint(n.view, p[0], p[1]);
+                if (local == null) { valid = false; break; }
+                line.append(' ').append(local[0] / density).append(' ').append(local[1] / density);
+            }
+            if (valid) b.append(line).append('\n');
+        }
+        return b.toString();
     }
 
     private boolean listensTouches() {
@@ -3973,6 +4053,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 : kind == Protocol.KIND_SCROLL ? new FrameLayout(context)
                 : kind == Protocol.KIND_MODAL ? new Layer(context) : new Group(context);
         Node n = new Node(id, view);
+        // Styles can arrive before Android lays the view out. Its pivot is relative to the actual size, so refresh it after a first layout or resize rather than retaining a pivot computed against zero bounds.
+        view.addOnLayoutChangeListener((v, l, t, r, b, oldL, oldT, oldR, oldB) -> {
+            if (r - l != oldR - oldL || b - t != oldB - oldT) paint(n);
+        });
         if (view instanceof CanvasNode) {
             ((CanvasNode) view).presser = this::pressAtScreen;
             ((CanvasNode) view).pictures = canvasImages;

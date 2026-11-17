@@ -37,9 +37,10 @@ const (
 type TouchEvent struct {
 	Phase TouchPhase
 	// Time is since an arbitrary origin.
-	Time    time.Duration
-	Touches []Touch
-	stopped *bool
+	Time     time.Duration
+	Touches  []Touch
+	stopped  *bool
+	geometry *driver.TouchGeometry
 }
 
 // StopPropagation keeps the views after this one on the path from
@@ -216,7 +217,7 @@ func touchPhase(p GesturePhase) TouchPhase {
 // negotiation, the responder's events.
 func (t *Tree) touched(ev driver.Event) {
 	s := &t.touches
-	e := TouchEvent{Phase: touchPhase(ev.Phase), Time: ev.Time, Touches: ev.Touches}
+	e := TouchEvent{Phase: touchPhase(ev.Phase), Time: ev.Time, Touches: ev.Touches, geometry: ev.TouchGeometry}
 	lifted := e.Phase == TouchEnd || e.Phase == TouchCancel
 	if e.Phase == TouchStart {
 		if s.paths == nil {
@@ -231,6 +232,11 @@ func (t *Tree) touched(ev driver.Event) {
 			if n := t.node(ev.ID); n != nil {
 				// A platform that names the view a finger went down on.
 				path = t.pathFrom(n)
+			}
+			if e.geometry != nil {
+				if id, ok := e.geometry.Targets[p.ID]; ok {
+					path = t.pathFrom(t.node(id))
+				}
 			}
 			if len(path) > 0 {
 				s.paths[p.ID] = path
@@ -336,7 +342,7 @@ func (t *Tree) localTouches(n *node, e *TouchEvent) TouchEvent {
 	local.Touches = slices.Clone(e.Touches)
 	for i := range local.Touches {
 		p := &local.Touches[i]
-		p.Position = n.surfacePoint(p.PagePosition)
+		p.Position = touchPosition(n, *p, e)
 	}
 	return local
 }
@@ -355,8 +361,22 @@ func (t *Tree) forgetLifted(e *TouchEvent) {
 
 // responderEvent returns what n hears about finger about.
 func (t *Tree) responderEvent(n *node, about Touch, e *TouchEvent) ResponderEvent {
-	return ResponderEvent{Position: n.surfacePoint(about.PagePosition),
+	return ResponderEvent{Position: touchPosition(n, about, e),
 		PagePosition: about.PagePosition, Time: e.Time, Gesture: t.touches.gesture}
+}
+
+// touchPosition uses the same native presentation snapshot for capture, bubbling, claims and responder callbacks, including a responder outside the changed finger's path. Older reports retain the static-layout fallback.
+func touchPosition(n *node, about Touch, e *TouchEvent) Point {
+	if e.geometry != nil {
+		if points := e.geometry.Positions[n.id]; len(points) == len(e.Touches) {
+			for i, p := range e.Touches {
+				if p.ID == about.ID {
+					return points[i]
+				}
+			}
+		}
+	}
+	return n.surfacePoint(about.PagePosition)
 }
 
 // respond runs fn, one of n's responder handlers, about finger about.

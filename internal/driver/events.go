@@ -356,6 +356,8 @@ type Event struct {
 	Insets Edges
 	// Touches are EventTouch's fingers.
 	Touches []Touch
+	// TouchGeometry is the platform's presentation snapshot for these touches. Without one, core uses the committed layout and static transforms.
+	TouchGeometry *TouchGeometry
 	// Values are the values a pan moves as it begins and ends
 	// (Animator.Gesture).
 	Values Point

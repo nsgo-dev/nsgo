@@ -35,6 +35,8 @@ type (
 	AnimatedValues = driver.AnimatedValues
 	// Event is what a platform reports (App.Report).
 	Event = driver.Event
+	// TouchGeometry is an event's snapshot of native hit targets and local positions, indexed in the same order as Event.Touches.
+	TouchGeometry = driver.TouchGeometry
 	// EventKind is what a platform reports about a view.
 	EventKind = driver.EventKind
 	// EventMask is a set of event kinds.

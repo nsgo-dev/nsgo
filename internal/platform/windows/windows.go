@@ -1982,6 +1982,7 @@ func (w *window) pointerMoved(x, y int32) {
 // touch reports the mouse as a finger, when ok.
 func (w *window) touch(ev driver.Event, ok bool) {
 	if ok {
+		w.captureTouches(&ev)
 		w.engine.Dispatch(ev)
 	}
 }

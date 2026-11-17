@@ -2415,6 +2415,7 @@ func (s *surface) touch(event objc.ID, report func(*surface, driver.Point) (driv
 	loc := objc.Send[apple.CGPoint](event, selLocationInWindow)
 	p := objc.Send[apple.CGPoint](s.native, selConvertPoint, loc, objc.ID(0))
 	if ev, ok := report(s, driver.Point{X: driver.Points(p.X), Y: driver.Points(p.Y)}); ok {
+		s.captureTouches(&ev)
 		s.engine.Dispatch(ev)
 	}
 }

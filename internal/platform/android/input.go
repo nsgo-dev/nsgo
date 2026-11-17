@@ -4,7 +4,6 @@ package android
 
 import (
 	"encoding/base64"
-	"strconv"
 	"strings"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -68,21 +67,4 @@ func readPaste(text, data string) *driver.PasteEvent {
 		}
 	}
 	return p
-}
-
-// readTouches reads the fingers of an EventTouch the runtime sends: each
-// "id x y changed", in points, joined by ";".
-func readTouches(s string) []driver.Touch {
-	var out []driver.Touch
-	for _, f := range strings.Split(s, ";") {
-		p := strings.Fields(f)
-		if len(p) != 4 {
-			continue
-		}
-		id, _ := strconv.Atoi(p[0])
-		x, _ := strconv.ParseFloat(p[1], 32)
-		y, _ := strconv.ParseFloat(p[2], 32)
-		out = append(out, driver.Touch{ID: id, PagePosition: driver.Point{X: driver.Points(x), Y: driver.Points(y)}, Changed: p[3] == "1"})
-	}
-	return out
 }

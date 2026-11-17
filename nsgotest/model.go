@@ -236,6 +236,29 @@ func (a *App) dispatchOn(tree *core.Tree, ev driver.Event) {
 	if tree == nil {
 		tree = a.tree
 	}
+	if ev.Kind == driver.EventTouch && ev.TouchGeometry == nil && tree == a.tree {
+		a.touchGeometry.Capture(&ev, func(p driver.Point) driver.NodeID {
+			if v := a.viewAt(p, func(*View) bool { return true }); v != nil {
+				return v.ID
+			}
+			return 0
+		}, func(id driver.NodeID) (driver.NodeID, driver.EventMask) {
+			v := a.views[id]
+			if v == nil {
+				return 0, 0
+			}
+			var up driver.NodeID
+			if v.Parent != nil {
+				up = v.Parent.ID
+			}
+			return up, v.Events
+		}, func(id driver.NodeID, p driver.Point) (driver.Point, bool) {
+			if v := a.views[id]; v != nil {
+				return v.localPoint(p), true
+			}
+			return driver.Point{}, false
+		})
+	}
 	tree.Dispatch(ev)
 	a.Settle()
 }
