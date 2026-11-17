@@ -1155,9 +1155,7 @@ func (t *Tree) sendSticky() {
 	}
 }
 
-// pinRange returns the scroll view sticky view n pins in and its range
-// of travel there: Top/Left pins to the viewport's start and Bottom/Right
-// to its end, with movement bounded by the parent's content box.
+// pinRange returns the scroll view sticky view n pins in and its range of travel there: Top/Left pins to the viewport's start and Bottom/Right to its end, with movement bounded by the parent's content box.
 func pinRange(n *node) (*node, StickyCell, bool) {
 	if p := n.parent; p != nil && p.scroll != nil && p.scroll.barHost == n {
 		return barRange(n)

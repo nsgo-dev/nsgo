@@ -177,8 +177,7 @@ func (s *surface) placeTrack(cell *view) {
 	track := map[string]string{"left": webstyle.Px(f.Origin.X), "top": webstyle.Px(f.Origin.Y),
 		"width": webstyle.Px(w), "height": webstyle.Px(h), "display": "block", "flex-direction": "", "justify-content": ""}
 	if trailing {
-		// The normal position is at the track's end. Native bottom/right
-		// stickiness moves it back through this track before it flows there.
+		// The normal position is at the track's end. Native bottom/right stickiness moves it back through this track before it flows there.
 		track["display"], track["flex-direction"], track["justify-content"] = "flex", "column", "flex-end"
 		track["top"] = webstyle.Px(f.Origin.Y + travel)
 		if horizontal {

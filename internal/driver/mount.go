@@ -578,10 +578,7 @@ type MountItem struct {
 	On      bool
 }
 
-// StickyCell is a sticky list cell and its travel, in its scroll view's
-// main-axis offsets: from Start it moves with the offset, as far as End
-// (which may be infinite). End below Start pins to the viewport's end,
-// with a negative shift back toward the content's start.
+// StickyCell is a sticky list cell and its travel, in its scroll view's main-axis offsets: from Start it moves with the offset, as far as End (which may be infinite). End below Start pins to the viewport's end, with a negative shift back toward the content's start.
 type StickyCell struct {
 	Cell       NodeID
 	Start, End Points

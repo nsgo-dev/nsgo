@@ -177,8 +177,7 @@ func (w *window) setSticky(v *view, cells []driver.StickyCell) {
 	w.redrawView(v)
 }
 
-// pinSticky moves scroll view v's sticky cells for its offset, within
-// their signed travel through driver.StickyShift.
+// pinSticky moves scroll view v's sticky cells for its offset, within their signed travel through driver.StickyShift.
 func (w *window) pinSticky(v *view) {
 	at := v.offset.Y
 	if v.scroll.Horizontal {
