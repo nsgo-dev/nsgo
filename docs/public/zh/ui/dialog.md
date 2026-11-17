@@ -55,7 +55,7 @@ ui.AlertDialog{
 }
 ```
 
-`Role: core.AlertCancel` 标记的操作会在 Escape 或返回时执行，随后调用 `OnOpenChange(false, base.ReasonCancel)`。`Default: true` 让操作在打开时获得键盘焦点，并让 Return 选择它；点击操作会先执行 `OnPress`，再调用 `OnOpenChange(false, base.ReasonSelect)`。键盘焦点不在其他操作或输入框上时，Return 执行默认操作：焦点移到另一个操作上时，Return 按下那个操作；警告框上方另有对话框时，Return 归那个对话框。执行过一个操作后，无论 `OnOpenChange` 怎么处理，警告框都会关闭，直到 `Open` 先变为 false 再变为 true 之前不再执行其他操作。同一标记出现多次时，以第一个为准。未设置标记时，Escape 直接关闭，不执行操作，Return 没有默认操作。`Role: core.AlertDestructive` 描述操作含义，外观仍由 `Variant` 或 `Color` 决定。
+`Role: core.AlertCancel` 标记的操作会在 Escape 或返回时执行，随后调用 `OnOpenChange(false, base.ReasonCancel)`。`Default: true` 让操作在桌面、Web 和 Apple TV 上打开时获得键盘焦点，并让 Return 选择它；点击操作会先执行 `OnPress`，再调用 `OnOpenChange(false, base.ReasonSelect)`。键盘焦点不在其他操作或输入框上时，Return 执行默认操作：焦点移到另一个操作上时，Return 按下那个操作；警告框上方另有对话框时，Return 归那个对话框。执行过一个操作后，无论 `OnOpenChange` 怎么处理，警告框都会关闭，直到 `Open` 先变为 false 再变为 true 之前不再执行其他操作。同一标记出现多次时，以第一个为准。未设置标记时，Escape 直接关闭，不执行操作，Return 没有默认操作。`Role: core.AlertDestructive` 描述操作含义，外观仍由 `Variant` 或 `Color` 决定。
 
 要显示系统自己的警告框或操作表，用 `cx.ShowAlert`（[平台服务](../services.md#警告框与剪贴板)）。
 

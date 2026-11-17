@@ -44,7 +44,7 @@ type Button struct {
 	// NoFocus keeps it out of the Tab stops, for a button of a row the
 	// keyboard reaches another way.
 	NoFocus bool
-	// AutoFocus moves the keyboard focus here once it mounts, unless NoFocus or Disabled keeps it out of the keyboard stops.
+	// AutoFocus moves the keyboard focus here once it mounts on desktops, the web and Apple TV, unless NoFocus or Disabled keeps it out of the keyboard stops; phones focus text fields alone.
 	AutoFocus bool
 	// AccessibilityElementsHidden hides it from assistive technology while
 	// it returns true, as a leaf's chevron.

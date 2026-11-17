@@ -10,15 +10,18 @@ import (
 )
 
 func TestButtonAutoFocusHonorsKeyboardStops(t *testing.T) {
+	desktop := core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}
+	phone := core.Environment{OS: core.OSIOS, Idiom: core.IdiomPhone}
 	for _, c := range []struct {
 		name                    string
+		env                     core.Environment
 		disabled, noFocus, want bool
-	}{{"enabled", false, false, true}, {"disabled", true, false, false}, {"no-focus", false, true, false}} {
+	}{{"enabled", desktop, false, false, true}, {"disabled", desktop, true, false, false}, {"no-focus", desktop, false, true, false}, {"phone", phone, false, false, false}} {
 		t.Run(c.name, func(t *testing.T) {
 			app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
-				return base.Button{TestID: "action", AutoFocus: true, NoFocus: c.noFocus,
+				return base.Button{TestID: "action", AutoFocus: true, NoFocus: c.noFocus, OnPress: func(core.PressEvent) {},
 					Disabled: func() bool { return c.disabled }, Style: core.Style{Width: core.Pt(40), Height: core.Pt(20)}}
-			})
+			}, nsgotest.Environment(c.env))
 			if got := app.Find("id:action").Focused; got != c.want {
 				t.Fatalf("focused %v, want %v", got, c.want)
 			}
