@@ -284,7 +284,9 @@ func (l *treeFollow) is(n int) bool              { return l.of(n).Get() == n }
 // and letters select by typeahead. It looks like nothing: the app sizes it
 // and styles the rows (ItemClass) or draws them (RenderItem).
 type Tree struct {
-	Items func() []TreeItem
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid func() bool
+	Items   func() []TreeItem
 	// Expanded makes the expanded items controlled.
 	Expanded        func() []string
 	DefaultExpanded []string
@@ -742,7 +744,7 @@ func (t Tree) Render(cx *core.Scope) core.Node {
 		}}
 	listStyle := core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0)}.Merge(t.ListStyle)
 	return core.View{Ref: root, Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTree, Label: t.Label, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
-		Disabled:  t.Disabled,
+		Disabled: t.Disabled, Invalid: t.Invalid,
 		Focusable: func() bool { return !is(t.Disabled) },
 		OnFocus: func() {
 			focused.Set(true)

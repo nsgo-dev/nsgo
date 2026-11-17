@@ -18,6 +18,7 @@ type colorState struct {
 	cx       *core.Scope
 	model    *core.Signal[colorModel]
 	disabled func() bool
+	invalid  func() bool
 	format   ColorFormat
 	noAlpha  bool
 	// notation is the place in colorNotations the channels spell it in.
@@ -38,6 +39,8 @@ func colorStateOf(cx *core.Scope) *colorState {
 }
 
 func (s *colorState) isDisabled() bool { return is(s.disabled) }
+
+func (s *colorState) isInvalid() bool { return is(s.invalid) }
 
 func (s *colorState) now() colorModel { return s.model.GetUntracked() }
 
@@ -76,6 +79,8 @@ func (s *colorState) emit(end bool) {
 // its end, with the color written as Format says, which is also the
 // notation ColorChannels start in.
 type ColorPicker struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid      func() bool
 	Value        func() core.Color
 	DefaultValue core.Color
 	Format       ColorFormat
@@ -100,7 +105,7 @@ func (p ColorPicker) Render(cx *core.Scope) core.Node {
 	if p.Value != nil {
 		first = core.Untracked(cx, p.Value)
 	}
-	s := &colorState{cx: cx, model: core.NewSignal(cx, colorModelOf(first)), disabled: p.Disabled, format: p.Format, noAlpha: p.NoAlpha,
+	s := &colorState{cx: cx, model: core.NewSignal(cx, colorModelOf(first)), disabled: p.Disabled, invalid: p.Invalid, format: p.Format, noAlpha: p.NoAlpha,
 		notation: core.NewSignal(cx, colorNotationOf(p.Format)),
 		report: func(c core.Color, formatted string, end bool) {
 			f := p.OnChange
@@ -129,7 +134,7 @@ func (p ColorPicker) Render(cx *core.Scope) core.Node {
 		})
 	}
 	colorKey.Provide(cx, s)
-	return core.View{Class: p.Class, Style: p.Style, Disabled: p.Disabled, TestID: p.TestID, OnLayout: p.OnLayout, Tooltip: p.Tooltip, Children: p.Children}
+	return core.View{Class: p.Class, Style: p.Style, Disabled: p.Disabled, Invalid: p.Invalid, TestID: p.TestID, OnLayout: p.OnLayout, Tooltip: p.Tooltip, Children: p.Children}
 }
 
 // colorDragging is what a thumb shows while it moves.

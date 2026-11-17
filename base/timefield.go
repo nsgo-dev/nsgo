@@ -302,6 +302,7 @@ type timeConfig struct {
 	precision     TimePrecision
 	cycle         HourCycle
 	disabled      func() bool
+	invalid       func() bool
 	label         string
 	segment       part
 	separator     part
@@ -397,7 +398,7 @@ func timeField(cx *core.Scope, c timeConfig, value func() TimeOfDay, changed fun
 	}
 	tab := bindWhile(atEnd(true), core.KeyAlways, false, controlKey{"tab", false, move(1)})
 	shiftTab := bindWhile(atEnd(false), core.KeyAlways, false, controlKey{"shift+tab", false, move(-1)})
-	native := core.Input{Ref: field, Label: c.label, Disabled: c.disabled, KeyboardType: core.KeyboardNumber, NoAutoCorrect: true,
+	native := core.Input{Ref: field, Label: c.label, Disabled: c.disabled, Invalid: c.invalid, KeyboardType: core.KeyboardNumber, NoAutoCorrect: true,
 		AutoCapitalize: core.AutoCapitalizeNone, HideCaret: true,
 		Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Right: core.Pt(0), Bottom: core.Pt(0), Left: core.Pt(0),
 			Padding: core.All(0), BorderWidth: 0, Background: core.Transparent, Color: core.Transparent,
@@ -411,7 +412,7 @@ func timeField(cx *core.Scope, c timeConfig, value func() TimeOfDay, changed fun
 		OnFocus: func() { focused.Set(true) }, OnBlur: func() { focused.Set(false) }}
 	nodes := []core.Node{native, keys, tab, shiftTab}
 	segments := editor.GetUntracked().segments()
-	disabledPart := func() core.PartStates { return core.PartStates{Disabled: is(c.disabled)} }
+	disabledPart := func() core.PartStates { return core.PartStates{Disabled: is(c.disabled), Invalid: is(c.invalid)} }
 	for i, s := range segments {
 		if i > 0 && s != SegmentPeriod {
 			nodes = append(nodes, core.View{AccessibilityElementsHidden: func() bool { return true }, NoFocus: true,
@@ -437,8 +438,10 @@ func segmentView(cx *core.Scope, c timeConfig, editor *core.Signal[segmentEditor
 		child = core.Dynamic(func(*core.Scope) core.Node { return c.renderSegment(entry.Get()) })
 	}
 	return core.View{AccessibilityElementsHidden: func() bool { return true }, NoFocus: true,
-		PartStates: func() core.PartStates { return core.PartStates{Disabled: is(c.disabled), Focused: selected.Get()} },
-		Class:      c.segment.Class, Style: c.segment.Style, StyleFunc: c.segment.Fn,
+		PartStates: func() core.PartStates {
+			return core.PartStates{Disabled: is(c.disabled), Invalid: is(c.invalid), Focused: selected.Get()}
+		},
+		Class: c.segment.Class, Style: c.segment.Style, StyleFunc: c.segment.Fn,
 		OnPress: func(core.PressEvent) {
 			if core.Untracked(cx, func() bool { return is(c.disabled) }) {
 				return
@@ -460,6 +463,8 @@ func segmentView(cx *core.Scope, c timeConfig, editor *core.Signal[segmentEditor
 // edit the selected segment and move between them, and a press selects
 // one. The app lays the field out and styles its parts, or draws them.
 type TimeField struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid      func() bool
 	Value        func() TimeOfDay
 	DefaultValue TimeOfDay
 	Precision    TimePrecision
@@ -502,9 +507,9 @@ func (t TimeField) Render(cx *core.Scope) core.Node {
 			t.OnChange(v)
 		}
 	}
-	c := timeConfig{precision: t.Precision, cycle: t.HourCycle.of(cx), disabled: t.Disabled, label: t.Label,
+	c := timeConfig{precision: t.Precision, cycle: t.HourCycle.of(cx), disabled: t.Disabled, invalid: t.Invalid, label: t.Label,
 		segment:   parts.Of(t.SegmentClass, t.SegmentStyle, t.SegmentStyleFunc),
 		separator: part{Class: t.SeparatorClass, Style: t.SeparatorStyle}, renderSegment: t.RenderSegment}
-	return core.View{Class: t.Class, Style: calendarRow.Merge(t.Style), StyleFunc: t.StyleFunc, Disabled: t.Disabled, TestID: t.TestID,
+	return core.View{Class: t.Class, Style: calendarRow.Merge(t.Style), StyleFunc: t.StyleFunc, Disabled: t.Disabled, Invalid: t.Invalid, TestID: t.TestID,
 		OnLayout: t.OnLayout, Tooltip: t.Tooltip, Children: timeField(cx, c, value, changed)}
 }

@@ -10,6 +10,8 @@ import (
 // RadioGroup with the others. Its children are the app's indicator and
 // label; a GroupStyle under Style.Group follows the radio's Checked.
 type Radio struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid  func() bool
 	Checked  func() bool
 	Disabled func() bool
 	// OnChange receives true when an unchecked radio is pressed: the app
@@ -40,7 +42,7 @@ func (r Radio) Render(cx *core.Scope) core.Node {
 	return rovingView(cx, core.View{Class: r.Class, Style: r.Style, StyleFunc: r.StyleFunc, Role: core.RoleRadio, Label: r.Label, Hint: r.Hint, TestID: r.TestID, OnLayout: r.OnLayout, Tooltip: r.Tooltip, HitSlop: r.HitSlop,
 		// Checked and selected both: some screen readers read one, some
 		// the other, as gpui-base's Radio states toggled and selected.
-		Disabled: r.Disabled, Checked: r.Checked, Selected: r.Checked,
+		Disabled: r.Disabled, Invalid: r.Invalid, Checked: r.Checked, Selected: r.Checked,
 		OnPress:  func(core.PressEvent) { check() },
 		Children: r.Children}, r.Checked, check)
 }
@@ -51,6 +53,8 @@ func (r Radio) Render(cx *core.Scope) core.Node {
 // and next enabled radio, around the ends, and check it. It holds no
 // value: each radio is told whether it is checked.
 type RadioGroup struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid   func() bool
 	Class     string
 	Style     core.Style
 	StyleFunc func() core.Style
@@ -65,6 +69,6 @@ type RadioGroup struct {
 // Render implements core.Node.
 func (g RadioGroup) Render(cx *core.Scope) core.Node {
 	group := newRoving(cx, false)
-	return core.View{Class: g.Class, Style: g.Style, StyleFunc: g.StyleFunc, Role: core.RoleRadioGroup, Label: g.Label, TestID: g.TestID, OnLayout: g.OnLayout, Tooltip: g.Tooltip,
+	return core.View{Class: g.Class, Style: g.Style, StyleFunc: g.StyleFunc, Role: core.RoleRadioGroup, Invalid: g.Invalid, Label: g.Label, TestID: g.TestID, OnLayout: g.OnLayout, Tooltip: g.Tooltip,
 		Children: append(slices.Clip(g.Children), group.keys())}
 }

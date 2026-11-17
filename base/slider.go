@@ -66,6 +66,8 @@ const (
 // it whose length the values map onto, the range and the thumbs on it,
 // then its children.
 type Slider struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid func() bool
 	// Value makes it controlled; without it the slider keeps its own, from
 	// DefaultValue.
 	Value        func() SliderValue
@@ -346,7 +348,7 @@ func (c *sliderCtl) thumb(start bool, focused *core.Signal[int]) core.Node {
 			c.nudge(start, func(r numberRange, v float64) float64 { return r.stepBy(v, by) })
 		}
 	}
-	return core.View{Class: s.ThumbClass, Style: base.Merge(s.ThumbStyle), Disabled: s.Disabled, Role: core.RoleAdjustable, Label: label, TestID: id, Ref: ref, Accessible: true,
+	return core.View{Class: s.ThumbClass, Style: base.Merge(s.ThumbStyle), Disabled: s.Disabled, Invalid: s.Invalid, Role: core.RoleAdjustable, Label: label, TestID: id, Ref: ref, Accessible: true,
 		StyleFunc: func() core.Style {
 			var look core.Style
 			if s.ThumbStyleFunc != nil {
@@ -415,7 +417,7 @@ func (s Slider) Render(cx *core.Scope) core.Node {
 		controlKey{"pageup", true, page(1)}, controlKey{"pagedown", true, page(-1)},
 		controlKey{"home", false, nudge(func(r numberRange, _ float64) float64 { return r.min })},
 		controlKey{"end", false, nudge(func(r numberRange, _ float64) float64 { return r.max })})
-	part := func() core.PartStates { return core.PartStates{Disabled: is(s.Disabled)} }
+	part := func() core.PartStates { return core.PartStates{Disabled: is(s.Disabled), Invalid: is(s.Invalid)} }
 	rangeBase := core.Style{Position: core.Absolute}
 	if s.Axis == Horizontal {
 		rangeBase.Top, rangeBase.Bottom = core.Pt(0), core.Pt(0)
@@ -451,6 +453,6 @@ func (s Slider) Render(cx *core.Scope) core.Node {
 		Children: parts}
 	track := core.View{Class: s.TrackClass, Style: core.Style{Group: "slider-track"}.Merge(s.TrackStyle), PartStates: part, NoFocus: true,
 		Responder: c.responder(c.pressTrack), Children: []core.Node{indicator}}
-	return core.View{Class: s.Class, Style: s.Style, StyleFunc: s.StyleFunc, Disabled: s.Disabled, TestID: s.TestID, OnLayout: s.OnLayout, Tooltip: s.Tooltip,
+	return core.View{Class: s.Class, Style: s.Style, StyleFunc: s.StyleFunc, Disabled: s.Disabled, Invalid: s.Invalid, TestID: s.TestID, OnLayout: s.OnLayout, Tooltip: s.Tooltip,
 		Children: append([]core.Node{track, keys}, s.Children...)}
 }

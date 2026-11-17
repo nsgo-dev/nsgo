@@ -14,6 +14,8 @@ const colorMaxSegments = 12
 // app styles the track and the thumb. An alpha track shows CheckerboardColor
 // squares under it.
 type ColorSlider struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid    func() bool
 	ColorSpace ColorSpace
 	Channel    ColorChannel
 	// Horizontal unless Axis says Vertical.
@@ -48,6 +50,7 @@ func (c ColorSlider) Render(cx *core.Scope) core.Node {
 	env := cx.Env()
 	mirrored := func() bool { return !vertical && env.RTL() }
 	disabled := func() bool { return is(c.Disabled) || picker.isDisabled() }
+	invalid := func() bool { return is(c.Invalid) || picker.isInvalid() }
 	rail := core.NewSignal(cx, core.Bounds{})
 	var drag *float64
 	dragging := core.NewSignal(cx, false)
@@ -165,7 +168,7 @@ func (c ColorSlider) Render(cx *core.Scope) core.Node {
 	}
 	track := core.View{Class: c.TrackClass, NoFocus: true,
 		Style:      core.Style{OverflowX: core.Hidden, OverflowY: core.Hidden, PointerEvents: core.PointerEventsNone}.Merge(c.TrackStyle),
-		PartStates: func() core.PartStates { return core.PartStates{Disabled: is(c.Disabled)} },
+		PartStates: func() core.PartStates { return core.PartStates{Disabled: is(c.Disabled), Invalid: invalid()} },
 		OnLayout:   func(b core.Bounds) { rail.Set(b) },
 		Children:   []core.Node{Checkerboard(c.CheckerboardColor, cmpPoints(c.CheckerboardSize, 4)), colors}}
 	thumb := core.View{Class: c.ThumbClass, Style: colorThumb.Merge(c.ThumbStyle),
@@ -193,7 +196,7 @@ func (c ColorSlider) Render(cx *core.Scope) core.Node {
 			return s
 		},
 		PartStates: func() core.PartStates { return dragStates(dragging.Get()) },
-		Disabled:   disabled, Accessible: true, Role: core.RoleAdjustable, Label: c.Label,
+		Disabled:   disabled, Invalid: invalid, Accessible: true, Role: core.RoleAdjustable, Label: c.Label,
 		AccessibilityValue: func() core.AccessibilityValue {
 			now := value()
 			return core.AccessibilityValue{Max: float32(spec.max), Now: float32(now), Text: spec.format(now)}
@@ -216,7 +219,7 @@ func (c ColorSlider) Render(cx *core.Scope) core.Node {
 				dragging.Set(true)
 			},
 			OnMove: dragTo, OnRelease: release, OnTerminate: release}}
-	return core.View{Class: c.Class, Style: c.Style, Disabled: disabled, NoFocus: true, TestID: c.TestID, OnLayout: c.OnLayout, Tooltip: c.Tooltip,
+	return core.View{Class: c.Class, Style: c.Style, Disabled: disabled, Invalid: invalid, NoFocus: true, TestID: c.TestID, OnLayout: c.OnLayout, Tooltip: c.Tooltip,
 		Responder: &core.Responder{Keep: true, Claims: claim,
 			OnGrant: func(e core.ResponderEvent) {
 				at := along(e.Position)

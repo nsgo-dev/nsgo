@@ -69,9 +69,11 @@ chips.Toggle{
 }
 ```
 
+`PartStates.Invalid` similarly applies `aria-invalid:` classes and `Style.AriaInvalid` to a decorative part, including `group-aria-invalid:` styles inside it, without reporting another invalid control. Put `Invalid` on the actual control or native input so assistive technology receives its validation state.
+
 ## Accessibility
 
-The root of a control says what it is: a `Role`, a `Label` when its text does not say it, a `Hint` for what activating it does, and `Checked`, `Selected`, `Disabled` or `Expanded` as they apply. Its parts stay silent. A control that moves between items with the arrows is one Tab stop, as a tab list is. [Accessibility](../accessibility.md) lists the roles and actions.
+The root of a control says what it is: a `Role`, a `Label` when its text does not say it, a `Hint` for what activating it does, and `Checked`, `Selected`, `Disabled`, `Invalid` or `Expanded` as they apply. Its parts stay silent. A control that moves between items with the arrows is one Tab stop, as a tab list is. [Accessibility](../accessibility.md) lists the roles and actions.
 
 ## What to pass through
 

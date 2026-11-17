@@ -134,6 +134,8 @@ export declare function ToastStack(props: ToastStackProps): JSX.Element;
 
 /** A list of choices when it takes multiple, selected, defaultSelected or onSelectedChange. */
 export interface ListProps<T> extends Pick<ListItemsProps<T>, "each" | "children" | "keyExtractor" | "onLoadMore" | "header" | "footer" | "empty"> {
+  /** The app rejected the control's value. */
+  invalid?: boolean;
   /** Any number of rows are chosen. */
   multiple?: boolean;
   /** The chosen rows' keys: keyExtractor's, else the items. */

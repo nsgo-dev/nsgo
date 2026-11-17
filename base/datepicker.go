@@ -18,6 +18,8 @@ type DatePreset struct {
 // touch screen picks the day at its time and closes. Return opens and
 // closes it from the focused trigger, Delete and Backspace clear.
 type DatePicker struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid      func() bool
 	Value        func() DateValue
 	DefaultValue DateValue
 	Range        bool
@@ -215,7 +217,7 @@ func (d DatePicker) Render(cx *core.Scope) core.Node {
 			}
 			closedBy = 0
 		}}
-	trigger := core.View{Ref: anchor, Class: d.Class, Style: d.Style, StyleFunc: d.StyleFunc, Label: d.Label, TestID: d.TestID, Role: core.RoleCombobox,
+	trigger := core.View{Ref: anchor, Class: d.Class, Style: d.Style, StyleFunc: d.StyleFunc, Label: d.Label, TestID: d.TestID, Role: core.RoleCombobox, Invalid: d.Invalid,
 		Disabled: d.Disabled, Focusable: func() bool { return !disabled() }, Expanded: st.open, ShowsExpanded: true,
 		AccessibilityValue: func() core.AccessibilityValue {
 			format := d.DateFormat
@@ -239,7 +241,7 @@ func (d DatePicker) Render(cx *core.Scope) core.Node {
 			OnPress:  func(core.PressEvent) { clear() },
 			Children: []core.Node{d.ClearButton}}
 	}}
-	return core.View{Class: d.RootClass, Style: d.RootStyle, OnLayout: d.OnLayout, Tooltip: d.Tooltip,
+	return core.View{Class: d.RootClass, Style: d.RootStyle, Invalid: d.Invalid, OnLayout: d.OnLayout, Tooltip: d.Tooltip,
 		Children: []core.Node{trigger, clearButton, keys, popup.node(cx)}}
 }
 
@@ -304,7 +306,7 @@ func (d DatePicker) content(cx *core.Scope, onSheet bool, s contentState) core.N
 				s.report(s.withTimes(v))
 			}
 		}
-		c := timeConfig{precision: d.TimePrecision, cycle: d.HourCycle.of(cx), disabled: d.Disabled, label: d.TimeFieldLabel,
+		c := timeConfig{precision: d.TimePrecision, cycle: d.HourCycle.of(cx), disabled: d.Disabled, invalid: d.Invalid, label: d.TimeFieldLabel,
 			segment:   parts.Of(d.SegmentClass, d.SegmentStyle, d.SegmentStyleFunc),
 			separator: part{Class: d.SeparatorClass, Style: d.SeparatorStyle}, renderSegment: d.RenderSegment}
 		var row []core.Node

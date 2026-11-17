@@ -7,6 +7,8 @@ order: 73
 
 `base` holds every control `ui` has, with its behavior, state and accessibility but no look. Each part takes a `Class`, a `Style` and a `StyleFunc` ([Parts and states](parts.md)), so a library or an app with a design of its own uses them instead of `ui`, or wraps them as `ui` does ([Looks and themes](looks.md)). This page covers the controls of the [component reference](../ui.md); the gallery shows every one beside its `ui` form.
 
+Controls such as `Button`, `Checkbox`, `Select`, `Slider` and `NumberInput` accept `Invalid: rejected.Get` to follow a validation signal. Style that state with `Class: "aria-invalid:border-red-500"` or `Style.AriaInvalid`. It updates accessibility and styles without disabling the control. Composite fields pass it to their real input and decorative parts; `ColorPicker` shares it with its controls.
+
 ## Button
 
 `base.Button` takes its look from `Style` and its content from `Children`. `OnPress` runs on a completed press; `OnPressDown` and `OnPressUp` follow a press starting and ending, for feedback of your own.

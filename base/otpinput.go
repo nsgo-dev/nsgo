@@ -29,7 +29,9 @@ const (
 // focus styles the cell that takes the next digit, data-filled those that
 // hold one. A press anywhere on it focuses it.
 type OtpInput struct {
-	Length int
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid func() bool
+	Length  int
 	// Value makes the code controlled, shown as it is; DefaultValue starts
 	// its own.
 	Value        func() string
@@ -239,7 +241,7 @@ func (o OtpInput) Render(cx *core.Scope) core.Node {
 		}}
 		return core.View{Class: o.CellClass, Style: o.CellStyle, StyleFunc: o.CellStyleFunc, Children: []core.Node{content},
 			PartStates: func() core.PartStates {
-				s := core.PartStates{Focused: focused.Get() && !disabled() && active(), Disabled: disabled()}
+				s := core.PartStates{Focused: focused.Get() && !disabled() && active(), Disabled: disabled(), Invalid: is(o.Invalid)}
 				if filled() {
 					s.Data = []string{"filled"}
 				}
@@ -259,9 +261,9 @@ func (o OtpInput) Render(cx *core.Scope) core.Node {
 		// The field tells assistive technology the code.
 		groups = append(groups, core.View{Class: o.GroupClass, Style: o.GroupStyle, Children: cells,
 			AccessibilityElementsHidden: func() bool { return true },
-			PartStates:                  func() core.PartStates { return core.PartStates{Disabled: disabled()} }})
+			PartStates:                  func() core.PartStates { return core.PartStates{Disabled: disabled(), Invalid: is(o.Invalid)} }})
 	}
-	input := core.Input{Ref: ref, Label: o.Label, Value: field.Get, Masked: o.Masked, Disabled: o.Disabled, HideCaret: true,
+	input := core.Input{Ref: ref, Label: o.Label, Value: field.Get, Masked: o.Masked, Disabled: o.Disabled, Invalid: o.Invalid, HideCaret: true,
 		KeyboardType: core.KeyboardNumber, AutoComplete: core.AutoCompleteOneTimeCode, NoAutoCorrect: true, AutoCapitalize: core.AutoCapitalizeNone,
 		Style: core.Style{Position: core.Absolute, Left: core.Pt(0), Top: core.Pt(0), Right: core.Pt(0), Bottom: core.Pt(0), Padding: core.All(0),
 			BorderWidth: 0, Background: core.Transparent, Color: core.Transparent, SelectionColor: core.Transparent},
@@ -287,7 +289,7 @@ func (o OtpInput) Render(cx *core.Scope) core.Node {
 				o.OnBlur()
 			}
 		}}
-	return core.View{Class: o.Class, Style: o.Style, StyleFunc: o.StyleFunc, Disabled: o.Disabled, TestID: o.TestID, OnLayout: o.OnLayout, Tooltip: o.Tooltip,
+	return core.View{Class: o.Class, Style: o.Style, StyleFunc: o.StyleFunc, Disabled: o.Disabled, Invalid: o.Invalid, TestID: o.TestID, OnLayout: o.OnLayout, Tooltip: o.Tooltip,
 		Children: append(groups, input)}
 }
 

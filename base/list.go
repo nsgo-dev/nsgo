@@ -22,7 +22,9 @@ import (
 // it has the keyboard focus, or after a press on a row until another list
 // takes them.
 type List struct {
-	Count func() int
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid func() bool
+	Count   func() int
 	// Key returns row i's identity, a comparable value such as an ID,
 	// which the selection holds; without it, the selection holds indexes.
 	Key func(i int) any
@@ -404,7 +406,7 @@ func (l List) Render(cx *core.Scope) core.Node {
 		},
 		Class: l.ListClass, Style: core.Style{FlexGrow: 1, MinHeight: core.Pt(0)}.Merge(l.ListStyle), StyleFunc: l.ListStyleFunc}
 	outer := core.View{Class: l.Class, TestID: l.TestID, Label: l.Label, Style: core.Style{MinHeight: core.Pt(0)}.Merge(l.Style),
-		StyleFunc: l.StyleFunc, Children: []core.Node{list}}
+		StyleFunc: l.StyleFunc, Invalid: l.Invalid, Children: []core.Node{list}}
 	if !selectable {
 		return outer
 	}

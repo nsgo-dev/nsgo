@@ -801,6 +801,8 @@ func (g *calendarGrid) day(cx *core.Scope, c dayCell, changed func(DateValue)) c
 // stop whose arrows, Home, End and Page keys move the cursor, turning the
 // months. It has no look: the app styles each part or draws the items.
 type Calendar struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid      func() bool
 	Value        func() DateValue
 	DefaultValue DateValue
 	// Range picks a start and an end.
@@ -833,5 +835,5 @@ func (c Calendar) Render(cx *core.Scope) core.Node {
 			c.OnChange(d)
 		}
 	}
-	return core.View{Class: c.Class, Style: c.Style, TestID: c.TestID, OnLayout: c.OnLayout, Tooltip: c.Tooltip, Children: g.nodes(changed)}
+	return core.View{Class: c.Class, Style: c.Style, TestID: c.TestID, Invalid: c.Invalid, OnLayout: c.OnLayout, Tooltip: c.Tooltip, Children: g.nodes(changed)}
 }

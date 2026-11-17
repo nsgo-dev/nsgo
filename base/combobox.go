@@ -15,6 +15,8 @@ import (
 // toggles, leaving it open. OnConfirm reports the value on every close;
 // Mod+Return closes it as it is. It has no look.
 type Combobox struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid      func() bool
 	Items        func() []SelectItem
 	Multiple     bool
 	Value        func() []string
@@ -256,7 +258,7 @@ func (c Combobox) Render(cx *core.Scope) core.Node {
 		return ""
 	}
 	text := core.Input{Ref: field, Placeholder: c.Placeholder, NoAutoCorrect: true, ReadonlyFunc: disabled, Disabled: c.Disabled,
-		Role: core.RoleCombobox, Label: c.Label, Expanded: st.open, Class: c.InputClass, Style: c.InputStyle,
+		Role: core.RoleCombobox, Invalid: c.Invalid, Label: c.Label, Expanded: st.open, Class: c.InputClass, Style: c.InputStyle,
 		Value: func() string {
 			if typed.Get() || c.Multiple {
 				return lb.queryNow()
@@ -344,7 +346,7 @@ func (c Combobox) Render(cx *core.Scope) core.Node {
 	}
 	children = append(children, lb.keys(st.open, pick), closedKeys, confirmKey, lb.present(cx, anchor, width, false, list, hooks))
 	return core.View{Ref: anchor, Class: c.Class, Style: core.Style{Direction: core.Row}.Merge(c.Style), StyleFunc: c.StyleFunc,
-		TestID: c.TestID, Tooltip: c.Tooltip,
+		TestID: c.TestID, Tooltip: c.Tooltip, Invalid: c.Invalid,
 		OnLayout: func(b core.Bounds) {
 			width.Set(b.Size.Width)
 			if c.OnLayout != nil {

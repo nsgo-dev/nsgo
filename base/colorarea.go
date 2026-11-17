@@ -10,6 +10,8 @@ import (
 // thumb, over the hue's color. It has no size or look of its own: the app
 // styles the panel and the thumb, and FillThumb fills it with the color.
 type ColorArea struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid    func() bool
 	Disabled   func() bool
 	PanelClass string
 	PanelStyle core.Style
@@ -35,6 +37,7 @@ type ColorArea struct {
 func (a ColorArea) Render(cx *core.Scope) core.Node {
 	picker := colorStateOf(cx)
 	disabled := func() bool { return is(a.Disabled) || picker.isDisabled() }
+	invalid := func() bool { return is(a.Invalid) || picker.isInvalid() }
 	var size core.Size
 	var drag *core.Point
 	dragging := core.NewSignal(cx, false)
@@ -80,7 +83,9 @@ func (a ColorArea) Render(cx *core.Scope) core.Node {
 		}
 	}
 	panel := core.View{Class: a.PanelClass, Style: colorFill.Merge(core.Style{OverflowX: core.Hidden, OverflowY: core.Hidden, PointerEvents: core.PointerEventsNone}).Merge(a.PanelStyle),
-		NoFocus: true, PartStates: func() core.PartStates { return core.PartStates{Disabled: is(a.Disabled), Focused: focused.Get()} },
+		NoFocus: true, PartStates: func() core.PartStates {
+			return core.PartStates{Disabled: is(a.Disabled), Invalid: invalid(), Focused: focused.Get()}
+		},
 		StyleFunc: func() core.Style {
 			s := core.Style{Background: picker.model.Get().hueColor()}
 			if a.PanelStyleFunc != nil {
@@ -116,7 +121,7 @@ func (a ColorArea) Render(cx *core.Scope) core.Node {
 			return s
 		},
 		PartStates: func() core.PartStates { return dragStates(dragging.Get()) },
-		Disabled:   disabled, Accessible: true, Role: core.RoleAdjustable, Label: a.Label,
+		Disabled:   disabled, Invalid: invalid, Accessible: true, Role: core.RoleAdjustable, Label: a.Label,
 		AccessibilityValue: func() core.AccessibilityValue {
 			m := picker.model.Get()
 			return core.AccessibilityValue{Max: 100, Now: float32(m.channel(ColorHSB, ChannelBrightness)), Text: m.format(ColorFormatHex)}
@@ -134,7 +139,7 @@ func (a ColorArea) Render(cx *core.Scope) core.Node {
 		// area's.
 		OnPress: func(core.PressEvent) {},
 		OnFocus: func() { focused.Set(true) }, OnBlur: func() { focused.Set(false) }}
-	return core.View{Class: a.Class, Style: a.Style, TestID: a.TestID, Tooltip: a.Tooltip, Disabled: disabled, NoFocus: true,
+	return core.View{Class: a.Class, Style: a.Style, TestID: a.TestID, Tooltip: a.Tooltip, Disabled: disabled, Invalid: invalid, NoFocus: true,
 		OnLayout: func(b core.Bounds) {
 			size = b.Size
 			if a.OnLayout != nil {

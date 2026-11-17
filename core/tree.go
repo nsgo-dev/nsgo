@@ -1105,6 +1105,7 @@ func (t *Tree) restyle(n *node) bool {
 	p.Indeterminate = p.Indeterminate || n.part.Indeterminate
 	p.Selected = p.Selected || n.part.Selected
 	p.Disabled = p.Disabled || n.part.Disabled
+	p.Invalid = p.Invalid || n.part.Invalid
 	t.showTrigger(n, &p)
 	var dyn Style
 	if n.dyn != nil {
@@ -1201,6 +1202,7 @@ func (t *Tree) sharedStates(n *node) shownStates {
 	p.Indeterminate = p.Indeterminate || n.part.Indeterminate
 	p.Selected = p.Selected || n.part.Selected
 	p.Disabled = p.Disabled || n.part.Disabled || n.input != nil && n.input.config.Disabled
+	p.Invalid = p.Invalid || n.part.Invalid
 	return statesOf(t.shownInteraction(n), &p, n.part.Data)
 }
 

@@ -69,9 +69,11 @@ chips.Toggle{
 }
 ```
 
+`PartStates.Invalid` 同样会把 `aria-invalid:` class 和 `Style.AriaInvalid` 应用到装饰部件，以及其内部的 `group-aria-invalid:` 样式，而不把部件报告为另一个无效控件。把 `Invalid` 传给实际控件或原生输入框，让辅助技术获得校验状态。
+
 ## 无障碍
 
-控件的根视图说明它是什么：`Role`；文字没有说清时给出 `Label`；激活后会发生什么写在 `Hint`；适用时再加上 `Checked`、`Selected`、`Disabled` 或 `Expanded`。部件本身不发声。用方向键在条目间移动的控件只占一个 Tab 停靠点，像标签列表那样。角色和操作的列表见[无障碍](../accessibility.md)。
+控件的根视图说明它是什么：`Role`；文字没有说清时给出 `Label`；激活后会发生什么写在 `Hint`；适用时再加上 `Checked`、`Selected`、`Disabled`、`Invalid` 或 `Expanded`。部件本身不发声。用方向键在条目间移动的控件只占一个 Tab 停靠点，像标签列表那样。角色和操作的列表见[无障碍](../accessibility.md)。
 
 ## 要透传的字段
 

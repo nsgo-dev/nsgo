@@ -9,6 +9,8 @@ import "github.com/nsgo-dev/nsgo/core"
 // Button is a pressable container with the button role. Its look is the
 // style and children the app gives it, its states included.
 type Button struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid     func() bool
 	OnPress     func(core.PressEvent)
 	OnLongPress func(core.PressEvent)
 	// OnPressDown and OnPressUp follow a press going down on the button
@@ -80,6 +82,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 		OnPressUp:                   b.OnPressUp,
 		Disabled:                    b.Disabled,
 		Busy:                        b.Busy,
+		Invalid:                     b.Invalid,
 		Selected:                    b.Selected,
 		Expanded:                    b.Expanded,
 		Role:                        role,

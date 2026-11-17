@@ -19,6 +19,8 @@ const pageSteps = 10
 // ControlsRight the field between them and a column with the increment
 // over the decrement.
 type NumberInput struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid func() bool
 	// Value makes it controlled once it returns a number; nil is an empty
 	// field. Without it the input keeps its own, from DefaultValue.
 	Value        func() *float64
@@ -402,7 +404,7 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 		controlKey{"pageup", true, nudge(true, pageSteps)}, controlKey{"pagedown", true, nudge(false, pageSteps)})
 	field := new(core.Ref)
 	input := core.Input{Ref: field, Class: n.InputClass, Style: n.InputStyle, StyleFunc: n.InputStyleFunc, Value: c.text.Get, PlaceholderFunc: n.Placeholder,
-		Label: n.Label, Role: core.RoleSpinButton, NoAutoCorrect: true, Disabled: n.Disabled,
+		Label: n.Label, Role: core.RoleSpinButton, NoAutoCorrect: true, Disabled: n.Disabled, Invalid: n.Invalid,
 		ReadonlyFunc: func() bool { return is(n.Readonly) || is(n.Disabled) },
 		KeyboardTypeFunc: func() core.KeyboardType {
 			// Phones' decimal pads have no minus sign.
@@ -501,12 +503,12 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 	var children []core.Node
 	if n.ControlsRight {
 		controls := core.View{Class: n.ControlsClass, Style: n.ControlsStyle, Children: []core.Node{inc, dec},
-			PartStates: func() core.PartStates { return core.PartStates{Disabled: is(n.Disabled)} }}
+			PartStates: func() core.PartStates { return core.PartStates{Disabled: is(n.Disabled), Invalid: is(n.Invalid)} }}
 		children = []core.Node{n.Prefix, input, n.Suffix, controls}
 	} else {
 		children = []core.Node{dec, n.Prefix, input, n.Suffix, inc}
 	}
-	return core.View{Class: n.Class, Style: n.Style, StyleFunc: n.StyleFunc, Disabled: n.Disabled, TestID: n.TestID, OnLayout: n.OnLayout, Tooltip: n.Tooltip,
+	return core.View{Class: n.Class, Style: n.Style, StyleFunc: n.StyleFunc, Disabled: n.Disabled, Invalid: n.Invalid, TestID: n.TestID, OnLayout: n.OnLayout, Tooltip: n.Tooltip,
 		PartStates: func() core.PartStates { return core.PartStates{Focused: focused.Get()} },
 		Children:   append(children, keys)}
 }

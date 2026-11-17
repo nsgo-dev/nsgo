@@ -7,6 +7,8 @@ order: 73
 
 `base` 包含 `ui` 中的每个控件，带有行为、状态和无障碍，但没有外观。每个部件都接受 `Class`、`Style` 和 `StyleFunc`（[部件与状态](parts.md)），所以有自己设计的组件库或应用可以用它们代替 `ui`，或者像 `ui` 那样包装它们（[外观与主题](looks.md)）。本页覆盖[组件参考](../ui.md)中的控件；gallery 在每个控件的 `ui` 形式旁边展示它。
 
+控件（如 `Button`、`Checkbox`、`Select`、`Slider` 和 `NumberInput`）接受 `Invalid: rejected.Get`，跟随校验信号。用 `Class: "aria-invalid:border-red-500"` 或 `Style.AriaInvalid` 设置该状态的样式。它更新无障碍状态和样式，不会禁用控件。复合字段会把它传给实际输入框和装饰部件；`ColorPicker` 会把它共享给内部控件。
+
 ## Button
 
 `base.Button` 的外观来自 `Style`，内容来自 `Children`。`OnPress` 在完整的按压后运行；`OnPressDown` 和 `OnPressUp` 跟随按压的开始和结束，用于你自己的反馈。

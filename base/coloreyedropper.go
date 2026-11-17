@@ -6,6 +6,8 @@ import "github.com/nsgo-dev/nsgo/core"
 // system's sampler, for the picker around it and OnPick; disabled where
 // the platform has none (core.Env.CanPickScreenColor).
 type ColorEyeDropper struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid   func() bool
 	Disabled  func() bool
 	OnPick    func(color core.Color)
 	Children  []core.Node
@@ -24,10 +26,11 @@ func (e ColorEyeDropper) Render(cx *core.Scope) core.Node {
 	picker := colorKey.Use(cx)
 	picking := false
 	env := cx.Env()
+	invalid := func() bool { return is(e.Invalid) || picker != nil && picker.isInvalid() }
 	disabled := func() bool {
 		return is(e.Disabled) || !env.CanPickScreenColor() || picker != nil && picker.isDisabled()
 	}
-	return core.View{Class: e.Class, Style: e.Style, StyleFunc: e.StyleFunc, Disabled: disabled, Accessible: true, Role: core.RoleButton, Label: e.Label,
+	return core.View{Class: e.Class, Style: e.Style, StyleFunc: e.StyleFunc, Disabled: disabled, Invalid: invalid, Accessible: true, Role: core.RoleButton, Label: e.Label,
 		TestID: e.TestID, OnLayout: e.OnLayout, Tooltip: e.Tooltip, Children: e.Children,
 		OnPress: func(core.PressEvent) {
 			if picking || core.Untracked(cx, disabled) {

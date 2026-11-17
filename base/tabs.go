@@ -11,6 +11,8 @@ import (
 // Tab is one tab of a tab list, in Tabs with the others. The app keeps
 // which is selected and shows its content beside the list.
 type Tab struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid  func() bool
 	Selected func() bool
 	Disabled func() bool
 	// OnPress runs on every press, the selected tab's included.
@@ -34,7 +36,7 @@ func (t Tab) Render(cx *core.Scope) core.Node {
 		press = func(core.PressEvent) {}
 	}
 	return rovingView(cx, core.View{Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTab, Label: t.Label, Hint: t.Hint, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
-		Disabled: t.Disabled, Selected: t.Selected, OnPress: press, Children: t.Children}, t.Selected, func() { press(core.PressEvent{}) })
+		Disabled: t.Disabled, Invalid: t.Invalid, Selected: t.Selected, OnPress: press, Children: t.Children}, t.Selected, func() { press(core.PressEvent{}) })
 }
 
 // tabsIndicator is how a tab list's indicator moves to another tab:
@@ -48,6 +50,8 @@ var tabsIndicator = core.LayoutTransition{Curve: core.LayoutSpring, Damping: 0.8
 // first and last, and the tab reached reports a press. It holds no value
 // and no content.
 type Tabs struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid   func() bool
 	Class     string
 	Style     core.Style
 	StyleFunc func() core.Style
@@ -74,7 +78,7 @@ func (t Tabs) Render(cx *core.Scope) core.Node {
 	if t.IndicatorClass != "" || !reflect.ValueOf(t.IndicatorStyle).IsZero() {
 		children = append([]core.Node{t.indicator(group)}, children...)
 	}
-	return core.View{Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTabList, Label: t.Label, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
+	return core.View{Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTabList, Invalid: t.Invalid, Label: t.Label, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
 		Children: children}
 }
 

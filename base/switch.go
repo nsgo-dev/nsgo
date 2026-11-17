@@ -5,6 +5,8 @@ import "github.com/nsgo-dev/nsgo/core"
 // Switch is on or off and takes effect at once, as a setting. Its parts
 // are a track and a thumb inside it, then its children, the label.
 type Switch struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid  func() bool
 	Checked  func() bool
 	Disabled func() bool
 	// OnChange receives the value a press asks for, the opposite of
@@ -33,12 +35,14 @@ type Switch struct {
 
 // Render implements core.Node.
 func (s Switch) Render(*core.Scope) core.Node {
-	shows := func() core.PartStates { return core.PartStates{Checked: is(s.Checked), Disabled: is(s.Disabled)} }
+	shows := func() core.PartStates {
+		return core.PartStates{Checked: is(s.Checked), Disabled: is(s.Disabled), Invalid: is(s.Invalid)}
+	}
 	thumb := core.View{Class: s.ThumbClass, Style: s.ThumbStyle, StyleFunc: s.ThumbStyleFunc, PartStates: shows}
 	track := core.View{Class: s.TrackClass, Style: s.TrackStyle, StyleFunc: s.TrackStyleFunc, PartStates: shows,
 		Children: []core.Node{thumb}}
 	return core.View{Class: s.Class, Style: s.Style, StyleFunc: s.StyleFunc, Role: core.RoleSwitch, Label: s.Label, Hint: s.Hint, TestID: s.TestID, OnLayout: s.OnLayout, Tooltip: s.Tooltip, HitSlop: s.HitSlop,
-		Disabled: s.Disabled, Checked: s.Checked,
+		Disabled: s.Disabled, Invalid: s.Invalid, Checked: s.Checked,
 		OnPress: func(core.PressEvent) {
 			if s.OnChange != nil {
 				s.OnChange(!is(s.Checked))

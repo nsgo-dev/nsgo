@@ -15,6 +15,8 @@ import (
 // the value. Up, Down, Return and Space open it from the focused trigger,
 // and letters choose by typeahead.
 type Select struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid      func() bool
 	Items        func() []SelectItem
 	Value        func() *string
 	DefaultValue string
@@ -260,7 +262,7 @@ func (s Select) Render(cx *core.Scope) core.Node {
 			width.Set(b.Size.Width)
 		}
 	}
-	trigger := core.View{Ref: anchor, Class: s.Class, Style: s.Style, StyleFunc: s.StyleFunc, Label: s.Label, TestID: s.TestID, Role: core.RoleCombobox,
+	trigger := core.View{Ref: anchor, Class: s.Class, Style: s.Style, StyleFunc: s.StyleFunc, Label: s.Label, TestID: s.TestID, Role: core.RoleCombobox, Invalid: s.Invalid,
 		Disabled: s.Disabled, Focusable: func() bool { return !disabled() }, Expanded: st.open, ShowsExpanded: true,
 		AccessibilityValue: func() core.AccessibilityValue {
 			if v := current.Get(); v != nil {
@@ -282,7 +284,7 @@ func (s Select) Render(cx *core.Scope) core.Node {
 			OnPress:  func(core.PressEvent) { choose(nil) },
 			Children: []core.Node{s.ClearButton}}
 	}}
-	return core.View{Class: s.RootClass, Style: s.RootStyle, OnLayout: s.OnLayout, Tooltip: s.Tooltip, Children: []core.Node{trigger, clear,
+	return core.View{Class: s.RootClass, Style: s.RootStyle, Invalid: s.Invalid, OnLayout: s.OnLayout, Tooltip: s.Tooltip, Children: []core.Node{trigger, clear,
 		lb.keys(st.open, pick), closedKeys, typed, lb.present(cx, anchor, width, true, list, hooks)}}
 }
 

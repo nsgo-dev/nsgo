@@ -22,6 +22,8 @@ const colorScrubDistance = 1
 // shows at once, the keys step it, and the change ends as the field is
 // left. Label says the channel's name when empty.
 type ColorField struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid    func() bool
 	Channel    ColorChannel
 	ColorSpace ColorSpace
 	Format     ColorFormat
@@ -76,11 +78,12 @@ func (f ColorField) Render(cx *core.Scope) core.Node {
 		picker.end()
 	}
 	disabled := func() bool { return is(f.Disabled) || picker.isDisabled() }
+	invalid := func() bool { return is(f.Invalid) || picker.isInvalid() }
 	if channel != ChannelNone {
-		return f.channel(cx, picker, channel, disabled)
+		return f.channel(cx, picker, channel, disabled, invalid)
 	}
 	return drawnField(f.Field, core.Input{Placeholder: f.Placeholder, NoAutoCorrect: true, AutoCapitalize: core.AutoCapitalizeNone,
-		ReadonlyFunc: disabled, Disabled: disabled, Label: f.Label, TestID: f.TestID, Class: f.Class, Style: f.Style,
+		ReadonlyFunc: disabled, Disabled: disabled, Invalid: invalid, Label: f.Label, TestID: f.TestID, Class: f.Class, Style: f.Style,
 		Value: func() string {
 			if d := draft.Get(); d != nil {
 				return *d
@@ -99,7 +102,7 @@ func (f ColorField) Render(cx *core.Scope) core.Node {
 
 // channel is the field of a channel, in percents, degrees or bytes as it
 // reads, to a decimal where it has them.
-func (f ColorField) channel(cx *core.Scope, picker *colorState, channel ColorChannel, disabled func() bool) core.Node {
+func (f ColorField) channel(cx *core.Scope, picker *colorState, channel ColorChannel, disabled, invalid func() bool) core.Node {
 	spec := colorSpecOf(f.ColorSpace, channel)
 	step, precision := 1.0, 0.1
 	switch f.ColorSpace {
@@ -123,7 +126,7 @@ func (f ColorField) channel(cx *core.Scope, picker *colorState, channel ColorCha
 	if label == "" {
 		label = colorChannelLabel(cx, channel)
 	}
-	in := NumberInput{Class: f.Class, Style: f.Style, TestID: f.TestID, Label: label, Disabled: disabled, Placeholder: func() string { return f.Placeholder },
+	in := NumberInput{Class: f.Class, Style: f.Style, TestID: f.TestID, Label: label, Disabled: disabled, Invalid: invalid, Placeholder: func() string { return f.Placeholder },
 		Min: func() *float64 { return &zero }, Max: func() *float64 { return &top }, Step: func() float64 { return step },
 		OnCommit: true, Live: true, Snap: true, Precision: precision, OnChangeEnd: picker.end,
 		Format: func(v float64) string { return colorNumber(v, decimals) + suffix },

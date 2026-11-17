@@ -17,6 +17,8 @@ const (
 // Link is content that goes somewhere when pressed, with the link role and
 // no look of its own. In a Toolbar it is one of its items.
 type Link struct {
+	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
+	Invalid func() bool
 	// Href is where it goes, a URL or a path of the app's, never shown.
 	Href     string
 	HrefFunc func() string
@@ -51,7 +53,7 @@ func (l Link) Render(cx *core.Scope) core.Node {
 		return l.Href
 	}
 	v := core.View{Class: l.Class, Style: l.Style, StyleFunc: l.StyleFunc, Role: core.RoleLink, Label: l.Label, Hint: l.Hint, TestID: l.TestID, OnLayout: l.OnLayout, Tooltip: l.Tooltip,
-		HitSlop: l.HitSlop, HitSlopFunc: l.HitSlopFunc, Disabled: l.Disabled, Children: l.Children,
+		HitSlop: l.HitSlop, HitSlopFunc: l.HitSlopFunc, Disabled: l.Disabled, Invalid: l.Invalid, Children: l.Children,
 		OnPress: func(e core.PressEvent) {
 			if to := href(); to != "" {
 				if l.OnOpen != nil {

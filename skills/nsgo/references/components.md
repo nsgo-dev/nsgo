@@ -11,7 +11,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 | Dates, times and colors | `ui.DatePicker`, `ui.Calendar`, `ui.TimeField`, `ui.ColorPicker` |
 | Scrolling and long data | `ui.ScrollView` or `core.Scroll`; `ui.List` or `core.List` for rows built only in view; `core.NewCollection` behind them |
 | Tables, trees and charts | `base/datatable` for large tables, `base.Table` for small ones, `ui.Tree`, `base/plot` for charts |
-| Navigation | `base.NewNav` with `ui.NavPage` and `ui.NavHeader` (the system's header on iOS and Android), `ui.Tabs[T]`, `ui.Sidebar`, `ui.SidebarShell`, `ui.TabShell` (a sidebar when wide, a bar when narrow), `mobile.TabBar` for the system tab bar, `ui.Breadcrumbs`, `ui.Pagination`, `ui.Stepper` |
+| Navigation | `base.NewNav` with `ui.NavPage` and `ui.NavHeader` (the system's header on iOS and Android), `ui.Tabs[T]`, `ui.Sidebar`, `ui.SidebarShell`, `ui.TabShell` (a bottom tab bar), `mobile.TabBar` for the system tab bar, `ui.Breadcrumbs`, `ui.Pagination`, `ui.Stepper` |
 | Overlays | `ui.Dialog`, `ui.AlertDialog`, `cx.ShowAlert` for the system's alert, `ui.Sheet`, `ui.Popover`, `ui.HoverCard`, `ui.Tooltip`, `ui.Toaster` for toasts |
 | Menus and commands | `ui.Menu` with `ui.MenuItem` and `ui.Submenu`, `ui.ContextMenu`, `ui.CommandDialog`, `ui.Toolbar` |
 | Disclosure and layout helpers | `ui.Accordion`, `ui.Collapsible`, `ui.Carousel`, `ui.Spacer`, `ui.HStack`, `ui.Wrap`, `ui.Settings` and `ui.FormSection` for settings pages |
@@ -25,6 +25,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 
 - Drive a native `core.WebView` through its `core.Ref` (`Reload`, `GoBack`, `GoForward`); app-owned history entries keep their `core.AccessWebSchemes` exemption, while new page-created navigations remain restricted.
 - A component's look comes from its `Variant`, a type of its own whose zero value is the default (`ui.ButtonVariant`), and a few take `Size` (`ui.SizeDefault`, small or large). Do not fake a variant with styles over the default.
+- For validation in `base` controls, pass `Invalid: rejected.Get`; style it with `aria-invalid:` classes or `Style.AriaInvalid`. Custom controls pass it to their actual input or root and use `core.PartStates.Invalid` on decorative parts to avoid duplicate accessibility state.
 - Controlled controls take a getter and a setter: `Value: name.Get, OnChange: name.Set`, `Checked: on.Get`, `Open: dialog.Get, OnOpenChange: ...`.
 - Use `ui.Slider.MinFunc`, `MaxFunc` and `StepFunc` for changing ranges and steps; `base.Slider.Min`, `Max` and `Step` already take getters. This keeps focus and an active drag mounted.
 - `ui.Dialog` and `ui.AlertDialog` take `Style` and `StyleFunc` for their surface; use `StyleFunc` for colors that follow the theme or other signals, merged after `Style` on both centered dialogs and sheets.

@@ -20,7 +20,7 @@ func baseListFace(p *props) core.Node {
 	l := base.List{Count: rows.count, Key: rows.key, Row: rows.row, Selection: r.listSelection(p), TapSelects: p.bool("tapSelects"),
 		Columns: p.int("numColumns"), EstimatedSize: p.points("estimatedItemSize"), Gap: p.points("gap"),
 		Header: r.listSlot(p, "header"), Footer: r.listSlot(p, "footer"), Empty: r.listSlot(p, "empty"), OnLoadMore: p.on("onLoadMore"),
-		Label: p.str("accessibilityLabel"), Ref: p.n.ref, TestID: p.str("testID"), Class: p.class(), StyleFunc: p.style,
+		Invalid: func() bool { return p.bool("invalid") }, Label: p.str("accessibilityLabel"), Ref: p.n.ref, TestID: p.str("testID"), Class: p.class(), StyleFunc: p.style,
 		ListClass: p.str("listClass"), ItemClass: p.str("itemClass")}
 	if p.has("listStyle") {
 		l.ListStyleFunc = func() core.Style { return r.style(p.get("listStyle")) }
