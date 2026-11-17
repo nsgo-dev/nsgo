@@ -8,31 +8,24 @@ import (
 // navEdgeTail is how far a soft edge's blur runs past its bars.
 const navEdgeTail core.Points = 24
 
-// systemHeader reports whether a page shows the platform's top app bar over
-// its content. Apple uses the system's glass; Android uses its native
-// toolbar. Other platforms draw NavHeader themselves.
+// systemHeader reports whether a page shows the platform's header, iOS's navigation bar or Android's toolbar, rather than NavHeader.
 func systemHeader(cx *core.Scope) bool {
 	os := cx.Env().OS()
 	return os == core.OSIOS || os == core.OSAndroid
 }
 
-// NavInset is the room to leave at the top of a page's content that does not
-// scroll for a NavPage's system header, and 0 where the header takes room of
-// its own. Scroll views under the header are inset already. It is tracked as
-// the safe area changes.
+// transparentHeader reports whether the system's header lies over the page's content without a background, which scrolls under it with a progressive blur: iOS's. Android's stays opaque until it draws scroll edge effects.
+func transparentHeader(cx *core.Scope) bool { return cx.Env().OS() == core.OSIOS }
+
+// NavInset is the room to leave at the top of a page's content that does not scroll for a NavPage's system header, and 0 where the header takes room of its own. Scroll views under the header are inset already. It is tracked as the safe area changes.
 func NavInset(cx *core.Scope) core.Points {
-	// iOS's transparent header reaches through the status bar. Android's
-	// native toolbar owns the inset and core.Scroll applies it to content.
-	if cx.Env().OS() != core.OSIOS {
+	if !transparentHeader(cx) {
 		return 0
 	}
 	return core.Insets(cx).Top
 }
 
-// NavHeader is the bar at the top of a page: a back button named
-// BackLabel while OnBack is set, the title, and the app's views at
-// either end. On iOS NavPage gives these to the system's header, whose
-// back button pops the page.
+// NavHeader is the bar at the top of a page: a back button named BackLabel while OnBack is set, the title, and the app's views at either end. On iOS and Android NavPage gives the title and the views to the system's header, whose own back button pops the page, so OnBack and BackLabel go unused there.
 type NavHeader struct {
 	Title string
 	// TitleFunc replaces Title as the graph changes.
@@ -41,12 +34,10 @@ type NavHeader struct {
 	BackLabel string
 	Leading   []core.Node
 	Trailing  []core.Node
-	// Scroll is the page's scroll view, ScrollFunc when it changes: under a
-	// system header it blurs progressively toward the top.
+	// Scroll is the page's scroll view, ScrollFunc when it changes: under iOS's system header it blurs progressively toward the top.
 	Scroll     *core.Ref
 	ScrollFunc func() *core.Ref
-	// Symbols has the system's header show its own buttons for what takes
-	// presses in Trailing, one each in order, as the back button is drawn.
+	// Symbols has iOS's system header show its own buttons for what takes presses in Trailing, one each in order, as the back button is drawn.
 	Symbols func() []core.HeaderSymbol
 	TestID  string
 }

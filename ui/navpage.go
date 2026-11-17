@@ -5,15 +5,9 @@ import (
 
 	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
-	"github.com/nsgo-dev/nsgo/mobile"
 )
 
-// NavPage returns p, a page of a base.Nav, on the page's background under
-// header, a NavHeader whose title and ends default to p's, unless p has a
-// Header of its own. On iOS and Android the platform draws the top app bar;
-// elsewhere NavHeader is drawn above the page. On iOS the system's
-// transparent header shows the title and trailing views over the page, which
-// scrolls under it.
+// NavPage returns p, a page of a base.Nav, on the page's background under header, a NavHeader whose title and ends default to p's, unless p has a Header of its own. On iOS and Android the platform's header shows header's title and the views at its ends, with its own back button, which pops the page: on iOS the system's transparent header over the page, which scrolls under it; on Android the native toolbar in the surface's color, above the page. Elsewhere NavHeader is drawn above the page.
 func NavPage(cx *core.Scope, p base.NavPage, header NavHeader) base.NavPage {
 	colors := ColorsOf(cx)
 	app := p.StyleFunc
@@ -42,23 +36,21 @@ func NavPage(cx *core.Scope, p base.NavPage, header NavHeader) base.NavPage {
 		}
 		p.Header = header
 	}
-	if mobile.IsAvailable(cx) {
-		// The system mounts the header views in its bar even while hidden.
-		p.HeaderHidden, p.HeaderLeft, p.HeaderRight, p.HeaderTitle = true, nil, nil, nil
-		top := core.View{Style: core.Style{PaddingEnv: core.EnvEdges{Top: core.EnvSafeArea, Right: core.EnvSafeArea, Left: core.EnvSafeArea}},
-			StyleFunc: Filled(colors.Surface), Children: []core.Node{p.Header}}
-		p.Header, p.Children = nil, append([]core.Node{top}, p.Children...)
-	}
 	return p
 }
 
-// systemNavPage shows header in the system's header, transparent over p,
-// with a bar under it that blurs the page's scroll view as far as the header
-// reaches, the blur's tail included.
+// systemNavPage shows header in the system's header. On iOS it is transparent over p, with a bar under it that blurs the page's scroll view as far as the header reaches, the blur's tail included. On Android, which draws no scroll edge effects yet, it is opaque in the surface's color and the page is laid out below it.
 func systemNavPage(cx *core.Scope, p base.NavPage, header NavHeader) base.NavPage {
 	colors := ColorsOf(cx)
-	p.HeaderTransparent, p.Header = true, nil
-	p.HeaderStyleFunc = func() core.Style { return core.Style{Color: colors.Text(), TintColor: colors.Text()} }
+	p.Header = nil
+	transparent := transparentHeader(cx)
+	p.HeaderStyleFunc = func() core.Style {
+		s := core.Style{Color: colors.Text(), TintColor: colors.Text()}
+		if !transparent {
+			s.Background = colors.Surface()
+		}
+		return s
+	}
 	if header.Title != "" {
 		p.Title = header.Title
 	}
@@ -72,6 +64,10 @@ func systemNavPage(cx *core.Scope, p base.NavPage, header NavHeader) base.NavPag
 		p.HeaderRight = navItems(header.Trailing)
 		p.IOS.HeaderRightSymbols = header.Symbols
 	}
+	if !transparent {
+		return p
+	}
+	p.HeaderTransparent = true
 	scroll := header.ScrollFunc
 	if scroll == nil {
 		scroll = func() *core.Ref { return header.Scroll }
