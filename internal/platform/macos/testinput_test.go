@@ -7,8 +7,66 @@ import (
 
 	"github.com/ebitengine/purego/objc"
 
+	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
+
+// AppKit gates delivery with the area's activity option, before any of our callbacks run. Check the native subscriptions, including the surface's moves that pick hovers and set cursors over views with no mouse handlers of their own.
+func TestPointerTrackingContinuesInBackground(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		s := newSurface(Options{Width: 300, Height: 200}, false)
+		defer func() {
+			s.close()
+			delete(views, s.native)
+			s.native.Send(selRelease)
+		}()
+		const enteredAndExited, moved, cursorUpdate = 0x01, 0x02, 0x04
+		const activityMask, activeInApp, always = 0xf0, 0x40, 0x80
+		areas := s.native.Send(sel("trackingAreas"))
+		var rootMoves, cursorUpdates bool
+		for i := uint(0); i < objc.Send[uint](areas, selCount); i++ {
+			area := areas.Send(sel("objectAtIndex:"), i)
+			options := objc.Send[uint](area, sel("options"))
+			if options&moved != 0 {
+				rootMoves = true
+				if options&activityMask != always {
+					t.Errorf("surface moves stop in a background app: options %#x", options)
+				}
+				if options&enteredAndExited != 0 {
+					t.Errorf("the surface hears its own enters and exits, which no view of it follows: options %#x", options)
+				}
+			}
+			if options&cursorUpdate != 0 {
+				cursorUpdates = true
+				if options&activityMask != activeInApp {
+					t.Errorf("cursorUpdate needs an active-app area: options %#x", options)
+				}
+			}
+		}
+		if !rootMoves || !cursorUpdates {
+			t.Errorf("surface tracks moves=%v, cursor updates=%v", rootMoves, cursorUpdates)
+		}
+		native := objc.ID(classView).Send(selNew)
+		defer native.Send(selRelease)
+		v := &view{native: native, surface: s}
+		defer func() {
+			if v.hover != 0 {
+				v.hover.Send(selRelease)
+			}
+		}()
+		for _, kind := range []driver.EventKind{driver.EventMouseEnter, driver.EventMouseMove, driver.EventMouseLeave} {
+			v.setEvents(driver.EventMask(1) << kind)
+			options := objc.Send[uint](v.hover, sel("options"))
+			if options&activityMask != always || options&enteredAndExited == 0 {
+				t.Errorf("%v stops entering/leaving in background: options %#x", kind, options)
+			}
+			if kind == driver.EventMouseMove && options&moved == 0 {
+				t.Error("the move listener has no native move subscription")
+			}
+		}
+	})
+}
 
 func testMouse(kind uint, at float64, window int) objc.ID {
 	return objc.ID(apple.Class("NSEvent")).Send(

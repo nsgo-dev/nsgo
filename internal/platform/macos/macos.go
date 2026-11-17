@@ -910,13 +910,14 @@ func newSurface(opts Options, embedded bool) *surface {
 		apple.Rect(0, 0, float64(opts.Width), float64(opts.Height)))
 	s.native.Send(selSetWantsLayer, true)
 	views[s.native] = &view{surface: s}
-	// Moves over the whole surface set the cursor (updateCursor), and
-	// AppKit asks for it as the mouse comes in.
-	const mouseMoved, cursorUpdate, activeInActiveApp, inVisibleRect = 0x02, 0x04, 0x40, 0x200
-	area := objc.ID(apple.Class("NSTrackingArea")).Send(selAlloc).Send(sel("initWithRect:options:owner:userInfo:"),
-		apple.Rect(0, 0, 0, 0), uint(mouseMoved|cursorUpdate|activeInActiveApp|inVisibleRect), s.native, objc.ID(0))
-	s.native.Send(sel("addTrackingArea:"), area)
-	area.Send(selRelease)
+	// Moves over the whole surface pick the hovers and set the cursor (filterEvent), in a background window too and over views with no mouse handlers. AppKit sends no cursorUpdate: to an area that is active always, so the cursor updates it asks for as the mouse comes in take a second area, active in the active app only.
+	const mouseMoved, cursorUpdate, activeInActiveApp, activeAlways, inVisibleRect = 0x02, 0x04, 0x40, 0x80, 0x200
+	for _, options := range []uint{mouseMoved | activeAlways | inVisibleRect, cursorUpdate | activeInActiveApp | inVisibleRect} {
+		area := objc.ID(apple.Class("NSTrackingArea")).Send(selAlloc).Send(sel("initWithRect:options:owner:userInfo:"),
+			apple.Rect(0, 0, 0, 0), options, s.native, objc.ID(0))
+		s.native.Send(sel("addTrackingArea:"), area)
+		area.Send(selRelease)
+	}
 	s.animator = driver.NewAnimator(func(e driver.Event) { s.engine.Dispatch(e) })
 	s.acceptFiles()
 	surfaces[s] = true
@@ -2148,11 +2149,10 @@ func (v *view) setEvents(m driver.EventMask) {
 	}
 }
 
-// trackingArea adds a tracking area over view's visible rect, reporting
-// the pointer entering and leaving it and, if moves, moving within it.
+// trackingArea adds a tracking area over view's visible rect, reporting the pointer entering and leaving it and, if moves, moving within it, whether or not the app or window is active, as Windows, Linux and the web follow the pointer in a background window.
 func trackingArea(view objc.ID, moves bool) objc.ID {
-	const enteredAndExited, mouseMoved, activeInActiveApp, inVisibleRect = 0x01, 0x02, 0x40, 0x200
-	options := uint(enteredAndExited | activeInActiveApp | inVisibleRect)
+	const enteredAndExited, mouseMoved, activeAlways, inVisibleRect = 0x01, 0x02, 0x80, 0x200
+	options := uint(enteredAndExited | activeAlways | inVisibleRect)
 	if moves {
 		options |= mouseMoved
 	}
