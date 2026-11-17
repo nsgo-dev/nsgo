@@ -18,6 +18,8 @@
 
 `Scope.ImageSize` and `Scope.PrefetchImage` are NSH's `Image.getSize` and `Image.prefetch`: `ItemImageInfo` carries the source, its `asset:` variant picked as for views, and the platform answers with `EventImageInfo`. The backends that load in Go call `imageload.Info`, so the bytes stay in `imageload`'s 32 MiB cache for the views that show them next, and read the size from the header (`imagedecode.Size`; ImageIO on Apple). Android answers in its Go process. The web loads an `<img>` outside the page and keeps the bytes in the browser's cache. The size is the one `OnLoad` reports.
 
+`imageload` turns a `file:` URL into a path by the rules `core.FileFromURL` uses (`driver.FileURLPath`): on Windows `file:///C:/...` keeps its drive letter and `file://server/share/...` becomes a UNC path; elsewhere the path is the URL's decoded path, and a host other than `localhost` fails rather than read a local file of the same path.
+
 ## Disk cache
 
 Every native backend loads `http(s)` images through `imageload`, which keeps their bytes in a disk cache under the app's cache directory (`imageload.UseDiskCache`, 256 MiB), as NSH's `DiskCache`. The web leaves caching to the browser.
@@ -53,4 +55,4 @@ Its scanline rasterizer computes exact coverage across each row with 16 samples 
 
 ## Verification
 
-`go test ./internal/platform/imageload` checks the disk cache's policy against a test server, and each backend's tests hold its HTTP client to the same checks (`imageloadtest.CheckHTTP`). `go test ./internal/platform/imagedecode` checks decoded frames, rasterized pixels and the bounds; the Windows and Linux native tests check animated GIFs and SVG pixels in a window. The Windows and Linux native tests also check a fit at a position, `Center`'s natural size, blur, fade and `ImageSize` in a window. The gallery's Images page shows every resize mode, blur, placeholders and fades, `ImageSize`, `PrefetchImage` and progress, an animated GIF and WebP, and SVG, plain and tinted.
+`go tool nsgo test ./internal/driver` checks the paths of Windows and other targets' file URLs on every host; `go tool nsgo test ./internal/platform/imageload` reads local files through their file URLs with `Load` and checks the disk cache's policy against a test server; each backend's tests hold its HTTP client to the same checks (`imageloadtest.CheckHTTP`). `go tool nsgo test ./internal/platform/imagedecode` checks decoded frames, rasterized pixels and the bounds; the Windows and Linux native tests check animated GIFs and SVG pixels in a window. The Windows and Linux native tests also check a fit at a position, `Center`'s natural size, blur, fade and `ImageSize` in a window. The gallery's Images page shows every resize mode, blur, placeholders and fades, `ImageSize`, `PrefetchImage` and progress, an animated GIF and WebP, and SVG, plain and tinted.

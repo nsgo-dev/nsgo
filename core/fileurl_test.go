@@ -68,40 +68,6 @@ func TestFileFromURLLocalFile(t *testing.T) {
 	}
 }
 
-func TestFileFromURLPaths(t *testing.T) {
-	for _, test := range []struct {
-		raw     string
-		windows bool
-		want    string
-	}{
-		{"file:///C:/dir/a%20b.txt", true, `C:\dir\a b.txt`},
-		{"file:///c:/dir/x", true, `c:\dir\x`},
-		{"file://localhost/C:/dir/x", true, `C:\dir\x`},
-		{"file://server/share/x.txt", true, `\\server\share\x.txt`},
-		{"file:////server/share/x.txt", true, `\\server\share\x.txt`},
-		{"file://localhost/C$/Users/x.txt", true, `\\localhost\C$\Users\x.txt`},
-		{"file:///home/me/a%20b%23c.txt", false, "/home/me/a b#c.txt"},
-		{"file://LOCALHOST/home/me/x", false, "/home/me/x"},
-	} {
-		u, err := url.Parse(test.raw)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, err := filePath(u, test.windows)
-		if err != nil {
-			t.Errorf("filePath(%q, %v): %v", test.raw, test.windows, err)
-			continue
-		}
-		if got != test.want {
-			t.Errorf("filePath(%q, %v) = %q, want %q", test.raw, test.windows, got, test.want)
-		}
-	}
-	u, _ := url.Parse("file://server/share/x.txt")
-	if p, err := filePath(u, false); err == nil {
-		t.Errorf("a remote file URL outside Windows = %q", p)
-	}
-}
-
 func TestFileFromURLBlob(t *testing.T) {
 	old := driver.BlobFile
 	defer func() { driver.BlobFile = old }()

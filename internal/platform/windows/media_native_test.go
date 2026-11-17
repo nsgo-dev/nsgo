@@ -11,6 +11,9 @@ import (
 	"image/gif"
 	"image/png"
 	"math"
+	"net/url"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -606,6 +609,41 @@ func TestAnimatedGIFAndSVGImagesDraw(t *testing.T) {
 	waitForColor(t, hwnd, px(150), px(150), 0x00ff00, time.Second)
 	waitForColor(t, hwnd, px(150), px(98), 0xff0000, time.Second)
 	waitForColor(t, hwnd, px(150), px(102), 0x00ff00, time.Second)
+}
+
+// TestFileURLImagesDraw checks an image shown by the file: URL of a file on a drive, with the slash before the drive that file:///C:/ has, and through localhost, with spaces, non-ASCII characters and escapes in its name.
+func TestFileURLImagesDraw(t *testing.T) {
+	title := "nsgo-file-url-images"
+	m := image.NewRGBA(image.Rect(0, 0, 10, 10))
+	for i := range m.Pix {
+		m.Pix[i] = []byte{0, 0x80, 0xff, 0xff}[i%4]
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, m); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "poster 日本 #%.png")
+	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	drive := (&url.URL{Scheme: "file", Path: "/" + filepath.ToSlash(path)}).String()
+	local := (&url.URL{Scheme: "file", Host: "localhost", Path: "/" + filepath.ToSlash(path)}).String()
+	app := func(cx *core.Scope) core.Node {
+		loaded := core.NewSignal(cx, 0)
+		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%d", title, loaded.Get())) })
+		onLoad := func(driver.Size) { loaded.Update(func(n int) int { return n + 1 }) }
+		return core.View{Style: core.Style{Width: driver.Pt(200), Height: driver.Pt(100), Background: driver.RGB(0xffffff),
+			Direction: core.Row}, Children: []core.Node{
+			core.Image{Source: driver.ImageSource{URI: drive}, ResizeMode: driver.Stretch, OnLoad: onLoad,
+				Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100)}},
+			core.Image{Source: driver.ImageSource{URI: local}, ResizeMode: driver.Stretch, OnLoad: onLoad,
+				Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100)}},
+		}}
+	}
+	hwnd := startWith(t, app, Options{Title: title + "|0", Width: 200, Height: 100})
+	waitForTitle(t, hwnd, title+"|2", 5*time.Second)
+	waitForColor(t, hwnd, px(50), px(50), 0x0080ff, time.Second)
+	waitForColor(t, hwnd, px(150), px(50), 0x0080ff, time.Second)
 }
 
 // TestImagesFitAtTheirPositionBlurAndFade checks the core fit with a

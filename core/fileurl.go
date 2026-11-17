@@ -41,9 +41,9 @@ func localFileFromURL(u *url.URL) (File, error) {
 	if u.Opaque != "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
 		return File{}, errors.New("core: file URL has unsupported components")
 	}
-	path, err := filePath(u, goruntime.GOOS == "windows")
+	path, err := driver.FileURLPath(u, goruntime.GOOS == "windows")
 	if err != nil {
-		return File{}, err
+		return File{}, fmt.Errorf("core: %w", err)
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -54,30 +54,6 @@ func localFileFromURL(u *url.URL) (File, error) {
 	}
 	name := filepath.Base(path)
 	return File{Name: name, MIME: driver.MIMEForFile(name), Size: info.Size(), Modified: info.ModTime(), Path: path}, nil
-}
-
-// filePath is the path a file: URL names on Windows, where /C:/ names a drive, with no host or localhost, and a host a UNC share, or elsewhere, where only localhost may be its host.
-func filePath(u *url.URL, windows bool) (string, error) {
-	if !strings.HasPrefix(u.Path, "/") {
-		return "", errors.New("core: file URL has no absolute path")
-	}
-	local := u.Host == "" || strings.EqualFold(u.Host, "localhost")
-	if !windows {
-		if !local {
-			return "", fmt.Errorf("core: file URL names a file on %s", u.Host)
-		}
-		return u.Path, nil
-	}
-	p := u.Path
-	drive := len(p) >= 3 && p[2] == ':' && 'a' <= p[1]|0x20 && p[1]|0x20 <= 'z'
-	switch {
-	case drive && local:
-		p = p[1:]
-	case u.Host != "":
-		// The share \\localhost\C$ is written file://localhost/C$.
-		p = "//" + u.Host + p
-	}
-	return strings.ReplaceAll(p, "/", `\`), nil
 }
 
 func blobFileFromURL(u *url.URL) (File, error) {

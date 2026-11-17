@@ -165,7 +165,11 @@ func fetch(ctx context.Context, uri string, progress Progress) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return os.ReadFile(filepath.FromSlash(u.Path))
+		path, err := driver.FileURLPath(u, runtime.GOOS == "windows")
+		if err != nil {
+			return nil, fmt.Errorf("imageload: %s: %w", uri, err)
+		}
+		return os.ReadFile(path)
 	case strings.HasPrefix(uri, "http://"), strings.HasPrefix(uri, "https://"):
 		if c := disk.Load(); c != nil {
 			return c.fetch(ctx, uri, progress)
