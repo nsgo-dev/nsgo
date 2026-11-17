@@ -4723,9 +4723,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                         && x < (c.area[0] + c.area[2]) * density && y < (c.area[1] + c.area[3]) * density;
                 if (!slop && !area) continue;
                 if (child instanceof Group) ((Group) child).childrenOnly = !slop;
+                int candidates = gestures.candidates();
                 if (deliver(child, e)) return child;
-                // A declined down has no up or cancel to clear this flag.
+                // A declined down has no up or cancel to clear this flag, and the gesture views it noted are not under the touch.
                 if (child instanceof Group) ((Group) child).childrenOnly = false;
+                gestures.forgetCandidates(candidates);
             }
             return null;
         }
@@ -4846,6 +4848,16 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         /** Notes a gesture view the new touch went down on, outermost first. */
         void candidate(Node n) {
             if (collecting) candidates.add(n);
+        }
+
+        /** How many gesture views the touch going down has noted so far. */
+        int candidates() {
+            return candidates.size();
+        }
+
+        /** Forgets the gesture views noted after the first count, as a probe that declined the touch noted them. */
+        void forgetCandidates(int count) {
+            if (candidates.size() > count) candidates.subList(count, candidates.size()).clear();
         }
 
         /** Takes the targets of the touch that went down. */

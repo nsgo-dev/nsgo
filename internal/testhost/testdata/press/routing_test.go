@@ -31,6 +31,30 @@ func TestPressRoutingDoesNotDisableSiblings(t *testing.T) {
 	}
 }
 
+// A sibling probed for a touch outside it, which declines it, must not take the touch's pan from the views it lands on.
+func TestDeclinedRoutingLeavesPansToTheTouchedViews(t *testing.T) {
+	var outer, sibling, presses int
+	app := nsgotest.Start(t, func(*core.Scope) core.Node {
+		return core.View{TestID: "outer", Style: core.Style{Width: core.Pt(300), Height: core.Pt(240)},
+			OnPan: func(core.PanEvent) { outer++ }, Children: []core.Node{
+				core.View{Style: core.Style{Width: core.Pt(300), Height: core.Pt(240)}, Children: []core.Node{
+					core.View{Style: core.Style{Position: core.Absolute, Left: core.Pt(20), Top: core.Pt(20),
+						Width: core.Pt(100), Height: core.Pt(60)}, OnPress: func(core.PressEvent) { presses++ }},
+					core.View{Style: core.Style{Position: core.Absolute, Left: core.Pt(170), Top: core.Pt(20),
+						Width: core.Pt(100), Height: core.Pt(60)}, OnPan: func(core.PanEvent) { sibling++ }},
+				}},
+			}}
+	}, nsgotest.Size(300, 240))
+	app.DragAt("id:outer", core.Point{X: 70, Y: 50}, core.Point{X: 0, Y: 40}, core.Point{X: 0, Y: 120})
+	if outer == 0 || sibling != 0 || presses != 0 {
+		t.Fatalf("drag from the earlier view: outer pans=%d, sibling pans=%d, presses=%d", outer, sibling, presses)
+	}
+	app.PressAt("id:outer", core.Point{X: 70, Y: 50})
+	if presses != 1 || sibling != 0 {
+		t.Fatalf("press after the drag: presses=%d, sibling pans=%d", presses, sibling)
+	}
+}
+
 func TestOverflowPressLeavesItsContainersPressable(t *testing.T) {
 	var child, parent, backdrop int
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
