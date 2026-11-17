@@ -83,7 +83,7 @@ A call into the platform can cost more than the op it plays draws ([performance]
 
 `internal/platform/canvastest` holds sample drawings, one for each group of features, and the pixels they must produce; the Apple, Windows and Linux players check them in their tests. The web and Android are checked by screenshots of the gallery's Canvas page.
 
-The web replays canvases 120 ms after a scroll zoom's last step, at the screen's pixel ratio multiplied by the enclosing scroll zooms, with raster zoom clamped to 1–4 as on Apple. CSS scales the kept pixels during a pinch or animation. New drawings and moved content take their current ancestry's scale; a zoom replays the recording without rerunning `Draw`. Browser regressions check line pixels, nested zooms, initial and interrupted animations, late mounting, moved holders, configuration changes and screen scale.
+The web replays canvases 120 ms after a scroll zoom's last step, at the screen's pixel ratio multiplied by the enclosing scroll zooms, with raster zoom clamped to 1–4 as on Apple. The zoom never takes a bitmap past 4096 × 4096 pixels or a side of 16384, where browsers stop drawing or memory runs short; a canvas already past that at the pixel ratio alone keeps the ratio. CSS scales the kept pixels during a pinch or animation. New drawings and moved content take their current ancestry's scale, read from the zoomed contents' `data-nsgo-zoom`; a zoom replays the recording without rerunning `Draw`.
 
 ## Where NSGo departs from NSH
 

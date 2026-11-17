@@ -1486,8 +1486,8 @@ func (s *surface) mount(b *driver.MountBatch) {
 				s.cover(v)
 			}
 			s.appear(v, lb, it.Parent)
-			if v.framed {
-				// Kept content can move between scroll views without a new drawing.
+			if v.framed && v.el.Get("isConnected").Bool() {
+				// Kept content can move between scroll views without a new drawing, and a new subtree's canvases drew before it reached the page. A subtree still being assembled waits for its root's insert, so each canvas is checked once.
 				s.refreshCanvasScale(v.el)
 			}
 		case driver.ItemRemove:

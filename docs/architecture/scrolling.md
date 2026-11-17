@@ -25,7 +25,7 @@ A scroll view follows NSH's `scrolling-and-lists.md`: `ScrollBehavior` holds pag
 - Windows draws macOS's overlay indicator (`scrollbar.Bar.Indicator`): 6 points thick, rounded, 3 from the edge, fading 700 ms after the view or the pointer last moved and shrinking past the edges. Linux keeps its own bar, shown while the pointer is over the view.
 - iOS and Android keep a focused field in a scroll view clear of the software keyboard: the keyboard's height joins the bottom inset while it shows, and the field scrolls into view with the keyboard's motion.
 - Zooming (`MaxZoomScale` above `MinZoomScale`, `Ref.ZoomTo`) is iOS's zoom view, Android's `ZoomScroll`, a scaled content element on the web and the container's bounds on macOS; Windows and Linux ignore it, as NSH's desktops do. Mouse drags never scroll content.
-- On the web, a zoom's last step schedules canvas replay after 120 ms without another step, at the cumulative scroll zoom clamped to 1–4 times the screen's pixel ratio. A new command, a pinch or Ctrl+wheel cancels the previous zoom animation; changing the limits cancels it too, so an old target cannot override the new one. Deleting a scroll cancels both the animation and pending replay.
+- On the web, a zoom's last step schedules canvas replay after 120 ms without another step, at the cumulative scroll zoom clamped to 1–4 times the screen's pixel ratio and to a bitmap budget ([canvas](canvas.md)). A new command, a pinch or Ctrl+wheel cancels the previous zoom animation; changing the limits cancels it too, so an old target cannot override the new one. Deleting a scroll cancels both the animation and pending replay.
 
 ### Edge effects
 

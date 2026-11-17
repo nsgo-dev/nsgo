@@ -22,7 +22,7 @@ func TestWebCanvasScrollZoom(t *testing.T) {
 		cases          int
 	}{
 		{"pixels", filepath.Join("testdata", "canvaszoom"), "", 4},
-		{"lifecycle", filepath.Join("..", "..", "internal", "platform", "web"), "^TestCanvasScrollZoom", 2},
+		{"lifecycle", filepath.Join("..", "..", "internal", "platform", "web"), "^TestCanvasScrollZoom", 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)

@@ -22,7 +22,7 @@ core.Canvas{
 
 The recording follows the web's `CanvasRenderingContext2D`: `Save` and `Restore`, transforms, paths of lines, curves, rectangles and arcs, fills and strokes with colors and gradients, clipping, dashes, shadows, text and images. `core.ParsePath` makes a `core.Path` from SVG path data, and `FillFromView` and `StrokeFromView` take the canvas view's inherited `Fill` and `Stroke` styles, so a chart follows the app's theme.
 
-On the web, a zoomed `core.Scroll` replays canvases at the cumulative zoom of their enclosing scroll views once the zoom rests, up to four times the screen's pixel ratio. This keeps lines and glyphs sharp without rerunning `Draw`.
+On the web, a zoomed `core.Scroll` replays canvases at the cumulative zoom of their enclosing scroll views once the zoom rests, up to four times the screen's pixel ratio and within 4096 × 4096 pixels. This keeps lines and glyphs sharp without rerunning `Draw`.
 
 ```go
 d.SetFillGradient(core.CanvasLinear(0, 0, float32(size.Width), 0,

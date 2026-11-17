@@ -75,14 +75,60 @@ func canvasZoomSurface(t *testing.T) (*surface, *view) {
 
 func waitCanvasPixels(t *testing.T, v *view, size int) {
 	t.Helper()
+	waitCanvasBitmap(t, v, size, size)
+}
+
+func waitCanvasBitmap(t *testing.T, v *view, w, h int) {
+	t.Helper()
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
-		if v.inner.Get("width").Int() == size && v.inner.Get("height").Int() == size {
+		if v.inner.Get("width").Int() == w && v.inner.Get("height").Int() == h {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("canvas bitmap is %dx%d, want %dx%d", v.inner.Get("width").Int(), v.inner.Get("height").Int(), size, size)
+			t.Fatalf("canvas bitmap is %dx%d, want %dx%d", v.inner.Get("width").Int(), v.inner.Get("height").Int(), w, h)
 		}
 	}
+}
+
+// mountCanvas mounts canvas id, w by h points, inside a new view holder into parent, in the order the core sends a new subtree: the canvas draws and is framed before its holder, and the holder reaches parent last.
+func mountCanvas(s *surface, holder, id, parent driver.NodeID, w, h driver.Points) *view {
+	d := driver.NewDrawing(nil)
+	d.SetFillColor(driver.RGB(0x000000)).FillRect(0, 0, 1, float32(h))
+	f := driver.Bounds{Size: driver.Size{Width: w, Height: h}}
+	s.mount(&driver.MountBatch{Items: []driver.MountItem{
+		{Kind: driver.ItemCreate, ID: holder, View: driver.KindView},
+		{Kind: driver.ItemCreate, ID: id, View: driver.KindCanvas},
+		{Kind: driver.ItemCanvas, ID: id, Drawing: d},
+		{Kind: driver.ItemFrame, ID: id, Frame: f},
+		{Kind: driver.ItemInsert, ID: id, Parent: holder},
+		{Kind: driver.ItemFrame, ID: holder, Frame: f},
+		{Kind: driver.ItemInsert, ID: holder, Parent: parent},
+	}})
+	return s.view(id)
+}
+
+func TestCanvasScrollZoomReachesNewSubtrees(t *testing.T) {
+	s, _ := canvasZoomSurface(t)
+	s.zoomCommand(s.view(2), &driver.ZoomRequest{Scale: 3}, false)
+	// The canvas draws while its holder is still detached, so only the holder's insert can find the zoom.
+	canvas := mountCanvas(s, 6, 7, 2, 100, 100)
+	waitCanvasPixels(t, canvas, 600)
+}
+
+func TestCanvasScrollZoomBoundsBitmap(t *testing.T) {
+	s, _ := canvasZoomSurface(t)
+	s.zoomCommand(s.view(2), &driver.ZoomRequest{Scale: 4}, false)
+	// 1024 points at a ratio of 2 are 2048 pixels; the zoom raises them only to the 4096 by 4096 budget, not to 8192.
+	square := mountCanvas(s, 6, 7, 2, 1024, 1024)
+	waitCanvasPixels(t, square, 4096)
+	// A long canvas stops at the largest side browsers draw.
+	long := mountCanvas(s, 8, 9, 2, 4096, 10)
+	waitCanvasBitmap(t, long, 16384, 40)
+	// One past the budget at the screen's ratio alone keeps that ratio.
+	large := mountCanvas(s, 10, 11, 2, 2500, 2500)
+	waitCanvasPixels(t, large, 5000)
+	// The fixture's small canvas still takes the whole zoom.
+	waitCanvasPixels(t, s.view(5), 800)
 }
 
 func TestCanvasScrollZoomFollowsKeptPlacement(t *testing.T) {

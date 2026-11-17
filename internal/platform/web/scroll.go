@@ -25,6 +25,8 @@ import (
 const (
 	momentumWait   = 150 // ms after a drag a scroll is its glide
 	zoomRasterWait = 120 // ms without a zoom step before canvases replay
+	// zoomAttr holds a zoomed scroll content's scale, which canvases inside it multiply into their pixels.
+	zoomAttr = "data-nsgo-zoom"
 )
 
 const scrollCSS = `@keyframes nsgo-spin { to { transform: rotate(360deg) } }
@@ -42,7 +44,7 @@ type scrollState struct {
 	markers []js.Value
 	spinner js.Value
 	zoom    float64
-	// Raster work waits until a pinch, wheel or animated zoom rests.
+	// rasterTimer replays the canvases inside once a pinch, wheel or animated zoom rests; zoomFrame and zoomStep are the animated zoom in flight, and zoomRun counts zooms so a replaced animation stops.
 	rasterTimer js.Value
 	rasterEnd   js.Func
 	zoomFrame   js.Value
@@ -179,10 +181,12 @@ func (v *view) placeContent() {
 		ox = max((float64(v.size.Width-in.Left-in.Right)-w)/2, 0)
 		oy = max((float64(v.size.Height-in.Top-in.Bottom)-h)/2, 0)
 	}
-	transform := ""
+	transform, scale := "", ""
 	if z != 1 {
-		transform = "scale(" + strconv.FormatFloat(z, 'g', -1, 64) + ")"
+		scale = strconv.FormatFloat(z, 'g', -1, 64)
+		transform = "scale(" + scale + ")"
 	}
+	setAttr(v.content, zoomAttr, scale)
 	setStyle(v.content, map[string]string{
 		"left": webstyle.Px(in.Left - b.Left + driver.Points(ox)), "top": webstyle.Px(in.Top - b.Top + driver.Points(oy+sc.pull)),
 		"width": webstyle.Px(v.scroll.Width - b.Left), "height": webstyle.Px(v.scroll.Height - b.Top), "transform": transform,
@@ -609,8 +613,7 @@ func (s *surface) zoomContent(v *view, scale, cx, cy, fx, fy float64) {
 	}
 }
 
-// rasterAfterZoom keeps CSS scaling cheap during the gesture, then
-// replays canvases at the resolution at which the scroll shows them.
+// rasterAfterZoom keeps CSS scaling cheap during the gesture, then replays canvases at the resolution at which the scroll shows them.
 func (s *surface) rasterAfterZoom(v *view) {
 	sc := v.sc
 	if sc.rasterEnd.IsUndefined() {
@@ -628,6 +631,7 @@ func (s *surface) rasterAfterZoom(v *view) {
 	sc.rasterTimer = js.Global().Call("setTimeout", sc.rasterEnd, zoomRasterWait)
 }
 
+// stopRaster cancels a waiting canvas replay and releases its callback, for a scroll view being deleted.
 func (sc *scrollState) stopRaster() {
 	if sc.rasterTimer.Truthy() {
 		js.Global().Call("clearTimeout", sc.rasterTimer)
