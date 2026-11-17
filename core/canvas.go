@@ -9,8 +9,8 @@ import (
 )
 
 // Canvas draws what Draw records, at the canvas's size, again whenever a
-// signal Draw read or the size changes. The platform plays the recording
-// on the main thread; Draw itself runs on the engine.
+// signal Draw read, the size or the available fonts change. The platform
+// plays the recording on the main thread; Draw itself runs on the engine.
 //
 // The Drawing measures text with the platform's text engine
 // (MeasureText, TextMetrics) and answers hit tests (IsPointInPath,
@@ -82,6 +82,7 @@ func (c Canvas) mountIn(t *Tree, cx *Scope, parent *node) { t.mountCanvas(cx, pa
 
 type canvasNode struct {
 	draw    func(*Drawing, Size)
+	effect  *computation
 	size    *Signal[Size]
 	drawing *Drawing
 	fresh   bool
@@ -190,7 +191,7 @@ func (t *Tree) mountCanvas(cx *Scope, parent *node, c Canvas) {
 			}
 		})
 	}
-	cx.renderEffect(func() {
+	cn.effect = cx.renderEffect(func() {
 		size := cn.size.Get()
 		if size == (Size{}) || cn.draw == nil {
 			return

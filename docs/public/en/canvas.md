@@ -7,7 +7,7 @@ order: 59
 
 ## A canvas
 
-`core.Canvas` records 2D drawing on the engine and has the platform play it, as a web page's `<canvas>` does. `Draw` runs again when a signal it read or the canvas's size changes, and the platform draws the recording on the main thread.
+`core.Canvas` records 2D drawing on the engine and has the platform play it, as a web page's `<canvas>` does. `Draw` runs again when a signal it read, the canvas's size or the available fonts change, and the platform draws the recording on the main thread. A font loaded through `cx.RegisterFont` reruns `Draw` once available, updating both text and geometry based on `TextMetrics`.
 
 ```go
 core.Canvas{

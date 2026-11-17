@@ -561,10 +561,11 @@ func (cx *Scope) Effect(fn func()) (stop func()) {
 
 // renderEffect runs fn now and again before the app's effects whenever
 // what it read changes. Element bindings are render effects.
-func (cx *Scope) renderEffect(fn func()) {
+func (cx *Scope) renderEffect(fn func()) *computation {
 	c := newComputation(cx.current(), renderEffect, nil)
 	c.effect = fn
 	c.run()
+	return c
 }
 
 // run runs fn under owner o, untracked, in a batch, catching panics.

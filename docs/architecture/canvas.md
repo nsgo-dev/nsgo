@@ -4,7 +4,7 @@
 
 ## Recording
 
-`Canvas.Draw` runs on the engine when a signal it read or the canvas's size changes and records `DrawOp`s into a `Drawing`, which travels in `ItemCanvas` and never changes after. `Icon` and `SVG` record the same way ([icons](icons.md)). The methods follow the web's `CanvasRenderingContext2D`:
+`Canvas.Draw` runs on the engine when a signal it read, the canvas's size or the available fonts change and records `DrawOp`s into a `Drawing`, which travels in `ItemCanvas` and never changes after. `FontsChanged` schedules every live canvas's recording effect: a drawing can use `TextMetrics` to place shapes without recording text, so replaying its old operations would leave stale geometry. `Icon` and `SVG` record the same way ([icons](icons.md)). The methods follow the web's `CanvasRenderingContext2D`:
 
 - State: `Save` and `Restore`, `Translate`, `Scale`, `Rotate`, `Transform`, `SetTransform` and `ResetTransform`, alpha, and `SetComposite`, Porter-Duff operators and blend modes named as `globalCompositeOperation`.
 - Lines and text: widths, caps, joins, `SetMiterLimit`, `SetLineDash` (an odd list repeats, as the web's) and its offset, `SetShadow`, `SetTextAlign` and `SetTextBaseline`.

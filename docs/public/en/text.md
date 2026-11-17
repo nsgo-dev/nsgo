@@ -68,7 +68,7 @@ func main() { nsgo.Run(Root, nsgo.Fonts("fonts/Inter-Regular.ttf", "fonts/Inter-
 cx.RegisterFont(data) // a TrueType or OpenType face
 ```
 
-A text laid out before a font arrives is prepared again. `cx.Env().FontScale()` is the user's text size, which texts follow unless `NoFontScaling` is set; `MaxFontSizeMultiplier` caps it.
+A text laid out before a font arrives is prepared again, and canvases run `Draw` again so their glyphs and text measurements use the loaded font. `cx.Env().FontScale()` is the user's text size, which texts follow unless `NoFontScaling` is set; `MaxFontSizeMultiplier` caps it.
 
 ## Selection and measurement
 

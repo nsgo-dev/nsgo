@@ -257,8 +257,8 @@ func (cx *Scope) RegisterFont(data []byte) error {
 	return nil
 }
 
-// FontsChanged prepares every text again, with fonts the platform made
-// available since it was prepared.
+// FontsChanged prepares every text and records every canvas again, with
+// fonts the platform made available since they were prepared.
 func (t *Tree) FontsChanged() {
 	t.fonts++
 	for _, n := range t.nodes {
@@ -272,10 +272,15 @@ func (t *Tree) FontsChanged() {
 		case n.input != nil:
 			n.input.lineH = 0
 			t.markLayout(n)
+		case n.canvas != nil && n.canvas.effect != nil:
+			// Draw can measure text without recording any text operations.
+			// Run it again so both its geometry and glyphs use the new fonts.
+			n.canvas.effect.mark(dirty)
 		}
 	}
 	t.measures = newMeasureCache()
 	t.markAll()
+	t.rt.maybeFlush()
 }
 
 // OpenURL opens u outside the app: a web page in the browser, a mailto:

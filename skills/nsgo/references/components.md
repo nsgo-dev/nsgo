@@ -23,6 +23,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 
 ## Using them well
 
+- `core.Canvas.Draw` runs again when a signal it reads, its size or the available fonts change; `cx.RegisterFont` updates its glyphs and `Drawing.TextMetrics` once the font loads, including asynchronously on the web ([canvas](https://nsgo.dev/docs/canvas.md)).
 - Show frames the app decodes or renders (video, emulators, previews) in a `core.Image` with `ImageSource{Pixels: frame, Version: n}`, bumping `Version` after writing each frame into the same `*image.RGBA`; never encode a PNG per frame ([images](https://nsgo.dev/docs/images.md)).
 - Drive a native `core.WebView` through its `core.Ref` (`Reload`, `GoBack`, `GoForward`); app-owned history entries keep their `core.AccessWebSchemes` exemption, while new page-created navigations remain restricted.
 - A transparent `core.Video` needs HEVC with alpha (`.mov`) on macOS (iOS unchecked) and VP9 with alpha (WebM) on Linux. On macOS, iOS, Windows and Linux a local clip whose alpha cannot be kept reports `OnError` with a `*core.MediaError` whose `Reason` is `core.MediaErrorAlphaUnsupported` (Windows refuses every clip with alpha until Media Foundation's alpha output is checked), so check `Reason`, not the message, to fall back to the app's own decoder; Android, the web and remote URLs play it as the decoder outputs it, possibly opaque ([Components](https://nsgo.dev/docs/components.md)).
