@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * One surface's bounded canvas cache, including loading and failed entries. The least recently drawn go first, but never one the pass of drawing under way drew: a pass drawing more than the limit keeps them all, as evicting one would request it again at the next pass, forever.
+ * One surface's bounded canvas cache, including failed entries, which loads under way exceed, as they are never evicted. The least recently drawn go first, but never one the pass of drawing under way drew: a pass drawing more than the limit keeps them all, as evicting one would request it again at the next pass, forever.
  */
 final class CanvasImages<T> {
     static final int LIMIT = 64;
@@ -77,8 +77,15 @@ final class CanvasImages<T> {
         Entry entry = entries.get(key);
         if (entry == null) {
             while (entries.size() >= LIMIT) {
-                Map.Entry<String, Entry> oldest = entries.entrySet().iterator().next();
-                if (oldest.getValue().used > pass) break;
+                // A load under way stays: cancelling it would leave what waits for it, a canvas or a shader that draws only when its images arrive, without the image until it draws again.
+                Map.Entry<String, Entry> oldest = null;
+                for (Map.Entry<String, Entry> item : entries.entrySet()) {
+                    if (!item.getValue().pending) {
+                        oldest = item;
+                        break;
+                    }
+                }
+                if (oldest == null || oldest.getValue().used > pass) break;
                 entries.remove(oldest.getKey());
                 retire(oldest.getKey(), oldest.getValue());
             }

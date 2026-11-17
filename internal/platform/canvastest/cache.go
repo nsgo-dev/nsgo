@@ -9,8 +9,8 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// CacheSources returns distinct, tiny red images for cache-pressure tests. Their data stays owned by the caller, so address-based source keys stay unique.
-func CacheSources(n int) []driver.ImageSource {
+// RedPNG is a tiny red PNG.
+func RedPNG() []byte {
 	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
 	for y := range 2 {
 		for x := range 2 {
@@ -21,9 +21,15 @@ func CacheSources(n int) []driver.ImageSource {
 	if err := png.Encode(&b, img); err != nil {
 		panic(err)
 	}
+	return b.Bytes()
+}
+
+// CacheSources returns distinct, tiny red images for cache-pressure tests. Their data stays owned by the caller, so address-based source keys stay unique.
+func CacheSources(n int) []driver.ImageSource {
+	data := RedPNG()
 	sources := make([]driver.ImageSource, n)
 	for i := range sources {
-		sources[i].Data = bytes.Clone(b.Bytes())
+		sources[i].Data = bytes.Clone(data)
 	}
 	return sources
 }

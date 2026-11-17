@@ -5,10 +5,13 @@
 package imageloadtest
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -59,4 +62,26 @@ func CheckHTTP(t *testing.T, get func(ctx context.Context, url string, header im
 	if _, err := get(ctx, srv.URL+"/slow", imageload.Header{}, nil); err != context.DeadlineExceeded || time.Since(start) > 5*time.Second {
 		t.Fatalf("a cancelled download = %v after %v", err, time.Since(start))
 	}
+}
+
+var slowRun atomic.Int64
+
+// Slow has imageload answer every http(s) source with body after delay, as a slow network does, until the test ends, and returns n distinct addresses for it. Each call's addresses are new, so imageload's own cache holds none of them yet.
+func Slow(t *testing.T, n int, delay time.Duration, body []byte) []string {
+	saved := imageload.HTTP
+	t.Cleanup(func() { imageload.HTTP = saved })
+	imageload.HTTP = func(ctx context.Context, url string, header imageload.Header, progress imageload.Progress) (*imageload.Response, error) {
+		select {
+		case <-time.After(delay):
+			return &imageload.Response{Status: 200, Body: bytes.Clone(body)}, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	run := slowRun.Add(1)
+	uris := make([]string, n)
+	for i := range uris {
+		uris[i] = fmt.Sprintf("https://slow.invalid/%d/%d.png", run, i)
+	}
+	return uris
 }

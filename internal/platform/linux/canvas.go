@@ -702,21 +702,17 @@ func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
 		var oldest string
 		var at uint64 = math.MaxUint64
 		for key, slot := range w.canvasImages {
-			if slot.used < at {
+			// A load under way stays: cancelling it would leave what waits for it, a canvas or a shader that draws only when its images arrive, without the image until it draws again, and canvases drawn in frames of their own would then cancel each other's loads forever.
+			if slot.load == nil && slot.used < at {
 				oldest, at = key, slot.used
 			}
 		}
 		if at > w.canvasPass {
-			// Every image was drawn by the frame under way: evicting one would load it again at the next frame, forever.
+			// Every image loaded was drawn by the frame under way, or none has loaded: evicting one would load it again at the next frame, forever.
 			break
 		}
 		w.canvasImages[oldest].reset(driver.ImageSource{})
 		delete(w.canvasImages, oldest)
-		if waiting := w.canvasWaiting[oldest]; len(waiting) > 0 {
-			// What waited for a load this cancels draws again, to ask for it anew: a shader's texture would otherwise never load.
-			w.post(func() { w.redrawWaiting(waiting) })
-		}
-		delete(w.canvasWaiting, oldest)
 	}
 	s := &imageSlot{src: src, used: w.canvasImageUse}
 	w.canvasImages[key] = s
@@ -766,7 +762,7 @@ func (w *window) redrawWaiting(waiting []*view) {
 	}
 }
 
-// maxCanvasImages bounds the encoded sources a window's canvases keep, loaded, loading or failed; the least recently drawn go first, but never one the frame under way drew, so a frame drawing more keeps them all until a later frame draws others.
+// maxCanvasImages bounds the encoded sources a window's canvases keep, loaded or failed, and is exceeded only by loads under way, which are never evicted; the least recently drawn go first, but never one the frame under way drew, so a frame drawing more keeps them all until a later frame draws others.
 const maxCanvasImages = 64
 
 // endCanvasPass ends the frame that drew the images used so far: they may be evicted from now on.

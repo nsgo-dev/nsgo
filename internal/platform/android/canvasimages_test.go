@@ -52,7 +52,7 @@ func TestCanvasRequestsBoundedAndReloadable(t *testing.T) {
 			t.Fatalf("source %d not available", i)
 		}
 		if i >= maxCanvasImages {
-			// Java's cache evicts its oldest pending entry and cancels its request.
+			// Java cancels a request it no longer waits for, the oldest here.
 			c.cancel(0, key(i-maxCanvasImages), uint32(i-maxCanvasImages+1))
 		}
 		if n := len(c.trees[0].loads); n > maxCanvasImages {

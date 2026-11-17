@@ -10,6 +10,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/canvastest"
+	"github.com/nsgo-dev/nsgo/internal/platform/imageload/imageloadtest"
 )
 
 func isolatedCanvasImages(t *testing.T) {
@@ -77,21 +78,50 @@ func TestCanvasImageCacheBoundAndReload(t *testing.T) {
 	}
 }
 
-func TestCanvasImageCacheBoundsPendingAndFailed(t *testing.T) {
+// Loads under way are never evicted, even by later passes: the cache exceeds its bound only by them, and shrinks back once they have loaded. Failed loads are evicted as loaded ones are.
+func TestCanvasImageCacheKeepsLoadsUnderWayAndEvictsFailed(t *testing.T) {
 	isolatedCanvasImages(t)
-	sources := canvastest.CacheSources(1000)
-	canvasImage(sources[0], CanvasHost{})
-	old := canvasImages[sources[0].Key()]
-	for _, src := range sources[1:] {
+	runMain()
+	sources := canvastest.CacheSources(2 * maxCanvasImages)
+	for _, src := range sources {
 		endCanvasPass()
-		canvasImage(src, CanvasHost{})
-		if len(canvasImages) > maxCanvasImages {
-			t.Fatal("pending cache grew beyond limit")
+		canvasImage(src, CanvasHost{Ratio: 1})
+	}
+	if len(canvasImages) != len(sources) {
+		t.Fatalf("%d of %d loads under way kept", len(canvasImages), len(sources))
+	}
+	kept := map[*loadedImage]bool{}
+	for _, src := range sources {
+		kept[canvasImages[src.Key()]] = true
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		runMain()
+		loaded := 0
+		for im := range kept {
+			if im.image != 0 {
+				loaded++
+			}
+		}
+		if loaded == len(kept) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d loaded", loaded, len(kept))
 		}
 	}
-	runMain()
-	if old.image != 0 || old.waiting != nil {
-		t.Fatal("obsolete completion revived a cache entry")
+	endCanvasPass()
+	canvasImage(canvastest.CacheSources(1)[0], CanvasHost{})
+	if len(canvasImages) != maxCanvasImages {
+		t.Fatalf("%d cached once the loads under way loaded", len(canvasImages))
+	}
+	evicted := 0
+	for im := range kept {
+		if im.image == 0 {
+			evicted++
+		}
+	}
+	if evicted != len(kept)-maxCanvasImages+1 {
+		t.Fatalf("%d evicted images released their native image", evicted)
 	}
 	// Failed loads must be evictable too, even with no decoded native image.
 	for key, im := range canvasImages {
@@ -167,23 +197,53 @@ func TestCanvasImageCacheKeepsAWidePass(t *testing.T) {
 	}
 }
 
-// What waited for a load that eviction cancels draws again, to ask for it anew: a shader, which draws only when its images arrive, would otherwise never get its texture.
-func TestCanvasImageCacheEvictionRedrawsWaiters(t *testing.T) {
+// Canvases drawn in passes of their own whose images together exceed the bound and load more slowly than a pass all get every image: a canvas's pass must not cancel another's loads, which would draw again and cancel the first's, forever.
+func TestCanvasImageCacheCanvasesDrawnApartLoadSlowImages(t *testing.T) {
 	isolatedCanvasImages(t)
 	runMain()
-	sources := canvastest.CacheSources(maxCanvasImages + 1)
-	redrawn := 0
-	canvasImage(sources[0], CanvasHost{Owner: t, Redraw: func() { redrawn++ }})
-	im := canvasImages[sources[0].Key()]
-	for _, src := range sources[1:] {
-		endCanvasPass()
-		canvasImage(src, CanvasHost{})
+	var sources []driver.ImageSource
+	for _, uri := range imageloadtest.Slow(t, 88, 150*time.Millisecond, canvastest.RedPNG()) {
+		sources = append(sources, driver.ImageSource{URI: uri})
 	}
-	if canvasImages[sources[0].Key()] == im {
-		t.Fatal("oldest pending image not evicted")
+	type canvas struct {
+		dirty   bool
+		sources []driver.ImageSource
 	}
-	runMain()
-	if redrawn != 1 {
-		t.Fatalf("waiter redrawn %d times", redrawn)
+	canvases := []*canvas{{sources: sources[:40]}, {sources: sources[40:80]}, {sources: sources[80:]}}
+	draws := 0
+	draw := func(c *canvas) {
+		c.dirty = false
+		draws++
+		for _, src := range c.sources {
+			canvasImage(src, CanvasHost{Owner: c, Ratio: 1, Redraw: func() { c.dirty = true }})
+		}
+		// The pass ends before the next canvas draws in a pass of its own.
+		runMain()
+	}
+	for _, c := range canvases {
+		draw(c)
+	}
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(time.Millisecond) {
+		runMain()
+		for _, c := range canvases {
+			if c.dirty {
+				draw(c)
+			}
+		}
+		loaded := 0
+		for _, src := range sources {
+			if im := canvasImages[src.Key()]; im != nil && im.image != 0 {
+				loaded++
+			}
+		}
+		if loaded == len(sources) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d loaded after %d draws, %d cached", loaded, len(sources), draws, len(canvasImages))
+		}
+	}
+	if draws > 3+len(sources) {
+		t.Fatalf("%d draws for %d images", draws, len(sources))
 	}
 }

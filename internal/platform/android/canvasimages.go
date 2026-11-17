@@ -7,10 +7,10 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// maxCanvasImages is the bound of Java's cache (CanvasImages.LIMIT), which a pass of drawing more sources exceeds until a later pass draws others.
+// maxCanvasImages is the bound of Java's cache (CanvasImages.LIMIT), which loads under way and a pass of drawing more sources exceed until later passes draw others.
 const maxCanvasImages = 64
 
-// canvasRequests keeps sources only while a mounted drawing uses them. Java owns the bounded decoded cache and asks again on a miss, and cancels the loads its eviction drops, so the loads under way are at most the pending entries of Java's cache; Go retains no sent-key set. Mounts and requests arrive on different goroutines.
+// canvasRequests keeps sources only while a mounted drawing uses them. Java owns the bounded decoded cache and asks again on a miss, never evicts a pending entry and cancels the loads of a cache it closes, so the loads under way are the pending entries of Java's cache; Go retains no sent-key set. Mounts and requests arrive on different goroutines.
 type canvasRequests struct {
 	mu     sync.Mutex
 	trees  map[uint32]*canvasSources

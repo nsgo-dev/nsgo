@@ -74,11 +74,47 @@ func TestCanvasImageCacheBoundAndReload(t *testing.T) {
 	}
 }
 
-func TestCanvasImageCacheBoundsPendingAndDropsQueuedResults(t *testing.T) {
+// Loads under way are never evicted, even by later paints: the cache exceeds its bound only by them, and shrinks back once they have loaded. A result queued when the window closes revives nothing.
+func TestCanvasImageCacheKeepsLoadsUnderWayAndDropsQueuedResults(t *testing.T) {
+	if _, err := devices(); err != nil {
+		t.Skip(err)
+	}
 	w := &window{}
 	defer w.closeCanvasImages()
-	sources := canvastest.CacheSources(1000)
-	old := w.canvasImage(sources[0])
+	sources := canvastest.CacheSources(2 * maxCanvasImages)
+	slots := map[*imageSlot]bool{}
+	for _, src := range sources {
+		w.endCanvasPass()
+		slots[w.canvasImage(src)] = true
+	}
+	if len(w.canvasImages) != len(sources) {
+		t.Fatalf("%d of %d loads under way kept", len(w.canvasImages), len(sources))
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		w.runTasks()
+		loaded := 0
+		for s := range slots {
+			if s.load == nil && s.pic != nil {
+				loaded++
+			}
+		}
+		if loaded == len(slots) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d loaded", loaded, len(slots))
+		}
+	}
+	w.endCanvasPass()
+	queued := w.canvasImage(canvastest.CacheSources(1)[0])
+	if len(w.canvasImages) != maxCanvasImages {
+		t.Fatalf("%d cached once the loads under way loaded", len(w.canvasImages))
+	}
+	for s := range slots {
+		if w.canvasImages[s.src.Key()] != s && (s.pic != nil || s.bitmap != nil) {
+			t.Fatal("an evicted image kept its resources")
+		}
+	}
 	// The paint's end is posted at once; the load's result follows it.
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
 		w.mu.Lock()
@@ -91,20 +127,9 @@ func TestCanvasImageCacheBoundsPendingAndDropsQueuedResults(t *testing.T) {
 			t.Fatal("load did not post a result")
 		}
 	}
-	for _, src := range sources[1:] {
-		w.endCanvasPass()
-		w.canvasImage(src)
-		if len(w.canvasImages) > maxCanvasImages {
-			t.Fatal("pending cache grew beyond limit")
-		}
-	}
-	w.runTasks()
-	if old.pic != nil || old.load != nil {
-		t.Fatal("queued completion resurrected evicted image")
-	}
 	w.closeCanvasImages()
 	w.runTasks()
-	if len(w.canvasImages) != 0 {
+	if len(w.canvasImages) != 0 || queued.pic != nil {
 		t.Fatal("closed cache revived")
 	}
 }

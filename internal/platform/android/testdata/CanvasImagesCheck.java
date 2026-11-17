@@ -61,11 +61,17 @@ public final class CanvasImagesCheck {
         cache.complete("image-0", generation, reloaded);
         CanvasImages<Picture>.Lease lease = draw(cache, "image-0");
         check(lease.value == reloaded, "reloaded image differs");
-        for (int i = 0; i < 1000; i++) {
-            draw(cache, "pending-" + i);
-            check(cache.size() <= 64, "unbounded pending cache");
+        // Loads under way are never evicted, so the cache exceeds its limit only by them: a canvas or shader waiting for one would go without it until it draws again, and canvases drawn in passes of their own would cancel each other's loads forever.
+        for (int i = 0; i < 100; i++) draw(cache, "pending-" + i);
+        check(cache.size() == 100, "a load under way was evicted");
+        check(cancellations.isEmpty(), "a load under way was cancelled");
+        for (int i = 0; i < 100; i++) {
+            String key = "pending-" + i;
+            check(cache.complete(key, requests.get(key), new Picture()), "a load under way was dropped");
         }
-        check(cancellations.containsKey("pending-0"), "evicted load was not cancelled");
+        draw(cache, "after-pending");
+        check(cache.size() == 64, "cache did not shrink once its loads under way loaded");
+        cache.complete("after-pending", requests.get("after-pending"), new Picture());
         check(!reloaded.freed, "GL frame's leased bitmap freed early");
         Thread gl = new Thread(lease::close);
         gl.start(); gl.join();
@@ -80,10 +86,13 @@ public final class CanvasImagesCheck {
         }
         draw(cache, "recent");
         int recent = requests.get("recent");
+        cache.complete("recent", recent, new Picture());
         for (int i = 0; i < 100; i++) {
-            cache.acquire("recent");
+            cache.acquire("recent").close();
             cache.acquire("other-" + i);
+            cache.complete("other-" + i, requests.get("other-" + i), new Picture());
             endPass();
+            check(cache.size() <= 64, "unbounded loaded cache");
         }
         check(requests.get("recent") == recent, "recently drawn image evicted");
 
@@ -109,7 +118,10 @@ public final class CanvasImagesCheck {
         endPass();
         check(requests.equals(before), "a wide pass requested again");
         // Later passes of others shrink the cache back to the limit.
-        for (int i = 0; i < 100; i++) draw(cache, "after-" + i);
+        for (int i = 0; i < 100; i++) {
+            draw(cache, "after-" + i);
+            cache.complete("after-" + i, requests.get("after-" + i), new Picture());
+        }
         check(cache.size() <= 64, "cache did not shrink after a wide pass");
         check(wide.get("wide-0").freed, "a wide pass's bitmap leaked");
 

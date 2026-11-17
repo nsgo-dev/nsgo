@@ -1029,12 +1029,13 @@ func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
 		var oldest string
 		var at uint64 = math.MaxUint64
 		for key, slot := range w.canvasImages {
-			if slot.used < at {
+			// A load under way stays: cancelling it would leave the canvases drawing it without the image until they paint again.
+			if slot.load == nil && slot.used < at {
 				oldest, at = key, slot.used
 			}
 		}
 		if at > w.canvasPass {
-			// Every image was drawn by the paint under way: evicting one would load it again at the next paint, forever.
+			// Every image loaded was drawn by the paint under way, or none has loaded: evicting one would load it again at the next paint, forever.
 			break
 		}
 		w.canvasImages[oldest].reset(driver.ImageSource{})
@@ -1079,7 +1080,7 @@ func (w *window) canvasImage(src driver.ImageSource) *imageSlot {
 	return s
 }
 
-// maxCanvasImages bounds the encoded sources a window's canvases keep, loaded, loading or failed; the least recently drawn go first, but never one the paint under way drew, so a paint drawing more keeps them all until a later paint draws others.
+// maxCanvasImages bounds the encoded sources a window's canvases keep, loaded or failed, and is exceeded only by loads under way, which are never evicted; the least recently drawn go first, but never one the paint under way drew, so a paint drawing more keeps them all until a later paint draws others.
 const maxCanvasImages = 64
 
 // endCanvasPass ends the paint that drew the images used so far: they may be evicted from now on.
