@@ -163,10 +163,7 @@ var (
 // flex item keeps its content's size, where an unset minimum is 0.
 var AutoMinimum = driver.AutoMinimum
 
-// CurrentColor, in a style's colors other than Color, is the text color
-// the view has: its own, else the one it inherits, else black, as CSS's
-// currentColor. It is the one color value set aside: it never draws as
-// itself.
+// CurrentColor, in a style's colors other than Color, is the text color the view has: its own, else the one it inherits, else its subtree's Palette.Text, as CSS's currentColor. It is the one color value set aside: it never draws as itself.
 const CurrentColor = driver.CurrentColor
 
 // Transparent is a color that draws nothing but, unlike 0, is set: a

@@ -914,9 +914,7 @@ func parseCSSColor(s string) (Color, bool, error) {
 	return parseSVGColor(s)
 }
 
-// CurrentColor, in a style's colors other than the text color itself, is
-// the text color the view has: its own, else the one it inherits, else
-// black, as CSS's currentColor. It never draws as itself.
+// CurrentColor, in a style's colors other than the text color itself, is the text color the view has: its own, else the one it inherits, else the engine's default text color, as CSS's currentColor. It never draws as itself.
 const CurrentColor Color = 0x00000001
 
 // A color-mix() of currentColor waits for the text color as a mark: a
