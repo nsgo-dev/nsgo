@@ -102,3 +102,47 @@ func TestCheckboxModifiedKeyboardActivation(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckboxAltActivationOnWindowsIsTheSystemsKey(t *testing.T) {
+	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux, core.OSWeb} {
+		t.Run(string(os), func(t *testing.T) {
+			var got []core.PressEvent
+			app := nsgotest.Start(t, func(*core.Scope) core.Node {
+				return base.Checkbox{TestID: "check", OnChangeEvent: func(_ bool, e core.PressEvent) { got = append(got, e) },
+					Style: core.Style{Width: core.Pt(40), Height: core.Pt(30)}}
+			}, nsgotest.Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
+			app.Focus("id:check")
+			app.Key("alt+space")
+			app.Key("alt+enter")
+			want := 2
+			if os == core.OSWindows {
+				want = 0 // WM_SYSKEYDOWN: the window menu's, never the focused view's
+			}
+			if len(got) != want {
+				t.Fatalf("alt activations = %+v, want %d", got, want)
+			}
+			for _, e := range got {
+				if e.Modifiers != (core.Modifiers{Alt: true}) || !e.Keyboard {
+					t.Fatalf("alt activation = %+v", e)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckboxChangeEventThroughItsVisibleLabel(t *testing.T) {
+	var got []core.PressEvent
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		box := &core.Ref{}
+		return core.View{Children: []core.Node{
+			base.Checkbox{TestID: "check", Ref: box, Label: "Files", OnChangeEvent: func(_ bool, e core.PressEvent) { got = append(got, e) },
+				Style: core.Style{Width: core.Pt(40), Height: core.Pt(30)}},
+			core.View{TestID: "label", LabelFor: box, Style: core.Style{Width: core.Pt(120), Height: core.Pt(30)},
+				Children: []core.Node{core.Text{Content: "Files"}}},
+		}}
+	}, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.PressWith("id:label", core.Modifiers{Shift: true})
+	if len(got) != 1 || got[0].Modifiers != (core.Modifiers{Shift: true}) || got[0].Position != (core.Point{}) {
+		t.Fatalf("label press = %+v, want one Shift press at the checkbox's origin", got)
+	}
+}
