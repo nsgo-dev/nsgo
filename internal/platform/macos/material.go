@@ -160,6 +160,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		if v.backdrop != 0 {
 			v.backdrop.Send(sel("removeFromSuperview"))
 			v.backdrop, v.backdropLayer, v.tint = 0, 0, 0
+			v.tintColor, v.tintStyled = 0, false
 		}
 		if !want {
 			v.glass, v.gaussian = false, false
@@ -210,7 +211,30 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		v.backdrop.Send(sel("addSubview:"), v.tint)
 		v.tint.Send(selRelease)
 	}
-	c := apple.CGColor(vs.Background)
-	v.tint.Send(selLayer).Send(selSetBackgroundColor, c)
-	apple.Release(c)
+}
+
+// styleTint draws the background above the blur, with the same transition and presentation-value retargeting as the view's own layer. Only color changes touch it, so frames moving other properties leave a tint's transition alone. A background binding takes over immediately.
+func (v *view) styleTint(vs *driver.ViewStyle) {
+	if v.tint == 0 {
+		return
+	}
+	layer := v.tint.Send(selLayer)
+	if v.animated.Has(driver.PropBackground) {
+		layer.Send(sel("removeAnimationForKey:"), apple.NSString("nsgo.backgroundColor"))
+	}
+	if v.tintStyled && v.tintColor == vs.Background {
+		return
+	}
+	next := driver.ViewStyle{Background: vs.Background, Opacity: 1}
+	tr := vs.Transition
+	if v.tintStyled && !v.animated.Has(driver.PropBackground) &&
+		(tr.Properties == 0 || tr.Properties&driver.TransitionBackground != 0) {
+		next.Transition = tr
+		next.Transition.Properties = driver.TransitionBackground
+	}
+	if next.Transition.Duration <= 0 {
+		layer.Send(sel("removeAnimationForKey:"), apple.NSString("nsgo.backgroundColor"))
+	}
+	apple.WithoutAnimation(func() { apple.StyleLayer(layer, nil, &next, 0) })
+	v.tintColor, v.tintStyled = vs.Background, true
 }

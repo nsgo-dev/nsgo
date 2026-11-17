@@ -90,6 +90,8 @@ type view struct {
 	backdrop, backdropLayer objc.ID
 	// tint is the view's background over its backdrop blur.
 	tint            objc.ID
+	tintColor       driver.Color
+	tintStyled      bool
 	glass, gaussian bool
 
 	pressing  atomic.Bool
@@ -1831,12 +1833,12 @@ func (s *surface) apply(b *driver.MountBatch) {
 			if apple.UsesFilters(it.ViewStyle) {
 				v.native.Send(sel("setLayerUsesCoreImageFilters:"), true)
 			}
+			v.setBackdrop(it.ViewStyle)
 			if v.animatesStyle() {
 				v.restyle()
 			} else {
 				v.styleLayer(it.ViewStyle)
 			}
-			v.setBackdrop(it.ViewStyle)
 			v.native.Send(selSetHidden, it.ViewStyle.Hidden)
 			if v.image != nil {
 				v.image.SetStyle(it.ViewStyle)

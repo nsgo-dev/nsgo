@@ -119,10 +119,12 @@ func aBareBackdropBlurFollowsItsRadius(t *testing.T) {
 		vs := driver.ViewStyle{Background: driver.RGBA(0, 0.4), CornerRadius: 12, Material: m,
 			Effects: &driver.Effects{BackdropFilters: []driver.Filter{{Kind: driver.FilterBlur, Amount: blur}}}}
 		v.style = vs
-		v.styleLayer(&vs)
 		v.setBackdrop(&vs)
+		v.styleLayer(&vs)
 	}
-	isA := func(o objc.ID, class objc.Class) bool { return o != 0 && objc.Send[bool](o, sel("isKindOfClass:"), class) }
+	isA := func(o objc.ID, class objc.Class) bool {
+		return o != 0 && objc.Send[bool](o, sel("isKindOfClass:"), class)
+	}
 	radius := func() float64 {
 		filters := v.backdropLayer.Send(sel("filters"))
 		if apple.Msg(filters, selCount) != 1 {

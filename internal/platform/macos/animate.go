@@ -345,6 +345,7 @@ func (v *view) restyle() {
 // styleLayer draws vs with v's layer, only what changed since it was
 // last drawn when that is all an animation moves.
 func (v *view) styleLayer(vs *driver.ViewStyle) {
+	v.styleTint(vs)
 	if v.holdClip(vs) {
 		// The holder clips the children: the view's own layer, its shadow and outline, stays unclipped.
 		drawn := *vs
