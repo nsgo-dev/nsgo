@@ -10,9 +10,7 @@ import (
 	"testing"
 )
 
-// TestTargetGoTestFlags exercises a real target executable. This fixture is
-// a library without NSGo's native host: it verifies Go's testing flags and
-// reporting, and needs no window or unlocked desktop.
+// TestTargetGoTestFlags exercises a real target executable. This fixture is a library without NSGo's native host: it verifies Go's testing flags and reporting, and needs no window or unlocked desktop.
 func TestTargetGoTestFlags(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and runs a target executable")

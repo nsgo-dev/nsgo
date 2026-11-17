@@ -79,6 +79,8 @@ go tool nsgo test -target macos
 
 要测量而不是检查时，用 `nsgotest.Measure()` 启动：应用运行在系统时钟上，`Advance` 会真实等待相应时长，各步骤只等待正在进行的动画停下。`app.Mark("name")` 标出此后的读数测的是什么，`app.Mark("-")` 结束标记；无论是否加 `-fps`，标记都会打印出来。
 
+NSGo 的参数要写在目录之前：`go tool nsgo test -target web ./app`，而不是写在目录之后。无头运行时，`--` 之后的参数交给 `go test`。在目标上运行时，`--` 之后只支持 `-short`、`-count`、`-cpu`、`-parallel`、`-failfast` 和 `-fullpath`，例如 `go tool nsgo test -target web ./app -- -short -count=3`；其他 Go 测试参数会明确报错，包括此时应写在目录之前的 `-run` 和 `-timeout`。`-count=0` 不运行任何测试。链接 NSGo 原生宿主的测试按每个次数和 CPU 设置在新进程中重复运行，结果带 `[run N]`，截图保存在 `run-N` 子目录中，每次调用各有超时；库包保留 Go 在进程内的重复运行。
+
 ## TSX 测试
 
 TSX 应用中用 `nsgo/test` 编写的 `*.test.tsx` 文件会随 Go 测试一起运行。

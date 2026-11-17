@@ -434,30 +434,45 @@ func targetResult(name, out string, code int, runErr error, dir string, seen map
 	return t, saved
 }
 
-// testLine matches go test -v's result line of a top-level test.
+// testLine matches go test -v's result line of a test, once its indentation is trimmed.
 var testLine = regexp.MustCompile(`^--- (PASS|FAIL|SKIP): (\S+) \(([0-9.]+)s\)`)
 
-// parseTestOutput turns one test process's output into its result; a
-// process that printed no result for it crashed or timed out.
+// parseTestOutput turns one test process's output into its result; a process that printed no result for it crashed or timed out.
 func parseTestOutput(name, out string, code int, runErr error) *testResult {
 	t := &testResult{Name: name, Output: out}
-	matched := ""
-	for _, line := range strings.Split(out, "\n") {
-		if m := testLine.FindStringSubmatch(strings.TrimLeft(line, " \t")); m != nil && (m[2] == name || strings.HasPrefix(m[2], name+"/")) && len(m[2]) >= len(matched) {
-			s, _ := strconv.ParseFloat(m[3], 64)
-			status := strings.ToLower(m[1])
-			if len(m[2]) > len(matched) {
-				matched, t.Status, t.Elapsed = m[2], status, 0
-			} else if m[2] != matched {
-				continue
-			} else if status == "fail" || t.Status == "skip" {
-				t.Status = status
-			}
-			t.Elapsed += time.Duration(s * float64(time.Second))
-		}
+	// Results by name across in-process repetitions: elapsed times add up, a failure outweighs a pass and a pass a skip.
+	type result struct {
+		status  string
+		elapsed time.Duration
 	}
-	if matched != "" {
-		t.Name = matched
+	results := map[string]*result{}
+	var subtests []string
+	for _, line := range strings.Split(out, "\n") {
+		m := testLine.FindStringSubmatch(strings.TrimLeft(line, " \t"))
+		if m == nil || m[2] != name && !strings.HasPrefix(m[2], name+"/") {
+			continue
+		}
+		s, _ := strconv.ParseFloat(m[3], 64)
+		status := strings.ToLower(m[1])
+		r := results[m[2]]
+		if r == nil {
+			r = &result{status: status}
+			results[m[2]] = r
+			if m[2] != name {
+				subtests = append(subtests, m[2])
+			}
+		} else if status == "fail" || r.status == "skip" {
+			r.status = status
+		}
+		r.elapsed += time.Duration(s * float64(time.Second))
+	}
+	// A run that reached one subtest, as -run Test/sub selects, reports it unless the test failed outside it; otherwise the top-level result covers every subtest, so a test with several is never reported as its first.
+	matched := name
+	if top := results[name]; len(subtests) == 1 && (top == nil || top.status != "fail" || results[subtests[0]].status == "fail") {
+		matched = subtests[0]
+	}
+	if r := results[matched]; r != nil {
+		t.Name, t.Status, t.Elapsed = matched, r.status, r.elapsed
 	}
 	if t.Status == "" || t.Status != "fail" && code != 0 {
 		why := fmt.Sprintf("the test process exited with %d", code)

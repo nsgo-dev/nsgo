@@ -11,8 +11,7 @@ import (
 	"testing"
 )
 
-// TestCLIProcess lets the real main reject arguments in a subprocess, before
-// loading a project, opening a browser, building or starting an MCP server.
+// TestCLIProcess lets the real main reject arguments in a subprocess, before loading a project, opening a browser, building or starting an MCP server.
 func TestCLIProcess(t *testing.T) {
 	if os.Getenv("NSGO_CLI_PROCESS") != "1" {
 		return
@@ -40,7 +39,7 @@ func TestCommandsRefuseTrailingArguments(t *testing.T) {
 		{[]string{"mcp", "missing-app", "-target", "web"}, "go tool nsgo mcp -target"},
 		{[]string{"check", "missing-app", "-target", "all"}, "go tool nsgo check -target"},
 		{[]string{"test", "missing-app", "-target", "web"}, "go tool nsgo test -target"},
-		{[]string{"test", "missing-app", "--", "-test.run", "TestOne"}, "go tool nsgo test -run"},
+		{[]string{"test", "missing-app", "--", "-test.target=web"}, "go tool nsgo test -target=web"},
 		{[]string{"test", "--", "-target", "web"}, "go tool nsgo test -target"},
 		{[]string{"init", "missing-app", "-name", "Name"}, "go tool nsgo init -name"},
 		{[]string{"i18n", "missing-app", "-source", "en"}, "go tool nsgo i18n -source"},
@@ -79,10 +78,17 @@ func TestTestArgumentsKeepGoTestFlags(t *testing.T) {
 		{[]string{"app", "-count", "2"}, "app", []string{"-count", "2"}},
 		{[]string{"app", "--", "-args", "-target", "custom"}, "app", []string{"-args", "-target", "custom"}},
 		{[]string{"app", "--", "-update=--target=custom"}, "app", []string{"-update=--target=custom"}},
+		// go test owns these too, so after the directory they are its flags, not misplaced ones.
+		{[]string{"--", "-timeout=20m", "-run", "TestOne"}, "", []string{"-timeout=20m", "-run", "TestOne"}},
+		{[]string{"app", "-test.bench=.", "-trace", "trace.out"}, "app", []string{"-test.bench=.", "-trace", "trace.out"}},
 	} {
 		fs := flag.NewFlagSet("test", flag.ContinueOnError)
 		fs.SetOutput(io.Discard)
 		fs.String("target", "", "")
+		fs.String("run", "", "")
+		fs.Duration("timeout", 0, "")
+		fs.String("bench", "", "")
+		fs.Bool("trace", false, "")
 		if err := parseCommand(fs, tc.args, -1); err != nil {
 			t.Fatal(err)
 		}
@@ -109,11 +115,11 @@ func TestShort(t *testing.T) {
 		t.Fatal(err)
 	}
 	mark := filepath.Join(dir, "mark")
-	cmd := exec.Command(exe, "-test.run=^TestCLIProcess$", "--", "test", "--", "-short", "-count=1")
+	cmd := exec.Command(exe, "-test.run=^TestCLIProcess$", "--", "test", "--", "-short", "-count=1", "-timeout=5m", "-run=^TestShort$")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "NSGO_CLI_PROCESS=1", "NSGO_CLI_MARK="+mark)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("test -- -short: %v\n%s", err, out)
+		t.Fatalf("test -- -short -timeout -run: %v\n%s", err, out)
 	}
 	if got, err := os.ReadFile(mark); err != nil || string(got) != "short" {
 		t.Fatalf("headless test did not run with -short: %q, %v", got, err)
@@ -134,8 +140,7 @@ func TestTargetTestFlagsNeverDisappear(t *testing.T) {
 		{"-skip=TestOne"}, {"-args", "-custom=one"}, {"-coverprofile=cover.out"}, {"-v=false"},
 		{"-short=maybe"}, {"-count"}, {"-count=x"}, {"-parallel=0"}, {"-cpu=1,0"},
 	} {
-		// A nil project proves the error precedes catalogs, listing, building
-		// and device discovery on every target.
+		// A nil project proves the error precedes catalogs, listing, building and device discovery on every target.
 		for _, target := range []string{"macos", "linux", "windows", "web", "ios", "tvos_simulator", "watchos_simulator", "android", "harmonyos"} {
 			if err := runTests(t.Context(), nil, testOptions{target: target, args: args}); err == nil || !strings.Contains(err.Error(), "test:") {
 				t.Errorf("%s %q: %v, want an explicit argument error", target, args, err)

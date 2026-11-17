@@ -65,6 +65,20 @@ func TestRepeatedTargetResults(t *testing.T) {
 	if got.Name != "TestOne/selected" || got.Status != "pass" {
 		t.Fatalf("indented subtest=%+v", got)
 	}
+	// A test with several subtests is reported as itself, not as its first subtest, failing when any subtest failed.
+	got = parseTestOutput("TestOne", "    --- PASS: TestOne/a (0.1s)\n    --- FAIL: TestOne/b (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
+	if got.Name != "TestOne" || got.Status != "fail" || got.Elapsed != 200*time.Millisecond {
+		t.Fatalf("several subtests=%+v", got)
+	}
+	got = parseTestOutput("TestOne", "    --- PASS: TestOne/a (0.1s)\n    --- PASS: TestOne/b (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
+	if got.Name != "TestOne" || got.Status != "pass" {
+		t.Fatalf("several passing subtests=%+v", got)
+	}
+	// One subtest that passed does not hide a failure of its parent.
+	got = parseTestOutput("TestOne", "    --- PASS: TestOne/a (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
+	if got.Name != "TestOne" || got.Status != "fail" {
+		t.Fatalf("failed parent=%+v", got)
+	}
 }
 
 func TestTreeOf(t *testing.T) {

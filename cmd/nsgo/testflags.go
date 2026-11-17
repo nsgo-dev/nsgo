@@ -16,9 +16,7 @@ type targetTestFlags struct {
 	failfast bool
 }
 
-// executions keeps Go's in-process repetitions for libraries. A linked native
-// host runs each repetition and CPU setting in a fresh process: phone and web
-// hosts can open only one app, and desktop tests get the same isolation.
+// executions keeps Go's in-process repetitions for libraries. A linked native host runs each repetition and CPU setting in a fresh process: phone and web hosts can open only one app, and desktop tests get the same isolation.
 func (f targetTestFlags) executions(hosted bool) iter.Seq[[]string] {
 	base, cpus := []string{}, f.cpus
 	if len(cpus) == 0 {
@@ -52,9 +50,7 @@ func (f targetTestFlags) executions(hosted bool) iter.Seq[[]string] {
 	}
 }
 
-// parseTargetTestFlags accepts only flags the target runner can honor. Build,
-// profiling and discovery flags need go test, and the runner itself owns run,
-// timeout and verbose output; none may disappear on a target.
+// parseTargetTestFlags accepts only flags the target runner can honor. Build, profiling and discovery flags need go test, and the runner itself owns run, timeout and verbose output; none may disappear on a target.
 func parseTargetTestFlags(args []string) (targetTestFlags, error) {
 	var f targetTestFlags
 	fs := flag.NewFlagSet("target test flags", flag.ContinueOnError)

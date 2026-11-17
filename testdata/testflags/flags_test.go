@@ -1,5 +1,4 @@
-// Package testflags links a native host without starting a UI. Its process
-// counter verifies the tool's isolation of host-linked test repetitions.
+// Package testflags links a native host without starting a UI. Its process counter verifies the tool's isolation of host-linked test repetitions.
 package testflags
 
 import (

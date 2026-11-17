@@ -6,16 +6,14 @@ import (
 	"strings"
 )
 
-// parseCommand keeps flag.Parse's flags-before-path convention, but never
-// silently discards what it leaves after the path. A negative paths count
-// lets test forward go test arguments instead.
+// parseCommand keeps flag.Parse's flags-before-path convention, but never silently discards what it leaves after the path. A negative paths count lets test forward go test arguments instead.
 func parseCommand(fs *flag.FlagSet, args []string, paths int) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if paths < 0 {
 		dir, rest := splitTestArgs(fs.Args())
-		if err := misplacedFlags(fs, dir, rest); err != nil {
+		if err := misplacedFlags(fs, dir, rest, goTestOwnFlags); err != nil {
 			return err
 		}
 		return testPathError(rest)
@@ -24,7 +22,7 @@ func parseCommand(fs *flag.FlagSet, args []string, paths int) error {
 		return nil
 	}
 	if paths > 0 {
-		if err := misplacedFlags(fs, fs.Arg(0), fs.Args()[paths:]); err != nil {
+		if err := misplacedFlags(fs, fs.Arg(0), fs.Args()[paths:], nil); err != nil {
 			return err
 		}
 		return fmt.Errorf("%s: takes one path, not %q as well", fs.Name(), fs.Arg(paths))
@@ -39,7 +37,11 @@ func testPathError(args []string) error {
 	return nil
 }
 
-func misplacedFlags(fs *flag.FlagSet, dir string, args []string) error {
+// goTestOwnFlags are test's flags that go test defines too. After the directory they are go test's: headless runs forward them, and a target run refuses them in parseTargetTestFlags with its own hint.
+var goTestOwnFlags = map[string]bool{"run": true, "timeout": true, "bench": true, "trace": true}
+
+// misplacedFlags refuses one of the command's own flags written after its path, unless forwarded names it as an argument the command hands on.
+func misplacedFlags(fs *flag.FlagSet, dir string, args []string, forwarded map[string]bool) error {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "-args" || a == "--args" || a == "--" {
@@ -50,7 +52,7 @@ func misplacedFlags(fs *flag.FlagSet, dir string, args []string) error {
 		}
 		name, value, hasValue := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-"), "=")
 		name = strings.TrimPrefix(name, "test.")
-		if f := fs.Lookup(name); f != nil {
+		if f := fs.Lookup(name); f != nil && !forwarded[name] {
 			option := "-" + name
 			if hasValue {
 				option += "=" + value

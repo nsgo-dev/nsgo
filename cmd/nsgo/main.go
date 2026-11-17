@@ -28,8 +28,8 @@
 // patterns do. test and check also take a directory without nsgo.yaml,
 // such as a library or a module's root, and run on every package under
 // it. Flags replace the nsgo.yaml values they name; -h lists them.
-// Put flags before the path. test forwards go test flags after -- headless;
-// target runs accept short, count, cpu, parallel, failfast and fullpath only.
+//
+// Put flags before the path. Headless, test forwards go test flags after the path, -run, -timeout, -bench and -trace there included; a target run accepts only -short, -count, -cpu, -parallel, -failfast and -fullpath there.
 package main
 
 import (
