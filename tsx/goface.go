@@ -658,6 +658,23 @@ func lowerCamel(s string) string {
 	return string(r)
 }
 
+// primaryRef names the *core.Ref field of t that takes the component's ref prop: Ref, else the first one.
+func primaryRef(t reflect.Type) string {
+	first := ""
+	for _, f := range reflect.VisibleFields(t) {
+		if !f.IsExported() || f.Anonymous || f.Type != refType {
+			continue
+		}
+		if f.Name == "Ref" {
+			return f.Name
+		}
+		if first == "" {
+			first = f.Name
+		}
+	}
+	return first
+}
+
 // planFields says how each exported field of t is set.
 func planFields(t reflect.Type, spec *faceSpec) []field {
 	byName := map[string]reflect.StructField{}
@@ -704,7 +721,8 @@ func planFields(t reflect.Type, spec *faceSpec) []field {
 			}
 		case ft == refType && name == "Ref":
 			plan.set = func(p *props, v reflect.Value) { v.Set(reflect.ValueOf(p.n.ref)) }
-		case ft == refType && name == "ThumbRef":
+		case ft == refType && name == primaryRef(t):
+			// A component without a Ref field gives its first ref, such as a Slider's ThumbRef or a Tree's ListRef, the node's ref unless the app passes one.
 			plan.set = func(p *props, v reflect.Value) {
 				if x := p.get(prop); defined(x) {
 					v.Set(p.r.decode(x, ft))

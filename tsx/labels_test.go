@@ -57,3 +57,29 @@ mount(App);`)
 		t.Fatalf("reference declaration missing from base types: %s", decls)
 	}
 }
+
+// A component whose only ref field is not Ref, as a Tree's ListRef, still gives it to the ref prop.
+func TestComponentRefReachesItsOnlyRefField(t *testing.T) {
+	app := run(t, `import { mount, signal, Text, View } from "nsgo";
+import { Slider, Tree } from "nsgo/base";
+function App() {
+  const list = signal(null), thumb = signal(null);
+  return <View>
+    <Text labelFor={list()}>Files</Text>
+    <Tree ref={n => { if (n.measure) list.set(n); }} items={[{ id: "a", label: "A" }]} style={{ width: 120, height: 60 }} />
+    <Text labelFor={thumb()}>Volume</Text>
+    <Slider thumbTestID="thumb" ref={n => thumb.set(n)} style={{ height: 32 }} thumbStyle={{ width: 12, height: 12 }} />
+  </View>;
+}
+mount(App);`)
+	named := false
+	for _, v := range app.Query("label:Files") {
+		named = named || v.Props.LabelledBy != nil
+	}
+	if !named {
+		t.Fatal("a Tree's ref did not reach its list")
+	}
+	if p := app.Find("id:thumb").Props; p.Label != "Volume" || p.LabelledBy == nil {
+		t.Fatalf("a Slider's ref did not reach its thumb: %+v", p)
+	}
+}
