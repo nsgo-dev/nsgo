@@ -219,8 +219,7 @@ func TestRelationalEnvironmentAndStackedSelectors(t *testing.T) {
 	if h.find("stacked").style.Color != RGB(0xffffff) {
 		t.Fatal("a target with no own classes did not follow appearance")
 	}
-	// The target reads its own subtree's theme, including after its first
-	// inherited rule created the class state for it.
+	// The target reads its own subtree's theme, including after its first inherited rule created the class state for it.
 	theme := *DefaultTheme()
 	theme.Dark = theme.Light
 	theme.Dark.Accent = RGB(0x123456)

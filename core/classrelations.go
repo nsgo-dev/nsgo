@@ -34,8 +34,7 @@ func (t *Tree) trackClassRelations(n *node) {
 	t.queueRelations(n)
 }
 
-// Descendant selectors stay in their source's subtree. A sibling or
-// ancestor selector expands only that source's matching scope.
+// Descendant selectors stay in their source's subtree. A sibling or ancestor selector expands only that source's matching scope.
 func relationScope(n *node) *node {
 	mode := uint8(0)
 	if n.cls != nil {
@@ -129,8 +128,7 @@ func (t *Tree) queueRelationRoot(root *node) {
 	t.changed = true
 }
 
-// Only sources whose matching scope changed are refreshed, once per
-// commit, instead of walking the app for every paint or reactive write.
+// Only sources whose matching scope changed are refreshed, once per commit, instead of walking the app for every paint or reactive write.
 func (t *Tree) queueRelations(n *node) {
 	if t.refreshingRelations {
 		return
@@ -201,8 +199,7 @@ func (t *Tree) updateRelationStyles() {
 				t.markLayout(n)
 			}
 			if wasSpace || c.list.spacing || c.props.hasSpaceX || c.props.hasSpaceY {
-				// A former spacing rule must clear margins even after the
-				// source no longer has any classes or matching rules.
+				// A former spacing rule must clear margins even after the source no longer has any classes or matching rules.
 				for _, child := range n.flatChildren() {
 					if t.restyle(child) {
 						t.markLayout(child)
@@ -274,9 +271,7 @@ func (t *Tree) relationMatches(rule *classRule, source, target *node) bool {
 	return match(len(rule.relations)-1, target) && t.relationCondition(target, &rule.cond)
 }
 
-// Specificity is considered before variant rank for selectors that
-// compete on the same target. & carries the utility's one class; a type
-// adds one, an attribute/class/pseudo-class adds 4096, and :where adds 0.
+// Specificity is considered before variant rank for selectors that compete on the same target. & carries the utility's one class; a type adds one, an attribute/class/pseudo-class adds 4096, and :where adds 0.
 func (s *classSelector) specificity() int {
 	best := 0
 	for _, steps := range s.choices {
@@ -353,9 +348,7 @@ func (t *Tree) resolveRelationClasses(n *node) {
 		for _, relation := range r.relations {
 			r.resolvedState = r.resolvedState || relation.selector.watch != 0 || relation.condition.stateful()
 		}
-		// Conditions have been matched to their actual elements. Keeping
-		// them as state slots would put an ancestor's hover on the child
-		// and could make a less-specific local state win the cascade.
+		// Conditions have been matched to their actual elements. Keeping them as state slots would put an ancestor's hover on the child and could make a less-specific local state win the cascade.
 		r.cond = classCond{placeholder: r.cond.placeholder, selection: r.cond.selection}
 		r.relations = nil
 		rules = append(rules, matched{r, specificity})

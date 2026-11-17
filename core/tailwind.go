@@ -495,13 +495,11 @@ type classRule struct {
 	rank      classRank
 	important bool
 	relations []classRelation
-	// resolvedState preserves state backgrounds when relational matching
-	// has already evaluated the state on its originating element.
+	// resolvedState preserves state backgrounds when relational matching has already evaluated the state on its originating element.
 	resolvedState bool
 }
 
-// Each arbitrary variant selects from the preceding variant's target.
-// Its condition belongs to that preceding target, not the final one.
+// Each arbitrary variant selects from the preceding variant's target. Its condition belongs to that preceding target, not the final one.
 type classRelation struct {
 	selector  *classSelector
 	condition classCond

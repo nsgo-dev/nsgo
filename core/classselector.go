@@ -8,8 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Class selectors match the engine's element tree, never a backend's
-// implementation views. Regions are transparent and svg means Icon/SVGView.
+// Class selectors match the engine's element tree, never a backend's implementation views. Regions are transparent and svg means Icon/SVGView.
 type classSelector struct {
 	choices [][]classSelectorStep
 	watch   uint16
@@ -40,8 +39,7 @@ type classSelectorFunc struct {
 	selector *classSelector
 }
 
-// parseClassSelector parses native selectors. An arbitrary variant has
-// one &, while :has takes relative selectors, as CSS does.
+// parseClassSelector parses native selectors. An arbitrary variant has one &, while :has takes relative selectors, as CSS does.
 func parseClassSelector(s string, relative bool) (*classSelector, bool) {
 	return parseClassSelectorAt(s, relative, 0)
 }
@@ -104,8 +102,7 @@ func parseClassSelectorAt(s string, relative bool, depth int) (*classSelector, b
 	return out, true
 }
 
-// selectorSplit and selectorPartEnd keep punctuation inside attributes
-// and functional pseudo-classes out of the selector's combinators.
+// selectorSplit and selectorPartEnd keep punctuation inside attributes and functional pseudo-classes out of the selector's combinators.
 func selectorSplit(s string, delimiter byte) ([]string, bool) {
 	var parts []string
 	start, brackets, parens := 0, 0, 0
@@ -462,9 +459,7 @@ func selectorAttr(n *node, shown shownStates, a classSelectorAttr) bool {
 	return false
 }
 
-// eachAnchor matches right to left and reports the element substituted
-// for &, which lets stacked arbitrary variants compose without rescanning
-// every possible intermediate element.
+// eachAnchor matches right to left and reports the element substituted for &, which lets stacked arbitrary variants compose without rescanning every possible intermediate element.
 func (s *classSelector) eachAnchor(t *Tree, target, anchor *node, found func(*node) bool) bool {
 	for _, steps := range s.choices {
 		var match func(int, *node, *node) bool
@@ -520,8 +515,7 @@ func (s *classSelector) matches(t *Tree, target, anchor *node) bool {
 }
 
 func (s *classSelector) has(t *Tree, anchor *node) bool {
-	// Relative siblings can leave the anchor's subtree, but cannot leave
-	// its parent's. Descendants stay inside it, including through regions.
+	// Relative siblings can leave the anchor's subtree, but cannot leave its parent's. Descendants stay inside it, including through regions.
 	root := anchor
 	if s.scopeMode() > 0 && anchor.nativeParent() != nil {
 		root = anchor.nativeParent()
