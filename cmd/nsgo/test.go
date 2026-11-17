@@ -712,11 +712,8 @@ func writeJUnit(path string, results []*testResult, packages map[string]*testRes
 			s.Failures++
 			failures++
 		case "skip":
-			msg := t.Message
-			if msg == "" {
-				msg = skipMessage(t.Output)
-			}
-			c.Skipped = &junitSkipped{Message: msg}
+			// Message holds the reason wherever a skip is reported; a target result's Output is its whole process's, host logs included.
+			c.Skipped = &junitSkipped{Message: t.Message}
 			s.Skipped++
 		}
 		s.Tests++

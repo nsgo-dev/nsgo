@@ -85,6 +85,17 @@ nsgo: host closed
 	if want := "all subtests skipped\nTestP/b: skip_test.go:8: b reason\nTestP/a: skip_test.go:7: a reason"; got.Status != "skip" || got.Message != want {
 		t.Errorf("parallel skips: status %s, message %q, want %q", got.Status, got.Message, want)
 	}
+	// A skip without a reason keeps an empty message in the JUnit report too, rather than the whole process's output.
+	bare := parseTestOutput("TestBare", 0, "nsgo: host started\n=== RUN   TestBare\n--- SKIP: TestBare (0.00s)\nPASS\nnsgo: host closed\n", 0, nil)
+	report := filepath.Join(t.TempDir(), "tests.xml")
+	if err := writeJUnit(report, []*testResult{bare}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(report); err != nil {
+		t.Fatal(err)
+	} else if bare.Status != "skip" || strings.Contains(string(data), "nsgo: host") {
+		t.Errorf("bare skip: status %s, JUnit %s", bare.Status, data)
+	}
 }
 
 func TestHeadlessAllSkippedSubtests(t *testing.T) {
