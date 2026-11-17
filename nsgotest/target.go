@@ -72,8 +72,7 @@ type target struct {
 	live bool
 	// quiet reports whether the last settle came to quiet before settleWait.
 	quiet bool
-	// syncing is the one outstanding engine barrier, retained when a
-	// settle times out so a blocked engine never accumulates waiters.
+	// syncing is the one outstanding engine barrier, retained when a settle times out so a blocked engine never accumulates waiters.
 	syncing chan struct{}
 
 	mu      sync.Mutex
@@ -275,8 +274,7 @@ func (t *target) sync(deadline time.Time) bool {
 	}
 }
 
-// settle waits for the engine to commit, then for no batch or finite
-// animation for quietFor, settleWait at most, applying what came.
+// settle waits for the engine to commit, then for no batch or finite animation for quietFor, settleWait at most, applying what came.
 func (t *target) settle() {
 	t.settleUntil(time.Now().Add(settleWait))
 }
@@ -318,9 +316,7 @@ func (t *target) settleUntil(deadline time.Time) {
 			return
 		}
 		if time.Since(quiet) >= quietFor {
-			// The engine can be in a slow commit while no batch arrives.
-			// Check it again before declaring the app quiet, then take the
-			// batches it sent before completing the barrier.
+			// The engine can be in a slow commit while no batch arrives. Check it again before declaring the app quiet, then take the batches it sent before completing the barrier.
 			if !t.sync(deadline) {
 				t.drain()
 				t.quiet = false

@@ -616,8 +616,7 @@ func (a *App) Storage() core.Storage {
 	return a.root.Storage()
 }
 
-// Settle runs what the app's goroutines posted and applies the commits
-// that follow, until nothing is left.
+// Settle runs what the app's goroutines posted and applies the commits that follow, until nothing is left. On a target it first waits for the engine to hand its pending commits to the platform, then until no batch came and nothing finite animated for 100 ms, checking the engine again before it returns, five seconds at most in all.
 func (a *App) Settle() {
 	if a.target != nil {
 		a.target.settle()

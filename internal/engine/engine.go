@@ -699,9 +699,7 @@ func LaunchFiles() []string {
 	return paths
 }
 
-// Sync returns once the engine ran what was posted to it before and
-// handed the resulting commits to the platforms, or the engine exited.
-// It must not be called from the engine goroutine.
+// Sync returns once the engine ran what was posted to it before and handed the resulting commits to the platforms, or the engine exited. It must not be called from the engine goroutine.
 func (e *Engine) Sync() {
 	done := make(chan struct{})
 	e.push(message{synced: done})

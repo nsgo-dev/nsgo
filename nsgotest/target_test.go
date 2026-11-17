@@ -70,8 +70,7 @@ func TestTargetSettleChecksTheEngineBeforeReturningQuiet(t *testing.T) {
 	tg.surface = settlingSurface{sync: func() {
 		calls++
 		if calls == 2 {
-			// A commit started after the first barrier but did not send
-			// its batch until the second barrier completed.
+			// A commit started after the first barrier but did not send its batch until the second barrier completed.
 			tg.observe(batch)
 		}
 	}}

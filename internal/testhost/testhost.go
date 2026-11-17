@@ -103,8 +103,7 @@ type Surface interface {
 	// as a system setting does.
 	Resize(size driver.Size) error
 	SetEnvironment(env driver.Environment) error
-	// Sync returns once the app's engine ran what was posted to it
-	// before and handed the resulting commits to the platform.
+	// Sync returns once the app's engine ran what was posted to it before and handed the resulting commits to the platform.
 	Sync()
 }
 

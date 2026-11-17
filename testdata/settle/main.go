@@ -19,8 +19,7 @@ func Root(cx *core.Scope) core.Node {
 			OnPress:  func(core.PressEvent) { cx.Post(func() { open.Set(true) }) },
 			Children: []core.Node{core.Text{Content: "Open"}}},
 		core.Show{When: open.Get, Then: func(cx *core.Scope) core.Node {
-			// Model the first construction of a large subtree taking longer
-			// than Settle's 100 ms quiet interval, without app-side barriers.
+			// Model the first construction of a large subtree taking longer than Settle's 100 ms quiet interval, without app-side barriers.
 			time.Sleep(400 * time.Millisecond)
 			return ui.Dialog{Open: func() bool { return true }, Bare: true, TestID: "guide",
 				Style: core.Style{Width: core.Pct(100), Height: core.Pct(100),

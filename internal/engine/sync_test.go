@@ -38,8 +38,7 @@ func TestSyncWaitsForTheCommitToReachThePlatform(t *testing.T) {
 	release := func() { once.Do(func() { close(p.release) }) }
 	t.Cleanup(release)
 	e.Sync()
-	// Queue the change without waking the engine. Sync's marker wakes
-	// that same pass, whose platform mount remains blocked below.
+	// Queue the change without waking the engine. Sync's marker wakes that same pass, whose platform mount remains blocked below.
 	e.enqueue(message{fn: func() { text.Set("changed") }})
 	done := make(chan struct{})
 	go func() { e.Sync(); close(done) }()
