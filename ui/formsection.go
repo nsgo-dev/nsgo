@@ -2,11 +2,7 @@ package ui
 
 import "github.com/nsgo-dev/nsgo/core"
 
-// FormSection is related rows on a rounded card, divided by hairlines
-// from the start of the titles above them, as an inset grouped list of iOS
-// Settings: Title above the card and Footer below it, in the muted color.
-// Its rows are FormRow and FormField, or the app's own nodes, which pad
-// themselves.
+// FormSection is related rows on a rounded card, divided by hairlines from the start of the titles above them, as an inset grouped list of iOS Settings: Title above the card and Footer below it, in the muted color. Its rows are FormRow and FormField, or the app's own nodes, which pad themselves; a core.Each among them gives each of its rows a hairline of its own.
 type FormSection struct {
 	Title, Footer string
 	Children      []core.Node
@@ -17,13 +13,14 @@ type FormSection struct {
 // Render implements core.Node.
 func (s FormSection) Render(cx *core.Scope) core.Node {
 	colors := ColorsOf(cx)
+	// Each row has its hairline below it, so a row from core.Each takes and keeps its own as rows come, go and move; the card's last view hides its hairline.
 	var rows []core.Node
-	for i, child := range s.Children {
-		if i > 0 {
-			rows = append(rows, core.View{Style: core.Style{Height: core.Pt(1), Margin: core.Edges{Left: formRowLead(s.Children[i-1])}},
-				StyleFunc: Filled(colors.Line)})
+	for _, child := range s.Children {
+		if each, ok := core.AfterEachRow(child, func(_ *core.Scope, row core.Node) core.Node { return formDivider(colors, row) }); ok {
+			rows = append(rows, each)
+			continue
 		}
-		rows = append(rows, child)
+		rows = append(rows, child, formDivider(colors, child))
 	}
 	var nodes []core.Node
 	if s.Title != "" {
@@ -40,6 +37,11 @@ func (s FormSection) Render(cx *core.Scope) core.Node {
 		nodes = append(nodes, footer)
 	}
 	return core.View{TestID: s.TestID, Style: core.Style{Gap: 6}.Merge(s.Style), Children: nodes}
+}
+
+// formDivider is the hairline below row, which hides as the card's last view.
+func formDivider(colors Colors, row core.Node) core.Node {
+	return core.View{Class: "last:hidden", Style: core.Style{Height: core.Pt(1), Margin: core.Edges{Left: formRowLead(row)}}, StyleFunc: Filled(colors.Line)}
 }
 
 // The rows' metrics: their least height, their padding at the sides and

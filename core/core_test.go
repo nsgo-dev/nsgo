@@ -2136,3 +2136,48 @@ func TestNewViewsSendOnlyWhatDiffers(t *testing.T) {
 		t.Fatalf("kinds = %v, want one style, props and events", k)
 	}
 }
+
+// TestAfterEachRowFollowsRows builds what AfterEachRow adds after each row from the row, moves and disposes it with the row, chains a second AfterEachRow after the first, and leaves the Each it copied and other nodes as they were.
+func TestAfterEachRowFollowsRows(t *testing.T) {
+	var items *Signal[[]string]
+	if n, ok := AfterEachRow(View{}, func(*Scope, Node) Node { return nil }); ok || n == nil {
+		t.Errorf("AfterEachRow took a view as an Each")
+	}
+	h := newHost(t, Size{Width: 100, Height: 200}, func(cx *Scope) Node {
+		items = NewSignalFunc(cx, []string{"a", "b"}, nil)
+		plain := Each(items.Get, func(s string) string { return s }, func(cx *Scope, item func() string, _ func() int) Node {
+			return View{TestID: item()}
+		})
+		after := func(suffix string) func(cx *Scope, row Node) Node {
+			return func(cx *Scope, row Node) Node { return View{TestID: row.(View).TestID + suffix} }
+		}
+		once, _ := AfterEachRow(plain, after("-1"))
+		twice, _ := AfterEachRow(once, after("-2"))
+		return View{Children: []Node{
+			View{TestID: "plain", Children: []Node{plain}},
+			View{TestID: "once", Children: []Node{once}},
+			View{TestID: "twice", Children: []Node{twice}},
+		}}
+	})
+	ids := func(id string) string {
+		var out []string
+		for _, n := range h.find(id).flatChildren() {
+			out = append(out, n.props.TestID)
+		}
+		return strings.Join(out, " ")
+	}
+	check := func(step, id, want string) {
+		t.Helper()
+		if got := ids(id); got != want {
+			t.Errorf("%s: %s holds %q, want %q", step, id, got, want)
+		}
+	}
+	h.commit()
+	check("start", "plain", "a b")
+	check("start", "once", "a a-1 b b-1")
+	check("start", "twice", "a a-1 a-2 b b-1 b-2")
+	items.Set([]string{"c", "b"})
+	h.commit()
+	check("replace and move", "once", "c c-1 b b-1")
+	check("replace and move", "twice", "c c-1 c-2 b b-1 b-2")
+}

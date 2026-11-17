@@ -42,10 +42,34 @@ func Each[T any, K comparable](items func() []T, key func(T) K,
 	return &each[T, K]{items: items, key: key, row: row}
 }
 
+// AfterEachRow returns a copy of node, an Each, that builds after's node after each of its rows, from the node the row built and under the row's scope, so it moves and goes with its row. For any other node it returns node and false. ui.FormSection hangs a hairline below each row of an Each with it.
+func AfterEachRow(node Node, after func(cx *Scope, row Node) Node) (Node, bool) {
+	if e, ok := node.(afterRows); ok {
+		return e.withAfter(after), true
+	}
+	return node, false
+}
+
+type afterRows interface {
+	withAfter(func(cx *Scope, row Node) Node) Node
+}
+
 type each[T any, K comparable] struct {
 	items func() []T
 	key   func(T) K
 	row   func(cx *Scope, item func() T, index func() int) Node
+	// after builds what follows each row (AfterEachRow).
+	after func(cx *Scope, row Node) Node
+}
+
+func (e *each[T, K]) withAfter(after func(cx *Scope, row Node) Node) Node {
+	c := *e
+	if prev := e.after; prev != nil {
+		c.after = func(cx *Scope, row Node) Node { return Group{prev(cx, row), after(cx, row)} }
+	} else {
+		c.after = after
+	}
+	return &c
 }
 
 func (e *each[T, K]) Render(*Scope) Node { return e }
@@ -87,7 +111,13 @@ func (e *each[T, K]) mount(t *Tree, region *node, owner *Scope) {
 					r.index = NewSignal(r.scope, i)
 					r.node = t.newRegion(region, r.scope)
 					item, index := r.item.Get, r.index.Get
-					t.within(r.scope, func() { t.mount(r.scope, r.node, e.row(r.scope, item, index)) })
+					t.within(r.scope, func() {
+						row := e.row(r.scope, item, index)
+						t.mount(r.scope, r.node, row)
+						if e.after != nil {
+							t.mount(r.scope, r.node, e.after(r.scope, row))
+						}
+					})
 				}
 				if _, dup := next[k]; dup {
 					nextExtra = append(nextExtra, r)
