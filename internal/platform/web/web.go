@@ -243,6 +243,8 @@ type view struct {
 	presented bool // a modal was inserted once
 	hover     bool // pointerenter and pointerleave are listened to
 	moves     bool // pointermove is
+	// canvasRatio is the pixels per point of the last replay, including scroll zoom.
+	canvasRatio float64
 	// focused is whether the view has the keyboard focus it reported.
 	focused bool
 	// panActivation decides when a drag on the view becomes its pan.
@@ -1484,6 +1486,10 @@ func (s *surface) mount(b *driver.MountBatch) {
 				s.cover(v)
 			}
 			s.appear(v, lb, it.Parent)
+			if v.framed {
+				// Kept content can move between scroll views without a new drawing.
+				s.refreshCanvasScale(v.el)
+			}
 		case driver.ItemRemove:
 			if el := v.outer(); canMove() && el.Get("isConnected").Bool() {
 				// Parked, not taken out of the page, so its scroll offsets and
@@ -1495,6 +1501,10 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemDelete:
 			// Forgotten first, so events its removal fires are not sent.
 			s.views[it.ID] = nil
+			if v.sc != nil {
+				v.sc.stopRaster()
+				v.sc.stopZoom()
+			}
 			s.dom.forget(it.ID)
 			if v.kind == driver.KindModal {
 				defer s.uncover(v) // once the batch is in

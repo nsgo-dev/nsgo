@@ -36,3 +36,4 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 - `ui.NavPage` and `ui.NavHeader` draw the system's own header and back gesture on phones; do not build a header of views there.
 - `ui.Menu` and `ui.Select` open beside their trigger on any device, or as a sheet when their `Presentation` asks; choose it explicitly instead of switching by device.
 - `core.Ref` focus, blur, scroll and zoom requests are dropped while the element is in unplaced `core.Holder` content, or when it leaves the tree before the commit; showing the content again does not replay them, so ask again once it is placed.
+- Web canvases in a zoomed `core.Scroll` replay at the cumulative scroll zoom once it rests, up to four times the screen's pixel ratio, without rerunning `Draw` ([canvas](https://nsgo.dev/docs/canvas.md)).

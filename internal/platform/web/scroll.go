@@ -23,7 +23,8 @@ import (
 // are the browser's, so they do nothing here.
 
 const (
-	momentumWait = 150 // ms after a drag a scroll is its glide
+	momentumWait   = 150 // ms after a drag a scroll is its glide
+	zoomRasterWait = 120 // ms without a zoom step before canvases replay
 )
 
 const scrollCSS = `@keyframes nsgo-spin { to { transform: rotate(360deg) } }
@@ -41,6 +42,12 @@ type scrollState struct {
 	markers []js.Value
 	spinner js.Value
 	zoom    float64
+	// Raster work waits until a pinch, wheel or animated zoom rests.
+	rasterTimer js.Value
+	rasterEnd   js.Func
+	zoomFrame   js.Value
+	zoomStep    js.Func
+	zoomRun     uint32
 	// pull moves the content down: a touch pulling past the top, or the
 	// spinner's room while refreshing.
 	pull       float64
@@ -112,7 +119,11 @@ func now() float64 { return js.Global().Get("performance").Call("now").Float() }
 // configureScroll applies a scroll view's configuration.
 func (s *surface) configureScroll(v *view, c *driver.ScrollConfig) {
 	sc := v.sc
+	oldZoom := sc.zoom
 	old := sc.config
+	if c.MinZoomScale != old.MinZoomScale || c.MaxZoomScale != old.MaxZoomScale {
+		sc.stopZoom()
+	}
 	sc.config = *c
 	b := &c.Behavior
 	x, y := "hidden", "auto"
@@ -145,6 +156,9 @@ func (s *surface) configureScroll(v *view, c *driver.ScrollConfig) {
 	}
 	s.setRefreshing(v, c.Refreshing && !c.Horizontal)
 	v.placeContent()
+	if sc.zoom != oldZoom {
+		s.rasterAfterZoom(v)
+	}
 	if c.Zooms() && c.ZoomScale != old.ZoomScale {
 		s.zoomCommand(v, &driver.ZoomRequest{Scale: c.ZoomScale}, true)
 	}
@@ -409,6 +423,7 @@ func (s *surface) scrollTouchStart(v *view, e js.Value) {
 	sc := v.sc
 	touches := e.Get("touches").Length()
 	if touches == 2 && sc.config.Zooms() && !sc.config.NoPinchZoom {
+		sc.stopZoom()
 		d, mx, my := touchDistance(e)
 		fx, fy := v.localPoint(mx, my)
 		sc.pinchDist, sc.pinchZoom = max(d, 1), sc.zoom
@@ -582,12 +597,59 @@ func (v *view) limitZoom(scale float64, rubber bool) float64 {
 // zoomContent zooms v to scale with content point cx, cy at viewport
 // point fx, fy.
 func (s *surface) zoomContent(v *view, scale, cx, cy, fx, fy float64) {
+	changed := v.sc.zoom != scale
 	v.sc.zoom = scale
 	v.placeContent()
 	in := v.sc.config.Behavior.ContentInset
 	v.el.Set("scrollLeft", cx*scale+float64(in.Left)-fx)
 	v.el.Set("scrollTop", cy*scale+float64(in.Top)+v.sc.pull-fy)
 	s.scrollEvent(v, driver.EventScroll)
+	if changed {
+		s.rasterAfterZoom(v)
+	}
+}
+
+// rasterAfterZoom keeps CSS scaling cheap during the gesture, then
+// replays canvases at the resolution at which the scroll shows them.
+func (s *surface) rasterAfterZoom(v *view) {
+	sc := v.sc
+	if sc.rasterEnd.IsUndefined() {
+		sc.rasterEnd = js.FuncOf(func(js.Value, []js.Value) any {
+			sc.rasterTimer = js.Undefined()
+			if s.view(v.id) == v {
+				s.refreshCanvasScale(v.content)
+			}
+			return nil
+		})
+	}
+	if sc.rasterTimer.Truthy() {
+		js.Global().Call("clearTimeout", sc.rasterTimer)
+	}
+	sc.rasterTimer = js.Global().Call("setTimeout", sc.rasterEnd, zoomRasterWait)
+}
+
+func (sc *scrollState) stopRaster() {
+	if sc.rasterTimer.Truthy() {
+		js.Global().Call("clearTimeout", sc.rasterTimer)
+		sc.rasterTimer = js.Undefined()
+	}
+	if !sc.rasterEnd.IsUndefined() {
+		sc.rasterEnd.Release()
+		sc.rasterEnd = js.Func{}
+	}
+}
+
+// stopZoom cancels the old target before another command or gesture takes over.
+func (sc *scrollState) stopZoom() {
+	sc.zoomRun++
+	if sc.zoomFrame.Truthy() {
+		js.Global().Call("cancelAnimationFrame", sc.zoomFrame)
+		sc.zoomFrame = js.Undefined()
+	}
+	if !sc.zoomStep.IsUndefined() {
+		sc.zoomStep.Release()
+		sc.zoomStep = js.Func{}
+	}
 }
 
 // zoomEnded springs a pinch back within the limits.
@@ -603,6 +665,8 @@ func (s *surface) zoomCommand(v *view, r *driver.ZoomRequest, animated bool) {
 	if v.sc == nil || !v.sc.config.Zooms() {
 		return
 	}
+	sc := v.sc
+	sc.stopZoom()
 	target := v.limitZoom(float64(r.Scale), false)
 	fx, fy := float64(v.size.Width)/2, float64(v.size.Height)/2
 	px, py := v.contentPoint(fx, fy)
@@ -614,22 +678,33 @@ func (s *surface) zoomCommand(v *view, r *driver.ZoomRequest, animated bool) {
 		s.zoomContent(v, target, cx, cy, fx, fy)
 		return
 	}
+	if target == sc.zoom && cx == px && cy == py {
+		// The initial configuration often keeps the current zoom and center.
+		s.zoomContent(v, target, cx, cy, fx, fy)
+		return
+	}
 	z0, start := v.sc.zoom, now()
-	var step js.Func
-	step = js.FuncOf(func(_ js.Value, args []js.Value) any {
+	run := sc.zoomRun
+	sc.zoomStep = js.FuncOf(func(_ js.Value, args []js.Value) any {
+		sc.zoomFrame = js.Undefined()
 		t := min((args[0].Float()-start)/250, 1)
 		k := 1 - math.Pow(1-t, 3)
 		if s.view(v.id) == v {
 			s.zoomContent(v, z0+(target-z0)*k, px+(cx-px)*k, py+(cy-py)*k, fx, fy)
 		}
+		// A scroll handler can replace this animation while its event runs.
+		if sc.zoomRun != run {
+			return nil
+		}
 		if t < 1 && s.view(v.id) == v {
-			js.Global().Call("requestAnimationFrame", step)
+			sc.zoomFrame = js.Global().Call("requestAnimationFrame", sc.zoomStep)
 		} else {
-			step.Release()
+			sc.zoomStep.Release()
+			sc.zoomStep = js.Func{}
 		}
 		return nil
 	})
-	js.Global().Call("requestAnimationFrame", step)
+	sc.zoomFrame = js.Global().Call("requestAnimationFrame", sc.zoomStep)
 }
 
 // scrollWheelZoom zooms a zoomable view with Ctrl and the wheel, as
@@ -641,6 +716,7 @@ func (s *surface) scrollWheelZoom(v *view, e js.Value) {
 	}
 	e.Call("preventDefault")
 	e.Call("stopPropagation")
+	v.sc.stopZoom()
 	fx, fy := v.localPoint(e.Get("clientX").Float(), e.Get("clientY").Float())
 	cx, cy := v.contentPoint(fx, fy)
 	s.zoomContent(v, v.limitZoom(v.sc.zoom*math.Exp(-e.Get("deltaY").Float()/100), false), cx, cy, fx, fy)

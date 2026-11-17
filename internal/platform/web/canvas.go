@@ -42,15 +42,14 @@ func (s *surface) changedNatives() {
 }
 
 // paint plays a canvas view's drawing into its <canvas>, whose pixels
-// follow the pixel ratio. The drawing's origin is inside the border.
+// follow the pixel ratio and enclosing scroll zooms. The drawing's origin
+// is inside the border.
 func (s *surface) paint(v *view) {
 	if v.drawing == nil {
 		return
 	}
-	ratio := float64(s.env.PixelRatio)
-	if ratio <= 0 {
-		ratio = 1
-	}
+	ratio := s.canvasScale(v)
+	v.canvasRatio = ratio
 	w := math.Max(float64(v.size.Width-v.border.Left-v.border.Right), 0)
 	h := math.Max(float64(v.size.Height-v.border.Top-v.border.Bottom), 0)
 	// Setting the size clears the canvas and resets its context.
@@ -67,6 +66,36 @@ func (s *surface) paint(v *view) {
 	ops := s.animator.CanvasOps(v.id, v.drawing)
 	for i := range ops {
 		p.Play(&ops[i])
+	}
+}
+
+// canvasScale follows enclosing scroll views, including nested zooms.
+// As on Apple and in NSH, raster zoom grows up to four times the screen's
+// pixel ratio, bounding the bitmap's memory while a scroll keeps zooming.
+func (s *surface) canvasScale(v *view) float64 {
+	zoom := 1.0
+	for el := v.el.Get("parentElement"); el.Truthy() && !el.Equal(s.host); el = el.Get("parentElement") {
+		if parent := s.viewOf(el); parent != nil && parent.sc != nil && parent.sc.zoom > 0 {
+			zoom *= parent.sc.zoom
+		}
+	}
+	ratio := float64(s.env.PixelRatio)
+	if ratio <= 0 {
+		ratio = 1
+	}
+	return ratio * min(max(zoom, 1), 4)
+}
+
+// refreshCanvasScale replays only drawings whose raster scale changed.
+// DOM placement is authoritative, including kept content moved to a new
+// scroll view and sticky wrappers around list cells.
+func (s *surface) refreshCanvasScale(root js.Value) {
+	canvases := root.Call("querySelectorAll", "canvas")
+	for i := range canvases.Length() {
+		v := s.viewOf(canvases.Index(i).Get("parentElement"))
+		if v != nil && v.kind == driver.KindCanvas && v.drawing != nil && v.canvasRatio != s.canvasScale(v) {
+			s.paint(v)
+		}
 	}
 }
 
