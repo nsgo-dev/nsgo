@@ -304,11 +304,15 @@ func (w *window) updatePointerCursor() {
 				break
 			}
 		}
-		if cursor == driver.CursorAuto {
+		switch {
+		case w.surfaceCursorSet && cursor == w.surfaceCursor:
+			// GTK makes a new cursor for every name it is given.
+		case cursor == driver.CursorAuto:
 			gtkWidgetSetCursorFromName(w.surface, nil)
-		} else {
+		default:
 			gtkWidgetSetCursorFromName(w.surface, cstr(cursor.Name()))
 		}
+		w.surfaceCursor, w.surfaceCursorSet = cursor, true
 	}
 	c, ok := driver.CursorAuto, false
 	// A text whose spans name no cursor keeps its layout untouched: glyphAt would make one it has not drawn.

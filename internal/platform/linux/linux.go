@@ -180,6 +180,10 @@ type window struct {
 	components driver.NativeComponents
 	drop       fileDrop
 
+	// surfaceCursor is the cursor last set on the surface, once surfaceCursorSet: the style's over the view the hit test finds.
+	surfaceCursor    driver.Cursor
+	surfaceCursorSet bool
+
 	lastPointer  driver.Point
 	cursorText   *view         // the text whose widget shows a span's cursor
 	down         driver.Event  // the last press: modifiers and click count
