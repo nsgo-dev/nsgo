@@ -1,4 +1,4 @@
-//go:build !nsgodev && (nsgotest || nsgocheck)
+//go:build !nsgodev && (nsgotest || nsgocheck) && !(js && wasm)
 
 package core
 

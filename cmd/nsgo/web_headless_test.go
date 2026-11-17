@@ -27,6 +27,7 @@ func TestWebHeadlessLibrary(t *testing.T) {
 	}{
 		{"nsgotest", "^(TestFramesFollowTheClock|TestAppDirectoriesAreTemporary|TestMicrophoneInput)$", []string{"TestAppDirectoriesAreTemporary", "TestFramesFollowTheClock", "TestMicrophoneInput"}, "TestMicrophoneInput"},
 		{"ui", "^TestInput$", []string{"TestInput"}, ""},
+		{"tsx", "^(TestAlertDialogNeedsActions|TestAnimatedCompositesRunInOrder)$", []string{"TestAlertDialogNeedsActions", "TestAnimatedCompositesRunInOrder"}, ""},
 	} {
 		t.Run(c.dir, func(t *testing.T) {
 			p, err := loadForTest(filepath.Join("..", "..", c.dir), nil)
