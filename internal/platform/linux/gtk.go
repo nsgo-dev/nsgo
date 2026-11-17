@@ -193,6 +193,7 @@ var (
 	gtkCssProviderLoadFromString           func(uintptr, *byte)
 	gtkStyleContextAddProvider             func(uintptr, uintptr, uint32)
 	gtkSettingsGetDefault                  func() uintptr
+	gtkSettingsResetProperty               func(uintptr, *byte)
 	gtkAlertDialogNew                      func(format *byte) uintptr
 	gtkAlertDialogSetMessage               func(uintptr, *byte)
 	gtkAlertDialogSetDetail                func(uintptr, *byte)
@@ -551,6 +552,7 @@ func bind() {
 	purego.RegisterLibFunc(&gtkCssProviderLoadFromString, gtkLib, "gtk_css_provider_load_from_string")
 	purego.RegisterLibFunc(&gtkStyleContextAddProvider, gtkLib, "gtk_style_context_add_provider")
 	purego.RegisterLibFunc(&gtkSettingsGetDefault, gtkLib, "gtk_settings_get_default")
+	purego.RegisterLibFunc(&gtkSettingsResetProperty, gtkLib, "gtk_settings_reset_property")
 	purego.RegisterLibFunc(&gtkAlertDialogNew, gtkLib, "gtk_alert_dialog_new")
 	purego.RegisterLibFunc(&gtkAlertDialogSetMessage, gtkLib, "gtk_alert_dialog_set_message")
 	purego.RegisterLibFunc(&gtkAlertDialogSetDetail, gtkLib, "gtk_alert_dialog_set_detail")

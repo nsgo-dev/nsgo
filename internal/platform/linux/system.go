@@ -630,23 +630,23 @@ func (w *window) setAppearance(a driver.Appearance) {
 		return
 	}
 	w.appearance = a
+	name := "gtk-application-prefer-dark-theme"
 	if colorScheme() {
-		scheme := map[driver.Appearance]int32{driver.AppearanceSystem: schemeDefault, driver.AppearanceLight: schemeLight,
-			driver.AppearanceDark: schemeDark}[a]
-		gObjectSetBool(settings, cstr("gtk-interface-color-scheme"), scheme, 0)
-		return
+		name = "gtk-interface-color-scheme"
 	}
-	if !w.preferDarkKnown {
-		w.preferDark, w.preferDarkKnown = settingBool(settings, "gtk-application-prefer-dark-theme"), true
+	switch {
+	case a == driver.AppearanceSystem:
+		// A value the app sets outranks the session's for good: GTK stops taking the session's changes into it. Resetting the setting has it follow the session again, as writing back the value read before would not.
+		gtkSettingsResetProperty(settings, cstr(name))
+	case colorScheme():
+		scheme := int32(schemeLight)
+		if a == driver.AppearanceDark {
+			scheme = schemeDark
+		}
+		gObjectSetBool(settings, cstr(name), scheme, 0)
+	default:
+		gObjectSetBool(settings, cstr(name), boolInt(a == driver.AppearanceDark), 0)
 	}
-	dark := w.preferDark
-	switch a {
-	case driver.AppearanceLight:
-		dark = false
-	case driver.AppearanceDark:
-		dark = true
-	}
-	gObjectSetBool(settings, cstr("gtk-application-prefer-dark-theme"), boolInt(dark), 0)
 }
 
 // setFrame sizes the window: GTK keeps the size, and the compositor

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,16 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
+
+func TestSettingsToWatchIncludesColorScheme(t *testing.T) {
+	names := settingsToWatch(true)
+	if !slices.Contains(names, "gtk-interface-color-scheme") {
+		t.Fatal("GTK 4.20 color scheme is not watched")
+	}
+	if slices.Contains(settingsToWatch(false), "gtk-interface-color-scheme") {
+		t.Fatal("pre-4.20 settings watch a color scheme that does not exist")
+	}
+}
 
 var (
 	gtkWidgetGetVisible          func(widget uintptr) int32
@@ -128,12 +139,57 @@ func TestServicesReachGTK(t *testing.T) {
 		}
 		return settingBool(gtkSettingsGetDefault(), "gtk-application-prefer-dark-theme")
 	}
+	// scheme is the raw setting, so a session's unsupported or default scheme is told apart from a value the app wrote.
+	scheme := func() int32 {
+		if colorScheme() {
+			return settingInt(gtkSettingsGetDefault(), "gtk-interface-color-scheme")
+		}
+		return int32(boolInt(settingBool(gtkSettingsGetDefault(), "gtk-application-prefer-dark-theme")))
+	}
 	var before bool
-	w.onLoop(t, func() { before = dark() })
+	var beforeScheme int32
+	w.onLoop(t, func() { before, beforeScheme = dark(), scheme() })
 	cx.Post(func() { cx.SetAppearance(core.AppearanceDark) })
 	wait("a dark appearance", dark)
 	cx.Post(func() { cx.SetAppearance(core.AppearanceSystem) })
-	wait("the system's appearance", func() bool { return dark() == before })
+	wait("the system's appearance", func() bool { return dark() == before && scheme() == beforeScheme })
+
+	// The session's appearance changing reaches Env.Dark of a running app, after it forced one and went back to the system's.
+	envDark := func(want bool) {
+		t.Helper()
+		deadline := time.Now().Add(5 * time.Second)
+		for ask(func(say func(string)) { say(fmt.Sprint(core.Untracked(cx, cx.Env().Dark))) }) != fmt.Sprint(want) {
+			if time.Now().After(deadline) {
+				t.Fatalf("Env.Dark did not become %v", want)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	var darkTheme bool
+	w.onLoop(t, func() {
+		darkTheme = strings.Contains(strings.ToLower(settingString(gtkSettingsGetDefault(), "gtk-theme-name")+os.Getenv("GTK_THEME")), "dark")
+	})
+	if darkTheme {
+		t.Log("a dark GTK theme shows dark whatever the scheme, so the scheme's changes are not checked")
+	} else {
+		envDark(before)
+		w.onLoop(t, func() {
+			if colorScheme() {
+				gObjectSetBool(gtkSettingsGetDefault(), cstr("gtk-interface-color-scheme"), map[bool]int32{false: schemeDark, true: schemeLight}[before], 0)
+			} else {
+				gObjectSetBool(gtkSettingsGetDefault(), cstr("gtk-application-prefer-dark-theme"), boolInt(!before), 0)
+			}
+		})
+		envDark(!before)
+		w.onLoop(t, func() {
+			name := "gtk-application-prefer-dark-theme"
+			if colorScheme() {
+				name = "gtk-interface-color-scheme"
+			}
+			gtkSettingsResetProperty(gtkSettingsGetDefault(), cstr(name))
+		})
+		envDark(before)
+	}
 
 	cx.Post(func() { cx.SetWindowFrame(core.WindowFrame{Width: 500, Height: 300}) })
 	wait("the new size", func() bool {

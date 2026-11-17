@@ -253,10 +253,8 @@ type window struct {
 	popoverID uint32
 	popupRefs map[uintptr]menuRef
 	trays     map[uint32]*linuxTray
-	// appearance is the one the app forces; preferDark the session's
-	// gtk-application-prefer-dark-theme, read once it is first forced.
-	appearance                  driver.Appearance
-	preferDark, preferDarkKnown bool
+	// appearance is the one the app forces.
+	appearance driver.Appearance
 }
 
 // menuBuild is where a menu's actions go.
@@ -576,10 +574,7 @@ func (w *window) setupSettings() {
 	gSignalConnect(w.surface, "map", cbMapped, w.handle)
 	gSignalConnect(w.surface, "unmap", cbMapped, w.handle)
 	if settings := gtkSettingsGetDefault(); settings != 0 {
-		names := []string{"gtk-theme-name", "gtk-application-prefer-dark-theme", "gtk-xft-dpi", "gtk-enable-animations"}
-		if colorScheme() {
-			names = append(names, "gtk-interface-contrast")
-		}
+		names := settingsToWatch(colorScheme())
 		for _, name := range names {
 			w.settingsHandlers = append(w.settingsHandlers, gSignalConnect(settings, "notify::"+name, cbSettingsChanged, w.handle))
 		}
@@ -587,6 +582,14 @@ func (w *window) setupSettings() {
 	if settings := gnomeA11ySettingsForWatch(); settings != 0 {
 		w.contrastHandler = gSignalConnect(settings, "changed::high-contrast", cbSettingsChanged, w.handle)
 	}
+}
+
+func settingsToWatch(colorScheme bool) []string {
+	names := []string{"gtk-theme-name", "gtk-application-prefer-dark-theme", "gtk-xft-dpi", "gtk-enable-animations"}
+	if colorScheme {
+		names = append(names, "gtk-interface-color-scheme", "gtk-interface-contrast")
+	}
+	return names
 }
 
 // Mount implements engine.Platform: it queues the batch and wakes the
