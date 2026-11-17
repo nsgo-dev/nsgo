@@ -62,7 +62,8 @@ var (
 	gtkAccessibleRelationGetType     func() uintptr
 	gtkAccessibleUpdateRelationValue func(uintptr, int32, *int32, *gValue)
 	gtkAccessibleResetRelation       func(uintptr, int32)
-	gValueSetPointer                 func(*gValue, uintptr)
+	gtkAccessibleListGetType         func() uintptr
+	gtkAccessibleListNewFromList     func(uintptr) uintptr
 	gListAppend                      func(uintptr, uintptr) uintptr
 	gListFree                        func(uintptr)
 	gTypeAddInterfaceStatic          func(uintptr, uintptr, *gInterfaceInfo)
@@ -78,7 +79,8 @@ func bindAccess() {
 	purego.RegisterLibFunc(&gtkAccessibleRelationGetType, gtkLib, "gtk_accessible_relation_get_type")
 	purego.RegisterLibFunc(&gtkAccessibleUpdateRelationValue, gtkLib, "gtk_accessible_update_relation_value")
 	purego.RegisterLibFunc(&gtkAccessibleResetRelation, gtkLib, "gtk_accessible_reset_relation")
-	purego.RegisterLibFunc(&gValueSetPointer, gobjectLib, "g_value_set_pointer")
+	purego.RegisterLibFunc(&gtkAccessibleListGetType, gtkLib, "gtk_accessible_list_get_type")
+	purego.RegisterLibFunc(&gtkAccessibleListNewFromList, gtkLib, "gtk_accessible_list_new_from_list")
 	purego.RegisterLibFunc(&gListAppend, glibLib, "g_list_append")
 	purego.RegisterLibFunc(&gListFree, glibLib, "g_list_free")
 	purego.RegisterLibFunc(&gValueSetString, gobjectLib, "g_value_set_string")
@@ -362,8 +364,7 @@ func (w *window) updateAccess(v *view) bool {
 	return old.set && n.label != old.label
 }
 
-// updateLabelRelation runs after the batch, when every referenced widget
-// has been created. GTK copies the GList and holds the accessible objects.
+// updateLabelRelation runs after the batch, when every referenced widget has been created. The labels go as a GtkAccessibleList (GTK 4.14), which GTK copies: a plain GList in a G_TYPE_POINTER value is one GTK up to 4.18 takes ownership of and later versions copy, so neither freeing nor keeping it is right on every version.
 func (w *window) updateLabelRelation(v *view) {
 	if v.deleted || v.widget == 0 {
 		return
@@ -382,8 +383,8 @@ func (w *window) updateLabelRelation(v *view) {
 		return
 	}
 	var value gValue
-	gValueInit(uintptr(unsafe.Pointer(&value)), 17<<2) // G_TYPE_POINTER
-	gValueSetPointer(&value, list)
+	gValueInit(uintptr(unsafe.Pointer(&value)), gtkAccessibleListGetType())
+	gValueTakeBoxed(uintptr(unsafe.Pointer(&value)), gtkAccessibleListNewFromList(list))
 	gtkAccessibleUpdateRelationValue(v.widget, 1, &relation, &value)
 	gValueUnset(uintptr(unsafe.Pointer(&value)))
 	gListFree(list)
