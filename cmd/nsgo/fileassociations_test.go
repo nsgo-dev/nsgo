@@ -221,7 +221,8 @@ func TestNSISFileAssociations(t *testing.T) {
 			}
 		}
 	}
-	for _, want := range []string{"Call RemoveFileTypes", "Call un.RemoveFileTypes", `StrCmp $1 $2 0 forget_type`,
+	// Before NSIS 3.06, DeleteRegKey /ifempty ignored values and would take other apps' Open With values and defaults with an extension's key.
+	for _, want := range []string{"!if ${NSIS_PACKEDVERSION} < 0x03006000\n!error", "Call RemoveFileTypes", "Call un.RemoveFileTypes", `StrCmp $1 $2 0 forget_type`,
 		`DeleteRegValue HKCU "Software\Classes\.$3\OpenWithProgids" "$0"`,
 		`DeleteRegKey /ifempty HKCU "Software\Classes\.$3"`,
 		`System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'`,

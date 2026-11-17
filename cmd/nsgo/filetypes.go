@@ -10,7 +10,7 @@ import (
 
 // fileType is a kind of document the app opens, which nsgo.yaml's file_types lists and desktop packages register with the system. Opening one reaches desktop.OnOpenFiles.
 type fileType struct {
-	// Name is what the Finder calls such a file.
+	// Name is what the Finder, Explorer and Linux file managers call such a file.
 	Name       string   `yaml:"name"`
 	Extensions []string `yaml:"extensions"`
 	// MIME names existing media types. Without it Linux uses the built-in extension table, defining unknown extensions of an owned type as application/x-<id>.

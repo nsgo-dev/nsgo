@@ -81,6 +81,8 @@ func main() {
 	}
 	set(`Software\Classes\.`+ext, "", "Other.App")
 	set(`Software\Classes\.`+ext+`\OpenWithProgids`, "Other.App", "")
+	// Another app's default with no Open With values of its own leaves the extension's key with values alone once ours go; it must survive.
+	set(`Software\Classes\.`+ext+"old", "", "Other.Old")
 	install := func() {
 		t.Helper()
 		setup, err := buildNSIS(t.Context(), p, pkg, "x64")
@@ -131,6 +133,9 @@ func main() {
 	install()
 	if _, err := read(`Software\Classes\.`+ext+`old\OpenWithProgids`, prog); err == nil {
 		t.Error("upgrade kept a dropped extension")
+	}
+	if got, err := read(`Software\Classes\.`+ext+"old", ""); err != nil || got != "Other.Old" {
+		t.Errorf("upgrade removed another app's default of a dropped extension: %q, %v", got, err)
 	}
 	uninstaller := filepath.Join(installed, "Uninstall.exe")
 	// Use the same silent invocation as the shipped install script. Let Go quote the spaced executable path and pass /S as a real argument.

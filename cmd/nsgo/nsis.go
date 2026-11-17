@@ -324,8 +324,12 @@ var nsisTemplate = template.Must(template.New("nsi").Funcs(template.FuncMap{
 	"close":    func() string { return nsisCloseApp },
 	"userPath": func() string { return nsisUserPath },
 	"amp":      func(s string) string { return strings.ReplaceAll(s, "&", "&&") },
-}).Parse(`; Written by nsgo build. Compile with NSIS 3: makensis -INPUTCHARSET UTF8 {{.Exe}}.nsi
+}).Parse(`; Written by nsgo build. Compile with NSIS 3.06 or later: makensis -INPUTCHARSET UTF8 {{.Exe}}.nsi
 Unicode true
+; RemoveFileTypes keeps an extension's key while it holds another app's values, and DeleteRegKey /ifempty only checks values from NSIS 3.06: an older compiler's uninstaller would delete them.
+!if ${NSIS_PACKEDVERSION} < 0x03006000
+!error "Compile with NSIS 3.06 or later"
+!endif
 ManifestDPIAware true
 SetCompressor /SOLID lzma
 Name {{q .Name}} {{q (amp .Name)}}
