@@ -1,6 +1,6 @@
 name: Check
 
-# Builds and vets every target on pull requests and pushes to main; test.yml runs the tests.
+# Checks Go formatting and builds and vets every target; test.yml runs the tests.
 on:
   pull_request:
   push:
@@ -16,6 +16,29 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    name: Go formatting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check tracked Go files
+        shell: bash
+        run: |
+          unformatted=$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+
   # go tool nsgo check -target all names the targets a Mac with Go and Xcode builds (cmd/nsgo/build.go, goAndXcodeTargets), and Apple's need cgo against Xcode's SDKs, which Linux has none of. So Linux vets the rest and a Mac only Apple's, side by side; a target added to cmd/nsgo/build.go's targets joins one of the two lists here.
   check:
     name: Build and vet

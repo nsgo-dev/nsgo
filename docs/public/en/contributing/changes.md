@@ -24,6 +24,8 @@ go tool nsgo test    # every package's tests
 
 Add a test for what you change: `nsgotest` for what a user sees, a package's own tests for the rest. Run the gallery on the platforms you touched ([Development setup](../contributing.md#the-gallery)).
 
+Format Go files with `gofmt` from the Go version in `go.mod`; `gofmt -l .` lists the files that need it. CI checks every tracked Go file and fails with the names of those that are not formatted.
+
 ## The pull request
 
 Title it as a Conventional Commit, such as `fix(linux): keep the caret after a paste`: a squash merge makes the title the commit's subject, and a check fails until it fits. The template asks for the targets the change touches, before and after screenshots of anything visible, and the checks you ran.

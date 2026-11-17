@@ -24,6 +24,8 @@ go tool nsgo test    # 运行所有包的测试
 
 为改动加上测试：用户看到的内容用 `nsgotest`，其余用包自己的测试。在改动涉及的平台上运行 Gallery（[开发环境](../contributing.md#gallery)）。
 
+用 `go.mod` 中 Go 版本自带的 `gofmt` 格式化 Go 文件；`gofmt -l .` 会列出需要格式化的文件。CI 会检查所有纳入版本库的 Go 文件，有未格式化的文件时失败并列出文件名。
+
 ## Pull request
 
 标题使用 Conventional Commits 格式，例如 `fix(linux): keep the caret after a paste`：squash 合并时标题会成为提交信息，格式不对时检查会失败。模板会要求写明改动涉及的目标平台、可见改动的前后截图，以及实际跑过的检查。
