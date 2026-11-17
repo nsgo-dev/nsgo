@@ -38,7 +38,7 @@ func testPathError(args []string) error {
 }
 
 // goTestOwnFlags are test's flags that go test defines too. After the directory they are go test's: headless runs forward them, and a target run refuses them in parseTargetTestFlags with its own hint.
-var goTestOwnFlags = map[string]bool{"run": true, "timeout": true, "bench": true, "trace": true}
+var goTestOwnFlags = map[string]bool{"run": true, "timeout": true, "bench": true, "trace": true, "ldflags": true}
 
 // misplacedFlags refuses one of the command's own flags written after its path, unless forwarded names it as an argument the command hands on.
 func misplacedFlags(fs *flag.FlagSet, dir string, args []string, forwarded map[string]bool) error {

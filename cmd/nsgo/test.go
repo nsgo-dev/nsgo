@@ -32,7 +32,7 @@ type testOptions struct {
 	fps         bool          // log the performance monitor's readings on target
 	device      string        // the simulator or device a mobile target runs on
 	team        string        // the Apple developer team an iPhone's test build is signed with
-	ldflags     []string      // app linker flags, appended to the test binary
+	ldflags     []string      // app linker flags -ldflags adds to nsgo.yaml's build.ldflags
 	// env are the tests' KEY=VALUE variables, on every target: a
 	// phone's tests see no others of this machine's.
 	env  []string
@@ -100,7 +100,6 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 	if opts.activate && opts.target != "macos" {
 		return errors.New("test: -activate goes with -target macos")
 	}
-	p.Build.LDFlags = append(p.Build.LDFlags, opts.ldflags...)
 	// go test would take another package inside the app's directory, and a target never reads it.
 	if err := testPathError(opts.args); err != nil {
 		return err
@@ -110,6 +109,7 @@ func runTests(ctx context.Context, p *project, opts testOptions) error {
 			return err
 		}
 	}
+	p.Build.LDFlags = append(p.Build.LDFlags, opts.ldflags...)
 	if err := p.prepareCatalogs(ctx, "./...", false); err != nil {
 		return err
 	}

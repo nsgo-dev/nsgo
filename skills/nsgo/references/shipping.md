@@ -30,6 +30,7 @@ dev:
 build:
   targets: [macos_arm64, windows_x64, linux_x64, ios, android_arm64, web]
   # tags: [timetzdata]         # Go build tags every build, test and check of the app takes
+  # ldflags: [-X main.releaseDate=2026-11-17]  # the app's own linker flags; -ldflags on build and test adds more
 # i18n: { dir: locales, source: en }
 # apple: { info: { NSCameraUsageDescription: Scans receipts. } }
 # release: { github: me/hello }

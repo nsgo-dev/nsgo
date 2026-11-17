@@ -111,7 +111,10 @@ func main() {
 		fs.StringVar(&o.screenshots, "screenshots", "", "write target screenshots under this relative `directory` (default: .nsgo/test/screenshots/<target>)")
 		fs.StringVar(&o.device, "device", "", "the `device` the target runs on: an iPhone's name, UDID, serial or ECID, a simulator's name or UDID, or an adb serial (default: the only one connected, or the booted simulator)")
 		fs.StringVar(&o.team, "team", "", "the Apple developer `team` -target ios signs the tests with (default: the team Xcode last used)")
-		o.ldflags = *stringListFlag(fs, "ldflags", "append app linker `flags` to the test binary; repeat for more values (default: nsgo.yaml's build.ldflags)")
+		fs.Func("ldflags", "add app linker `flags` to nsgo.yaml's build.ldflags for the test binaries; repeat for more", func(v string) error {
+			o.ldflags = append(o.ldflags, v)
+			return nil
+		})
 		fs.BoolVar(&o.fps, "fps", false, "log the performance monitor's readings once a second (with -target macos, windows, linux, ios_simulator, web or android)")
 		fs.Func("env", "set `KEY=VALUE` in the tests' environment, a phone's too; repeat for more", func(kv string) error {
 			if k, _, ok := strings.Cut(kv, "="); !ok || k == "" {

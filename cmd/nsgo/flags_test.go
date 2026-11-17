@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -97,6 +98,37 @@ func TestLoadBuildLdflags(t *testing.T) {
 	}
 	if !slices.Equal(p.Build.LDFlags, []string{"-X main.releaseDate=2026-11-17"}) {
 		t.Fatalf("build.ldflags = %q", p.Build.LDFlags)
+	}
+}
+
+// TestAppLdflagsReachTheBinary: the app's linker flags stamp its variables in the binary go build links, values with spaces included, and a -X of the tool's for the same variable wins.
+func TestAppLdflagsReachTheBinary(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs go build")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod":  "module stamp\n\ngo 1.26\n",
+		"main.go": "package main\n\nimport \"fmt\"\n\nvar releaseDate, note, owner string\n\nfunc main() { fmt.Print(releaseDate + \"|\" + note + \"|\" + owner) }\n",
+	})
+	p := &project{Dir: dir, Name: "Stamp", ID: "com.example.stamp", Version: "1.0.0"}
+	p.Build.LDFlags = []string{"-X main.releaseDate=2026-11-17", "-X 'main.note=two words' -X main.owner=app"}
+	bin := filepath.Join(dir, "app")
+	cmd, done, err := goBuildCommand(t.Context(), p, bin, nil, buildExtra{}, "-X main.owner=tool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := cmd.CombinedOutput()
+	done()
+	if err != nil {
+		t.Fatalf("go build: %v\n%s", err, out)
+	}
+	got, err := exec.Command(bin).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "2026-11-17|two words|tool"; string(got) != want {
+		t.Errorf("the binary printed %q, want %q", got, want)
 	}
 }
 
@@ -373,10 +405,16 @@ func TestIdentityLdflags(t *testing.T) {
 	if !strings.Contains(p.ldflags(), "core.appRelease=1") {
 		t.Errorf("a release's ldflags %s say development", p.ldflags())
 	}
-	p.Build.LDFlags = []string{"-X main.releaseDate=2026-11-17"}
-	flags = p.ldflags()
-	if strings.Index(flags, "main.releaseDate") > strings.Index(flags, "core.appName") {
-		t.Fatalf("app ldflags come after NSGo identity flags: %s", flags)
+	// The linker keeps a variable's last -X, so the app's own flags come before every one of the tool's.
+	p.Build.LDFlags = []string{"-X main.releaseDate=2026-11-17", "-X 'main.note=two words'"}
+	p.Appearance = "dark"
+	flags = p.ldflags("-X main.tool=1")
+	if !strings.HasPrefix(flags, "-X main.releaseDate=2026-11-17 -X 'main.note=two words' -X ") {
+		t.Errorf("ldflags %s do not start with the app's own", flags)
+	}
+	p.Build.LDFlags, p.Appearance = nil, ""
+	if flags := p.ldflags(); strings.HasPrefix(flags, " ") {
+		t.Errorf("ldflags without the app's own %q start with a space", flags)
 	}
 	// go build splits -ldflags at spaces outside quotes and takes no escapes inside them, so a name with a single quote goes in double quotes.
 	p = &project{Name: "Bob's Notes", ID: "com.example.notes", Version: "1.0.0"}

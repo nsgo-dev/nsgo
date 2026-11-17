@@ -81,6 +81,7 @@ func TestTestArgumentsKeepGoTestFlags(t *testing.T) {
 		// go test owns these too, so after the directory they are its flags, not misplaced ones.
 		{[]string{"--", "-timeout=20m", "-run", "TestOne"}, "", []string{"-timeout=20m", "-run", "TestOne"}},
 		{[]string{"app", "-test.bench=.", "-trace", "trace.out"}, "app", []string{"-test.bench=.", "-trace", "trace.out"}},
+		{[]string{"-ldflags", "-X a.b=c", "app", "-ldflags", "-X a.b=d"}, "app", []string{"-ldflags", "-X a.b=d"}},
 	} {
 		fs := flag.NewFlagSet("test", flag.ContinueOnError)
 		fs.SetOutput(io.Discard)
@@ -89,6 +90,7 @@ func TestTestArgumentsKeepGoTestFlags(t *testing.T) {
 		fs.Duration("timeout", 0, "")
 		fs.String("bench", "", "")
 		fs.Bool("trace", false, "")
+		fs.String("ldflags", "", "")
 		if err := parseCommand(fs, tc.args, -1); err != nil {
 			t.Fatal(err)
 		}
@@ -123,6 +125,39 @@ func TestShort(t *testing.T) {
 	}
 	if got, err := os.ReadFile(mark); err != nil || string(got) != "short" {
 		t.Fatalf("headless test did not run with -short: %q, %v", got, err)
+	}
+}
+
+// TestHeadlessCLILdflags: test's -ldflags, repeated, adds to nsgo.yaml's build.ldflags in the test binary.
+func TestHeadlessCLILdflags(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs the test command")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod":    "module headlessldflags\n\ngo 1.26\n",
+		"nsgo.yaml": "name: Stamp\nbuild:\n  ldflags:\n    - -X headlessldflags.fromYAML=yaml\n",
+		"stamp.go":  "package stamp\n\nvar fromYAML, fromFlag, fromSecond string\n",
+		"stamp_test.go": `package stamp
+import ("os"; "testing")
+func TestStamp(t *testing.T) {
+ if err := os.WriteFile(os.Getenv("NSGO_CLI_MARK"), []byte(fromYAML+"|"+fromFlag+"|"+fromSecond), 0600); err != nil { t.Fatal(err) }
+}
+`,
+	})
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mark := filepath.Join(dir, "mark")
+	cmd := exec.Command(exe, "-test.run=^TestCLIProcess$", "--", "test", "-ldflags", "-X 'headlessldflags.fromFlag=two words'", "-ldflags=-X headlessldflags.fromSecond=2", "--", "-count=1")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "NSGO_CLI_PROCESS=1", "NSGO_CLI_MARK="+mark)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("test -ldflags: %v\n%s", err, out)
+	}
+	if got, err := os.ReadFile(mark); err != nil || string(got) != "yaml|two words|2" {
+		t.Fatalf("the test binary's variables: %q, %v; want yaml|two words|2", got, err)
 	}
 }
 

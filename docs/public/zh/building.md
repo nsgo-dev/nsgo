@@ -50,7 +50,7 @@ dev:
 build:
   output: dist
   tags: []              # 应用每次构建、测试和检查都使用的 Go 构建标签，例如 timetzdata
-  ldflags: []            # 应用的链接器参数，例如 -X main.releaseDate=2026-11-17
+  ldflags: []           # 应用自己的链接器参数，例如 -X main.releaseDate=2026-11-17
   open: false           # true 时构建后打开输出目录
   installers: true      # false 时不生成磁盘映像、Windows 安装程序和 Linux 软件包
   jobs: 0               # 同时构建的目标数；0 为 CPU 数的一半，1 为逐个构建
@@ -71,7 +71,7 @@ build:
 
 命令行参数会替换同名的值，例如 `-target`、`-version` 或 `-output`；`-h` 列出全部参数。
 
-`build.ldflags` 会把应用的链接器参数加入每次构建。`build` 或 `test` 的 `-ldflags` 可为本次调用增加参数；需要多个值时可以重复使用。应用参数会排在 NSGo 自己的身份参数之前，因此可以写入应用变量，同时保持 `nsgo.yaml` 中的名称和版本为准。
+`build.ldflags` 是应用自己的链接器参数，每一项按 go build 的 `-ldflags` 的写法书写，例如 `-X main.releaseDate=2026-11-17` 或 `-X 'main.channel=beta builds'`。链接应用的每次构建都会使用它们：`dev` 及其每次重新加载、`build`（包括 `-embed`）和 `test`（包括 `-target`），覆盖所有目标。`build` 和 `test` 的 `-ldflags` 会追加到其后而不是替换它们，需要多个值时可以重复使用。它们排在工具自己的 `-X` 参数之前，而链接器以同一变量的最后一个值为准，因此 `core.App` 中的名称、ID 和版本始终取自 `nsgo.yaml`。工具会给 go 传入自己的 `-ldflags`，它会替换 `GOFLAGS` 中的 `-ldflags`，所以链接器参数应写在这里；无窗口 `test` 中写在目录之后的 `-ldflags` 属于 go test，会替换它们全部。
 
 工具为应用运行的每个 go 命令都使用 `build.tags`：`dev` 及其每次重新加载、`build`（包括 `-embed`）、`test`（包括 `-target`）和 `check`，覆盖所有目标。NSGo 自己的标签（例如 `dev` 中的 `nsgodev`、目标测试中的 `nsgotest`）会加在它们之后，`GOFLAGS` 中 `-tags` 的标签也会合并进来，而不是被替换；`GOFLAGS` 的其余选项照常生效。
 

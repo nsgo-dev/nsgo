@@ -50,7 +50,7 @@ dev:
 build:
   output: dist
   tags: []              # Go build tags every build, test and check of the app takes, such as timetzdata
-  ldflags: []            # app linker flags, such as -X main.releaseDate=2026-11-17
+  ldflags: []           # the app's own linker flags, such as -X main.releaseDate=2026-11-17
   open: false           # true opens the output directory after building
   installers: true      # false leaves out the disk image, the Windows installer and the Linux packages
   jobs: 0               # how many targets build at once; 0 is half the CPUs, 1 one after another
@@ -71,7 +71,7 @@ build:
 
 Flags replace the values they name, such as `-target`, `-version` or `-output`; `-h` lists them all.
 
-`build.ldflags` adds the app's linker flags to every build. `-ldflags` on `build` or `test` adds more for that invocation; repeat it for more values. The flags are applied before NSGo's own identity flags, so the app's variables can be stamped while the name and version from `nsgo.yaml` stay authoritative.
+`build.ldflags` holds the app's own linker flags, each written as go build's `-ldflags` takes it, such as `-X main.releaseDate=2026-11-17` or `-X 'main.channel=beta builds'`. Every build that links the app takes them: `dev` and its reloads, `build` with `-embed` too and `test` with `-target` too, on every target. `-ldflags` on `build` and `test` adds to them rather than replacing them, repeated for more. They come before the tool's own `-X` flags, and the linker keeps a variable's last, so the name, ID and version in `core.App` stay those of `nsgo.yaml`. The tool passes go its own `-ldflags`, which replaces one in `GOFLAGS`, so linker flags belong here; a headless `test`'s `-ldflags` after the directory is go test's and replaces them all.
 
 Every go command the tool runs for the app takes `build.tags`, in `dev` and its reloads, `build` with `-embed` too, `test` with `-target` too and `check`, on every target. NSGo's own tags, such as `nsgodev` in `dev` or `nsgotest` in target tests, are added to them, as are the tags of `-tags` in `GOFLAGS`, which would otherwise be replaced; the rest of `GOFLAGS` applies as it is.
 

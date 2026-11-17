@@ -51,8 +51,7 @@ func bindOverride[T any](fs *flag.FlagSet, name, usage string, parse func(string
 	return o
 }
 
-// stringListFlag collects a repeatable string flag, preserving each value's
-// spaces for flags such as -ldflags whose value is parsed by another tool.
+// stringListFlag collects a repeatable string flag's values in order, each as written: an -ldflags value keeps its spaces and quotes for go build to split.
 func stringListFlag(fs *flag.FlagSet, name, usage string) *[]string {
 	var values []string
 	fs.Func(name, usage, func(value string) error {
@@ -239,7 +238,7 @@ func bindBuildFlags(fs *flag.FlagSet) *buildFlags {
 	f := &buildFlags{overrides: bindOverrides(fs)}
 	f.targets = stringFlag(fs, "target", "comma-separated `targets`: all for every platform Go and Xcode build, miniprogram for every mini program, or their names (default: nsgo.yaml's build.targets)")
 	f.output = stringFlag(fs, "output", "the `output` directory (default: nsgo.yaml's build.output)")
-	f.ldflags = stringListFlag(fs, "ldflags", "append app linker `flags` to the build; repeat for more values (default: nsgo.yaml's build.ldflags)")
+	f.ldflags = stringListFlag(fs, "ldflags", "add app linker `flags` to nsgo.yaml's build.ldflags, as go build's -ldflags takes them; repeat for more")
 	f.open = boolFlag(fs, "open", "open the output directory (default: nsgo.yaml's build.open)")
 	f.install = boolFlag(fs, "installers", "package macOS, Windows and Linux targets for users to install: a disk image, an NSIS installer, Debian and Arch packages (default: nsgo.yaml's build.installers, else true)")
 	f.jobs = intFlag(fs, "jobs", "how many targets build at once (default: nsgo.yaml's build.jobs, else half the CPUs)")
