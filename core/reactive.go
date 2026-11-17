@@ -83,7 +83,7 @@ func (rt *runtime) unpark(p *parking) {
 
 // RootOptions connect a graph to its host, an engine or a test driver.
 type RootOptions struct {
-	// CheckCommits compares incremental commits with a full layout and panics on changes the incremental pass missed. Tests enable it; performance measurements leave it off for their own graph. In a test build (nsgotest or nsgocheck) it also records the goroutine that calls NewRoot as the graph's owner and panics when another goroutine writes to the graph, commits it or runs code in it; a development build (nsgodev) checks every native graph whatever this says.
+	// CheckCommits compares incremental commits with a full layout and panics on changes the incremental pass missed. Tests enable it; performance measurements leave it off for their own graph. In a native test build (nsgotest or nsgocheck, not WebAssembly) it also records the goroutine that calls NewRoot as the graph's owner and panics when another goroutine writes to the graph, commits it or runs code in it; a development build (nsgodev) checks every native graph whatever this says.
 	CheckCommits bool
 	// Post runs fn on the graph's goroutine later. It must be safe to
 	// call from any goroutine and must not block.
