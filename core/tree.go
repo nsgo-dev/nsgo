@@ -1188,15 +1188,20 @@ func (t *Tree) restyle(n *node) bool {
 func (t *Tree) groupState(n *node, name string) shownStates {
 	for a := n.parent; a != nil; a = a.parent {
 		if g := a.style.Group; g != "" && (name == "" || g == name) {
-			p := a.props
-			p.Checked = p.Checked || a.part.Checked
-			p.Indeterminate = p.Indeterminate || a.part.Indeterminate
-			p.Selected = p.Selected || a.part.Selected
-			p.Disabled = p.Disabled || a.part.Disabled || a.input != nil && a.input.config.Disabled
-			return statesOf(t.shownInteraction(a), &p, a.part.Data)
+			return t.sharedStates(a)
 		}
 	}
 	return shownStates{}
+}
+
+// sharedStates returns the states n shows the views that follow it as their group or peer: its props with its part's and its input's.
+func (t *Tree) sharedStates(n *node) shownStates {
+	p := n.props
+	p.Checked = p.Checked || n.part.Checked
+	p.Indeterminate = p.Indeterminate || n.part.Indeterminate
+	p.Selected = p.Selected || n.part.Selected
+	p.Disabled = p.Disabled || n.part.Disabled || n.input != nil && n.input.config.Disabled
+	return statesOf(t.shownInteraction(n), &p, n.part.Data)
 }
 
 // restyleExpanded restyles n, and the view that shows its expanded state,

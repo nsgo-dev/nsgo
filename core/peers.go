@@ -23,16 +23,11 @@ func (t *Tree) matchesPeer(n *node, cond classPeer) bool {
 		if !k.peerMarked() || !slices.Contains(k.cls.list.peers, cond.name) {
 			continue
 		}
-		props := k.props
-		props.Checked = props.Checked || k.part.Checked
-		props.Indeterminate = props.Indeterminate || k.part.Indeterminate
-		props.Selected = props.Selected || k.part.Selected
-		props.Disabled = props.Disabled || k.part.Disabled || k.input != nil && k.input.config.Disabled
-		shown := statesOf(t.shownInteraction(k), &props, k.part.Data)
+		shown := t.sharedStates(k)
 		var states uint16
-		for i, on := range shown.on {
+		for s, on := range shown.on {
 			if on {
-				states |= classStates[i]
+				states |= classStates[s]
 			}
 		}
 		if states&cond.states == cond.states && states&cond.notStates == 0 &&
