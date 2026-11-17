@@ -10,11 +10,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Tailwind CSS classes (`flex-row gap-4 p-4 bg-white dark:bg-zinc-900`),
-// ported from NSH's nsh-core tailwind module: class strings are parsed
-// into cached rules, and a node resolves them for its
-// environment and states. Utilities and variants mean what they mean in
-// Tailwind CSS 4; what has no native meaning is an unknown class.
+// Tailwind CSS classes (`flex-row gap-4 p-4 bg-white dark:bg-zinc-900`), ported from NSH's nsh-core tailwind module: class strings are parsed into cached rules, and a node resolves them for its environment and states. Utilities and variants mean what they mean in Tailwind CSS 4; what has no native meaning is an unknown class.
 //
 // Later utilities win over earlier ones; variant rules apply after plain
 // ones in Tailwind's variant order; important ones (`!p-4`, `p-4!`) after
@@ -492,8 +488,10 @@ type classRule struct {
 type classList struct {
 	tw    *tailwindTheme
 	theme *Theme
-	class string
-	rules []classRule
+	// tokens is the host token set the string was parsed with.
+	tokens uint64
+	class  string
+	rules  []classRule
 	// env is set when the rules depend on the environment: the
 	// appearance, the window, the direction, the platform, the motion
 	// setting or the theme's colors.
@@ -521,15 +519,23 @@ type classEnv struct {
 	tw             *tailwindTheme
 	// theme gives the tokens classes name as variables: rounded-(--radius).
 	theme *Theme
+	// hostColors are the host's tokens, whose names classes know as the theme's.
+	hostColors hostColors
 	// fontSize is what em-based utilities (tracking-*) measure against.
 	fontSize Points
 }
 
-// classSource is a class string and its subtree's themes.
+// classSource is a class string, its subtree's themes and the host token set over them.
 type classSource struct {
-	tw    *tailwindTheme
-	theme *Theme
-	class string
+	tw     *tailwindTheme
+	theme  *Theme
+	tokens uint64
+	class  string
+}
+
+// parsedFor reports whether l was parsed for env's themes and host tokens.
+func (l *classList) parsedFor(env *classEnv) bool {
+	return l.tw == env.tw && l.theme == env.theme && l.tokens == env.hostColors.id
 }
 
 // parseClasses parses a class string for Tailwind's default theme.
@@ -540,27 +546,26 @@ func parseClasses(s string) *classList { return defaultTailwind.parse(s) }
 // ignore. A tool checks classes written for it with it before they draw.
 func UnknownClasses(s string) []string { return slices.Clone(parseClasses(s).unknown) }
 
-// parseClasses caches a class string on its graph, with its own theme's
-// color names. A theme is read-only after SetTheme.
-func (rt *runtime) parseClasses(theme *Theme, s string) *classList {
-	t := theme.tailwind()
-	key := classSource{t, theme, s}
+// parseClasses caches a class string on its graph, with the color names of env's theme and of the host's tokens. A theme is read-only after SetTheme.
+func (rt *runtime) parseClasses(env *classEnv, s string) *classList {
+	t := env.theme.tailwind()
+	key := classSource{t, env.theme, env.hostColors.id, s}
 	if l, ok := rt.classCache.get(key); ok {
 		return l
 	}
-	l := t.parseFor(s, theme)
+	l := t.parseFor(s, env.theme, env.hostColors)
 	rt.classCache.put(key, l)
 	return l
 }
 
 func (t *tailwindTheme) parse(s string) *classList {
-	return t.parseFor(s, DefaultTheme())
+	return t.parseFor(s, DefaultTheme(), hostColors{})
 }
 
-func (t *tailwindTheme) parseFor(s string, theme *Theme) *classList {
+func (t *tailwindTheme) parseFor(s string, theme *Theme, host hostColors) *classList {
 	parser := *t
-	parser.palette = theme
-	l := &classList{tw: t, theme: theme, class: s}
+	parser.palette, parser.hostColors = theme, host
+	l := &classList{tw: t, theme: theme, tokens: host.id, class: s}
 	for _, token := range strings.Fields(s) {
 		if !parser.parseToken(l, token) {
 			l.unknown = append(l.unknown, token)

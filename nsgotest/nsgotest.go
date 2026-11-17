@@ -53,7 +53,6 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Tests check that each commit sends all that changed; a running app the automation follows lays each commit out once, as its users' does.
 // Option configures Start.
 type Option func(*App)
 
@@ -142,11 +141,7 @@ func ManualFrames() Option {
 	return func(a *App) { a.manualFrames = true }
 }
 
-// Measure runs the app as it runs for its users, for a measurement on a
-// target: on the system's clock, so Advance waits as long as it moves,
-// with its own commits unchecked, whose check otherwise lays
-// every node out again, and with steps that wait only for what animates
-// to rest, not for the app to stop committing. Headless, it does nothing.
+// Measure runs the app as it runs for its users, for a measurement on a target: on the system's clock, so Advance waits as long as it moves, with its own commits unchecked, whose check otherwise lays every node out again, and with steps that wait only for what animates to rest, not for the app to stop committing. Headless, it does nothing.
 func Measure() Option {
 	return func(a *App) { a.measure = true }
 }
@@ -533,6 +528,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		}
 	}
 	a.root = core.NewRoot(core.RootOptions{
+		// Tests check that each commit sends all that changed; a running app the automation follows lays each commit out once, as its users' does.
 		CheckCommits: !automationBuild,
 		Post: func(fn func()) {
 			a.mu.Lock()

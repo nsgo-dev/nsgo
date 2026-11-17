@@ -83,6 +83,11 @@ func (p *Palette) SetColor(name string, c Color) {
 	p.Colors[name] = c
 }
 
+// knowsColor reports whether a class may name name: the parsed subtree's theme or the host's tokens define it.
+func (t *tailwindTheme) knowsColor(name string) bool {
+	return t.palette.hasColor(name) || t.hostColors.has(name)
+}
+
 // hasColor reports names defined by this theme in either appearance.
 func (t *Theme) hasColor(name string) bool {
 	if t == nil {
@@ -415,10 +420,7 @@ type (
 	scopeAppearance struct{}
 )
 
-// SetTheme gives cx and everything it builds from now on theme t; a
-// nil t takes back what an earlier call gave, so the theme above shows.
-// Called at the app's root it is the app's theme; a deeper call wins
-// for its subtree, so a sidebar or a panel can take another.
+// SetTheme gives cx and everything it builds from now on theme t; a nil t takes back what an earlier call gave, so the theme above shows. Called at the app's root it is the app's theme; a deeper call wins for its subtree, so a sidebar or a panel can take another. A theme changed after it is set is not followed: set a changed copy instead.
 func (cx *Scope) SetTheme(t *Theme) {
 	o := cx
 	if s, ok := o.values[scopeTheme{}].(*Signal[*Theme]); ok {
@@ -554,12 +556,20 @@ func (rt *runtime) defaultTheme() *Theme {
 	return rt.theme
 }
 
-// hostColors are a host's Tokens read as colors.
+// hostColors are a host's Tokens read as colors. id tells one set from another, for the classes parsed with it; the zero set has id 0.
 type hostColors struct {
+	id           uint64
 	values, dark map[string]Color
 }
 
 func (h hostColors) any() bool { return len(h.values) > 0 || len(h.dark) > 0 }
+
+// has reports whether the tokens name a color in either appearance.
+func (h hostColors) has(name string) bool {
+	_, light := h.values[name]
+	_, dark := h.dark[name]
+	return light || dark
+}
 
 func (h hostColors) apply(p *Palette, dark bool) {
 	for name, c := range h.values {

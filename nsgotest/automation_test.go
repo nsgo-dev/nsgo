@@ -286,7 +286,7 @@ func (f *fakeLive) Screenshot() ([]byte, error) {
 func TestAgentFollowsALiveSurface(t *testing.T) {
 	g := newAgent()
 	t.Cleanup(g.close)
-	root := core.NewRoot(core.RootOptions{})
+	root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild})
 	t.Cleanup(root.Dispose)
 	tree := core.NewTree(root, core.ApproxTextEngine{})
 	tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
@@ -361,7 +361,7 @@ func TestAgentFollowsTheRegistry(t *testing.T) {
 	devtools.Enabled, devtools.Automation = true, g
 	t.Cleanup(func() { devtools.Enabled, devtools.Automation = false, nil })
 	start := func(title, text string) {
-		root := core.NewRoot(core.RootOptions{Windows: &core.WindowOptions{Width: 300, Height: 200}})
+		root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild, Windows: &core.WindowOptions{Width: 300, Height: 200}})
 		t.Cleanup(root.Dispose)
 		app := core.NewTree(root, core.ApproxTextEngine{})
 		app.Mount(core.AppRoot(func(cx *core.Scope) {
@@ -389,7 +389,7 @@ func TestAgentFollowsTheRegistry(t *testing.T) {
 func TestAgentWaitsForTheFirstWindow(t *testing.T) {
 	g := newAgent()
 	t.Cleanup(g.close)
-	root := core.NewRoot(core.RootOptions{})
+	root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild})
 	t.Cleanup(root.Dispose)
 	tree := core.NewTree(root, core.ApproxTextEngine{})
 	tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
@@ -433,7 +433,7 @@ func TestAgentTellsSurfacesApart(t *testing.T) {
 	t.Cleanup(g.close)
 	trees := map[uint32]*chooser{}
 	for _, id := range []uint32{0, 1} {
-		root := core.NewRoot(core.RootOptions{})
+		root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild})
 		t.Cleanup(root.Dispose)
 		tree := core.NewTree(root, core.ApproxTextEngine{})
 		tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
@@ -490,7 +490,7 @@ func TestAgentTellsSurfacesApart(t *testing.T) {
 func TestAgentLosesAModelRatherThanTheApp(t *testing.T) {
 	g := newAgent()
 	t.Cleanup(g.close)
-	root := core.NewRoot(core.RootOptions{})
+	root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild})
 	t.Cleanup(root.Dispose)
 	tree := core.NewTree(root, core.ApproxTextEngine{})
 	tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})

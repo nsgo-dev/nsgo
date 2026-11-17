@@ -32,7 +32,7 @@ func (t *Tree) setClasses(n *node, class string) {
 	}
 	var env classEnv
 	Untracked(n.owner, func() bool { env = t.classEnv(n); return true })
-	l := t.rt.parseClasses(env.theme, class)
+	l := t.rt.parseClasses(&env, class)
 	if n.cls != nil && n.cls.list == l {
 		return
 	}
@@ -97,7 +97,7 @@ func (t *Tree) followSpanClasses(n *node) {
 	if n.cls == nil {
 		var env classEnv
 		Untracked(n.owner, func() bool { env = t.classEnv(n); return true })
-		n.cls = &nodeClasses{list: t.rt.parseClasses(env.theme, " "), env: env}
+		n.cls = &nodeClasses{list: t.rt.parseClasses(&env, " "), env: env}
 	}
 	if !n.cls.bound {
 		n.cls.bound = true
@@ -126,8 +126,8 @@ func (t *Tree) followEnv(n *node) {
 			if n.created {
 				c.env.rtl = n.rtl
 			}
-			if c.list.tw != env.tw || c.list.theme != env.theme {
-				c.list = t.rt.parseClasses(env.theme, c.list.class)
+			if !c.list.parsedFor(&env) {
+				c.list = t.rt.parseClasses(&env, c.list.class)
 				t.rt.reportUnknown(c.list)
 			}
 			t.resolveClasses(n)
@@ -146,7 +146,7 @@ func (t *Tree) classEnv(n *node) classEnv {
 	e := o.Env()
 	pal := o.Palette()
 	return classEnv{dark: o.Dark(), window: e.Window(), rtl: e.RTL(), reduce: e.ReduceMotion(), contrast: e.IncreaseContrast(), os: e.OS(),
-		palette: &pal, tw: o.Theme().tailwind(), theme: o.Theme()}
+		palette: &pal, tw: o.Theme().tailwind(), theme: o.Theme(), hostColors: e.tokens.Get()}
 }
 
 // resolveClasses resolves n's classes for their environment and n's
@@ -343,7 +343,7 @@ func (t *Tree) spanStyle(n *node, class string, style Style) (Style, *spanClasse
 	}
 	var env classEnv
 	Untracked(n.owner, func() bool { env = t.classEnv(n); return true })
-	l := t.rt.parseClasses(env.theme, class)
+	l := t.rt.parseClasses(&env, class)
 	t.rt.reportUnknown(l)
 	sc := &spanClasses{list: l, base: style}
 	return sc.resolve(&env), sc
@@ -377,8 +377,8 @@ func (t *Tree) resolveSpanClasses(n *node) {
 	changed := false
 	for i := range n.text.spans {
 		sp := &n.text.spans[i]
-		if sp.cls != nil && (sp.cls.list.tw != env.tw || sp.cls.list.theme != env.theme) {
-			sp.cls.list = t.rt.parseClasses(env.theme, sp.cls.list.class)
+		if sp.cls != nil && !sp.cls.list.parsedFor(&env) {
+			sp.cls.list = t.rt.parseClasses(&env, sp.cls.list.class)
 			t.rt.reportUnknown(sp.cls.list)
 			sp.style = sp.cls.resolve(&env)
 			changed = true

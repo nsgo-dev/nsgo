@@ -1,8 +1,6 @@
 package core
 
-// parseCache keeps two generations of parsed values on one graph. An old
-// value used again is promoted, and a full generation replaces the old
-// one, as measureCache does. Callers use it on the graph's goroutine.
+// parseCache keeps two generations of parsed values on one graph. An old value used again is promoted, and a full generation replaces the old one, as measureCache does. Callers use it on the graph's goroutine.
 type parseCache[K comparable, V any] struct {
 	now, old map[K]V
 }

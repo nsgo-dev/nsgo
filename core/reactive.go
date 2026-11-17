@@ -83,9 +83,7 @@ func (rt *runtime) unpark(p *parking) {
 
 // RootOptions connect a graph to its host, an engine or a test driver.
 type RootOptions struct {
-	// CheckCommits compares incremental commits with a full layout and
-	// panics on changes the incremental pass missed. Tests enable it;
-	// performance measurements leave it off for their own graph.
+	// CheckCommits compares incremental commits with a full layout and panics on changes the incremental pass missed. Tests enable it; performance measurements leave it off for their own graph.
 	CheckCommits bool
 	// Post runs fn on the graph's goroutine later. It must be safe to
 	// call from any goroutine and must not block.
@@ -146,6 +144,7 @@ type runtime struct {
 	classCache   parseCache[classSource, *classList]
 	templates    parseCache[GridTracks, *gridTemplate]
 	reported     parseCache[string, bool]
+	tokenSets    uint64 // the host token sets given so far, which number them
 
 	owner    *Scope       // the owner of what running code creates
 	observer *computation // the computation reads subscribe

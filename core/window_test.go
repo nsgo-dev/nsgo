@@ -664,7 +664,7 @@ func TestWindowFrame(t *testing.T) {
 
 func TestOpenLinksWaitForAHandlerApartFromFiles(t *testing.T) {
 	var posted []func()
-	root := NewRoot(RootOptions{Post: func(fn func()) { posted = append(posted, fn) }, Clock: NewManualClock(time.Unix(0, 0))})
+	root := testRoot(RootOptions{Post: func(fn func()) { posted = append(posted, fn) }, Clock: NewManualClock(time.Unix(0, 0))})
 	tree := NewTree(root, ApproxTextEngine{})
 	var links, files [][]string
 	handle := NewSignal(root, false)

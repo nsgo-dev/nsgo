@@ -42,7 +42,13 @@ type Tokens struct {
 // SetTokens gives the app the host's tokens, from now on: what reads
 // Env.Token runs again.
 func (t *Tree) SetTokens(tokens Tokens) {
-	t.root.Env().tokens.Set(parseTokens(tokens))
+	c := parseTokens(tokens)
+	if c.any() {
+		// Classes parsed with the old tokens are parsed again with these, whose names they may use.
+		t.rt.tokenSets++
+		c.id = t.rt.tokenSets
+	}
+	t.root.Env().tokens.Set(c)
 }
 
 // HostInbox is how many events a Host or an app keeps for later: those

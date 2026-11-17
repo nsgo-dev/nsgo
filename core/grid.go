@@ -30,8 +30,7 @@ type gridTemplate struct {
 	err    error
 }
 
-// parseTemplate caches the track lists this graph lays out. Validation
-// without a graph parses directly and retains no process-level entries.
+// parseTemplate caches the track lists this graph lays out. Validation without a graph parses directly and retains no process-level entries.
 func (rt *runtime) parseTemplate(g GridTracks) (*gridTemplate, error) {
 	if t, ok := rt.templates.get(g); ok {
 		return t, t.err

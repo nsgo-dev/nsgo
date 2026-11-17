@@ -26,7 +26,7 @@ func (p *disposalPreparedText) Release() {
 
 func TestDisposingATreeReleasesItsPreparedTexts(t *testing.T) {
 	text := &disposalTextEngine{}
-	root := NewRoot(RootOptions{})
+	root := testRoot(RootOptions{})
 	tree := NewTree(root, text)
 	tree.Resize(Size{Width: 200, Height: 200}, Geometry{})
 	var value *Signal[string]

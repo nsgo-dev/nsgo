@@ -18,8 +18,7 @@ func TestCommitChecksBelongToTheirGraph(t *testing.T) {
 				return View{Style: Style{Width: Pt(40), Height: Pt(20)}}
 			})
 			tree.Commit()
-			// Deliberately bypass the dirty marks. Only this graph's
-			// full-layout diagnostic can find the missed width change.
+			// Deliberately bypass the dirty marks. Only this graph's full-layout diagnostic can find the missed width change.
 			tree.view.children[0].style.Width = Pt(80)
 			tree.changed = true
 			defer func() {
