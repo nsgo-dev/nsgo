@@ -59,6 +59,8 @@ type testResult struct {
 	// Message is why the tool failed a test that passed or skipped, as one whose screenshot it cannot save, and the failure's message in place of the output's first line.
 	Message  string
 	reported int // how much of a benchmark's Output it reported
+	// whole marks the result of one target test process, which counts in the tally whatever its name, a selected subtest's included, since no parent result is reported beside it.
+	whole bool
 }
 
 // failFor fails t for why, a reason the tool found after the test ran, and adds why to its output.
@@ -535,9 +537,8 @@ func (r *testRun) print(t *testResult) {
 func (r *testRun) finish(opts testOptions, waitErr error) error {
 	var passed, failed, skipped int
 	for _, t := range r.results {
-		// Subtests count with their test; a benchmark's every result
-		// counts, its subbenchmarks' too.
-		if strings.Contains(t.Name, "/") && !strings.HasPrefix(t.Name, "Benchmark") {
+		// Subtests count with their test, unless a target process reported one alone; a benchmark's every result counts, its subbenchmarks' too.
+		if !t.whole && strings.Contains(t.Name, "/") && !strings.HasPrefix(t.Name, "Benchmark") {
 			continue
 		}
 		switch t.Status {

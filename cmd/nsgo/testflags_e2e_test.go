@@ -45,6 +45,10 @@ func TestRepeat(t *testing.T) {
  })
 }
 func TestFirstFailure(t *testing.T) { t.Fatal("stop here") }
+func TestSubs(t *testing.T) {
+ t.Run("a", func(t *testing.T) { t.Run("leaf", func(t *testing.T) { mark(t, "leaf") }) })
+ t.Run("b", func(t *testing.T) { t.Fatal("the selected subtest failed") })
+}
 func TestLater(t *testing.T) { mark(t, "later") }
 `,
 	})
@@ -76,6 +80,18 @@ func TestLater(t *testing.T) { mark(t, "later") }
 	r, marks, err = run("TestRepeat/selected", []string{"-count", "3", "-cpu=2", "-parallel=2", "-fullpath"})
 	if err != nil || r.Tests != 1 || r.Failures != 0 || r.Suites[0].Skipped != 0 || marks != "repeat\nrepeat\n" {
 		t.Fatalf("-count/-cpu/subtest: %+v, marks=%q, %v", r, marks, err)
+	}
+	// A failing subtest selected alone fails the run: it is the process's whole result, not a subtest counted with a parent beside it.
+	r, marks, err = run("TestSubs/b", []string{"-count=2"})
+	if err == nil || err.Error() != "1 test failed" || r.Tests != 1 || r.Failures != 1 || r.Suites[0].Cases[0].Name != "TestSubs/b" {
+		t.Fatalf("failing selected subtest: %+v, marks=%q, %v", r, marks, err)
+	}
+	// A selected subtest is reported as itself at the depth -run names, nested or with a lone subtest of its own.
+	for _, pattern := range []string{"TestSubs/a/leaf", "TestSubs/a"} {
+		r, marks, err = run(pattern, nil)
+		if err != nil || r.Tests != 1 || r.Failures != 0 || r.Suites[0].Cases[0].Name != pattern || marks != "leaf\n" {
+			t.Fatalf("selected subtest %s: %+v, marks=%q, %v", pattern, r, marks, err)
+		}
 	}
 	r, marks, err = run("TestFirstFailure|TestLater", []string{"-failfast"})
 	if err == nil || r.Tests != 1 || r.Failures != 1 || strings.Contains(marks, "later") {

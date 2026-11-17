@@ -113,6 +113,7 @@ func runTargetTests(ctx context.Context, p *project, opts testOptions) error {
 	if opts.fps {
 		env = append(env, "NSGO_TEST_FPS=1")
 	}
+	depth := runDepth(opts.run)
 tests:
 	for _, name := range names {
 		iteration := 0
@@ -138,7 +139,7 @@ tests:
 			if repeated {
 				dir = filepath.Join(shots, fmt.Sprintf("run-%d", iteration))
 			}
-			t, saved := targetResult(name, out.String(), code, err, dir, savedPaths)
+			t, saved := targetResult(name, depth, out.String(), code, err, dir, savedPaths)
 			if t.Elapsed == 0 {
 				t.Elapsed = time.Since(started)
 			}
@@ -321,6 +322,15 @@ func splitTestRun(run string) (top, sub string) {
 	return run, ""
 }
 
+// runDepth is how many levels of subtests run selects below the top-level test, as go test splits it: 1 for TestGallery/dark-home, 0 without a slash.
+func runDepth(run string) int {
+	depth := 0
+	for _, sub := splitTestRun(run); sub != ""; _, sub = splitTestRun(sub) {
+		depth++
+	}
+	return depth
+}
+
 // targetTestArgs runs exactly one top-level test while retaining go test's
 // hierarchical subtest matching when -run contains a slash.
 func targetTestArgs(name, run string, timeout time.Duration) []string {
@@ -424,9 +434,9 @@ func isTestName(name string) bool {
 }
 
 // targetResult turns one test process's output into its result and saves the screenshots it carries in dir, returning the files written.
-func targetResult(name, out string, code int, runErr error, dir string, seen map[string]bool) (*testResult, []string) {
+func targetResult(name string, depth int, out string, code int, runErr error, dir string, seen map[string]bool) (*testResult, []string) {
 	text, saved, saveErr := saveScreenshots(out, dir, seen)
-	t := parseTestOutput(name, text, code, runErr)
+	t := parseTestOutput(name, depth, text, code, runErr)
 	// A screenshot the tool cannot save, as one whose path an earlier one took, fails its test, and the run goes on.
 	if saveErr != nil {
 		t.failFor(saveErr.Error())
@@ -437,9 +447,9 @@ func targetResult(name, out string, code int, runErr error, dir string, seen map
 // testLine matches go test -v's result line of a test, once its indentation is trimmed.
 var testLine = regexp.MustCompile(`^--- (PASS|FAIL|SKIP): (\S+) \(([0-9.]+)s\)`)
 
-// parseTestOutput turns one test process's output into its result; a process that printed no result for it crashed or timed out.
-func parseTestOutput(name, out string, code int, runErr error) *testResult {
-	t := &testResult{Name: name, Output: out}
+// parseTestOutput turns one test process's output into its result, that of the subtest depth levels down when -run selected one (runDepth); a process that printed no result for it crashed or timed out.
+func parseTestOutput(name string, depth int, out string, code int, runErr error) *testResult {
+	t := &testResult{Name: name, Output: out, whole: true}
 	// Results by name across in-process repetitions: elapsed times add up, a failure outweighs a pass and a pass a skip.
 	type result struct {
 		status  string
@@ -466,10 +476,16 @@ func parseTestOutput(name, out string, code int, runErr error) *testResult {
 		}
 		r.elapsed += time.Duration(s * float64(time.Second))
 	}
-	// A run that reached one subtest, as -run Test/sub selects, reports it unless the test failed outside it; otherwise the top-level result covers every subtest, so a test with several is never reported as its first.
+	// A run whose -run reached exactly one subtest at the depth it selects, as Test/sub or Test/sub/leaf does, reports that subtest, not its own subtests, unless the test failed outside it; otherwise the top-level result covers every subtest, so a test with several is never reported as its first.
 	matched := name
-	if top := results[name]; len(subtests) == 1 && (top == nil || top.status != "fail" || results[subtests[0]].status == "fail") {
-		matched = subtests[0]
+	var selected []string
+	for _, sub := range subtests {
+		if depth > 0 && strings.Count(sub, "/") == depth {
+			selected = append(selected, sub)
+		}
+	}
+	if top := results[name]; len(selected) == 1 && (top == nil || top.status != "fail" || results[selected[0]].status == "fail") {
+		matched = selected[0]
 	}
 	if r := results[matched]; r != nil {
 		t.Name, t.Status, t.Elapsed = matched, r.status, r.elapsed

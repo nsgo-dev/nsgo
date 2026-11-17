@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -26,6 +27,11 @@ func TestSplitTestRun(t *testing.T) {
 			t.Errorf("splitTestRun(%q) = %q, %q; want %q, %q", tc.pattern, top, sub, tc.top, tc.sub)
 		}
 	}
+	for pattern, want := range map[string]int{"": 0, "TestGallery": 0, "TestGallery/dark-home": 1, "TestGallery/[dark/home]": 1, "TestGallery/a/b": 2, "TestA|TestB/(x/y)/z": 2} {
+		if got := runDepth(pattern); got != want {
+			t.Errorf("runDepth(%q) = %d, want %d", pattern, got, want)
+		}
+	}
 }
 
 func TestTargetTestArgs(t *testing.T) {
@@ -36,7 +42,7 @@ func TestTargetTestArgs(t *testing.T) {
 }
 
 func TestParseTargetSubtestOutput(t *testing.T) {
-	got := parseTestOutput("TestGallery", "--- PASS: TestGallery/dark-home (0.2s)\n--- PASS: TestGallery (0.2s)\n", 0, nil)
+	got := parseTestOutput("TestGallery", 1, "--- PASS: TestGallery/dark-home (0.2s)\n--- PASS: TestGallery (0.2s)\n", 0, nil)
 	if got.Name != "TestGallery/dark-home" || got.Status != "pass" {
 		t.Fatalf("result = %+v, want the selected subtest", got)
 	}
@@ -53,7 +59,7 @@ func TestRepeatedTargetResults(t *testing.T) {
 		{"--- FAIL: TestOne (0.1s)\n--- PASS: TestOne (0.2s)\n", "fail", 1},
 		{"--- SKIP: TestOne (0.1s)\nprocess failed during teardown\n", "fail", 1},
 	} {
-		got := parseTestOutput("TestOne", tc.output, tc.code, nil)
+		got := parseTestOutput("TestOne", 0, tc.output, tc.code, nil)
 		if got.Status != tc.want {
 			t.Errorf("%q (exit %d): %s, want %s", tc.output, tc.code, got.Status, tc.want)
 		}
@@ -61,23 +67,64 @@ func TestRepeatedTargetResults(t *testing.T) {
 			t.Errorf("repeated elapsed=%v, want 300ms", got.Elapsed)
 		}
 	}
-	got := parseTestOutput("TestOne", "    --- PASS: TestOne/selected (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
+	got := parseTestOutput("TestOne", 1, "    --- PASS: TestOne/selected (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
 	if got.Name != "TestOne/selected" || got.Status != "pass" {
 		t.Fatalf("indented subtest=%+v", got)
 	}
 	// A test with several subtests is reported as itself, not as its first subtest, failing when any subtest failed.
-	got = parseTestOutput("TestOne", "    --- PASS: TestOne/a (0.1s)\n    --- FAIL: TestOne/b (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
+	got = parseTestOutput("TestOne", 0, "    --- PASS: TestOne/a (0.1s)\n    --- FAIL: TestOne/b (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
 	if got.Name != "TestOne" || got.Status != "fail" || got.Elapsed != 200*time.Millisecond {
 		t.Fatalf("several subtests=%+v", got)
 	}
-	got = parseTestOutput("TestOne", "    --- PASS: TestOne/a (0.1s)\n    --- PASS: TestOne/b (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
+	got = parseTestOutput("TestOne", 0, "    --- PASS: TestOne/a (0.1s)\n    --- PASS: TestOne/b (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
 	if got.Name != "TestOne" || got.Status != "pass" {
 		t.Fatalf("several passing subtests=%+v", got)
 	}
 	// One subtest that passed does not hide a failure of its parent.
-	got = parseTestOutput("TestOne", "    --- PASS: TestOne/a (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
+	got = parseTestOutput("TestOne", 1, "    --- PASS: TestOne/a (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
 	if got.Name != "TestOne" || got.Status != "fail" {
 		t.Fatalf("failed parent=%+v", got)
+	}
+	// A nested selection, -run TestOne/a/b, reports its deepest subtest; a failure outside it still reports the parent.
+	got = parseTestOutput("TestOne", 2, "        --- FAIL: TestOne/a/b (0.1s)\n    --- FAIL: TestOne/a (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
+	if got.Name != "TestOne/a/b" || got.Status != "fail" {
+		t.Fatalf("nested subtest=%+v", got)
+	}
+	got = parseTestOutput("TestOne", 2, "        --- PASS: TestOne/a/b (0.1s)\n    --- FAIL: TestOne/a (0.1s)\n--- FAIL: TestOne (0.2s)\n", 1, nil)
+	if got.Name != "TestOne" || got.Status != "fail" {
+		t.Fatalf("nested subtest under a failed parent=%+v", got)
+	}
+	// The selection reports the subtest -run names, not its own lone subtest, and a whole test with one subtest reports itself.
+	got = parseTestOutput("TestOne", 1, "        --- PASS: TestOne/a/leaf (0.1s)\n    --- PASS: TestOne/a (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
+	if got.Name != "TestOne/a" || got.Status != "pass" {
+		t.Fatalf("selected parent of a lone subtest=%+v", got)
+	}
+	got = parseTestOutput("TestOne", 0, "    --- PASS: TestOne/a (0.1s)\n--- PASS: TestOne (0.2s)\n", 0, nil)
+	if got.Name != "TestOne" || got.Status != "pass" {
+		t.Fatalf("whole test with one subtest=%+v", got)
+	}
+}
+
+// TestSelectedSubtestCounts checks that a target run whose only result is a selected subtest, alone or as one of a host-linked test's repetitions, counts it in the tally and fails the run when it failed.
+func TestSelectedSubtestCounts(t *testing.T) {
+	for _, repeated := range []bool{false, true} {
+		var out bytes.Buffer
+		r := &testRun{out: &out}
+		for i, status := range []string{"PASS", "FAIL"} {
+			code := 0
+			if status == "FAIL" {
+				code = 1
+			}
+			res := parseTestOutput("TestSubs", 1, "    --- "+status+": TestSubs/b (0.1s)\n--- "+status+": TestSubs (0.1s)\n", code, nil)
+			if repeated {
+				res.Name = fmt.Sprintf("%s [run %d]", res.Name, i+1)
+			}
+			r.results = append(r.results, res)
+		}
+		err := r.finish(testOptions{}, nil)
+		if err == nil || err.Error() != "1 test failed" || !strings.Contains(out.String(), "1 passed, 1 failed, 0 skipped") {
+			t.Errorf("repeated=%v: %v, tally %q", repeated, err, out.String())
+		}
 	}
 }
 
@@ -800,8 +847,8 @@ func TestToolFailureIsTheMessage(t *testing.T) {
 	dir := t.TempDir()
 	shot := "nsgo-screenshot ~" + base64.RawURLEncoding.EncodeToString([]byte("home")) + " 1/1 iVBORw0KGgo=\n"
 	passed := "=== RUN   TestShot\n    shot_test.go:9: took it\n" + shot + shot + "--- PASS: TestShot (0.01s)\nPASS\n"
-	dup, _ := targetResult("TestShot", passed, 0, nil, dir, map[string]bool{})
-	exited, _ := targetResult("TestExit", "=== RUN   TestExit\n--- PASS: TestExit (0.01s)\nPASS\n", 1, nil, dir, map[string]bool{})
+	dup, _ := targetResult("TestShot", 0, passed, 0, nil, dir, map[string]bool{})
+	exited, _ := targetResult("TestExit", 0, "=== RUN   TestExit\n--- PASS: TestExit (0.01s)\nPASS\n", 1, nil, dir, map[string]bool{})
 	for _, c := range []struct {
 		res  *testResult
 		want string
