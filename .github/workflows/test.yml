@@ -97,6 +97,13 @@ jobs:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
         run: xvfb-run -a go tool nsgo test -target linux ./internal/testhost/testdata/press
+      - name: Test headless editing keys and bindings
+        run: go tool nsgo test ./internal/testhost/testdata/keys
+      - name: Test native editing keys and bindings
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: xvfb-run -a go tool nsgo test -target linux ./internal/testhost/testdata/keys
       - name: Test
         env:
           GDK_BACKEND: x11
@@ -191,6 +198,8 @@ jobs:
         run: go tool nsgo test -run '^TestWindowObserversSurviveGC$' ./internal/platform/macos -- -race -timeout=180s
       - name: Test native press routing, modifiers and visible labels
         run: go tool nsgo test -target macos ./internal/testhost/testdata/press
+      - name: Test native editing keys and bindings
+        run: go tool nsgo test -target macos ./internal/testhost/testdata/keys
       - name: Test native radio and tab focus
         run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test composited captures
@@ -233,6 +242,8 @@ jobs:
           cache: true
       - name: Test native press routing, modifiers and visible labels
         run: go tool nsgo test -target windows ./internal/testhost/testdata/press
+      - name: Test native editing keys and bindings
+        run: go tool nsgo test -target windows ./internal/testhost/testdata/keys
       - name: Test native focus, styles, activation and label relationships
         run: go tool nsgo test -run '^(TestRefFocusUsesNativeKeyboardStops|TestNativeLabeledByProvider)$' ./internal/platform/windows
       - name: Test menu yield with a focused WebView2 page

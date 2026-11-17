@@ -794,7 +794,7 @@ func (a *App) Commit(selector, text string) {
 	a.Compose(selector, "")
 }
 
-// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter; else Escape goes back. A key nothing takes does nothing, as on a device.
+// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, or mod+a selects all its text; else Escape goes back. A key nothing takes does nothing, as on a device.
 func (a *App) Key(key string) {
 	a.t.Helper()
 	a.step("key(%s)", key)
@@ -843,7 +843,15 @@ func (a *App) Key(key string) {
 		name, shift = rest, true
 	}
 	for _, v := range a.views {
-		if !v.Focused || v.Kind != driver.KindInput || v.Input.Readonly || v.Input.Disabled || strings.Contains(name, "+") {
+		if !v.Focused || v.Kind != driver.KindInput || v.Input.Readonly || v.Input.Disabled {
+			continue
+		}
+		if slices.Contains(names, "mod+a") {
+			a.moveSelection(v, driver.TextRange{Start: 0, End: driver.UTF16Len(v.Text)})
+			a.done()
+			return
+		}
+		if strings.Contains(name, "+") {
 			continue
 		}
 		typed := key[len(key)-len(name):]

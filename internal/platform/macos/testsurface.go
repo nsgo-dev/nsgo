@@ -486,6 +486,11 @@ func (t *testSurface) Key(key string) error {
 		// leaves to the app the user works in: the field does the edit the
 		// menu item would ask of it.
 		onMainSync(func() {
+			ev := apple.KeyEvent(evKeyDown, flags, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), name, name, false, code)
+			rememberTestInput(ev)
+			if t.s.filter(ev) == 0 {
+				return
+			}
 			if r := t.s.window.Send(sel("firstResponder")); r != 0 {
 				r.Send(sel("tryToPerform:with:"), sel(action), objc.ID(0))
 			}

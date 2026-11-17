@@ -326,10 +326,10 @@ func (t *testSurface) Key(key string) error {
 		hold(vkLWin, meta)
 		hostSetKeyboardState.Call(uintptr(unsafe.Pointer(&state)))
 		defer hostSetKeyboardState.Call(uintptr(unsafe.Pointer(&saved)))
-		if w := t.w; w.focusedField() != nil && w.editKey(vk, ctrl, shift, alt) {
+		if t.w.shortcut(vk, 1) {
 			return
 		}
-		if t.w.shortcut(vk, 1) {
+		if w := t.w; w.focusedField() != nil && w.editKey(vk, ctrl, shift, alt) {
 			return
 		}
 		hostSendMessage.Call(t.w.hwnd, wmKeyDown, vk, 1)

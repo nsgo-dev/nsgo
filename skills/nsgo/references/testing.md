@@ -39,7 +39,7 @@ Keep each graph on the goroutine that created it, cleanup included. Signal write
 Use `app.Post(func() { signal.Set(value) })` from a test or stubbed worker to queue work on the app's graph goroutine, then `app.Settle()` or a wait before reading views. It runs on the test goroutine headless and the engine goroutine on a target, so the same test may set signals on both; the function takes no steps and does not call `t.Fatal`.
 
 - Pointer and touch: `Press`, `PressWith`, `PressAt`, `PressAtWith`, `LongPress`, `RightClick`, `Hover`, `Drag`, `Scroll`, `ScrollTo`, `PullToRefresh`, `Pinch`, `Wheel`.
-- Keyboard and text: `Focus`, `Type`, `Clear`, `Submit`, `KeyPress`, `Paste`, `Select`, `Compose`.
+- Keyboard and text: `Focus`, `Type`, `Clear`, `Submit`, `Key`, `KeyPress`, `Paste`, `Select`, `Compose`.
 - Menus and system UI: `ChooseMenu`, `ChooseDockMenu`, `ChoosePopup`, `ClosePopup`, `HeaderBack`, `Answer` for alerts (start with `nsgotest.PendingAlerts()`), `GrantPermission`, `DropFiles`, `CloseWindow` (with a desktop `Environment`, where the main view shows in the main window as `nsgo.Run` opens one: on macOS, and on Windows and Linux for an app's function).
 - Reading: `Find`, `Exists`, `Enabled`, `Query`, `Texts`, `Dump`, and `FindMounted` for views outside the window; a view's `Bounds()` is its frame in the window's points, and an image's `Image.Source.Version` the frame of pixels it shows.
 - Waiting: every step settles until animations end, headless also until style transitions reach their `OnTransitionEnd` (start with `ManualFrames()` to inspect them midway with `Advance`); on a target it, and `Settle`, first waits for the engine's pending commit, then for 100 ms without batches or finite animations, five seconds at most in total, so never add an empty post to wait for a slow first commit. `WaitFor`, `WaitForGone` and `WaitUntil` wait for what arrives later, such as a `cx.Post` from a goroutine. `Advance` and `FastForward` move the clock, which `cx.Now()` reads, so time what the app measures itself, such as a gesture's speed, with `cx.Now()` rather than `time.Now()`; never `time.Sleep`.
@@ -48,6 +48,8 @@ Use `app.Post(func() { signal.Set(value) })` from a test or stubbed worker to qu
 `PressWith(selector, core.Modifiers{Shift: true})` and `PressAtWith(selector, at, mods)` hold `Shift`, `Control`, `Alt` or `Platform` for that press only, including its down and up events. Plain presses carry no modifiers. These steps use native input on a target; watchOS rejects modified presses.
 
 `Ref.Focus()` commands follow platform focus stops: text fields everywhere, plus enabled pressable and `Focusable` views on desktops, the web and Apple TV. Use a desktop or web `Environment` when a headless test exercises button focus. The `Focus` step reaches these desktop/web stops through Tab. Any of `OnPress`, `OnPressDown`, `OnPressUp` or `OnLongPress` makes a view a stop; Return or Space sends it the down, up and press events it handles.
+
+`Key("mod+a")` selects a focused field headless and on desktop targets unless a binding takes it. `KeyAlways` takes editing keys before the field acts; `KeyAuto` and `KeyNotEditing` leave its editing keys alone.
 
 ## Tests without the network
 

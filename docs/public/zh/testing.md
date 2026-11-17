@@ -43,6 +43,8 @@ func TestMain(m *testing.M) {
 
 无头运行默认使用手机 idiom，与项目的目标平台无关，因此 `cx.Env().Desktop()` 为 false，悬停提示不会出现。传入 `nsgotest.Idiom(core.IdiomDesktop)` 可以测试桌面上的呈现，环境的其余部分保持不变，包括 `Environment` 选项设置的值。键盘焦点取决于环境的操作系统，而不是 idiom。
 
+在无头测试和桌面目标上，没有绑定消费按键时，`app.Key("mod+a")` 会全选当前文本框的内容。`KeyAlways` 绑定会在文本框编辑之前消费编辑键；`KeyAuto` 和 `KeyNotEditing` 则把编辑键留给已聚焦的文本框。
+
 ## 运行测试
 
 ```sh

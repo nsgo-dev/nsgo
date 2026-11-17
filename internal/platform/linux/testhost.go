@@ -337,8 +337,8 @@ var keyvals = map[string]uint32{
 	"pageup": 0xff55, "pagedown": 0xff56, "delete": 0xffff,
 }
 
-// Key presses a key with modifiers: the focused field edits as its key
-// bindings would, and other keys reach the window's key controller.
+// Key presses a key with modifiers through the window's controller first,
+// then lets the focused field edit if the controller leaves it the key.
 func (t *testSurface) Key(key string) error {
 	parts := strings.Split(strings.ToLower(key), "+")
 	name := parts[len(parts)-1]
@@ -364,8 +364,11 @@ func (t *testSurface) Key(key string) error {
 	if !ok {
 		return fmt.Errorf("unknown key %q", key)
 	}
-	var handled bool
 	t.onLoop(func() {
+		defer keyReleasedCallback(0, keyval, 0, state, t.w.handle)
+		if keyPressedCallback(0, keyval, 0, state, t.w.handle) != 0 {
+			return
+		}
 		v := t.focused()
 		if v == nil || v.entry == 0 && v.textView == 0 {
 			return
@@ -390,14 +393,6 @@ func (t *testSurface) Key(key string) error {
 		default:
 			return
 		}
-		handled = true
-	})
-	if handled {
-		return nil
-	}
-	t.onLoop(func() {
-		keyPressedCallback(0, keyval, 0, state, t.w.handle)
-		keyReleasedCallback(0, keyval, 0, state, t.w.handle)
 	})
 	return nil
 }

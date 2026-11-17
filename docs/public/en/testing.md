@@ -43,6 +43,8 @@ An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, is tested
 
 Headless runs use the phone idiom by default, whatever the project targets, so `cx.Env().Desktop()` is false and hover tooltips never show. Pass `nsgotest.Idiom(core.IdiomDesktop)` to test a desktop presentation, keeping the rest of the environment, an `Environment` option's included. Keyboard focus follows the environment's OS, not its idiom.
 
+`app.Key("mod+a")` selects the focused field's text headless and on desktop targets when no binding takes it. A `KeyAlways` binding takes editing keys before the field acts; `KeyAuto` and `KeyNotEditing` leave them to the focused field.
+
 ## Run the tests
 
 ```sh
