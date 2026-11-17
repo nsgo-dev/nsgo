@@ -50,6 +50,7 @@ func TestLink(t *testing.T) {
 	})
 }
 
+// TestLinkTextColor draws a link's text and hover underline in the color its Style gives, the accent when it gives none.
 func TestLinkTextColor(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		ink, hover := core.RGB(0xf2dcb5), core.RGB(0xffeedd)
@@ -59,6 +60,7 @@ func TestLinkTextColor(t *testing.T) {
 				Link{Text: "Plain", TestID: "plain", Style: core.Style{Color: ink}},
 				Link{Text: "Custom", TestID: "custom", Style: core.Style{Color: ink, Hover: &core.Style{Color: hover}}},
 				Link{Text: "Transparent", TestID: "transparent", Style: core.Style{Color: core.Transparent}},
+				Link{Text: "Hovered", TestID: "hovered", Style: core.Style{Hover: &core.Style{Color: hover}}},
 			}}
 		})
 		if got := app.Find("default >> Default").TextStyle.Color; got != p.Accent {
@@ -103,6 +105,14 @@ func TestLinkTextColor(t *testing.T) {
 		}
 		if text = app.Find("custom >> Custom"); text.TextStyle.Color != ink || text.ID != id {
 			t.Fatal("an appearance change replaced the custom color or rebuilt the link")
+		}
+		// A hover color alone keeps the accent until the pointer enters.
+		if got := app.Find("hovered >> Hovered").TextStyle.Color; got != want {
+			t.Fatalf("hover-only link color = %#x, want the accent %#x", got, want)
+		}
+		app.Hover("hovered")
+		if text = app.Find("hovered >> Hovered"); text.TextStyle.Color != hover || text.TextStyle.Decoration != core.TextDecorationUnderline {
+			t.Fatalf("hover-only link under the pointer = %+v", text.TextStyle)
 		}
 	})
 }
