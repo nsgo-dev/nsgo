@@ -789,10 +789,7 @@ document.body.append(f);
 		q("|https://localhost/ true;https://localhost/ false;https://localhost/ true;https://localhost/ false;") + q(next.URL+"/next true;") + q(next.URL+"/next false;") + q(next.URL+"/fail true;") + own)
 }
 
-// TestWebPageNavigationReportsDestinationAtStart checks restricted and
-// unrestricted page-made loads before the response, as well as host reload and
-// history commands, and a provisional failure. It runs in a separate process
-// and skips where WebKitGTK 6.0 is missing.
+// TestWebPageNavigationReportsDestinationAtStart has a restricted and an unrestricted view's page navigate with location.href and no frame's action before it, and checks that the start and the loading state name the destination while its response is still held, that the app's reload and history commands keep their start URLs, that a restricted view's refused blob: page reports no start, and that a provisional failure after a step within the page reports its own URL. It skips where WebKitGTK 6.0 is missing, in a process of its own as WebKit takes the first thread that uses it.
 func TestWebPageNavigationReportsDestinationAtStart(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -849,7 +846,17 @@ func TestWebPageNavigationReportsDestinationAtStart(t *testing.T) {
 					cx.ProvideAccess(webSchemesAccess{})
 				}
 				events := core.NewSignal(cx, "")
-				add := func(event string) { events.Update(func(v string) string { return v + event + ";" }) }
+				add := func(event string) {
+					// A blob: URL is unique to its page, so it is written by its scheme alone.
+					if i := strings.Index(event, "blob:"); i >= 0 {
+						rest := ""
+					if j := strings.IndexByte(event[i:], ' '); j >= 0 {
+						rest = event[i+j:]
+					}
+					event = event[:i] + "blob" + rest
+					}
+					events.Update(func(v string) string { return v + event + ";" })
+				}
 				cx.Effect(func() { cx.SetTitle(title + "|" + events.Get()) })
 				return core.WebView{Source: core.WebSrc(source), Ref: &ref,
 					Style:       core.Style{Width: core.Pt(200), Height: core.Pt(120)},
@@ -872,8 +879,7 @@ func TestWebPageNavigationReportsDestinationAtStart(t *testing.T) {
 			load := func(url string) string { return "load " + url + ";state " + url + " false;" }
 			want := title + "|" + start(source) + load(source)
 			waitForTitle(t, w, want)
-			// No preceding frame navigation hint: location.href alone must
-			// name the destination while its response is still blocked.
+			// No frame's navigation action comes first: location.href alone must name the destination while its response is still held.
 			root.Post(func() { ref.InjectJavaScript(fmt.Sprintf("location.href = %q", next)) })
 			want += start(next)
 			waitForTitle(t, w, want)
@@ -888,9 +894,15 @@ func TestWebPageNavigationReportsDestinationAtStart(t *testing.T) {
 				want += start(step.url) + load(step.url)
 				waitForTitle(t, w, want)
 			}
-			// A host history step within an app-owned document starts no
-			// load. Its source grant must not make the next page-made load
-			// bypass destination tracking, even in an unrestricted view.
+			if restricted {
+				// The access refuses pages a page makes itself, which WebKitGTK tells apart only at the main-frame response: the refusal must not be preceded by a start for a page that never loads.
+				root.Post(func() {
+					ref.InjectJavaScript(`location.href = URL.createObjectURL(new Blob(['<p>blob</p>'], {type: 'text/html'}))`)
+				})
+				want += "error blob;"
+				waitForTitle(t, w, want)
+			}
+			// The app's history step within its own document starts no load. Its grant must not make the page's next load report its start at WEBKIT_LOAD_STARTED, with the URI of the page still shown, even in an unrestricted view.
 			root.Post(func() {
 				ref.Evaluate(fmt.Sprintf(`addEventListener('popstate', () => { location.href = %q }); history.pushState(null, '', '#step'); 1`, failed), func(_ string, err error) {
 					if err != nil {

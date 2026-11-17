@@ -936,9 +936,7 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 		v.web.startPending = v.web.config.Restricted && !v.web.ownNavigation &&
 			(v.web.aboutPending || aboutScheme(uri) && !v.web.config.Navigable(uri))
 		v.web.aboutPending = false
-		// Page-made loads can still expose the old URI here. The main
-		// resource request identifies the destination without mistaking
-		// a frame's navigation policy action for the top level's.
+		// A page-made load can still expose the old URI here, so its start waits for its main resource request (webResourceStartedCallback), which names the destination without mistaking a frame's navigation action for the top level's.
 		v.web.uriPending = !v.web.ownNavigation
 		if !v.web.startPending && !v.web.uriPending {
 			w.navigated(v, true, driver.EventLoadStart)
@@ -989,18 +987,18 @@ func webLoadChangedCallback(page uintptr, event uint32, data uintptr) {
 	}
 }
 
-// webResourceStartedCallback reports a page-made load as soon as its main
-// resource request starts, before the response or commit. WebKitGTK sets the
-// main resource before this signal; frame and subresource requests never take
-// the pending start. Loads without a resource (about: pages or cached history)
-// fall back to their committed URI in webLoadChangedCallback.
+// webResourceStartedCallback reports a page-made load's start as its main resource request starts, before the response or commit. WebKitGTK sets the main resource before this signal, so frame and subresource requests never take the pending start. Loads without a resource (about: pages or cached history) fall back to their committed URI in webLoadChangedCallback. A restricted view's page of a page's own making that its config refuses, such as a blob: page, is refused at its main-frame response (webPolicyCallback), so its start stays held and is never reported, as on the other platforms, which refuse it before it starts.
 func webResourceStartedCallback(page, resource, request, data uintptr) {
 	w, v := webOf(data, page)
 	if v == nil || !v.web.uriPending || v.web.startPending || resource != webkitWebViewGetMainResource(page) {
 		return
 	}
+	uri := goString(webkitURIRequestGetURI(request))
+	if !v.web.config.Navigable(uri) {
+		return
+	}
 	v.web.uriPending = false
-	w.navigatedTo(v, goString(webkitURIRequestGetURI(request)), true, driver.EventLoadStart)
+	w.navigatedTo(v, uri, true, driver.EventLoadStart)
 }
 
 // gError is GLib's GError.
@@ -1015,8 +1013,7 @@ func webLoadFailedCallback(page uintptr, event uint32, uri, gerr uintptr, data u
 	if v == nil {
 		return 0
 	}
-	// A start awaiting the request or commit is still reported before its
-	// failure, but never for a refused page.
+	// A start awaiting the request or commit is still reported before its failure, but never for a refused page.
 	if (v.web.startPending || v.web.uriPending) && v.web.config.Navigable(goString(uri)) {
 		w.navigatedTo(v, goString(uri), true, driver.EventLoadStart)
 	}
