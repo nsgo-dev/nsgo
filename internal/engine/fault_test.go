@@ -40,7 +40,9 @@ func TestEngineFaultIsolation(t *testing.T) {
 			cmd.Env = append(os.Environ(), "NSGO_TEST_ENGINE_FAULT="+mode)
 			out, err := cmd.CombinedOutput()
 			if mode == "check" {
-				if err == nil || !strings.Contains(string(out), "panic: injected text fault") {
+				// The fault report alone also prints the panic, so only the runtime's exit status for an unrecovered panic shows that the engine re-panicked.
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || exit.ExitCode() != 2 || !strings.Contains(string(out), "panic: injected text fault") {
 					t.Fatalf("CheckCommits did not re-panic: %v\n%s", err, out)
 				}
 			} else if err != nil {

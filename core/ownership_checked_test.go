@@ -52,3 +52,20 @@ func TestGraphOwnership(t *testing.T) {
 		t.Fatalf("posted Set: memo = %d, want 2", got)
 	}
 }
+
+func TestGraphOwnershipFollowsTheRoot(t *testing.T) {
+	if developmentOwnership {
+		t.Skip("a development build checks every graph")
+	}
+	unchecked := NewRoot(RootOptions{})
+	t.Cleanup(unchecked.Dispose)
+	signal := NewSignal(unchecked, 0)
+	result := make(chan any, 1)
+	go func() {
+		defer func() { result <- recover() }()
+		signal.Set(1)
+	}()
+	if r := <-result; r != nil {
+		t.Fatalf("a graph created without CheckCommits checked its owner: %v", r)
+	}
+}
