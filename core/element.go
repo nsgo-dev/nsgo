@@ -267,8 +267,7 @@ func (v View) Render(*Scope) Node { return v }
 
 func (v View) mountIn(t *Tree, cx *Scope, parent *node) { t.mountView(cx, parent, v) }
 
-// PartStates are the states a part of a control is styled in: its Style's
-// Checked, Indeterminate, Selected, Disabled and Invalid merge in while they hold.
+// PartStates are the states a part of a control is styled in: its Style's Checked, Indeterminate, Selected, Disabled and Invalid merge in while they hold.
 type PartStates struct {
 	Checked, Indeterminate, Selected, Disabled bool
 	// Invalid applies aria-invalid styles without reporting a separate accessible state.

@@ -10,8 +10,7 @@ import (
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
-// Validation can change without remounting a control, taking both its
-// accessible state and its class/style variants back to their valid form.
+// Validation can change without remounting a control, taking both its accessible state and its class/style variants back to their valid form.
 func TestControlsFollowInvalid(t *testing.T) {
 	controls := []core.Node{
 		base.Button{}, base.Checkbox{}, base.Switch{}, base.Radio{}, base.RadioGroup{},
@@ -135,8 +134,7 @@ func TestInvalidPartsStyleWithoutReportingValidation(t *testing.T) {
 				t.Errorf("%s has %d styled parts, want %d", id, parts, wantParts)
 			}
 		}
-		// The real text fields must carry the accessible state even when
-		// the visible cells/segments are only decorative.
+		// The real text fields must carry the accessible state even when the visible cells/segments are only decorative.
 		for _, id := range []string{"number", "code", "time"} {
 			var fields int
 			var visit func(*nsgotest.View)
@@ -159,8 +157,7 @@ func TestInvalidPartsStyleWithoutReportingValidation(t *testing.T) {
 	}
 }
 
-// A color picker's validation reaches the actual fields and adjustable
-// thumbs, including a channel rendered through NumberInput.
+// A color picker's validation reaches the actual fields and adjustable thumbs, including a channel rendered through NumberInput.
 func TestColorPickerSharesInvalidWithItsParts(t *testing.T) {
 	var bad *core.Signal[bool]
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
