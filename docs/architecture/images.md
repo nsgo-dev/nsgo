@@ -43,7 +43,7 @@ Shaders' `Images` do not take pixels: the core drops them, copying none, so an i
 
 ## Disk cache
 
-Every native backend loads `http(s)` images through `imageload`, which keeps their bytes in a disk cache under the app's cache directory (`imageload.UseDiskCache`, 256 MiB), as NSH's `DiskCache`. The web leaves caching to the browser.
+Every native backend loads `http(s)` images through `imageload`, which keeps their bytes in a disk cache under the app's cache directory (`imageload.UseDiskCache`, 256 MiB), as NSH's `DiskCache`. Loads of one URL share a fetch, which stops once nobody waits for it; a load asked for after that starts a fetch of its own rather than fail with the cancelled one. The web leaves caching to the browser.
 
 `imageload` downloads through the system's HTTP client, which each backend sets as `imageload.HTTP`, so apps link no Go HTTP and TLS stack: URLSession on Apple platforms, WinHTTP, libsoup 3 on Linux, and on Android the runtime's `HttpURLConnection`, which Java runs for the Go process (`msgFetch`, `fetch.go` and `Downloads.java`). Downloads follow the system's proxies, certificates and policies: a plain `http` image needs App Transport Security's exception on Apple platforms (`apple.info`) and cleartext traffic allowed on Android, as web views and videos do.
 

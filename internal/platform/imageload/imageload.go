@@ -88,7 +88,8 @@ func Load(ctx context.Context, src driver.ImageSource, progress Progress) ([]byt
 		return data, nil
 	}
 	c := inflight[uri]
-	if c == nil {
+	if c == nil || c.waiters == 0 {
+		// A call nobody waits for is cancelled, its fetch only not yet returned: joining it would fail with its cancellation.
 		fetchCtx, cancel := context.WithCancel(context.Background())
 		c = &call{done: make(chan struct{}), cancel: cancel}
 		inflight[uri] = c
@@ -136,7 +137,9 @@ func Info(it *driver.MountItem, size func(data []byte) (driver.Size, error)) dri
 func (c *call) fetch(ctx context.Context, uri string) {
 	data, err := fetch(ctx, uri, c.report)
 	mu.Lock()
-	delete(inflight, uri)
+	if inflight[uri] == c {
+		delete(inflight, uri)
+	}
 	if err == nil {
 		cache.put(uri, data)
 	}

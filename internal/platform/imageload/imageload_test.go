@@ -65,6 +65,77 @@ func TestDataURIAndCancel(t *testing.T) {
 	}
 }
 
+// A load right after the only waiter of a fetch cancelled it, as a canvas cache evicting and drawing a source again does, fetches anew instead of joining the cancelled fetch, and the cancelled fetch, returning later, leaves the new one in flight.
+func TestLoadAfterCancelFetchesAnew(t *testing.T) {
+	saved := HTTP
+	defer func() { HTTP = saved }()
+	var hits atomic.Int32
+	first, second := make(chan struct{}), make(chan struct{})
+	HTTP = func(ctx context.Context, url string, header Header, progress Progress) (*Response, error) {
+		switch hits.Add(1) {
+		case 1:
+			<-first
+			return nil, ctx.Err()
+		default:
+			<-second
+			return &Response{Status: 200, Body: []byte("png-bytes")}, nil
+		}
+	}
+	src := core.Src("https://example.invalid/load-after-cancel.png")
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); !ok(); time.Sleep(time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal(what)
+			}
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancelled := make(chan error, 1)
+	go func() {
+		_, err := Load(ctx, src, nil)
+		cancelled <- err
+	}()
+	waitFor("the first fetch did not start", func() bool { return hits.Load() == 1 })
+	mu.Lock()
+	old := inflight[src.URI]
+	mu.Unlock()
+	cancel()
+	if err := <-cancelled; err != context.Canceled {
+		t.Fatalf("cancelled Load = %v", err)
+	}
+	type result struct {
+		data []byte
+		err  error
+	}
+	results := make(chan result, 2)
+	load := func() {
+		data, err := Load(context.Background(), src, nil)
+		results <- result{data, err}
+	}
+	go load()
+	waitFor("a load after a cancel joined the cancelled fetch", func() bool { return hits.Load() == 2 })
+	close(first)
+	<-old.done
+	mu.Lock()
+	current := inflight[src.URI]
+	mu.Unlock()
+	if current == nil || current == old {
+		t.Fatal("the cancelled fetch's end dropped the new fetch")
+	}
+	go load()
+	time.Sleep(20 * time.Millisecond)
+	close(second)
+	for range 2 {
+		if r := <-results; r.err != nil || string(r.data) != "png-bytes" {
+			t.Fatalf("Load = %q, %v", r.data, r.err)
+		}
+	}
+	if n := hits.Load(); n != 2 {
+		t.Fatalf("fetched %d times, want 2", n)
+	}
+}
+
 func TestInfoKeepsTheBytesForViews(t *testing.T) {
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
