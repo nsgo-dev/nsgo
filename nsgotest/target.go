@@ -70,8 +70,6 @@ func Target() string { return os.Getenv("NSGO_TEST_TARGET") }
 type target struct {
 	a       *App
 	surface testhost.Surface
-	// appScope is the scope the platform renders the app under, on the engine's graph, which App.Post posts to; a.root is the test's own graph, for storage and the model's callbacks.
-	appScope *core.Scope
 	// live is set for a running app's surface the automation follows (automation.go), whose model also drops the alerts the user answers.
 	live bool
 	// quiet reports whether the last settle came to quiet before settleWait.
@@ -84,6 +82,8 @@ type target struct {
 	updates []targetUpdate
 	// lost says why a live model stopped following its surface: a batch it could not apply. It queues nothing after.
 	lost string
+	// appScope is the scope the platform renders the app under, on the engine's graph, which App.Post posts to; a.root is the test's own graph, for storage and the model's callbacks. The engine's goroutine sets it, which may be after Open returns, as on Windows and Android.
+	appScope *core.Scope
 }
 
 type targetUpdate struct {
@@ -190,7 +190,9 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 	a.seed()
 	a.anim = driver.NewAnimator(func(driver.Event) {})
 	s, err := h.Open(func(cx *core.Scope) core.Node {
+		t.mu.Lock()
 		t.appScope = cx
+		t.mu.Unlock()
 		return app(cx)
 	}, a.targetOptions(t))
 	if err != nil {
@@ -370,6 +372,17 @@ func (t *target) runPosts() bool {
 		fn()
 	}
 	return len(posts) > 0
+}
+
+// postApp hands fn, which App.Post queued, to the engine's goroutine, to run under the app's scope before the engine's next barrier completes. It runs on the test goroutine, in runPosts.
+func (t *target) postApp(fn func()) {
+	t.mu.Lock()
+	cx := t.appScope
+	t.mu.Unlock()
+	if cx == nil {
+		t.a.t.Fatal("nsgotest: App.Post: the platform has not rendered the app yet")
+	}
+	cx.Post(fn)
 }
 
 // pending reports whether posts wait for the next runPosts.

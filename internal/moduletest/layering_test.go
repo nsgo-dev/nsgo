@@ -90,8 +90,8 @@ var layers = []struct {
 	{"icons/", []string{"core"}},
 	{"ui/chat/locales", []string{"core", "i18n"}},
 	{"ui/", []string{"core", "base/", "ui/", "mobile", "desktop", "icons/"}},
-	// The TSX test runner drives apps through nsgotest.
-	{"tsx/tsxtest", []string{"core", "internal/driver", "nsgotest", "tsx", "tsx/"}},
+	// The TSX test runner drives apps through nsgotest, and runs its VM's work on the test goroutine through nsgotest's hook in internal/testhost (PostToTest), as App.Post runs on the engine's on a target.
+	{"tsx/tsxtest", []string{"core", "internal/driver", "internal/testhost", "nsgotest", "tsx", "tsx/"}},
 	// The nsgo tool links the bundler, so it reaches no runtime.
 	{"tsx/bundler", []string{"core", "internal/driver", "internal/woff"}},
 	// The JS engines' API reaches goja or the page, nothing of NSGo's.

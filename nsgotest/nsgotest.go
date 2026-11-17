@@ -699,7 +699,7 @@ func (a *App) yieldToPage() bool {
 func (a *App) Post(fn func()) {
 	if t := a.target; t != nil && !t.live {
 		posted := fn
-		fn = func() { t.appScope.Post(posted) }
+		fn = func() { t.postApp(posted) }
 	}
 	a.postTest(fn)
 }
