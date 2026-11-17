@@ -123,14 +123,7 @@ func webKey(web objc.ID, window int, chars, plain string, code uint16, shift boo
 		flags = flagShift
 	}
 	for _, kind := range []uint{evKeyDown, evKeyUp} {
-		// keyCode and isARepeat follow the eight register arguments, so
-		// they go on the stack packed as Apple's arm64 ABI packs them,
-		// which purego, giving each a slot, would not: one word carries
-		// both.
-		stacked := uint64(code) << 16
-		ev := objc.ID(apple.Class("NSEvent")).Send(
-			sel("keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:"),
-			kind, apple.CGPoint{}, flags, uptime(), window, objc.ID(0), apple.NSString(chars), apple.NSString(plain), stacked)
+		ev := apple.KeyEvent(kind, flags, uptime(), window, chars, plain, false, code)
 		if kind == evKeyDown {
 			web.Send(sel("keyDown:"), ev)
 		} else {

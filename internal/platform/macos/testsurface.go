@@ -280,15 +280,7 @@ var editActions = map[string]string{"a": "selectAll:", "c": "copy:", "v": "paste
 func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 	for _, kind := range []uint{evKeyDown, evKeyUp} {
 		onMainSync(func() {
-			// keyCode and isARepeat follow the eight register arguments, so
-			// they go on the stack packed as Apple's arm64 ABI packs them,
-			// which purego, giving each a slot, would not: one word carries
-			// both.
-			stacked := uint64(code) << 16
-			ev := objc.ID(apple.Class("NSEvent")).Send(
-				sel("keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:"),
-				kind, apple.CGPoint{}, flags, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), objc.ID(0),
-				apple.NSString(chars), apple.NSString(ignoring), stacked)
+			ev := apple.KeyEvent(kind, flags, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), chars, ignoring, false, code)
 			rememberTestInput(ev)
 			if objc.Send[bool](t.s.window, sel("isKeyWindow")) {
 				nsApp().Send(sel("postEvent:atStart:"), ev, false)

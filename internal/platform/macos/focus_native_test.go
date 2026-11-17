@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -135,16 +134,7 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 					text string
 				}{{49, " "}, {36, "\r"}} {
 					for _, repeat := range []uint64{0, 1} {
-						// Apple's arm64 ABI packs the final bool and uint16 together; on x64 the arguments have separate slots.
-						args := []any{uint(10), apple.CGPoint{}, uint(0), float64(0), objc.Send[int](live.window, sel("windowNumber")), objc.ID(0), apple.NSString(k.text), apple.NSString(k.text)}
-						if runtime.GOARCH == "arm64" {
-							args = append(args, repeat|uint64(k.code)<<16)
-						} else {
-							args = append(args, repeat != 0, k.code)
-						}
-						event := objc.ID(apple.Class("NSEvent")).Send(
-							sel("keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:"),
-							args...)
+						event := apple.KeyEvent(evKeyDown, 0, 0, objc.Send[int](live.window, sel("windowNumber")), k.text, k.text, repeat != 0, k.code)
 						v.native.Send(sel("keyDown:"), event)
 					}
 				}

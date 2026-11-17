@@ -92,8 +92,7 @@ func postForeign(t *testing.T, kinds ...uint) {
 		for _, kind := range kinds {
 			var event objc.ID
 			if kind == 10 || kind == 11 {
-				event = events.Send(sel("keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:"),
-					kind, apple.CGPoint{}, uint(0), now(), number, objc.ID(0), apple.NSString("x"), apple.NSString("x"), uint64(7)<<16)
+				event = apple.KeyEvent(kind, 0, now(), number, "x", "x", false, 7)
 			} else {
 				event = events.Send(sel("mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:"),
 					kind, at, uint(0), now(), number, objc.ID(0), 0, 1, float32(1))

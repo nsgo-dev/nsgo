@@ -115,3 +115,35 @@ func TestForeignTrackingDoesNotChangeHover(t *testing.T) {
 		}
 	})
 }
+
+// A scripted key carries the key code and repeat flag it was made with on both Apple silicon and Intel, whose ABIs pass the selector's last two arguments differently: the keymap and Tab read the key code, not the characters.
+func TestKeyEventCarriesItsKeyCode(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		for _, c := range []struct {
+			kind   uint
+			code   uint16
+			repeat bool
+		}{{evKeyDown, 7, false}, {evKeyUp, 48, false}, {evKeyDown, 49, true}, {evKeyDown, 0xffff, true}} {
+			event := apple.KeyEvent(c.kind, flagShift, 12, 3, "X", "x", c.repeat, c.code)
+			if event == 0 {
+				t.Fatalf("AppKit made no key event for key %d", c.code)
+			}
+			if got := objc.Send[uint16](event, sel("keyCode")); got != c.code {
+				t.Errorf("key %d: the event's key code is %d", c.code, got)
+			}
+			if got := objc.Send[bool](event, sel("isARepeat")); got != c.repeat {
+				t.Errorf("key %d: isARepeat is %v, want %v", c.code, got, c.repeat)
+			}
+			if got := objc.Send[uint](event, sel("type")); got != c.kind {
+				t.Errorf("key %d: the event's type is %d, want %d", c.code, got, c.kind)
+			}
+			if got := objc.Send[int](event, sel("windowNumber")); got != 3 {
+				t.Errorf("key %d: the event's window is %d, want 3", c.code, got)
+			}
+			if chars, ignoring := apple.GoString(event.Send(sel("characters"))), apple.GoString(event.Send(sel("charactersIgnoringModifiers"))); chars != "X" || ignoring != "x" {
+				t.Errorf("key %d: the event types %q, %q without modifiers", c.code, chars, ignoring)
+			}
+		}
+	})
+}
