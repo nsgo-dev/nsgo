@@ -96,13 +96,26 @@ func (t *Tree) bindAccessibility(cx *Scope, n *node, a a11y) {
 // sentProps returns the props n sends: a group without a label of its
 // own reads the text inside it.
 func (n *node) sentProps() driver.ViewProps {
-	p := n.props
+	p := n.labelProps()
 	p.Appearance = n.appearance
 	if n.hoist != nil {
 		p.TabAfter = n.hoist.tabAfter
 	}
 	if n.input != nil && n.input.config.Disabled {
 		p.Disabled = true
+	}
+	if l := n.labels; l != nil {
+		if l.name != "" {
+			p.Label = l.name
+		}
+		p.LabelledBy = l.ids
+		if target := n.labelTarget(); target != nil {
+			p.LabelFor = target.id
+			p.LabelPress = n.h.press == nil && n.h.longPress == nil && n.h.pressDown == nil && n.h.pressUp == nil
+			if p.LabelPress && !p.Focusable {
+				p.NoFocus = true
+			}
+		}
 	}
 	if tn := n.text; tn != nil && p.Label == "" && tn.text.HasHidden() {
 		// Screen readers leave hidden spans out.

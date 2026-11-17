@@ -60,6 +60,9 @@ func (s *surface) configureNative(v *view, c *driver.NativeConfig) {
 	for name, value := range c.Props {
 		v.component.SetProp(name, value)
 	}
+	if _, ok := v.component.(*nsSwitch); ok {
+		v.updateAccessibility()
+	}
 }
 
 // nativeView returns the NSView a component's View gives.

@@ -93,6 +93,7 @@ const (
 	propIsContentElement    = 30017
 	propIsOffscreen         = 30022
 	propIsPassword          = 30019
+	propLabeledBy           = 30018
 	propLiveSetting         = 30135
 	propHeadingLevel        = 30173
 	propIsDialog            = 30174
@@ -353,7 +354,7 @@ func groups(p *driver.ViewProps, pressable bool) bool {
 }
 
 func takesPresses(v *view) bool {
-	return v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress)
+	return !v.props.LabelPress && (v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress))
 }
 
 // isElement reports whether v is an element of its own.
@@ -586,6 +587,17 @@ func uiaGetPropertyValue(i *uiaIface, id uintptr, out *variant) uintptr {
 	}
 	s := e.spec(v)
 	switch id {
+	case propLabeledBy:
+		if e.part == 0 && v.props.LabelledBy != nil {
+			for _, id := range *v.props.LabelledBy {
+				if label := e.w.view(id); label != nil && !label.deleted {
+					provider := &e.w.element(id, 0).simple
+					uiaAddRef(provider)
+					out.vt, out.val = vtUnknown, uint64(uintptr(unsafe.Pointer(provider)))
+					break
+				}
+			}
+		}
 	case propControlType:
 		out.setInt(s.control)
 	case propLocalizedType:

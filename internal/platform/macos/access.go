@@ -70,6 +70,29 @@ func accessMethods() []objc.MethodDef {
 		{Cmd: selCustomAction, Fn: accessibilityCustom},
 		{Cmd: sel("accessibilityLabel"), Fn: accessibilityLabel},
 		{Cmd: sel("accessibilityChildren"), Fn: accessibilityChildren},
+		{Cmd: sel("accessibilityTitleUIElement"), Fn: func(self objc.ID, _ objc.SEL) objc.ID {
+			if v := views[self]; v != nil {
+				return v.titleUIElement()
+			}
+			return 0
+		}},
+		{Cmd: sel("accessibilityServesAsTitleForUIElements"), Fn: func(self objc.ID, _ objc.SEL) objc.ID {
+			v := views[self]
+			if v == nil || v.surface == nil {
+				return nsArray(nil)
+			}
+			var targets []objc.ID
+			for _, target := range v.surface.views {
+				if target != nil && target.props.LabelledBy != nil {
+					for _, id := range *target.props.LabelledBy {
+						if id == v.id {
+							targets = append(targets, target.accessElement())
+						}
+					}
+				}
+			}
+			return nsArray(targets)
+		}},
 	}
 	for s, name := range axPerform {
 		defs = append(defs, objc.MethodDef{Cmd: s, Fn: func(self objc.ID, _ objc.SEL) bool {
@@ -155,7 +178,7 @@ func (v *view) axRole() [2]string {
 		return roles[driver.RoleText]
 	case p.Accessible == driver.AccessibleNo || p.Role == driver.RoleTextField:
 		return [2]string{}
-	case v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress):
+	case !p.LabelPress && (v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress)):
 		return roles[driver.RoleButton]
 	case p.Label != "" || p.Accessible == driver.AccessibleYes:
 		return [2]string{"AXGroup", ""}
@@ -172,6 +195,36 @@ func nsOrNil(s string) objc.ID {
 		return 0
 	}
 	return apple.NSString(s)
+}
+
+// accessElement is the control's exposed element, an input's cell or text
+// editor rather than its container.
+func (v *view) accessElement() objc.ID {
+	if s, ok := v.component.(*nsSwitch); ok {
+		return s.view
+	}
+	if in := v.input; in != nil {
+		if in.multiline {
+			return in.field
+		}
+		return in.field.Send(sel("cell"))
+	}
+	return v.native
+}
+
+// AppKit and UI Automation expose one naming element. Label carries the
+// complete resolved name when the app supplies several.
+func (v *view) titleUIElement() objc.ID {
+	if v.surface != nil && v.props.LabelledBy != nil {
+		for _, id := range *v.props.LabelledBy {
+			if int(id) < len(v.surface.views) {
+				if label := v.surface.views[id]; label != nil {
+					return label.accessElement()
+				}
+			}
+		}
+	}
+	return 0
 }
 
 // nsArray returns an autoreleased array of items.
@@ -208,6 +261,9 @@ func (v *view) setLabel(label string) {
 		return
 	}
 	v.props.Label = label
+	if _, ok := v.component.(*nsSwitch); ok {
+		v.updateAccessibility()
+	}
 	v.announceLive(label)
 }
 
@@ -294,6 +350,12 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 		return nil
 	}
 	return []objc.MethodDef{
+		{Cmd: sel("accessibilityTitleUIElement"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
+			if v := owner(self); v != nil {
+				return v.titleUIElement()
+			}
+			return apple.SendSuper[objc.ID](self, cmd)
+		}},
 		{Cmd: sel("accessibilityPlaceholderValue"), Fn: func(self objc.ID, cmd objc.SEL) objc.ID {
 			if v := owner(self); v != nil {
 				return nsOrNil(v.input.fs.Config.Placeholder)
@@ -314,7 +376,7 @@ func editorAccessMethods(cell bool) []objc.MethodDef {
 			if v == nil || names == 0 {
 				return names
 			}
-			for _, name := range []string{"AXSubrole", "AXDescription", "AXIdentifier", "AXExpanded", "AXValueDescription", "AXPlaceholderValue"} {
+			for _, name := range []string{"AXSubrole", "AXDescription", "AXIdentifier", "AXExpanded", "AXValueDescription", "AXPlaceholderValue", "AXTitleUIElement"} {
 				if _, ok := v.editorAttribute(name); !ok {
 					continue
 				}
@@ -370,6 +432,8 @@ func (v *view) editorAttribute(name string) (objc.ID, bool) {
 		role, subrole = "AXTextField", "AXSearchField"
 	}
 	switch name {
+	case "AXTitleUIElement":
+		return v.titleUIElement(), true
 	case "AXRole":
 		if role != "" {
 			return apple.NSString(role), true
@@ -439,6 +503,13 @@ func (v *view) announceLive(text string) {
 // updateAccessibility sets v's attributes from its props, events and text.
 func (v *view) updateAccessibility() {
 	native, p := v.native, &v.props
+	if s, ok := v.component.(*nsSwitch); ok {
+		native.Send(selSetAccessibilityElement, false)
+		v.axElement = false
+		s.view.Send(sel("setAccessibilityLabel:"), nsOrNil(p.Label))
+		s.view.Send(sel("setAccessibilityTitleUIElement:"), v.titleUIElement())
+		return
+	}
 	role := v.axRole()
 	element := role[0] != "" && !p.ElementsHidden
 	native.Send(selSetAccessibilityElement, element)

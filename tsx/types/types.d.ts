@@ -289,6 +289,10 @@ export interface HostProps {
   delayLongPress?: number;
   accessible?: boolean;
   accessibilityLabel?: string;
+  /** Visible label target. Pressing the label focuses and activates it. */
+  labelFor?: YNode | null;
+  /** Visible elements naming this control, ahead of accessibilityLabel. */
+  labelledBy?: (YNode | null)[] | null;
   accessibilityHint?: string;
   accessibilityDescription?: string;
   role?: AccessibilityRole;

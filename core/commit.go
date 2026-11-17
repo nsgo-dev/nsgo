@@ -233,6 +233,9 @@ func (t *Tree) commitRound() {
 	t.stacks = live
 	t.updatePeerStyles()
 	t.resolve(t.view, textFields{Language: lang}, false)
+	if t.updateLabels() {
+		t.resolve(t.view, textFields{Language: lang}, false)
+	}
 	t.timeLayout()
 	// Lists fill their windows from the layout, which may need another.
 	for range 4 {
@@ -241,6 +244,9 @@ func (t *Tree) commitRound() {
 		}
 		t.updatePeerStyles()
 		t.resolve(t.view, textFields{Language: lang}, false)
+		if t.updateLabels() {
+			t.resolve(t.view, textFields{Language: lang}, false)
+		}
 		t.timeLayout()
 	}
 	// System headers cover what the stacks' places decide.

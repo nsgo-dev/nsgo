@@ -81,7 +81,12 @@ func (s *nsSwitch) SetProp(name string, value any) {
 	}
 }
 
-func (s *nsSwitch) Command(string, any) {}
+func (s *nsSwitch) Command(name string, _ any) {
+	if name == "activate" && objc.Send[bool](s.view, sel("isEnabled")) {
+		s.view.Send(sel("window")).Send(sel("makeFirstResponder:"), s.view)
+		s.view.Send(sel("performClick:"), objc.ID(0))
+	}
+}
 
 func (s *nsSwitch) Close() {
 	delete(nsSwitches, s.view)

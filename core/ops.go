@@ -218,6 +218,7 @@ func (t *Tree) setView(n *node, v View) {
 // setText sets text n's parts from v, reading its functions once, and
 // mounts its attachments under cx.
 func (t *Tree) setText(cx *Scope, n *node, v Text) {
+	t.setLabels(n, v.LabelFor, v.LabelledBy)
 	base := v.Style
 	if v.StyleFunc != nil {
 		base = base.Merge(v.StyleFunc())
@@ -344,6 +345,7 @@ func (t *Tree) setScroll(n *node, v Scroll) {
 // setInput sets text field n's parts from v, reading its functions once:
 // a Value makes it controlled, following the value of the last Set.
 func (t *Tree) setInput(n *node, v Input) {
+	t.setLabels(n, nil, v.LabelledBy)
 	base := v.Style
 	if v.StyleFunc != nil {
 		base = base.Merge(v.StyleFunc())

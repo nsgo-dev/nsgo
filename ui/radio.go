@@ -8,8 +8,12 @@ import (
 // Radio is one option of a RadioGroup, with Text or the app's Children
 // beside its ring.
 type Radio struct {
-	Checked  func() bool
-	Disabled func() bool
+	// Ref and LabelledBy are the control view's, as a core.View's.
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
+	Invalid    func() bool
+	Checked    func() bool
+	Disabled   func() bool
 	// OnChange receives true when the unchecked radio is pressed: check it
 	// and uncheck the others.
 	OnChange func(checked bool)
@@ -40,7 +44,7 @@ func (r Radio) Render(cx *core.Scope) core.Node {
 	if label == "" {
 		label = r.Text
 	}
-	return base.Radio{Checked: r.Checked, Disabled: r.Disabled, OnChange: r.OnChange, Style: selectionRow.Merge(r.Style),
+	return base.Radio{Ref: r.Ref, LabelledBy: r.LabelledBy, Invalid: r.Invalid, Checked: r.Checked, Disabled: r.Disabled, OnChange: r.OnChange, Style: selectionRow.Merge(r.Style),
 		StyleFunc: func() core.Style { return core.Style{FocusVisible: FocusRing(cx, 2)} },
 		Children:  append([]core.Node{ring}, selectionLabel(cx, r.Text, r.Children)...), Label: label, Hint: r.Hint, TestID: r.TestID}
 }

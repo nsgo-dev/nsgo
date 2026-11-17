@@ -28,6 +28,22 @@ core.View{Accessible: true, Label: "苹果，每公斤 12 元", Children: []core
 }}
 ```
 
+## 可见标签
+
+把控件的 `Ref` 作为 `LabelFor` 传给 `core.Text` 或 `core.View`。点击标签会聚焦控件并执行它的按压操作，例如切换复选框。标签当前可见的文本会成为控件的无障碍名称，无需重复填写 `Label`；标签的无障碍状态和样式也会跟随控件的 `Disabled`、`Invalid`。标签不会因此变成按钮或增加 Tab 停靠点。
+
+```go
+field := new(core.Ref)
+return core.View{Children: []core.Node{
+	core.Text{Content: "邮箱", LabelFor: field},
+	base.Input{Ref: field},
+}}
+```
+
+`LabelledBy: []*core.Ref{label, requirement}` 按给定顺序组合多个可见元素的名称，优先于 `Label`，但不转发点击。未设置它时，`Label` 优先于按树顺序排列的 `LabelFor` 名称。文本更新、移动、隐藏、卸载及重新挂载都会更新关联。缺失、重复、循环和隐藏的引用会被忽略；关联仅限同一表面、同一隔离范围。标签不能激活模态层后面的控件。
+
+`base` 和 `ui` 的按钮、复选框、单选框、开关、选择框及数字输入框会把 `Ref`、`LabelledBy` 传给实际控件；滑块提供 `ThumbRef` 和 `StartThumbRef`。TSX 使用 `labelFor={field()}` 和 `labelledBy={[label()]}`，通过 `ref={node => field.set(node)}` 把节点写入信号，因此放在输入框前面的标签也能在输入框挂载后建立关联。
+
 ## 操作
 
 `AccessibilityActions` 列出屏幕阅读器在元素上提供的操作：标准操作（`core.ActionActivate`、`ActionIncrement`、`ActionDecrement`、`ActionEscape`、`ActionMagicTap`）和应用自己的操作，每个都有 `Name` 和 `Label`。`OnAccessibilityAction` 接收名称。

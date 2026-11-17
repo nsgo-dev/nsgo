@@ -201,6 +201,16 @@ type View struct {
 	// Label is what assistive technology reads.
 	Label     string
 	LabelFunc func() string
+	// LabelFor makes this view a visible label for the referenced control:
+	// pressing it focuses the control and runs its press action. The label
+	// follows the control's Disabled and Invalid states. References must
+	// be mounted in the same tree and confinement scope.
+	LabelFor *Ref
+	// LabelledBy names the view from these visible elements, in order,
+	// ahead of Label. Without it or Label, LabelFor labels name a control
+	// in tree order. Missing, hidden, repeated and cyclic references are
+	// ignored. LabelledBy alone does not forward presses.
+	LabelledBy []*Ref
 	// Hint says what activating the element does, read after its label.
 	Hint string
 	// AccessibilityDescription says more about the element, read after
@@ -330,7 +340,10 @@ type Text struct {
 	// Label replaces the text for assistive technology.
 	Label     string
 	LabelFunc func() string
-	Hint      string
+	// LabelFor and LabelledBy are a View's label associations.
+	LabelFor   *Ref
+	LabelledBy []*Ref
+	Hint       string
 	// LiveRegion has screen readers announce the text as it changes; a RoleStatus text is a polite one when 0.
 	LiveRegion LiveRegion
 	TestID     string
@@ -450,6 +463,8 @@ type Input struct {
 	Ref           *Ref
 	Label         string
 	LabelFunc     func() string
+	// LabelledBy names the input from visible elements, as a View's.
+	LabelledBy []*Ref
 	// AccessibilityDescription and Invalid are a View's: what the field
 	// expects, and that the app rejected its content.
 	AccessibilityDescription     string

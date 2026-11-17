@@ -24,8 +24,12 @@ const (
 // and marks them under the track, up to 60 of them; at 0 the keys move a
 // hundredth of the range.
 type Slider struct {
-	Value    func() float64
-	OnChange func(value float64)
+	// ThumbRef and StartThumbRef are the end and start thumbs' refs.
+	ThumbRef, StartThumbRef *core.Ref
+	LabelledBy              []*core.Ref
+	Invalid                 func() bool
+	Value                   func() float64
+	OnChange                func(value float64)
 	// High and OnHighChange make it a range, Value its low end.
 	High         func() float64
 	OnHighChange func(value float64)
@@ -141,7 +145,7 @@ func (s Slider) Render(cx *core.Scope) core.Node {
 	}
 	return base.Slider{Value: value, OnChange: change,
 		Min: func() float64 { lo, _ := s.bounds(); return lo }, Max: func() float64 { _, hi := s.bounds(); return hi }, Step: s.step, Disabled: s.Disabled,
-		Label: label, StartLabel: startLabel, ValueText: valueText, TestID: s.TestID, ThumbTestID: thumb, StartThumbTestID: startThumb, Marks: []core.Node{marks},
+		ThumbRef: s.ThumbRef, StartThumbRef: s.StartThumbRef, LabelledBy: s.LabelledBy, Invalid: s.Invalid, Label: label, StartLabel: startLabel, ValueText: valueText, TestID: s.TestID, ThumbTestID: thumb, StartThumbTestID: startThumb, Marks: []core.Node{marks},
 		Style:              core.Style{MinWidth: core.Pt(80), Disabled: Dimmed()}.Merge(s.Style),
 		StyleFunc:          sizeStyle,
 		TrackStyle:         core.Style{Height: core.Pct(100)},

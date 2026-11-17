@@ -28,6 +28,22 @@ core.View{Accessible: true, Label: "Apples, $1.20 a kilo", Children: []core.Node
 }}
 ```
 
+## Visible labels
+
+Give a `core.Text` or `core.View` the control's `Ref` as `LabelFor`. Pressing the label focuses the control and runs its press action, such as toggling a checkbox. Its current visible text names the control without repeating a `Label` string, and it follows the control's `Disabled` and `Invalid` states for accessibility and styles. A label gains no button role or Tab stop.
+
+```go
+field := new(core.Ref)
+return core.View{Children: []core.Node{
+	core.Text{Content: "Email", LabelFor: field},
+	base.Input{Ref: field},
+}}
+```
+
+`LabelledBy: []*core.Ref{label, requirement}` names a control from several visible elements in the given order, ahead of `Label`; it does not forward presses. Otherwise `Label` wins over implicit `LabelFor` names, whose order follows the tree. Text updates, moves, hiding, removal and remounting update the relation. Missing, repeated, cyclic and hidden references are ignored; associations stay inside one surface and confinement scope. A label cannot activate a control behind a modal.
+
+`base` and `ui` buttons, checkboxes, radios, switches, selects and number inputs pass `Ref` and `LabelledBy` to their control; sliders expose `ThumbRef` and `StartThumbRef`. In TSX, use `labelFor={field()}` and `labelledBy={[label()]}` with node signals populated by `ref={node => field.set(node)}`, so a label before its field updates when that field mounts.
+
 ## Actions
 
 `AccessibilityActions` lists what the screen reader offers on an element: the standard actions (`core.ActionActivate`, `ActionIncrement`, `ActionDecrement`, `ActionEscape`, `ActionMagicTap`) and the app's own, each with a `Name` and a `Label`. `OnAccessibilityAction` receives the name.

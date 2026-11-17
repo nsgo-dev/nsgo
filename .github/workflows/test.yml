@@ -53,13 +53,13 @@ jobs:
           pactl set-default-sink nsgo_test
       - name: Vet
         run: go tool nsgo check
-      - name: Test headless modified presses
+      - name: Test headless presses and visible labels
         run: go tool nsgo test ./internal/testhost/testdata/press
-      - name: Test native modified presses
+      - name: Test native presses and visible labels
         env:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
-        run: xvfb-run -a go tool nsgo test -target linux -run '^TestPressModifiersReachTheApp$' ./internal/testhost/testdata/press
+        run: xvfb-run -a go tool nsgo test -target linux -run '^(TestPressModifiersReachTheApp|TestVisibleLabelsFocusAndActivateTheirControls)$' ./internal/testhost/testdata/press
       - name: Test
         env:
           GDK_BACKEND: x11
@@ -73,6 +73,10 @@ jobs:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
         run: xvfb-run -a go tool nsgo test -target linux -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
+      - name: Test browser visible label relationships
+        run: go tool nsgo test -target web -run '^TestVisibleLabelARIAReferences$' ./internal/platform/web
+      - name: Test browser visible label activation
+        run: go tool nsgo test -target web -run '^TestVisibleLabelsFocusAndActivateTheirControls$' ./internal/testhost/testdata/press
       - name: Test browser focus, styles and activation
         run: go tool nsgo test -target web -run '^TestRefFocusUsesNativeKeyboardStops$' ./internal/platform/web
       - name: Test browser radio and tab focus
@@ -114,8 +118,8 @@ jobs:
         env:
           GOGC: "1"
         run: go tool nsgo test -run '^TestWindowObserversSurviveGC$' ./internal/platform/macos -- -race -timeout=180s
-      - name: Test native modified presses
-        run: go tool nsgo test -target macos -run '^TestPressModifiersReachTheApp$' ./internal/testhost/testdata/press
+      - name: Test native presses and visible labels
+        run: go tool nsgo test -target macos -run '^(TestPressModifiersReachTheApp|TestVisibleLabelsFocusAndActivateTheirControls|TestVisibleLabelActivatesSystemSwitch)$' ./internal/testhost/testdata/press
       - name: Test native radio and tab focus
         run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test composited captures
@@ -155,10 +159,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Test native modified presses
-        run: go tool nsgo test -target windows -run '^TestPressModifiersReachTheApp$' ./internal/testhost/testdata/press
-      - name: Test native focus, styles and activation
-        run: go tool nsgo test -run '^TestRefFocusUsesNativeKeyboardStops$' ./internal/platform/windows
+      - name: Test native presses and visible labels
+        run: go tool nsgo test -target windows -run '^(TestPressModifiersReachTheApp|TestVisibleLabelsFocusAndActivateTheirControls)$' ./internal/testhost/testdata/press
+      - name: Test native focus, styles, activation and label relationships
+        run: go tool nsgo test -run '^(TestRefFocusUsesNativeKeyboardStops|TestNativeLabeledByProvider)$' ./internal/platform/windows
       - name: Test native radio and tab focus
         run: go tool nsgo test -target windows -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test instance isolation and file handoff

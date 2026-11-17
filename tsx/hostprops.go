@@ -21,6 +21,10 @@ func (r *runtime) viewProp(p *core.View, name string, v js.Value) bool {
 		p.TestID = stringOf(v)
 	case "accessibilityLabel":
 		p.Label = stringOf(v)
+	case "labelFor":
+		p.LabelFor = r.labelRef(v)
+	case "labelledBy":
+		p.LabelledBy = r.labelRefs(v)
 	case "accessibilityHint":
 		p.Hint = stringOf(v)
 	case "accessibilityDescription":
@@ -248,6 +252,10 @@ var liveRegions = map[string]core.LiveRegion{"none": core.LiveRegionNone, "polit
 // textProp sets a prop of a <Text>, reporting whether it has it.
 func (r *runtime) textProp(p *core.Text, name string, v js.Value) bool {
 	switch name {
+	case "labelFor":
+		p.LabelFor = r.labelRef(v)
+	case "labelledBy":
+		p.LabelledBy = r.labelRefs(v)
 	case "testID":
 		p.TestID = stringOf(v)
 	case "accessibilityLabel":
@@ -500,6 +508,8 @@ var autoCompletes = map[string]core.AutoComplete{"off": core.AutoCompleteOff, "n
 // inputProp sets a prop of an <Input>, reporting whether it has it.
 func (r *runtime) inputProp(p *core.Input, name string, v js.Value) bool {
 	switch name {
+	case "labelledBy":
+		p.LabelledBy = r.labelRefs(v)
 	case "value":
 		s := stringOf(v)
 		p.Value = func() string { return s }

@@ -29,12 +29,14 @@ type Native struct {
 	StyleFunc func() Style
 
 	// OnEvent receives what the component emits.
-	OnEvent  func(name string, data any)
-	OnPress  func(PressEvent)
-	OnLayout func(Bounds)
-	Ref      *Ref
-	Label    string
-	TestID   string
+	OnEvent    func(name string, data any)
+	OnPress    func(PressEvent)
+	OnLayout   func(Bounds)
+	Ref        *Ref
+	Label      string
+	LabelledBy []*Ref
+	Invalid    func() bool
+	TestID     string
 }
 
 // Render implements Node.
@@ -54,10 +56,12 @@ type nativeNode struct {
 
 func (t *Tree) mountNative(cx *Scope, parent *node, v Native) {
 	n := t.newNode(driver.KindNative, parent, cx)
+	t.setLabels(n, nil, v.LabelledBy)
 	t.bindStyle(cx, n, v.Style, v.StyleFunc)
 	t.setRef(n, v.Ref)
 	n.h = handlers{press: v.OnPress, layout: v.OnLayout}
 	n.props = driver.ViewProps{Label: v.Label, TestID: v.TestID}
+	t.bindBool(cx, n, v.Invalid, &n.props.Invalid)
 	nn := &nativeNode{component: v.Component, props: v.Props, event: v.OnEvent}
 	n.native = nn
 	if v.PropsFunc != nil {

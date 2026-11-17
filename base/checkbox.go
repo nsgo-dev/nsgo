@@ -7,6 +7,9 @@ import "github.com/nsgo-dev/nsgo/core"
 // the app's Indicator mark, then its children, the label assistive
 // technology reads.
 type Checkbox struct {
+	// Ref and LabelledBy are the control view's, as a core.View's.
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
 	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
 	Invalid func() bool
 	Checked func() bool
@@ -57,7 +60,7 @@ func (c Checkbox) Render(*core.Scope) core.Node {
 	if c.Indicator != nil {
 		mark = []core.Node{c.Indicator}
 	}
-	return core.View{Class: c.Class, Style: c.Style, StyleFunc: c.StyleFunc, Role: role, Label: c.Label, Hint: c.Hint,
+	return core.View{Class: c.Class, Style: c.Style, StyleFunc: c.StyleFunc, Ref: c.Ref, LabelledBy: c.LabelledBy, Role: role, Label: c.Label, Hint: c.Hint,
 		TestID: c.TestID, OnLayout: c.OnLayout, Tooltip: c.Tooltip, HitSlop: c.HitSlop, Disabled: c.Disabled, Invalid: c.Invalid, Indeterminate: c.Indeterminate,
 		Checked: func() bool { return is(c.Checked) && !is(c.Indeterminate) },
 		OnPress: func(core.PressEvent) {

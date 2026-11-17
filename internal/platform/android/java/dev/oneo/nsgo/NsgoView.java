@@ -4437,6 +4437,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         ripple(n, ripple, rippleColor, rippleRadius);
         n.selectionArea = in.readUnsignedByte() != 0;
         int selectable = in.readUnsignedByte(), selectionColor = in.readInt();
+        int labelFlags = in.readUnsignedByte();
+        n.invalid = Protocol.flag(labelFlags, 0);
+        n.labelPress = Protocol.flag(labelFlags, 1);
+        n.labelFor = in.readInt();
+        n.labelledBy = new int[in.readInt()];
+        for (int i = 0; i < n.labelledBy.length; i++) n.labelledBy[i] = in.readInt();
         if (n.view instanceof TextNode) ((TextNode) n.view).selectable(selectable, Text.argb(selectionColor));
         View view = n.accessible();
         // A text field's ItemInput enables it.
@@ -4556,7 +4562,20 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         n.accessible().setContentDescription(d.isEmpty() ? null : d);
     }
 
-    private static void describe(Node n, AccessibilityNodeInfo info) {
+    private void describe(Node n, AccessibilityNodeInfo info) {
+        info.setContentInvalid(n.invalid);
+        Node target = nodes.get(n.labelFor);
+        if (target != null && Build.VERSION.SDK_INT < 36) info.setLabelFor(target.accessible());
+        for (int id : n.labelledBy) {
+            Node label = nodes.get(id);
+            if (label == null) continue;
+            if (Build.VERSION.SDK_INT >= 36) info.addLabeledBy(label.accessible());
+            else { info.setLabeledBy(label.accessible()); break; }
+        }
+        if (n.labelPress) {
+            info.setClassName("android.widget.TextView");
+            info.setFocusable(false);
+        }
         String className = null, role = null;
         boolean checkable = false;
         switch (n.role) {
@@ -5241,6 +5260,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         long events;
         int role;
         boolean disabled, selected, checked, mixed;
+        boolean invalid, labelPress;
+        int labelFor;
+        int[] labelledBy = new int[0];
         String label = "", text = "", testID = "";
         /** Accessibility beyond the role, label and states, as core.ViewProps has it. */
         String hint = "", valueText = "";

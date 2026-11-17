@@ -702,8 +702,16 @@ func planFields(t reflect.Type, spec *faceSpec) []field {
 					v.Set(reflect.ValueOf(p.children()))
 				}
 			}
-		case ft == refType:
+		case ft == refType && name == "Ref":
 			plan.set = func(p *props, v reflect.Value) { v.Set(reflect.ValueOf(p.n.ref)) }
+		case ft == refType && name == "ThumbRef":
+			plan.set = func(p *props, v reflect.Value) {
+				if x := p.get(prop); defined(x) {
+					v.Set(p.r.decode(x, ft))
+				} else {
+					v.Set(reflect.ValueOf(p.n.ref))
+				}
+			}
 		case name == "Ref" && ft.Kind() == reflect.Pointer && ft.Elem().Kind() == reflect.Struct:
 			// A ref of the component's own: the ref prop gets its methods.
 			plan.set = func(p *props, v reflect.Value) {
@@ -876,6 +884,9 @@ func (r *runtime) decode(v js.Value, t reflect.Type) reflect.Value {
 		return out
 	}
 	switch t {
+	case refType:
+		out.Set(reflect.ValueOf(r.labelRef(v)))
+		return out
 	case gojaValueType:
 		out.Set(reflect.ValueOf(v))
 		return out

@@ -379,6 +379,8 @@ func (d *declarer) ts(t reflect.Type) string {
 		return s.name
 	}
 	switch t {
+	case refType:
+		return "YNode | null"
 	case nodeType, nodesType:
 		return "JSX.Element"
 	case styleType:

@@ -59,6 +59,12 @@ var (
 	gtkAccessibleAnnounce            func(uintptr, *byte, int32)
 	gtkLabelGetType                  func() uintptr
 	gtkAccessibleRangeGetType        func() uintptr
+	gtkAccessibleRelationGetType     func() uintptr
+	gtkAccessibleUpdateRelationValue func(uintptr, int32, *int32, *gValue)
+	gtkAccessibleResetRelation       func(uintptr, int32)
+	gValueSetPointer                 func(*gValue, uintptr)
+	gListAppend                      func(uintptr, uintptr) uintptr
+	gListFree                        func(uintptr)
 	gTypeAddInterfaceStatic          func(uintptr, uintptr, *gInterfaceInfo)
 )
 
@@ -69,6 +75,12 @@ type gInterfaceInfo struct {
 }
 
 func bindAccess() {
+	purego.RegisterLibFunc(&gtkAccessibleRelationGetType, gtkLib, "gtk_accessible_relation_get_type")
+	purego.RegisterLibFunc(&gtkAccessibleUpdateRelationValue, gtkLib, "gtk_accessible_update_relation_value")
+	purego.RegisterLibFunc(&gtkAccessibleResetRelation, gtkLib, "gtk_accessible_reset_relation")
+	purego.RegisterLibFunc(&gValueSetPointer, gobjectLib, "g_value_set_pointer")
+	purego.RegisterLibFunc(&gListAppend, glibLib, "g_list_append")
+	purego.RegisterLibFunc(&gListFree, glibLib, "g_list_free")
 	purego.RegisterLibFunc(&gValueSetString, gobjectLib, "g_value_set_string")
 	purego.RegisterLibFunc(&gValueSetDouble, gobjectLib, "g_value_set_double")
 	purego.RegisterLibFunc(&gValueSetBoolean, gobjectLib, "g_value_set_boolean")
@@ -115,6 +127,8 @@ func enumValue(kind, nick string) int32 {
 		t = gtkAccessiblePropertyGetType()
 	case "state":
 		t = gtkAccessibleStateGetType()
+	case "relation":
+		t = gtkAccessibleRelationGetType()
 	case "tristate":
 		t = gtkAccessibleTristateGetType()
 	}
@@ -154,7 +168,7 @@ func roleNick(kind driver.ViewKind, p *driver.ViewProps, pressable bool) string 
 		return "label"
 	case kind == driver.KindInput:
 		return "text-box"
-	case pressable:
+	case pressable && !p.LabelPress:
 		return "button"
 	case kind == driver.KindImage && p.Label != "":
 		return "img"
@@ -346,6 +360,33 @@ func (w *window) updateAccess(v *view) bool {
 		gtkWidgetSetName(v.widget, cstr(name))
 	}
 	return old.set && n.label != old.label
+}
+
+// updateLabelRelation runs after the batch, when every referenced widget
+// has been created. GTK copies the GList and holds the accessible objects.
+func (w *window) updateLabelRelation(v *view) {
+	if v.deleted || v.widget == 0 {
+		return
+	}
+	relation := enumValue("relation", "labelled-by")
+	var list uintptr
+	if v.props.LabelledBy != nil {
+		for _, id := range *v.props.LabelledBy {
+			if label := w.view(id); label != nil && !label.deleted && label.widget != 0 {
+				list = gListAppend(list, label.widget)
+			}
+		}
+	}
+	if list == 0 {
+		gtkAccessibleResetRelation(v.widget, relation)
+		return
+	}
+	var value gValue
+	gValueInit(uintptr(unsafe.Pointer(&value)), 17<<2) // G_TYPE_POINTER
+	gValueSetPointer(&value, list)
+	gtkAccessibleUpdateRelationValue(v.widget, 1, &relation, &value)
+	gValueUnset(uintptr(unsafe.Pointer(&value)))
+	gListFree(list)
 }
 
 // accessChanged follows a change of what v tells assistive technology:

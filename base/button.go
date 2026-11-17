@@ -11,6 +11,8 @@ import "github.com/nsgo-dev/nsgo/core"
 type Button struct {
 	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
 	Invalid     func() bool
+	Ref         *core.Ref
+	LabelledBy  []*core.Ref
 	OnPress     func(core.PressEvent)
 	OnLongPress func(core.PressEvent)
 	// OnPressDown and OnPressUp follow a press going down on the button
@@ -66,8 +68,8 @@ func (b Button) Render(cx *core.Scope) core.Node {
 	if role == core.RoleNone {
 		role = core.RoleButton
 	}
-	var ref *core.Ref
-	if b.AutoFocus && !b.NoFocus {
+	ref := b.Ref
+	if ref == nil && b.AutoFocus && !b.NoFocus {
 		ref = &core.Ref{}
 	}
 	view := barItem(cx, core.View{
@@ -87,6 +89,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 		Expanded:                    b.Expanded,
 		Role:                        role,
 		Label:                       b.Label,
+		LabelledBy:                  b.LabelledBy,
 		LabelFunc:                   b.LabelFunc,
 		Desktop:                     b.Desktop,
 		Tooltip:                     b.Tooltip,
@@ -96,7 +99,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 		AccessibilityElementsHidden: b.AccessibilityElementsHidden,
 		TestID:                      b.TestID, OnLayout: b.OnLayout,
 	}, nil)
-	if ref != nil {
+	if b.AutoFocus && !b.NoFocus && ref != nil {
 		cx.Post(func() {
 			if view.Disabled == nil || !view.Disabled() {
 				ref.Focus()

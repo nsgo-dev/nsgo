@@ -9,8 +9,11 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 // user's choice at once, as the system's does, and its size is the
 // system's where the style leaves it open.
 type SystemSwitch struct {
-	Checked  func() bool
-	Disabled func() bool
+	Ref        *Ref
+	LabelledBy []*Ref
+	Invalid    func() bool
+	Checked    func() bool
+	Disabled   func() bool
 	// OnChange receives the value the user chose, which the native component reports as its "change" event with a bool: a test reports one with nsgotest's Emit(selector, "change", value), or flips the switch with Press.
 	OnChange func(checked bool)
 	// Size is macOS's control size, "small" or "large", else the regular
@@ -42,6 +45,7 @@ func (s SystemSwitch) native(*Scope) Node {
 		style.AlignSelf = AlignCenter
 	}
 	return Native{Component: driver.SwitchComponent, Style: style, Label: s.Label, TestID: s.TestID,
+		Ref: s.Ref, LabelledBy: s.LabelledBy, Invalid: s.Invalid,
 		PropsFunc: func() map[string]any {
 			props := map[string]any{"checked": s.Checked != nil && s.Checked(), "disabled": s.Disabled != nil && s.Disabled()}
 			if s.Size != "" {

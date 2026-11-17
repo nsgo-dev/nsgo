@@ -196,13 +196,14 @@ type surface struct {
 
 // view is the element of one NodeID.
 type view struct {
-	id      driver.NodeID
-	kind    driver.ViewKind
-	el      js.Value // framed and styled by the view's items
-	content js.Value // where children go: el, or a scroll view's content
-	inner   js.Value // a text view's text, a text field's <input> or a <canvas>
-	textCSS *cssBox  // a text view's inner style
-	elCSS   *cssBox  // el's style but its frame (css)
+	accessPrefix string
+	id           driver.NodeID
+	kind         driver.ViewKind
+	el           js.Value // framed and styled by the view's items
+	content      js.Value // where children go: el, or a scroll view's content
+	inner        js.Value // a text view's text, a text field's <input> or a <canvas>
+	textCSS      *cssBox  // a text view's inner style
+	elCSS        *cssBox  // el's style but its frame (css)
 	// look is el's class of the view style, feel of what its events make
 	// of the pointer and selection, and textClass inner's of its
 	// paragraph (classes.go).
@@ -1754,7 +1755,8 @@ func (s *surface) create(id driver.NodeID, kind driver.ViewKind) *view {
 	}
 	// A new view has the default style and no props or events: the core
 	// sends them only when they differ, and the element shows them as it is.
-	v := &view{id: id, kind: kind, el: s.element("div"), style: driver.DefaultViewStyle}
+	v := &view{id: id, kind: kind, el: s.element("div"), style: driver.DefaultViewStyle,
+		accessPrefix: fmt.Sprintf("nsgo-a11y-%p-", s)}
 	v.el.Get("classList").Call("add", "nsgo-view")
 	v.el.Set("nsgoID", int(id))
 	v.content = v.el
@@ -1787,6 +1789,11 @@ func (s *surface) create(id driver.NodeID, kind driver.ViewKind) *view {
 		s.newScroll(v)
 	}
 	s.views[id] = v
+	el := v.el
+	if kind == driver.KindInput {
+		el = v.inner
+	}
+	setAttr(el, "id", v.accessPrefix+strconv.FormatUint(uint64(v.id), 10))
 	s.dom.register(v)
 	return v
 }
@@ -2063,6 +2070,16 @@ func setViewProps(v *view, p *driver.ViewProps) {
 	if v.kind == driver.KindInput {
 		el = v.inner
 	}
+	if !el.Call("hasAttribute", "id").Bool() {
+		setAttr(el, "id", v.accessPrefix+strconv.FormatUint(uint64(v.id), 10))
+	}
+	var labelled []string
+	if p.LabelledBy != nil {
+		for _, id := range *p.LabelledBy {
+			labelled = append(labelled, v.accessPrefix+strconv.FormatUint(uint64(id), 10))
+		}
+	}
+	setAttr(el, "aria-labelledby", strings.Join(labelled, " "))
 	flag := func(on bool) string {
 		if on {
 			return "true"

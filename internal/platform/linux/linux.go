@@ -811,7 +811,7 @@ func (w *window) view(id driver.NodeID) *view {
 // apply applies one commit's items.
 func (w *window) apply(b *driver.MountBatch) {
 	w.batch++
-	var rescroll, loads []*view
+	var rescroll, loads, labels []*view
 	type focusChange struct {
 		v     *view
 		focus bool
@@ -1091,6 +1091,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			w.accessChanged(v)
 		case driver.ItemViewProps:
 			if it.ViewProps != nil {
+				if v.props.LabelledBy != it.ViewProps.LabelledBy {
+					labels = append(labels, v)
+				}
 				v.props = *it.ViewProps
 				if v.props.Disabled && w.drop.over == v {
 					w.setDropOver(nil)
@@ -1168,6 +1171,9 @@ func (w *window) apply(b *driver.MountBatch) {
 		}
 	}
 	w.setRoot(b.Root)
+	for _, v := range labels {
+		w.updateLabelRelation(v)
+	}
 	// Bindings change with the batch, and its views exist now.
 	w.showAnimated()
 	w.updateDropTarget()

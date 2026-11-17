@@ -63,7 +63,13 @@ func (s *uiSwitch) SetProp(name string, value any) {
 	}
 }
 
-func (s *uiSwitch) Command(string, any) {}
+func (s *uiSwitch) Command(name string, _ any) {
+	if name == "activate" && objc.Send[bool](s.view, sel("isEnabled")) {
+		on := !objc.Send[bool](s.view, sel("isOn"))
+		s.view.Send(sel("setOn:animated:"), on, true)
+		s.cx.Emit("change", on)
+	}
+}
 
 func (s *uiSwitch) Close() {
 	delete(uiSwitches, s.view)

@@ -119,6 +119,9 @@ func (v *view) setLabel(label string) {
 		return
 	}
 	v.props.Label = label
+	if _, ok := v.component.(*uiSwitch); ok {
+		v.updateAccessibility()
+	}
 	v.announceLive(label)
 }
 
@@ -214,11 +217,17 @@ func (v *view) announceLive(text string) {
 // updateAccessibility sets v's properties from its props, events and text.
 func (v *view) updateAccessibility() {
 	native, p := v.native, &v.props
+	if s, ok := v.component.(*uiSwitch); ok {
+		native.Send(selSetIsAccessibilityElement, false)
+		v.axElement = false
+		s.view.Send(sel("setAccessibilityLabel:"), nsOrNil(p.Label))
+		return
+	}
 	// VoiceOver keeps to a dialog while it shows.
 	native.Send(sel("setAccessibilityViewIsModal:"), p.Role == driver.RoleDialog || p.Role == driver.RoleAlertDialog)
 	native.Send(selSetAccessibilityElementsHidden, p.ElementsHidden)
 	const noContainer, semanticGroup = 0, 4
-	pressable := v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress)
+	pressable := !p.LabelPress && (v.events.Has(driver.EventPress) || v.events.Has(driver.EventLongPress))
 	var t uint64
 	role := p.Role
 	if role == driver.RoleStatus && v.kind == driver.KindText {

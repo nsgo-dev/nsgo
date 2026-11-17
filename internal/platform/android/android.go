@@ -1861,4 +1861,14 @@ func writeViewProps(w *writer, p *driver.ViewProps) {
 	w.flags(p.SelectionArea)
 	w.byte(byte(p.Selectable))
 	w.u32(uint32(p.SelectionColor))
+	w.flags(p.Invalid, p.LabelPress)
+	w.u32(uint32(p.LabelFor))
+	var labels []driver.NodeID
+	if p.LabelledBy != nil {
+		labels = *p.LabelledBy
+	}
+	w.u32(uint32(len(labels)))
+	for _, id := range labels {
+		w.u32(uint32(id))
+	}
 }

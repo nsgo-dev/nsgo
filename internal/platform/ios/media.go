@@ -518,6 +518,9 @@ func (s *surface) configureNative(v *view, c *driver.NativeConfig) {
 	for name, value := range c.Props {
 		v.component.SetProp(name, value)
 	}
+	if _, ok := v.component.(*uiSwitch); ok {
+		v.updateAccessibility()
+	}
 }
 
 // setAccessory makes the InputAccessoryView id the bar above input v's

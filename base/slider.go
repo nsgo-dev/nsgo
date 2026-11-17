@@ -80,6 +80,8 @@ type Slider struct {
 	// bottom of a vertical one. Read as it is made.
 	Axis     Axis
 	Disabled func() bool
+	// LabelledBy applies to both thumbs, as a core.View's.
+	LabelledBy []*core.Ref
 	// Label is what assistive technology says for the thumb, on a range the
 	// end's; StartLabel for a range's start, Label by default.
 	Label      string
@@ -114,6 +116,8 @@ type Slider struct {
 	TestID   string
 	// ThumbRef is the thumb's, on a range the end's.
 	ThumbRef *core.Ref
+	// StartThumbRef is a range's start thumb.
+	StartThumbRef *core.Ref
 	// ThumbTestID and StartThumbTestID name the thumb, on a range the
 	// end's, and a range's start.
 	ThumbTestID, StartThumbTestID string
@@ -325,7 +329,7 @@ func (c *sliderCtl) thumb(start bool, focused *core.Signal[int]) core.Node {
 	s := c.s
 	label, id, ref := s.Label, s.ThumbTestID, s.ThumbRef
 	if start {
-		id, ref = s.StartThumbTestID, nil
+		id, ref = s.StartThumbTestID, s.StartThumbRef
 		if s.StartLabel != "" {
 			label = s.StartLabel
 		}
@@ -348,7 +352,7 @@ func (c *sliderCtl) thumb(start bool, focused *core.Signal[int]) core.Node {
 			c.nudge(start, func(r numberRange, v float64) float64 { return r.stepBy(v, by) })
 		}
 	}
-	return core.View{Class: s.ThumbClass, Style: base.Merge(s.ThumbStyle), Disabled: s.Disabled, Invalid: s.Invalid, Role: core.RoleAdjustable, Label: label, TestID: id, Ref: ref, Accessible: true,
+	return core.View{Class: s.ThumbClass, Style: base.Merge(s.ThumbStyle), Disabled: s.Disabled, Invalid: s.Invalid, Role: core.RoleAdjustable, Label: label, LabelledBy: s.LabelledBy, TestID: id, Ref: ref, Accessible: true,
 		StyleFunc: func() core.Style {
 			var look core.Style
 			if s.ThumbStyleFunc != nil {

@@ -19,6 +19,9 @@ const pageSteps = 10
 // ControlsRight the field between them and a column with the increment
 // over the decrement.
 type NumberInput struct {
+	// Ref is the field's; LabelledBy is a core.Input's.
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
 	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
 	Invalid func() bool
 	// Value makes it controlled once it returns a number; nil is an empty
@@ -402,9 +405,12 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 	keys := bindWhile(focused.Get, core.KeyAlways, false,
 		controlKey{"up", true, nudge(true, 1)}, controlKey{"down", true, nudge(false, 1)},
 		controlKey{"pageup", true, nudge(true, pageSteps)}, controlKey{"pagedown", true, nudge(false, pageSteps)})
-	field := new(core.Ref)
+	field := n.Ref
+	if field == nil {
+		field = new(core.Ref)
+	}
 	input := core.Input{Ref: field, Class: n.InputClass, Style: n.InputStyle, StyleFunc: n.InputStyleFunc, Value: c.text.Get, PlaceholderFunc: n.Placeholder,
-		Label: n.Label, Role: core.RoleSpinButton, NoAutoCorrect: true, Disabled: n.Disabled, Invalid: n.Invalid,
+		Label: n.Label, LabelledBy: n.LabelledBy, Role: core.RoleSpinButton, NoAutoCorrect: true, Disabled: n.Disabled, Invalid: n.Invalid,
 		ReadonlyFunc: func() bool { return is(n.Readonly) || is(n.Disabled) },
 		KeyboardTypeFunc: func() core.KeyboardType {
 			// Phones' decimal pads have no minus sign.

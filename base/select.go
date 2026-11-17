@@ -15,6 +15,9 @@ import (
 // the value. Up, Down, Return and Space open it from the focused trigger,
 // and letters choose by typeahead.
 type Select struct {
+	// Ref and LabelledBy are the trigger view's, as a core.View's.
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
 	// Invalid is core.View.Invalid, for accessibility and aria-invalid styles.
 	Invalid      func() bool
 	Items        func() []SelectItem
@@ -124,7 +127,10 @@ func (s Select) Render(cx *core.Scope) core.Node {
 	current := core.NewMemoFunc(cx, value, sameValue)
 	searchable := func() bool { return is(s.Searchable) }
 	lb := newListbox(cx, s.Items, searchable, listQuery{})
-	anchor := new(core.Ref)
+	anchor := s.Ref
+	if anchor == nil {
+		anchor = new(core.Ref)
+	}
 	width := core.NewSignal[core.Points](cx, -1)
 	focused := core.NewSignal(cx, false)
 	how, closedBy := openedByPress, Reason(0)
@@ -262,7 +268,7 @@ func (s Select) Render(cx *core.Scope) core.Node {
 			width.Set(b.Size.Width)
 		}
 	}
-	trigger := core.View{Ref: anchor, Class: s.Class, Style: s.Style, StyleFunc: s.StyleFunc, Label: s.Label, TestID: s.TestID, Role: core.RoleCombobox, Invalid: s.Invalid,
+	trigger := core.View{Ref: anchor, Class: s.Class, Style: s.Style, StyleFunc: s.StyleFunc, Label: s.Label, LabelledBy: s.LabelledBy, TestID: s.TestID, Role: core.RoleCombobox, Invalid: s.Invalid,
 		Disabled: s.Disabled, Focusable: func() bool { return !disabled() }, Expanded: st.open, ShowsExpanded: true,
 		AccessibilityValue: func() core.AccessibilityValue {
 			if v := current.Get(); v != nil {

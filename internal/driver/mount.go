@@ -906,6 +906,15 @@ type ViewProps struct {
 	// Level is a heading's or a tree item's level, from 1; 0 for none.
 	Level int
 	Label string
+	// LabelledBy lists the visible elements naming this view. The slice
+	// is immutable, keeping ViewProps comparable. Label is the resolved
+	// name too, for backends without a native relationship API.
+	LabelledBy *[]NodeID
+	// LabelFor is the control this visible label activates. LabelPress
+	// says EventPress exists only to forward that activation: backends
+	// must not infer a button role or a Tab stop from it.
+	LabelFor   NodeID
+	LabelPress bool
 	// Description says more about the element, read after its name, as
 	// ARIA's aria-description; Hint says what activating it does.
 	Description string

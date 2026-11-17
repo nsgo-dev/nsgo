@@ -16,6 +16,10 @@ import (
 // and the list marks it with its row's selected face. The rows are made as
 // they scroll in, so a list may be long. Options' Icon and Content go unused.
 type Select[T comparable] struct {
+	// Ref is the field's; LabelledBy and Invalid are a core.View's.
+	Ref         *core.Ref
+	LabelledBy  []*core.Ref
+	Invalid     func() bool
 	Options     []Option[T]
 	Value       func() T
 	OnChange    func(value T)
@@ -123,7 +127,7 @@ func (s Select[T]) Render(cx *core.Scope) core.Node {
 		Style:     core.Style{Group: "button", CornerRadius: RadiusControl},
 		StyleFunc: func() core.Style { return core.Style{FocusVisible: FocusRing(cx, 2)} },
 		Trigger:   face, PopupStyleFunc: popup, BackdropStyle: backdrop, ListStyle: core.Style{MaxHeight: core.Pt(320)},
-		ItemStyle: row, ItemStyleFunc: look, GroupStyle: group, GroupStyleFunc: groupLook, Label: label, TestID: s.TestID,
+		ItemStyle: row, ItemStyleFunc: look, GroupStyle: group, GroupStyleFunc: groupLook, Ref: s.Ref, LabelledBy: s.LabelledBy, Invalid: s.Invalid, Label: label, TestID: s.TestID,
 		RenderItem: func(e base.SelectEntry) core.Node {
 			id := ""
 			if s.TestID != "" {

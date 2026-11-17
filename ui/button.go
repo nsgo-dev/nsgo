@@ -26,8 +26,10 @@ const (
 // leading Icon, or the Icon alone in a square. base.Button gives the
 // behavior; the look is ui's.
 type Button struct {
-	Text    string
-	Variant ButtonVariant
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
+	Text       string
+	Variant    ButtonVariant
 	// Color fills it with that color instead.
 	Color func() core.Color
 	Icon  func() *core.SVG
@@ -67,7 +69,7 @@ func (b Button) Render(cx *core.Scope) core.Node {
 			}
 		}
 	}
-	return base.Button{OnPress: press, Disabled: b.Disabled, Busy: b.Busy, AutoFocus: b.AutoFocus, Label: b.label(), TestID: b.TestID,
+	return base.Button{Ref: b.Ref, LabelledBy: b.LabelledBy, OnPress: press, Disabled: b.Disabled, Busy: b.Busy, AutoFocus: b.AutoFocus, Label: b.label(), TestID: b.TestID,
 		Style: style, StyleFunc: focus, Children: []core.Node{face}}
 }
 

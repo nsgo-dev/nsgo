@@ -16,8 +16,12 @@ import (
 // and the step; text that is no number gives the value back. A drag across
 // its Leading handle scrubs it.
 type NumberInput struct {
-	Value    func() float64
-	OnChange func(value float64)
+	// Ref is the field's; LabelledBy and Invalid are a core.Input's.
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
+	Invalid    func() bool
+	Value      func() float64
+	OnChange   func(value float64)
 	// Min and Max are the range, when Max is above Min.
 	Min, Max float64
 	// Step is what the buttons, the keys and the scrub change the value
@@ -76,7 +80,7 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 		}
 	}
 	number := func(v float64) func() *float64 { return func() *float64 { return &v } }
-	in := base.NumberInput{Format: format, Parse: parse, OnCommit: true, Snap: true, Step: n.step, Disabled: n.Disabled, Label: n.Label, TestID: n.TestID,
+	in := base.NumberInput{Ref: n.Ref, LabelledBy: n.LabelledBy, Invalid: n.Invalid, Format: format, Parse: parse, OnCommit: true, Snap: true, Step: n.step, Disabled: n.Disabled, Label: n.Label, TestID: n.TestID,
 		ControlsRight: true, IncrementLabel: n.IncrementLabel, DecrementLabel: n.DecrementLabel,
 		Value: func() *float64 {
 			v := 0.0

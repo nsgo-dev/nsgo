@@ -9,12 +9,17 @@ import (
 // sliding across and the track changing color on the platform. Label is
 // what assistive technology reads.
 type Switch struct {
-	Checked  func() bool
-	OnChange func(bool)
-	Label    string
-	Size     Size
-	Variant  SwitchVariant
-	TestID   string
+	// Ref and LabelledBy are the control view's, as a core.View's.
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
+	Invalid    func() bool
+	Disabled   func() bool
+	Checked    func() bool
+	OnChange   func(bool)
+	Label      string
+	Size       Size
+	Variant    SwitchVariant
+	TestID     string
 }
 
 // SwitchVariant is a Switch's look.
@@ -35,6 +40,7 @@ func (s Switch) Render(cx *core.Scope) core.Node {
 		return core.Show{When: func() bool { return core.SystemSwitchAvailable(cx) }, Else: s.own,
 			Then: func(*core.Scope) core.Node {
 				return core.SystemSwitch{Checked: s.Checked, OnChange: s.OnChange, Label: s.Label, TestID: s.TestID,
+					Ref: s.Ref, LabelledBy: s.LabelledBy, Disabled: s.Disabled, Invalid: s.Invalid,
 					Size: sized(s.Size, "", "small", "large")}
 			}}
 	}
@@ -45,7 +51,7 @@ func (s Switch) Render(cx *core.Scope) core.Node {
 func (s Switch) own(cx *core.Scope) core.Node {
 	look := NewSwitchLook(cx, s.Checked, s.Size)
 	// More to press on every side, without taking more room.
-	return base.Switch{Checked: s.Checked, OnChange: s.OnChange, Label: s.Label, TestID: s.TestID,
+	return base.Switch{Ref: s.Ref, LabelledBy: s.LabelledBy, Invalid: s.Invalid, Disabled: s.Disabled, Checked: s.Checked, OnChange: s.OnChange, Label: s.Label, TestID: s.TestID,
 		Style:          core.Style{Margin: core.All(-8), Padding: core.All(8)},
 		TrackStyleFunc: look.Track, ThumbStyleFunc: look.Thumb}
 }
