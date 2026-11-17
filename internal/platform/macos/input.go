@@ -253,7 +253,9 @@ func (v *view) setEditor(multiline, masked bool) {
 		scroll, tv := newMultilineEditor()
 		label := objc.ID(apple.Class("NSTextField")).Send(sel("labelWithString:"), apple.NSString(""))
 		label.Send(selSetHidden, true)
-		label.Send(selSetAccessibilityHidden, true)
+		// The placeholder is the text view's AXPlaceholderValue, so its drawn label is no element; the label's cell answers for it, so both stand down (accessibilityHidden leaves it in the tree VoiceOver walks).
+		label.Send(selSetAccessibilityElement, false)
+		label.Send(sel("cell")).Send(selSetAccessibilityElement, false)
 		label.Send(sel("cell")).Send(sel("setWraps:"), true)
 		v.native.Send(selAddSubview, label)
 		in.field, in.host, in.label = tv, scroll, label

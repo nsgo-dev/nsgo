@@ -73,7 +73,7 @@ func TestInputAccessibilityLabel(t *testing.T) {
 			config := driver.InputConfig{Multiline: c.multiline, Masked: c.masked, Placeholder: "Search messages",
 				Style: driver.TextStyle{Font: driver.Font{Size: 14}, Color: core.RGB(0)}}
 			v.configure(&config)
-			if got := findInputAX(window, c.role, "Search"); got == 0 {
+			if got := findAX(window, axIs(c.role, "Search")); got == 0 {
 				t.Errorf("%s: no native accessibility element with role %s and label Search", c.name, c.role)
 			}
 			field := v.input.field
@@ -95,14 +95,16 @@ func TestInputAccessibilityLabel(t *testing.T) {
 			if !slices.Contains(axAttrNames(field), "AXPlaceholderValue") {
 				t.Errorf("%s: native attributes lack AXPlaceholderValue", c.name)
 			}
-			if c.multiline && !objc.Send[bool](v.input.label, sel("isAccessibilityHidden")) {
-				t.Error("text view: visual placeholder is a separate accessibility element")
+			if findAX(window, func(e objc.ID) bool {
+				return apple.GoString(e.Send(sel("accessibilityRole"))) == "AXStaticText" && apple.GoString(e.Send(sel("accessibilityValue"))) == "Search messages"
+			}) != 0 {
+				t.Errorf("%s: the drawn placeholder is an accessibility element of its own", c.name)
 			}
 			v.setLabel("Find messages")
 			if got := apple.GoString(field.Send(sel("accessibilityLabel"))); got != "Find messages" {
 				t.Errorf("%s: updated native label = %q", c.name, got)
 			}
-			if findInputAX(window, c.role, "Find messages") == 0 {
+			if findAX(window, axIs(c.role, "Find messages")) == 0 {
 				t.Errorf("%s: updated label is absent from the window's accessibility tree", c.name)
 			}
 			for _, placeholder := range []string{"Type a query", ""} {
@@ -128,7 +130,15 @@ func TestInputAccessibilityLabel(t *testing.T) {
 	})
 }
 
-func findInputAX(root objc.ID, role, label string) objc.ID {
+// axIs matches an element by its role and label.
+func axIs(role, label string) func(objc.ID) bool {
+	return func(e objc.ID) bool {
+		return apple.GoString(e.Send(sel("accessibilityRole"))) == role && apple.GoString(e.Send(sel("accessibilityLabel"))) == label
+	}
+}
+
+// findAX is the first element under root, as accessibility clients walk it through accessibilityChildren, that match takes.
+func findAX(root objc.ID, match func(objc.ID) bool) objc.ID {
 	seen := make(map[objc.ID]bool)
 	var find func(objc.ID) objc.ID
 	find = func(e objc.ID) objc.ID {
@@ -136,7 +146,7 @@ func findInputAX(root objc.ID, role, label string) objc.ID {
 			return 0
 		}
 		seen[e] = true
-		if apple.GoString(e.Send(sel("accessibilityRole"))) == role && apple.GoString(e.Send(sel("accessibilityLabel"))) == label {
+		if match(e) {
 			return e
 		}
 		children := e.Send(sel("accessibilityChildren"))
