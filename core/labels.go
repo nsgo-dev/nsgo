@@ -7,8 +7,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// labelRelations keeps declared refs separate from their projection. In
-// particular, removing an association must restore the label's own states.
+// labelRelations keeps declared refs separate from their projection. In particular, removing an association must restore the label's own states.
 type labelRelations struct {
 	forRef            *Ref
 	by                []*Ref
@@ -34,8 +33,7 @@ func (t *Tree) setLabels(n *node, target *Ref, by []*Ref) {
 	}
 }
 
-// labelRef accepts only live, visible refs in the same surface and
-// confinement. Naming must not expose a sandbox's surrounding views either.
+// labelRef accepts only live, visible refs in the same surface and confinement. Naming must not expose a sandbox's surrounding views either.
 func (t *Tree) labelRef(source *node, r *Ref) *node {
 	if r == nil || r.t != t || !t.labelMounted(r.n) || !t.labelMounted(source) || r.n == source || confinement(source.owner) != confinement(r.n.owner) {
 		return nil
@@ -91,9 +89,7 @@ func (n *node) labelProps() driver.ViewProps {
 	return p
 }
 
-// updateLabels visits registered associations, not every view. It runs
-// after text preparation, so names include the current visible spans and
-// attachments. Refs may acquire or lose their node without a prop changing.
+// updateLabels visits registered associations, not every view. It runs after text preparation, so names include the current visible spans and attachments. Refs may acquire or lose their node without a prop changing.
 func (t *Tree) updateLabels() bool {
 	if len(t.labels) == 0 && len(t.labelled) == 0 {
 		return false
@@ -123,8 +119,7 @@ func (t *Tree) updateLabels() bool {
 	}
 	clear(t.labels[len(live):])
 	t.labels = live
-	// Implicit labels follow document order even when a region moves or a
-	// later-mounted label is inserted before an existing one.
+	// Implicit labels follow document order even when a region moves or a later-mounted label is inserted before an existing one.
 	for label, target := range targets {
 		if target.props.Label == "" && (target.labels == nil || len(target.labels.by) == 0) {
 			by[target] = append(by[target], label)
@@ -143,8 +138,7 @@ func (t *Tree) updateLabels() bool {
 			})
 		}
 	}
-	// Drop every edge participating in a cycle, rather than making the
-	// result depend on map traversal order. A text's own label still works.
+	// Drop every edge participating in a cycle, rather than making the result depend on map traversal order. A text's own label still works.
 	var reaches func(*node, *node, map[*node]bool) bool
 	reaches = func(n, goal *node, seen map[*node]bool) bool {
 		if n == goal {
@@ -267,8 +261,7 @@ func (t *Tree) updateLabels() bool {
 	return changed
 }
 
-// labelActive prevents a label in a modal from activating a control below
-// it. The backend checks focus placement too, but the action runs here.
+// labelActive prevents a label in a modal from activating a control below it. The backend checks focus placement too, but the action runs here.
 func (t *Tree) labelActive(n *node) bool {
 	for _, host := range append([]*node{t.view}, t.frames...) {
 		top := topModal(host)

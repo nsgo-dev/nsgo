@@ -8,8 +8,7 @@ import (
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
-// The same test presses real label views on native targets and verifies
-// the input's focus, control activation and dynamic state restoration.
+// The same test presses real label views on native targets and verifies the input's focus, control activation and dynamic state restoration.
 func TestVisibleLabelsFocusAndActivateTheirControls(t *testing.T) {
 	var scope *core.Scope
 	var name *core.Signal[string]

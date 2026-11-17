@@ -73,8 +73,7 @@ type Tree struct {
 	navTops      map[*node]*node
 	lists        []*node
 	accessories  []*node
-	// labels registers elements declaring label associations; labelled
-	// also holds controls named by those labels in the previous round.
+	// labels registers elements declaring label associations; labelled also holds controls named by those labels in the previous round.
 	labels, labelled []*node
 	headerViews      []*node
 	status           statusBars

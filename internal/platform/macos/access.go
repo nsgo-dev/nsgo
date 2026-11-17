@@ -197,8 +197,7 @@ func nsOrNil(s string) objc.ID {
 	return apple.NSString(s)
 }
 
-// accessElement is the control's exposed element, an input's cell or text
-// editor rather than its container.
+// accessElement is the control's exposed element, an input's cell or text editor rather than its container.
 func (v *view) accessElement() objc.ID {
 	if s, ok := v.component.(*nsSwitch); ok {
 		return s.view
@@ -212,8 +211,7 @@ func (v *view) accessElement() objc.ID {
 	return v.native
 }
 
-// AppKit and UI Automation expose one naming element. Label carries the
-// complete resolved name when the app supplies several.
+// AppKit and UI Automation expose one naming element. Label carries the complete resolved name when the app supplies several.
 func (v *view) titleUIElement() objc.ID {
 	if v.surface != nil && v.props.LabelledBy != nil {
 		for _, id := range *v.props.LabelledBy {
