@@ -103,6 +103,47 @@ func TestReportsAcceptanceWriteFailure(t *testing.T) {
 	}
 }
 
+func TestHostCleanupPersistsBuild(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("the web refuses to run an isolated package")
+	}
+	// Leave the acceptance goroutine pending until the view's cleanup joins it, as on a busy app with only one available processor.
+	procs := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(procs)
+	s := newSigner(t)
+	data := s.build(t, 2)
+	dir := t.TempDir()
+	trust, err := pkg.OpenTrust(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trust.AddRoot(s.root.Public().(ed25519.PublicKey))
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		shown := core.NewSignal(cx, true)
+		// A press closes the view on the graph's own goroutine, which a target run requires.
+		return core.View{Children: []core.Node{
+			core.View{TestID: "close", OnPress: func(core.PressEvent) { shown.Set(false) },
+				Children: []core.Node{core.Text{Content: "Close"}}},
+			core.Show{When: shown.Get, Then: func(cx *core.Scope) core.Node {
+				return Host(cx, data, trust, "")
+			}},
+		}}
+	})
+	app.WaitFor("id:install", wait)
+	app.Press("id:install")
+	app.WaitFor("id:waves", wait)
+	app.Press("id:close")
+	app.WaitForGone("id:waves", wait)
+	// Reopen the disk state rather than reading the live Trust, whose lock could itself wait for the pending write and hide the race.
+	reopened, err := pkg.OpenTrust(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if build, ok := reopened.AcceptedBuild("dev.oneo.nsgo.plugins.greeter"); !ok || build != 2 {
+		t.Fatalf("persisted build after view cleanup = %d, %v; want 2, true", build, ok)
+	}
+}
+
 // refusal starts a host of data and returns why it refused it.
 func refusal(t *testing.T, data []byte, trust *pkg.Trust) string {
 	t.Helper()
