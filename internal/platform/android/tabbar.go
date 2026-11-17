@@ -9,9 +9,8 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 // navigation bar, reporting the user's choice as "change".
 type tabBar struct{ cx *driver.NativeContext }
 
-// tabBarHeight is Material 3's navigation bar's height; the runtime's
-// view measures itself taller by the system's navigation bar it reaches
-// under.
+// tabBarHeight is Material 3's navigation bar's content height. The runtime
+// reports a taller natural size only where the bar overlaps system navigation.
 const tabBarHeight driver.Points = 80
 
 func newTabBar(cx *driver.NativeContext) driver.NativeComponent {
@@ -47,9 +46,15 @@ func (*tabBar) ViewProps(name string, value any) []driver.AndroidViewProp {
 
 // ViewEvent implements driver.AndroidEventMapper.
 func (t *tabBar) ViewEvent(name string, args []any) {
-	if name == "onChange" && len(args) == 1 {
-		if i, ok := args[0].(float64); ok {
-			t.cx.Emit("change", i)
+	if len(args) != 1 {
+		return
+	}
+	if value, ok := args[0].(float64); ok {
+		switch name {
+		case "onChange":
+			t.cx.Emit("change", value)
+		case "onSize":
+			t.cx.SetSize(driver.Size{Height: driver.Points(value)})
 		}
 	}
 }

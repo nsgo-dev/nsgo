@@ -10,10 +10,13 @@ import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.util.TypedValue;
 import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewTreeObserver;
+import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -36,11 +39,21 @@ public final class TabBar extends LinearLayout {
         void onChange(int index);
     }
 
+    /** Reports the bar's natural height in points to the Go layout. */
+    public interface OnSizeListener {
+        void onSize(float height);
+    }
+
     private OnChangeListener listener;
+    private OnSizeListener sizeListener;
     private int selected;
     /** The theme's accent as ARGB (0: none): the selected tab's icon, label and indicator. */
     private int tint;
     private final float density;
+    /** The pixels of this bar over the system's navigation bar, kept clear as bottom padding. */
+    private int bottomInset;
+    /** Runs after every layout pass of the window, so a move of the bar or of any ancestor updates the overlap; padding changed there takes effect on the next pass instead of re-entering this one. */
+    private final ViewTreeObserver.OnGlobalLayoutListener placement = this::updateNavigationInset;
 
     public TabBar(Context context) {
         super(context);
@@ -55,11 +68,7 @@ public final class TabBar extends LinearLayout {
      */
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
-        // Under the system's navigation bar, as Material's bar reaches,
-        // its tabs above it.
-        int inset = navigationInset();
-        if (getPaddingBottom() != inset) setPadding(0, 0, 0, inset);
-        int height = MeasureSpec.getMode(heightSpec) == MeasureSpec.EXACTLY ? MeasureSpec.getSize(heightSpec) : dp(80) + inset;
+        int height = MeasureSpec.getMode(heightSpec) == MeasureSpec.EXACTLY ? MeasureSpec.getSize(heightSpec) : dp(80) + bottomInset;
         int width = MeasureSpec.getMode(widthSpec) == MeasureSpec.UNSPECIFIED ? 0 : MeasureSpec.getSize(widthSpec);
         super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
@@ -67,6 +76,22 @@ public final class TabBar extends LinearLayout {
 
     public void setOnChangeListener(OnChangeListener l) {
         listener = l;
+    }
+
+    public void setOnSizeListener(OnSizeListener l) {
+        sizeListener = l;
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        getViewTreeObserver().addOnGlobalLayoutListener(placement);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        getViewTreeObserver().removeOnGlobalLayoutListener(placement);
+        super.onDetachedFromWindow();
     }
 
     /** Makes the tabs from titles, resource icons and optional base64 canvas drawings. */
@@ -189,14 +214,25 @@ public final class TabBar extends LinearLayout {
         }
     }
 
-    /** The height the system's navigation bar covers, in pixels. */
-    private int navigationInset() {
+    /** Keeps only the part of this bar under navigation clear, never the IME. */
+    private void updateNavigationInset() {
+        if (!isAttachedToWindow()) return;
         View root = getRootView();
-        if (getContext() instanceof android.app.Activity) {
-            root = ((android.app.Activity) getContext()).getWindow().getDecorView();
+        WindowInsets in = getRootWindowInsets();
+        int inset = 0;
+        if (in != null && root.getHeight() > 0) {
+            int nav = Build.VERSION.SDK_INT >= 30 ? in.getInsets(WindowInsets.Type.navigationBars()).bottom
+                    : Math.min(in.getSystemWindowInsetBottom(), in.getStableInsetBottom());
+            int[] at = new int[2], window = new int[2];
+            getLocationInWindow(at);
+            root.getLocationInWindow(window);
+            int bottom = window[1] + root.getHeight();
+            inset = Math.max(0, Math.min(nav, at[1] + getHeight() - (bottom - nav)));
         }
-        android.view.WindowInsets in = root.getRootWindowInsets();
-        return in != null ? in.getSystemWindowInsetBottom() : 0;
+        if (inset == bottomInset) return;
+        bottomInset = inset;
+        setPadding(0, 0, 0, inset);
+        if (sizeListener != null) sizeListener.onSize((dp(80) + inset) / density);
     }
 
     private boolean night() {
