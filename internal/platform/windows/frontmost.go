@@ -5,7 +5,6 @@ package windows
 import (
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"unsafe"
 
@@ -39,7 +38,9 @@ var (
 	frontmost      driver.FrontmostAppInfo
 	frontmostHwnd  uintptr
 	frontmostMoves uintptr // the location hook on frontmost.PID's windows
-	frontmostWatch sync.Once
+	// frontmostFront is the foreground hook, and frontmostWatching whether the hooks are set, from the first call until unwatchFrontmost.
+	frontmostFront    uintptr
+	frontmostWatching bool
 	// frontmostEvent is the hooks' callback, made with the first hook.
 	frontmostEvent uintptr
 	// appNames are the display names of the executables seen in front, by path.
@@ -48,13 +49,29 @@ var (
 
 // frontmostApp returns the application in front, following it from the first call on.
 func frontmostApp() driver.FrontmostAppInfo {
-	frontmostWatch.Do(func() {
-		frontmostEvent = syscall.NewCallback(frontmostChanged)
-		setWinEventHook.Call(eventSystemForeground, eventSystemForeground, 0, frontmostEvent, 0, 0, winEventOutOfContext)
+	if !frontmostWatching {
+		frontmostWatching = true
+		if frontmostEvent == 0 {
+			frontmostEvent = syscall.NewCallback(frontmostChanged)
+		}
+		frontmostFront, _, _ = setWinEventHook.Call(eventSystemForeground, eventSystemForeground, 0, frontmostEvent, 0, 0, winEventOutOfContext)
 		frontmost, frontmostHwnd = readFrontmost(driver.FrontmostAppInfo{})
 		hookFrontmostMoves(frontmost.PID)
-	})
+	}
 	return frontmost
+}
+
+// unwatchFrontmost removes the hooks as the main thread's loop ends. Windows delivers their events through whatever message processing the thread still does, and a thread whose goroutine has ended, as a test's window thread does as it exits, would run frontmostChanged with no goroutine and crash; a later Run sets them again on its own thread.
+func unwatchFrontmost() {
+	if !frontmostWatching {
+		return
+	}
+	hookFrontmostMoves(0)
+	if frontmostFront != 0 {
+		unhookWinEvent.Call(frontmostFront)
+		frontmostFront = 0
+	}
+	frontmost, frontmostHwnd, frontmostWatching = driver.FrontmostAppInfo{}, 0, false
 }
 
 // frontmostChanged is a WinEventProc: a window came to the front, or a window of the process in front moved.

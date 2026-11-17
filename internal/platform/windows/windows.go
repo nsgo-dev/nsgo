@@ -708,6 +708,7 @@ func Run(app engine.App, opts Options) {
 	for {
 		r, _, _ := getMessageW.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
 		if int32(r) <= 0 {
+			unwatchFrontmost()
 			stopWinSparkle()
 			w.engine.Close()
 			engine.SyncStorage()
