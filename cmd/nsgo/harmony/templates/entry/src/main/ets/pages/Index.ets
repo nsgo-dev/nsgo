@@ -3377,8 +3377,7 @@ class Renderer {
     this.pullId = 0;
   }
 
-  // pinSticky moves a scroll view's sticky cells for its offset. A cell
-  // travels by clamp(offset - Start, 0, End - Start), as the item says.
+  // pinSticky moves a scroll view's sticky cells for its offset. A cell travels between 0 and End - Start, as driver.StickyShift does: forward for a start-pinned cell, back toward the content's start for an end-pinned one, whose End is below its Start.
   // Android moves the cell with setTranslationY; ArkUI's Scroll clips a
   // translated child at its laid-out frame, so here the cell's position
   // follows the scroll instead.
@@ -3397,7 +3396,8 @@ class Renderer {
     const at = v.horizontal ? o.xOffset : o.yOffset;
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
-      const d = Math.min(Math.max(at - c.s, 0), Math.max(c.e - c.s, 0));
+      const travel = c.e - c.s;
+      const d = Math.min(Math.max(at - c.s, Math.min(travel, 0)), Math.max(travel, 0));
       let sh = this.cellShifts.get(c.c);
       if (sh === undefined) {
         sh = new StickyShift();

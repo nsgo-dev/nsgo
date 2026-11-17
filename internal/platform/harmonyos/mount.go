@@ -271,10 +271,7 @@ func (m *mounter) item(b *driver.MountBatch, it *driver.MountItem) {
 		// answered a tap on the device. UIKit, AppKit and Android need
 		// this area to know where to look; here there is nothing to apply.
 	case driver.ItemStickyCells:
-		// Each cell's id and the offsets it travels between. The render
-		// layer moves it by clamp(offset - Start, 0, End - Start) from its
-		// frame, as Android's runtime does. An animated inset has no value
-		// to follow here, so Start already counts it.
+		// Each cell's id and the offsets it travels between. The render layer moves it from its frame by driver.StickyShift's signed travel, as Android's runtime does. An animated inset has no value to follow here, so Start already counts it.
 		type cell struct {
 			Cell  driver.NodeID `json:"c"`
 			Start driver.Points `json:"s"`
