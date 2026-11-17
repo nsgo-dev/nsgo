@@ -73,6 +73,8 @@ On `android` and `ios` the tests run only in NSGo's test host: Android's runtime
 
 Packages that do not link the platform backend run headless in the target's runtime. With `-target web`, library controls can be tested inside the browser this way. Storage stays in memory, and `DataDir`, `CacheDir` and `LogsDir` are empty because the browser has no filesystem. The file-backed `nsgotest.MicrophoneInput` fake skips there because it needs real WAV files.
 
+An Android test that panics or exits before reporting its result fails with the process's exit status and its captured output, including the panic stack. A `TestMain` that exits without starting the host fails this way too, even with status 0.
+
 On `web` the tests run in a headless Chrome, Chromium or Edge the tool finds, or in the browser executable `NSGO_BROWSER` names. The tool waits up to 30 seconds for it to start, stops waiting when the command is cancelled, and reports the browser's error output if it exits or never answers.
 
 Each step, and `app.Settle()`, waits for the engine's pending commit before counting 100 ms without batches or finite animations. The whole wait stops after five seconds even if the app keeps changing; a slow first dialog needs no extra post or sleep in the test.

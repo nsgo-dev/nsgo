@@ -492,7 +492,7 @@ func parseTestOutput(name string, depth int, out string, code int, runErr error)
 	if r := results[matched]; r != nil {
 		t.Name, t.Status, t.Elapsed = matched, r.status, r.elapsed
 	}
-	if t.Status == "" || t.Status != "fail" && code != 0 {
+	if t.Status == "" || runErr != nil || t.Status != "fail" && code != 0 {
 		why := fmt.Sprintf("the test process exited with %d", code)
 		if runErr != nil {
 			why = runErr.Error()

@@ -212,13 +212,29 @@ public final class NsgoEngine {
     }
 
     private void log(Process running, Listener recipient) {
+        boolean marked = false;
         try (BufferedReader err = new BufferedReader(new InputStreamReader(running.getErrorStream()))) {
             for (String line; (line = err.readLine()) != null; ) {
+                if (testRun != null && (line.startsWith("nsgo-test-exit " + testRun + " ") || line.startsWith("nsgo-test-error " + testRun + " "))) {
+                    marked = true;
+                }
                 // stdout may reach EOF before stderr's buffered tail, so this process's recipient keeps hearing its log until it drains, the test host's final result and exit marker included.
                 recipient.onLog(line);
             }
         } catch (IOException ignored) {
             // The process ended.
         }
+        // Logcat stays open after the child exits. Report an unmarked exit only after draining stderr, so its panic and stack precede it.
+        String reason;
+        try {
+            reason = "the test process ended without its exit code (status " + running.waitFor() + ")";
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            reason = "interrupted while waiting for the test process's exit code";
+        }
+        synchronized (this) {
+            if (closed || marked || testRun == null || testRun.isEmpty()) return;
+        }
+        recipient.onLog("nsgo-test-error " + testRun + " " + reason);
     }
 }

@@ -48,6 +48,15 @@ func TestParseTargetSubtestOutput(t *testing.T) {
 	}
 }
 
+func TestFailedTargetKeepsItsProcessError(t *testing.T) {
+	output := "=== RUN   TestCrash\n--- FAIL: TestCrash (0.00s)\npanic: exit fixture\nstack trace\n"
+	why := "the test process ended without its exit code (status 2)"
+	result := parseTestOutput("TestCrash", 0, output, -1, fmt.Errorf("%s", why))
+	if result.Status != "fail" || !strings.Contains(result.Output, output) || !strings.Contains(result.Output, why) {
+		t.Fatalf("process failure lost after the FAIL line: %+v", result)
+	}
+}
+
 func TestRepeatedTargetResults(t *testing.T) {
 	for _, tc := range []struct {
 		output, want string
