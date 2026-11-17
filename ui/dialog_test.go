@@ -108,7 +108,7 @@ func TestDialogTextFuncsUpdateInPlace(t *testing.T) {
 func TestAlertDialogRoleAndActions(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		ways := []string{"escape", "back", "press"}
-		// nsgotest presses the focused view on Return in a macOS or web environment, as those platforms do; on a phone Return is the default's through base.Sheet (TestReturnRunsTheDefaultActionOnce).
+		// nsgotest presses the focused view on Return in a desktop or web environment, as those platforms do; on a phone Return is the default's through base.Sheet (TestReturnRunsTheDefaultActionOnce).
 		if e.Idiom == core.IdiomDesktop {
 			ways = append(ways, "return", "tab-return")
 		}

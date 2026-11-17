@@ -48,7 +48,7 @@ ui.Button{Text: "Saving…", Disabled: saving.Get, OnPress: save}
 
 The button reports `RoleButton`, its text as its name, and `Hint` as what pressing it does. `Label` replaces the text for assistive technology. An icon-only button without `Label` is unreadable, so name it.
 
-Return and Space press a focused button on macOS, the web and Apple TV; a phone's screen reader presses it as a click.
+Return and Space press a focused button on desktops, the web and Apple TV; a phone's screen reader presses it as a click.
 
 ## Platform
 

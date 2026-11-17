@@ -39,6 +39,8 @@ An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, is tested
 
 `app.PressWith("id:row", core.Modifiers{Shift: true})` holds modifiers for one press; `PressAtWith(selector, core.Point{X: 20, Y: 10}, mods)` presses a point in the view. `Shift`, `Control`, `Alt` and `Platform` (Command on Apple, the Windows/Super key elsewhere) reach `OnPressDown`, `OnPressUp` and `OnPress`, headless and through native target input. Native platform conventions still apply: Chrome on macOS turns Control-click into a context menu. A later `Press` or `PressAt` has no modifiers. watchOS rejects modified presses because it has no keyboard modifier input.
 
+`app.Focus(selector)` reaches a field as a tap does and, in a desktop or web `Environment` or on those targets, a pressable or `Focusable` view through Tab, so a following `app.Key("Return")` presses it. A `Ref.Focus()` the app calls follows the same stops: fields everywhere, other views only on desktops, the web and Apple TV, so a headless test of a button's focus needs one of those environments.
+
 ## Run the tests
 
 ```sh

@@ -17,10 +17,7 @@ func pressable(v *View) bool {
 	return v.Events.Has(driver.EventPress) || v.Events.Has(driver.EventPressDown)
 }
 
-// focusable reports whether v is a keyboard focus stop. It follows the
-// stops moveFocus uses on macOS and the web: editable fields, pressable views
-// and views explicitly marked Focusable, except for read-only, disabled or
-// NoFocus views.
+// focusable reports whether v is a keyboard focus stop. It follows the stops moveFocus uses on desktops and the web: editable fields, pressable views and views explicitly marked Focusable, except for read-only, disabled or NoFocus views.
 func focusable(v *View) bool {
 	if v.disabled(nil) || v.Props.NoFocus {
 		return false
@@ -784,7 +781,7 @@ func (a *App) Commit(selector, text string) {
 	a.Compose(selector, "")
 }
 
-// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a macOS or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on; else the focused field takes a character, Backspace or Enter; else Escape goes back. A key nothing takes does nothing, as on a device.
+// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on; else the focused field takes a character, Backspace or Enter; else Escape goes back. A key nothing takes does nothing, as on a device.
 func (a *App) Key(key string) {
 	a.t.Helper()
 	a.step("key(%s)", key)
@@ -904,8 +901,7 @@ func (a *App) keyNames(k string) []string {
 	return []string{k}
 }
 
-// tabs says whether Tab moves the keyboard focus between pressable views
-// and fields, as on desktops and the web.
+// tabs says whether Tab moves the keyboard focus between pressable views and fields, as on desktops and the web.
 func (a *App) tabs() bool {
 	return a.env != nil && a.env.FocusesViews()
 }

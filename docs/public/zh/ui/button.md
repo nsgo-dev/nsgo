@@ -48,7 +48,7 @@ ui.Button{Text: "正在保存…", Disabled: saving.Get, OnPress: save}
 
 按钮报告 `RoleButton`，以文字作为名称，以 `Hint` 说明按下后会发生什么。`Label` 为辅助技术替换文字。只有图标而没有 `Label` 的按钮无法被读出，请给它命名。
 
-在 macOS、Web 和 Apple TV 上，回车和空格会按下获得焦点的按钮；手机的读屏器把它当作点击来按下。
+在桌面、Web 和 Apple TV 上，回车和空格会按下获得焦点的按钮；手机的读屏器把它当作点击来按下。
 
 ## 平台
 
