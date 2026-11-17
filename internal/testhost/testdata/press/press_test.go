@@ -11,8 +11,7 @@ import (
 
 func TestMain(m *testing.M) { nsgotest.Main(m) }
 
-// TestPressModifiersReachTheApp uses the same press steps headless and
-// through the targets' native input, checking every edge and the next tap.
+// TestPressModifiersReachTheApp uses the same press steps headless and through the targets' native input, checking every edge and the next tap.
 func TestPressModifiersReachTheApp(t *testing.T) {
 	if nsgotest.Target() == "watchos_simulator" {
 		t.Skip("watchOS has no keyboard modifier input")
@@ -37,8 +36,7 @@ func TestPressModifiersReachTheApp(t *testing.T) {
 	check := func(mods core.Modifiers) {
 		t.Helper()
 		phases := []string{"down", "up", "press"}
-		// AppKit and Chromium on macOS also report a context menu for
-		// Control-click; Chromium replaces the click with that event.
+		// AppKit and Chromium on macOS also report a context menu for Control-click; Chromium replaces the click with that event.
 		if (nsgotest.Target() == "web" || nsgotest.Target() == "macos") && mods.Control && len(menus) == 1 && menus[0] == mods {
 			if nsgotest.Target() == "web" {
 				phases = phases[:2]

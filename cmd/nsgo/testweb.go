@@ -90,7 +90,7 @@ type webOp struct {
 	DX        float64      `json:"dx"`
 	DY        float64      `json:"dy"`
 	Hold      int64        `json:"hold,omitempty"`
-	Modifiers webModifiers `json:"modifiers,omitempty"`
+	Modifiers webModifiers `json:"modifiers"`
 	Path      []struct {
 		X, Y float64
 	} `json:"path,omitempty"`

@@ -125,14 +125,13 @@ func (a *App) Press(selector string) {
 	a.PressWith(selector, driver.Modifiers{})
 }
 
-// PressWith presses as Press does, with the modifier keys held for this
-// press only. A target sends them through its native input.
+// PressWith presses as Press does, with the modifier keys held for this press only. A target sends them through its native input.
 func (a *App) PressWith(selector string, mods driver.Modifiers) {
 	a.t.Helper()
 	if mods == (driver.Modifiers{}) {
 		a.step("press(%s)", selector)
 	} else {
-		a.step("pressWith(%s, %v)", selector, mods)
+		a.step("pressWith(%s, %s)", selector, modifierNames(mods))
 	}
 	v, at, index := a.pressTarget(selector)
 	a.pressAt(v, at, index, mods)
@@ -146,14 +145,13 @@ func (a *App) PressAt(selector string, at driver.Point) {
 	a.PressAtWith(selector, at, driver.Modifiers{})
 }
 
-// PressAtWith presses as PressAt does, with the modifier keys held for
-// this press only.
+// PressAtWith presses as PressAt does, with the modifier keys held for this press only.
 func (a *App) PressAtWith(selector string, at driver.Point, mods driver.Modifiers) {
 	a.t.Helper()
 	if mods == (driver.Modifiers{}) {
 		a.step("pressAt(%s, %v, %v)", selector, at.X, at.Y)
 	} else {
-		a.step("pressAtWith(%s, %v, %v, %v)", selector, at.X, at.Y, mods)
+		a.step("pressAtWith(%s, %v, %v, %s)", selector, at.X, at.Y, modifierNames(mods))
 	}
 	m := a.pick(selector, "view", func(m *View) (*View, bool) { return m, true })
 	page := m.pagePoint(at)
@@ -162,6 +160,20 @@ func (a *App) PressAtWith(selector string, at driver.Point, mods driver.Modifier
 		a.t.Fatalf("nsgotest: nothing pressable at %v in %q\n%s", at, selector, a.Dump())
 	}
 	a.pressAt(v, page, 0, mods)
+}
+
+// modifierNames names the keys mods holds for a step's name, as "Shift+Platform".
+func modifierNames(mods driver.Modifiers) string {
+	var names []string
+	for _, key := range []struct {
+		name string
+		held bool
+	}{{"Control", mods.Control}, {"Alt", mods.Alt}, {"Shift", mods.Shift}, {"Platform", mods.Platform}} {
+		if key.held {
+			names = append(names, key.name)
+		}
+	}
+	return strings.Join(names, "+")
 }
 
 // pressAt presses v at the surface point at.

@@ -369,6 +369,9 @@ func TestModifiedPressKeepsItsSpanModifiers(t *testing.T) {
 	if span != mods {
 		t.Fatalf("span modifiers = %v; want %v", span, mods)
 	}
+	if app.stepName != "pressWith(text:link, Shift+Platform)" {
+		t.Fatalf("step name = %q", app.stepName)
+	}
 }
 
 func TestTabMovesTheFocusBetweenPressablesAndFields(t *testing.T) {

@@ -110,8 +110,7 @@ func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Mod
 	if mods.Control {
 		buttons |= 0x0008 // MK_CONTROL
 	}
-	// Send each message on the window's thread while its keyboard state
-	// holds the modifiers, so GetKeyState and native controls see them too.
+	// Send each message on the window's thread while its keyboard state holds the modifiers, so GetKeyState and native controls see them too.
 	send := func(message, buttons uintptr) {
 		t.onMain(func() {
 			var saved [256]byte
