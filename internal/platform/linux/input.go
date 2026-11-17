@@ -94,8 +94,8 @@ func clickPressedCallback(gesture uintptr, n int32, x, y float64, data uintptr) 
 		w.pressConsumed = true
 		return
 	}
-	if w.embedded && w.focus == nil {
-		// A host's widget takes the keys once pressed.
+	if w.embedded && w.focusedView() == nil {
+		// A host's widget takes the keys once pressed. A focused control in it already has them, and grabbing the surface would blur it.
 		gtkWidgetGrabFocus(w.surface)
 	}
 	w.pointerDown(driver.Point{X: driver.Points(x), Y: driver.Points(y)},
@@ -117,8 +117,8 @@ func (w *window) pointerDown(at driver.Point, button uint32, device uintptr, sta
 	if button == 1 {
 		w.touch(w.mouse.Down(w.listensTouches(), at))
 	}
-	// A press on the surface leaves the focused field or page.
-	if w.focusedView() != nil || w.focusedWeb() != nil {
+	// A press on the surface leaves the focused field or page. A focused control keeps the focus, as on the other desktops: a press does not move it, and a handler that wants it elsewhere focuses that view itself.
+	if w.focusedEntry() != nil || w.focusedWeb() != nil {
 		w.focusEntry(nil)
 	}
 	w.pressOutside(at)

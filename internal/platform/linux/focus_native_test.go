@@ -5,6 +5,7 @@ package linux
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -65,6 +66,17 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 		if button == nil || button.props.TestID != "button" || gtkWindowGetFocus(w.toplevel()) != button.widget {
 			t.Error("Ref.Focus did not grab the button's GTK widget")
 		}
+		// A click on empty space or on a view that is no stop leaves a focused control focused, in GTK too, and Return still presses it.
+		for _, at := range []driver.Point{{X: 190, Y: 190}, {X: 50, Y: 115}} {
+			w.pointerDown(at, 1, 0, 0, 1)
+			w.pointerUp(at)
+			if w.focusedView() != button || gtkWindowGetFocus(w.toplevel()) != button.widget {
+				t.Errorf("a click at %v dropped the focused button", at)
+			}
+		}
+		if !w.controlKey(gdkReturn, 0, false) {
+			t.Error("Return did not press the button after the clicks")
+		}
 		// The keymap has Return before the focused button: a binding that yields it to the button leaves it, one that does not takes it.
 		keys := w.keys
 		w.keys = []driver.KeyBinding{{Key: "enter", Yields: driver.KeyUsePress}}
@@ -83,7 +95,7 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 			keyReleasedCallback(0, key, key, 0, w.handle)
 		}
 	})
-	waitForTitle(t, w, title+"|button|2")
+	waitForTitle(t, w, title+"|button|3")
 	w.onLoop(t, func() {
 		if button.style.Background != driver.RGB(0x123456) {
 			t.Errorf("focus-visible background = %#x", button.style.Background)
@@ -92,9 +104,9 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 	key("mod+p")
 	key("mod+n")
 	key("mod+m")
-	waitForTitle(t, w, title+"|button-checked|2")
+	waitForTitle(t, w, title+"|button-checked|3")
 	key("mod+v")
-	waitForTitle(t, w, title+"|explicit|2")
+	waitForTitle(t, w, title+"|explicit|3")
 	w.onLoop(t, func() {
 		v := w.focusedView()
 		if v == nil || v.props.TestID != "explicit" || gtkWindowGetFocus(w.toplevel()) != v.widget {
@@ -105,6 +117,85 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 		}
 		if !w.tab(true) || w.focusedView() != v {
 			t.Error("Shift+Tab did not return to the explicit stop")
+		}
+		// A click outside a focused field still blurs it.
+		if !w.tab(false) || w.focusedView() == nil || w.focusedView().props.TestID != "field" {
+			t.Error("Tab did not focus the input")
+			return
+		}
+		w.pointerDown(driver.Point{X: 190, Y: 190}, 1, 0, 0, 1)
+		w.pointerUp(driver.Point{X: 190, Y: 190})
+		if w.focusedView() != nil || gtkWindowGetFocus(w.toplevel()) != 0 {
+			t.Error("a click on empty space left the input focused")
+		}
+	})
+}
+
+func TestEmbeddedClickKeepsControlFocus(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	host := startTestWindow(t, func(*core.Scope) core.Node { return core.View{} }, Options{Width: 200, Height: 300})
+	var embedded *View
+	host.onLoop(t, func() {
+		var err error
+		embedded, err = NewView(func(*core.Scope) core.Node {
+			return core.View{Style: core.Style{Width: core.Pt(160), Height: core.Pt(100)}, Children: []core.Node{
+				core.View{TestID: "button", Style: core.Style{Width: core.Pt(60), Height: core.Pt(30)}, OnPress: func(core.PressEvent) {}},
+			}}
+		}, Options{})
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		gtkWidgetSetSizeRequest(embedded.Handle(), 160, 100)
+		gtkBoxAppend(host.box, embedded.Handle())
+	})
+	if embedded == nil {
+		t.Fatal("the embedded view did not open")
+	}
+	surface := embedded.Handle()
+	t.Cleanup(func() {
+		host.onLoop(t, func() {
+			embedded.Close()
+			gtkWidgetUnparent(surface)
+		})
+	})
+	var button *view
+	for deadline := time.Now().Add(5 * time.Second); button == nil; time.Sleep(10 * time.Millisecond) {
+		host.onLoop(t, func() {
+			for _, v := range embedded.w.views {
+				if v != nil && v.props.TestID == "button" && v.widget != 0 {
+					button = v
+				}
+			}
+		})
+		if button == nil && time.Now().After(deadline) {
+			t.Fatal("the embedded app did not mount")
+		}
+	}
+	host.onLoop(t, func() {
+		w := embedded.w
+		click := func() {
+			gesture := gtkGestureClickNew()
+			clickPressedCallback(gesture, 1, 150, 90, w.handle)
+			gObjectUnref(gesture)
+		}
+		w.focusView(button)
+		if w.focusedView() != button || gtkWindowGetFocus(w.toplevel()) != button.widget {
+			t.Error("focusView did not focus the embedded button")
+			return
+		}
+		// The press on empty space leaves the focused control's GTK focus alone instead of moving it to the surface.
+		click()
+		if w.focusedView() != button || gtkWindowGetFocus(w.toplevel()) != button.widget {
+			t.Error("a click on empty space blurred the embedded button")
+		}
+		// With nothing focused, the press still gives the surface the keys.
+		w.focusEntry(nil)
+		click()
+		if gtkWindowGetFocus(w.toplevel()) != surface {
+			t.Error("a click did not focus the embedded surface")
 		}
 	})
 }
