@@ -9,6 +9,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
+// TestNativeWindowsKeepGTKOnItsInitializationThread opens three windows, one after another, and reads the OS thread each one's main loop runs on: all three must be one thread, as GTK may be called only on the thread that initialized it. Each window on a goroutine of its own, as the harness once opened them, runs on a new thread each time.
 func TestNativeWindowsKeepGTKOnItsInitializationThread(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens windows")

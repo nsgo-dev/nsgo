@@ -49,7 +49,7 @@ func nativeApp(title string) engine.App {
 	}
 }
 
-// testWindowCalls keeps consecutive windows on GTK's initialization thread. The native tests open one primary window at a time.
+// testWindowCalls runs the native tests' windows, one after another, on the locked OS thread whose first window initializes GTK, as GTK must be called only on that thread. A window's call returns once it has closed, so the next test's window waits for it.
 var testWindowCalls = sync.OnceValue(func() chan func() {
 	calls := make(chan func())
 	go func() {
@@ -61,7 +61,7 @@ var testWindowCalls = sync.OnceValue(func() chan func() {
 	return calls
 })
 
-// startTestWindow opens the window on the shared GTK thread and returns it once its engine runs. The test skips where no display can open one.
+// startTestWindow opens the window on the shared GTK thread and returns it once its engine runs. The test skips where no display can open one, and fails when the previous test's window still holds the thread.
 func startTestWindow(t *testing.T, app engine.App, opts Options) *window {
 	t.Helper()
 	type result struct {
@@ -757,7 +757,7 @@ document.body.append(f);
 		next.URL+"/next true;"+next.URL+"/next false;"+next.URL+"/fail true;|start about:blank;state about:blank true;load about:blank;state about:blank false;")
 }
 
-// TestWebViewsOutliveEachOther opens an Incognito web view and one in the app's session, both serving an app-owned scheme, and one that serves none. Each page keeps its scheme and downloads as the others unmount and mount again, the page without a handler gets an error rather than a load that never ends, and a view that unmounts mid-download cancels it. It skips where WebKitGTK 6.0 is missing. WebKit takes the thread that first uses it for its main one, and each test runs GTK on a thread of its own, so the test runs in a process of its own.
+// TestWebViewsOutliveEachOther opens an Incognito web view and one in the app's session, both serving an app-owned scheme, and one that serves none. Each page keeps its scheme and downloads as the others unmount and mount again, the page without a handler gets an error rather than a load that never ends, and a view that unmounts mid-download cancels it. It skips where WebKitGTK 6.0 is missing. It runs in a process of its own, as the other WebKit tests do.
 func TestWebViewsOutliveEachOther(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
