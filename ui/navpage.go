@@ -7,7 +7,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// NavPage returns p, a page of a base.Nav, on the page's background under header, a NavHeader whose title and ends default to p's, unless p has a Header of its own. On iOS and Android the platform's header shows header's title and the views at its ends, with its own back button, which pops the page: on iOS the system's transparent header over the page, which scrolls under it; on Android the native toolbar in the surface's color, above the page. Elsewhere NavHeader is drawn above the page.
+// NavPage returns p, a page of a base.Nav, on the page's background under header, a NavHeader whose title and ends default to p's, unless p has a Header of its own. On iOS and Android a page's own Header becomes the system header's title view, taking precedence over HeaderTitle and keeping p's left and right views; otherwise header supplies the title and ends. The system's back button pops the page: on iOS the transparent header lies over the page, which scrolls under it; on Android the toolbar in the surface's color is above it. Elsewhere the page's own Header, or NavHeader, is drawn above the page.
 func NavPage(cx *core.Scope, p base.NavPage, header NavHeader) base.NavPage {
 	colors := ColorsOf(cx)
 	app := p.StyleFunc
@@ -19,6 +19,10 @@ func NavPage(cx *core.Scope, p base.NavPage, header NavHeader) base.NavPage {
 		return s
 	}
 	if systemHeader(cx) {
+		if p.Header != nil {
+			p.HeaderTitle = p.Header
+			header = NavHeader{Scroll: header.Scroll, ScrollFunc: header.ScrollFunc}
+		}
 		return systemNavPage(cx, p, header)
 	}
 	if p.Header == nil {

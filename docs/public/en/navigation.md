@@ -9,6 +9,8 @@ order: 56
 
 `base.NewNav` keeps a stack of routes of one type: `Push` adds a page, `Pop` removes the top page, `PopToRoot` returns to the first and `Replace` swaps the top. Its `Stack` renders every route as a page, keeping the pages below mounted with their state while the top one shows. `ui.NavPage` gives each page `ui`'s background and a `ui.NavHeader` with its title, back button and buttons.
 
+Give a page its own `Header` to replace `ui.NavHeader`. On iOS and Android it appears in the system header's title area, in place of `HeaderTitle`, keeping the page's `HeaderLeft`, `HeaderRight` and system back button. Elsewhere it is drawn above the content. `ui.NavHeader.Scroll` still connects an iOS page's scrolling to its header blur.
+
 ```go
 nav := base.NewNav(cx, "inbox")
 

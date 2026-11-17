@@ -61,6 +61,56 @@ func TestNavPage(t *testing.T) {
 	}
 }
 
+func TestNavPageKeepsCustomHeader(t *testing.T) {
+	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux, core.OSWeb, core.OSIOS, core.OSAndroid} {
+		t.Run(string(os), func(t *testing.T) {
+			e := desktopEnv
+			e.OS = os
+			if os == core.OSIOS || os == core.OSAndroid {
+				e.Idiom, e.HeaderHeight = core.IdiomPhone, 44
+			}
+			var pressed int
+			app, _ := start(t, e, func(cx *core.Scope) core.Node {
+				nav := base.NewNav(cx, "home", "detail")
+				return nav.Stack(core.Style{FlexGrow: 1}, func(cx *core.Scope, route string, _ func() int) base.NavPage {
+					return NavPage(cx, base.NavPage{
+						Title: "Page " + route, TestID: "page-" + route,
+						Header: core.View{TestID: "custom-" + route, Style: core.Style{Width: core.Pt(160), Height: core.Pt(30)},
+							OnPress: func(core.PressEvent) { pressed++ }},
+						HeaderTitle: core.View{TestID: "other-title"},
+						HeaderLeft:  core.View{TestID: "left-" + route},
+						HeaderRight: core.View{TestID: "right-" + route},
+						Children:    []core.Node{core.View{TestID: "content-" + route, Style: core.Style{FlexGrow: 1}}},
+					}, NavHeader{TestID: "default-header", Title: "Ignored", Leading: []core.Node{core.View{TestID: "ignored-left"}},
+						Trailing: []core.Node{core.View{TestID: "ignored-right"}}})
+				})
+			})
+			if got := len(app.QueryMounted("id:custom-detail")); got != 1 {
+				t.Fatalf("custom header mounted %d times, want once", got)
+			}
+			for _, id := range []string{"default-header", "other-title", "ignored-left", "ignored-right"} {
+				if len(app.QueryMounted("id:"+id)) != 0 {
+					t.Fatalf("custom header did not take precedence over %s", id)
+				}
+			}
+			custom := app.Find("id:custom-detail")
+			if custom.Frame.Size != (core.Size{Width: 160, Height: 30}) {
+				t.Fatalf("custom header size = %v", custom.Frame.Size)
+			}
+			if os == core.OSIOS || os == core.OSAndroid {
+				c := app.Find("id:page-detail").Screen
+				if c.TitleView == 0 || custom.Parent.ID != c.TitleView || c.Left == 0 || c.Right == 0 || !c.CanGoBack || c.Title != "Page detail" {
+					t.Fatalf("custom header was not retained as the native title view: %+v", c)
+				}
+			}
+			app.Press("id:custom-detail")
+			if pressed != 1 {
+				t.Fatal("the custom header did not receive its press")
+			}
+		})
+	}
+}
+
 // TestNavInset leaves room for the header only where the content runs under
 // it, and the page's content starts under it there.
 func TestNavInset(t *testing.T) {

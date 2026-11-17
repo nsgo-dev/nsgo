@@ -67,7 +67,7 @@ Touch screens have no pointer, so these exist on desktops alone.
 | --- | --- | --- |
 | `ui.TabShell` | iOS | Floats over the content when it uses the system's tab bar |
 | `ui.TabShell` | iOS, Android | The system's tab bar: on iOS when every tab has a `SystemIcon`, on Android when every tab has a `SystemIcon` or an `Icon`, whose SVG shows where `SystemIcon` names no drawable |
-| `ui.NavPage` | `NavHeader` in the page | iOS: the system's transparent header over the page, with its own glass, title and back button; content scrolls under it with a progressive blur. Android: the native toolbar, with its own title, back arrow and the header's views, in the surface's color under the status bar, and the page below it |
+| `ui.NavPage` | The page's own `Header`, or `NavHeader`, above the content | iOS: the system's transparent header over the page, with its own glass, title and back button; content scrolls under it with a progressive blur. Android: the native toolbar, with its own title, back arrow and the header's views, in the surface's color under the status bar, and the page below it. A page's own `Header` becomes the title view on both, keeping the page's left and right views |
 | `ui/chat` glass surfaces | macOS, iOS, Windows | No drawn rim, as the system's glass draws its own |
 | `ui/filepicker` | macOS | Shortcuts use Command instead of Control |
 | `base.Command`'s `InputSource` | macOS | Selects the keyboard input source; nothing elsewhere |
