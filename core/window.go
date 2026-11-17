@@ -53,6 +53,8 @@ type WindowOptions struct {
 	Constraints WindowConstraints
 	// Workspaces are the workspaces the window shows on (desktop.SetWindowWorkspaces).
 	Workspaces WindowWorkspaces
+	// PointerEvents is where the window takes the pointer (SetWindowPointerEvents), from its first frame.
+	PointerEvents WindowPointerEvents
 }
 
 // PanelOptions are a panel's: the core's part of desktop.PanelOptions,
@@ -67,6 +69,8 @@ type PanelOptions struct {
 	NoActivate bool
 	// Material is the material behind the content (WindowMaterial).
 	Material WindowMaterial
+	// PointerEvents is where the panel takes the pointer (SetWindowPointerEvents), from its first frame.
+	PointerEvents WindowPointerEvents
 }
 
 // Window is a window or a panel the app opened: the core's part of
@@ -137,7 +141,7 @@ func (cx *Scope) OpenWindow(opts WindowOptions, content func(cx *Scope) Node) *W
 	size := limits.Clamp(Size{Width: opts.Width, Height: opts.Height})
 	w := rt.openSurface(cx.current(), driver.SurfaceConfig{Kind: driver.SurfaceWindow, Title: opts.Title,
 		Width: size.Width, Height: size.Height, Frame: opts.Frame, Hidden: opts.Hidden, Material: opts.Material, Constraints: limits,
-		Workspaces: opts.Workspaces}, content)
+		Workspaces: opts.Workspaces, PointerEvents: cx.windowPointer(opts.PointerEvents)}, content)
 	if opts.Key != "" {
 		w.key = opts.Key
 		if rt.keyed == nil {
@@ -160,7 +164,8 @@ func (cx *Scope) OpenPanel(opts PanelOptions, content func(cx *Scope) Node) *Win
 		opts.Width, opts.Height = 360, 420
 	}
 	return rt.openSurface(cx.current(), driver.SurfaceConfig{Kind: driver.SurfacePanel, Width: opts.Width,
-		Height: opts.Height, Hidden: true, HideOnBlur: opts.HideOnBlur, NoActivate: opts.NoActivate, Material: opts.Material}, content)
+		Height: opts.Height, Hidden: true, HideOnBlur: opts.HideOnBlur, NoActivate: opts.NoActivate, Material: opts.Material,
+		PointerEvents: cx.windowPointer(opts.PointerEvents)}, content)
 }
 
 // openSurface opens a surface of cfg's kind showing content under owner:

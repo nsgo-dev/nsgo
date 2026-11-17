@@ -734,4 +734,5 @@ func bind() {
 	bindEditing()
 	bindAccess()
 	bindTouchScroll()
+	bindWindowPointer()
 }

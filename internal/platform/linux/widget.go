@@ -316,6 +316,8 @@ func (w *window) allocateSurface(width, height int32) {
 			w.startEngine(w.app, w.opts, size)
 		}
 	}
+	// GTK may have set the surface's input region as it allocated the window.
+	w.input.stale = true
 	if size.Width != w.lastWidth || size.Height != w.lastHeight {
 		w.lastWidth, w.lastHeight = size.Width, size.Height
 		if w.engine != nil {
@@ -396,6 +398,7 @@ func (w *window) snapshotSurface(snap uintptr) {
 		w.revealDue = false
 		w.revealCanvases()
 	}
+	w.updateInputRegion()
 	bg := driver.RGB(0xffffff)
 	root := w.view(w.root)
 	if root != nil {

@@ -186,6 +186,8 @@ func (s *surface) command(c *driver.WindowCommand) {
 		s.refresh()
 	case driver.WindowSetConstraints:
 		s.setConstraints(c.Constraints)
+	case driver.WindowSetPointerEvents:
+		s.setPointerEvents(c.PointerEvents)
 	case driver.WindowSetAnchor:
 		if s.kind != driver.SurfacePanel {
 			break

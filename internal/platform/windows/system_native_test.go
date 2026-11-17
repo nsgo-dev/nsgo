@@ -264,6 +264,28 @@ func TestServicesReachTheSystem(t *testing.T) {
 	}
 	cx.Post(func() { cx.SetWindowLevel(core.WindowLevelNormal) })
 
+	// A window that takes no pointer is layered and transparent to it, and taking it again leaves it neither.
+	passing := func(want bool) {
+		t.Helper()
+		deadline := time.Now().Add(3 * time.Second)
+		for {
+			ex, _, _ := getWindowLongProc.Call(hwnd, gwlExStyle)
+			got := ex&wsExTransparent != 0
+			if got == want && (ex&wsExLayered != 0) == want {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Errorf("ex style %x; want the pointer let through %v", ex, want)
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	cx.Post(func() { cx.SetWindowPointerEvents(core.WindowPointerNone) })
+	passing(true)
+	cx.Post(func() { cx.SetWindowPointerEvents(core.WindowPointerAuto) })
+	passing(false)
+
 	// The menu bar hides until Alt is pressed and released alone.
 	menu := func() uintptr {
 		var m uintptr

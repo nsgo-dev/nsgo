@@ -229,6 +229,8 @@ type surface struct {
 	// stops end the surface's observations as it closes.
 	stops  []func()
 	closed bool
+	// pointer is where the window takes the pointer (windowpointer.go).
+	pointer windowPointer
 	// appearance is the one the app forces, host the one an embedding
 	// host sets, which an embedded surface shows in.
 	appearance, host driver.Appearance
@@ -922,6 +924,7 @@ func (s *surface) close() {
 	s.sensors.Close()
 	delete(surfaces, s)
 	s.stopTicking()
+	s.stopPassTimer()
 	for _, stop := range s.stops {
 		stop()
 	}

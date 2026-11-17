@@ -215,6 +215,12 @@ warning := core.Text{ContentFunc: func() string {
 }}
 ```
 
+`desktop.SetWindowPointerEvents` 让指针穿过窗口，落到它下面任何应用的窗口上：`WindowPointerNone` 处处穿过，像抬头显示那样；`WindowPointerPainted` 只在没有视图绘制内容、也没有视图接收指针的地方穿过，像桌面宠物周围那样，宠物本身仍接收按下、拖动和右键。`WindowOptions.PointerEvents` 和 `PanelOptions.PointerEvents` 让窗口一打开就这样。完全不接收指针的窗口收不到任何按下，所以应用要从快捷键、托盘图标或另一个窗口把指针交还给它。受 `Access` 约束的代码需要 `core.AccessOverlay`。
+
+```go
+desktop.OpenPanel(cx, desktop.PanelOptions{Width: 600, Height: 400, PointerEvents: desktop.WindowPointerPainted}, Pet)
+```
+
 ## 登录
 
 `cx.AuthSession` 在系统的认证会话里用 OAuth 服务登录，而不是在网页视图里：macOS 和 iOS 用 `ASWebAuthenticationSession`，Windows、Linux 以及没有设置 scheme 的 Mac 用默认浏览器加回环地址重定向，Web 用弹出窗口。协议由应用负责：它生成 PKCE 校验码和 state，为传给它的重定向地址拼出授权 URL，并在用 code 换令牌前检查回调。取消不算失败：`errors.Is(err, core.AuthCancelled)` 表示用户关闭了会话，或返回的 `cancel` 结束了它。

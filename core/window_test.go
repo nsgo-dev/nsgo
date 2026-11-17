@@ -762,3 +762,50 @@ func TestOpenFilesWaitForAHandler(t *testing.T) {
 		t.Errorf("a disposed handler heard %q", opened[2:])
 	}
 }
+
+// A window or a panel opens taking the pointer where the app asked, and SetWindowPointerEvents changes it; code whose Access does not grant overlays keeps the pointer.
+func TestWindowPointerEvents(t *testing.T) {
+	var inside, held *Scope
+	w := newWindows(t, func(cx *Scope) {
+		cx.OpenWindow(WindowOptions{PointerEvents: WindowPointerPainted}, func(cx *Scope) Node { inside = cx; return View{} })
+		cx.OpenPanel(PanelOptions{PointerEvents: WindowPointerNone}, func(cx *Scope) Node { return View{} })
+		denied := cx.Child()
+		denied.Run(func() {
+			denied.ProvideAccess(denyOverlays{})
+			denied.OpenWindow(WindowOptions{PointerEvents: WindowPointerNone}, func(cx *Scope) Node { held = cx; return View{} })
+		})
+	})
+	opened := w.take(0, driver.ItemOpenSurface)
+	if len(opened) != 3 {
+		t.Fatalf("opened %d surfaces", len(opened))
+	}
+	for i, want := range []WindowPointerEvents{WindowPointerPainted, WindowPointerNone, WindowPointerAuto} {
+		if got := opened[i].Surface.PointerEvents; got != want {
+			t.Errorf("surface %d opens with pointer events %d; want %d", i, got, want)
+		}
+	}
+	window, heldWindow := opened[0].Surface.ID, opened[2].Surface.ID
+	for _, p := range []WindowPointerEvents{WindowPointerNone, WindowPointerAuto, WindowPointerPainted} {
+		inside.SetWindowPointerEvents(p)
+		held.SetWindowPointerEvents(p)
+		w.commit()
+		if sent := w.take(window, driver.ItemWindow); len(sent) != 1 || sent[0].Window.Action != driver.WindowSetPointerEvents ||
+			sent[0].Window.PointerEvents != p {
+			t.Fatalf("setting %d sent %+v", p, windowCommands(sent))
+		}
+		if sent := w.take(heldWindow, driver.ItemWindow); len(sent) != 1 || sent[0].Window.PointerEvents != WindowPointerAuto {
+			t.Fatalf("code held from overlays set %d: %+v", p, windowCommands(sent))
+		}
+	}
+}
+
+// windowCommands are the window commands of items, for a failure's message.
+func windowCommands(items []driver.MountItem) []driver.WindowCommand {
+	var out []driver.WindowCommand
+	for _, it := range items {
+		if it.Window != nil {
+			out = append(out, *it.Window)
+		}
+	}
+	return out
+}

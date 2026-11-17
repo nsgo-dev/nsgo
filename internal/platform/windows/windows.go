@@ -361,7 +361,9 @@ type window struct {
 	hideOnBlur bool
 	noActivate bool
 	visible    bool
-	focused    bool
+	// pointerMode is where the window takes the pointer (windowpointer.go).
+	pointerMode driver.WindowPointerEvents
+	focused     bool
 	// anchor is the tray icon a panel last showed under, 0 for none, and anchorBounds and placement where core.Window.ShowAt last placed it, placement WindowPlaceDefault for nowhere. noActivate keeps a panel from ever taking the focus.
 	anchor       uint32
 	anchorBounds driver.Bounds
@@ -928,6 +930,7 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 		setWindowPos.Call(hwnd, 0, 0, 0, uintptr(child.px(opts.Width)), uintptr(child.px(opts.Height)), swpNoActivate|swpNoZOrder)
 	}
 	windows[hwnd] = child
+	child.setPointerEvents(cfg.PointerEvents)
 	hearTaskbarButton(hwnd)
 	child.updateIME()
 	child.configureGestures()
@@ -2378,6 +2381,8 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 			w.blink()
 		case longPressTimer:
 			w.longPressed()
+		case passTimer:
+			w.passUnpainted()
 		}
 		return 0
 	case wmKeyDown:

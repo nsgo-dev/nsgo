@@ -59,3 +59,36 @@ func TestTaskProgressBarFraction(t *testing.T) {
 		}
 	}
 }
+
+func TestPaintedViews(t *testing.T) {
+	plain := DefaultViewStyle
+	for _, tc := range []struct {
+		name   string
+		kind   ViewKind
+		style  ViewStyle
+		events EventMask
+		drag   WindowDrag
+		want   bool
+	}{
+		{"an empty container", KindView, plain, 0, WindowDragInherit, false},
+		{"a container with a background", KindView, ViewStyle{Opacity: 1, Background: RGB(0x336699)}, 0, WindowDragInherit, true},
+		{"a transparent background", KindView, ViewStyle{Opacity: 1, Background: RGBA(0x336699, 0)}, 0, WindowDragInherit, false},
+		{"a border", KindView, ViewStyle{Opacity: 1, BorderWidth: 1, BorderColor: RGB(0)}, 0, WindowDragInherit, true},
+		{"a hidden border", KindView, ViewStyle{Opacity: 1, BorderWidth: 1, BorderColor: RGB(0), BorderStyle: BorderNone}, 0, WindowDragInherit, false},
+		{"one side's border", KindView, ViewStyle{Opacity: 1, Borders: Edges{Bottom: 1}, BorderColors: EdgeColors{Bottom: RGB(0)}}, 0, WindowDragInherit, true},
+		{"a shadow alone", KindView, ViewStyle{Opacity: 1, ShadowColor: RGB(0), ShadowRadius: 4}, 0, WindowDragInherit, false},
+		{"a gradient", KindView, ViewStyle{Opacity: 1, Effects: &Effects{Gradients: []GradientPaint{{}}}}, 0, WindowDragInherit, true},
+		{"a text", KindText, plain, 0, WindowDragInherit, true},
+		{"an image", KindImage, plain, 0, WindowDragInherit, true},
+		{"an invisible image", KindImage, ViewStyle{}, 0, WindowDragInherit, false},
+		{"a pressable container", KindView, plain, 1 << EventPress, WindowDragInherit, true},
+		{"a context menu's container", KindView, plain, 1 << EventContextMenu, WindowDragInherit, true},
+		{"an invisible pressable", KindView, ViewStyle{Hidden: true}, 1 << EventPress, WindowDragInherit, true},
+		{"a window drag handle", KindView, plain, 0, WindowDragOn, true},
+		{"a container hearing no pointer event", KindView, plain, 1 << EventFocus, WindowDragInherit, false},
+	} {
+		if got := Painted(tc.kind, &tc.style, tc.events, tc.drag); got != tc.want {
+			t.Errorf("%s: Painted = %v; want %v", tc.name, got, tc.want)
+		}
+	}
+}

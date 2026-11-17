@@ -558,3 +558,18 @@ func TestAnswerAtReachesTheAlertsSurface(t *testing.T) {
 		t.Fatalf("answering %q reached %v", alerts[1].Title, answers)
 	}
 }
+
+// The window commands a test reads hold where the app lets the pointer through its window.
+func TestWindowPointerEventsReachTheWindow(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	app := Start(t, func(cx *core.Scope) core.Node {
+		return core.View{TestID: "pass", Style: core.Style{Width: core.Pt(100), Height: core.Pt(100)}, OnPress: func(core.PressEvent) { desktop.SetWindowPointerEvents(cx, desktop.WindowPointerPainted) }}
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	app.Press("id:pass")
+	if n := len(app.Window); n == 0 || app.Window[n-1].Action != driver.WindowSetPointerEvents ||
+		app.Window[n-1].PointerEvents != desktop.WindowPointerPainted {
+		t.Fatalf("the window was sent %+v", app.Window)
+	}
+}

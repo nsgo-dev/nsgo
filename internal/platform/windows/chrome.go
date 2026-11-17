@@ -317,6 +317,8 @@ func (w *window) windowCommand(c *driver.WindowCommand) {
 		w.setMaterial(c.Material)
 	case driver.WindowSetConstraints:
 		w.setConstraints(c.Constraints)
+	case driver.WindowSetPointerEvents:
+		w.setPointerEvents(c.PointerEvents)
 	case driver.WindowSetAnchor:
 		if w.kind == driver.SurfacePanel {
 			w.anchorBounds, w.placement = c.AnchorBounds, c.Placement

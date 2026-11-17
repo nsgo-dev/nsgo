@@ -121,6 +121,7 @@ func (o *surface) openSurface(cfg driver.SurfaceConfig) {
 		s.native.Send(selLayer).Send(sel("setMasksToBounds:"), true)
 	}
 	s.setMaterial(cfg.Material)
+	s.setPointerEvents(cfg.PointerEvents)
 	s.attach(o.engine)
 	if cfg.Kind == driver.SurfaceWindow {
 		s.setConstraints(cfg.Constraints)

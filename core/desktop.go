@@ -51,6 +51,19 @@ func (cx *Scope) SetWindowWorkspaces(w WindowWorkspaces) {
 	cx.window(WindowCommand{Action: WindowSetWorkspaces, Workspaces: w})
 }
 
+// SetWindowPointerEvents is the core's part of desktop.SetWindowPointerEvents, which apps use.
+func (cx *Scope) SetWindowPointerEvents(p WindowPointerEvents) {
+	cx.window(WindowCommand{Action: driver.WindowSetPointerEvents, PointerEvents: cx.windowPointer(p)})
+}
+
+// windowPointer is p as code using cx may set it: a window that lets the pointer through to other apps, as an overlay does, takes AccessOverlay, as NSH's windows capability's overlay grants it; without it the window takes the pointer.
+func (cx *Scope) windowPointer(p WindowPointerEvents) WindowPointerEvents {
+	if p == WindowPointerAuto || p > WindowPointerPainted || cx.denied(serviceOverlay, "pointerEvents") {
+		return WindowPointerAuto
+	}
+	return p
+}
+
 // SetWindowConstraints is the core's part of desktop.SetWindowConstraints, which apps use.
 func (cx *Scope) SetWindowConstraints(c WindowConstraints) {
 	cx.window(WindowCommand{Action: driver.WindowSetConstraints, Constraints: c.Normalized()})

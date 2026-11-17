@@ -68,7 +68,7 @@ const (
 	AccessSecrets = "secrets"
 	// AccessPermissions is checking, asking for and opening the settings of the system's permissions, by the permission's key (AccessRequest.Resource), and guiding the user to give them.
 	AccessPermissions = "permissions"
-	// AccessOverlay is windows over other apps on Android (OpenOverlay), which TSX packages cannot declare.
+	// AccessOverlay is windows over other apps on Android (OpenOverlay), and desktop windows that let the pointer through to them (SetWindowPointerEvents), which TSX packages cannot declare.
 	AccessOverlay = "overlay"
 	// AccessAudio is the audio package's sounds and players, refused with AudioNotAllowed.
 	AccessAudio = "audio"

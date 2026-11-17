@@ -13,9 +13,9 @@ import "github.com/nsgo-dev/nsgo/core"
 type (
 	// Window is a window or a panel the app opened.
 	Window = core.Window
-	// WindowOptions are a window's title, size, constraints and key.
+	// WindowOptions are a window's title, size, constraints, key and where it takes the pointer.
 	WindowOptions = core.WindowOptions
-	// PanelOptions are a panel's size, whether it hides as it loses the focus, and whether it never takes it.
+	// PanelOptions are a panel's size, whether it hides as it loses the focus, whether it never takes it, and where it takes the pointer.
 	PanelOptions = core.PanelOptions
 	// WindowClosing is a close the user asked for, which
 	// Window.OnClosing may cancel.
