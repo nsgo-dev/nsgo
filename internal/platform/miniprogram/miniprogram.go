@@ -287,6 +287,10 @@ func (s *surface) paint(id driver.NodeID, ops []driver.DrawOp, size driver.Size)
 	p := canvas2d.NewPlayer(ctx, ratio, math.Hypot(w, h))
 	p.Font = canvasFont
 	p.Image = func(src driver.ImageSource) (js.Value, float64, bool) {
+		if src.Pixels != nil {
+			// Mini programs show no pixels yet: loading them as an <image> of their key would keep one for each version, never loading.
+			return js.Undefined(), 1, false
+		}
 		im := s.canvasImage(src, id)
 		if !im.loaded {
 			waiting = waiting || !im.failed

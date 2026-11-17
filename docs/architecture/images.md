@@ -16,7 +16,7 @@
 
 ## Pixel buffers
 
-`ImageSource.Pixels` is an `*image.RGBA` the app draws, premultiplied as Go's type is, with `Version` telling frames written into the same buffer apart (#107, NSH's `ImageSrc::rgba`). `Image` and `Canvas` show it with nothing loaded or decoded:
+`ImageSource.Pixels` is an `*image.RGBA` the app draws, premultiplied as Go's type is, with `Version` telling frames written into the same buffer apart (#107, NSH's `ImageSrc::rgba`, which takes straight RGBA it never copies: Go's own image type is what decoders hand an app, and the copy lets the app reuse one buffer). `Image` and `Canvas` show it with nothing loaded or decoded, and a buffer with no pixels as no image:
 
 - The core copies the pixels when the commit that carries a new buffer or `Version` runs, on the engine goroutine, into a buffer of the platform's at the origin with rows of 4 bytes a pixel (`driver.CopyPixels`). The app may write the next frame into the same buffer once that commit ran, from its next `RequestAnimationFrame` callback for one; a decoder on another goroutine writes into a second buffer and posts the swap. A commit that resends the view for another reason, such as its position, sends the same copy, so the platform keeps its frame; the same `Version` is not drawn again, however the buffer changed.
 - Versions set between two commits coalesce into the last. The core copies each version it commits, a hidden or minimized window's too, although #107 asks that such a window copy nothing; the roadmap records it.

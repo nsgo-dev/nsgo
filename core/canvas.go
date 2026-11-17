@@ -116,6 +116,11 @@ func (cn *canvasNode) withFrames(d *Drawing) *Drawing {
 		if op.Image == nil || op.Image.Pixels == nil {
 			continue
 		}
+		if op.Image.Pixels.Rect.Empty() {
+			// A buffer with no pixels draws nothing.
+			op.Image = nil
+			continue
+		}
 		k := pixelKey{op.Image.Pixels, op.Image.Version}
 		c := frames[k]
 		if c == nil {

@@ -26,9 +26,9 @@ type pixelFrame struct {
 	copy    *image.RGBA
 }
 
-// of returns the copy of src's pixels to send: the one made last while src names the same buffer at the same version, so a platform keeps its frame when only the look changes, else a new one.
+// of returns the copy of src's pixels to send: the one made last while src names the same buffer at the same version, so a platform keeps its frame when only the look changes, else a new one. A buffer with no pixels sends none, as the view then shows nothing.
 func (f *pixelFrame) of(src ImageSource) *image.RGBA {
-	if src.Pixels == nil {
+	if src.Pixels == nil || src.Pixels.Rect.Empty() {
 		*f = pixelFrame{}
 		return nil
 	}

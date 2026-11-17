@@ -312,3 +312,44 @@ func TestShaderImagesTakeNoPixels(t *testing.T) {
 		t.Fatalf("a new version sent %+v, which reads no pixels", sh)
 	}
 }
+
+func TestPixelsTakeNoPlaceholderAndEmptyBuffersNoCopy(t *testing.T) {
+	var src *Signal[ImageSource]
+	h := newHost(t, Size{Width: 200, Height: 200}, func(cx *Scope) Node {
+		src = NewSignalFunc(cx, ImageSource{Pixels: image.NewRGBA(image.Rect(0, 0, 2, 2)), Version: 1}, nil)
+		return Image{TestID: "frame", SourceFunc: src.Get, Placeholder: Src("https://x/placeholder.png")}
+	})
+	b := h.commit()
+	id := h.find("frame").id
+	if it := pixelsItem(b, id); it == nil || it.Source.Pixels == nil || !it.Placeholder.Empty() {
+		t.Fatalf("item = %+v, want the pixels without the placeholder", it)
+	}
+	src.Set(ImageSource{Pixels: image.NewRGBA(image.Rectangle{}), Version: 2})
+	if it := pixelsItem(h.commit(), id); it == nil || !it.Source.Empty() || !it.Placeholder.Empty() {
+		t.Fatalf("an empty buffer sent %+v, want no pixels", it)
+	}
+	src.Set(Src("https://x/a.png"))
+	if it := pixelsItem(h.commit(), id); it == nil || it.Placeholder.URI != "https://x/placeholder.png" {
+		t.Fatalf("a URI source sent %+v, want its placeholder back", it)
+	}
+}
+
+func TestCanvasDrawsNoEmptyBuffer(t *testing.T) {
+	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+		return Canvas{Style: Style{Height: Pt(40)}, Draw: func(d *Drawing, size Size) {
+			d.DrawImageIn(ImageSource{Pixels: image.NewRGBA(image.Rectangle{}), Version: 1}, 0, 0, 10, 10)
+		}}
+	})
+	for _, it := range h.commit().Items {
+		if it.Kind != driver.ItemCanvas {
+			continue
+		}
+		for _, op := range it.Drawing.Ops {
+			if op.Kind == driver.DrawImage && op.Image != nil {
+				t.Fatalf("drew %+v, want no image for an empty buffer", op.Image)
+			}
+		}
+		return
+	}
+	t.Fatal("no canvas was sent")
+}

@@ -833,7 +833,11 @@ func (t *Tree) emitParts(n *node) bool {
 		c.Position = n.style.ObjectPosition
 		c.Source = t.pickScale(c.Source)
 		c.Placeholder = t.pickScale(c.Placeholder)
-		c.Placeholder.Pixels = nil // a placeholder shows while a source loads, which pixels never do
+		// A placeholder shows while a source loads, which pixels never do: a pixel source has none, and a placeholder's pixels are dropped.
+		if c.Source.Pixels != nil {
+			c.Placeholder = ImageSource{}
+		}
+		c.Placeholder.Pixels, c.Placeholder.Version = nil, 0
 		if t.rt.restricted {
 			t.refuseImage(n, &c.Source, &im.refused, n.h.loadError)
 			t.refuseImage(n, &c.Placeholder, &im.refusedPlaceholder, n.h.loadError)
