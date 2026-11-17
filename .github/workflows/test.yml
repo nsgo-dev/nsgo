@@ -39,6 +39,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Select Xcode with Icon Composer
+        if: matrix.target == 'macos'
+        run: echo "DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer" >> "$GITHUB_ENV"
       - name: Test gallery on the target
         run: go tool nsgo test -target ${{ matrix.target }} -junit "$RUNNER_TEMP/gallery.xml" -screenshots gallery-screenshots ./examples/gallery
       - name: Keep results and screenshots
