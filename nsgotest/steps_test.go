@@ -165,6 +165,58 @@ func TestPressesAndLongPressesSendWhatPlatformsSend(t *testing.T) {
 	}
 }
 
+func TestPressesReachTouchOnlyViewsWithoutKeyboardStops(t *testing.T) {
+	var touches []core.TouchPhase
+	var log []string
+	app := Start(t, func(*core.Scope) core.Node {
+		row := core.Style{Width: core.Pt(100), Height: core.Pt(40)}
+		return core.View{Children: []core.Node{
+			core.Input{TestID: "first", Style: row},
+			core.View{TestID: "touch", Style: row, OnTouch: func(e core.TouchEvent) { touches = append(touches, e.Phase) }},
+			core.View{TestID: "responder", Style: row, Responder: &core.Responder{
+				Claims:    []core.TouchClaim{{}},
+				OnGrant:   func(core.ResponderEvent) { log = append(log, "grant") },
+				OnRelease: func(core.ResponderEvent) { log = append(log, "release") },
+			}},
+			core.Input{TestID: "last", Style: row},
+		}}
+	}, Environment(driver.Environment{OS: driver.OSWeb}))
+	app.Press("touch")
+	app.PressAt("touch", core.Point{X: 10, Y: 10})
+	if !slices.Equal(touches, []core.TouchPhase{core.TouchStart, core.TouchEnd, core.TouchStart, core.TouchEnd}) {
+		t.Fatalf("touch phases = %v", touches)
+	}
+	app.Press("responder")
+	app.PressAt("responder", core.Point{X: 10, Y: 10})
+	if !slices.Equal(log, []string{"grant", "release", "grant", "release"}) {
+		t.Fatalf("responder events = %v", log)
+	}
+	app.Key("Tab")
+	app.Key("Tab")
+	if !app.Find("last").Focused {
+		t.Fatal("Tab stopped on a touch-only view")
+	}
+}
+
+func TestPressOnTouchChildStillPressesItsButton(t *testing.T) {
+	var presses, touches int
+	app := Start(t, func(*core.Scope) core.Node {
+		return core.View{OnPress: func(core.PressEvent) { presses++ }, Children: []core.Node{
+			core.View{TestID: "child", Style: core.Style{Width: core.Pt(100), Height: core.Pt(40)},
+				OnTouch: func(e core.TouchEvent) {
+					if e.Phase == core.TouchStart {
+						touches++
+					}
+				}},
+		}}
+	})
+	app.Press("child")
+	app.PressAt("child", core.Point{X: 10, Y: 10})
+	if presses != 2 || touches != 2 {
+		t.Fatalf("presses = %d, touches = %d, want 2 each", presses, touches)
+	}
+}
+
 func TestDragAtStartsWhereItSays(t *testing.T) {
 	var start core.Point
 	app := Start(t, func(cx *core.Scope) core.Node {

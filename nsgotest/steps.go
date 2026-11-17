@@ -17,6 +17,11 @@ func pressable(v *View) bool {
 	return v.Events.Has(driver.EventPress) || v.Events.Has(driver.EventPressDown)
 }
 
+// pointerPressable includes touch listeners and responders, which can take a tap without becoming keyboard stops.
+func pointerPressable(v *View) bool {
+	return pressable(v) || v.Events.Has(driver.EventPressUp) || v.Events.Has(driver.EventLongPress) || v.Events.Has(driver.EventTouch)
+}
+
 // focusable reports whether v is a keyboard focus stop. It follows the stops moveFocus uses on desktops and the web: editable fields, pressable views and views explicitly marked Focusable, except for read-only, disabled or NoFocus views.
 func focusable(v *View) bool {
 	if v.disabled(nil) || v.Props.NoFocus {
@@ -70,6 +75,9 @@ func (a *App) pressTarget(selector string) (v *View, at driver.Point, index int)
 	v = a.pick(selector, "pressable view", func(m *View) (*View, bool) {
 		t := m.upTo(pressable)
 		if t == nil {
+			t = m.upTo(pointerPressable)
+		}
+		if t == nil {
 			return nil, false
 		}
 		match = m
@@ -111,7 +119,7 @@ func (a *App) charsAt(selector string, v *View) int {
 	return 0
 }
 
-// Press presses what selector names, or the pressable view around it, as
+// Press presses what selector names, or the pressable or touch-listening view around it, as
 // a tap does: a finger goes down and lifts on its middle, which the views
 // listening to touches hear and presses outside the overlays it is not in
 // report, while the view hears PressDown, PressUp and Press. On a
@@ -282,7 +290,10 @@ func walk(v *View, fn func(*View)) {
 // that takes presses, following visible overflow until a view that clips
 // stops it, as a pointer there finds it.
 func (a *App) pressableAt(p driver.Point) *View {
-	return a.viewAt(p, pressable)
+	if v := a.viewAt(p, pressable); v != nil {
+		return v
+	}
+	return a.viewAt(p, pointerPressable)
 }
 
 // viewAt returns the topmost visible view at the surface point p that ok
