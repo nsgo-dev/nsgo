@@ -593,10 +593,7 @@ func (wv *webView) listenInput() {
 		wv.focusWindow()
 		(*comObject)(args).call(moveFocusPutHandled, 1)
 	}))
-	// WebView2 receives keyboard messages in its child window, so the
-	// process window loop cannot see them. Its accelerator event is the
-	// synchronous host hook: app shortcuts and menu equivalents get the
-	// same keymap and focus semantics as keys sent to the window itself.
+	// WebView2 takes the keys in its own windows, which the window's message loop never sees. Its accelerator event, raised before the page gets a key with Control or Alt held or one that types no character, lets the keymap and the application menu take those as they take the window's own keys, by the page's focus.
 	wv.controller.subscribe(controllerAddAcceleratorKeyPressed, newHandler(&iidAcceleratorKeyPressed, func(_ uintptr, args unsafe.Pointer) {
 		if wv.closed || args == nil {
 			return
@@ -615,11 +612,9 @@ func (wv *webView) listenInput() {
 	}))
 }
 
-// acceleratorKey routes a WebView2 key-down accelerator through the same
-// shortcut path as a key delivered to the window. Returning false leaves
-// the key to the page and WebView2's browser accelerators.
+// acceleratorKey matches a key coming down in the page (keyEventKindKeyDown or keyEventKindSystemKeyDown) against the shortcuts as the message loop matches the window's, and reports whether one took it. A key none takes goes on to the page and WebView2's own accelerators.
 func (wv *webView) acceleratorKey(kind, key uint32, lParam int32) bool {
-	if wv.closed || (kind != 0 && kind != 2) {
+	if wv.closed || kind != keyEventKindKeyDown && kind != keyEventKindSystemKeyDown {
 		return false
 	}
 	return wv.w.shortcut(uintptr(key), uintptr(uint32(lParam)))

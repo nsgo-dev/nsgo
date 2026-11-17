@@ -243,9 +243,7 @@ func TestMenuYieldFollowsNativeFocus(t *testing.T) {
 			held[vkControl] |= 0x80
 			setState.Call(uintptr(unsafe.Pointer(&held)))
 			defer setState.Call(uintptr(unsafe.Pointer(&saved)))
-			// What the message loop or a focused WebView2 page does with
-			// Control+R. The latter must use AcceleratorKeyPressed rather
-			// than the top-level window's message loop.
+			// What WebView2's accelerator event does with Control+R while the page has the focus, else the message loop.
 			took := false
 			for wv := range w.webs {
 				if wv.focused {
@@ -305,4 +303,154 @@ func TestMenuYieldFollowsNativeFocus(t *testing.T) {
 	onMain(t, hwnd, func(w *window) { page(w).focusWindow() })
 	waitFor("the keymap kept the binding outside the page", false, func(w *window) bool { return !page(w).focused })
 	press("3|2")
+}
+
+// TestFocusedPageKeysReachShortcutsFirst types into a focused WebView2 page through the system's input queue, as the user's keyboard does. Control+J, which a KeyAlways binding takes, and Control+K, which a MenuAlways item takes, run the app's handlers and never reach the page; Control+A, whose KeyAuto binding yields to text, Control+L, whose MenuNotEditing item yields too, Control+B, which nothing binds, and a plain letter all reach the page.
+func TestFocusedPageKeysReachShortcutsFirst(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if _, err := findWebView2(); err != nil {
+		t.Skip(err)
+	}
+	const title = "nsgo-page-keys"
+	app := func(cx *core.Scope) core.Node {
+		bound, chosen, yielded, notEditing := core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0)
+		page := core.NewSignal(cx, "")
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Actions", Items: []core.MenuItem{
+			{Label: "Palette", Shortcut: "mod+k", When: core.MenuAlways, OnSelect: func() { chosen.Update(func(n int) int { return n + 1 }) }},
+			{Label: "Locate", Shortcut: "mod+l", When: core.MenuNotEditing, OnSelect: func() { notEditing.Update(func(n int) int { return n + 1 }) }},
+		}}})
+		cx.OnKeyWith("mod+j", core.KeyOptions{When: core.KeyAlways}, func() { bound.Update(func(n int) int { return n + 1 }) })
+		cx.OnKey("mod+a", func() { yielded.Update(func(n int) int { return n + 1 }) })
+		cx.Effect(func() {
+			cx.SetTitle(fmt.Sprintf("%s|%d|%d|%d|%d|%s", title, bound.Get(), chosen.Get(), yielded.Get(), notEditing.Get(), page.Get()))
+		})
+		// The page reports each key that comes down with Control held, the field's value as it changes, and "ready" once it has the focus and its field has it within.
+		const html = `<!doctype html><input id=f><script>
+const f = document.getElementById('f');
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.key !== 'Control') nsgo.postMessage('^' + e.key.toLowerCase()); }, true);
+f.addEventListener('input', () => nsgo.postMessage('=' + f.value));
+nsgo.postMessage('loaded');
+const ready = setInterval(() => {
+  f.focus();
+  if (document.hasFocus() && document.activeElement === f) { clearInterval(ready); nsgo.postMessage('ready'); }
+}, 50);
+</script>`
+		return core.View{Style: core.Style{Padding: driver.All(10), Background: driver.RGB(0xffffff)}, Children: []core.Node{
+			core.WebView{Source: core.WebHTML(html, ""), OnMessage: func(data string) { page.Update(func(s string) string { return s + data + " " }) },
+				Style: core.Style{Width: driver.Pt(260), Height: driver.Pt(120)}},
+		}}
+	}
+	hwnd := startApp(t, title, app, 300, 200)
+	// The first start of the browser process can take a while.
+	waitForTitle(t, hwnd, title+"|0|0|0|0|", 30*time.Second)
+	if !takeForeground(hwnd) {
+		t.Skip("cannot bring the window to the front for the system's input")
+	}
+	got := waitForTitle(t, hwnd, title+"|0|0|0|0|", 10*time.Second)
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(got, "ready") {
+		if time.Now().After(deadline) {
+			fg, _, _ := getForegroundWindow.Call()
+			t.Fatalf("the page's field did not take the focus (in front: %v): %q", fg == hwnd, got)
+		}
+		onMain(t, hwnd, func(w *window) {
+			for wv := range w.webs {
+				if !wv.focused {
+					wv.takeFocus()
+				}
+			}
+		})
+		time.Sleep(100 * time.Millisecond)
+		got = windowText(hwnd)
+	}
+	onMain(t, hwnd, func(w *window) {
+		focused := false
+		for wv := range w.webs {
+			focused = focused || wv.focused
+		}
+		if !focused {
+			t.Fatal("the window does not know the page has the focus")
+		}
+	})
+	sendKeys(t, hwnd, vkControl, 'J')
+	waitForTitle(t, hwnd, title+"|1|0|0|0|", 5*time.Second)
+	sendKeys(t, hwnd, vkControl, 'K')
+	waitForTitle(t, hwnd, title+"|1|1|0|0|", 5*time.Second)
+	sendKeys(t, hwnd, vkControl, 'A')
+	sendKeys(t, hwnd, vkControl, 'L')
+	sendKeys(t, hwnd, vkControl, 'B')
+	sendKeys(t, hwnd, 'X')
+	// The page posts in the order the keys came, so its field's value comes after every key before it.
+	got = waitForTitle(t, hwnd, title+"|1|1|0|0|", 5*time.Second)
+	deadline = time.Now().Add(5 * time.Second)
+	for !strings.Contains(got, "=x") {
+		if time.Now().After(deadline) {
+			t.Fatalf("the page did not type x: %q", got)
+		}
+		time.Sleep(20 * time.Millisecond)
+		got = windowText(hwnd)
+	}
+	if !strings.HasPrefix(got, title+"|1|1|0|0|") {
+		t.Errorf("after the keys the counts are %q, want the binding and the Palette item once and the yielding binding and the Locate item never", got)
+	}
+	log := got[strings.LastIndex(got, "|")+1:]
+	for _, key := range []string{"^j", "^k"} {
+		if strings.Contains(log, key) {
+			t.Errorf("the page also got %s: %q", key, log)
+		}
+	}
+	for _, key := range []string{"^a", "^l", "^b"} {
+		if !strings.Contains(log, key) {
+			t.Errorf("the page did not get %s: %q", key, log)
+		}
+	}
+}
+
+var (
+	keybdEvent        = user32.NewProc("keybd_event")
+	attachThreadInput = user32.NewProc("AttachThreadInput")
+	windowThread      = user32.NewProc("GetWindowThreadProcessId")
+	currentThread     = kernel32.NewProc("GetCurrentThreadId")
+)
+
+// takeForeground makes hwnd the foreground window, joining the input of the window in front for the moment Windows' foreground lock asks it to, and reports whether it is.
+func takeForeground(hwnd uintptr) bool {
+	for range 20 {
+		if fg, _, _ := getForegroundWindow.Call(); fg == hwnd {
+			return true
+		}
+		fg, _, _ := getForegroundWindow.Call()
+		own, _, _ := currentThread.Call()
+		other, _, _ := windowThread.Call(fg, 0)
+		if other != 0 && other != own {
+			attachThreadInput.Call(own, other, 1)
+		}
+		setForegroundWindow.Call(hwnd)
+		if other != 0 && other != own {
+			attachThreadInput.Call(own, other, 0)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	fg, _, _ := getForegroundWindow.Call()
+	return fg == hwnd
+}
+
+// sendKeys presses keys in order and lets them go in reverse through the system's input queue, after checking hwnd is still in front so the keys go nowhere else.
+func sendKeys(t *testing.T, hwnd uintptr, keys ...byte) {
+	t.Helper()
+	if fg, _, _ := getForegroundWindow.Call(); fg != hwnd {
+		t.Fatal("the window left the front before the keys were sent")
+	}
+	const keyUp = 0x2
+	for _, k := range keys {
+		scan, _, _ := mapVirtualKeyW.Call(uintptr(k), 0)
+		keybdEvent.Call(uintptr(k), scan, 0, 0)
+	}
+	for i := len(keys) - 1; i >= 0; i-- {
+		scan, _, _ := mapVirtualKeyW.Call(uintptr(keys[i]), 0)
+		keybdEvent.Call(uintptr(keys[i]), scan, keyUp, 0)
+	}
+	time.Sleep(150 * time.Millisecond)
 }
