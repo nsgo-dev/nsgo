@@ -24,8 +24,7 @@ func checkFixture(t *testing.T) *project {
 	return p
 }
 
-// missingXcode also exercises a Mac whose selected Xcode has no mobile SDKs.
-// The go command remains real, so the tests verify cross-target vetting.
+// missingXcode also exercises a Mac whose selected Xcode has no mobile SDKs. The go command remains real, so the tests verify cross-target vetting.
 func missingXcode(t *testing.T) {
 	checkXcrun(t, "echo 'Xcode SDK unavailable' >&2\nexit 1\n")
 }
@@ -63,7 +62,7 @@ func TestCheckAllWithMissingWatchSDK(t *testing.T) {
 			t.Errorf("did not vet available %s:\n%s", name, out)
 		}
 	}
-	if !strings.Contains(out, "skipped watchos, watchos_simulator:") || strings.Count(out, "skipped ") != 1 {
+	if !strings.Contains(out, "skipped watchos, watchos_simulator: the watchOS SDK needs Xcode") || strings.Count(out, "skipped ") != 1 {
 		t.Errorf("missing the unavailable SDK summary:\n%s", out)
 	}
 }
@@ -84,8 +83,12 @@ func TestCheckAllWithoutXcode(t *testing.T) {
 			t.Errorf("did not vet %s:\n%s", name, out)
 		}
 	}
-	if !strings.Contains(out, "skipped ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator") || strings.Count(out, "skipped ") != 1 || !strings.Contains(out, "Xcode") {
-		t.Errorf("missing one summary of unavailable Apple targets:\n%s", out)
+	reason := "they need macOS with Xcode"
+	if runtime.GOOS == "darwin" {
+		reason = "the iOS SDK needs Xcode: xcrun --sdk iphoneos --show-sdk-path"
+	}
+	if !strings.Contains(out, "skipped ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator: "+reason) || strings.Count(out, "skipped ") != 1 {
+		t.Errorf("missing one summary of unavailable Apple targets and why:\n%s", out)
 	}
 }
 

@@ -63,9 +63,7 @@ func check(ctx context.Context, p *project, target string) error {
 	return checkTSX(ctx, p)
 }
 
-// checkTargets vets every requested target. Only Apple mobile targets included
-// through all may be skipped for an unavailable SDK; explicit names stay strict.
-// A target's failure does not prevent checking the independent targets after it.
+// checkTargets vets every requested target. Only Apple mobile targets included through all may be skipped for an unavailable SDK; explicit names stay strict. A target's failure does not prevent checking the independent targets after it.
 func checkTargets(ctx context.Context, p *project, target string) error {
 	requested := strings.Split(target, ",")
 	names, err := expandTargets(requested)
@@ -73,6 +71,8 @@ func checkTargets(ctx context.Context, p *project, target string) error {
 		return err
 	}
 	var skipped []string
+	// why is the reason the first target was skipped for, so a Mac whose Xcode lacks an SDK, or fails for another reason, says which.
+	var why string
 	var failures []error
 	for _, name := range names {
 		if ctx.Err() != nil {
@@ -83,10 +83,14 @@ func checkTargets(ctx context.Context, p *project, target string) error {
 		optional := apple && slices.Contains(requested, "all") && !slices.Contains(requested, name)
 		if optional && runtime.GOOS != "darwin" {
 			skipped = append(skipped, name)
+			why = "they need macOS with Xcode"
 			continue
 		}
 		env, err := vetEnv(ctx, name)
 		if err != nil && optional && ctx.Err() == nil {
+			if why == "" {
+				why = err.Error()
+			}
 			skipped = append(skipped, name)
 			continue
 		}
@@ -102,7 +106,7 @@ func checkTargets(ctx context.Context, p *project, target string) error {
 		s.done("vetted for "+name, "")
 	}
 	if len(skipped) > 0 {
-		warn("skipped %s: Xcode's SDKs and clang are unavailable", strings.Join(skipped, ", "))
+		warn("skipped %s: %s", strings.Join(skipped, ", "), why)
 	}
 	return errors.Join(failures...)
 }
