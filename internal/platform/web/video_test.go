@@ -92,9 +92,32 @@ func TestFinishedVideoWaitsForReplay(t *testing.T) {
 	config.Paused = false
 	s.setVideo(v, &config)
 	wait(4)
+	// Move the native scrubber without using Ref.Seek. Cover both a
+	// settled seek and a play before the browser dispatches seeked.
+	seeked := 0
+	v.listeners.on(v.video.el, "seeked", func(js.Value) { seeked++ })
+	for i, settle := range []bool{true, false} {
+		config.Paused = true
+		s.setVideo(v, &config)
+		before := seeked
+		v.video.el.Set("currentTime", 0.2)
+		if settle {
+			for deadline := time.Now().Add(5 * time.Second); seeked == before; time.Sleep(10 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the native scrubber did not finish seeking")
+				}
+			}
+		}
+		config.Paused = false
+		s.setVideo(v, &config)
+		if got := v.video.el.Get("currentTime").Float(); got < 0.19 {
+			t.Fatalf("play after native scrub (settled %v) rewound to %v", settle, got)
+		}
+		wait(5 + i)
+	}
 	other := js.Global().Get("URL").Call("createObjectURL", blob).String()
 	defer js.Global().Get("URL").Call("revokeObjectURL", other)
 	config.Source = other
 	s.setVideo(v, &config)
-	wait(5)
+	wait(7)
 }

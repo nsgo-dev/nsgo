@@ -173,7 +173,8 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 			v.status.asked()
 			v.player.Send(sel("pause"))
 		default:
-			if play.completed || v.atEnd() {
+			// The native scrubber may have moved a completed player.
+			if v.atEnd() {
 				v.player.Send(sel("seekToTime:"), cmTimeOf(0))
 			}
 			play.applied(true)
