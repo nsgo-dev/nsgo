@@ -44,7 +44,10 @@ func TestWebSourceShows(t *testing.T) {
 		{WebSource{Src: "data:text/html,<p>hi</p>"}, "data:text/html,%3Cp%3Ehi%3C/p%3E", true},
 		{WebSource{Src: "data:text/html,<p>hi</p>"}, "data:text/html,<p>evil</p>", false},
 		{WebSource{Src: "data:text/html,<p>hi</p>"}, "about:blank", false},
-		{WebSource{}, "about:blank", false},
+		{WebSource{}, "about:blank", true},
+		{WebSource{}, "about:blank#top", true},
+		{WebSource{}, "data:text/html,<p>", false},
+		{WebSource{}, "about:srcdoc", false},
 	} {
 		if got := c.source.Shows(c.url); got != c.want {
 			t.Errorf("%+v.Shows(%q) = %v, want %v", c.source, c.url, got, c.want)

@@ -121,7 +121,9 @@ func (s *surface) loadFrame(v *view, src driver.WebSource) {
 	if !c.NoJavaScript {
 		sandbox = append(sandbox, "allow-scripts")
 	}
-	if src.HTML == "" && src.Src != "" {
+	// about:blank inherits the embedding page's origin unless the sandbox
+	// keeps it opaque, just as an empty srcdoc page is kept opaque.
+	if src.HTML == "" && src.Src != "" && src.Src != "about:blank" {
 		// Pages of other sites keep their origin, so their storage works;
 		// one of the app's own must not reach the app.
 		url := js.Global().Get("URL")

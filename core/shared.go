@@ -366,7 +366,9 @@ type (
 	// WebNavigation is a web view's page and history.
 	WebNavigation = driver.WebNavigation
 	// WebSource is what a web view shows: the page at Src, or HTML, whose
-	// relative links resolve against BaseURL, instead when it is set.
+	// relative links resolve against BaseURL, instead when it is set. With
+	// neither Src nor HTML it loads about:blank and reports the usual load
+	// and navigation events, clearing any previous page.
 	WebSource = driver.WebSource
 	// WindowAction is what an ItemWindow asks of the window.
 	WindowAction = driver.WindowAction

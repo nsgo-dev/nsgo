@@ -893,6 +893,7 @@ func (t *Tree) emitParts(n *node) bool {
 		if t.rt.restricted {
 			t.restrictWeb(n, &c)
 		}
+		c.Source = driver.ResolveWebSource(c.Source)
 		if first || !sameWebConfig(c, wn.sent) {
 			wn.sent = c
 			add(driver.MountItem{Kind: driver.ItemWeb, ID: n.id, Web: &c})

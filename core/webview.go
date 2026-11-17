@@ -15,6 +15,8 @@ import (
 
 // WebView shows a web page in the platform's web view, which fills the view and takes its own pointer, wheel and keyboard input. Pages reach the app with window.nsgo.postMessage(data), which OnMessage and OnMessageFrom receive from the pages MessageOrigins allows; Ref.PostMessage dispatches a MessageEvent on the page's window.
 type WebView struct {
+	// Source loads about:blank when neither Src nor HTML is set, clearing
+	// the previous page and reporting the usual load and navigation events.
 	Source WebSource
 	// The page loads again when SourceFunc's source changes.
 	SourceFunc func() WebSource
@@ -363,6 +365,7 @@ func (r *Ref) Load(src WebSource) {
 			src.BaseURL = ""
 		}
 	}
+	src = driver.ResolveWebSource(src)
 	r.t.commands = append(r.t.commands, driver.MountItem{Kind: driver.ItemWebCommand, ID: r.n.id,
 		WebCommand: driver.WebLoad, Data: &src})
 	r.t.changed = true

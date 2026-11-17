@@ -18,7 +18,7 @@ core.View{
 }
 ```
 
-`core.WebView` shows web content; attach a `core.Ref` to call `Reload`, `GoBack` and `GoForward`. On native targets these commands keep the app's own HTML and data sources exempt from `core.AccessWebSchemes`; pages that create new navigations still follow the access policy.
+`core.WebView` shows web content; an empty `WebSource` loads `about:blank` and reports the usual load and navigation events. Set `SourceFunc` to an empty source or call `Ref.Load(core.WebSource{})` to clear the previous page. Attach a `core.Ref` to call `Reload`, `GoBack` and `GoForward`. On native targets these commands keep the app's own HTML and data sources exempt from `core.AccessWebSchemes`; pages that create new navigations still follow the access policy.
 
 `core.Video` plays a file or URL in the platform's player. A transparent clip shows what is behind it as HEVC with alpha in a `.mov` on macOS (iOS is not yet checked), and as VP9 with alpha in WebM on Linux with GStreamer's codecalpha plug-in (`gstreamer1.0-plugins-bad`, which a Linux package can recommend in `nsgo.yaml`). On macOS, iOS, Windows and Linux, a local clip whose alpha cannot be kept (WebM on Apple platforms, HEVC on Linux, and any on Windows until Media Foundation's alpha output has been checked on a Windows machine) makes `OnError` say so instead of the video showing in an opaque box: the error is a `*core.MediaError` whose `Reason` is `core.MediaErrorAlphaUnsupported`, so the app can decode that clip itself instead. Android and the web, and remote URLs on every platform, play such clips as their decoder outputs them, which may be opaque.
 

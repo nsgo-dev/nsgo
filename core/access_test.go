@@ -79,7 +79,7 @@ func TestAccessHoldsWhatItsOwnerRenders(t *testing.T) {
 			t.Errorf("%s loads %q, want %q", id, uris[id], uri)
 		}
 	}
-	if web == nil || web.Source.Src != "" || !web.Restricted || web.Hosts != "ok.com *.cdn.com" || web.Schemes != "about blob data" {
+	if web == nil || web.Source.Src != "about:blank" || !web.Restricted || web.Hosts != "ok.com *.cdn.com" || web.Schemes != "about blob data" {
 		t.Fatalf("the web view is sent %+v", web)
 	}
 	h.drain()

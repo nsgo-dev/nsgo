@@ -104,6 +104,13 @@ jobs:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
         run: xvfb-run -a go tool nsgo test -target linux ./internal/testhost/testdata/keys
+      - name: Test native empty web sources
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: xvfb-run -a go tool nsgo test -target linux ./internal/testhost/testdata/websource
+      - name: Test browser empty web sources
+        run: go tool nsgo test -target web -run '^TestEmptyWebSourceIsOpaque$' ./internal/platform/web
       - name: Test
         env:
           GDK_BACKEND: x11
@@ -161,6 +168,7 @@ jobs:
             go tool nsgo test -target android -device emulator-5554 -timeout 2m ./internal/testhost/testdata/press || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestHardwareKeys' ./internal/platform/android || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestIME|^TestHardwareEnter' ./internal/platform/android || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
+            go tool nsgo test -target android -device emulator-5554 -timeout 2m ./internal/testhost/testdata/websource || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
 
   apple:
     # Use the Intel pool while hosted arm64 capacity leaves jobs unallocated.
@@ -202,6 +210,8 @@ jobs:
         run: go tool nsgo test -target macos ./internal/testhost/testdata/press
       - name: Test native editing keys and bindings
         run: go tool nsgo test -target macos ./internal/testhost/testdata/keys
+      - name: Test native empty web sources
+        run: go tool nsgo test -target macos ./internal/testhost/testdata/websource
       - name: Test native radio and tab focus
         run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test composited captures
@@ -228,6 +238,7 @@ jobs:
           # Booting a simulator on a hosted runner takes from about three to ten minutes, and the three cases run in one package, so go test's default ten-minute limit can end the last case before it starts.
           go tool nsgo test -run '^TestSimulatorProcessResults$' ./cmd/nsgo -- -timeout=25m
           go tool nsgo test -target ios_simulator -timeout 30s -run '^TestFoldGeometry$' ./internal/platform/ios
+          go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
 
   windows:
     runs-on: windows-latest
@@ -246,6 +257,8 @@ jobs:
         run: go tool nsgo test -target windows ./internal/testhost/testdata/press
       - name: Test native editing keys and bindings
         run: go tool nsgo test -target windows ./internal/testhost/testdata/keys
+      - name: Test native empty web sources
+        run: go tool nsgo test -target windows ./internal/testhost/testdata/websource
       - name: Test native focus, styles, activation and label relationships
         run: go tool nsgo test -run '^(TestRefFocusUsesNativeKeyboardStops|TestNativeLabeledByProvider)$' ./internal/platform/windows
       - name: Test menu yield with a focused WebView2 page

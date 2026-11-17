@@ -9,15 +9,26 @@ import (
 )
 
 // WebSource is what a web view shows: the page at Src, or HTML, whose
-// relative links resolve against BaseURL, instead when it is set.
+// relative links resolve against BaseURL, instead when it is set. With neither
+// Src nor HTML it loads about:blank, including the usual load events.
 type WebSource struct {
 	Src     string
 	HTML    string
 	BaseURL string
 }
 
-// Origin is the origin of the page the source loads, as WebOrigin writes it: Src's, or for HTML, BaseURL's, which is "null" without one. A source with neither has none ("").
+// ResolveWebSource supplies the blank page for a source with neither a URL nor HTML.
+// Core resolves sources before sending a WebConfig or WebLoad to any backend.
+func ResolveWebSource(s WebSource) WebSource {
+	if s.Src == "" && s.HTML == "" {
+		s.Src = "about:blank"
+	}
+	return s
+}
+
+// Origin is the origin of the page the source loads, as WebOrigin writes it: Src's, or for HTML, BaseURL's, which is "null" without one. An empty source loads about:blank, whose origin is "null".
 func (s WebSource) Origin() string {
+	s = ResolveWebSource(s)
 	switch {
 	case s.HTML != "" && s.BaseURL == "":
 		return "null"
@@ -31,6 +42,7 @@ func (s WebSource) Origin() string {
 
 // Shows reports whether rawURL is the page s loads, which tells apart the pages of an opaque origin ("null"), as every one of them has the same: HTML without a base URL is at about:blank (about:srcdoc on the web), other HTML at BaseURL and a Src at itself, fragments aside. A page the view went to, such as a data: URL a frame sent it to, is not.
 func (s WebSource) Shows(rawURL string) bool {
+	s = ResolveWebSource(s)
 	page, _, _ := strings.Cut(rawURL, "#")
 	switch {
 	case s.HTML != "" && s.BaseURL == "":

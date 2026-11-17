@@ -69,7 +69,7 @@ func TestServeSchemeStaysInItsSubtree(t *testing.T) {
 		t.Errorf("a sibling's schemes: app answers %q, own %v", got, sibling.SchemeHandlers["own"] != nil)
 	}
 	// A restricted sibling may not load a scheme only another subtree serves.
-	if sibling.Source.Src != "" || sibling.Navigable("own://index.html") {
+	if sibling.Source.Src != "about:blank" || sibling.Navigable("own://index.html") {
 		t.Errorf("a sibling loads another subtree's scheme: %+v", sibling.Source)
 	}
 }

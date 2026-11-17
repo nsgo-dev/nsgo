@@ -7,6 +7,58 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+func TestEmptyWebSourceLoadsBlank(t *testing.T) {
+	for _, restricted := range []bool{false, true} {
+		name := "unrestricted"
+		if restricted {
+			name = "restricted"
+		}
+		t.Run(name, func(t *testing.T) {
+			var ref Ref
+			var source *Signal[WebSource]
+			h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+				if restricted {
+					cx.ProvideAccess(hostsAccess{})
+				}
+				source = NewSignal(cx, WebSource{})
+				return WebView{SourceFunc: source.Get, Ref: &ref}
+			})
+			check := func(want WebSource) {
+				t.Helper()
+				var sources []WebSource
+				for _, item := range h.commit().Items {
+					if item.Kind == driver.ItemWeb {
+						sources = append(sources, item.Web.Source)
+					}
+				}
+				if !slices.Equal(sources, []WebSource{want}) {
+					t.Fatalf("sent sources %v, want %v", sources, want)
+				}
+			}
+			blank := WebSrc("about:blank")
+			check(blank)
+			page := WebHTML("<p>private</p>", "")
+			source.Set(page)
+			check(page)
+			source.Set(WebSource{})
+			check(blank)
+			if kinds(h.commit())[driver.ItemWeb] != 0 {
+				t.Fatal("an unchanged blank source loaded again")
+			}
+			for range 2 {
+				ref.Load(WebSource{})
+				b := h.commit()
+				if len(b.Items) != 1 || b.Items[0].WebCommand != driver.WebLoad {
+					t.Fatalf("explicit blank load sent %v", b.Items)
+				}
+				if got := b.Items[0].Data.(*driver.WebSource); *got != blank {
+					t.Fatalf("explicit blank load sent %+v", got)
+				}
+			}
+		})
+	}
+}
+
 func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	var ref Ref
 	var src *Signal[WebSource]
@@ -124,7 +176,7 @@ func TestWebMessagesComeFromTheSourcesOrigin(t *testing.T) {
 		{"listed null", WebSrc("https://app.example/"), []string{"null"}, nil},
 		{"listed, none an origin", WebSrc("https://app.example/"), []string{"example.com"}, []string{"https://app.example/index.html"}},
 		{"any", WebSrc("https://app.example/"), []string{"*"}, []string{"https://app.example/index.html", "https://other.example/", "about:blank", "data:text/html,<p>", "https://app.example:8443/"}},
-		{"no source", WebSource{}, nil, nil},
+		{"empty source", WebSource{}, nil, []string{"about:blank"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			var strs []string

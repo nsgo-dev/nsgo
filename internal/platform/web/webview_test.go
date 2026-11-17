@@ -3,12 +3,69 @@
 package web
 
 import (
+	"strings"
 	"syscall/js"
 	"testing"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
 )
+
+func TestEmptyWebSourceIsOpaque(t *testing.T) {
+	doc := js.Global().Get("document")
+	if !doc.Truthy() {
+		t.Skip("no document here: run with nsgo test -target web")
+	}
+	mount := doc.Call("createElement", "div")
+	mount.Set("id", "nsgo-empty-websource")
+	doc.Get("body").Call("appendChild", mount)
+	defer mount.Call("remove")
+	var source *core.Signal[core.WebSource]
+	var ref core.Ref
+	var scope *core.Scope
+	var starts, loads int
+	var loaded core.WebNavigation
+	s := open(func(cx *core.Scope) core.Node {
+		scope, source = cx, core.NewSignal(cx, core.WebSource{})
+		return core.WebView{SourceFunc: source.Get, Ref: &ref,
+			Style:       core.Style{Width: core.Pt(100), Height: core.Pt(100)},
+			OnLoadStart: func(core.WebNavigation) { starts++ },
+			OnLoad:      func(nav core.WebNavigation) { loads++; loaded = nav }}
+	}, Options{Mount: "#nsgo-empty-websource"}, nil)
+	defer s.engine.Close()
+	wait := func(want int) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); starts < want || loads < want; time.Sleep(10 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("%d starts and %d loads, want %d", starts, loads, want)
+			}
+		}
+		if starts < want || loads < want {
+			t.Fatalf("%d starts and %d loads, want at least %d of each", starts, loads, want)
+		}
+	}
+	blank := func() {
+		t.Helper()
+		frame := mount.Call("querySelector", "iframe")
+		if loaded.URL != "about:blank" || loaded.Loading || frame.Call("hasAttribute", "srcdoc").Bool() ||
+			frame.Call("getAttribute", "src").String() != "about:blank" {
+			t.Fatalf("empty source did not load a blank document: %+v", loaded)
+		}
+		if strings.Contains(frame.Call("getAttribute", "sandbox").String(), "allow-same-origin") || !frame.Get("contentDocument").IsNull() {
+			t.Fatal("the blank frame can reach the app's origin")
+		}
+	}
+	wait(1)
+	blank()
+	scope.Post(func() { source.Set(core.WebHTML("<p>private</p>", "")) })
+	wait(2)
+	scope.Post(func() { source.Set(core.WebSource{}) })
+	wait(3)
+	blank()
+	scope.Post(func() { ref.Load(core.WebSource{}) })
+	wait(4)
+	blank()
+}
 
 // TestWebViewDropsTheBridgeOfAPageThatLeft loads HTML whose page goes to another, which has no bridge, and comes back as the app reloads it. An Evaluate made before the HTML's page handed its port waits for it; one the page had not answered as it left ends with an error, as does one made while the other page shows; and the HTML shown again answers again. The other page reaches no OnMessage. Run in a browser: nsgo test -target web.
 func TestWebViewDropsTheBridgeOfAPageThatLeft(t *testing.T) {
