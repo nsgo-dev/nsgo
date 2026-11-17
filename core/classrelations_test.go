@@ -376,6 +376,18 @@ func TestRelationalStatesAskOnlyPressableViewsForPresses(t *testing.T) {
 	if !h.find("button").events().Has(driver.EventPressDown) {
 		t.Error("a pressable view in the selector's scope does not report presses")
 	}
+	// The pressable view's reported presses reach the selector around it.
+	button := h.find("button")
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPressDown, ID: button.id})
+	h.commit()
+	if got := h.find("source").style.Padding.Top; got != 8 {
+		t.Fatalf("pressed button: source padding=%v, want 8", got)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPressUp, ID: button.id})
+	h.commit()
+	if got := h.find("source").style.Padding.Top; got != 0 {
+		t.Fatalf("released button: source padding=%v, want 0", got)
+	}
 }
 
 func TestRelationalSourcesOnlyResolveInTheirScope(t *testing.T) {
