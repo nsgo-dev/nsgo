@@ -16,7 +16,6 @@ import (
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/core"
-	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
@@ -44,23 +43,14 @@ func silence(t *testing.T, d time.Duration) string {
 	return path
 }
 
-// videoBackend is the backend of the app's one video, which shows without controls.
-func videoBackend(t *testing.T) *apple.Video {
-	t.Helper()
+// videoPlayer is the AVPlayer of the app's one video, which shows without controls: what its controls would pause and play.
+func videoPlayer(t *testing.T) objc.ID {
 	for _, v := range views {
 		if v.video != nil && v.video.View() != 0 {
-			return v.video
+			return v.video.View().Send(sel("layer")).Send(sel("player"))
 		}
 	}
 	t.Error("no video shows")
-	return nil
-}
-
-func videoPlayer(t *testing.T) objc.ID {
-	t.Helper()
-	if v := videoBackend(t); v != nil {
-		return v.View().Send(sel("layer")).Send(sel("player"))
-	}
 	return 0
 }
 
@@ -105,22 +95,7 @@ func TestVideoReportsWhatItsPlayerDidByItself(t *testing.T) {
 					if objc.Send[float32](videoPlayer(t), sel("rate")) == 0 {
 						hear("held")
 					}
-					v := videoBackend(t)
-					if v == nil {
-						return
-					}
-					// The engine can react to OnPlay immediately. Reporting
-					// from inside play lets its pause reenter AVPlayer before
-					// play finished, which macOS 15 follows with another play.
-					dispatch := v.Dispatch
-					v.Dispatch = func(ev driver.Event) {
-						if ev.Kind == driver.EventVideoPlay {
-							t.Error("reported play before the native play operation returned")
-						}
-						dispatch(ev)
-					}
 					videoPlayer(t).Send(sel("play"))
-					v.Dispatch = dispatch
 					mu.Lock()
 					replayed = objc.Send[float32](videoPlayer(t), sel("rate"))
 					mu.Unlock()

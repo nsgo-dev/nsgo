@@ -48,7 +48,17 @@ type Video struct {
 type videoStatus struct {
 	loaded, failed, buffering bool
 	play                      videoPlayback
+	// settling is until when the player may still post rate changes it finishes late, after the backend's own play or pause (asked); pending says one came meanwhile, for reason.
+	settling time.Time
+	pending  bool
+	reason   int
 }
+
+// videoSettle is how long after the backend's own play or pause the player's rate changes are followed only once they settle. AVPlayer can finish a play only after a pause asked for right after it, and then post that play and the pause once more: on macOS 15 on Intel, a pause the app makes just after the controls played is followed, after it returned, by a play and, some 40ms later, a pause again.
+const videoSettle = 500 * time.Millisecond
+
+// asked records that the backend is about to play or pause the player itself.
+func (st *videoStatus) asked() { st.settling = time.Now().Add(videoSettle) }
 
 // cmTime is CoreMedia's CMTime.
 type cmTime struct {
@@ -139,6 +149,11 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 		v.observe()
 	}
 	if v.player != 0 {
+		pausedChanged := reopened || c.Paused != old.Paused
+		// A play or pause the controls made while the player settled is followed first, so the app's unchanged Paused is not applied over it.
+		if !pausedChanged {
+			v.settle(v.status)
+		}
 		play := &v.status.play
 		v.player.Send(sel("setMuted:"), c.Muted)
 		v.player.Send(sel("setVolume:"), c.Volume)
@@ -148,18 +163,21 @@ func (v *Video) Configure(c *driver.VideoConfig) {
 		}
 		// What the controls or the system did holds until Paused changes (videoPlayback). The player posts its rate change before it returns, so the state it reaches is recorded first.
 		switch {
-		case !play.configure(reopened || c.Paused != old.Paused):
+		case !play.configure(pausedChanged):
 			if play.playing && c.Rate != old.Rate {
+				v.status.asked()
 				v.player.Send(sel("setRate:"), c.Rate)
 			}
 		case c.Paused:
 			play.applied(false)
+			v.status.asked()
 			v.player.Send(sel("pause"))
 		default:
 			if play.completed || v.atEnd() {
 				v.player.Send(sel("seekToTime:"), cmTimeOf(0))
 			}
 			play.applied(true)
+			v.status.asked()
 			v.player.Send(sel("setRate:"), c.Rate)
 		}
 	}
@@ -256,6 +274,7 @@ func (v *Video) open() {
 		st.play.ended(v.config.Repeat)
 		v.Dispatch(driver.Event{Kind: driver.EventEnd})
 		if v.config.Repeat {
+			st.asked()
 			v.player.Send(sel("seekToTime:"), cmTimeOf(0))
 			v.player.Send(sel("play"))
 		}
@@ -269,17 +288,19 @@ func (v *Video) open() {
 	ended.Release()
 	// The player's rate changes when its controls, the PiP window, Control Center or the system play or pause it (macOS 12 and iOS 15 say why).
 	rated := objcblock.New(func(_ objc.Block, note objc.ID) {
-		if v.status == st && v.player != 0 {
-			// AVPlayer can post while play or pause is still changing its
-			// internal state. Let that operation return before reporting it:
-			// an app reacting immediately must not reenter that operation.
-			reason := rateReason(note)
-			OnMain(func() {
-				if v.status == st && v.player != 0 {
-					v.rateChanged(reason)
-				}
-			})
+		if v.status != st || v.player == 0 {
+			return
 		}
+		reason := rateReason(note)
+		// After the backend's own play or pause, what the player posts may be an earlier change it finished late: follow the rate it settles on.
+		if wait := time.Until(st.settling); wait > 0 {
+			if !st.pending {
+				time.AfterFunc(wait, func() { OnMain(func() { v.settle(st) }) })
+			}
+			st.pending, st.reason = true, reason
+			return
+		}
+		v.rateChanged(reason)
 	})
 	v.rateToken = center.Send(selAddObserver, NSString("AVPlayerRateDidChangeNotification"), v.player, queue, rated).Send(sel("retain"))
 	rated.Release()
@@ -492,6 +513,7 @@ func (v *Video) watchSystemPauses(st *videoStatus) {
 		if notificationInt(note, "AVAudioSessionInterruptionTypeKey") == began {
 			v.systemPause(driver.VideoPauseInterruption)
 		} else if notificationInt(note, "AVAudioSessionInterruptionOptionKey")&shouldResume != 0 && st.play.resume() {
+			st.asked()
 			v.player.Send(sel("setRate:"), v.config.Rate)
 			v.rateChanged(driver.VideoPauseInterruption)
 		}
@@ -540,9 +562,18 @@ func (v *Video) systemPause(reason int) {
 	st := v.status
 	st.play.expect(reason)
 	if st.play.playing {
+		st.asked()
 		v.player.Send(sel("pause"))
 	}
 	v.rateChanged(reason)
+}
+
+// settle follows the rate the player settled on, when it posted rate changes while it settled after the backend's own play or pause.
+func (v *Video) settle(st *videoStatus) {
+	if v.status == st && v.player != 0 && st.pending {
+		st.pending = false
+		v.rateChanged(st.reason)
+	}
 }
 
 // rateChanged follows a play or pause the player made on its own, reporting it once; reason is a pause's unless the system said why before. A pause at the item's end is EventEnd's.
@@ -639,6 +670,7 @@ func (v *Video) Seek(position time.Duration) {
 		v.player.Send(sel("seekToTime:toleranceBefore:toleranceAfter:"), cmTimeOf(position), zero, zero)
 		if replay && !v.config.Paused {
 			play.applied(true)
+			v.status.asked()
 			v.player.Send(sel("setRate:"), v.config.Rate)
 			v.followAudio()
 		}
