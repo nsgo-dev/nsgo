@@ -4663,7 +4663,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             if (action == MotionEvent.ACTION_DOWN) routed = route(e);
             if (routed != null) {
                 if (action != MotionEvent.ACTION_DOWN) deliver(routed, e);
-                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) routed = null;
+                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    routed = null;
+                    // A group routed to that routes on itself ends its touch here, not below.
+                    childrenOnly = false;
+                }
                 return true;
             }
             if (node != null && node.followsGestures()) {
@@ -4700,8 +4704,11 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                         || c.area != null && x >= c.area[0] * density && y >= c.area[1] * density
                         && x < (c.area[0] + c.area[2]) * density && y < (c.area[1] + c.area[3]) * density;
                 if (!slop && !area) continue;
-                if (child instanceof Group) ((Group) child).childrenOnly = !slop;
+                Group group = child instanceof Group ? (Group) child : null;
+                if (group != null) group.childrenOnly = !slop;
                 if (deliver(child, e)) return child;
+                // A child that turns the down away sees no up to clear this with, so clear the mark here.
+                if (group != null) group.childrenOnly = false;
             }
             return null;
         }
