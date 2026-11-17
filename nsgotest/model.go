@@ -309,8 +309,7 @@ func (a *App) closed(surface *core.Tree) {
 	a.showMenu()
 }
 
-// viewItemNames identifies items that require a view even when ID is zero.
-// Names also keep malformed batches useful as test failures.
+// viewItemNames identifies items that require a view even when ID is zero. Names also keep malformed batches useful as test failures.
 var viewItemNames = map[driver.ItemKind]string{
 	driver.ItemInsert:             "ItemInsert",
 	driver.ItemRemove:             "ItemRemove",

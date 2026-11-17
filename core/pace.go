@@ -188,12 +188,10 @@ func (t *Tree) makeNow(n *node) {
 	}
 }
 
-// makeCommanded drops commands whose targets left the tree, then makes
-// the views the remaining commands name before a backend receives them.
+// makeCommanded drops commands whose targets left the tree, then makes the views the remaining commands name before a backend receives them.
 func (t *Tree) makeCommanded() {
 	kept := t.commands[:0]
-	// Queued scrolls have already contributed to core's predicted offset.
-	// Cancel them in reverse order so no unsent offset or count survives.
+	// Queued scrolls have already contributed to core's predicted offset. Cancel them in reverse order so no unsent offset or count survives.
 	for i := len(t.commands) - 1; i >= 0; i-- {
 		it := &t.commands[i]
 		if it.ID == 0 {
@@ -233,8 +231,7 @@ func (t *Tree) makeCommanded() {
 	}
 }
 
-// Commands on retained web or native views may still run out of the tree;
-// moving focus or scrolling instead requires a place showing the content.
+// Commands on retained web or native views may still run out of the tree; moving focus or scrolling instead requires a place showing the content.
 func commandNeedsPlacement(kind driver.ItemKind) bool {
 	switch kind {
 	case driver.ItemFocus, driver.ItemBlur, driver.ItemAccessibilityFocus,

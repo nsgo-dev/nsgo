@@ -39,8 +39,7 @@ func TestRefFocusInUnplacedHolder(t *testing.T) {
 	if !app.Find("field").Focused {
 		t.Fatal("placed input did not take focus")
 	}
-	// A scroll queued just before detaching is dropped; it must not leave
-	// an unacknowledged scroll count that offsets later reports forever.
+	// A scroll queued just before detaching is dropped; it must not leave an unacknowledged scroll count that offsets later reports forever.
 	app.Post(func() { scroll.ScrollToEnd(false); shown.Set(false) })
 	app.Settle()
 	app.Post(func() { shown.Set(true); scroll.ScrollTo(core.Point{Y: 30}, false) })
