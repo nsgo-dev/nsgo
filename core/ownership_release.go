@@ -6,4 +6,4 @@ package core
 type graphOwner struct{}
 
 func newGraphOwner(bool) graphOwner { return graphOwner{} }
-func (graphOwner) check()           {}
+func (*runtime) check()             {}

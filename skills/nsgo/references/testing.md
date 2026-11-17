@@ -32,7 +32,7 @@ An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, starts wi
 
 Prefer what a user sees, text and roles, and set `TestID` on elements where text repeats or is translated. Tests read words in the language they run in.
 
-Keep each graph on the goroutine that created it, cleanup included. Signal writes, effect/memo scheduling and commits from another goroutine panic in tests and development builds; use `cx.Post` from workers and wait through the app's steps. An internal engine panic still fails the test, even though a shipped app isolates it to that engine.
+Keep each graph on the goroutine that created it, cleanup included. Signal writes, new effects and memos, batches and commits from another goroutine panic in tests and development builds when they land while the app is idle (`-race` catches the rest); use `cx.Post` from workers and wait through the app's steps. An internal engine panic still fails the test, even though a shipped app isolates it to that engine.
 
 ## Steps
 

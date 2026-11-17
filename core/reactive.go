@@ -813,7 +813,6 @@ func (c *computation) run() {
 }
 
 func (rt *runtime) enqueue(c *computation) {
-	rt.check()
 	if rt.aborted {
 		return
 	}
@@ -835,7 +834,6 @@ func (rt *runtime) maybeFlush() {
 }
 
 func (rt *runtime) flush() {
-	rt.check()
 	if rt.aborted {
 		return
 	}
@@ -991,7 +989,7 @@ func (s *Signal[T]) Get() T {
 }
 
 // GetUntracked returns the value without subscribing.
-func (s *Signal[T]) GetUntracked() T { s.rt.check(); return s.value }
+func (s *Signal[T]) GetUntracked() T { return s.value }
 
 // Set stores v and schedules the computations that read the signal.
 func (s *Signal[T]) Set(v T) {

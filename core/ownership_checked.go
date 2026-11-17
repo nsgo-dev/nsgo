@@ -14,8 +14,12 @@ func newGraphOwner(checked bool) graphOwner {
 	return graphOwner{}
 }
 
-func (o graphOwner) check() {
-	if o.goroutine != 0 && o.goroutine != currentGoroutine() {
+// check panics when the calling goroutine does not own the graph. Go has no cheap goroutine ID, so the lookup runs only while the graph is idle: inside a batch, a flush or a computation, the call comes from code the graph itself is running on its goroutine, unless another goroutine races with it, which is left to the race detector. Checking every write there would make a development build's commits several times slower.
+func (rt *runtime) check() {
+	if rt.goroutine == 0 || rt.batch > 0 || rt.flushing || rt.observer != nil {
+		return
+	}
+	if rt.goroutine != currentGoroutine() {
 		panic("core: the reactive graph belongs to another goroutine; use Scope.Post")
 	}
 }
