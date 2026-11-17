@@ -268,7 +268,7 @@ func (v *Video) open() {
 		v.player.Send(sel("currentItem")), queue, ended).Send(sel("retain"))
 	ended.Release()
 	// The player's rate changes when its controls, the PiP window, Control Center or the system play or pause it (macOS 12 and iOS 15 say why).
-	rated := objc.NewBlock(func(_ objc.Block, note objc.ID) {
+	rated := objcblock.New(func(_ objc.Block, note objc.ID) {
 		if v.status == st && v.player != 0 {
 			v.rateChanged(rateReason(note))
 		}

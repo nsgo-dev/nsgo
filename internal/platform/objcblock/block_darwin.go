@@ -2,11 +2,9 @@
 
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2025 The Ebitengine Authors
-// Callback sharing follows purego's objc block bridge; NSGo pins templates,
-// allocates descriptors in native memory and checks block allocation.
+// Callback sharing follows purego's objc block bridge; NSGo pins templates, allocates descriptors in native memory and checks block allocation.
 
-// Package objcblock creates Objective-C blocks whose storage remains valid
-// across Go stack moves and garbage collection.
+// Package objcblock creates Objective-C blocks whose storage remains valid across Go stack moves and garbage collection.
 package objcblock
 
 import (
@@ -21,10 +19,7 @@ import (
 	"github.com/ebitengine/purego/objc"
 )
 
-// The Apple Block ABI: https://clang.llvm.org/docs/Block-ABI-Apple.html.
-// Descriptors and signatures live in native memory for the process lifetime,
-// one per callback type. The runtime owns each block and calls dispose when
-// its last reference goes away; only then may Go forget its closure.
+// The Apple Block ABI: https://clang.llvm.org/docs/Block-ABI-Apple.html. Descriptors and signatures live in native memory for the process lifetime, one per callback type. The runtime owns each block and calls dispose when its last reference goes away; only then may Go forget its closure.
 type descriptor struct {
 	_                             structs.HostLayout
 	reserved, size, copy, dispose uintptr
@@ -64,11 +59,7 @@ func initialize() {
 	dispose = purego.NewCallback(func(block objc.Block) { functions.Delete(block) })
 }
 
-// New returns a retained block for fn, whose first argument must be objc.Block.
-// It supports the scalar and pointer signatures the platform backends use.
-// The caller releases its reference with Block.Release after the receiving
-// API has copied the block, or once the callback is no longer needed.
-// Invoke it through native APIs, not purego's Go-only Block.Invoke cache.
+// New returns a retained block for fn, whose first argument must be objc.Block. It supports the scalar and pointer signatures the platform backends use. The caller releases its reference with Block.Release after the receiving API has copied the block, or once the callback is no longer needed. Invoke it through native APIs, not purego's Go-only Block.Invoke cache.
 func New(fn any) objc.Block {
 	setup.Do(initialize)
 	return newBlock(fn, copyNative)
@@ -80,8 +71,7 @@ func newBlock(fn any, copyBlock func(*literal) objc.Block) objc.Block {
 		panic("objcblock: expected a non-nil function")
 	}
 	layout := template(value.Type())
-	// A uintptr hides a Go stack address from stack relocation. Pin the
-	// template on the heap, and pass a typed pointer through purego instead.
+	// A uintptr hides a Go stack address from stack relocation. Pin the template on the heap, and pass a typed pointer through purego instead.
 	var pin runtime.Pinner
 	pin.Pin(&layout)
 	defer pin.Unpin()

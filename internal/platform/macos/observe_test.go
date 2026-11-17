@@ -15,8 +15,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// Each child creates and closes many windows in one process; fresh children
-// also exercise the observers installed only when the first window opens.
+// Each child creates and closes many windows in one process; fresh children also exercise the observers installed only when the first window opens.
 func TestWindowObserversSurviveGC(t *testing.T) {
 	if os.Getenv("NSGO_OBSERVER_STRESS_CHILD") != "1" {
 		executable, err := os.Executable()

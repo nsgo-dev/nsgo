@@ -95,8 +95,7 @@ func TestBlockConcurrentCreationUnderGC(t *testing.T) {
 				go func() {
 					defer close(done)
 					want := int64(worker*256 + i)
-					// Start each creation on a fresh small stack, while the
-					// other workers allocate, collect and reuse old stacks.
+					// Start each creation on a fresh small stack, while the other workers allocate, collect and reuse old stacks.
 					block := New(func(_ objc.Block, value int64) int64 { return value + want })
 					header := (*literal)(nativeAddress(block))
 					var invoke func(objc.Block, int64) int64
