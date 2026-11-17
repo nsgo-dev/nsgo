@@ -27,9 +27,9 @@ ui.Input{
 
 ## Focus and the keyboard
 
-A `Ref`'s focus, blur and scroll commands do nothing while its element belongs to unplaced `Holder` content. Commands queued before the element leaves are also dropped. Place the content and issue a new command to act on it; old commands are never replayed.
-
 `Ref` focuses a field and blurs it, and `cx.DismissKeyboard()` closes the software keyboard. `OnFocus` and `OnBlur` follow the focus, and `View.OnFocus`/`OnBlur` do the same for any focusable view. A focused view that leaves the tree, as its `Show` closes or its row goes, hears `OnBlur` once, after the commit that removed it or, when the platform reports the next focus first, before that view's `OnFocus`, and the views around it that stay hear `OnFocusOut`.
+
+A `Ref`'s focus, blur, scroll and zoom requests do nothing while its element is in a `Holder`'s content that no place shows, and those still queued when the element leaves the tree are dropped. Showing the content again does not replay them: ask again once it is placed.
 
 ```go
 email := &core.Ref{}

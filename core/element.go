@@ -566,10 +566,9 @@ func (s Scroll) Render(*Scope) Node { return s }
 
 func (s Scroll) mountIn(t *Tree, cx *Scope, parent *node) { t.mountScroll(cx, parent, s) }
 
-// Ref refers to a mounted element: an overlay's anchor, focus, its
-// bounds. Its zero value is ready to use; pass its address in an
-// element's Ref field. Focus, blur and scroll requests are dropped in
-// unplaced Holder content; placing it again does not replay them.
+// Ref refers to a mounted element: an overlay's anchor, focus, its bounds. Its zero value is ready to use; pass its address in an element's Ref field.
+//
+// Its focus, blur, scroll, zoom and reveal requests do nothing while the element is in a Holder's content that no place shows, and those still queued when it leaves the tree are dropped; placing the content again does not replay them.
 type Ref struct {
 	t *Tree
 	n *node
