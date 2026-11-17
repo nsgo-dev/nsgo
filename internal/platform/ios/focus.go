@@ -158,8 +158,7 @@ func (v *view) focusable() bool {
 	return true
 }
 
-// focusView asks tvOS's focus engine to move to this stop. Touch-only
-// UIKit continues to focus inputs, without opening a keyboard for views.
+// focusView asks tvOS's focus engine to move to this stop. Touch-only UIKit continues to focus inputs, without opening a keyboard for views.
 func (s *surface) focusView(v *view) {
 	system := objc.ID(apple.Class("UIFocusSystem")).Send(sel("focusSystemForEnvironment:"), v.native)
 	if system != 0 {

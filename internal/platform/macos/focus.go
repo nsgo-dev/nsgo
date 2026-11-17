@@ -118,9 +118,7 @@ func (s *surface) tabFromSurface(backward bool) {
 	s.window.Send(sel(action), root.native)
 }
 
-// focus moves the first responder to a field or a keyboard stop. Clearing
-// the field editor first also lets a command issued by a mouse press move
-// focus: acceptsFirstResponder otherwise keeps that click in the editor.
+// focus moves the first responder to a field or a keyboard stop. Clearing the field editor first also lets a command issued by a mouse press move focus: acceptsFirstResponder otherwise keeps that click in the editor.
 func (v *view) focus() {
 	if !v.inFocusScope() {
 		return

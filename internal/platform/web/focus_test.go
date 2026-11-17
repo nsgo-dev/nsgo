@@ -77,7 +77,6 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 	wait("the explicit stop's focus", func() bool { return find("explicit").Equal(doc.Get("activeElement")) })
 	scope.Post(explicit.Blur)
 	wait("the explicit stop's blur", func() bool { return !find("explicit").Equal(doc.Get("activeElement")) })
-	// This test owns the surface's engine; browser listeners last until
-	// the per-test page closes, as in the backend's other browser tests.
+	// This test owns the surface's engine; browser listeners last until the per-test page closes, as in the backend's other browser tests.
 	s.engine.Close()
 }

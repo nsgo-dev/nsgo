@@ -121,9 +121,7 @@ func (d *TouchDrag) Move(c *driver.ScrollConfig, at driver.Point, now time.Time)
 	return d.raw
 }
 
-// Refreshes reports whether releasing the finger refreshes, using the
-// pull before rubber banding so the threshold does not depend on the
-// viewport's size or whether the content bounces.
+// Refreshes reports whether releasing the finger refreshes, using the pull before rubber banding so the threshold does not depend on the viewport's size or whether the content bounces.
 func (d *TouchDrag) Refreshes(c *driver.ScrollConfig, refreshing bool) bool {
 	var offset driver.Point
 	SetAlong(c, &offset, d.raw)

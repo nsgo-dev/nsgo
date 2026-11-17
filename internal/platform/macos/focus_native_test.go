@@ -46,9 +46,7 @@ func programmaticFocusApp(title string) func(*core.Scope) core.Node {
 	}
 }
 
-// Run owns AppKit's process lifetime, so this test gets a process of its
-// own. The assertions read AppKit's real first responder and the mounted
-// focus style after the engine has handled its native focus reports.
+// Run owns AppKit's process lifetime, so this test gets a process of its own. The assertions read AppKit's real first responder and the mounted focus style after the engine has handled its native focus reports.
 func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 	if os.Getenv("NSGO_TEST_FOCUS_PROCESS") != t.Name() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -132,8 +130,7 @@ func TestRefFocusUsesNativeKeyboardStops(t *testing.T) {
 					text string
 				}{{49, " "}, {36, "\r"}} {
 					for _, repeat := range []uint64{0, 1} {
-						// Apple's arm64 ABI packs the final bool and uint16
-						// together; on x64 the arguments have separate slots.
+						// Apple's arm64 ABI packs the final bool and uint16 together; on x64 the arguments have separate slots.
 						args := []any{uint(10), apple.CGPoint{}, uint(0), float64(0), objc.Send[int](live.window, sel("windowNumber")), objc.ID(0), apple.NSString(k.text), apple.NSString(k.text)}
 						if runtime.GOARCH == "arm64" {
 							args = append(args, repeat|uint64(k.code)<<16)

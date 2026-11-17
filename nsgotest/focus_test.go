@@ -7,9 +7,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// Ref.Focus goes through mount commands, unlike the Focus test step,
-// which uses Tab. This catches a model that promises focus the native
-// command handler cannot give.
+// Ref.Focus goes through mount commands, unlike the Focus test step, which uses Tab. This catches a model that promises focus the native command handler cannot give.
 func TestRefFocusMatchesThePlatformsKeyboardStops(t *testing.T) {
 	for _, env := range []driver.Environment{
 		{OS: driver.OSMacOS}, {OS: driver.OSWindows}, {OS: driver.OSLinux},

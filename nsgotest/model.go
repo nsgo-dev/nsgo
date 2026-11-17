@@ -788,8 +788,7 @@ func (a *App) apply(b *driver.MountBatch) {
 	}
 }
 
-// canFocus follows the platform's imperative focus contract. A command
-// to a plain view, a hidden stop or a view below a modal changes nothing.
+// canFocus follows the platform's imperative focus contract. A command to a plain view, a hidden stop or a view below a modal changes nothing.
 func (a *App) canFocus(v *View) bool {
 	if v == nil || v.disabled(nil) {
 		return false
