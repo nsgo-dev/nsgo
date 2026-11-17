@@ -9,7 +9,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// A transparent window is a borderless NsgoWindow, which the class lets take the keyboard, with a clear background and no opaque content behind the app's views, so the desktop shows wherever they draw nothing and AppKit's shadow follows what they draw. Leaving transparency puts the title bar back, keeping the content's size and where it is. A window off the taskbar is out of the Window menu and Cmd+`; the Dock is the app's activation policy (setDockVisible).
+// A transparent window is a borderless NsgoWindow, which the class lets take the keyboard, with a clear background and no opaque content behind the app's views, so the desktop shows wherever they draw nothing. AppKit casts its shadow from what the window draws but keeps it until told otherwise, so a transparent window's shadow is recomputed after each batch, as a pet's pose changes; motion between batches, such as a running animation, catches up at the next one. Leaving transparency puts the title bar back, keeping the content's size and where it is. A window off the taskbar is out of the Window menu and Cmd+`; the Dock is the app's activation policy (setDockVisible).
 
 var selSetHasShadow = sel("setHasShadow:")
 
@@ -49,6 +49,13 @@ func (s *surface) setTransparent(on bool) {
 	s.refresh()
 }
 
+// reshadow has AppKit cast a transparent window's shadow again from what the window now draws.
+func (s *surface) reshadow() {
+	if s.transparent && s.window != 0 && objc.Send[bool](s.window, sel("hasShadow")) {
+		s.window.Send(sel("invalidateShadow"))
+	}
+}
+
 // setSkipTaskbar keeps the window out of the Window menu and Cmd+`, or puts it back.
 func (s *surface) setSkipTaskbar(on bool) {
 	w := s.window
@@ -62,4 +69,9 @@ func (s *surface) setSkipTaskbar(on bool) {
 		behavior &^= ignoresCycle
 	}
 	w.Send(sel("setCollectionBehavior:"), behavior)
+}
+
+// ownWindow reports whether the surface shows in a window of its own, which turns transparent and leaves the Window menu: not a view a host embeds, the app's own surface or a tray icon's, which show in none, or a panel.
+func (s *surface) ownWindow() bool {
+	return !s.embedded && s.window != 0 && s.kind == driver.SurfaceWindow
 }

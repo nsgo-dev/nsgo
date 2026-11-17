@@ -97,6 +97,10 @@ func (w *window) environment() driver.Environment {
 		Lifecycle:        w.lifecycle(),
 		Speak:            speakAvailable(),
 
+		// Only a window opened transparent has the composition that shows what is behind it (look.go).
+		CanMakeWindowsTransparent: w.canTransparent && !w.embedded,
+		CanSkipTaskbar:            w.kind == driver.SurfaceWindow && !w.embedded && !(w.primary && w.opts.Hidden),
+
 		// The toast notifier's schedule, which has no repeats.
 		ScheduledNotifications: true,
 

@@ -137,7 +137,7 @@ func WindowMaterial(material core.WindowMaterial) Option {
 	return func(o *options) { o.platform.Material = material }
 }
 
-// WindowTransparent opens the main window without a background or frame, so what is behind it shows wherever the app draws nothing, on macOS, Windows and Linux: desktop.WindowOptions.Transparent says how, and desktop.SetWindowTransparent changes it later.
+// WindowTransparent opens the main window without a background or frame, so what is behind it shows wherever the app draws nothing, on macOS, Windows and Linux: desktop.WindowOptions.Transparent says how, desktop.SetWindowTransparent changes it later, and desktop.CanMakeWindowsTransparent says whether what is behind the window shows.
 func WindowTransparent() Option {
 	return func(o *options) { o.platform.Transparent = true }
 }
@@ -147,7 +147,7 @@ func WindowNoShadow() Option {
 	return func(o *options) { o.platform.NoShadow = true }
 }
 
-// SkipTaskbar keeps the main window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+` (desktop.WindowOptions.SkipTaskbar); desktop.SetSkipTaskbar changes it later.
+// SkipTaskbar keeps the main window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+` (desktop.WindowOptions.SkipTaskbar); desktop.SetSkipTaskbar changes it later, and desktop.CanSkipTaskbar says whether it takes effect.
 func SkipTaskbar() Option {
 	return func(o *options) { o.platform.SkipTaskbar = true }
 }

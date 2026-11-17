@@ -3,7 +3,6 @@
 package linux
 
 import (
-	"log"
 	"sync"
 
 	"github.com/ebitengine/purego"
@@ -11,7 +10,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// GTK 4 draws a window with an alpha channel wherever the display composites, an RGBA visual on X11 and any surface on Wayland, so a transparent window is an undecorated one whose theme background is gone: it loses the style class that paints it, and a style of NSGo's own clears it and the shadow GTK draws. NoShadow clears the shadow GTK draws around its own decorations; a window manager's, as on X11 with server-side ones, stays. GTK 4 keeps a window off the task list only on X11, through its GdkX11Surface's hint, and Wayland has no such hint.
+// GTK 4 draws a window with an alpha channel wherever the display composites, an RGBA visual on X11 and any surface on Wayland, so a transparent window is an undecorated one whose theme background is gone: it loses the style class that paints it, and a style of NSGo's own clears it and the shadow GTK draws. NoShadow clears the shadow GTK draws around its own decorations; a window manager's, as on X11 with server-side ones, stays. Without a compositor, as on X11 without a compositing manager, there is no alpha to show through and the window shows black where the app draws nothing, which the environment says (CanMakeWindowsTransparent). GTK 4 keeps a window off the task list only on X11, through its GdkX11Surface's hint, and Wayland has no such hint, which the environment says too (CanSkipTaskbar).
 
 // lookCSS clears the theme's background and shadow from windows of the classes NSGo gives them.
 const lookCSS = `
@@ -22,24 +21,53 @@ window.nsgo-no-shadow, window.nsgo-no-shadow.csd { box-shadow: none; }
 var (
 	gtkWidgetAddCSSClass               func(widget uintptr, class *byte)
 	gtkWidgetRemoveCSSClass            func(widget uintptr, class *byte)
+	gdkDisplayIsComposited             func(display uintptr) int32
+	gdkDisplayIsRGBA                   func(display uintptr) int32
 	gdkX11SurfaceSetSkipTaskbarHint    func(surface uintptr, skip int32)
 	gdkX11SurfaceSetSkipTaskbarHintSet bool
-	// bindLook binds what windows' looks need and gives the display lookCSS, above the theme, once.
+	// bindLook binds what windows' looks need, once.
 	bindLook = sync.OnceFunc(func() {
 		purego.RegisterLibFunc(&gtkWidgetAddCSSClass, gtkLib, "gtk_widget_add_css_class")
 		purego.RegisterLibFunc(&gtkWidgetRemoveCSSClass, gtkLib, "gtk_widget_remove_css_class")
+		purego.RegisterLibFunc(&gdkDisplayIsComposited, gtkLib, "gdk_display_is_composited")
+		purego.RegisterLibFunc(&gdkDisplayIsRGBA, gtkLib, "gdk_display_is_rgba")
 		if _, err := purego.Dlsym(gtkLib, "gdk_x11_surface_set_skip_taskbar_hint"); err == nil {
 			purego.RegisterLibFunc(&gdkX11SurfaceSetSkipTaskbarHint, gtkLib, "gdk_x11_surface_set_skip_taskbar_hint")
 			gdkX11SurfaceSetSkipTaskbarHintSet = true
 		}
+	})
+	// addLookCSS gives the display lookCSS, above the theme, once a window needs it.
+	addLookCSS = sync.OnceFunc(func() {
 		provider := gtkCssProviderNew()
 		gtkCssProviderLoadFromString(provider, cstr(lookCSS))
 		// GTK_STYLE_PROVIDER_PRIORITY_APPLICATION.
 		gtkStyleContextAddForDisplay(gdkDisplayGetDefault(), provider, 600)
 	})
-	// noTaskListHint is logged once where the session has no hint to keep a window off its task list.
-	noTaskListHint sync.Once
 )
+
+// ownWindow reports whether the surface shows in a top-level window of its own, which turns transparent and leaves the task list: not a view a host embeds, the app's own surface (Options.Hidden), a panel or a tray icon's.
+func (w *window) ownWindow() bool {
+	return w.win != 0 && !w.embedded && !(w.primary && w.opts.Hidden) && w.kind == driver.SurfaceWindow
+}
+
+// displayComposites reports whether the display shows a window's alpha over what is behind it: a compositor with an RGBA visual, as every Wayland one and an X11 compositing manager are.
+func displayComposites() bool {
+	bindLook()
+	display := gdkDisplayGetDefault()
+	return display != 0 && gdkDisplayIsComposited(display) != 0 && gdkDisplayIsRGBA(display) != 0
+}
+
+// skipTaskbarHint reports whether GDK has the hint that keeps a window off the task list: only on X11, Xwayland included.
+func skipTaskbarHint() bool {
+	if bindLook(); !gdkX11SurfaceSetSkipTaskbarHintSet {
+		return false
+	}
+	if bindX11Panels(); !x11PanelsReady {
+		return false
+	}
+	display := gdkDisplayGetDefault()
+	return display != 0 && gTypeIsA(display, gdkX11DisplayGetType()) != 0
+}
 
 // applyLook opens the window as opts ask: transparent, without a shadow, off the task list.
 func (w *window) applyLook(opts Options) {
@@ -57,6 +85,7 @@ func (w *window) applyLook(opts Options) {
 // setCSSClass gives the window class, or takes it away.
 func (w *window) setCSSClass(class string, on bool) {
 	bindLook()
+	addLookCSS()
 	if on {
 		gtkWidgetAddCSSClass(w.win, cstr(class))
 	} else {
@@ -84,20 +113,13 @@ func (w *window) setShadow(on bool) {
 	}
 }
 
-// setSkipTaskbar keeps the window off the X11 task list, or puts it back; where GDK does not draw on X11 it logs once that it cannot.
+// setSkipTaskbar keeps the window off the X11 task list, or puts it back; elsewhere it does nothing, as CanSkipTaskbar says.
 func (w *window) setSkipTaskbar(on bool) {
-	if w.win == 0 {
+	if w.win == 0 || !skipTaskbarHint() {
 		return
 	}
-	bindLook()
-	if _, _, ok := w.x11Window(); !ok || !gdkX11SurfaceSetSkipTaskbarHintSet {
-		if on {
-			noTaskListHint.Do(func() {
-				log.Print("nsgo: only X11 has a hint to keep a window off the task list: the window stays in it")
-			})
-		}
-		return
-	}
+	// The hint is the GdkSurface's, which the window has once realized.
+	gtkWidgetRealize(w.win)
 	if surface := gtkNativeGetSurface(w.win); surface != 0 {
 		gdkX11SurfaceSetSkipTaskbarHint(surface, boolInt(on))
 	}

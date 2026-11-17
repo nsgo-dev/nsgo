@@ -67,6 +67,9 @@ type Environment struct {
 	Purchases bool
 	// ScheduledNotifications says ItemShowNotification schedules a notification for a later At, which the system shows with the app's process ended.
 	ScheduledNotifications bool
+	// CanMakeWindowsTransparent says SurfaceConfig.Transparent and WindowSetTransparent show what is behind the surface's window wherever the app draws nothing, and CanSkipTaskbar that SurfaceConfig.SkipTaskbar and WindowSetSkipTaskbar keep it off the taskbar; both false without a desktop window of the surface's own (an embedded view, the app's own hidden surface, a panel, a tray icon), and where the platform or session has no way (see desktop.CanMakeWindowsTransparent and desktop.CanSkipTaskbar).
+	CanMakeWindowsTransparent bool
+	CanSkipTaskbar            bool
 	// VerticalBarEdge is the edge the system chose for a vertical bar where it may place one, as iOS 27.1 does; Unspecified elsewhere. It is not geometry: Tree.Resize reports that.
 	VerticalBarEdge VerticalBarEdge
 	// RTL lays the app out right to left.

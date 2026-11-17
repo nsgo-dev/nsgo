@@ -855,3 +855,21 @@ func windowCommands(items []driver.MountItem) []driver.WindowCommand {
 	}
 	return out
 }
+
+// Env reports whether the window can be transparent and skip the taskbar as its environment says, and a scope reading them follows a change.
+func TestWindowLookCapabilities(t *testing.T) {
+	var transparent, taskbar []bool
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		cx.Effect(func() { transparent = append(transparent, cx.Env().CanMakeWindowsTransparent()) })
+		cx.Effect(func() { taskbar = append(taskbar, cx.Env().CanSkipTaskbar()) })
+		return View{}
+	})
+	h.commit()
+	h.tree.SetEnvironment(Environment{CanMakeWindowsTransparent: true})
+	h.commit()
+	h.tree.SetEnvironment(Environment{CanMakeWindowsTransparent: true, CanSkipTaskbar: true})
+	h.commit()
+	if !slices.Equal(transparent, []bool{false, true}) || !slices.Equal(taskbar, []bool{false, true}) {
+		t.Fatalf("transparent = %v, taskbar = %v", transparent, taskbar)
+	}
+}

@@ -441,7 +441,8 @@ func (s *surface) dragWindow(event objc.ID) bool {
 	if !dragsWindow(hit, up) {
 		return false
 	}
-	if objc.Send[int](event, sel("clickCount")) == 2 {
+	// A transparent window has no title bar whose double-click zooms or minimizes it, as a desktop pet's must not: it drags as for one click.
+	if objc.Send[int](event, sel("clickCount")) == 2 && !s.transparent {
 		defaults := objc.ID(apple.Class("NSUserDefaults")).Send(sel("standardUserDefaults"))
 		switch apple.GoString(defaults.Send(sel("stringForKey:"), apple.NSString("AppleActionOnDoubleClick"))) {
 		case "Minimize":

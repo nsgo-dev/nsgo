@@ -32,6 +32,7 @@ type Env struct {
 	appleSignIn          *Signal[bool]
 	purchases            *Signal[bool]
 	scheduled            *Signal[bool]
+	transparent, taskbar *Signal[bool]
 	fontScale, ratio     *Signal[float32]
 	// locale and systemRTL are the platform's or the host's; forced is
 	// the locale Scope.SetLocale forces.
@@ -98,6 +99,8 @@ func newEnv(cx *Scope, app *Env) *Env {
 		appleSignIn:      NewSignal(cx, false),
 		purchases:        NewSignal(cx, false),
 		scheduled:        NewSignal(cx, false),
+		transparent:      NewSignal(cx, false),
+		taskbar:          NewSignal(cx, false),
 		fontScale:        NewSignal(cx, float32(1)),
 		ratio:            NewSignal(cx, float32(1)),
 		locale:           NewSignal(cx, ""),
@@ -206,6 +209,8 @@ func (e *Env) set(v Environment) {
 	e.appleSignIn.Set(v.SignInWithApple)
 	e.purchases.Set(v.Purchases)
 	e.scheduled.Set(v.ScheduledNotifications)
+	e.transparent.Set(v.CanMakeWindowsTransparent)
+	e.taskbar.Set(v.CanSkipTaskbar)
 	e.fontScale.Set(v.FontScale)
 	e.ratio.Set(v.PixelRatio)
 	e.locale.Set(v.Locale)
@@ -350,6 +355,12 @@ func (e *Env) CanPurchase() bool { return e.purchases.Get() }
 
 // CanScheduleNotifications reports whether a Notification with a later At or a Repeat is scheduled here, for the system to show with the app's process ended: on macOS and iOS in an app bundle, Android, and Windows for one without a Repeat. Elsewhere ShowNotification answers false for one without asking the platform.
 func (e *Env) CanScheduleNotifications() bool { return e.scheduled.Get() }
+
+// CanMakeWindowsTransparent reports whether the scope's desktop window shows what is behind it while transparent (WindowOptions.Transparent, SetWindowTransparent): the core's part of desktop.CanMakeWindowsTransparent, which apps use.
+func (e *Env) CanMakeWindowsTransparent() bool { return e.transparent.Get() }
+
+// CanSkipTaskbar reports whether WindowOptions.SkipTaskbar and SetSkipTaskbar keep the scope's desktop window off the taskbar: the core's part of desktop.CanSkipTaskbar, which apps use.
+func (e *Env) CanSkipTaskbar() bool { return e.taskbar.Get() }
 
 // RTL reports whether the app lays out right to left: as the language it
 // shows is written (Language), else the locale it forces, else as the

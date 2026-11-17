@@ -2,12 +2,9 @@
 
 package windows
 
-import (
-	"log"
-	"unsafe"
-)
+import "unsafe"
 
-// A transparent window is a popup without a frame, as NSH's is: a system frame around see-through content would draw a box nothing is in, and its system menu stays for the taskbar's menu. It draws through DirectComposition with alpha, as a window with a material does (material.go), clearing to nothing where the app draws nothing, and DWM draws it bare: no shadow and square corners. Only a window opened transparent has the composition, which WS_EX_NOREDIRECTIONBITMAP holds from the window's creation, so only such a window changes between transparent and framed later, clearing to white while framed. A framed window keeps the shadow its frame casts.
+// A transparent window is a popup without a frame, as NSH's is: a system frame around see-through content would draw a box nothing is in, and its system menu stays for the taskbar's menu. It draws through DirectComposition with alpha, as a window with a material does (material.go), clearing to nothing where the app draws nothing, and DWM draws it bare: no shadow and square corners. Only a window opened transparent has the composition, which WS_EX_NOREDIRECTIONBITMAP holds from the window's creation, so only such a window changes between transparent and framed later, clearing to white while framed, and only its environment reports CanMakeWindowsTransparent. A framed window keeps the shadow its frame casts.
 //
 // A window off the taskbar is a tool window, which neither the taskbar nor Alt+Tab lists; a framed one then shows a tool window's smaller caption. The taskbar adds or deletes the button of a window that shows as the style changes (ITaskbarList).
 
@@ -23,10 +20,9 @@ const (
 	taskbarDeleteTab = 5
 )
 
-// composeTransparent has a window opening transparent draw through DirectComposition, where the system has it; else it opens framed and opaque.
+// composeTransparent has a window opening transparent draw through DirectComposition, where the system has it; else it opens framed and opaque, and its environment says so (CanMakeWindowsTransparent).
 func (w *window) composeTransparent() {
 	if !compositionAvailable() {
-		log.Printf("nsgo: transparent windows need DirectComposition: the window stays opaque")
 		return
 	}
 	w.baseComposed, w.transparent, w.canTransparent = true, true, true

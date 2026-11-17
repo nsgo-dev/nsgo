@@ -55,11 +55,11 @@ type WindowOptions struct {
 	Workspaces WindowWorkspaces
 	// PointerEvents is where the window takes the pointer (SetWindowPointerEvents), from its first frame.
 	PointerEvents WindowPointerEvents
-	// Transparent leaves the window without a background or frame: what is behind it shows wherever the app draws nothing, as for a desktop pet or a widget, and WindowDrag views move it. desktop.SetWindowTransparent changes it later, which on Windows needs a window opened transparent.
+	// Transparent leaves the window without a background or frame: what is behind it shows wherever the app draws nothing, as for a desktop pet or a widget, and WindowDrag views move it. desktop.SetWindowTransparent changes it later, which on Windows needs a window opened transparent; desktop.CanMakeWindowsTransparent says in the window's scope whether what is behind it shows; where it does not, the window stays opaque.
 	Transparent bool
 	// NoShadow drops the system's shadow around the window; on Windows only a transparent window has none.
 	NoShadow bool
-	// SkipTaskbar keeps the window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+`; the Dock is the app's (desktop.SetDockVisible), and Wayland has no such hint.
+	// SkipTaskbar keeps the window off the Windows taskbar and Alt+Tab, off the task list on X11, and out of macOS's Window menu and Cmd+`; the Dock is the app's (desktop.SetDockVisible), and Wayland has no such hint (desktop.CanSkipTaskbar).
 	SkipTaskbar bool
 }
 

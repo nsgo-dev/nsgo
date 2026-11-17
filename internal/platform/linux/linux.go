@@ -121,6 +121,8 @@ type window struct {
 	settingsHandlers []uint64
 	// contrastHandler is the handler on GNOME's accessibility settings, which are not GTK's.
 	contrastHandler uint64
+	// compositedHandler is the handler on the display's composited property, which outlives the window.
+	compositedHandler uint64
 	// embedded is set for a host's widget (NewView): the host owns the
 	// window, its chrome and the main loop. app and opts start its engine
 	// once GTK first allocates it.
@@ -607,6 +609,10 @@ func (w *window) setupSettings() {
 	if settings := gnomeA11ySettingsForWatch(); settings != 0 {
 		w.contrastHandler = gSignalConnect(settings, "changed::high-contrast", cbSettingsChanged, w.handle)
 	}
+	// An X11 compositing manager starting or stopping changes whether a transparent window shows through (CanMakeWindowsTransparent).
+	if display := gdkDisplayGetDefault(); display != 0 && w.kind == driver.SurfaceWindow {
+		w.compositedHandler = gSignalConnect(display, "notify::composited", cbSettingsChanged, w.handle)
+	}
 }
 
 func settingsToWatch(colorScheme bool) []string {
@@ -772,6 +778,10 @@ func (w *window) releaseSurface() {
 	if w.contrastHandler != 0 {
 		gSignalHandlerDisconnect(gnomeA11ySettingsForWatch(), w.contrastHandler)
 		w.contrastHandler = 0
+	}
+	if w.compositedHandler != 0 {
+		gSignalHandlerDisconnect(gdkDisplayGetDefault(), w.compositedHandler)
+		w.compositedHandler = 0
 	}
 	w.releaseTextContexts()
 	if w.win != 0 {

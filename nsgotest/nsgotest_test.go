@@ -498,6 +498,29 @@ func TestTransparentWindowsAreRecorded(t *testing.T) {
 	}
 }
 
+// A window tells whether it can be transparent and skip the taskbar as the environment says: neither on Wayland without a compositor's alpha, both on Windows.
+func TestTransparentWindowCapabilities(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	app := StartApp(t, func(cx *core.Scope) {
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			text := func(s string) func(*core.Scope) core.Node {
+				return func(*core.Scope) core.Node { return core.Text{Content: s} }
+			}
+			return core.View{Children: []core.Node{
+				core.Show{When: func() bool { return desktop.CanMakeWindowsTransparent(cx) }, Then: text("see-through"), Else: text("opaque")},
+				core.Show{When: func() bool { return desktop.CanSkipTaskbar(cx) }, Then: text("off the taskbar"), Else: text("on the taskbar")},
+			}}
+		})
+	}, Environment(core.Environment{OS: core.OSLinux, Idiom: core.IdiomDesktop}))
+	app.Find("text:opaque")
+	app.Find("text:on the taskbar")
+	app.SetEnvironment(core.Environment{OS: core.OSWindows, Idiom: core.IdiomDesktop, CanMakeWindowsTransparent: true, CanSkipTaskbar: true})
+	app.Find("text:see-through")
+	app.Find("text:off the taskbar")
+}
+
 // Another window's shortcuts and menu bar leave the main window's, which Key and ChooseMenu reach, and a context menu any window shows chooses on that window.
 func TestOtherWindowsKeepTheirShortcutsAndMenus(t *testing.T) {
 	if Target() != "" {
