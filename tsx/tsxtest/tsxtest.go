@@ -30,6 +30,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 	"github.com/nsgo-dev/nsgo/tsx"
 	"github.com/nsgo-dev/nsgo/tsx/bundler"
@@ -487,9 +488,7 @@ type network struct {
 	requests []map[string]any
 }
 
-// answer is what a route's function returns for rec, which runs on the
-// test's goroutine as a step or wait settles, its VM's: a response, or a
-// promise of one, which the settles after look at until it is settled.
+// answer is what a route's function returns for rec, which runs on the test's goroutine as a step or wait settles, its VM's, also on a target (testhost.PostToTest): a response, or a promise of one, which the settles after look at until it is settled.
 func (n *network) answer(fn goja.Callable, rec map[string]any, ctx context.Context) (stubResponse, error) {
 	type result struct {
 		res stubResponse
@@ -500,7 +499,7 @@ func (n *network) answer(fn goja.Callable, rec map[string]any, ctx context.Conte
 	check = func(p *goja.Promise) {
 		switch p.State() {
 		case goja.PromiseStatePending:
-			n.app.Post(func() { check(p) })
+			testhost.PostToTest(n.app, func() { check(p) })
 		case goja.PromiseStateRejected:
 			done <- result{err: fmt.Errorf("nsgo/test: the route failed: %v", p.Result())}
 		default:
@@ -508,7 +507,7 @@ func (n *network) answer(fn goja.Callable, rec map[string]any, ctx context.Conte
 			done <- result{res, err}
 		}
 	}
-	n.app.Post(func() {
+	testhost.PostToTest(n.app, func() {
 		v, err := fn(goja.Undefined(), n.r.vm.ToValue(rec))
 		if err != nil {
 			done <- result{err: err}

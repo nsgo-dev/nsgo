@@ -13,6 +13,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/internal/testhost"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 	"github.com/nsgo-dev/nsgo/tsx/bundler"
 )
@@ -79,7 +80,7 @@ func settle(v goja.Value, app *nsgotest.App, done func(goja.Value, error)) {
 	}
 	switch p.State() {
 	case goja.PromiseStatePending:
-		app.Post(func() { settle(v, app, done) })
+		testhost.PostToTest(app, func() { settle(v, app, done) })
 	case goja.PromiseStateRejected:
 		done(nil, errors.New(message(p.Result())))
 	default:
