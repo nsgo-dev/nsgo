@@ -135,6 +135,10 @@ type project struct {
 	// their Info.plist, such as NSMicrophoneUsageDescription.
 	Apple struct {
 		Info map[string]any `yaml:"info"`
+		// RequiresFullScreen is the iOS package's UIRequiresFullScreen, true unless set; false lets an iPad run the app in Split View, Slide Over and Stage Manager.
+		RequiresFullScreen *bool `yaml:"requires_full_screen"`
+		// Orientations are the iPad's UISupportedInterfaceOrientations~ipad, of portrait, portrait_upside_down, landscape_left and landscape_right; all four when RequiresFullScreen is false, which needs them, and undeclared otherwise.
+		Orientations []string `yaml:"orientations"`
 		// AppGroup is the app group an iOS app shares with its widgets,
 		// group.<id> by default.
 		AppGroup string `yaml:"app_group"`
@@ -334,6 +338,9 @@ func load(dir string) (*project, error) {
 	}
 	if p.Name == "" {
 		return nil, fmt.Errorf("nsgo.yaml: name is required")
+	}
+	if err := p.validateIPadMultitasking(); err != nil {
+		return nil, err
 	}
 	if strings.Contains(p.Name, "'") && strings.Contains(p.Name, `"`) {
 		return nil, fmt.Errorf("nsgo.yaml: name %q has both a single and a double quote, which go build cannot pass to the app; use one kind", p.Name)
@@ -539,4 +546,62 @@ func goArchName(arch string) string {
 		return "x64"
 	}
 	return arch
+}
+
+// iosOrientations are apple.orientations' names, in the order a default list declares them, with the UIKit orientations they stand for.
+var iosOrientations = []struct{ name, plist string }{
+	{"portrait", "UIInterfaceOrientationPortrait"},
+	{"portrait_upside_down", "UIInterfaceOrientationPortraitUpsideDown"},
+	{"landscape_left", "UIInterfaceOrientationLandscapeLeft"},
+	{"landscape_right", "UIInterfaceOrientationLandscapeRight"},
+}
+
+// validateIPadMultitasking checks apple.orientations and apple.requires_full_screen: known orientations, none twice, all four for an iPad app that multitasks, which App Store Connect refuses otherwise, and no apple.info entry for the keys they write.
+func (p *project) validateIPadMultitasking() error {
+	seen := make(map[string]bool, len(p.Apple.Orientations))
+	for _, orientation := range p.Apple.Orientations {
+		known := false
+		for _, o := range iosOrientations {
+			known = known || o.name == orientation
+		}
+		if !known {
+			return fmt.Errorf("nsgo.yaml: apple.orientations has %q; use portrait, portrait_upside_down, landscape_left or landscape_right", orientation)
+		}
+		if seen[orientation] {
+			return fmt.Errorf("nsgo.yaml: apple.orientations repeats %q", orientation)
+		}
+		seen[orientation] = true
+	}
+	if !p.IOSRequiresFullScreen() && len(p.Apple.Orientations) > 0 && len(p.Apple.Orientations) < len(iosOrientations) {
+		return fmt.Errorf("nsgo.yaml: apple.requires_full_screen is false, so apple.orientations must list all four orientations, as an iPad app that multitasks supports each; leave it out to declare them all")
+	}
+	for _, k := range [][2]string{{"UIRequiresFullScreen", "apple.requires_full_screen"}, {"UISupportedInterfaceOrientations~ipad", "apple.orientations"}} {
+		if _, ok := p.Apple.Info[k[0]]; ok {
+			return fmt.Errorf("nsgo.yaml: apple.info sets %s, which the iOS package writes; set %s instead", k[0], k[1])
+		}
+	}
+	return nil
+}
+
+// IOSRequiresFullScreen is the iOS package's UIRequiresFullScreen value.
+func (p *project) IOSRequiresFullScreen() bool {
+	return p.Apple.RequiresFullScreen == nil || *p.Apple.RequiresFullScreen
+}
+
+// IOSHasIPadOrientations says whether the iOS package declares iPad orientations.
+func (p *project) IOSHasIPadOrientations() bool {
+	return len(p.Apple.Orientations) > 0 || !p.IOSRequiresFullScreen()
+}
+
+// IOSIPadOrientationsPlist writes the iPad orientation array for Info.plist.
+func (p *project) IOSIPadOrientationsPlist() string {
+	var b strings.Builder
+	b.WriteString("<array>")
+	for _, o := range iosOrientations {
+		if len(p.Apple.Orientations) == 0 || slices.Contains(p.Apple.Orientations, o.name) {
+			b.WriteString("<string>" + o.plist + "</string>")
+		}
+	}
+	b.WriteString("</array>")
+	return b.String()
 }

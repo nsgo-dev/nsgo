@@ -196,7 +196,10 @@ func buildIOSApp(ctx context.Context, p *project, sys *appleOS, dir string, simu
 var iosPlist = template.Must(template.New("ios").Parse(plistHead + `	<key>MinimumOSVersion</key><string>{{.IOSMinimum}}</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key><true/>
 	<key>UILaunchScreen</key><dict/>
-	<key>UIRequiresFullScreen</key><true/>
+	<key>UIRequiresFullScreen</key>{{if .IOSRequiresFullScreen}}<true/>{{else}}<false/>{{end}}
+{{- if .IOSHasIPadOrientations}}
+	<key>UISupportedInterfaceOrientations~ipad</key>{{.IOSIPadOrientationsPlist}}
+{{- end}}
 	<key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
 {{- if eq .Appearance "light"}}
 	<key>UIUserInterfaceStyle</key><string>Light</string>

@@ -63,3 +63,87 @@ func TestSensorAppleInfoDictionaryAndLocationEntitlement(t *testing.T) {
 		t.Fatal("empty build claims an entitlement")
 	}
 }
+
+// iosPlistFor writes the iOS Info.plist of the nsgo.yaml in src, as load validates it.
+func iosPlistFor(t *testing.T, src string) string {
+	t.Helper()
+	var p project
+	if err := yaml.Unmarshal([]byte(src), &p); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.validateIPadMultitasking(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "Info.plist")
+	if err := writePlist(path, &p, iosPlist, ""); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+const everyIPadOrientation = "<key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>"
+
+func TestIOSPlistKeepsFullScreenByDefault(t *testing.T) {
+	plist := iosPlistFor(t, "name: Sheet\n")
+	if !strings.Contains(plist, "<key>UIRequiresFullScreen</key><true/>") {
+		t.Errorf("default plist is not full screen:\n%s", plist)
+	}
+	if strings.Contains(plist, "UISupportedInterfaceOrientations") {
+		t.Errorf("default plist declares orientations:\n%s", plist)
+	}
+}
+
+func TestIOSMultitaskingDeclaresEveryIPadOrientation(t *testing.T) {
+	for _, src := range []string{
+		"name: Sheet\napple:\n  requires_full_screen: false\n",
+		"name: Sheet\napple:\n  requires_full_screen: false\n  orientations: [landscape_right, portrait, landscape_left, portrait_upside_down]\n",
+	} {
+		plist := iosPlistFor(t, src)
+		for _, want := range []string{"<key>UIRequiresFullScreen</key><false/>", everyIPadOrientation} {
+			if !strings.Contains(plist, want) {
+				t.Errorf("%q: plist lacks %q:\n%s", src, want, plist)
+			}
+		}
+	}
+}
+
+func TestIOSFullScreenIPadOrientations(t *testing.T) {
+	plist := iosPlistFor(t, "name: Sheet\napple:\n  orientations: [landscape_left, portrait]\n")
+	for _, want := range []string{
+		"<key>UIRequiresFullScreen</key><true/>",
+		"<key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string></array>",
+	} {
+		if !strings.Contains(plist, want) {
+			t.Errorf("plist lacks %q:\n%s", want, plist)
+		}
+	}
+}
+
+func TestIPadMultitaskingRejections(t *testing.T) {
+	for src, want := range map[string]string{
+		"apple:\n  orientations: [diagonal]\n":                                                           `apple.orientations has "diagonal"`,
+		"apple:\n  orientations: [portrait, portrait]\n":                                                 `apple.orientations repeats "portrait"`,
+		"apple:\n  requires_full_screen: false\n  orientations: [portrait, landscape_left]\n":            "must list all four",
+		"apple:\n  info:\n    UIRequiresFullScreen: false\n":                                             "set apple.requires_full_screen",
+		"apple:\n  info:\n    UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait]\n": "set apple.orientations",
+	} {
+		var p project
+		if err := yaml.Unmarshal([]byte(src), &p); err != nil {
+			t.Fatal(err)
+		}
+		if err := p.validateIPadMultitasking(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: error = %v, want %q", src, err, want)
+		}
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: Sheet\napple:\n  orientations: [diagonal]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := load(dir); err == nil || !strings.Contains(err.Error(), "apple.orientations") {
+		t.Errorf("load error = %v, want the orientation's", err)
+	}
+}
