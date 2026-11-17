@@ -5,14 +5,13 @@ import "reflect"
 // Regions are spans of their parent's children that change: each owns
 // the scope its nodes were built under and disposes it when they go.
 
-// Dynamic builds its nodes again whenever what fn read changes.
+// Dynamic builds its nodes again whenever what fn read changes. The nodes it built before go first, so their bindings never run against what replaced them.
 type Dynamic func(cx *Scope) Node
 
 // Render implements Node.
 func (d Dynamic) Render(*Scope) Node { return d }
 
-// Show builds Then while When is true and Else otherwise. Each branch is
-// built only when When changes.
+// Show builds Then while When is true and Else otherwise. Each branch is built only when When changes, and goes before its bindings can run again, so a binding in Then never runs once When has turned false.
 type Show struct {
 	When func() bool
 	Then func(cx *Scope) Node
@@ -22,8 +21,7 @@ type Show struct {
 // Render implements Node.
 func (s Show) Render(*Scope) Node { return s }
 
-// Catch builds Try and, when it or anything under it panics, Fallback
-// instead. Calling reset builds Try again.
+// Catch builds Try and, when it or anything under it panics, Fallback instead, disposing what failed before its bindings can run again. Calling reset builds Try again.
 type Catch struct {
 	Try      func(cx *Scope) Node
 	Fallback func(cx *Scope, err error, reset func()) Node
