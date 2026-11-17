@@ -12,9 +12,7 @@ import (
 	"github.com/nsgo-dev/nsgo/tsx/pkg"
 )
 
-// Hold the engine in an unrelated owner's computation until the fetch
-// worker posts its next action. The redirect must wait for its own
-// sandbox's policy instead of reading the engine's unrelated owner.
+// Hold the engine in an unrelated owner's computation until the fetch worker posts its next action. The redirect must wait for its own sandbox's policy instead of reading the engine's unrelated owner.
 func TestFetchRedirectUsesItsSandboxWhileAnotherOwnerRuns(t *testing.T) {
 	for _, test := range []struct {
 		name      string
@@ -96,9 +94,9 @@ func TestFetchRedirectUsesItsSandboxWhileAnotherOwnerRuns(t *testing.T) {
 				step = next()
 			})
 			if test.dispose {
-				// Drop the queued check, just as the engine does after its
-				// scope is disposed. The worker must still finish.
-				root.Dispose()
+				// Dispose the runtime's scope alone while the app lives on: the queued check is dropped, as the engine drops what a disposed scope posted, and the worker must still finish instead of waiting for the app to end.
+				owner.Dispose()
+				step()
 				next()()
 				if completed || len(requests) != 1 {
 					t.Fatal("the disposed fetch completed or sent its redirect")

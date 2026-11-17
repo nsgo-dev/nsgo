@@ -517,8 +517,7 @@ func (r *runtime) fetch(call js.FunctionCall) js.Value {
 	r.cx.Run(func() { ctx, cancel = context.WithCancel(r.cx.Context()) })
 	if r.sandbox != nil && r.sandbox.caps {
 		opts.check = func(u, m string) error {
-			// A redirect arrives on the worker. Ask on the graph's
-			// goroutine, under this runtime's scope and its host's grants.
+			// A redirect arrives on the worker. Ask on the graph's goroutine, under this runtime's scope and its host's grants.
 			checked := make(chan error, 1)
 			r.cx.Post(func() {
 				if err := ctx.Err(); err != nil {
