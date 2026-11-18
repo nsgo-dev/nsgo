@@ -280,9 +280,7 @@ var virtualKeys = map[string]uintptr{
 	"pagedown": 0x22, "delete": 0x2E,
 }
 
-// Key presses key with the modifiers held in the thread's keyboard
-// state: the focused field edits as its keys would, a keymap binding
-// fires, and else the window's own key handling takes it.
+// Key presses key with the modifiers held in the thread's keyboard state, in the order the message loop and the window procedure take a real key: a keymap binding or menu shortcut first, then the focused field's editing, and else the window's own key handling.
 func (t *testSurface) Key(key string) error {
 	parts := strings.Split(strings.ToLower(key), "+")
 	name := parts[len(parts)-1]

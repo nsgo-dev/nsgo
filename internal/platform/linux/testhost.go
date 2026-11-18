@@ -337,8 +337,7 @@ var keyvals = map[string]uint32{
 	"pageup": 0xff55, "pagedown": 0xff56, "delete": 0xffff,
 }
 
-// Key presses a key with modifiers through the window's controller first,
-// then lets the focused field edit if the controller leaves it the key.
+// Key presses a key with modifiers through the window's controller first, then lets the focused field edit if the controller leaves it the key, and releases the key either way.
 func (t *testSurface) Key(key string) error {
 	parts := strings.Split(strings.ToLower(key), "+")
 	name := parts[len(parts)-1]

@@ -49,7 +49,7 @@ Use `app.Post(func() { signal.Set(value) })` from a test or stubbed worker to qu
 
 `Ref.Focus()` commands follow platform focus stops: text fields everywhere, plus enabled pressable and `Focusable` views on desktops, the web and Apple TV. Use a desktop or web `Environment` when a headless test exercises button focus. The `Focus` step reaches these desktop/web stops through Tab. Any of `OnPress`, `OnPressDown`, `OnPressUp` or `OnLongPress` makes a view a stop; Return or Space sends it the down, up and press events it handles.
 
-`Key("mod+a")` selects a focused field headless and on desktop targets unless a binding takes it. `KeyAlways` takes editing keys before the field acts; `KeyAuto` and `KeyNotEditing` leave its editing keys alone.
+`Key("mod+a")` selects a focused field unless a binding takes it. Headless, on desktop targets and on the web, `KeyAlways` takes Return, Backspace and select-all before the field acts; `KeyAuto` and `KeyNotEditing` leave them to the field. The Android and iOS test hosts do not give the keymap these keys first yet.
 
 ## Tests without the network
 

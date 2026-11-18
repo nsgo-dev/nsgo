@@ -119,6 +119,8 @@ jobs:
         run: xvfb-run -a go tool nsgo test -target linux -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test browser press routing, modifiers and visible labels
         run: go tool nsgo test -target web ./internal/testhost/testdata/press
+      - name: Test browser editing keys and bindings
+        run: go tool nsgo test -target web ./internal/testhost/testdata/keys
       - name: Test browser backend
         run: go tool nsgo test -target web ./internal/platform/web
       - name: Test browser relational selectors from TSX
