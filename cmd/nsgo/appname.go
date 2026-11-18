@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -58,31 +59,109 @@ func (n *appNames) languages() []string {
 	return langs
 }
 
-// writeAppleNames writes the app's names into an Apple bundle's resource
-// directory, an InfoPlist.strings per language in its .lproj, and returns
-// the Info.plist entries that name it in the source language.
+// writeAppleNames writes an InfoPlist.strings per language into the .lproj directories of an Apple bundle's resource directory, with the app's names and its localized apple.info strings, and returns the Info.plist entries of the source language.
 func writeAppleNames(p *project, resources string) (string, error) {
 	localizations, err := p.appleLocalizations()
 	if err != nil {
 		return "", err
 	}
 	n, err := p.appNames()
-	if n == nil || err != nil {
-		return localizations, err
+	if err != nil {
+		return "", err
 	}
-	for _, lang := range n.languages() {
+	info, err := p.appleInfoStrings()
+	if err != nil {
+		return "", err
+	}
+	if n == nil && info == nil {
+		return localizations, nil
+	}
+	langs := map[string]bool{}
+	if n != nil {
+		for lang := range n.names {
+			langs[lang] = true
+		}
+	}
+	if info != nil {
+		for lang := range info.texts {
+			langs[lang] = true
+		}
+	}
+	for lang := range langs {
+		var strs strings.Builder
+		named := false
+		if n != nil {
+			if name, ok := n.names[lang]; ok {
+				name := appleString(name)
+				fmt.Fprintf(&strs, "\"CFBundleDisplayName\" = %s;\n\"CFBundleName\" = %s;\n", name, name)
+				named = true
+			}
+		}
+		if info != nil {
+			texts := info.texts[lang]
+			for _, key := range slices.Sorted(maps.Keys(texts)) {
+				// appName's entries name the app; a message of the same key would contradict them.
+				if named && (key == "CFBundleDisplayName" || key == "CFBundleName") {
+					continue
+				}
+				fmt.Fprintf(&strs, "%s = %s;\n", appleString(key), appleString(texts[key]))
+			}
+		}
 		dir := filepath.Join(resources, lang+".lproj")
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return "", err
 		}
-		name := appleString(n.names[lang])
-		strs := fmt.Sprintf("\"CFBundleDisplayName\" = %s;\n\"CFBundleName\" = %s;\n", name, name)
-		if err := os.WriteFile(filepath.Join(dir, "InfoPlist.strings"), []byte(strs), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "InfoPlist.strings"), []byte(strs.String()), 0o644); err != nil {
 			return "", err
 		}
 	}
+	if n == nil {
+		// Without it the system falls back to English's .lproj, which an app written in another language lacks.
+		return localizations + fmt.Sprintf("<key>CFBundleDevelopmentRegion</key><string>%s</string>", xmlEscape(info.source)), nil
+	}
 	return localizations + fmt.Sprintf("<key>CFBundleDevelopmentRegion</key><string>%s</string>\n\t<key>CFBundleDisplayName</key><string>%s</string>",
 		xmlEscape(n.source), xmlEscape(n.names[n.source])), nil
+}
+
+// appleInfo is the text of the string apple.info entries the app's catalogs have a message of the same key for.
+type appleInfo struct {
+	source string                       // the source language
+	texts  map[string]map[string]string // by language, then key
+}
+
+// appleInfoStrings reads apple.info's localized strings from the app's catalogs: each string entry whose key is a message of theirs, which says no argument, in every language of the catalogs, the source's message in a language that does not translate it, as the catalogs' functions say it. It returns nil when no entry has a message. Other entries keep only their Info.plist value.
+func (p *project) appleInfoStrings() (*appleInfo, error) {
+	if len(p.Apple.Info) == 0 || p.I18n.Dir == "" || !hasCatalogs(p.I18n.Dir) {
+		return nil, nil
+	}
+	c, ds := loadCatalog(p.I18n.Dir, p.I18n.Source)
+	if err := ds.err(); err != nil {
+		return nil, err
+	}
+	src := c.files[c.source]
+	info := &appleInfo{source: c.source, texts: map[string]map[string]string{}}
+	for _, key := range slices.Sorted(maps.Keys(p.Apple.Info)) {
+		if _, ok := p.Apple.Info[key].(string); !ok || src.msgs[key] == nil {
+			continue
+		}
+		if len(c.params[key]) > 0 {
+			return nil, fmt.Errorf("%s: %s is apple.info's, so it takes no arguments", rel(src.path), key)
+		}
+		for lang, f := range c.files {
+			m := f.msgs[key]
+			if m == nil {
+				m = src.msgs[key]
+			}
+			if info.texts[lang] == nil {
+				info.texts[lang] = map[string]string{}
+			}
+			info.texts[lang][key] = constantText(m.parts)
+		}
+	}
+	if len(info.texts) == 0 {
+		return nil, nil
+	}
+	return info, nil
 }
 
 // appleLocalizations returns the Info.plist entry listing the languages of

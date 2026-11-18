@@ -30,7 +30,7 @@ cx.RequestPermission(core.PermissionCamera, func(s core.PermissionStatus) {
 
 ## 用途说明
 
-在 macOS 和 iOS 上，请求权限需要应用的 Info.plist 写明用途，由 `nsgo.yaml` 的 `apple.info` 提供；缺少时请求回答不可用并在日志中写出所需的键，因为系统会在询问时终止应用。
+在 macOS 和 iOS 上，请求权限需要应用的 Info.plist 写明用途，由 `nsgo.yaml` 的 `apple.info` 提供；缺少时请求回答不可用并在日志中写出所需的键，因为系统会在询问时终止应用。应用[文案](localization.md)中与之同键的文案（例如 `locales/en.yaml` 中的 `NSCameraUsageDescription: Scans the codes you point it at.`）会翻译这段用途说明，系统随后用用户的语言询问；没有翻译它的语言使用源语言的文案。
 
 ```yaml
 apple:

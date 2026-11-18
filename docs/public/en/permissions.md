@@ -30,7 +30,7 @@ cx.RequestPermission(core.PermissionCamera, func(s core.PermissionStatus) {
 
 ## Usage descriptions
 
-On macOS and iOS, asking needs the permission's reason in the app's Info.plist, which `nsgo.yaml`'s `apple.info` holds; without it the request answers unavailable and logs the key, as the system would end the app.
+On macOS and iOS, asking needs the permission's reason in the app's Info.plist, which `nsgo.yaml`'s `apple.info` holds; without it the request answers unavailable and logs the key, as the system would end the app. A message of the app's [catalogs](localization.md) with the same key, such as `NSCameraUsageDescription: Scans the codes you point it at.` in `locales/en.yaml`, translates the reason, which the system then asks in the user's language; a language that does not translate it says the source's.
 
 ```yaml
 apple:
