@@ -1436,7 +1436,7 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 		case driver.ItemAppearance:
 			w.byte(byte(it.Appearance))
 		case driver.ItemDirection:
-			w.flags(it.RTL)
+			writeDirection(w, it)
 		case driver.ItemKeymap:
 			w.u32(uint32(len(it.Keys)))
 			for _, k := range it.Keys {

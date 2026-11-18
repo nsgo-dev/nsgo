@@ -98,6 +98,22 @@ const (
 	textBringAllToFront
 	textServices
 	textHelp
+	textRoleLink
+	textRoleTab
+	textRoleSearchBox
+	textRoleStatus
+	textRoleMenu
+	textRoleMenuItem
+	textRoleDialog
+	textRoleAlert
+	textRoleTable
+	textRoleGrid
+	textRoleRow
+	textRoleColumnHeader
+	textRoleCell
+	textStatePartiallyChecked
+	textStateExpanded
+	textStateCollapsed
 	numTexts
 )
 
@@ -142,6 +158,22 @@ var keyOfText = [numTexts]string{
 	"bringAllToFront",
 	"services",
 	"help",
+	"roleLink",
+	"roleTab",
+	"roleSearchBox",
+	"roleStatus",
+	"roleMenu",
+	"roleMenuItem",
+	"roleDialog",
+	"roleAlert",
+	"roleTable",
+	"roleGrid",
+	"roleRow",
+	"roleColumnHeader",
+	"roleCell",
+	"statePartiallyChecked",
+	"stateExpanded",
+	"stateCollapsed",
 }
 
 // textsEn are the messages without arguments in en.
@@ -183,7 +215,23 @@ var textsEn = i18n.NewTexts(""+
 	"Stop Speaking"+
 	"Bring All to Front"+
 	"Services"+
-	"Help",
+	"Help"+
+	"link"+
+	"tab"+
+	"search box"+
+	"status"+
+	"menu"+
+	"menu item"+
+	"dialog"+
+	"alert"+
+	"table"+
+	"grid"+
+	"row"+
+	"column header"+
+	"cell"+
+	"partially checked"+
+	"expanded"+
+	"collapsed",
 	[]uint16{
 		4,
 		6,
@@ -223,6 +271,22 @@ var textsEn = i18n.NewTexts(""+
 		18,
 		8,
 		4,
+		4,
+		3,
+		10,
+		6,
+		4,
+		9,
+		6,
+		5,
+		5,
+		4,
+		3,
+		13,
+		4,
+		17,
+		8,
+		9,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -264,7 +328,23 @@ var textsZhHans = i18n.NewTexts(""+
 	"停止讲话"+
 	"前置全部窗口"+
 	"服务"+
-	"帮助",
+	"帮助"+
+	"链接"+
+	"标签页"+
+	"搜索框"+
+	"状态"+
+	"菜单"+
+	"菜单项"+
+	"对话框"+
+	"提醒"+
+	"表格"+
+	"网格"+
+	"行"+
+	"列标题"+
+	"单元格"+
+	"部分选中"+
+	"已展开"+
+	"已收起",
 	[]uint16{
 		6,
 		6,
@@ -304,6 +384,22 @@ var textsZhHans = i18n.NewTexts(""+
 		18,
 		6,
 		6,
+		6,
+		9,
+		9,
+		6,
+		6,
+		9,
+		9,
+		6,
+		6,
+		6,
+		3,
+		9,
+		9,
+		12,
+		9,
+		9,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -794,3 +890,147 @@ func Help(cx *core.Scope) string { return For(cx).Help() }
 
 // Help is the package's Help in the language of msgs.
 func (msgs Messages) Help() string { return msgs.text(textHelp) }
+
+// RoleLink says "link"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a link as.
+func RoleLink(cx *core.Scope) string { return For(cx).RoleLink() }
+
+// RoleLink is the package's RoleLink in the language of msgs.
+func (msgs Messages) RoleLink() string { return msgs.text(textRoleLink) }
+
+// RoleTab says "tab"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a tab of a tab list as.
+func RoleTab(cx *core.Scope) string { return For(cx).RoleTab() }
+
+// RoleTab is the package's RoleTab in the language of msgs.
+func (msgs Messages) RoleTab() string { return msgs.text(textRoleTab) }
+
+// RoleSearchBox says "search box"
+// in the language the app shows under cx.
+//
+// What Android's and Windows' screen readers announce a search field as, in place of a text field.
+func RoleSearchBox(cx *core.Scope) string { return For(cx).RoleSearchBox() }
+
+// RoleSearchBox is the package's RoleSearchBox in the language of msgs.
+func (msgs Messages) RoleSearchBox() string { return msgs.text(textRoleSearchBox) }
+
+// RoleStatus says "status"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a status area, which reports changes as they happen, as.
+func RoleStatus(cx *core.Scope) string { return For(cx).RoleStatus() }
+
+// RoleStatus is the package's RoleStatus in the language of msgs.
+func (msgs Messages) RoleStatus() string { return msgs.text(textRoleStatus) }
+
+// RoleMenu says "menu"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a menu as.
+func RoleMenu(cx *core.Scope) string { return For(cx).RoleMenu() }
+
+// RoleMenu is the package's RoleMenu in the language of msgs.
+func (msgs Messages) RoleMenu() string { return msgs.text(textRoleMenu) }
+
+// RoleMenuItem says "menu item"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces an item of a menu as.
+func RoleMenuItem(cx *core.Scope) string { return For(cx).RoleMenuItem() }
+
+// RoleMenuItem is the package's RoleMenuItem in the language of msgs.
+func (msgs Messages) RoleMenuItem() string { return msgs.text(textRoleMenuItem) }
+
+// RoleDialog says "dialog"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a dialog as.
+func RoleDialog(cx *core.Scope) string { return For(cx).RoleDialog() }
+
+// RoleDialog is the package's RoleDialog in the language of msgs.
+func (msgs Messages) RoleDialog() string { return msgs.text(textRoleDialog) }
+
+// RoleAlert says "alert"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces an urgent message as.
+func RoleAlert(cx *core.Scope) string { return For(cx).RoleAlert() }
+
+// RoleAlert is the package's RoleAlert in the language of msgs.
+func (msgs Messages) RoleAlert() string { return msgs.text(textRoleAlert) }
+
+// RoleTable says "table"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a table as.
+func RoleTable(cx *core.Scope) string { return For(cx).RoleTable() }
+
+// RoleTable is the package's RoleTable in the language of msgs.
+func (msgs Messages) RoleTable() string { return msgs.text(textRoleTable) }
+
+// RoleGrid says "grid"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a grid of cells the user moves between as.
+func RoleGrid(cx *core.Scope) string { return For(cx).RoleGrid() }
+
+// RoleGrid is the package's RoleGrid in the language of msgs.
+func (msgs Messages) RoleGrid() string { return msgs.text(textRoleGrid) }
+
+// RoleRow says "row"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a row of a table or grid as.
+func RoleRow(cx *core.Scope) string { return For(cx).RoleRow() }
+
+// RoleRow is the package's RoleRow in the language of msgs.
+func (msgs Messages) RoleRow() string { return msgs.text(textRoleRow) }
+
+// RoleColumnHeader says "column header"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces the header of a table's column as.
+func RoleColumnHeader(cx *core.Scope) string { return For(cx).RoleColumnHeader() }
+
+// RoleColumnHeader is the package's RoleColumnHeader in the language of msgs.
+func (msgs Messages) RoleColumnHeader() string { return msgs.text(textRoleColumnHeader) }
+
+// RoleCell says "cell"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a cell of a table or grid as.
+func RoleCell(cx *core.Scope) string { return For(cx).RoleCell() }
+
+// RoleCell is the package's RoleCell in the language of msgs.
+func (msgs Messages) RoleCell() string { return msgs.text(textRoleCell) }
+
+// StatePartiallyChecked says "partially checked"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces a checkbox in its mixed state as, checked for some of the items it stands for.
+func StatePartiallyChecked(cx *core.Scope) string { return For(cx).StatePartiallyChecked() }
+
+// StatePartiallyChecked is the package's StatePartiallyChecked in the language of msgs.
+func (msgs Messages) StatePartiallyChecked() string { return msgs.text(textStatePartiallyChecked) }
+
+// StateExpanded says "expanded"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces an expandable element that shows its content as.
+func StateExpanded(cx *core.Scope) string { return For(cx).StateExpanded() }
+
+// StateExpanded is the package's StateExpanded in the language of msgs.
+func (msgs Messages) StateExpanded() string { return msgs.text(textStateExpanded) }
+
+// StateCollapsed says "collapsed"
+// in the language the app shows under cx.
+//
+// What Android's screen reader announces an expandable element that hides its content as.
+func StateCollapsed(cx *core.Scope) string { return For(cx).StateCollapsed() }
+
+// StateCollapsed is the package's StateCollapsed in the language of msgs.
+func (msgs Messages) StateCollapsed() string { return msgs.text(textStateCollapsed) }

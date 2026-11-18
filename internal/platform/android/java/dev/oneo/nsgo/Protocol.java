@@ -426,6 +426,24 @@ final class Protocol {
     static final int ACCESSIBLE_YES = 1;
     static final int ACCESSIBLE_NO = 2;
 
+    // The words ITEM_DIRECTION carries, in the language the app shows, for what TalkBack has no word of its own: roles and states, by their index, as protocol.go's spoken words.
+    static final int SPOKEN_LINK = 0;
+    static final int SPOKEN_TAB = 1;
+    static final int SPOKEN_SEARCH_BOX = 2;
+    static final int SPOKEN_STATUS = 3;
+    static final int SPOKEN_MENU = 4;
+    static final int SPOKEN_MENU_ITEM = 5;
+    static final int SPOKEN_DIALOG = 6;
+    static final int SPOKEN_ALERT = 7;
+    static final int SPOKEN_TABLE = 8;
+    static final int SPOKEN_GRID = 9;
+    static final int SPOKEN_ROW = 10;
+    static final int SPOKEN_COLUMN_HEADER = 11;
+    static final int SPOKEN_CELL = 12;
+    static final int SPOKEN_PARTIALLY_CHECKED = 13;
+    static final int SPOKEN_EXPANDED = 14;
+    static final int SPOKEN_COLLAPSED = 15;
+
     // Keyboard types, as in core/mount.go.
     static final int KEYBOARD_EMAIL = 1;
     static final int KEYBOARD_NUMBER = 2;

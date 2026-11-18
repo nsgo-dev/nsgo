@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/nsgo-dev/nsgo/desktop/locales"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
@@ -392,8 +393,8 @@ func (e *uiaElement) spec(v *view) uiaSpec {
 	p := &v.props
 	s := uiaSpec{name: p.Label, help: p.Hint, description: p.Description, invalid: p.Invalid, automationID: p.TestID, enabled: !p.Disabled, toggle: -1, live: p.LiveRegion}
 	if p.Role == driver.RoleSearchField {
-		// UIA has no search control type: an edit says what it is, as browsers name ARIA's searchbox. A status bar's own type is the system's, in its language.
-		s.localizedType = "search box"
+		// UIA has no search control type: an edit says what it is, as browsers name ARIA's searchbox, in the language the app shows. A status bar's own type is the system's, in its language.
+		s.localizedType = locales.In(e.language()).RoleSearchBox()
 	}
 	pressable := takesPresses(v)
 	switch {
@@ -478,6 +479,14 @@ func groupedText(v *view) string {
 
 // children returns the elements inside element e: its view's, flattened,
 // and a canvas's parts.
+// language is the language the app shows in e's window (driver.ItemDirection), "" before it says one or without a window.
+func (e *uiaElement) language() string {
+	if e.w == nil {
+		return ""
+	}
+	return e.w.language
+}
+
 func (e *uiaElement) children() []*uiaElement {
 	v, ok := e.alive()
 	if !ok || e.part > 0 {

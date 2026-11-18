@@ -177,3 +177,63 @@ func TestWebCommandsMatchJava(t *testing.T) {
 		}
 	}
 }
+
+// TestSpokenWordsMatchJava holds Protocol.java's SPOKEN_* indexes to the order spoken writes the words in: each English word is its constant's name.
+func TestSpokenWordsMatchJava(t *testing.T) {
+	testhost.RequireSource(t)
+	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	words := spoken("en")
+	found := 0
+	for _, m := range regexp.MustCompile(`static final int SPOKEN_(\w+) = (\d+);`).FindAllStringSubmatch(string(java), -1) {
+		i, _ := strconv.Atoi(m[2])
+		want := strings.ToLower(strings.ReplaceAll(m[1], "_", " "))
+		if i >= len(words) || words[i] != want {
+			t.Errorf("Protocol.java's SPOKEN_%s is %d, which spoken says as %q", m[1], i, words[min(i, len(words)-1)])
+		}
+		found++
+	}
+	if found != len(words) {
+		t.Errorf("Protocol.java has %d SPOKEN_ indexes for spoken's %d words", found, len(words))
+	}
+}
+
+// TestDirectionSaysTheWordsInTheAppsLanguage checks that ItemDirection carries TalkBack's words in the language the app shows, as NsgoView.apply reads them after the direction.
+func TestDirectionSaysTheWordsInTheAppsLanguage(t *testing.T) {
+	english := spoken("en")
+	for _, c := range []struct {
+		lang      string
+		rtl       bool
+		searchBox string
+		partly    string
+	}{
+		{"en", false, "search box", "partially checked"},
+		{"zh-Hans", false, "搜索框", "部分选中"},
+		{"zh-CN", false, "搜索框", "部分选中"},
+		{"de", true, "search box", "partially checked"},
+	} {
+		var w writer
+		writeDirection(&w, &driver.MountItem{Kind: driver.ItemDirection, RTL: c.rtl, Language: c.lang})
+		r := reader{w.buf}
+		if rtl := r.byte(); rtl != map[bool]byte{false: 0, true: 1}[c.rtl] {
+			t.Errorf("%s: direction %d", c.lang, rtl)
+		}
+		words := make([]string, r.u32())
+		for i := range words {
+			words[i] = r.str()
+		}
+		if len(r.buf) != 0 || len(words) != len(english) {
+			t.Fatalf("%s: %d words, %d bytes left", c.lang, len(words), len(r.buf))
+		}
+		if words[2] != c.searchBox || words[13] != c.partly {
+			t.Errorf("%s: a search box is %q and partially checked %q", c.lang, words[2], words[13])
+		}
+		for i, s := range words {
+			if s == "" || c.searchBox != english[2] && s == english[i] {
+				t.Errorf("%s: word %d is %q", c.lang, i, s)
+			}
+		}
+	}
+}

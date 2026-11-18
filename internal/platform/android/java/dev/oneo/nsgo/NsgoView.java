@@ -991,6 +991,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * it whatever the system's.
      */
     private int direction = -1;
+    /** What TalkBack announces for the roles and states it has no word of its own for, by Protocol.SPOKEN_*, in the language the app shows; empty before Go sends them. */
+    private String[] spoken = new String[0];
 
     /** The pick the photo picker answers. */
     private Services.Pick pick;
@@ -2811,10 +2813,14 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 systemBars();
                 environment();
                 break;
-            case Protocol.ITEM_DIRECTION:
+            case Protocol.ITEM_DIRECTION: {
                 direction = in.readUnsignedByte() != 0 ? LAYOUT_DIRECTION_RTL : LAYOUT_DIRECTION_LTR;
+                String[] words = new String[in.readInt()];
+                for (int i = 0; i < words.length; i++) words[i] = Protocol.readString(in);
+                spoken = words;
                 applyDirection();
                 break;
+            }
             case Protocol.ITEM_QUIT: {
                 // Quitting ends the overlays with the app.
                 quit = true;
@@ -4728,6 +4734,18 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         n.accessible().setContentDescription(d.isEmpty() ? null : d);
     }
 
+    /** The word Go sent for Protocol.SPOKEN_* index i, in the language the app shows; null for -1 or before Go sends them. */
+    private String spoken(int i) {
+        return i >= 0 && i < spoken.length && !spoken[i].isEmpty() ? spoken[i] : null;
+    }
+
+    /** Adds part, unless null, to the state TalkBack reads after the role. */
+    private static void appendState(StringBuilder state, String part) {
+        if (part == null) return;
+        if (state.length() > 0) state.append(", ");
+        state.append(part);
+    }
+
     private void describe(Node n, AccessibilityNodeInfo info) {
         info.setContentInvalid(n.invalid);
         Node target = nodes.get(n.labelFor);
@@ -4742,57 +4760,59 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             info.setClassName("android.widget.TextView");
             info.setFocusable(false);
         }
-        String className = null, role = null;
+        String className = null;
+        int role = -1;
         boolean checkable = false;
         switch (n.role) {
             case Protocol.ROLE_BUTTON: className = "android.widget.Button"; break;
-            case Protocol.ROLE_LINK: role = "link"; break;
+            case Protocol.ROLE_LINK: role = Protocol.SPOKEN_LINK; break;
             case Protocol.ROLE_HEADER: info.setHeading(true); break;
             case Protocol.ROLE_IMAGE: className = "android.widget.ImageView"; break;
             case Protocol.ROLE_CHECKBOX: className = "android.widget.CheckBox"; checkable = true; break;
             case Protocol.ROLE_SWITCH: className = "android.widget.Switch"; checkable = true; break;
             case Protocol.ROLE_RADIO: className = "android.widget.RadioButton"; checkable = true; break;
-            case Protocol.ROLE_TAB: role = "tab"; break;
+            case Protocol.ROLE_TAB: role = Protocol.SPOKEN_TAB; break;
             case Protocol.ROLE_TEXT: className = "android.widget.TextView"; break;
             case Protocol.ROLE_TEXT_FIELD: className = "android.widget.EditText"; break;
-            case Protocol.ROLE_SEARCH_FIELD: className = "android.widget.EditText"; role = "search box"; break;
-            case Protocol.ROLE_STATUS: role = "status"; break;
+            // An edit text still, which TalkBack edits as one, named a search box.
+            case Protocol.ROLE_SEARCH_FIELD: className = "android.widget.EditText"; role = Protocol.SPOKEN_SEARCH_BOX; break;
+            case Protocol.ROLE_STATUS: role = Protocol.SPOKEN_STATUS; break;
             case Protocol.ROLE_RADIO_GROUP: className = "android.widget.RadioGroup"; break;
             case Protocol.ROLE_TAB_LIST: className = "android.widget.TabWidget"; break;
-            case Protocol.ROLE_MENU: role = "menu"; break;
-            case Protocol.ROLE_MENU_ITEM: role = "menu item"; break;
-            case Protocol.ROLE_DIALOG: role = "dialog"; break;
-            case Protocol.ROLE_ALERT: role = "alert"; break;
-            case Protocol.ROLE_TABLE: role = "table"; break;
-            case Protocol.ROLE_GRID: role = "grid"; break;
-            case Protocol.ROLE_ROW: role = "row"; break;
-            case Protocol.ROLE_COLUMN_HEADER: role = "column header"; info.setHeading(true); break;
-            case Protocol.ROLE_CELL: role = "cell"; break;
+            case Protocol.ROLE_MENU: role = Protocol.SPOKEN_MENU; break;
+            case Protocol.ROLE_MENU_ITEM: role = Protocol.SPOKEN_MENU_ITEM; break;
+            case Protocol.ROLE_DIALOG: role = Protocol.SPOKEN_DIALOG; break;
+            case Protocol.ROLE_ALERT: role = Protocol.SPOKEN_ALERT; break;
+            case Protocol.ROLE_TABLE: role = Protocol.SPOKEN_TABLE; break;
+            case Protocol.ROLE_GRID: role = Protocol.SPOKEN_GRID; break;
+            case Protocol.ROLE_ROW: role = Protocol.SPOKEN_ROW; break;
+            case Protocol.ROLE_COLUMN_HEADER: role = Protocol.SPOKEN_COLUMN_HEADER; info.setHeading(true); break;
+            case Protocol.ROLE_CELL: role = Protocol.SPOKEN_CELL; break;
             default: break;
         }
         if (className != null) info.setClassName(className);
         // The key AndroidX and TalkBack read a role description under.
-        if (role != null) info.getExtras().putCharSequence("AccessibilityNodeInfo.roleDescription", role);
+        String roleDescription = spoken(role);
+        if (roleDescription != null) info.getExtras().putCharSequence("AccessibilityNodeInfo.roleDescription", roleDescription);
+        StringBuilder state = new StringBuilder();
         if (checkable) {
             info.setCheckable(true);
             info.setChecked(n.checked && !n.mixed);
             // The checked state has no mixed value to set, so describe it.
-            if (n.mixed && Build.VERSION.SDK_INT >= 30) info.setStateDescription("partially checked");
+            if (n.mixed) appendState(state, spoken(Protocol.SPOKEN_PARTIALLY_CHECKED));
         }
         info.setSelected(n.selected);
         if (!n.testID.isEmpty()) info.setViewIdResourceName(n.testID);
         if (!n.hint.isEmpty()) info.setHintText(n.hint);
-        StringBuilder state = new StringBuilder();
         if (n.expandable) {
-            state.append(n.expanded ? "expanded" : "collapsed");
+            appendState(state, spoken(n.expanded ? Protocol.SPOKEN_EXPANDED : Protocol.SPOKEN_COLLAPSED));
             if (n.offers(n.expanded ? "collapse" : "expand")) {
                 info.addAction(n.expanded ? AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE
                         : AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND);
             }
         }
         if (!n.valueText.isEmpty()) {
-            if (state.length() > 0) state.append(", ");
-            state.append(n.valueText);
+            appendState(state, n.valueText);
         } else if (n.range) {
             info.setRangeInfo(AccessibilityNodeInfo.RangeInfo.obtain(
                     AccessibilityNodeInfo.RangeInfo.RANGE_TYPE_FLOAT, n.min, n.max, n.now));

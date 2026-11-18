@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/nsgo-dev/nsgo/desktop/locales"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
@@ -261,6 +262,26 @@ func writeWindow(w *writer, c *driver.WindowCommand) {
 	w.points(f.Width)
 	w.points(f.Height)
 	w.flags(f.Move, f.Width > 0 && f.Height > 0)
+}
+
+// spoken returns the words TalkBack announces for the roles and states it has no word of its own for, in lang, by Protocol.java's SPOKEN_* indexes: Android's classes name buttons, checkboxes and fields in the system's language, but nothing names a link, a tab or a table, as Material's tabs name themselves from resources of their own.
+func spoken(lang string) []string {
+	m := locales.In(lang)
+	return []string{
+		m.RoleLink(), m.RoleTab(), m.RoleSearchBox(), m.RoleStatus(), m.RoleMenu(), m.RoleMenuItem(), m.RoleDialog(), m.RoleAlert(),
+		m.RoleTable(), m.RoleGrid(), m.RoleRow(), m.RoleColumnHeader(), m.RoleCell(),
+		m.StatePartiallyChecked(), m.StateExpanded(), m.StateCollapsed(),
+	}
+}
+
+// writeDirection writes ItemDirection as NsgoView.apply reads it: the direction, then the spoken words in the language the app shows.
+func writeDirection(w *writer, it *driver.MountItem) {
+	w.flags(it.RTL)
+	words := spoken(it.Language)
+	w.u32(uint32(len(words)))
+	for _, s := range words {
+		w.str(s)
+	}
 }
 
 // writer and reader are the protocol's encoding: big-endian, lengths

@@ -36,4 +36,4 @@ runs the app in a pseudo locale that shows untranslated and cut text. Any build 
 
 ## NSGo's own words
 
-NSGo's components say their words in the languages NSGo is translated to. For another language, a key that names a package, such as `github.com/nsgo-dev/nsgo/base/locales`, gives that package's messages in the file's language.
+NSGo's components say their words in the languages NSGo is translated to. For another language, a key that names a package, such as `github.com/nsgo-dev/nsgo/base/locales`, gives that package's messages in the file's language. The platforms' menus, and the roles and states Android's and Windows' screen readers announce where the system has no word of its own, such as a tab or a search box, say the words of `github.com/nsgo-dev/nsgo/desktop/locales`.

@@ -1305,7 +1305,7 @@ func TestFileFilterNamesTheTypes(t *testing.T) {
 	}
 }
 
-// TestStatusAndSearchFieldElements checks what UI Automation reads of a status, a status bar named by the texts inside it with the system's own type name, and of a search field, an edit named a search box.
+// TestStatusAndSearchFieldElements checks what UI Automation reads of a status, a status bar named by the texts inside it with the system's own type name, and of a search field, an edit named a search box in the language the app shows.
 func TestStatusAndSearchFieldElements(t *testing.T) {
 	e := &uiaElement{}
 	text := func(s string) *view {
@@ -1319,6 +1319,11 @@ func TestStatusAndSearchFieldElements(t *testing.T) {
 	search := &view{kind: driver.KindInput, props: driver.ViewProps{Role: driver.RoleSearchField, Label: "Find"}}
 	if s := e.spec(search); s.control != ctEdit || s.name != "Find" || s.localizedType != "search box" {
 		t.Errorf("a search field is control %d named %q, type %q", s.control, s.name, s.localizedType)
+	}
+	// Named in the language the app shows, not English.
+	chinese := &uiaElement{w: &window{language: "zh-Hans"}}
+	if s := chinese.spec(search); s.control != ctEdit || s.localizedType != "搜索框" {
+		t.Errorf("in Chinese, a search field is control %d, type %q", s.control, s.localizedType)
 	}
 	field := &view{kind: driver.KindInput, props: driver.ViewProps{Role: driver.RoleTextField, Label: "Name"}}
 	if s := e.spec(field); s.control != ctEdit || s.localizedType != "" {

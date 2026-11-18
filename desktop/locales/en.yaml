@@ -85,3 +85,51 @@ services:
 help:
   message: "Help"
   description: The title of the menu of the help items.
+roleLink:
+  message: "link"
+  description: What Android's screen reader announces a link as.
+roleTab:
+  message: "tab"
+  description: What Android's screen reader announces a tab of a tab list as.
+roleSearchBox:
+  message: "search box"
+  description: What Android's and Windows' screen readers announce a search field as, in place of a text field.
+roleStatus:
+  message: "status"
+  description: What Android's screen reader announces a status area, which reports changes as they happen, as.
+roleMenu:
+  message: "menu"
+  description: What Android's screen reader announces a menu as.
+roleMenuItem:
+  message: "menu item"
+  description: What Android's screen reader announces an item of a menu as.
+roleDialog:
+  message: "dialog"
+  description: What Android's screen reader announces a dialog as.
+roleAlert:
+  message: "alert"
+  description: What Android's screen reader announces an urgent message as.
+roleTable:
+  message: "table"
+  description: What Android's screen reader announces a table as.
+roleGrid:
+  message: "grid"
+  description: What Android's screen reader announces a grid of cells the user moves between as.
+roleRow:
+  message: "row"
+  description: What Android's screen reader announces a row of a table or grid as.
+roleColumnHeader:
+  message: "column header"
+  description: What Android's screen reader announces the header of a table's column as.
+roleCell:
+  message: "cell"
+  description: What Android's screen reader announces a cell of a table or grid as.
+statePartiallyChecked:
+  message: "partially checked"
+  description: What Android's screen reader announces a checkbox in its mixed state as, checked for some of the items it stands for.
+stateExpanded:
+  message: "expanded"
+  description: What Android's screen reader announces an expandable element that shows its content as.
+stateCollapsed:
+  message: "collapsed"
+  description: What Android's screen reader announces an expandable element that hides its content as.
