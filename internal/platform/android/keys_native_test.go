@@ -101,6 +101,43 @@ func hardwareKeysResume(t *testing.T, leave string) {
 	}
 }
 
+// A focused field that leaves the tree, as a search field closed by a shortcut does, gives the focus back to the host rather than to the window's next field.
+func TestHardwareKeysResumeAfterFocusedInputGoes(t *testing.T) {
+	var pressed, secondFocus atomic.Int32
+	var text atomic.Value
+	text.Store("")
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		searching := core.NewSignal(cx, true)
+		cx.OnKey("space", func() { pressed.Add(1) })
+		cx.OnKeyWith("mod+b", core.KeyOptions{When: core.KeyAlways}, func() { searching.Set(false) })
+		return core.View{Children: []core.Node{
+			core.Show{When: searching.Get, Then: func(*core.Scope) core.Node {
+				return core.Input{TestID: "search", AutoFocus: true, Style: core.Style{Width: core.Pt(240), Height: core.Pt(44)},
+					OnChange: func(value string) { text.Store(value) }}
+			}},
+			core.Input{TestID: "other", Style: core.Style{Width: core.Pt(240), Height: core.Pt(44)}, OnFocus: func() { secondFocus.Add(1) }},
+		}}
+	})
+	if !app.Find("id:search").Focused {
+		t.Fatal("AutoFocus did not reach the search field")
+	}
+	app.Key("space")
+	if pressed.Load() != 0 || text.Load() != " " {
+		t.Fatalf("focused field: binding=%d text=%q", pressed.Load(), text.Load())
+	}
+	app.Key("mod+b")
+	if app.Exists("id:search") {
+		t.Fatal("the shortcut did not remove the search field")
+	}
+	if app.Find("id:other").Focused || secondFocus.Load() != 0 {
+		t.Fatalf("removing the focused field focused another one %d times", secondFocus.Load())
+	}
+	app.Key("space")
+	if pressed.Load() != 1 {
+		t.Fatalf("after the focused field went, Space fired %d times; want once", pressed.Load())
+	}
+}
+
 func TestHardwareKeysCanFocusInput(t *testing.T) {
 	var text atomic.Value
 	text.Store("")

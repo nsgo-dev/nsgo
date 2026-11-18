@@ -96,7 +96,7 @@ What 0.5.0 changed in how the keyboard's focus, popups and assistive technology 
 | Item | NSH reference | Done when |
 | --- | --- | --- |
 | Context menus from any input | `elements.md`, #978, #1098, #1544, #1555, #1610 | The menu key, Shift+F10 and a screen reader's menu action open a view's context menu; a held finger or pen opens a `ContextMenu` on any device and a mouse never; a secondary click outside closes overlays; a second one on the trigger opens it again where it lands; and `ContextMenuEvent` names its pointer |
-| Modified keyboard activation on mobile | [#398](https://github.com/nsgo-dev/nsgo/issues/398), [#413](https://github.com/nsgo-dev/nsgo/issues/413) | Focused pressables on Android and iOS/tvOS receive Space and Return from a physical keyboard with their modifiers after the keymap; Android currently falls back to native key dispatch, and iOS/tvOS handles the remote's select without keyboard modifiers. Desktop and web checkbox callbacks preserve them, while watchOS and mini programs have no physical-keyboard activation path |
+| Modified keyboard activation on mobile | [#398](https://github.com/nsgo-dev/nsgo/issues/398) | Focused pressables on Android and iOS/tvOS receive Space and Return from a physical keyboard with their modifiers after the keymap; Android currently falls back to native key dispatch, and iOS/tvOS handles the remote's select without keyboard modifiers. Desktop and web checkbox callbacks preserve them, while watchOS and mini programs have no physical-keyboard activation path |
 
 ## From NSGo's issues
 
