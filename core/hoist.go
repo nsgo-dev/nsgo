@@ -125,6 +125,10 @@ type covered struct {
 // modals, is placed beside an anchor, which a scroll may move.
 func anchored(host *node) bool {
 	for _, h := range host.hosted {
+		if h.style.Display == DisplayNone {
+			// A hidden overlay, such as a closed tooltip kept for its description, is placed again once its display changes.
+			continue
+		}
 		if o := h.hoist.overlay; o != nil && (o.Anchor != nil || o.AnchorBounds != nil) || h.hoist.modal != nil && anchored(h) {
 			return true
 		}

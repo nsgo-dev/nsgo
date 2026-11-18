@@ -106,3 +106,25 @@ func TestMovingContentIntoAndOutOfTooltipUpdatesItsAccessibility(t *testing.T) {
 		t.Fatalf("text kept tooltip accessibility after leaving: %+v", p)
 	}
 }
+
+// A closed tooltip's hidden overlay stays mounted for its description, so it must not count as an anchored overlay that a scroll moves: otherwise every scroll lays out the whole tree and places every hidden bubble.
+func TestHiddenTooltipDoesNotFollowScrolls(t *testing.T) {
+	h := newHost(t, Size{Width: 300, Height: 300}, func(*Scope) Node {
+		return Scroll{TestID: "scroll", Style: Style{FlexGrow: 1}, Children: []Node{
+			View{TestID: "trigger", Label: "Delete", Role: RoleButton, Style: Style{Width: Pt(20), Height: Pt(20)}, Tooltip: Text{Content: "Deletes the row"}},
+			View{Style: Style{Height: Pt(1000)}},
+		}}
+	})
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventScroll, ID: h.find("scroll").id, Point: Point{Y: 40}})
+	if h.tree.view.layoutDirty {
+		t.Fatal("a scroll lays the tree out again for a hidden tooltip")
+	}
+	h.commit()
+	h.tree.within(h.tree.root, func() { h.find("trigger").tip.focus(true) })
+	h.commit()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventScroll, ID: h.find("scroll").id, Point: Point{Y: 80}})
+	if !h.tree.view.layoutDirty {
+		t.Fatal("a shown tooltip does not follow a scroll")
+	}
+}
