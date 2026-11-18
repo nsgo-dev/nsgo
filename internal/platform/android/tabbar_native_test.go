@@ -75,9 +75,7 @@ func TestTabBarSVGNativeTint(t *testing.T) {
 	check(1)
 }
 
-// A bar only reserves the part of its own frame under the navigation bar.
-// Moving an ancestor must update that overlap even if the bar's local frame
-// stays unchanged, and moving back must restore its original natural height.
+// A bar only reserves the part of its own frame under the navigation bar. Moving an ancestor must update that overlap even if the bar's local frame stays unchanged, and moving back must restore its original natural height.
 func TestTabBarNativeInsetsFollowPlacement(t *testing.T) {
 	if nsgotest.Target() != "android" {
 		t.Skip("requires Android pixels")

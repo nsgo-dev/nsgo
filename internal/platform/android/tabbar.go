@@ -9,8 +9,7 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 // navigation bar, reporting the user's choice as "change".
 type tabBar struct{ cx *driver.NativeContext }
 
-// tabBarHeight is Material 3's navigation bar's content height. The runtime
-// reports a taller natural size only where the bar overlaps system navigation.
+// tabBarHeight is Material 3's navigation bar's content height. The runtime reports a taller natural size only where the bar overlaps system navigation.
 const tabBarHeight driver.Points = 80
 
 func newTabBar(cx *driver.NativeContext) driver.NativeComponent {
