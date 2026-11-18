@@ -17,11 +17,13 @@ func TestTabBarSVGNativeTint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var choose func(int)
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		theme := core.DefaultTheme()
 		theme.Light.Accent, theme.Dark.Accent = core.RGB(0xd02030), core.RGB(0xd02030)
 		cx.SetTheme(theme)
 		selected := core.NewSignal(cx, 0)
+		choose = selected.Set
 		return core.View{Style: core.Style{Width: core.Pct(100), Height: core.Pct(100)}, TestID: "root", Children: []core.Node{
 			core.TabBar{Items: []core.TabBarItem{{Title: "Home", SVG: svg}, {Title: "Search", Icon: "magnifyingglass", SVG: svg}, {Title: "Menu", Icon: "android:ic_menu_search", SVG: svg}},
 				Selected: selected.Get, OnChange: selected.Set, TestID: "bar",
@@ -66,6 +68,6 @@ func TestTabBarSVGNativeTint(t *testing.T) {
 	if idle[2]*2 > idle[1] {
 		t.Fatalf("idle pixels: %d under the SVG, %d where Icon names a drawable; the drawable did not take precedence", idle[1], idle[2])
 	}
-	app.Press("id:bar")
+	app.Post(func() { choose(1) })
 	check(1)
 }
