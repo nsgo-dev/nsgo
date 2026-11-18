@@ -673,7 +673,7 @@ func TestKeymapFollowsAModalThatBindsNothing(t *testing.T) {
 	}
 }
 
-// A YieldsToMenu binding leaves its key out of the keymap, which platforms match before the application menu, while an enabled item of the menu has the key as its shortcut, written with "mod" or the platform's own Command or Control, a role's included; a disabled item or one in a disabled submenu leaves it the key, and it takes the key back as the menu goes. A binding without the option keeps its key before the menu. Where no menu shows, on iOS, Android and the web, every binding keeps its key.
+// A YieldsToMenu binding leaves its key out of the keymap, which platforms match before the application menu, while an enabled item of the menu has the key as its shortcut, written with "mod" or the platform's own Command or Control, a role's included; a disabled item or one in a disabled submenu leaves it the key, on macOS even with an enabled item after it, as AppKit stops at the first item with the key, and it takes the key back as the menu goes. A binding without the option keeps its key before the menu. Where no menu shows, on iOS, Android and the web, every binding keeps its key.
 func TestBindingsYieldToTheMenuAsAsked(t *testing.T) {
 	for _, os := range []OS{OSMacOS, OSWindows, OSLinux, OSIOS, OSAndroid, OSWeb} {
 		command := map[OS]string{OSMacOS: "Cmd+R", OSIOS: "Cmd+R"}[os]
@@ -689,6 +689,7 @@ func TestBindingsYieldToTheMenuAsAsked(t *testing.T) {
 			{"mod+r", []MenuItem{{Label: "Run", Shortcut: "mod+r"}}, []string{"mod+q", "mod+s"}},
 			{command, []MenuItem{{Label: "Run", Shortcut: command}}, []string{"mod+q", "mod+s"}},
 			{"disabled", []MenuItem{{Label: "Run", Shortcut: "mod+r", Disabled: true}}, []string{"mod+r", "mod+q", "mod+s"}},
+			{"disabled, then enabled", []MenuItem{{Label: "Off", Shortcut: "mod+r", Disabled: true}, {Label: "Run", Shortcut: "mod+r"}}, map[bool][]string{true: {"mod+r", "mod+q", "mod+s"}, false: {"mod+q", "mod+s"}}[os == OSMacOS]},
 			{"in a disabled submenu", []MenuItem{{Label: "More", Disabled: true, Items: []MenuItem{{Label: "Run", Shortcut: "mod+r"}}}}, []string{"mod+r", "mod+q", "mod+s"}},
 			{"other keys", []MenuItem{{Label: "Rerun", Shortcut: "mod+shift+r"}, {Label: "Save", Shortcut: "mod+s"}}, []string{"mod+r", "mod+q", "mod+s"}},
 			// Quit's own shortcut is Command+Q on a Mac, Alt+F4 elsewhere.

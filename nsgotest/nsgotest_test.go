@@ -663,7 +663,7 @@ func TestStartAppKeepsTheAppsScope(t *testing.T) {
 	app.Find("id:main")
 }
 
-// A key nothing else takes chooses the enabled application-menu item it is the shortcut of, in a submenu too and a role's own on a Mac; a disabled item takes nothing, leaving the key to a later item with it, and a NotInText one leaves it to a focused field.
+// A key nothing else takes chooses the enabled application-menu item it is the shortcut of, in a submenu too and a role's own on a Mac; a disabled item takes nothing, and on a Mac, as AppKit stops at the first item with the key, leaves nothing to a later item with it, which Windows chooses; a NotInText one leaves the key to a focused field.
 func TestApplicationMenuShortcuts(t *testing.T) {
 	if Target() != "" {
 		t.Skip("checks the headless menu shortcut path")
@@ -694,7 +694,7 @@ func TestApplicationMenuShortcuts(t *testing.T) {
 	for _, key := range []string{"mod+r", "meta+r", "mod+d", "mod+i", "mod+e", "mod+g", "mod+c"} {
 		app.Key(key)
 	}
-	if want := []string{"reload", "reload", "refresh", "again", "copy"}; !slices.Equal(chosen, want) {
+	if want := []string{"reload", "reload", "refresh", "copy"}; !slices.Equal(chosen, want) {
 		t.Errorf("on macOS: chose %q, want %q", chosen, want)
 	}
 	chosen = nil
@@ -705,11 +705,12 @@ func TestApplicationMenuShortcuts(t *testing.T) {
 		t.Errorf("with the field focused: chose %q, want %q", chosen, want)
 	}
 
-	// Elsewhere the focused field handles the editing roles' keys, which the menu leaves alone.
+	// Elsewhere the focused field handles the editing roles' keys, which the menu leaves alone, and a disabled item leaves its key to a later one.
 	app = start(core.OSWindows)
 	app.Key("ctrl+c")
 	app.Key("ctrl+r")
-	if want := []string{"reload"}; !slices.Equal(chosen, want) {
+	app.Key("ctrl+e")
+	if want := []string{"reload", "again"}; !slices.Equal(chosen, want) {
 		t.Errorf("on Windows: chose %q, want %q", chosen, want)
 	}
 

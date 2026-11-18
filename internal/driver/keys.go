@@ -139,25 +139,41 @@ func FindKey(keymap []KeyBinding, names []string, focus KeyUse, repeat bool) (id
 	return 0, false
 }
 
-// MenuShortcut finds the enabled item of entries or of their enabled submenus that takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac (mac) every item's, elsewhere all but the editing roles', whose keys the focused field handles itself. While editing, NotInText items leave the key to the focused input or web view. The first such item in menu order takes the key, as the platforms' menus find it; a disabled one takes nothing.
+// MenuShortcut finds the enabled item of entries or of their enabled submenus that takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac (mac) every item's, elsewhere all but the editing roles', whose keys the focused field handles itself. While editing, NotInText items leave the key to the focused input or web view. The first such item in menu order takes the key, as the platforms' menus find it; a disabled one takes nothing, and on a Mac it keeps the key from the items after it too, as AppKit stops at the first key equivalent that matches.
 func MenuShortcut(entries []MenuEntry, names []string, mac, editing bool) (MenuEntry, bool) {
+	e, ok, _ := menuShortcut(entries, names, mac, editing)
+	return e, ok
+}
+
+// menuShortcut is MenuShortcut, also reporting whether a disabled item on a Mac ended the search.
+func menuShortcut(entries []MenuEntry, names []string, mac, editing bool) (found MenuEntry, ok, stopped bool) {
+	has := func(e MenuEntry) bool {
+		shortcut := e.Shortcut
+		if shortcut == "" {
+			shortcut = NormalizeKey(e.Role.Shortcut(mac))
+		}
+		return shortcut != "" && slices.Contains(names, shortcut)
+	}
 	for _, e := range entries {
 		switch {
-		case e.Disabled || e.Separator:
+		case e.Separator:
 		case len(e.Items) > 0:
-			if found, ok := MenuShortcut(e.Items, names, mac, editing); ok {
-				return found, true
+			if e.Disabled {
+				continue
+			}
+			if found, ok, stopped := menuShortcut(e.Items, names, mac, editing); ok || stopped {
+				return found, ok, stopped
+			}
+		case e.Disabled:
+			if mac && has(e) {
+				return MenuEntry{}, false, true
 			}
 		case e.NotInText && editing:
 		case mac || !e.Role.EditsText():
-			shortcut := e.Shortcut
-			if shortcut == "" {
-				shortcut = NormalizeKey(e.Role.Shortcut(mac))
-			}
-			if shortcut != "" && slices.Contains(names, shortcut) {
-				return e, true
+			if has(e) {
+				return e, true, false
 			}
 		}
 	}
-	return MenuEntry{}, false
+	return MenuEntry{}, false, false
 }
