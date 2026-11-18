@@ -55,6 +55,26 @@ func TestWebSourceShows(t *testing.T) {
 	}
 }
 
+func TestResolveWebSource(t *testing.T) {
+	blank := WebSource{Src: "about:blank"}
+	for _, c := range []struct{ source, want WebSource }{
+		{WebSource{}, blank},
+		{WebSource{BaseURL: "https://app.example/"}, blank},
+		{WebSource{Src: "https://app.example/"}, WebSource{Src: "https://app.example/"}},
+		{WebSource{HTML: "<p>", BaseURL: "app://bundle/"}, WebSource{HTML: "<p>", BaseURL: "app://bundle/"}},
+	} {
+		if got := ResolveWebSource(c.source); got != c.want {
+			t.Errorf("ResolveWebSource(%+v) = %+v, want %+v", c.source, got, c.want)
+		}
+		if got := c.source.Origin(); got != c.want.Origin() {
+			t.Errorf("%+v.Origin() = %q, want %q", c.source, got, c.want.Origin())
+		}
+	}
+	if got := (WebSource{}).Origin(); got != "null" {
+		t.Errorf("an empty source's origin is %q, want null", got)
+	}
+}
+
 // A backend that has no page to run an Evaluate in answers it itself, from the script's marker.
 func TestWebEvaluateMarker(t *testing.T) {
 	for _, marker := range []string{"nsgo-evaluate:0123abcd:", `odd "quoted\" marker`} {

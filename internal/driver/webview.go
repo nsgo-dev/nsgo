@@ -8,20 +8,17 @@ import (
 	"strings"
 )
 
-// WebSource is what a web view shows: the page at Src, or HTML, whose
-// relative links resolve against BaseURL, instead when it is set. With neither
-// Src nor HTML it loads about:blank, including the usual load events.
+// WebSource is what a web view shows: the page at Src, or HTML, whose relative links resolve against BaseURL, instead when it is set. With neither Src nor HTML it loads about:blank, with the usual load events (ResolveWebSource).
 type WebSource struct {
 	Src     string
 	HTML    string
 	BaseURL string
 }
 
-// ResolveWebSource supplies the blank page for a source with neither a URL nor HTML.
-// Core resolves sources before sending a WebConfig or WebLoad to any backend.
+// ResolveWebSource is the source a backend loads for s: s itself, or about:blank for a source with neither Src nor HTML, whose BaseURL then has nothing to resolve. Core resolves sources before sending a WebConfig or WebLoad to any backend.
 func ResolveWebSource(s WebSource) WebSource {
 	if s.Src == "" && s.HTML == "" {
-		s.Src = "about:blank"
+		return WebSource{Src: "about:blank"}
 	}
 	return s
 }

@@ -65,6 +65,12 @@ func TestEmptyWebSourceIsOpaque(t *testing.T) {
 	scope.Post(func() { ref.Load(core.WebSource{}) })
 	wait(4)
 	blank()
+	// An about: page the app names itself takes the app's origin just the same unless the sandbox keeps it opaque.
+	scope.Post(func() { ref.Load(core.WebSrc("about:blank?probe")) })
+	wait(5)
+	if frame := mount.Call("querySelector", "iframe"); strings.Contains(frame.Call("getAttribute", "sandbox").String(), "allow-same-origin") || !frame.Get("contentDocument").IsNull() {
+		t.Fatal("an about: frame can reach the app's origin")
+	}
 }
 
 // TestWebViewDropsTheBridgeOfAPageThatLeft loads HTML whose page goes to another, which has no bridge, and comes back as the app reloads it. An Evaluate made before the HTML's page handed its port waits for it; one the page had not answered as it left ends with an error, as does one made while the other page shows; and the HTML shown again answers again. The other page reaches no OnMessage. Run in a browser: nsgo test -target web.

@@ -15,8 +15,7 @@ import (
 
 // WebView shows a web page in the platform's web view, which fills the view and takes its own pointer, wheel and keyboard input. Pages reach the app with window.nsgo.postMessage(data), which OnMessage and OnMessageFrom receive from the pages MessageOrigins allows; Ref.PostMessage dispatches a MessageEvent on the page's window.
 type WebView struct {
-	// Source loads about:blank when neither Src nor HTML is set, clearing
-	// the previous page and reporting the usual load and navigation events.
+	// Source loads about:blank when neither Src nor HTML is set, clearing the previous page and reporting the usual load and navigation events.
 	Source WebSource
 	// The page loads again when SourceFunc's source changes.
 	SourceFunc func() WebSource
@@ -259,9 +258,7 @@ func (t *Tree) dispatchWeb(n *node, ev driver.Event) {
 	var nav WebNavigation
 	if ev.Navigation != nil {
 		nav = *ev.Navigation
-		// WebView2 exposes its default about:blank title as the URL,
-		// while WebKit and browsers expose no title. Keep the shared
-		// blank-source contract independent of the native web engine.
+		// Chromium's web views, WebView2 and Android's WebView, name an untitled about:blank page by its URL, where WebKit and browsers give it no title; an empty source reports no title on every backend.
 		if nav.URL == "about:blank" && nav.Title == "about:blank" {
 			nav.Title = ""
 		}

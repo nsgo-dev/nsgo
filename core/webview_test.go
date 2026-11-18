@@ -45,8 +45,9 @@ func TestEmptyWebSourceLoadsBlank(t *testing.T) {
 			if kinds(h.commit())[driver.ItemWeb] != 0 {
 				t.Fatal("an unchanged blank source loaded again")
 			}
-			for range 2 {
-				ref.Load(WebSource{})
+			// A repeated explicit blank load navigates again, and a base URL with nothing to resolve changes nothing.
+			for _, src := range []WebSource{{}, {}, {BaseURL: "https://app.example/"}} {
+				ref.Load(src)
 				b := h.commit()
 				if len(b.Items) != 1 || b.Items[0].WebCommand != driver.WebLoad {
 					t.Fatalf("explicit blank load sent %v", b.Items)
