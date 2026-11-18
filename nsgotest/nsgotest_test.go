@@ -583,6 +583,66 @@ func TestCloseWindowRunsTheMainWindowsHandlers(t *testing.T) {
 	}
 }
 
+// Application-menu role items without OnSelect are carried out by the headless model as the desktop performs them.
+func TestApplicationMenuRolesHeadless(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless menu role path")
+	}
+	var closed, quit int
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{{Role: core.MenuClose}}}})
+		desktop.OnQuitRequest(cx, func(*desktop.QuitRequest) { quit++ })
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			w := desktop.CurrentWindow(cx)
+			w.OnClosing(cx, func(*desktop.WindowClosing) { closed++ })
+			return core.Text{Content: "main"}
+		})
+	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.Key("mod+w")
+	if closed != 1 || app.root.MainWindow() != nil {
+		t.Fatalf("close role ran %d handlers and left window %v", closed, app.root.MainWindow() != nil)
+	}
+
+	quitRequests := 0
+	app = StartApp(t, func(cx *core.Scope) {
+		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{{Role: core.MenuQuit}}}})
+		desktop.OnQuitRequest(cx, func(*desktop.QuitRequest) { quitRequests++ })
+		cx.SetMainView(func(cx *core.Scope) core.Node { return core.Text{Content: "main"} })
+	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.ChooseMenu("App", "Quit")
+	if quitRequests != 1 {
+		t.Fatalf("quit role ran %d quit handlers", quitRequests)
+	}
+
+	app = StartApp(t, func(cx *core.Scope) {
+		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "Edit", Items: []desktop.MenuItem{{Role: core.MenuCopy}, {Role: core.MenuPaste}}}})
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			return core.Input{TestID: "field", DefaultValue: "abc"}
+		})
+	}, Environment(core.Environment{OS: core.OSWindows, Idiom: core.IdiomDesktop}))
+	app.Focus("id:field")
+	app.Select("id:field", 0, 3)
+	app.Key("ctrl+c")
+	if app.Clipboard != "abc" {
+		t.Fatalf("copy role put %q in the clipboard", app.Clipboard)
+	}
+	app.Select("id:field", 3, 3)
+	app.Key("ctrl+v")
+	if got := app.Find("id:field").Text; got != "abcabc" {
+		t.Fatalf("paste role produced %q", got)
+	}
+
+	if msg := fails(t, func(tb testing.TB) {
+		app := StartApp(tb, func(cx *core.Scope) {
+			desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{{Role: core.MenuAbout}}}})
+			cx.SetMainView(func(cx *core.Scope) core.Node { return core.Text{Content: "main"} })
+		}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+		app.ChooseMenu("App", "About")
+	}); !strings.Contains(msg, `menu role "About" is not supported headlessly`) {
+		t.Fatalf("unsupported role failed with %q", msg)
+	}
+}
+
 // Another window the app opens runs beside the main one without disturbing the views steps reach, and each window's alerts are answered to the window that showed them, though both number them alike.
 func TestOtherWindowsLeaveTheMainOnesViews(t *testing.T) {
 	if Target() != "" {

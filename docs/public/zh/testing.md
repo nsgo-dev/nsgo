@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 
 在真实目标上，`nsgotest.Environment` 固定外观、语言环境、文字大小、减少动画、增强对比度、登录时启动的原因、位于前台的应用及平台是否跟踪它，以及设备的名称和型号。其余部分保持目标自身的值：操作系统、idiom、安全区域和系统标题栏高度。因此，`Environment` 设置为 `core.OSWindows` 并不会让 `go tool nsgo test -target macos` 按 Windows 布局应用；这样的测试要么无头运行，此时整个 `Environment` 都会生效，要么使用 `-target windows`。`nsgotest.Idiom` 同样只在无头运行时生效。`nsgotest.Size` 在 macOS、Windows、Linux 和 Web 上设置测试窗口的大小；Android、iOS、tvOS 和 watchOS 保持设备屏幕的大小。
 
-没有绑定消费按键时，`app.Key("mod+a")` 会全选当前文本框的内容。在 macOS、Windows 或 Linux 的 `Environment` 中，没有被绑定、聚焦视图或文本框消费的按键会选择以它为快捷键的已启用应用菜单项，因此 `app.Key("mod+r")` 可以测试菜单快捷键能否到达对应的菜单项：已禁用的菜单项不响应，`NotInText` 菜单项把按键留给已聚焦的文本框。在无头测试、桌面目标和 Web 上，`KeyAlways` 绑定会在文本框编辑之前消费 Return、Backspace 和全选；`KeyAuto` 和 `KeyNotEditing` 则把这些键留给已聚焦的文本框。Android 和 iOS 的测试宿主还不会先把这些键交给键位绑定。已聚焦视图的 `OnKeyDown` 会最先收到 `app.Key`，单独的修饰键（`app.Key("shift")`）也算；它消费的键不会再交给任何绑定，无头测试以及桌面和 Web 目标上都是如此。
+没有绑定消费按键时，`app.Key("mod+a")` 会全选当前文本框的内容。在 macOS、Windows 或 Linux 的 `Environment` 中，没有被绑定、聚焦视图或文本框消费的按键会选择以它为快捷键的已启用应用菜单项，因此 `app.Key("mod+r")` 可以测试菜单快捷键能否到达对应的菜单项：已禁用的菜单项不响应，`NotInText` 菜单项把按键留给已聚焦的文本框。无头 `ChooseMenu` 和菜单快捷键会执行没有 `OnSelect` 的已支持标准角色，并明确报告不支持的角色。在无头测试、桌面目标和 Web 上，`KeyAlways` 绑定会在文本框编辑之前消费 Return、Backspace 和全选；`KeyAuto` 和 `KeyNotEditing` 则把这些键留给已聚焦的文本框。Android 和 iOS 的测试宿主还不会先把这些键交给键位绑定。已聚焦视图的 `OnKeyDown` 会最先收到 `app.Key`，单独的修饰键（`app.Key("shift")`）也算；它消费的键不会再交给任何绑定，无头测试以及桌面和 Web 目标上都是如此。
 
 ## 运行测试
 

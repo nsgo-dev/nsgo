@@ -170,16 +170,17 @@ func (a *App) ChooseMenu(path ...string) {
 			a.t.Fatalf("nsgotest: the menu item %q is disabled", path[:i+1])
 		}
 		if i == len(path)-1 {
-			if found.ID == 0 {
-				a.t.Fatalf("nsgotest: menu item %q does nothing", path)
-			}
 			if a.target != nil {
 				a.step("chooseMenu(%q)", path)
 				a.target.menu(func(s testhost.Surface) error { return s.ChooseMenu(found.ID) })
 				a.done()
 				return
 			}
-			a.dispatchOn(a.menuTree, driver.Event{Kind: driver.EventMenu, Count: found.ID})
+			if found.ID != 0 {
+				a.dispatchOn(a.menuTree, driver.Event{Kind: driver.EventMenu, Count: found.ID})
+			} else {
+				a.menuRole(*found)
+			}
 			return
 		}
 		items = found.Items
