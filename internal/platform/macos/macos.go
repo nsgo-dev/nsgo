@@ -910,7 +910,7 @@ func newSurface(opts Options, embedded bool) *surface {
 		apple.Rect(0, 0, float64(opts.Width), float64(opts.Height)))
 	s.native.Send(selSetWantsLayer, true)
 	views[s.native] = &view{surface: s}
-	// Moves over the whole surface pick the hovers and set the cursor (filterEvent), in a background window too and over views with no mouse handlers. AppKit sends no cursorUpdate: to an area that is active always, so the cursor updates it asks for as the mouse comes in take a second area, active in the active app only.
+	// Moves over the whole surface pick the hovers (filterEvent), in a background window too and over views with no mouse handlers, and set the cursor while the app is active: macOS shows only the active app's cursors. AppKit sends no cursorUpdate: to an area that is active always, so the cursor updates it asks for as the mouse comes in, and as the app becomes active under a resting mouse, take a second area, active in the active app only.
 	const mouseMoved, cursorUpdate, activeInActiveApp, activeAlways, inVisibleRect = 0x02, 0x04, 0x40, 0x80, 0x200
 	for _, options := range []uint{mouseMoved | activeAlways | inVisibleRect, cursorUpdate | activeInActiveApp | inVisibleRect} {
 		area := objc.ID(apple.Class("NSTrackingArea")).Send(selAlloc).Send(sel("initWithRect:options:owner:userInfo:"),
@@ -2678,19 +2678,12 @@ func covers(v *view, hit objc.ID) bool {
 	return hit != 0 && objc.Send[bool](hit, sel("isDescendantOf:"), v.native)
 }
 
-// updateCursor shows the cursor over hit, as Windows answers
-// WM_SETCURSOR. A move sets it always, as the pointer may come from
-// another app or the window's edge; otherwise it is set only when the app
-// shows another, as -[NSCursor set] costs milliseconds with a customized
-// pointer, and not while a button is down: a drag keeps the cursor it
-// began with.
+// updateCursor shows the cursor over hit, as Windows answers WM_SETCURSOR, while the app is active: macOS shows a background app's window with the active app's cursor, and the cursor area sets it as the app becomes active. A move sets it always, as the pointer may come from another app or the window's edge; otherwise it is set only when the app shows another, as -[NSCursor set] costs milliseconds with a customized pointer, and not while a button is down: a drag keeps the cursor it began with.
 func (s *surface) updateCursor(hit, up objc.ID, loc apple.CGPoint, always bool) {
-	if !always {
-		app := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
-		if !objc.Send[bool](app, sel("isActive")) ||
-			objc.Send[uint](objc.ID(apple.Class("NSEvent")), sel("pressedMouseButtons")) != 0 {
-			return
-		}
+	app := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+	if !objc.Send[bool](app, sel("isActive")) ||
+		!always && objc.Send[uint](objc.ID(apple.Class("NSEvent")), sel("pressedMouseButtons")) != 0 {
+		return
 	}
 	cursor, own := cursorAt(hit, up, loc)
 	if !own {
