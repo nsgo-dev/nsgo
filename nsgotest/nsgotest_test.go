@@ -16,52 +16,31 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+// closingDialog is a dialog with an exit transition and a button outside it that closes it.
+func closingDialog(cx *core.Scope) core.Node {
+	open := core.NewSignal(cx, true)
+	return base.Dialog{
+		Open: open.Get, Animation: core.ModalNone, TestID: "dialog",
+		PopupStyle: core.Style{Width: core.Pt(100), Height: core.Pt(100),
+			Transition: core.Transition{Duration: 200 * time.Millisecond, Properties: core.TransitionOpacity}},
+		EndingStyle: core.Style{Opacity: core.Alpha(0)},
+		After: []core.Node{core.View{Role: core.RoleButton, Label: "close", TestID: "close",
+			OnPress: func(core.PressEvent) { open.Set(false) }, Style: core.Style{Width: core.Pt(40), Height: core.Pt(40)}}},
+	}
+}
+
+// A step that closes a dialog returns once its exit transition is over and it has left the tree.
 func TestStepsWaitForEndingStyleTransition(t *testing.T) {
-	var open *core.Signal[bool]
-	app := Start(t, func(cx *core.Scope) core.Node {
-		open = core.NewSignal(cx, true)
-		return base.Dialog{
-			Open: open.Get, Animation: core.ModalNone, TestID: "dialog",
-			PopupStyle: core.Style{
-				Width: core.Pt(100), Height: core.Pt(100),
-				Transition: core.Transition{Duration: 200 * time.Millisecond, Properties: core.TransitionOpacity},
-			},
-			EndingStyle: core.Style{Opacity: core.Alpha(0)},
-			After: []core.Node{core.View{
-				Role: core.RoleButton, Label: "close", TestID: "close",
-				OnPress: func(core.PressEvent) { open.Set(false) },
-				Style:   core.Style{Width: core.Pt(40), Height: core.Pt(40)},
-			}},
-		}
-	})
+	app := Start(t, closingDialog)
 	app.Press("id:close")
 	if app.Exists("id:dialog") {
 		t.Fatal("Press returned while the dialog's ending transition still runs")
 	}
 }
 
+// ManualFrames leaves the exit transition to the test's Advance.
 func TestManualFramesKeepsEndingStyleTransitionPending(t *testing.T) {
-	var open *core.Signal[bool]
-	app := Start(t, func(cx *core.Scope) core.Node {
-		open = core.NewSignal(cx, true)
-		return base.Dialog{
-			Open: open.Get, Animation: core.ModalNone, TestID: "dialog",
-			PopupStyle: core.Style{
-				Width:  core.Pt(100),
-				Height: core.Pt(100),
-				Transition: core.Transition{
-					Duration:   200 * time.Millisecond,
-					Properties: core.TransitionOpacity,
-				},
-			},
-			EndingStyle: core.Style{Opacity: core.Alpha(0)},
-			After: []core.Node{core.View{
-				Role: core.RoleButton, Label: "close", TestID: "close",
-				OnPress: func(core.PressEvent) { open.Set(false) },
-				Style:   core.Style{Width: core.Pt(40), Height: core.Pt(40)},
-			}},
-		}
-	}, ManualFrames())
+	app := Start(t, closingDialog, ManualFrames())
 	app.Press("id:close")
 	if !app.Exists("id:dialog") {
 		t.Fatal("ManualFrames advanced the ending transition")
@@ -69,6 +48,87 @@ func TestManualFramesKeepsEndingStyleTransitionPending(t *testing.T) {
 	app.Advance(200 * time.Millisecond)
 	if app.Exists("id:dialog") {
 		t.Fatal("ending transition did not finish after Advance")
+	}
+}
+
+// fading is a dynamic style whose opacity follows on, with a transition of delay and duration.
+func fading(on *core.Signal[bool], delay, duration time.Duration) func() core.Style {
+	return func() core.Style {
+		opacity := core.Alpha(1)
+		if on.Get() {
+			opacity = core.Alpha(0.5)
+		}
+		return core.Style{Width: core.Pt(40), Height: core.Pt(40), Opacity: opacity,
+			Transition: core.Transition{Delay: delay, Duration: duration, Properties: core.TransitionOpacity}}
+	}
+}
+
+// A step that restyles a view runs its OnTransitionEnd once the transition's delay and duration are over, and returns then.
+func TestStepsRunOnTransitionEnd(t *testing.T) {
+	var ends []time.Duration
+	var began time.Time
+	app := Start(t, func(cx *core.Scope) core.Node {
+		on := core.NewSignal(cx, false)
+		return core.View{Children: []core.Node{
+			core.View{TestID: "faded", OnTransitionEnd: func() { ends = append(ends, cx.Now().Sub(began)) },
+				StyleFunc: fading(on, 50*time.Millisecond, 250*time.Millisecond)},
+			core.View{Role: core.RoleButton, Label: "fade", TestID: "fade", OnPress: func(core.PressEvent) { on.Set(true) },
+				Style: core.Style{Width: core.Pt(40), Height: core.Pt(40)}},
+		}}
+	})
+	ends = nil
+	began = app.Clock.Now()
+	app.Press("id:fade")
+	if len(ends) != 1 {
+		t.Fatalf("OnTransitionEnd ran %d times in the step, want once", len(ends))
+	}
+	if want := 300 * time.Millisecond; ends[0] < want || ends[0] > want+driver.FrameInterval {
+		t.Fatalf("OnTransitionEnd ran %v after the press, want %v", ends[0], want)
+	}
+	if took := app.Clock.Now().Sub(began); took > 300*time.Millisecond+driver.FrameInterval {
+		t.Fatalf("the step took %v of the clock, past the transition's end", took)
+	}
+}
+
+// A view whose OnTransitionEnd restyles it again holds a step for settleLimit at most.
+func TestEndlessTransitionsHoldAStepForTheLimit(t *testing.T) {
+	app := Start(t, func(cx *core.Scope) core.Node {
+		flip := core.NewSignal(cx, false)
+		toggle := func() { flip.Set(!flip.GetUntracked()) }
+		return core.View{TestID: "pulse", Role: core.RoleButton, Label: "pulse",
+			OnPress: func(core.PressEvent) { toggle() }, OnTransitionEnd: toggle,
+			StyleFunc: fading(flip, 0, 100*time.Millisecond)}
+	})
+	began := app.Clock.Now()
+	app.Press("id:pulse")
+	if took := app.Clock.Now().Sub(began); took < settleLimit || took > settleLimit+2*driver.FrameInterval {
+		t.Fatalf("the step took %v of the clock, want the %v limit", took, settleLimit)
+	}
+}
+
+// A view removed while its transition runs holds the step no longer.
+func TestARemovedViewsTransitionHoldsNoStep(t *testing.T) {
+	app := Start(t, func(cx *core.Scope) core.Node {
+		shown, faded := core.NewSignal(cx, true), core.NewSignal(cx, false)
+		return core.View{Children: []core.Node{
+			core.View{Role: core.RoleButton, Label: "fade", TestID: "fade",
+				OnPress: func(core.PressEvent) {
+					faded.Set(true)
+					cx.AfterFunc(50*time.Millisecond, func() { shown.Set(false) })
+				}, Style: core.Style{Width: core.Pt(40), Height: core.Pt(40)}},
+			core.Show{When: shown.Get, Then: func(*core.Scope) core.Node {
+				return core.View{TestID: "faded", OnTransitionEnd: func() { t.Error("OnTransitionEnd ran for a removed view") },
+					StyleFunc: fading(faded, 0, time.Second)}
+			}},
+		}}
+	})
+	began := app.Clock.Now()
+	app.Press("id:fade")
+	if app.Exists("id:faded") {
+		t.Fatal("the view was not removed")
+	}
+	if took := app.Clock.Now().Sub(began); took > 50*time.Millisecond+2*driver.FrameInterval {
+		t.Fatalf("the step took %v of the clock for a view removed after 50ms", took)
 	}
 }
 

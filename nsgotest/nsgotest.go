@@ -27,12 +27,7 @@
 // in the order a user finds them: the topmost modal's first, then the rest
 // in tree order.
 //
-// Steps act as a user does and send what a platform's input sends: Press
-// is a finger down and up, Type a key at a time, Scroll a drag 10 points
-// a frame. A step whose selector matches no view, or more than one it
-// would act on, or a disabled one, fails the test. Each step then waits,
-// moving the clock a frame at a time for at most 2 seconds, until no
-// animation that ends runs.
+// Steps act as a user does and send what a platform's input sends: Press is a finger down and up, Type a key at a time, Scroll a drag 10 points a frame. A step whose selector matches no view, or more than one it would act on, or a disabled one, fails the test. Each step then waits, moving the clock a frame at a time for at most 2 seconds, until no animation that ends runs and every style transition has reached its OnTransitionEnd; ManualFrames leaves them to the test's Advance.
 package nsgotest
 
 import (
@@ -134,9 +129,7 @@ func NoCaretMoves() Option {
 	return func(a *App) { a.noCaretMoves = true }
 }
 
-// ManualFrames keeps steps from taking display frames: the animations a
-// step starts move only as Advance moves the clock, so a test can look at
-// them on the way.
+// ManualFrames keeps steps from taking display frames: the animations and style transitions a step starts move, and their OnTransitionEnd runs, only as Advance moves the clock, so a test can look at them on the way.
 func ManualFrames() Option {
 	return func(a *App) { a.manualFrames = true }
 }
@@ -730,12 +723,7 @@ func (a *App) step(format string, args ...any) {
 	}
 }
 
-// done ends a step: it settles, then takes display frames while an
-// animation that ends runs and lists bind the rows they pace, for at most
-// settleLimit of the clock's time, and has OnAlert answer the alerts
-// shown. Frames the app asks for itself
-// do not hold a step, since its own loops may never end: Advance runs
-// them.
+// done ends a step: it settles, then takes display frames while an animation that ends runs, a style transition waits for its OnTransitionEnd or lists bind the rows they pace, for at most settleLimit of the clock's time, and has OnAlert answer the alerts shown. Frames the app asks for itself do not hold a step, since its own loops may never end: Advance runs them.
 func (a *App) done() {
 	a.t.Helper()
 	if a.target != nil {

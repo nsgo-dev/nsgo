@@ -155,8 +155,7 @@ func (t *Tree) timeTransitionEnds() {
 	t.ending = t.ending[:0]
 }
 
-// PendingTransitionEnds reports whether a live view has a style transition
-// whose OnTransitionEnd callback has not run yet.
+// PendingTransitionEnds reports whether a live view waits for its style transition to end before its OnTransitionEnd runs. It is nsgotest's: a step takes frames until it is false.
 func (t *Tree) PendingTransitionEnds() bool {
 	for _, n := range t.nodes {
 		if n != nil && !n.deleted && !n.owner.disposed && n.endStop != nil {

@@ -55,6 +55,8 @@ Tests check reactive graph ownership: access signals and scopes on the app's gor
 
 `app.Post(func() { state.Set(value) })` queues work on the app's graph goroutine as the next step or wait settles: the test goroutine headless, the engine goroutine on a target. Call it from a test or a stubbed worker, then use `app.Settle()` or a wait to read the resulting views. The function may post more, which the same step runs; it takes no steps and does not call `t.Fatal`, as on a target it runs off the test goroutine.
 
+Headless, each step then moves the clock a frame at a time, for at most 2 seconds, until the animations that end have ended and each style transition has run its `OnTransitionEnd`: a dialog or popover closing through its `EndingStyle` is gone when `app.Press` returns. To look at them on the way, start with `nsgotest.ManualFrames()`; they then move only as `app.Advance` moves the clock.
+
 ## Run on a platform
 
 Tests run in a real window with the platform's own input. Discovery follows the target's build tags, including target-only test files in otherwise portable packages:
@@ -79,7 +81,7 @@ An Android test that panics or exits before reporting its result fails with the 
 
 On `web` the tests run in a headless Chrome, Chromium or Edge the tool finds, or in the browser executable `NSGO_BROWSER` names. The tool waits up to 30 seconds for it to start, stops waiting when the command is cancelled, and reports the browser's error output if it exits or never answers.
 
-Each step, and `app.Settle()`, waits for the engine's pending commit before counting 100 ms without batches or finite animations. Headless steps also advance style transitions until their `OnTransitionEnd` callbacks run. The whole wait stops after five seconds even if the app keeps changing; a slow first dialog needs no extra post or sleep in the test.
+Each step, and `app.Settle()`, waits for the engine's pending commit before counting 100 ms without batches or finite animations. The whole wait stops after five seconds even if the app keeps changing; a slow first dialog needs no extra post or sleep in the test.
 
 On Android, the tool wakes a sleeping screen and dismisses a lock screen without a credential before building and before each test. A device locked with a PIN, password or pattern must be unlocked before the run can continue; the error names the device.
 
