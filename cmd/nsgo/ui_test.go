@@ -134,3 +134,13 @@ func TestStepPrintsItsLinesAtOnce(t *testing.T) {
 		t.Fatalf("detailIn wrote %q, want %q", got, want)
 	}
 }
+
+func TestStepPrintsItsStartWhenStderrIsRedirected(t *testing.T) {
+	got := captureStderr(t, func() {
+		s := begin("vetting for android_arm64")
+		s.fail()
+	})
+	if got != "  vetting for android_arm64…\n" {
+		t.Fatalf("step start = %q", got)
+	}
+}

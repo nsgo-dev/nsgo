@@ -339,6 +339,11 @@ func begin(format string, args ...any) *Step {
 		out.draw()
 		out.Unlock()
 		spin()
+	} else {
+		// A redirected run has no spinner to show while the step is active.
+		// Leave a durable start line so a slow or interrupted command still
+		// names the work in progress.
+		line(s.label + "…")
 	}
 	return s
 }
