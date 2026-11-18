@@ -234,6 +234,46 @@ func TestDragAtStartsWhereItSays(t *testing.T) {
 	}
 }
 
+// A drag from a point of a view goes down on the pressable view under that point, as PressAt presses it and as the web does, not on the view the selector names (#566).
+func TestDragAtPressesThePressableUnderItsPoint(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		pan   bool
+		path  []core.Point
+		press int // the child's presses: a drag that moves past the slop cancels its press
+	}{
+		{"tap", false, nil, 1},
+		{"drag", false, []core.Point{{X: 40}, {X: 80, Y: 20}}, 0},
+		{"pan", true, []core.Point{{X: 40}, {X: 80, Y: 20}}, 0},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var parentDown, pans, childDown, childPress int
+			app := Start(t, func(cx *core.Scope) core.Node {
+				v := core.View{TestID: "parent", Style: core.Style{Width: core.Pt(200), Height: core.Pt(200)},
+					OnPressDown: func(core.PressEvent) { parentDown++ }, Children: []core.Node{
+						core.View{TestID: "child", Style: core.Style{Width: core.Pt(200), Height: core.Pt(200)},
+							OnPressDown: func(core.PressEvent) { childDown++ }, OnPress: func(core.PressEvent) { childPress++ }},
+					}}
+				if c.pan {
+					v.OnPan = func(core.PanEvent) { pans++ }
+				}
+				return v
+			}, Size(200, 200))
+			app.DragAt("id:parent", core.Point{X: 50, Y: 50}, c.path...)
+			if parentDown != 0 || childDown != 1 || childPress != c.press {
+				t.Fatalf("parent down %d, child down %d, child press %d, want 0, 1 and %d", parentDown, childDown, childPress, c.press)
+			}
+			if c.pan && pans == 0 {
+				t.Fatal("the parent's pan did not take the drag")
+			}
+			app.PressAt("id:parent", core.Point{X: 50, Y: 50})
+			if parentDown != 0 || childDown != 2 || childPress != c.press+1 {
+				t.Fatalf("after PressAt: parent down %d, child down %d, child press %d, want 0, 2 and %d", parentDown, childDown, childPress, c.press+1)
+			}
+		})
+	}
+}
+
 func TestLongPressSelectsText(t *testing.T) {
 	app := Start(t, func(cx *core.Scope) core.Node {
 		return core.View{Children: []core.Node{
