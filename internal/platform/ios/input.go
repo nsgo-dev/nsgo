@@ -499,6 +499,8 @@ func (v *view) configure(c *driver.InputConfig) {
 		in.label.Send(selSetText, apple.NSString(c.Placeholder))
 		f.Send(sel("setEditable:"), !c.Disabled)
 		f.Send(sel("setSelectable:"), !c.Disabled)
+		p := c.Padding
+		f.Send(sel("setTextContainerInset:"), edgeInsets{Top: float64(p.Top), Left: float64(p.Left), Bottom: float64(p.Bottom), Right: float64(p.Right)})
 	} else {
 		attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
 		attrs.Send(sel("setObject:forKey:"), uiColor(placeholder), apple.Global(uikitPath, "NSForegroundColorAttributeName"))
@@ -546,7 +548,16 @@ func inputLayout(self objc.ID, cmd objc.SEL) {
 	}
 	in, box := v.input, v.inset
 	frame := apple.Rect(float64(box.Origin.X), float64(box.Origin.Y), float64(box.Size.Width), float64(box.Size.Height))
-	in.field.Send(selSetFrame, frame)
+	if in.multiline {
+		// The text view fills the padding box, its text inset by the
+		// padding, so its indicator runs along the edges and the text
+		// scrolls under the padding.
+		p := in.fs.Config.Padding
+		in.field.Send(selSetFrame, apple.Rect(float64(box.Origin.X-p.Left), float64(box.Origin.Y-p.Top),
+			float64(box.Size.Width+p.Left+p.Right), float64(box.Size.Height+p.Top+p.Bottom)))
+	} else {
+		in.field.Send(selSetFrame, frame)
+	}
 	if in.label != 0 {
 		fit := objc.Send[apple.CGSize](in.label, sel("sizeThatFits:"), apple.CGSize{Width: frame.Size.Width, Height: 1e7})
 		frame.Size.Height = min(fit.Height, frame.Size.Height)

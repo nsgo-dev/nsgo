@@ -128,6 +128,14 @@ func registerInput() {
 			{Cmd: selDoCommand, Fn: func(self objc.ID, _ objc.SEL, tv objc.ID, cmd objc.SEL) bool {
 				return inputOf(self).command(tv, cmd)
 			}},
+			{Cmd: sel("textContainerOrigin"), Fn: func(self objc.ID, _ objc.SEL) apple.CGPoint {
+				in := inputOf(self)
+				if in == nil {
+					return apple.CGPoint{}
+				}
+				p := in.fs.Config.Padding
+				return apple.CGPoint{X: float64(p.Left), Y: float64(p.Top)}
+			}},
 			{Cmd: sel("keyDown:"), Fn: func(self objc.ID, cmd objc.SEL, event objc.ID) {
 				in := inputOf(self)
 				if in != nil {
@@ -753,6 +761,10 @@ func (v *view) configure(c *driver.InputConfig) {
 	in.field.Send(selSetEditable, !c.Readonly && !c.Disabled)
 	if in.multiline {
 		in.field.Send(sel("setSelectable:"), !c.Disabled)
+		// The inset's halves sum each axis's padding; textContainerOrigin
+		// puts the text after the top and left padding.
+		p := c.Padding
+		in.field.Send(sel("setTextContainerInset:"), apple.CGSize{Width: float64(p.Left+p.Right) / 2, Height: float64(p.Top+p.Bottom) / 2})
 		in.label.Send(selSetFont, objc.ID(font))
 		in.label.Send(selSetTextColor, nsColor(placeholderColor(c)))
 		in.label.Send(selSetAlignment, align)
@@ -848,8 +860,9 @@ func setContentType(f objc.ID, a driver.AutoComplete, masked bool) {
 	f.Send(sel("setContentType:"), t)
 }
 
-// inputLayout places the editor at the content box: a field's line
-// centered in it, a text view filling it.
+// inputLayout places the editor: a field's line centered in the content
+// box, a text view's scroll view filling the padding box, so its scroller
+// runs along the edges and the text scrolls under the padding.
 func inputLayout(self objc.ID, cmd objc.SEL) {
 	apple.Super(self, cmd)
 	v := views[self]
@@ -860,7 +873,8 @@ func inputLayout(self objc.ID, cmd objc.SEL) {
 	in, box := v.input, v.inset
 	x, w := float64(box.Origin.X), float64(box.Size.Width)
 	if in.multiline {
-		in.host.Send(selSetFrame, apple.Rect(x, float64(box.Origin.Y), w, float64(box.Size.Height)))
+		p := in.fs.Config.Padding
+		in.host.Send(selSetFrame, apple.Rect(x-float64(p.Left), float64(box.Origin.Y-p.Top), w+float64(p.Left+p.Right), float64(box.Size.Height+p.Top+p.Bottom)))
 		h := objc.Send[apple.CGSize](in.label, selIntrinsicContentSize).Height
 		in.label.Send(selSetFrame, apple.Rect(x, float64(box.Origin.Y), w, max(h, float64(box.Size.Height))))
 		return

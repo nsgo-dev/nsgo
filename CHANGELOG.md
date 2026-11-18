@@ -23,6 +23,7 @@
 - Lay out and draw a Windows window at each size as a drag resizes it, as macOS does, instead of stretching the last frame to the window.
 - Keep `chat.FloatingConversation`'s bottom edge blur within its composer's room, so a transcript without a composer ends sharp.
 - Keep a `base/terminal` view following output that comes faster than frames instead of leaving the end, and follow it again once scrolled back to the end (#686).
+- Keep a multiline `Input`'s scroll bar along its edges on macOS and iOS, its padding insetting the text, which scrolls under it (#701).
 - Keep a scroll view still as a text selection starts in it on macOS, rather than scrolling it toward where the last drag ended or the window's corner.
 - Open the output directory with `nsgo build -open` when nsgo leads its terminal's session, as in an app's terminal without a shell, instead of losing the opener as nsgo exits (#672).
 - Show a bundled macOS app's Dock badge without the notification permission until the app uses notifications (#190 by @houko).

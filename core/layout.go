@@ -651,8 +651,9 @@ func (t *Tree) syncContent(n *node) bool {
 			return true
 		}
 	case n.input != nil:
-		if b := contentBox(l); b != n.input.config.Content {
-			n.input.config.Content = b
+		p := Edges{Top: Points(l.Padding.Top), Right: Points(l.Padding.Right), Bottom: Points(l.Padding.Bottom), Left: Points(l.Padding.Left)}
+		if b := contentBox(l); b != n.input.config.Content || p != n.input.config.Padding {
+			n.input.config.Content, n.input.config.Padding = b, p
 			t.mark(n)
 			return true
 		}

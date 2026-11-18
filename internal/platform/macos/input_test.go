@@ -32,6 +32,37 @@ func TestInputLayoutAfterUnmount(t *testing.T) {
 	})
 }
 
+// TestMultilineEditorScrollsUnderPadding checks that a multiline input's
+// scroll view fills the padding box and its text keeps the padding, uneven
+// sides included (#701).
+func TestMultilineEditorScrollsUnderPadding(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		s := &surface{views: make([]*view, 2), animator: driver.NewAnimator(func(driver.Event) {})}
+		v := s.create(driver.KindInput, 1)
+		s.views[v.id] = v
+		v.native.Send(selSetFrame, apple.Rect(0, 0, 300, 200))
+		pad := driver.Edges{Top: 18, Right: 20, Bottom: 20, Left: 12}
+		v.configure(&driver.InputConfig{Multiline: true, Padding: pad,
+			Content: driver.Bounds{Origin: driver.Point{X: 13, Y: 19}, Size: driver.Size{Width: 266, Height: 160}}})
+		v.native.Send(sel("layout"))
+		in := v.input
+		if got, want := objc.Send[apple.CGRect](in.host, sel("frame")), apple.Rect(1, 1, 298, 198); got != want {
+			t.Errorf("scroll view at %v, want the padding box %v", got, want)
+		}
+		if got := objc.Send[apple.CGPoint](in.field, sel("textContainerOrigin")); got != (apple.CGPoint{X: 12, Y: 18}) {
+			t.Errorf("text starts at %v, want after the top and left padding", got)
+		}
+		in.host.Send(sel("tile"))
+		visible := objc.Send[apple.CGSize](in.host, sel("contentSize")).Width
+		wraps := objc.Send[apple.CGSize](in.field.Send(sel("textContainer")), sel("size")).Width
+		if wraps != visible-32 {
+			t.Errorf("text wraps at %v pt in a %v pt viewport, want the left and right padding off", wraps, visible)
+		}
+		s.delete(v, false)
+	})
+}
+
 // TestMultilineEditorWrapsInItsViewport checks a multiline input's text
 // view, its container and the text it lays out against the width the
 // scroll view shows, as the input narrows and widens, with overlay and

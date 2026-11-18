@@ -856,6 +856,9 @@ type InputConfig struct {
 	KeyboardType KeyboardType
 	// Content is where the text goes in the view: inside padding and border.
 	Content Bounds
+	// Padding surrounds Content inside the border. A multi-line editor
+	// scrolls in the padding box, its text inset by Padding.
+	Padding Edges
 	// Accessory is the InputAccessoryView that rides above the keyboard
 	// while the field has focus, or 0; AccessoryID is the ID the field
 	// names it by, which tests read.
