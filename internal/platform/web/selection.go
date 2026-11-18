@@ -121,7 +121,7 @@ func (s *surface) selectionChanged() {
 	s.selectedArea = area
 	if area != nil && box != s.selectedBox {
 		s.selectedBox = box
-		s.send(area, driver.Event{Kind: driver.EventSelectionChange, Point: box.Origin, Size: box.Size})
+		s.send(area, driver.Event{Kind: driver.EventSelectionChange, Point: box.Origin, Size: box.Size, Text: js.Global().Call("getSelection").Call("toString").String()})
 	}
 }
 
