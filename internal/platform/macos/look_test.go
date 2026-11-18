@@ -23,12 +23,14 @@ func TestTransparentWindow(t *testing.T) {
 		s := newSurface(Options{Width: 160, Height: 100}, false)
 		s.window, s.id = window, 1
 		window.Send(sel("setContentView:"), s.native)
-		defer func() {
+		// Torn down on the main queue, as destroy does: setTransparent(false) lays the title bar out again in a block applyTitleBar queues there, which sends to this window when a later test runs the main run loop. Released now, the window is gone by then and that block messages freed memory. newSurface registered the surface too; left in surfaces, a later window allocated at this window's address would be taken for it.
+		defer apple.OnMain(func() {
+			delete(surfaces, s)
 			delete(views, s.native)
 			s.native.Send(selRelease)
 			window.Send(sel("close"))
 			window.Send(selRelease)
-		}()
+		})
 		content := func() apple.CGSize {
 			return objc.Send[apple.CGRect](window, sel("contentRectForFrameRect:"), objc.Send[apple.CGRect](window, sel("frame"))).Size
 		}
