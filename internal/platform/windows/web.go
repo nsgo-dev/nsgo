@@ -1167,6 +1167,40 @@ func (wv *webView) setFocused(focused bool) {
 	wv.w.report(wv.v, driver.Event{Kind: kind, ID: wv.v.id})
 }
 
+// focusedWeb returns the page that has the keyboard focus, nil when none has.
+func (w *window) focusedWeb() *webView {
+	for wv := range w.webs {
+		if wv.focused && !wv.closed && wv.web != nil {
+			return wv
+		}
+	}
+	return nil
+}
+
+// webEditCommands are the editing roles' commands in a page: Blink's editor commands, which its shortcuts run, and which the menus of Chromium's own windows run. Delete removes the selection alone, as a field's does.
+var webEditCommands = map[driver.MenuRole]string{
+	driver.MenuUndo: "Undo", driver.MenuRedo: "Redo", driver.MenuCut: "Cut",
+	driver.MenuCopy: "Copy", driver.MenuPaste: "Paste", driver.MenuPasteAndMatchStyle: "PasteAndMatchStyle",
+	driver.MenuDelete: "Delete", driver.MenuSelectAll: "SelectAll",
+}
+
+// webEdit runs role's editing command in the focused page, if one has the focus. WebView2 has no call for editing commands, and document.execCommand from a script runs as the page's own, which Chromium lets paste nothing and which deletes a character where nothing is selected, so CDP carries the command on a key event with no key, as Blink runs a key's editing commands: in the focused frame, as a menu's, and unless the page cancels the key.
+func (w *window) webEdit(role driver.MenuRole) {
+	wv := w.focusedWeb()
+	command := webEditCommands[role]
+	if wv == nil || command == "" {
+		return
+	}
+	report := func(_ string, err error) {
+		if err != nil {
+			wv.report(driver.Event{Kind: driver.EventError, Text: err.Error()})
+		}
+	}
+	what := "run the menu's " + command
+	wv.devTools("Input.dispatchKeyEvent", `{"type":"rawKeyDown","commands":["`+command+`"]}`, what, report)
+	wv.devTools("Input.dispatchKeyEvent", `{"type":"keyUp"}`, what, report)
+}
+
 // close lets the page go, with its visuals.
 func (wv *webView) close() {
 	if wv.closed {

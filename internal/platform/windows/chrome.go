@@ -1047,17 +1047,19 @@ func (w *window) chooseMenu(ref menuRef) {
 	case driver.MenuToggleFullScreen:
 		w.toggleFullScreen()
 	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuPasteAndMatchStyle, driver.MenuDelete, driver.MenuSelectAll:
-		// The focused field's own keys.
-		if ref.role == driver.MenuPasteAndMatchStyle {
-			if in := w.focusedField(); in != nil {
-				w.paste(in)
-			}
-		} else if ref.role == driver.MenuDelete {
+		// The focused field's own keys, else the focused page's editing command.
+		in := w.focusedField()
+		switch {
+		case in == nil:
+			w.webEdit(ref.role)
+		case ref.role == driver.MenuPasteAndMatchStyle:
+			w.paste(in)
+		case ref.role == driver.MenuDelete:
 			// Delete removes the selection alone, as the field's context menu does; with none it would remove the character after the caret.
-			if in := w.focusedField(); in != nil && in.model.hasSelection() {
+			if in.model.hasSelection() {
 				w.editKey(vkDelete, false, false, false)
 			}
-		} else {
+		default:
 			vk := map[driver.MenuRole]uintptr{driver.MenuUndo: 'Z', driver.MenuRedo: 'Y', driver.MenuCut: 'X',
 				driver.MenuCopy: 'C', driver.MenuPaste: 'V', driver.MenuSelectAll: 'A'}[ref.role]
 			w.editKey(vk, true, false, false)

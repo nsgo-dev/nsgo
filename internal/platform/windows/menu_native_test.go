@@ -416,6 +416,119 @@ const ready = setInterval(() => {
 	}
 }
 
+// TestEditMenuEditsTheFocusedPage chooses the Edit menu's roles, as the menu bar sends them, while a WebView2 page's text area has the focus: each runs in the page what its shortcut runs, Copy and Cut writing the clipboard and Paste reading it, and Delete removes the selection alone, nothing with a caret.
+func TestEditMenuEditsTheFocusedPage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if _, err := findWebView2(); err != nil {
+		t.Skip(err)
+	}
+	const title = "nsgo-page-edit"
+	roles := []core.MenuRole{core.MenuUndo, core.MenuRedo, core.MenuCut, core.MenuCopy, core.MenuPaste, core.MenuDelete, core.MenuSelectAll}
+	app := func(cx *core.Scope) core.Node {
+		page := core.NewSignal(cx, "")
+		var items []core.MenuItem
+		for _, r := range roles {
+			items = append(items, core.MenuItem{Role: r})
+		}
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Edit", Items: items}})
+		cx.Effect(func() { cx.SetTitle(title + "|" + page.Get()) })
+		// The page reports whether its text area has the focus, the area's value and its selection, as they change.
+		const html = `<!doctype html><textarea id=f>hello page</textarea><script>
+const f = document.getElementById('f');
+f.focus();
+f.setSelectionRange(10, 10);
+let last = '';
+setInterval(() => {
+  if (document.activeElement !== f) f.focus();
+  const s = (document.hasFocus() && document.activeElement === f ? 'ready' : 'wait') + ':' + f.value + ':' + f.selectionStart + '-' + f.selectionEnd;
+  if (s !== last) { last = s; nsgo.postMessage(s); }
+}, 30);
+</script>`
+		return core.View{Style: core.Style{Padding: driver.All(10), Background: driver.RGB(0xffffff)}, Children: []core.Node{
+			core.WebView{Source: core.WebHTML(html, ""), OnMessage: func(data string) { page.Set(data) },
+				Style: core.Style{Width: driver.Pt(260), Height: driver.Pt(120)}},
+		}}
+	}
+	hwnd := startApp(t, title, app, 300, 200)
+	// The first start of the browser process can take a while.
+	waitForTitle(t, hwnd, title+"|", 30*time.Second)
+	if !takeForeground(hwnd) {
+		t.Skip("cannot bring the window to the front")
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for !strings.HasPrefix(windowText(hwnd), title+"|ready:hello page:10-10") {
+		if time.Now().After(deadline) {
+			t.Fatalf("the page's text area did not take the focus: %q", windowText(hwnd))
+		}
+		onMain(t, hwnd, func(w *window) {
+			for wv := range w.webs {
+				if !wv.focused {
+					wv.takeFocus()
+				}
+			}
+		})
+		time.Sleep(100 * time.Millisecond)
+	}
+	onMain(t, hwnd, func(w *window) {
+		if w.focusedWeb() == nil {
+			t.Fatal("the window does not know the page has the focus")
+		}
+	})
+	choose := func(r core.MenuRole) {
+		t.Helper()
+		onMain(t, hwnd, func(w *window) {
+			i := slices.IndexFunc(w.chrome.entries, func(ref menuRef) bool { return ref.role == r })
+			if i < 0 {
+				t.Fatalf("the menu has no item of role %d", r)
+			}
+			postMessageW.Call(hwnd, wmCommand, uintptr(i+1), 0)
+		})
+	}
+	clipboard := func(want string) {
+		t.Helper()
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			got := ""
+			onMain(t, hwnd, func(w *window) { got = w.clipboard() })
+			if got == want {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("the clipboard holds %q, want %q", got, want)
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	setClipboard := func(s string) { onMain(t, hwnd, func(w *window) { w.setClipboard(s) }) }
+	page := func(want string) {
+		t.Helper()
+		waitForTitle(t, hwnd, title+"|ready:"+want, 5*time.Second)
+	}
+	// With the caret at the end Delete removes nothing, which Select All then shows.
+	choose(core.MenuDelete)
+	choose(core.MenuSelectAll)
+	page("hello page:0-10")
+	setClipboard("before")
+	choose(core.MenuCopy)
+	clipboard("hello page")
+	choose(core.MenuDelete)
+	page(":0-0")
+	choose(core.MenuPaste)
+	page("hello page:10-10")
+	choose(core.MenuUndo)
+	page(":")
+	choose(core.MenuRedo)
+	page("hello page:")
+	choose(core.MenuSelectAll)
+	page("hello page:0-10")
+	setClipboard("before")
+	choose(core.MenuCut)
+	page(":0-0")
+	clipboard("hello page")
+}
+
 var (
 	keybdEvent        = user32.NewProc("keybd_event")
 	attachThreadInput = user32.NewProc("AttachThreadInput")

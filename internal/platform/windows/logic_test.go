@@ -474,6 +474,15 @@ func TestMenuHelpers(t *testing.T) {
 	}
 }
 
+// TestWebEditCommandsCoverTheEditingRoles checks that a page has a command for every role chooseMenu edits text with, Paste and Match Style and those whose keys a field takes, and for nothing else.
+func TestWebEditCommandsCoverTheEditingRoles(t *testing.T) {
+	for r := range driver.MenuRole(64) {
+		if has, edits := webEditCommands[r] != "", r.EditsText() || r == driver.MenuPasteAndMatchStyle; has != edits {
+			t.Errorf("role %d has a page command %v, edits text %v", r, has, edits)
+		}
+	}
+}
+
 func TestPixelConversionsUseTheWindowScale(t *testing.T) {
 	w := &window{scale: 1.5}
 	if got := w.px(10); got != 15 {

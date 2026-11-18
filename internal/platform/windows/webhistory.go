@@ -19,7 +19,8 @@ type webHistorySnapshot struct {
 	} `json:"entries"`
 }
 
-func (wv *webView) devTools(method, params string, done func(string, error)) {
+// devTools calls a CDP method of the page; what says what the call does, in its errors.
+func (wv *webView) devTools(method, params, what string, done func(string, error)) {
 	var h *comHandler
 	h = newHandler(&iidDevToolsCompleted, func(hr uintptr, result unsafe.Pointer) {
 		defer h.release()
@@ -27,19 +28,19 @@ func (wv *webView) devTools(method, params string, done func(string, error)) {
 			return
 		}
 		if failed(hr) {
-			done("", hresultError("nsgo: the web view could not read or navigate its history", hr))
+			done("", hresultError("nsgo: the web view could not "+what, hr))
 			return
 		}
 		done(wideString((*uint16)(result)), nil)
 	})
 	if hr := wv.web.call(webCallDevTools, uintptr(unsafe.Pointer(wide(method))), uintptr(unsafe.Pointer(wide(params))), h.ptr()); failed(hr) {
 		h.release()
-		done("", hresultError("nsgo: the web view does not provide its navigation history", hr))
+		done("", hresultError("nsgo: the web view could not "+what, hr))
 	}
 }
 
 func (wv *webView) readHistory(done func(*webHistorySnapshot)) {
-	wv.devTools("Page.getNavigationHistory", "{}", func(data string, err error) {
+	wv.devTools("Page.getNavigationHistory", "{}", "read its history", func(data string, err error) {
 		var history webHistorySnapshot
 		if err == nil {
 			err = json.Unmarshal([]byte(data), &history)
@@ -92,7 +93,7 @@ func (wv *webView) historyCommand(command driver.WebCommand) {
 		}
 		wv.historyKind = webNavigationHistory
 		// Select the entry we just verified, even if a page changes history while the asynchronous command is in flight.
-		wv.devTools("Page.navigateToHistoryEntry", `{"entryId":`+strconv.Itoa(entry.ID)+`}`, func(_ string, err error) {
+		wv.devTools("Page.navigateToHistoryEntry", `{"entryId":`+strconv.Itoa(entry.ID)+`}`, "navigate its history", func(_ string, err error) {
 			if err != nil {
 				wv.historySource = nil
 				wv.report(driver.Event{Kind: driver.EventError, Text: err.Error()})
