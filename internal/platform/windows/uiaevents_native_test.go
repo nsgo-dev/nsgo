@@ -1,4 +1,4 @@
-//go:build windows && !386
+//go:build windows
 
 package windows
 
@@ -17,7 +17,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// A UI Automation client, as Narrator is one: UIAutomationClient.h's IUIAutomation, IUIAutomationElement and IUIAutomationElementArray, and a property-changed event handler made here. The handler's VARIANT comes by value, which x64 and arm64 pass as a pointer to a copy; 386 pushes it, so the test leaves 386 out.
+// A UI Automation client, as Narrator is one: UIAutomationClient.h's IUIAutomation, IUIAutomationElement and IUIAutomationElementArray, and a property-changed event handler made here. The handler's VARIANT comes by value, which x64 and arm64 pass as a pointer to a copy and 386 pushes, four words (propertyChangedSlot).
 var (
 	clsidCUIAutomation                    = parseGUID("ff48dba4-60ef-4201-aa87-54103eef594e")
 	iidUIAutomation                       = parseGUID("30cbe57d-d9d0-452a-ab13-7ac5ac4825ee")
@@ -60,25 +60,27 @@ var propertyHandlerVtbl = [4]uintptr{
 	}),
 	syscall.NewCallback(func(this *propertyHandler) uintptr { return 1 }), // the test owns it
 	syscall.NewCallback(func(this *propertyHandler) uintptr { return 1 }),
-	syscall.NewCallback(func(this *propertyHandler, sender uintptr, property int32, value *variant) uintptr {
-		e := propertyEvent{property: property}
-		switch value.vt {
-		case vtBSTR:
-			e.value = wideString(*(**uint16)(unsafe.Pointer(&value.val)))
-		case vtI4:
-			e.value = fmt.Sprint(int32(uint32(value.val)))
-		case vtR8:
-			e.value = fmt.Sprint(math.Float64frombits(value.val))
-		case vtBool:
-			e.value = fmt.Sprint(int16(uint16(value.val)))
-		default:
-			e.value = fmt.Sprintf("vt %d", value.vt)
-		}
-		this.mu.Lock()
-		this.got = append(this.got, e)
-		this.mu.Unlock()
-		return sOK
-	}),
+	propertyChangedSlot(),
+}
+
+// heard records the event of property with its new value.
+func (h *propertyHandler) heard(property int32, value *variant) {
+	e := propertyEvent{property: property}
+	switch value.vt {
+	case vtBSTR:
+		e.value = wideString(*(**uint16)(unsafe.Pointer(&value.val)))
+	case vtI4:
+		e.value = fmt.Sprint(int32(uint32(value.val)))
+	case vtR8:
+		e.value = fmt.Sprint(math.Float64frombits(value.val))
+	case vtBool:
+		e.value = fmt.Sprint(int16(uint16(value.val)))
+	default:
+		e.value = fmt.Sprintf("vt %d", value.vt)
+	}
+	h.mu.Lock()
+	h.got = append(h.got, e)
+	h.mu.Unlock()
 }
 
 func (h *propertyHandler) events() []propertyEvent {

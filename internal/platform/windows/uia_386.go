@@ -20,3 +20,9 @@ func setRangeSlot() uintptr {
 		return uiaSetRangeWords(i, uintptr(uint64(hi)<<32|uint64(lo)))
 	})
 }
+
+// raisePropertyChanged calls UiaRaiseAutomationPropertyChangedEvent, whose VARIANTs come by value: 386 pushes each, four words.
+func raisePropertyChanged(provider uintptr, property int32, was, now *variant) {
+	a, b := (*[4]uintptr)(unsafe.Pointer(was)), (*[4]uintptr)(unsafe.Pointer(now))
+	uiaRaiseAutomationPropertyChangedEvent.Call(provider, uintptr(property), a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3])
+}

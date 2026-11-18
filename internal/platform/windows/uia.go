@@ -1115,7 +1115,7 @@ func expandState(expanded bool) int32 {
 
 // raise raises the property-changed event of property on e.
 func (e *uiaElement) raise(property int32, was, now *variant) {
-	uiaRaiseAutomationPropertyChangedEvent.Call(uintptr(unsafe.Pointer(&e.simple)), uintptr(property), uintptr(unsafe.Pointer(was)), uintptr(unsafe.Pointer(now)))
+	raisePropertyChanged(uintptr(unsafe.Pointer(&e.simple)), property, was, now)
 }
 
 // raiseString raises the change of a string property, both values strings, empty ones too.
