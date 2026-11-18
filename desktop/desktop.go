@@ -105,6 +105,14 @@ func IsAvailable(cx *core.Scope) bool {
 	return false
 }
 
+// CanLookUp reports whether the system dictionary panel is available. macOS
+// provides it through AppKit; other platforms currently do not.
+func CanLookUp(cx *core.Scope) bool { return cx.Env().CanLookUp() }
+
+// LookUp shows the system dictionary panel for text near at. It returns false
+// when the platform has no dictionary panel or text is empty.
+func LookUp(cx *core.Scope, text string, at core.Bounds) bool { return cx.LookUp(text, at) }
+
 // SetTitle sets the window's title on desktops and the page's on the web.
 func SetTitle(cx *core.Scope, title string) { cx.SetTitle(title) }
 

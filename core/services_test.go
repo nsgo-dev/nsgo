@@ -167,6 +167,28 @@ func TestOpenURL(t *testing.T) {
 	}
 }
 
+func TestLookUp(t *testing.T) {
+	var cx *Scope
+	h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node { cx = c; return View{} })
+	h.tree.SetEnvironment(Environment{OS: OSMacOS, CanLookUp: true})
+	h.commit()
+	if !cx.LookUp("word", Bounds{Origin: Point{X: 12, Y: 18}, Size: Size{Width: 40, Height: 20}}) {
+		t.Fatal("LookUp reported unavailable on macOS")
+	}
+	it := command(h.commit(), driver.ItemLookUp)
+	if it == nil || it.Value != "word" || it.Point != (Point{X: 12, Y: 18}) {
+		t.Fatalf("lookup item = %+v", it)
+	}
+	h.tree.SetEnvironment(Environment{OS: OSWindows})
+	h.commit()
+	if cx.LookUp("word", Bounds{}) || command(h.commit(), driver.ItemLookUp) != nil {
+		t.Fatal("LookUp sent on an unsupported platform")
+	}
+	if cx.LookUp("   ", Bounds{}) {
+		t.Fatal("empty LookUp text was accepted")
+	}
+}
+
 func TestPickImages(t *testing.T) {
 	var cx *Scope
 	h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node { cx = c; return View{} })

@@ -2,6 +2,7 @@ package nsgotest
 
 import (
 	"math"
+	"strings"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -523,8 +524,43 @@ func (a *App) SelectText(selector string, box driver.Bounds) {
 	a.t.Helper()
 	a.step("selectText(%s, %v)", selector, box)
 	v := a.pick(selector, "view", func(m *View) (*View, bool) { return m, true })
-	a.send(v, driver.Event{Kind: driver.EventSelectionChange, Point: box.Origin, Size: box.Size})
+	text := selectedText(v)
+	if box.Size == (driver.Size{}) {
+		text = ""
+	}
+	a.send(v, driver.Event{Kind: driver.EventSelectionChange, Point: box.Origin, Size: box.Size, Text: text})
 	a.done()
+}
+
+// selectedText returns the text represented by a headless selection. The
+// SelectText test action supplies the selection's box, but not character
+// offsets, so a text view contributes all of its content and an area joins
+// its descendant text views in document order.
+func selectedText(v *View) string {
+	if v == nil {
+		return ""
+	}
+	if v.Kind == driver.KindText {
+		if v.Props.Selectable == driver.SelectableOff {
+			return ""
+		}
+		return v.Text
+	}
+	var parts []string
+	var walk func(*View)
+	walk = func(n *View) {
+		if n.Kind == driver.KindText {
+			if n.Props.Selectable != driver.SelectableOff && n.Text != "" {
+				parts = append(parts, n.Text)
+			}
+			return
+		}
+		for _, child := range n.Children {
+			walk(child)
+		}
+	}
+	walk(v)
+	return strings.Join(parts, "\n")
 }
 
 // HoverOut moves the mouse out of the surface: every view hovered hears

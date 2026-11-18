@@ -340,6 +340,23 @@ func TestLongPressSelectsText(t *testing.T) {
 	app.LongPress("text:In an area")
 }
 
+func TestSelectableTextReportsItsSelectedString(t *testing.T) {
+	var got core.TextSelection
+	app := Start(t, func(cx *core.Scope) core.Node {
+		return core.View{TestID: "area", Selectable: true, OnTextSelectionText: func(s core.TextSelection) { got = s }, Children: []core.Node{
+			core.Text{Content: "Select me"},
+		}}
+	})
+	app.SelectText("id:area", core.Bounds{Origin: core.Point{X: 4, Y: 8}, Size: core.Size{Width: 32, Height: 18}})
+	if got.Text != "Select me" || got.Bounds.Origin != (core.Point{X: 4, Y: 8}) || got.Bounds.Size != (core.Size{Width: 32, Height: 18}) {
+		t.Fatalf("selection = %+v", got)
+	}
+	app.SelectText("id:area", core.Bounds{})
+	if got.Text != "" || got.Bounds != (core.Bounds{}) {
+		t.Fatalf("cleared selection = %+v", got)
+	}
+}
+
 func TestTypingIsKeyByKey(t *testing.T) {
 	var keys, changes []string
 	var submitted string

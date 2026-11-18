@@ -169,6 +169,8 @@ type View struct {
 	// selection touches, in the view, as the user moves it: no Size when
 	// it clears.
 	OnTextSelection func(Bounds)
+	// OnTextSelectionText receives the selected text and its bounds.
+	OnTextSelectionText func(TextSelection)
 
 	Ref *Ref
 	// Disabled stops presses and is reported to assistive technology.

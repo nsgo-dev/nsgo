@@ -354,6 +354,7 @@ type handlers struct {
 	focusIn, focusOut                    func()
 	mouseEnter, mouseLeave, mouseMove    func(MouseEvent)
 	textSelection                        func(Bounds)
+	textSelectionText                    func(TextSelection)
 	focus, blur                          func()
 	keyDown                              func(KeyEvent) bool
 	touch, touchCapture                  func(TouchEvent)
@@ -1741,7 +1742,7 @@ func (t *Tree) setViewParts(n *node, v View) {
 	t.pointersMoved = t.pointerStyled
 	n.h = handlers{focusIn: v.OnFocusIn, focusOut: v.OnFocusOut, press: v.OnPress, longPress: v.OnLongPress, pressDown: v.OnPressDown, pressUp: v.OnPressUp,
 		mouseEnter: v.OnMouseEnter, mouseLeave: v.OnMouseLeave, mouseMove: v.OnMouseMove,
-		textSelection: v.OnTextSelection,
+		textSelection: v.OnTextSelection, textSelectionText: v.OnTextSelectionText,
 		layout:        v.OnLayout, contextMenu: v.OnContextMenu, touch: v.OnTouch, touchCapture: v.OnTouchCapture,
 		pan: v.OnPan, pinch: v.OnPinch, rotation: v.OnRotation, wheel: v.OnWheel,
 		fileEnter: v.OnFileDragEnter, fileLeave: v.OnFileDragLeave, fileDrop: v.OnFileDrop,
@@ -2430,6 +2431,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		if h.textSelection != nil {
 			t.within(n.owner, func() { h.textSelection(Bounds{Origin: ev.Point, Size: ev.Size}) })
 		}
+		if h.textSelectionText != nil {
+			t.within(n.owner, func() { h.textSelectionText(TextSelection{Text: ev.Text, Bounds: Bounds{Origin: ev.Point, Size: ev.Size}}) })
+		}
 	case driver.EventKeyPress:
 		if in := n.input; in != nil && in.keyPress != nil {
 			t.within(n.owner, func() { in.keyPress(ev.Text) })
@@ -2800,6 +2804,7 @@ func (n *node) events() driver.EventMask {
 	bit(driver.EventLoadEnd, h.loadEnd != nil)
 	bit(driver.EventChangeText, n.kind == driver.KindInput)
 	bit(driver.EventSelectionChange, h.textSelection != nil)
+	bit(driver.EventSelectionChange, h.textSelectionText != nil)
 	if in := n.input; in != nil {
 		bit(driver.EventSelectionChange, in.selection != nil)
 		bit(driver.EventKeyPress, in.keyPress != nil)

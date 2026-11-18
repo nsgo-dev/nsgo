@@ -27,6 +27,7 @@ type Env struct {
 	audio, speak            *Signal[bool]
 	camera                  *Signal[bool]
 	canSendInput            *Signal[bool]
+	canLookUp               *Signal[bool]
 	level, place            *Signal[bool]
 	workspaces              *Signal[bool]
 	hasWebView              *Signal[bool]
@@ -100,6 +101,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		speak:            NewSignal(cx, false),
 		camera:           NewSignal(cx, false),
 		canSendInput:     NewSignal(cx, false),
+		canLookUp:        NewSignal(cx, false),
 		level:            NewSignal(cx, false),
 		place:            NewSignal(cx, false),
 		workspaces:       NewSignal(cx, false),
@@ -215,6 +217,7 @@ func (e *Env) set(v Environment) {
 	e.speak.Set(v.Speak)
 	e.camera.Set(v.Camera)
 	e.canSendInput.Set(v.CanSendInput)
+	e.canLookUp.Set(v.CanLookUp)
 	e.level.Set(v.CanSetWindowLevel)
 	e.place.Set(v.CanPlaceWindows)
 	e.workspaces.Set(v.CanSetWindowWorkspaces)
@@ -364,6 +367,9 @@ func (e *Env) CanTakePhoto() bool { return e.camera.Get() }
 // trusted input here. macOS supports this through AppKit; other backends
 // currently drop it.
 func (e *Env) CanSendInput() bool { return e.canSendInput.Get() }
+
+// CanLookUp reports whether desktop.LookUp can show the system dictionary panel.
+func (e *Env) CanLookUp() bool { return e.canLookUp.Get() }
 
 // HasWebView reports whether this target provides the native or browser web
 // view host used by WebView.

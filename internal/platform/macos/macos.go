@@ -1086,6 +1086,7 @@ func (s *surface) environment() driver.Environment {
 		Speech:           apple.SpeechAvailable(),
 		Speak:            apple.SpeakAvailable(),
 		CanSendInput:     true,
+		CanLookUp:        true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
 		Purchases:        apple.PurchasesAvailable(),
@@ -1699,6 +1700,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemOpenURL:
 			s.openURL(it.Value, it.Count)
+			continue
+		case driver.ItemLookUp:
+			s.lookUp(it.Value, it.Point)
 			continue
 		case driver.ItemCheckForUpdates:
 			s.checkForUpdates(it.On, it.Count)

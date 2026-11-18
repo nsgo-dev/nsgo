@@ -44,7 +44,11 @@ func (s *Selection) Tell(origin driver.Point, cleared bool) (driver.Event, bool)
 		return driver.Event{}, false
 	}
 	s.Told = b
-	return driver.Event{Kind: driver.EventSelectionChange, ID: s.Area, Point: b.Origin, Size: b.Size}, true
+	text := ""
+	if !cleared {
+		text = s.Model.Text(s)
+	}
+	return driver.Event{Kind: driver.EventSelectionChange, ID: s.Area, Point: b.Origin, Size: b.Size, Text: text}, true
 }
 
 // Len implements driver.SelectionTexts.

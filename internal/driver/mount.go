@@ -360,6 +360,8 @@ const (
 	ItemPurchase
 	// ItemWebCookies adds or replaces Cookies in the persistent store the app's web views share; the platform answers with EventWebCookies carrying Count, Text why it failed.
 	ItemWebCookies
+	// ItemLookUp shows the platform's dictionary panel for Value at Point.
+	ItemLookUp
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.

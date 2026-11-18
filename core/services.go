@@ -312,6 +312,23 @@ func (cx *Scope) OpenURL(u string, done func(opened bool)) {
 	}
 }
 
+// LookUp is desktop.LookUp's core operation. It asks the platform's
+// dictionary to explain text near at, returning false where the platform has
+// no dictionary panel or text is empty. macOS shows its system Look Up panel;
+// other platforms currently report false.
+func (cx *Scope) LookUp(text string, at Bounds) bool {
+	if strings.TrimSpace(text) == "" || !Untracked(cx, cx.Env().CanLookUp) {
+		return false
+	}
+	t := cx.tree()
+	if t == nil {
+		return false
+	}
+	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemLookUp, Value: text, Point: at.Origin})
+	t.changed = true
+	return true
+}
+
 // PickOptions say how PickImages picks and prepares images.
 type PickOptions struct {
 	// Multiple lets the user pick several images, at most Limit (0: up

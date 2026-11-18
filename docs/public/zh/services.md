@@ -54,6 +54,14 @@ cx.Share(core.ShareOptions{
 }, func(shown bool, err error) {})
 ```
 
+`desktop.CanLookUp` 说明系统词典面板是否可用。`desktop.LookUp` 在 macOS 上为文本在 `core.Bounds` 附近打开词典面板，在其他平台或文本为空时返回 false。
+
+```go
+if desktop.CanLookUp(cx) {
+	desktop.LookUp(cx, selection.Text, selection.Bounds)
+}
+```
+
 ## 照片与文件
 
 `cx.PickImages` 显示系统照片选择器，返回 `core.PickedFile`，其中包含字节、名称、类型和像素尺寸。`cx.TakePhoto` 在平台有相机时打开相机；`cx.Env().CanTakePhoto` 说明是否有。

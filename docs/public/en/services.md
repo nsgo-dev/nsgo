@@ -54,6 +54,14 @@ cx.Share(core.ShareOptions{
 }, func(shown bool, err error) {})
 ```
 
+`desktop.CanLookUp` says whether the system dictionary panel is available. `desktop.LookUp` opens it for text near a `core.Bounds` on macOS and returns false elsewhere or for empty text.
+
+```go
+if desktop.CanLookUp(cx) {
+	desktop.LookUp(cx, selection.Text, selection.Bounds)
+}
+```
+
 ## Photos and files
 
 `cx.PickImages` shows the system's photo picker and answers with `core.PickedFile`s, whose bytes, name, type and pixel size the app reads. `cx.TakePhoto` shows the camera where the platform has one; `cx.Env().CanTakePhoto` says whether it does.

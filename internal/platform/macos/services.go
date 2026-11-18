@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -129,6 +130,21 @@ func (s *surface) authSession(id uint32, r driver.AuthRequest) {
 // openURL opens u with the app the system picks and reports whether one took it.
 func (s *surface) openURL(u string, id uint32) {
 	s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: openSystemURL(u)})
+}
+
+// lookUp asks AppKit to show its dictionary panel for text at a point in the
+// surface's view coordinates.
+func (s *surface) lookUp(text string, at driver.Point) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	attributed := objc.ID(apple.Class("NSAttributedString")).Send(selAlloc).Send(sel("initWithString:"), apple.NSString(text))
+	if attributed == 0 {
+		return
+	}
+	defer attributed.Send(selRelease)
+	s.native.Send(sel("showDefinitionForAttributedString:atPoint:"), attributed,
+		apple.CGPoint{X: float64(at.X), Y: float64(at.Y)})
 }
 
 // openSystemURL opens u with the app the system picks, reporting whether one took it.

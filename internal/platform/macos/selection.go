@@ -148,7 +148,7 @@ func (s *selection) show(old []*view) {
 func (s *selection) tell(b driver.Bounds) {
 	if b != s.told {
 		s.told = b
-		s.area.report(driver.Event{Kind: driver.EventSelectionChange, Point: b.Origin, Size: b.Size})
+		s.area.report(driver.Event{Kind: driver.EventSelectionChange, Point: b.Origin, Size: b.Size, Text: s.model.Text(s)})
 	}
 }
 
@@ -356,6 +356,7 @@ func (s *surface) clearSelection() {
 	for _, v := range s.selecting.texts {
 		v.setSelected(0, 0)
 	}
+	s.selecting.model.Clear()
 	s.selecting.tell(driver.Bounds{})
 	s.selecting = nil
 }
