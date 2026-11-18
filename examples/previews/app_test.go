@@ -98,9 +98,11 @@ func TestPickerWithoutHost(t *testing.T) {
 // previewMark is a code block's preview mark in the docs.
 var previewMark = regexp.MustCompile("(?m)^```go\\b.*\\bpreview=(\\S+)")
 
-// TestDocsNameDemos checks that every preview mark in the docs names a
-// demo and every demo has an English page showing it.
+// TestDocsNameDemos checks that every preview mark in the docs names a demo and every demo has an English page showing it.
 func TestDocsNameDemos(t *testing.T) {
+	if nsgotest.Target() != "" {
+		t.Skip("reads the repository's docs, which a target's test app does not run beside")
+	}
 	root := filepath.Join("..", "..", "docs", "public")
 	used := map[string]bool{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
