@@ -37,20 +37,18 @@ func readTouchEvent(s string) ([]driver.Touch, *driver.TouchGeometry) {
 		if len(p) < 2 {
 			continue
 		}
-		id, err := strconv.Atoi(p[1])
-		if err != nil {
-			continue
-		}
 		switch p[0] {
 		case "t":
-			if len(p) == 3 {
+			id, err := strconv.Atoi(p[1])
+			if err == nil && len(p) == 3 {
 				target, err := strconv.ParseUint(p[2], 10, 32)
 				if err == nil {
 					g.Targets[id] = driver.NodeID(target)
 				}
 			}
 		case "p":
-			if len(p) != 2+2*len(touches) {
+			id, err := strconv.ParseUint(p[1], 10, 32)
+			if err != nil || len(p) != 2+2*len(touches) {
 				continue
 			}
 			var positions []driver.Point
