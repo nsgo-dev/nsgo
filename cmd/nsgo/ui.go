@@ -13,8 +13,7 @@ package main
 //     with what it does at the moment (stage), replaced by its ✓ line, or
 //     cleared when it fails and the error follows. Steps running at once,
 //     such as nsgo build's targets, show a spinner line each.
-//   - Colors on terminals unless NO_COLOR is set; redirected, only the
-//     result lines appear.
+//   - Colors on terminals unless NO_COLOR is set. Redirected, there is no spinner: a step prints its label with "…" as it begins, so a log names the step a slow, failed or interrupted run was on, then its result line.
 //   - All of it is stderr, so stdout stays free for what a command prints.
 
 import (
@@ -316,9 +315,7 @@ func spin() {
 	})
 }
 
-// Step is a step that takes a while. On a terminal its spinner line is
-// shown while it runs, and done replaces it with the step's ✓ line; fail
-// clears it, since the error printed next says what went wrong.
+// Step is a step that takes a while. On a terminal its spinner line is shown while it runs, and done replaces it with the step's ✓ line; fail clears it, since the error printed next says what went wrong. Redirected, begin prints the step's label as a line of its own, which stays.
 type Step struct {
 	label string
 	stage string
@@ -340,9 +337,7 @@ func begin(format string, args ...any) *Step {
 		out.Unlock()
 		spin()
 	} else {
-		// A redirected run has no spinner to show while the step is active.
-		// Leave a durable start line so a slow or interrupted command still
-		// names the work in progress.
+		// Without a spinner, a line says the step has begun, even when it holds its other lines, so a slow or interrupted run still names it.
 		line(s.label + "…")
 	}
 	return s

@@ -135,12 +135,30 @@ func TestStepPrintsItsLinesAtOnce(t *testing.T) {
 	}
 }
 
+// Redirected, a step names itself as it begins, so a log shows what a slow, failed or interrupted run was doing (#653), including a step that holds its other lines beside others.
 func TestStepPrintsItsStartWhenStderrIsRedirected(t *testing.T) {
-	got := captureStderr(t, func() {
-		s := begin("vetting for android_arm64")
-		s.fail()
+	if terminalOf().tty {
+		t.Skip("stderr is a terminal")
+	}
+	var s *Step
+	started := captureStderr(t, func() { s = begin("vetting for android_arm64") })
+	if want := "  vetting for android_arm64…\n"; started != want {
+		t.Fatalf("begin wrote %q, want %q", started, want)
+	}
+	if got := captureStderr(t, s.fail); got != "" {
+		t.Fatalf("a failed step wrote %q after its start", got)
+	}
+
+	held := captureStderr(t, func() {
+		s = begin("[2/5] building ios")
+		s.hold = true
+		detailIn(withStep(context.Background(), s), "no widgets on tvOS")
 	})
-	if got != "  vetting for android_arm64…\n" {
-		t.Fatalf("step start = %q", got)
+	if want := "  [2/5] building ios…\n"; held != want {
+		t.Fatalf("a holding step began with %q, want %q", held, want)
+	}
+	ended := captureStderr(t, func() { s.done("built ios", "") })
+	if want := "    no widgets on tvOS\n  ✓ built ios ("; !strings.HasPrefix(ended, want) {
+		t.Fatalf("the step ended with %q, want it to start %q", ended, want)
 	}
 }
