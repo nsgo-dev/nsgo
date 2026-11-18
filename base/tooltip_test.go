@@ -6,6 +6,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
@@ -113,5 +114,68 @@ func TestPlainTooltipDoesNotBecomeTheUnlabelledTriggersName(t *testing.T) {
 	v = app.Find("id:control")
 	if v.Props.Label != "Save" {
 		t.Fatalf("the visible tooltip changed the trigger's name to %q", v.Props.Label)
+	}
+}
+
+// A closed tooltip's bubble stays mounted, hidden, for its description, so it waits in its starting part: showing it again changes its display and nothing its transition would animate from the shown or ending style.
+func TestTooltipWaitsInItsStartingStyleWhileHidden(t *testing.T) {
+	var open *core.Signal[bool]
+	app := startDesktop(t, func(cx *core.Scope) core.Node {
+		open = core.NewSignal(cx, false)
+		return base.Tooltip{Open: open.Get, Trigger: base.Button{Label: "Save", Style: core.Style{Height: core.Pt(30)}},
+			PopupStyle:    core.Style{Transition: core.Transition{Duration: 200 * time.Millisecond, Properties: core.TransitionOpacity}},
+			StartingClass: "scale-90", StartingStyle: core.Style{Opacity: core.Alpha(0)}, EndingStyle: core.Style{Opacity: core.Alpha(0.5)},
+			Children: []core.Node{core.Text{Content: "Writes the document", TestID: "tip"}}}
+	})
+	bubble := func() *nsgotest.View {
+		t.Helper()
+		for v := app.FindMounted("id:tip"); v != nil; v = v.Parent {
+			if v.Props.PointerEvents == core.PointerEventsNone {
+				return v
+			}
+		}
+		t.Fatal("the tooltip has no overlay")
+		return nil
+	}
+	waiting := func(when string) {
+		t.Helper()
+		b := bubble()
+		if !b.Style.Hidden || b.Style.Opacity != 0 || b.Style.Transform == driver.DefaultViewStyle.Transform {
+			t.Fatalf("%s: the hidden bubble does not wait in its starting part: hidden %v, opacity %v, transform %v", when, b.Style.Hidden, b.Style.Opacity, b.Style.Transform)
+		}
+	}
+	waiting("before it first shows")
+	for round := range 2 {
+		app.Post(func() { open.Set(true) })
+		app.Settle()
+		if b := bubble(); b.Style.Hidden || b.Style.Opacity != 0 {
+			t.Fatalf("round %d: the bubble shows at opacity %v, hidden %v", round, b.Style.Opacity, b.Style.Hidden)
+		}
+		app.Advance(60 * time.Millisecond)
+		if got := bubble().Style.Opacity; got != 1 {
+			t.Fatalf("round %d: past its first frame the bubble's opacity is %v", round, got)
+		}
+		app.Post(func() { open.Set(false) })
+		app.Settle()
+		if b := bubble(); b.Style.Hidden || b.Style.Opacity != 0.5 {
+			t.Fatalf("round %d: closing, the bubble's opacity is %v, hidden %v", round, b.Style.Opacity, b.Style.Hidden)
+		}
+		app.Advance(time.Second)
+		waiting("after it closed")
+	}
+}
+
+// A disabled tooltip never shows, so it gives its trigger no description either.
+func TestDisabledTooltipDescribesNothing(t *testing.T) {
+	app := startDesktop(t, func(*core.Scope) core.Node {
+		return base.Tooltip{Disabled: true, Trigger: base.Button{Label: "Save", TestID: "save", Style: core.Style{Height: core.Pt(30)}, OnPress: func(core.PressEvent) {}},
+			Children: []core.Node{core.Text{Content: "Writes the document", TestID: "tip"}}}
+	})
+	if got := app.Find("id:save").Props.Description; got != "" {
+		t.Fatalf("a disabled tooltip described its button as %q", got)
+	}
+	app.Key("tab")
+	if app.Exists("id:tip") {
+		t.Fatal("a disabled tooltip showed for the keyboard's focus")
 	}
 }

@@ -127,8 +127,7 @@ func (n *node) sentProps() driver.ViewProps {
 		p.Label = b.String()
 	}
 	if n.inTooltip() {
-		// A tooltip is a visual description of its trigger, never a second
-		// screen-reader element or a live announcement.
+		// A tooltip is a visual description of its trigger, never a second screen-reader element or a live announcement.
 		p.Accessible, p.ElementsHidden = driver.AccessibleNo, true
 		p.Role, p.LiveRegion = RoleNone, LiveRegionNone
 	} else if p.Description == "" && n.tooltipDescription != "" {

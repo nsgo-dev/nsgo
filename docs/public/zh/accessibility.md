@@ -80,7 +80,7 @@ core.Text{ContentFunc: func() string { return fmt.Sprintf("购物车里有 %d �
 
 ## 焦点与键盘
 
-工具提示在触发控件获得焦点前就提供描述。`View.Tooltip`、`base.Tooltip` 和 `ui.Tooltip` 将当前文本作为控件的无障碍描述；与控件名称相同的文字会去重，应用设置的 `AccessibilityDescription` 优先保留。包裹控件的容器会把描述传给其中的控件。气泡及其子元素对屏幕阅读器隐藏，不会作为警报播报，因此 `ui.IconButton` 的默认提示不会重复朗读标签。
+工具提示在触发控件获得焦点前就提供描述。`View.Tooltip`、`base.Tooltip` 和 `ui.Tooltip` 将当前文本作为控件的无障碍描述；与控件名称相同的文字会去重，应用设置的 `AccessibilityDescription` 优先保留，`Disabled` 的工具提示不提供描述。包裹控件的容器会把描述传给其中的控件。气泡及其子元素对屏幕阅读器隐藏，不会作为警报播报，因此 `ui.IconButton` 的默认提示不会重复朗读标签。
 
 在桌面、Web 和 Apple TV 上，可按压的视图和文本框一起成为 Tab 停靠点；`NoFocus` 让一个视图退出，`Focusable` 让没有按压的视图成为停靠点。`Style.FocusVisible` 只在键盘移动焦点时绘制焦点环（`focus-visible:`），`Style.Focus` 对应任何焦点，`Style.FocusWithin` 对应视图内的焦点，`OnFocus` 和 `OnBlur` 听到焦点变化（获得焦点的视图离开树时也会收到 `OnBlur`），`Ref.Focus()` 和 `Ref.SetAccessibilityFocus()` 移动焦点。Return 和空格按下获得焦点的视图，方向键在标签列表、单选组和菜单中移动。键盘把焦点移到视图上时，它的 `Tooltip` 立即显示，直到焦点离开或按下 Escape。弹出层的 `OnOpen` 在内容就绪后运行，在其中调用 `Focus` 就能把焦点移进去，非模态对话框应当这样做；popover 的内容在 Tab 顺序中紧跟触发器，弹出层关闭时焦点回到触发器。
 

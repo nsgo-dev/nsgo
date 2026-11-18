@@ -19,8 +19,7 @@ func (t *Tree) mountTooltip(cx *Scope, n *node, tip Node) {
 		t.setRef(n, &Ref{})
 	}
 	anchor := n.ref
-	// The synthetic root separates the trigger's text and accessibility
-	// from its tooltip, including elements a renderer moves into it.
+	// The synthetic root separates the trigger's text and accessibility from its tooltip, including elements a renderer moves into it.
 	content := t.newNode(0, n, cx)
 	content.tooltipOwner = n
 	content.props.ElementsHidden = true
@@ -78,8 +77,7 @@ type tooltipHooks struct {
 	focus      func(on bool)
 }
 
-// inTooltip follows the current shadow ancestry: a TSX renderer may move
-// an already mounted element into or out of a tooltip.
+// inTooltip follows the current shadow ancestry: a TSX renderer may move an already mounted element into or out of a tooltip.
 func (n *node) inTooltip() bool {
 	for p := n; p != nil; p = p.parent {
 		if p.tooltipOwner != nil {
@@ -91,8 +89,7 @@ func (n *node) inTooltip() bool {
 
 func tooltipWords(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-// tooltipText reads the content of each bubble even while the bubble itself
-// is hidden. Visibility and accessibility choices inside it still apply.
+// tooltipText reads the content of each bubble even while the bubble itself is hidden. Visibility and accessibility choices inside it still apply.
 func tooltipText(root *node) string {
 	var text strings.Builder
 	var read func(*node, bool)
@@ -127,8 +124,7 @@ func tooltipText(root *node) string {
 	return text.String()
 }
 
-// tooltipTargets unwraps a trigger's decorative containers, so a tooltip
-// around a button describes that button, rather than an anonymous wrapper.
+// tooltipTargets unwraps a trigger's decorative containers, so a tooltip around a button describes that button, rather than an anonymous wrapper.
 func tooltipTargets(anchor *node) []*node {
 	var targets []*node
 	var visit func(*node)
@@ -155,9 +151,7 @@ func tooltipTargets(anchor *node) []*node {
 	return targets
 }
 
-// updateTooltipDescriptions runs after text and visible labels resolve.
-// Keep the app's description separate from this projection, so changes,
-// removal and nested tooltips restore the control's own description.
+// updateTooltipDescriptions runs after text and visible labels resolve. Keep the app's description separate from this projection, so changes, removal and nested tooltips restore the control's own description.
 func (t *Tree) updateTooltipDescriptions() {
 	if len(t.tooltips) == 0 && len(t.described) == 0 {
 		return
@@ -193,8 +187,7 @@ func (t *Tree) updateTooltipDescriptions() {
 			n.tooltipDescription = text
 			t.touch(n)
 		}
-		// The tooltip can stay unchanged while the trigger's visible name
-		// changes to or from the same words.
+		// The tooltip can stay unchanged while the trigger's visible name changes to or from the same words.
 		if n.sentProps().Description != n.sent.props.Description {
 			t.touch(n)
 		}

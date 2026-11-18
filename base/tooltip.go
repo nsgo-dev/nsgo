@@ -128,16 +128,29 @@ func (t Tooltip) Hint(cx *core.Scope, anchor *core.Ref) (core.Node, func(core.Hi
 	}
 	bubble := m.overlay(core.Overlay{Anchor: anchor, Placement: place, Align: t.Align, Offset: offset, Margin: margin,
 		Children: t.Children, PointerEvents: core.PointerEventsNone}, parts.Of(class, style, fn))
-	look := bubble.StyleFunc
+	// The closed bubble stays mounted, hidden, so its text describes the trigger. It waits in its starting part, as a newly mounted popup starts: showing it then changes its display alone, and its transition runs from the starting style rather than from the shown or ending one.
+	look, phase := bubble.StyleFunc, bubble.ClassFunc
 	bubble.StyleFunc = func() core.Style {
 		s := look()
 		if !m.shown.Get() {
+			s = s.Merge(m.starting.Style)
 			s.Display = core.DisplayNone
 		}
 		return s
 	}
+	bubble.ClassFunc = func() string {
+		if !m.shown.Get() {
+			return m.startingClass
+		}
+		return phase()
+	}
+	var shown core.Node = bubble
+	if t.Disabled {
+		// A disabled tooltip never shows, so it describes nothing either: assistive technology hears what sighted users see.
+		shown = nil
+	}
 	return core.Group{
-		bubble,
+		shown,
 		// Escape hides what the keyboard's focus shows (WAI-ARIA's
 		// tooltip pattern), while it shows.
 		core.Show{When: func() bool { return st.open() && focused.Get() }, Then: func(cx *core.Scope) core.Node {
