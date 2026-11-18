@@ -282,7 +282,6 @@ func chartMotion(appear, update time.Duration, still bool) plot.Motion {
 	return m
 }
 
-
 // headline is a card's large figure, in color or the text's.
 func headline(cx *core.Scope, text func() string, color func() core.Color) core.Node {
 	colors := ui.ColorsOf(cx)

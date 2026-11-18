@@ -425,7 +425,7 @@ func (v *view) pointerLayer(content core.Node) core.Node {
 	}
 	return core.View{NoFocus: true, ImportantForAccessibility: core.ImportantNo, TestID: testID,
 		Children: []core.Node{content},
-		OnPress: press,
+		OnPress:  press,
 		OnMouseMove: func(e core.MouseEvent) {
 			if v.spec.OnHover != nil && e.PressedButton == core.MouseButtonNone {
 				v.spec.OnHover(v.s.ToContent(e.Position), true)

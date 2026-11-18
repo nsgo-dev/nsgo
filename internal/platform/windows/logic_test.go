@@ -1308,7 +1308,9 @@ func TestFileFilterNamesTheTypes(t *testing.T) {
 // TestStatusAndSearchFieldElements checks what UI Automation reads of a status, a status bar named by the texts inside it with the system's own type name, and of a search field, an edit named a search box.
 func TestStatusAndSearchFieldElements(t *testing.T) {
 	e := &uiaElement{}
-	text := func(s string) *view { return &view{kind: driver.KindText, plain: s, props: driver.ViewProps{Role: driver.RoleText}} }
+	text := func(s string) *view {
+		return &view{kind: driver.KindText, plain: s, props: driver.ViewProps{Role: driver.RoleText}}
+	}
 	status := &view{kind: driver.KindView, props: driver.ViewProps{Role: driver.RoleStatus, LiveRegion: driver.LiveRegionPolite},
 		children: []*view{text("3"), text("files saved")}}
 	if s := e.spec(status); s.control != ctStatusBar || s.name != "3 files saved" || s.localizedType != "" || s.live != driver.LiveRegionPolite {

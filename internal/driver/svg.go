@@ -37,8 +37,8 @@ type svgBox struct{ x, y, w, h float32 }
 
 // Bounds on what one document may take to parse, since SVG files come from the network: nesting deeper than maxSVGDepth fails, and so does a document whose use elements and markers draw more than maxSVGVisits elements or that records more than maxSVGOps operations.
 const (
-	maxSVGDepth  = 256
-	maxSVGUses   = 16
+	maxSVGDepth = 256
+	maxSVGUses  = 16
 	// A quarter of a million elements is far past what a drawing draws, and refusing a document of nested uses or markers that asks for more takes a fifth of the time a million did.
 	maxSVGVisits = 1 << 18
 	maxSVGOps    = 1 << 21

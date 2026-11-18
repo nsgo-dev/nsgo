@@ -102,7 +102,6 @@ var (
 	darkCellLabel = core.Style{Color: core.RGBA(0xffffff, 0.9)}
 )
 
-
 // correlationCard is how a portfolio's holdings move together: a
 // correlation matrix of their daily returns as a heatmap, a Cell per pair
 // in the bands of its two holdings (band scales with the tickers as their
@@ -131,8 +130,12 @@ func correlationCard(cx *core.Scope) core.Node {
 		}
 		return s / float64(len(pairs()))
 	}
-	closest := func() holdingPair { return slices.MaxFunc(pairs(), func(a, b holdingPair) int { return cmpFloat(a.r, b.r) }) }
-	hedge := func() holdingPair { return slices.MinFunc(pairs(), func(a, b holdingPair) int { return cmpFloat(a.r, b.r) }) }
+	closest := func() holdingPair {
+		return slices.MaxFunc(pairs(), func(a, b holdingPair) int { return cmpFloat(a.r, b.r) })
+	}
+	hedge := func() holdingPair {
+		return slices.MinFunc(pairs(), func(a, b holdingPair) int { return cmpFloat(a.r, b.r) })
+	}
 	kinship := func(p holdingPair) string {
 		switch {
 		case p.a == p.b:
@@ -199,11 +202,11 @@ func correlationCard(cx *core.Scope) core.Node {
 			}, colors.Faint)),
 		ramp(cx, scale, constant3("−1", "0", "+1"), core.Style{Margin: core.Edges{Top: 10}}),
 		core.View{Style: core.Style{Margin: core.Edges{Top: chartGap() + 4}}, OnLayout: func(b core.Bounds) { width.Set(b.Size.Width) }, Children: []core.Node{plot.Plot{
-			TestID:     "correlation-plot",
-			Count:      func() int { return len(cells()) },
-			XScale:     band,
-			YScale:     band,
-			ColorScale: func() plot.ColorScale { return plot.DivergingColors(scale()...).Over(-1, 1) },
+			TestID:           "correlation-plot",
+			Count:            func() int { return len(cells()) },
+			XScale:           band,
+			YScale:           band,
+			ColorScale:       func() plot.ColorScale { return plot.DivergingColors(scale()...).Over(-1, 1) },
 			AppearGeneration: func() any { return 1 },
 			Motion: func() plot.Motion {
 				m := chartMotion(ms(900), ms(650), false)
@@ -232,7 +235,7 @@ func correlationCard(cx *core.Scope) core.Node {
 					}
 					return plot.Cell{X: func() []string { return dirs(cells(), func(p holdingPair) string { return p.b }) }, Y: func() []string { return dirs(cells(), func(p holdingPair) string { return p.a }) },
 						Value: func() []float64 { return column(cells(), func(p holdingPair) float64 { return p.r }) }, Corners: plot.AllCorners(3), Stagger: 0.5, HoverDim: 0.65,
-						Label: func() []string { return dirs(cells(), func(p holdingPair) string { return minus(p.r, 2) }) },
+						Label:      func() []string { return dirs(cells(), func(p holdingPair) string { return minus(p.r, 2) }) },
 						LabelStyle: core.Style{FontSize: size, FontVariant: core.FontTabularNums, Color: cellLabel}, DarkLabelStyle: darkCellLabel,
 						HoverCellStyleFunc: ringStyle(cx, 4)}
 				}),
@@ -357,7 +360,9 @@ func seasonalityCard(cx *core.Scope) core.Node {
 		return symbol.Get()
 	}
 	// The scale's own domain: the largest move either way, even about 0.
-	reach := func() float64 { return slices.Max(column(rows(), func(r monthReturn) float64 { return math.Abs(r.ret) })) }
+	reach := func() float64 {
+		return slices.Max(column(rows(), func(r monthReturn) float64 { return math.Abs(r.ret) }))
+	}
 	total := func() float64 {
 		p := 1.0
 		for _, r := range rows() {
@@ -654,11 +659,11 @@ func activityCard(cx *core.Scope) core.Node {
 			return []string{tr.ChartsQuietest(thousandsOf(quietest().trades)), tr.ChartsBusiest(thousandsOf(busiest().trades))}
 		}, core.Style{Margin: core.Edges{Top: 10, Left: 36}}),
 		core.View{Style: core.Style{Margin: core.Edges{Top: chartGap() + 4}}, OnLayout: func(b core.Bounds) { width.Set(b.Size.Width) }, Children: []core.Node{plot.Plot{
-			TestID: "activity-plot",
-			Count:  func() int { return len(rows()) },
-			XScale: func() plot.Scale { return plot.BandScale(plot.Band{Domain: slots, PaddingInner: 0.14}) },
-			YScale: func() plot.Scale { return plot.BandScale(plot.Band{Domain: weekdays, PaddingInner: 0.14}) },
-			ColorScale: func() plot.ColorScale { return plot.SequentialColors(scale()...) },
+			TestID:           "activity-plot",
+			Count:            func() int { return len(rows()) },
+			XScale:           func() plot.Scale { return plot.BandScale(plot.Band{Domain: slots, PaddingInner: 0.14}) },
+			YScale:           func() plot.Scale { return plot.BandScale(plot.Band{Domain: weekdays, PaddingInner: 0.14}) },
+			ColorScale:       func() plot.ColorScale { return plot.SequentialColors(scale()...) },
 			AppearGeneration: func() any { return 1 },
 			Motion: func() plot.Motion {
 				m := chartMotion(ms(900), ms(600), false)

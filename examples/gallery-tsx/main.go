@@ -13,9 +13,9 @@ import (
 	"github.com/nsgo-dev/nsgo/tsx/compiler"
 	_ "github.com/nsgo-dev/nsgo/tsx/editor"
 	_ "github.com/nsgo-dev/nsgo/tsx/terminal"
+	_ "github.com/nsgo-dev/nsgo/tsx/ui"
 	_ "github.com/nsgo-dev/nsgo/tsx/ui/chat"
 	_ "github.com/nsgo-dev/nsgo/tsx/ui/richeditor"
-	_ "github.com/nsgo-dev/nsgo/tsx/ui"
 )
 
 //go:embed *.tsx *.ts demos/*.tsx demos/*.ts

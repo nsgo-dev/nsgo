@@ -31,7 +31,7 @@ const (
 // livePoint is a tick: its second, its price, and the high and low of the
 // ten before it.
 type livePoint struct {
-	t                 int
+	t                int
 	price, high, low float64
 }
 
@@ -212,7 +212,7 @@ func liveCard(cx *core.Scope) core.Node {
 		head,
 		spaced(chartGap(), plot.Plot{
 			TestID: "live-plot",
-			Y: prices,
+			Y:      prices,
 			// The ticks along their seconds, so a new one slides the window
 			// on, each point keeping its place.
 			X:      seconds,
@@ -271,7 +271,7 @@ func liveCard(cx *core.Scope) core.Node {
 				// breathing.
 				core.View{PointerEvents: core.PointerEventsNone, Style: core.Style{Position: core.Absolute, Left: core.Pct(100), Width: core.Pt(0), Height: core.Pt(0)},
 					StyleFunc: func() core.Style { return core.Style{Top: core.Pt(y(last()))} },
-					Children: []core.Node{ping(12, func() core.Color { return ui.Alpha(tone(), 0.5) }), dot(9, tone, true)}},
+					Children:  []core.Node{ping(12, func() core.Color { return ui.Alpha(tone(), 0.5) }), dot(9, tone, true)}},
 				// The gutter: the grid's values clear of the last price's tag.
 				plot.Axis{Placement: plot.AxisRight, TickValues: func() []float64 {
 					var out []float64
@@ -404,7 +404,9 @@ func depthCard(cx *core.Scope) core.Node {
 			return core.Style{Background: c(), BorderColor: colors.Inset(), Opacity: core.Alpha(o)}
 		}
 	}
-	values := func(f func(depthLevel) float64) func() []float64 { return func() []float64 { return column(rows.Get(), f) } }
+	values := func(f func(depthLevel) float64) func() []float64 {
+		return func() []float64 { return column(rows.Get(), f) }
+	}
 	side := func(bid bool, c func() core.Color) []core.Node {
 		value := values(func(l depthLevel) float64 { return l.ask })
 		if bid {
@@ -622,7 +624,9 @@ func drawdownCard(cx *core.Scope) core.Node {
 		return core.Show{When: func() bool { return hover.Get() >= 0 && over.Get() != which }, Then: func(*core.Scope) core.Node {
 			return core.Group{
 				core.View{PointerEvents: core.PointerEventsNone, Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Bottom: core.Pt(0), Width: core.Pt(1)},
-					StyleFunc: func() core.Style { return core.Style{Left: across(max(hover.Get(), 0)), Background: ui.Alpha(colors.Text(), 0.22)} }},
+					StyleFunc: func() core.Style {
+						return core.Style{Left: across(max(hover.Get(), 0)), Background: ui.Alpha(colors.Text(), 0.22)}
+					}},
 				core.View{PointerEvents: core.PointerEventsNone, Style: core.Style{Position: core.Absolute, Width: core.Pt(0), Height: core.Pt(0)},
 					StyleFunc: func() core.Style { return core.Style{Left: across(max(hover.Get(), 0)), Top: core.Pt(height(which))} },
 					Children: []core.Node{core.View{Style: core.Style{Position: core.Absolute, Left: core.Pt(-4), Top: core.Pt(-4), Width: core.Pt(8), Height: core.Pt(8), CornerRadius: 4, BorderWidth: 2},
@@ -700,12 +704,12 @@ func drawdownCard(cx *core.Scope) core.Node {
 			},
 			// Underwater: hanging from zero, deeper red the further down.
 			plot.Plot{
-				TestID:             "underwater-plot",
-				Y:                  func() []float64 { return column(equity, func(d equityDay) float64 { return d.drawdown }) },
-				YScale:             func() plot.Scale { return plot.LinearScale(ddFloor, 0) },
-				AppearGeneration:   func() any { return 1 },
-				Motion:             motion,
-				Label:              tr.ChartsUnderwaterLabel(troughText, itoa(equityTrough.day+1)),
+				TestID:           "underwater-plot",
+				Y:                func() []float64 { return column(equity, func(d equityDay) float64 { return d.drawdown }) },
+				YScale:           func() plot.Scale { return plot.LinearScale(ddFloor, 0) },
+				AppearGeneration: func() any { return 1 },
+				Motion:           motion,
+				Label:            tr.ChartsUnderwaterLabel(troughText, itoa(equityTrough.day+1)),
 				AccessibilityValue: func() core.AccessibilityValue {
 					if hover.Get() < 0 {
 						return core.AccessibilityValue{}

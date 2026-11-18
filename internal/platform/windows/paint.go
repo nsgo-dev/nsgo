@@ -109,11 +109,11 @@ type pushed struct {
 
 // painter is one frame's drawing pass.
 type painter struct {
-	w      *window
-	g      *gfx
-	dc     *comObject
-	scale  float32 // pixels per point
-	m      matrix  // the world transform: the drawn view's points to the target's DIPs
+	w     *window
+	g     *gfx
+	dc    *comObject
+	scale float32 // pixels per point
+	m     matrix  // the world transform: the drawn view's points to the target's DIPs
 	// sent is the transform the device context holds, once set says it
 	// is known: most views draw at their parent's after their children,
 	// and each message costs a system call.

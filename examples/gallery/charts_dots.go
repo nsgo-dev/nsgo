@@ -319,7 +319,7 @@ func riskCard(cx *core.Scope) core.Node {
 // highest 12-month targets, the mean three months ago, and how many cover
 // it.
 type covered struct {
-	ticker                                string
+	ticker                                  string
 	price, low, mean, high, prior, analysts float64
 }
 
@@ -411,7 +411,9 @@ func targetsCard(cx *core.Scope) core.Node {
 		}
 		return ""
 	}
-	values := func(f func(target) float64) func() []float64 { return func() []float64 { return column(rows.Get(), f) } }
+	values := func(f func(target) float64) func() []float64 {
+		return func() []float64 { return column(rows.Get(), f) }
+	}
 	medianUp := func() float64 { return median(column(rows.Get(), func(t target) float64 { return t.meanUp })) }
 	top := func() target { return rows.Get()[0] }
 	widest := func() target {
@@ -481,7 +483,9 @@ func targetsCard(cx *core.Scope) core.Node {
 			},
 			AppearGeneration: func() any { return 1 },
 			Motion:           chartMotion(ms(900), ms(600), false),
-			LabelFunc:        func() string { return tr.ChartsTargetsLabel(name(), pct(medianUp(), 1), top().ticker, pct(top().meanUp, 1)) },
+			LabelFunc: func() string {
+				return tr.ChartsTargetsLabel(name(), pct(medianUp(), 1), top().ticker, pct(top().meanUp, 1))
+			},
 			AccessibilityValue: func() core.AccessibilityValue {
 				if t, ok := shown(); ok {
 					return core.AccessibilityValue{Text: tr.ChartsTargetsValue(t.ticker, dollars(t.mean), pct(t.meanUp, 1), dollars(t.price))}
@@ -498,7 +502,9 @@ func targetsCard(cx *core.Scope) core.Node {
 				// Today's price: no upside.
 				plot.Grid{X: func() []float64 { return []float64{0} }, StyleFunc: baselineStyle(cx)},
 				plot.Rule{Value: values(func(t target) float64 { return t.highUp }), Bases: values(func(t target) float64 { return t.lowUp }), Stagger: 0.4, HoverDim: 0.65,
-					StyleFunc: func() core.Style { return core.Style{Stroke: core.PaintColor(ui.Alpha(colors.Text(), 0.3)), StrokeWidth: 2} }},
+					StyleFunc: func() core.Style {
+						return core.Style{Stroke: core.PaintColor(ui.Alpha(colors.Text(), 0.3)), StrokeWidth: 2}
+					}},
 				plot.Dot{Value: values(func(t target) float64 { return t.priorUp }), R: 3.5, Stagger: 0.4, HoverDim: 0.65, HoverDotStyle: hidden,
 					StyleFunc: func() core.Style {
 						return core.Style{Fill: core.PaintColor(colors.Surface()), Stroke: core.PaintColor(colors.Muted()), StrokeWidth: 1.5}
@@ -513,7 +519,9 @@ func targetsCard(cx *core.Scope) core.Node {
 						return r[int(v)].ticker
 					}
 					return ""
-				}, LabelStyleFunc: func() core.Style { return gutterStyle(cx, 44, false)().Merge(core.Style{Padding: core.Edges{Right: 10}, Color: colors.Muted()}) }},
+				}, LabelStyleFunc: func() core.Style {
+					return gutterStyle(cx, 44, false)().Merge(core.Style{Padding: core.Edges{Right: 10}, Color: colors.Muted()})
+				}},
 				plot.Axis{TickValues: func() []float64 { return ticks }, Format: func(v float64, _ int) string {
 					if v == 0 {
 						return tr.ChartsToday()

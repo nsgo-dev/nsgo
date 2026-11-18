@@ -213,7 +213,9 @@ func TestScheduledNotificationsShowAsTheClockReachesThem(t *testing.T) {
 	if got, want := app.PendingNotifications[0].At, time.Date(2026, 1, 1, 9, 0, 0, 0, time.UTC); !got.Equal(want) {
 		t.Errorf("daily first at %v, want %v", got, want)
 	}
-	daily := func() bool { return slices.ContainsFunc(app.Notifications, func(n core.Notification) bool { return n.ID == "daily" }) }
+	daily := func() bool {
+		return slices.ContainsFunc(app.Notifications, func(n core.Notification) bool { return n.ID == "daily" })
+	}
 	app.FastForward(9 * time.Hour)
 	if !daily() {
 		t.Errorf("no daily one at nine: %+v", app.Notifications)

@@ -44,19 +44,19 @@ type view struct {
 	structureKey uint64
 	structureAt  time.Time
 
-	anims         map[string]*nodeAnim
-	moveRun       *core.AnimationRun
-	moves         int
+	anims   map[string]*nodeAnim
+	moveRun *core.AnimationRun
+	moves   int
 
 	// Signals: tick runs prepare again, laid out follows the result,
 	// moving the nodes' motion to a new layout.
-	tick      *core.Signal[int]
-	laidOut   *core.Signal[int]
-	measured  *core.Signal[int]
-	ready     *core.Signal[bool]
-	moving    *core.Signal[bool]
-	hovered   *core.Signal[string]
-	focused   string
+	tick     *core.Signal[int]
+	laidOut  *core.Signal[int]
+	measured *core.Signal[int]
+	ready    *core.Signal[bool]
+	moving   *core.Signal[bool]
+	hovered  *core.Signal[string]
+	focused  string
 	// lastPress is the node the last press reached, "" for empty space:
 	// a double press opens or zooms only where both presses went.
 	lastPress string

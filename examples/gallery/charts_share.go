@@ -222,9 +222,9 @@ func revenueCard(cx *core.Scope) core.Node {
 		// names and below it where it has not, never cutting a name short.
 		core.View{Style: layout, Children: []core.Node{
 			plot.Plot{
-				TestID:           "revenue-plot",
-				Y:                func() []float64 { return column(regions, func(r region) float64 { return r.revenue }) },
-				Label:            tr.ChartsRevenueLabel(money(regionsTotal), regions[0].name, portion(regions[0].revenue)),
+				TestID: "revenue-plot",
+				Y:      func() []float64 { return column(regions, func(r region) float64 { return r.revenue }) },
+				Label:  tr.ChartsRevenueLabel(money(regionsTotal), regions[0].name, portion(regions[0].revenue)),
 				AccessibilityValue: func() core.AccessibilityValue {
 					if r, ok := shown(); ok {
 						return core.AccessibilityValue{Text: r.name + ": " + money(r.revenue) + ", " + portion(r.revenue)}

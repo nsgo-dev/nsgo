@@ -515,7 +515,7 @@ type tableGeo struct {
 	// fixed and right are the widths of the columns fixed at the left and
 	// at the right.
 	rowHeight, header, lead, fixed, right float32
-	y, x                           tableAxis
+	y, x                                  tableAxis
 	// cx and cy are the content offsets.
 	cx, cy float64
 }

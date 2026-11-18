@@ -265,9 +265,9 @@ type market struct {
 	spent          time.Duration
 	updates        int
 	// second is the ticks since the last pulse.
-	second         int
-	lastMean       float64
-	changes        []float64
+	second   int
+	lastMean float64
+	changes  []float64
 }
 
 func newMarket(cx *core.Scope) *market {

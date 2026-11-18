@@ -19,9 +19,9 @@ const (
 	bufferSeconds = 0.1
 	bufferCount   = 3
 
-	kAudioFormatLinearPCM      = 0x6C70636D // 'lpcm'
-	kLinearPCMFormatSignedInt  = 1 << 2
-	kLinearPCMFormatPacked     = 1 << 3
+	kAudioFormatLinearPCM     = 0x6C70636D // 'lpcm'
+	kLinearPCMFormatSignedInt = 1 << 2
+	kLinearPCMFormatPacked    = 1 << 3
 )
 
 // streamDescription is AudioStreamBasicDescription.
@@ -47,17 +47,17 @@ type queueBuffer struct {
 }
 
 var system struct {
-	once          sync.Once
-	err           error
-	newInput      func(format *streamDescription, callback, user, runLoop, mode uintptr, flags uint32, queue *uintptr) int32
-	allocate      func(queue uintptr, size uint32, buffer **queueBuffer) int32
-	enqueue       func(queue uintptr, buffer *queueBuffer, packets uint32, descriptions uintptr) int32
-	start         func(queue, startTime uintptr) int32
-	stop          func(queue uintptr, immediate bool) int32
-	dispose       func(queue uintptr, immediate bool) int32
-	callback      uintptr
-	nextID        atomic.Uintptr
-	recordings    sync.Map // of *recording, by id
+	once       sync.Once
+	err        error
+	newInput   func(format *streamDescription, callback, user, runLoop, mode uintptr, flags uint32, queue *uintptr) int32
+	allocate   func(queue uintptr, size uint32, buffer **queueBuffer) int32
+	enqueue    func(queue uintptr, buffer *queueBuffer, packets uint32, descriptions uintptr) int32
+	start      func(queue, startTime uintptr) int32
+	stop       func(queue uintptr, immediate bool) int32
+	dispose    func(queue uintptr, immediate bool) int32
+	callback   uintptr
+	nextID     atomic.Uintptr
+	recordings sync.Map // of *recording, by id
 }
 
 type recording struct {

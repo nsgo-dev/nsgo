@@ -36,10 +36,10 @@ func cents(v float64) float64 { return math.Round(v*100) / 100 }
 // dayCandle is a day of a stock: its prices, its volume in millions, and its
 // volume again under its direction, NaN under the other.
 type dayCandle struct {
-	date                          string
+	date                           string
 	open, high, low, close, volume float64
-	dir                           string
-	upVolume, downVolume          float64
+	dir                            string
+	upVolume, downVolume           float64
 }
 
 // candles are a stock's days over three months: a climb, a pullback, a
@@ -145,7 +145,9 @@ func candlesCard(cx *core.Scope) core.Node {
 	}
 	grid := func() []float64 { lo, hi := domain(); return gridTicks(lo, hi, 4) }
 	y := func(v float64) float64 { lo, hi := domain(); return (1 - (v-lo)/(hi-lo)) * priceHeight }
-	topVolume := func() float64 { return slices.Max(column(rows.Get(), func(c dayCandle) float64 { return c.volume })) * 1.12 }
+	topVolume := func() float64 {
+		return slices.Max(column(rows.Get(), func(c dayCandle) float64 { return c.volume })) * 1.12
+	}
 	total := func() float64 { return (last().close/rows.Get()[0].open - 1) * 100 }
 	ups := func() int {
 		n := 0
@@ -187,9 +189,13 @@ func candlesCard(cx *core.Scope) core.Node {
 			StyleFunc: axisStyle(cx, core.Style{})}
 	}
 	motion := chartMotion(ms(800), 0, true)
-	values := func(f func(dayCandle) float64) func() []float64 { return func() []float64 { return column(rows.Get(), f) } }
+	values := func(f func(dayCandle) float64) func() []float64 {
+		return func() []float64 { return column(rows.Get(), f) }
+	}
 	direction := func() []string { return dirs(rows.Get(), func(c dayCandle) string { return c.dir }) }
-	band := func() plot.Scale { return plot.BandScale(plot.Band{PaddingInner: candleInner, PaddingOuter: candleOuter}) }
+	band := func() plot.Scale {
+		return plot.BandScale(plot.Band{PaddingInner: candleInner, PaddingOuter: candleOuter})
+	}
 	return Card{TestID: "card-candles", Title: tr.ChartsCandles(), Description: tr.ChartsCandlesNote(), Children: []core.Node{
 		core.View{Style: core.Style{Gap: 4}, Children: []core.Node{
 			core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{
@@ -305,8 +311,12 @@ func candlesCard(cx *core.Scope) core.Node {
 			},
 		}},
 		chartFigures(cx, chartGap()+4,
-			chartFigure(cx, tr.ChartsHigh(), func() string { return fixed(slices.Max(column(rows.Get(), func(c dayCandle) float64 { return c.high })), 2) }, nil),
-			chartFigure(cx, tr.ChartsLow(), func() string { return fixed(slices.Min(column(rows.Get(), func(c dayCandle) float64 { return c.low })), 2) }, nil),
+			chartFigure(cx, tr.ChartsHigh(), func() string {
+				return fixed(slices.Max(column(rows.Get(), func(c dayCandle) float64 { return c.high })), 2)
+			}, nil),
+			chartFigure(cx, tr.ChartsLow(), func() string {
+				return fixed(slices.Min(column(rows.Get(), func(c dayCandle) float64 { return c.low })), 2)
+			}, nil),
 			chartFigure(cx, tr.ChartsChange(), func() string { return pct(total(), 1) }, func() Tone { return upDown(total()) }),
 			chartFigure(cx, tr.ChartsUpDays(), func() string { return itoa(ups()) + " / " + itoa(len(rows.Get())) }, nil)),
 		chartSwitch(tr.ChartsPeriod(), 180, span.Get, func(s string) {
@@ -509,7 +519,9 @@ func volumeCard(cx *core.Scope) core.Node {
 			},
 			AppearGeneration: func() any { return span.Get() },
 			Motion:           chartMotion(ms(700), ms(600), false),
-			LabelFunc:        func() string { return tr.ChartsVolumePriceLabel(span.Get(), pct(total(), 1), shares(average()), unit()) },
+			LabelFunc: func() string {
+				return tr.ChartsVolumePriceLabel(span.Get(), pct(total(), 1), shares(average()), unit())
+			},
 			AccessibilityValue: func() core.AccessibilityValue {
 				if hover.Get() < 0 {
 					return core.AccessibilityValue{}
@@ -546,7 +558,9 @@ func volumeCard(cx *core.Scope) core.Node {
 			core.Dynamic(func(cx *core.Scope) core.Node {
 				return chartFigure(cx, tr.ChartsAvgPer(unit()), func() string { return shares(average()) }, nil)
 			}),
-			chartFigure(cx, tr.ChartsHigh(), func() string { return "$" + fixed(slices.Max(column(rows(), func(s tapeSession) float64 { return s.close })), 2) }, nil)),
+			chartFigure(cx, tr.ChartsHigh(), func() string {
+				return "$" + fixed(slices.Max(column(rows(), func(s tapeSession) float64 { return s.close })), 2)
+			}, nil)),
 		chartSwitch(tr.ChartsPeriod(), 180, span.Get, func(s string) {
 			cx.Batch(func() {
 				span.Set(s)
@@ -619,9 +633,11 @@ func marginsCard(cx *core.Scope) core.Node {
 		}},
 		axisTitles(cx, "USD", tr.ChartsMargin()),
 		plot.Plot{
-			TestID:           "margins-plot",
-			Count:            func() int { return len(quarterNames) },
-			XScale:           func() plot.Scale { return plot.BandScale(plot.Band{PaddingInner: 0.4, PaddingOuter: 0.2, MaxBandWidth: 44}) },
+			TestID: "margins-plot",
+			Count:  func() int { return len(quarterNames) },
+			XScale: func() plot.Scale {
+				return plot.BandScale(plot.Band{PaddingInner: 0.4, PaddingOuter: 0.2, MaxBandWidth: 44})
+			},
 			AppearGeneration: func() any { return 0 },
 			Motion:           chartMotion(ms(700), ms(600), false),
 			LabelFunc:        func() string { return tr.ChartsMarginsLabel(name(), "$"+fixed(year(), 1)+"B", itoa(losses())) },
@@ -667,7 +683,9 @@ func marginsCard(cx *core.Scope) core.Node {
 						return "2025"
 					}
 					return "2026"
-				}, LabelStyleFunc: func() core.Style { return belowStyle(cx)().Merge(core.Style{Padding: core.Edges{Top: chartBelow + 2}, Color: colors.Muted()}) }},
+				}, LabelStyleFunc: func() core.Style {
+					return belowStyle(cx)().Merge(core.Style{Padding: core.Edges{Top: chartBelow + 2}, Color: colors.Muted()})
+				}},
 			},
 		},
 		chartFigures(cx, chartGap()+4,

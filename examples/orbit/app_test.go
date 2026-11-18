@@ -107,7 +107,6 @@ func TestTheButtonTakesPressesUnderTheGlass(t *testing.T) {
 	}
 }
 
-
 func TestASwipeTurnsTheRing(t *testing.T) {
 	headless(t)
 	app := start(t)

@@ -20,7 +20,9 @@ func TestSensorModelPermissionsCachingAndDisposal(t *testing.T) {
 		t.Fatal("checking asked")
 	}
 	var refused error
-	app.Post(func() { _, _ = cx.Locate(core.LocationOptions{}, func(_ core.LocationFix, err error) { refused = err }) })
+	app.Post(func() {
+		_, _ = cx.Locate(core.LocationOptions{}, func(_ core.LocationFix, err error) { refused = err })
+	})
 	app.Settle()
 	if !errors.Is(refused, core.SensorNotAllowed) || app.Permissions[core.PermissionLocation] != core.PermissionNotAsked {
 		t.Fatalf("locating without the permission: %v, and it asked: %v", refused, app.Permissions[core.PermissionLocation])

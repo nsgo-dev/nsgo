@@ -30,10 +30,10 @@ type View struct {
 	// Renderer lays it out; nil is Default().
 	Renderer *Renderer
 	// Label is what assistive technology reads in place of what the formula says.
-	Label      string
-	Class      string
-	Style      core.Style
-	StyleFunc  func() core.Style
+	Label     string
+	Class     string
+	Style     core.Style
+	StyleFunc func() core.Style
 	// ErrorStyle's color marks what failed to parse; ErrorClass and ErrorStyle style the source a formula past Untie's limits, or whose fonts did not load, shows instead.
 	ErrorClass string
 	ErrorStyle core.Style

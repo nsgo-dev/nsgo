@@ -173,18 +173,20 @@ func (c *tableColumns) rebuild(from int) {
 	c.starts[len(c.order)] = x
 }
 
-func (c *tableColumns) len() int                    { return len(c.order) }
-func (c *tableColumns) def(display int) int         { return c.order[display] }
-func (c *tableColumns) displayOf(def int) int       { return c.shown[def] }
-func (c *tableColumns) width(def int) float32       { return c.widths[def] }
-func (c *tableColumns) start(display int) float64   { return c.starts[display] }
-func (c *tableColumns) displayWidth(d int) float32  { return c.widths[c.order[d]] }
-func (c *tableColumns) total() float64              { return c.starts[len(c.order)] }
-func (c *tableColumns) fixedWidth() float64         { return c.starts[c.fixed] }
-func (c *tableColumns) scrollEnd() int              { return len(c.order) - c.right }
-func (c *tableColumns) rightWidth() float64         { return c.total() - c.starts[c.scrollEnd()] }
-func (c *tableColumns) scrollWidth() float64        { return c.starts[c.scrollEnd()] - c.fixedWidth() }
-func (c *tableColumns) scrolls(display int) bool    { return display >= c.fixed && display < c.scrollEnd() }
+func (c *tableColumns) len() int                   { return len(c.order) }
+func (c *tableColumns) def(display int) int        { return c.order[display] }
+func (c *tableColumns) displayOf(def int) int      { return c.shown[def] }
+func (c *tableColumns) width(def int) float32      { return c.widths[def] }
+func (c *tableColumns) start(display int) float64  { return c.starts[display] }
+func (c *tableColumns) displayWidth(d int) float32 { return c.widths[c.order[d]] }
+func (c *tableColumns) total() float64             { return c.starts[len(c.order)] }
+func (c *tableColumns) fixedWidth() float64        { return c.starts[c.fixed] }
+func (c *tableColumns) scrollEnd() int             { return len(c.order) - c.right }
+func (c *tableColumns) rightWidth() float64        { return c.total() - c.starts[c.scrollEnd()] }
+func (c *tableColumns) scrollWidth() float64       { return c.starts[c.scrollEnd()] - c.fixedWidth() }
+func (c *tableColumns) scrolls(display int) bool {
+	return display >= c.fixed && display < c.scrollEnd()
+}
 func (c *tableColumns) hasDef(def int) bool         { return def >= 0 && def < len(c.shown) }
 func (c *tableColumns) startOf(display int) float64 { return c.starts[min(display, len(c.order))] }
 

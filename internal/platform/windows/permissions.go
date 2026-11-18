@@ -74,7 +74,9 @@ func permissionStatus(name string) (status int, byDevice bool) {
 
 // permission carries out an ItemPermission numbered id.
 func (w *window) permission(id uint32, r driver.PermissionRequest) {
-	answer := func(status int) { w.engine.Dispatch(driver.Event{Kind: driver.EventPermission, Count: id, Index: status}) }
+	answer := func(status int) {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventPermission, Count: id, Index: status})
+	}
 	switch r.Command {
 	case driver.PermissionCheck, driver.PermissionAsk:
 		status, _ := permissionStatus(r.Name)

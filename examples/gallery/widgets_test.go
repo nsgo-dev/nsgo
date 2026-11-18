@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nsgo-dev/nsgo/examples/gallery/locales"
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/examples/gallery/locales"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 	"github.com/nsgo-dev/nsgo/widget"
 )

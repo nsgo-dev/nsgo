@@ -85,17 +85,17 @@ func Root(cx *core.Scope) core.Node {
 	sw := &swipe{r: r}
 	return core.View{TestID: "orbit", OnWheel: sw.wheel,
 		Style: core.Style{FlexGrow: 1, Background: paper, Overflow: core.Hidden}, Children: []core.Node{
-		dial(cx, r, full),
-		r.space(full),
-		// The stage centers the ring; only its cards take the pointer, so
-		// a drag anywhere else reaches the floor below.
-		core.View{PointerEvents: core.PointerEventsBoxNone, Style: center, Children: []core.Node{
-			core.View{PointerEvents: core.PointerEventsBoxNone, Style: core.Style{Width: core.Pt(cardWidth), Height: core.Pt(cardHeight),
-				Perspective: perspective, Margin: core.Edges{Bottom: stageLift * 2}}, Children: cards},
-		}},
-		header(cx, r),
-		index(cx, r),
-	}}
+			dial(cx, r, full),
+			r.space(full),
+			// The stage centers the ring; only its cards take the pointer, so
+			// a drag anywhere else reaches the floor below.
+			core.View{PointerEvents: core.PointerEventsBoxNone, Style: center, Children: []core.Node{
+				core.View{PointerEvents: core.PointerEventsBoxNone, Style: core.Style{Width: core.Pt(cardWidth), Height: core.Pt(cardHeight),
+					Perspective: perspective, Margin: core.Edges{Bottom: stageLift * 2}}, Children: cards},
+			}},
+			header(cx, r),
+			index(cx, r),
+		}}
 }
 
 // arrive is how a piece of the page comes in at launch: up from below and

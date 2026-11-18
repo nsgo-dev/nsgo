@@ -25,18 +25,18 @@ type Animator struct {
 	// and rotation.
 	pinches, rotations map[NodeID]uint32
 	// pulls are the values scroll views' pulls past their tops set.
-	pulls    map[NodeID]uint32
-	starts   map[NodeID][4]float64
-	report   func(Event)
-	gen      uint64 // bumped when any value changes
+	pulls  map[NodeID]uint32
+	starts map[NodeID][4]float64
+	report func(Event)
+	gen    uint64 // bumped when any value changes
 	// changed are the views Changed reports next, and viewsStale says
 	// every bound view may have: a value changing marks them all with a
 	// flag, as setting each in the map every frame cost most of a frame
 	// of the gallery's Animations page.
 	changed    map[NodeID]bool
 	viewsStale bool
-	now      float64 // seconds of the last step
-	finished []Event
+	now        float64 // seconds of the last step
+	finished   []Event
 
 	// shaders are the shader views with bound lanes; shadersStale says
 	// values changed since ChangedShaders last looked.

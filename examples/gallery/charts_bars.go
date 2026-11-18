@@ -103,7 +103,7 @@ func salesCard(cx *core.Scope) core.Node {
 			XScale: func() plot.Scale {
 				return plot.BandScale(plot.Band{PaddingInner: 0.3, PaddingOuter: 0.15, MaxBandWidth: 56, GroupPadding: 0.12})
 			},
-			YScale: func() plot.Scale { return plot.LinearScale(0, salesTop) },
+			YScale:           func() plot.Scale { return plot.LinearScale(0, salesTop) },
 			AppearGeneration: func() any { return stacked.Get() },
 			Motion:           chartMotion(ms(600), 0, false),
 			Label:            tr.ChartsSalesLabel(best.month),
@@ -256,7 +256,9 @@ func bridgeCard(cx *core.Scope) core.Node {
 		}
 		return signedMillions(s.amount())
 	}
-	values := func(f func(bridgeStep) float64) func() []float64 { return func() []float64 { return column(steps.Get(), f) } }
+	values := func(f func(bridgeStep) float64) func() []float64 {
+		return func() []float64 { return column(steps.Get(), f) }
+	}
 	var options []ui.Option[string]
 	for _, q := range bridgeQuarters {
 		options = append(options, ui.Option[string]{Value: q, Label: q})
@@ -290,7 +292,9 @@ func bridgeCard(cx *core.Scope) core.Node {
 		core.View{Style: core.Style{Margin: core.Edges{Top: chartGap()}}, OnLayout: func(b core.Bounds) { plotWidth.Set(b.Size.Width - chartAxisGap - 8) }, Children: []core.Node{plot.Plot{
 			TestID: "bridge-plot",
 			Count:  func() int { return len(steps.Get()) },
-			XScale: func() plot.Scale { return plot.BandScale(plot.Band{PaddingInner: bridgeInner, PaddingOuter: bridgeOuter}) },
+			XScale: func() plot.Scale {
+				return plot.BandScale(plot.Band{PaddingInner: bridgeInner, PaddingOuter: bridgeOuter})
+			},
 			YScale: func() plot.Scale { return plot.LinearScale(0, bridgeTop) },
 			// Each step's kind takes its color: totals graphite, rises and
 			// falls in the day's tones.
@@ -299,7 +303,9 @@ func bridgeCard(cx *core.Scope) core.Node {
 			},
 			AppearGeneration: func() any { return 1 },
 			Motion:           chartMotion(ms(900), ms(550), false),
-			LabelFunc:        func() string { return tr.ChartsBridgeLabel(quarter.Get(), millions(revenue()), millions(net()), margin(net())) },
+			LabelFunc: func() string {
+				return tr.ChartsBridgeLabel(quarter.Get(), millions(revenue()), millions(net()), margin(net()))
+			},
 			AccessibilityValue: func() core.AccessibilityValue {
 				if s, ok := shown(); ok {
 					return core.AccessibilityValue{Text: s.name + ": " + written(s)}
@@ -326,7 +332,14 @@ func bridgeCard(cx *core.Scope) core.Node {
 				}},
 				plot.Grid{Y: func() []float64 { return []float64{0} }, StyleFunc: baselineStyle(cx)},
 				plot.Bar{Value: values(func(s bridgeStep) float64 { return s.end }), Bases: values(func(s bridgeStep) float64 { return s.start }),
-					Color:   func() []string { s := steps.Get(); out := make([]string, len(s)); for i, x := range s { out[i] = x.kind }; return out },
+					Color: func() []string {
+						s := steps.Get()
+						out := make([]string, len(s))
+						for i, x := range s {
+							out[i] = x.kind
+						}
+						return out
+					},
 					Corners: plot.AllCorners(2), Stagger: 0.5, HoverDim: 0.6,
 					Label: func() []string {
 						s := steps.Get()
@@ -698,7 +711,9 @@ func funnelCard(cx *core.Scope) core.Node {
 				Count:  func() int { return n },
 				// Stages down the plot, the counts across it, centered on zero.
 				XScale: func() plot.Scale { return plot.LinearScale(-funnelHalf, funnelHalf) },
-				YScale: func() plot.Scale { return plot.BandScale(plot.Band{PaddingInner: funnelInner, PaddingOuter: funnelOuter}) },
+				YScale: func() plot.Scale {
+					return plot.BandScale(plot.Band{PaddingInner: funnelInner, PaddingOuter: funnelOuter})
+				},
 				// One hue, deepest at the top stage.
 				ColorScale: func() plot.ColorScale {
 					shades := make([]core.Color, n)

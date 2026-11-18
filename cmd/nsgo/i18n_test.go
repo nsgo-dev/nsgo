@@ -228,7 +228,7 @@ github.com/nsgo-dev/nsgo/base/locales:
   calendarMonthName: "Monat: {d, date, ::MMM}, {d, time, short}"
   calendarWeekday: "Tag: {d, date, ::EEEEE}"
 `,
-		"locales/en-GB.yaml":  `greeting: "Hiya, {name}!"`,
+		"locales/en-GB.yaml": `greeting: "Hiya, {name}!"`,
 		"locales/ar.yaml": `
 due: "{d, date, medium}"
 github.com/nsgo-dev/nsgo/base/locales:

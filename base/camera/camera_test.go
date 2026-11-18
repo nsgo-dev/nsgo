@@ -51,7 +51,9 @@ func TestViewFitsTheContent(t *testing.T) {
 		t.Fatal("a fit counts as a move")
 	}
 	// A part of it shows as the user moving there would.
-	h.app.Post(func() { h.state.FitBounds(core.Bounds{Origin: core.Point{X: 600, Y: 400}, Size: core.Size{Width: 200, Height: 100}}) })
+	h.app.Post(func() {
+		h.state.FitBounds(core.Bounds{Origin: core.Point{X: 600, Y: 400}, Size: core.Size{Width: 200, Height: 100}})
+	})
 	h.app.Settle()
 	if p := h.state.ToView(core.Point{X: 700, Y: 450}); !near(float64(p.X), 450) || !near(float64(p.Y), 350) || !near(h.state.Zoom(), 1) || !h.state.Moved() {
 		t.Fatalf("the part's middle shows at %v ×%v", p, h.state.Zoom())
@@ -143,7 +145,9 @@ func TestViewPansAndZooms(t *testing.T) {
 		t.Fatalf("zoom out went to %v", h.state.Zoom())
 	}
 	// Center keeps the zoom.
-	h.app.Post(func() { h.state.Center(core.Bounds{Origin: core.Point{X: 1100, Y: 700}, Size: core.Size{Width: 100, Height: 100}}) })
+	h.app.Post(func() {
+		h.state.Center(core.Bounds{Origin: core.Point{X: 1100, Y: 700}, Size: core.Size{Width: 100, Height: 100}})
+	})
 	h.app.Settle()
 	if p := h.state.ToView(core.Point{X: 1150, Y: 750}); !near(float64(p.X), 450) || !near(float64(p.Y), 350) || !near(h.state.Zoom(), zoom) {
 		t.Fatalf("the centered part shows at %v", p)
