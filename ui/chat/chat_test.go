@@ -169,6 +169,32 @@ func TestFloatingEdgeStaysUnderComposer(t *testing.T) {
 	})
 }
 
+// TestContentWidth caps the transcript and the composer at a conversation's
+// reading width, keeping the scroll view at its edges, and caps neither
+// without one.
+func TestContentWidth(t *testing.T) {
+	for _, width := range []core.Points{0, 660} {
+		app := start(t, desktopEnv, func(cx *core.Scope) core.Node {
+			return FloatingConversation{State: NewConversationState(cx), JumpLabel: "Latest", ContentWidth: width,
+				Children: []core.Node{core.View{TestID: "turn", Style: core.Style{Height: core.Pt(40)}}},
+				Composer: []core.Node{core.View{TestID: "composer", Style: core.Style{Height: core.Pt(40)}}}}
+		})
+		scroll := app.Find("id:chat-transcript").Frame.Size.Width
+		want := scroll - 40
+		if width > 0 {
+			want = width
+		}
+		for _, id := range []string{"turn", "composer"} {
+			if got := app.Find("id:" + id).Frame.Size.Width; got != want {
+				t.Errorf("ContentWidth %v: %s %v wide in %v, want %v", width, id, got, scroll, want)
+			}
+		}
+		if scroll != 968 {
+			t.Errorf("ContentWidth %v: transcript %v wide, want the conversation's 968", width, scroll)
+		}
+	}
+}
+
 // TestComposerAutoFocus focuses the editor as the composer mounts only with AutoFocus.
 func TestComposerAutoFocus(t *testing.T) {
 	for _, auto := range []bool{false, true} {

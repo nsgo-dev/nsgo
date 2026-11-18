@@ -223,7 +223,7 @@ export function ChatDemo() {
         </View>
       </If>
       <View class="min-h-0 min-w-0 flex-1">
-        <FloatingConversation testID="chat" state={state} jumpAccessibilityLabel="Jump to the latest message" composer={[composer]}>
+        <FloatingConversation contentWidth={720} testID="chat" state={state} jumpAccessibilityLabel="Jump to the latest message" composer={[composer]}>
           {transcript}
         </FloatingConversation>
       </View>

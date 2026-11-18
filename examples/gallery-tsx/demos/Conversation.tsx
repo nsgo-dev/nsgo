@@ -260,7 +260,7 @@ export function ConversationDemo() {
 
   return (
     <View class="min-h-0 flex-1 bg-background">
-      <FloatingConversation testID="conversation" state={state} jumpAccessibilityLabel="Jump to the latest message" composer={[composer]}>
+      <FloatingConversation contentWidth={720} testID="conversation" state={state} jumpAccessibilityLabel="Jump to the latest message" composer={[composer]}>
         {transcript}
       </FloatingConversation>
     </View>

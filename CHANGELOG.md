@@ -17,6 +17,7 @@
 - Add `core.ScrollEvent.Stale`, TSX's `stale`, which marks a report from before the platform applied a scroll from code, and `terminal.View.HideIndicator`, which hides its scroll bar (#692 by @houko).
 - Add `chat.Composer.AutoFocus`, which focuses the editor as the composer mounts.
 - Add `chat.QuotaRow.Pace`, which marks on a limit's bar in `chat.Quota` and `chat.QuotaSummary` what would remain had it been used evenly, so a fill short of the mark runs out before it resets.
+- Add `ContentWidth` to `chat.Conversation` and `chat.FloatingConversation`, which centers the transcript and the floating composer in at most that width, and fill the conversation without it, replacing the fixed 720 pt `chat.ContentWidth` (#719).
 - Report `Video.OnError` instead of an opaque picture for a local video whose alpha the platform cannot keep: WebM with alpha on macOS and iOS, any clip with alpha on Windows until Media Foundation's alpha output is checked, and on Linux HEVC with alpha, or VP8 and VP9 with alpha without GStreamer's codecalpha plug-in; add `MediaError.Reason`, `MediaErrorAlphaUnsupported` for these, so an app can fall back to its own decoder without matching the message (#569 by @houko).
 - Stop reporting a web view load that was stopped, replaced or turned into a download to `OnError` on Apple platforms and Windows (#233 by @houko).
 - Keep a view's own outer shadows and outline outside its `Overflow: Hidden` clip on Apple for views, images and macOS scroll views, as CSS does (#238 by @houko).

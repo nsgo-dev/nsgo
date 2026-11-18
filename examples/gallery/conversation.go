@@ -231,7 +231,7 @@ func conversationDemo(cx *core.Scope) core.Node {
 
 	return core.View{StyleFunc: func() core.Style { return fillPage.Merge(core.Style{Background: colors.Background()}) }, Children: []core.Node{
 		core.View{Style: fillPage.Merge(core.Style{PaddingEnv: core.EnvEdges{Bottom: core.EnvKeyboard}}), Children: []core.Node{
-			chat.FloatingConversation{State: state, JumpLabel: tr.ChatJumpToTheLatestMessage(), TestID: "conversation", Children: []core.Node{transcript}, Composer: []core.Node{composer}},
+			chat.FloatingConversation{State: state, JumpLabel: tr.ChatJumpToTheLatestMessage(), ContentWidth: chatWidth, TestID: "conversation", Children: []core.Node{transcript}, Composer: []core.Node{composer}},
 		}},
 	}}
 }

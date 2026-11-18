@@ -7,9 +7,6 @@ import (
 	"github.com/nsgo-dev/nsgo/ui"
 )
 
-// ContentWidth is the reading width of transcripts and the composer.
-const ContentWidth core.Points = 720
-
 // The composer card's height with one line of draft and no attachments,
 // until a glass composer measures it, how far the edge's progressive blur
 // fades out beyond its bars, and how far a floating composer stays off the
@@ -84,12 +81,14 @@ func (s *ConversationState) grown(core.Bounds) {
 // Conversation is a bounded scroll viewport with a jump button, which
 // floats over it so showing it never changes the viewport's height. Give
 // its parent a bounded height. Label its button with JumpLabel. It follows
-// the end, and yields as the user scrolls up.
+// the end, and yields as the user scrolls up. ContentWidth caps the
+// transcript's reading width, centered; zero fills the conversation.
 type Conversation struct {
-	State     *ConversationState
-	JumpLabel string
-	Children  []core.Node
-	TestID    string
+	State        *ConversationState
+	JumpLabel    string
+	ContentWidth core.Points
+	Children     []core.Node
+	TestID       string
 }
 
 // Render implements core.Node.
@@ -97,7 +96,7 @@ func (v Conversation) Render(cx *core.Scope) core.Node {
 	s := v.State
 	return core.View{TestID: v.TestID, Style: ui.FillRest, Children: []core.Node{
 		core.Scroll{Ref: s.scroll, OnScroll: s.scrolled, Style: ui.FillRest, Children: []core.Node{
-			chatTranscript(s, core.Edges{Top: 22, Right: 20, Bottom: 22, Left: 20}, v.Children, nil),
+			chatTranscript(s, v.ContentWidth, core.Edges{Top: 22, Right: 20, Bottom: 22, Left: 20}, v.Children, nil),
 		}},
 		core.Show{When: func() bool { return !s.AtLatest() }, Then: func(cx *core.Scope) core.Node {
 			return chatJumpButton(cx, s, v.JumpLabel, func() core.Points { return ui.ButtonHeight/2 - 6 }, false)
@@ -106,12 +105,22 @@ func (v Conversation) Render(cx *core.Scope) core.Node {
 }
 
 // chatTranscript centers the turns in the reading width, 48 pt apart.
-func chatTranscript(s *ConversationState, pad core.Edges, children []core.Node, clearance func() core.Style) core.Node {
-	column := []core.Node{core.View{Style: core.Style{Width: core.Pct(100), MaxWidth: core.Pt(ContentWidth), MinWidth: core.Pt(0), Gap: 48}, Children: children}}
+func chatTranscript(s *ConversationState, width core.Points, pad core.Edges, children []core.Node, clearance func() core.Style) core.Node {
+	column := []core.Node{core.View{Style: chatColumn(width).Merge(core.Style{Gap: 48}), Children: children}}
 	if clearance != nil {
 		column = append(column, core.View{Style: core.Style{FlexShrink: 0}, StyleFunc: clearance})
 	}
 	return core.View{OnLayout: s.grown, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: 0, AlignItems: core.AlignCenter, Padding: pad}, Children: column}
+}
+
+// chatColumn is a reading column's style: the full width, capped at width
+// when it is positive.
+func chatColumn(width core.Points) core.Style {
+	st := core.Style{Width: core.Pct(100), MinWidth: core.Pt(0)}
+	if width > 0 {
+		st.MaxWidth = core.Pt(width)
+	}
+	return st
 }
 
 // chatJumpButton is the jump to the latest turn: a 32-point circle, on
@@ -164,14 +173,17 @@ func chatGlassEdge(cx *core.Scope, rim core.Color) core.Color {
 // covers the transcript behind it, without following the card as it grows. Give
 // its parent a bounded height; Composer typically builds a Composer
 // with Glass set. It manages no title bar: TopInset clears a bar the host
-// overlays, which the transcript scrolls under.
+// overlays, which the transcript scrolls under. ContentWidth caps the
+// reading width of the transcript and the composer, centered; zero fills
+// the conversation.
 type FloatingConversation struct {
-	State     *ConversationState
-	JumpLabel string
-	Children  []core.Node
-	Composer  []core.Node
-	TopInset  core.Points
-	TestID    string
+	State        *ConversationState
+	JumpLabel    string
+	ContentWidth core.Points
+	Children     []core.Node
+	Composer     []core.Node
+	TopInset     core.Points
+	TestID       string
 }
 
 // Render implements core.Node.
@@ -187,7 +199,7 @@ func (v FloatingConversation) Render(cx *core.Scope) core.Node {
 		core.Scroll{Ref: s.scroll, OnScroll: s.scrolled, EdgeEffects: core.EdgeEffects{Top: core.EdgeEffectSoft, Bottom: core.EdgeEffectSoft}, TestID: "chat-transcript",
 			Behavior: core.ScrollBehavior{KeyboardDismissMode: core.KeyboardDismissInteractive},
 			Style:    ui.FillRest.Merge(transparent), Children: []core.Node{
-				chatTranscript(s, core.Edges{Top: 22 + inset, Right: 20, Left: 20}, v.Children, func() core.Style {
+				chatTranscript(s, v.ContentWidth, core.Edges{Top: 22 + inset, Right: 20, Left: 20}, v.Children, func() core.Style {
 					return core.Style{Height: core.Pt(s.composer.Get() + 22)}
 				}),
 			}},
@@ -207,7 +219,7 @@ func (v FloatingConversation) Render(cx *core.Scope) core.Node {
 			StyleFunc: func() core.Style {
 				return core.Style{Padding: core.Edges{Right: 20, Bottom: FloatingMargin(cx, s.footer.Get()), Left: 20}}
 			},
-			Children: []core.Node{core.View{Style: core.Style{Width: core.Pct(100), MaxWidth: core.Pt(ContentWidth), MinWidth: core.Pt(0)}, Children: v.Composer}}},
+			Children: []core.Node{core.View{Style: chatColumn(v.ContentWidth), Children: v.Composer}}},
 	}}
 }
 

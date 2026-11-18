@@ -17,6 +17,9 @@ import (
 	"github.com/nsgo-dev/nsgo/ui/chat"
 )
 
+// chatWidth is the reading width of the gallery's conversations.
+const chatWidth core.Points = 720
+
 var featured = []struct {
 	id   string
 	icon func() *core.SVG
@@ -648,7 +651,7 @@ func chatDemo(cx *core.Scope) core.Node {
 		}
 		return core.View{Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Left: core.Pt(0), Right: core.Pt(0), AlignItems: core.AlignCenter},
 			StyleFunc: func() core.Style { return core.Style{Bottom: core.Pt(conversation.ComposerHeight())} },
-			Children: []core.Node{core.View{Style: core.Style{FlexGrow: 1, Width: core.Pct(100), MaxWidth: core.Pt(chat.ContentWidth), MinHeight: core.Pt(0)}, Children: []core.Node{
+			Children: []core.Node{core.View{Style: core.Style{FlexGrow: 1, Width: core.Pct(100), MaxWidth: core.Pt(chatWidth), MinHeight: core.Pt(0)}, Children: []core.Node{
 				core.View{Style: core.Style{FlexGrow: 1, JustifyContent: core.JustifyCenter, Padding: core.Symmetric(24, 20), Gap: 24, MinHeight: core.Pt(0)}, Children: []core.Node{
 					Appear{Children: []core.Node{core.View{Style: core.Style{AlignItems: core.AlignCenter, Gap: 12}, Children: []core.Node{
 						IconTile{Icon: lucide.Sparkles, Size: 56},
@@ -786,7 +789,7 @@ func chatDemo(cx *core.Scope) core.Node {
 
 	pane := core.View{StyleFunc: func() core.Style { return fillPage.Merge(core.Style{Background: colors.Background()}) }, Children: []core.Node{
 		core.View{Style: fillPage.Merge(core.Style{PaddingEnv: core.EnvEdges{Bottom: core.EnvKeyboard}}), Children: []core.Node{
-			chat.FloatingConversation{State: conversation, JumpLabel: tr.ChatJumpToTheLatestMessage(), TestID: "messages",
+			chat.FloatingConversation{State: conversation, JumpLabel: tr.ChatJumpToTheLatestMessage(), ContentWidth: chatWidth, TestID: "messages",
 				// One selection across the turns.
 				Children: []core.Node{core.View{Selectable: true, Style: core.Style{Gap: 48, MinWidth: core.Pt(0)}, Children: []core.Node{
 					core.Each(messages.Get, func(m msg) string { return m.id }, func(cx *core.Scope, m func() msg, _ func() int) core.Node {
