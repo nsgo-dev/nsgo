@@ -41,6 +41,8 @@ An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, is tested
 
 `app.Focus(selector)` reaches a field as a tap does and, in a desktop or web `Environment` or on those targets, a pressable or `Focusable` view through Tab, so a following `app.Key("Return")` presses it. A `Ref.Focus()` the app calls follows the same stops: fields everywhere, other views only on desktops, the web and Apple TV, so a headless test of a button's focus needs one of those environments. A pressable view has any of `OnPress`, `OnPressDown`, `OnPressUp` or `OnLongPress`, as on the platforms; Return or Space on it sends the down, up and press events it handles, so a view with only `OnLongPress` takes the focus but no key presses it.
 
+Headless runs use the phone idiom by default, whatever the project targets, so `cx.Env().Desktop()` is false and hover tooltips never show. Pass `nsgotest.Idiom(core.IdiomDesktop)` to test a desktop presentation, keeping the rest of the environment, an `Environment` option's included. Keyboard focus follows the environment's OS, not its idiom.
+
 ## Run the tests
 
 ```sh

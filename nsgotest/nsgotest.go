@@ -74,6 +74,11 @@ func Environment(env driver.Environment) Option {
 	return func(a *App) { a.env = &env }
 }
 
+// Idiom starts a headless app with idiom, core.IdiomPhone by default, and the rest of its environment as it would be otherwise: Environment's when the test passes one, before or after Idiom, the defaults when not. IdiomDesktop has what reads Env.Desktop take its desktop path, such as hover tooltips; keyboard focus follows the environment's OS instead. App.SetEnvironment later reports its environment whole, idiom included. Under `nsgo test -target` the platform's idiom stays, as Environment's does.
+func Idiom(idiom driver.Idiom) Option {
+	return func(a *App) { a.idiom = &idiom }
+}
+
 // HotKeyTaken has the headless platform answer the global shortcuts of keys, in core.Scope.OnKey's form, as desktop.HotKeyTaken, so a test runs an app's path for a combination another app holds; other keys register.
 func HotKeyTaken(keys ...string) Option {
 	return func(a *App) {
@@ -410,6 +415,8 @@ type App struct {
 	rootID     driver.NodeID
 	edits      map[driver.NodeID]uint32
 	env        *driver.Environment
+	// idiom is the Idiom option's, which a headless start applies over env.
+	idiom *driver.Idiom
 	// keyBindings is the keymap as the platform matches it, which Key reads.
 	keyBindings []driver.KeyBinding
 
@@ -498,6 +505,15 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		}
 		a.startTarget(view)
 		return a
+	}
+	if a.idiom != nil {
+		// On a copy, as one Environment option may start other apps too.
+		env := driver.Environment{}
+		if a.env != nil {
+			env = *a.env
+		}
+		env.Idiom = *a.idiom
+		a.env = &env
 	}
 	// Where nsgo.Run opens windows the app does here: on macOS, and on Windows and Linux for an app's function. Its main view shows in the main window, where CurrentWindow, MainWindow and OnClosing work and CloseWindow closes it.
 	var desktop bool

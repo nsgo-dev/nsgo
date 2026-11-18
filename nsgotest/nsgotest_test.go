@@ -2,6 +2,7 @@ package nsgotest
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -129,6 +130,55 @@ func TestARemovedViewsTransitionHoldsNoStep(t *testing.T) {
 	}
 	if took := app.Clock.Now().Sub(began); took > 50*time.Millisecond+2*driver.FrameInterval {
 		t.Fatalf("the step took %v of the clock for a view removed after 50ms", took)
+	}
+}
+
+// Idiom changes the idiom alone: the rest of the environment stays the default, or the Environment option's in either order, also when one Environment option starts more than one app.
+func TestIdiomOptionChangesOnlyTheIdiom(t *testing.T) {
+	root := func(cx *core.Scope) core.Node {
+		return core.Text{TestID: "env", ContentFunc: func() string {
+			e := cx.Env()
+			return fmt.Sprintf("desktop=%v os=%q dark=%v scale=%v lifecycle=%v locale=%q", e.Desktop(), e.OS(), e.Dark(), e.FontScale(), e.Lifecycle(), e.Locale())
+		}}
+	}
+	read := func(opts ...Option) string { return Start(t, root, opts...).Find("id:env").Text }
+	if got, want := read(), `desktop=false os="" dark=false scale=1 lifecycle=active locale=""`; got != want {
+		t.Fatalf("default environment = %s, want %s", got, want)
+	}
+	if got, want := read(Idiom(core.IdiomDesktop)), `desktop=true os="" dark=false scale=1 lifecycle=active locale=""`; got != want {
+		t.Fatalf("with Idiom = %s, want %s", got, want)
+	}
+	env := Environment(core.Environment{OS: core.OSWindows, Dark: true, FontScale: 1.5, Locale: "fr-FR"})
+	want := `desktop=true os="windows" dark=true scale=1.5 lifecycle=active locale="fr-FR"`
+	if got := read(env, Idiom(core.IdiomDesktop)); got != want {
+		t.Fatalf("Environment then Idiom = %s, want %s", got, want)
+	}
+	if got := read(Idiom(core.IdiomDesktop), env); got != want {
+		t.Fatalf("Idiom then Environment = %s, want %s", got, want)
+	}
+	if got, want := read(env), `desktop=false os="windows" dark=true scale=1.5 lifecycle=active locale="fr-FR"`; got != want {
+		t.Fatalf("Environment reused after Idiom = %s, want %s", got, want)
+	}
+}
+
+// A desktop idiom is all a headless test needs to hover a view and find its tooltip, which phones never show.
+func TestIdiomOptionShowsHoverTooltips(t *testing.T) {
+	root := func(cx *core.Scope) core.Node {
+		return core.View{TestID: "target", Tooltip: core.Text{Content: "the tip"}, Children: []core.Node{core.Text{Content: "hover me"}}}
+	}
+	for _, c := range []struct {
+		name string
+		opts []Option
+		want bool
+	}{{"phone", nil, false}, {"desktop", []Option{Idiom(core.IdiomDesktop)}, true}} {
+		t.Run(c.name, func(t *testing.T) {
+			app := Start(t, root, c.opts...)
+			app.Hover("id:target")
+			app.Advance(time.Second)
+			if got := app.Exists("text:the tip"); got != c.want {
+				t.Fatalf("tooltip shown = %v, want %v", got, c.want)
+			}
+		})
 	}
 }
 
