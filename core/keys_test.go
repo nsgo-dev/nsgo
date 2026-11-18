@@ -118,6 +118,40 @@ func TestAllSurfaceBindingsFollowEveryWindow(t *testing.T) {
 	}
 }
 
+// An app-wide binding rests under a modal shown in another window, as that window's own bindings do, so Escape reaches the dialog's OnRequestClose there, unless it is OverModals (#446).
+func TestAllSurfaceBindingsRestUnderAnotherWindowsModal(t *testing.T) {
+	for _, over := range []bool{false, true} {
+		var dialog *Signal[bool]
+		var other *Window
+		w := newWindows(t, func(cx *Scope) {
+			cx.SetMainView(func(*Scope) Node { return View{} })
+			cx.OnKeyWith("escape", KeyOptions{AllSurfaces: true, OverModals: over}, func() {})
+			other = cx.OpenWindow(WindowOptions{Title: "Other"}, func(cx *Scope) Node {
+				dialog = NewSignal(cx, false)
+				return View{Children: []Node{Show{When: dialog.Get, Then: func(*Scope) Node { return Modal{Children: []Node{Text{Content: "dialog"}}} }}}}
+			})
+		})
+		var tree *Tree
+		for _, s := range w.app.Surfaces() {
+			if s.Window() == other {
+				tree = s
+			}
+		}
+		matched := func() bool {
+			id, _ := driver.FindKey(tree.keymap(), []string{"escape"}, 0, false)
+			return id != 0
+		}
+		if !matched() {
+			t.Fatalf("OverModals %v: the other window's keymap has no escape before its dialog shows", over)
+		}
+		dialog.Set(true)
+		w.commit()
+		if got := matched(); got != over {
+			t.Fatalf("OverModals %v: under the other window's dialog its keymap matches escape: %v, want %v", over, got, over)
+		}
+	}
+}
+
 // On macOS one menu bar shows the menu a surface sent last, the app's own surface's while a window sets none, so a YieldsToMenu binding in any window leaves its key to an enabled item of that menu, and takes it back as the item is disabled. On Windows and Linux each window shows its own menu bar, and the app surface's menu takes no window's key (#446).
 func TestYieldingBindingsFollowTheMenuBarShown(t *testing.T) {
 	for _, os := range []OS{OSMacOS, OSWindows, OSLinux} {
