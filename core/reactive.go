@@ -218,11 +218,12 @@ type runtime struct {
 	// windows are the main window's options where the platform opens
 	// windows (RootOptions.Windows); surfaces the trees of the windows,
 	// panels and tray views opened, keyed those opened with a key.
-	windows   *WindowOptions
-	tray      bool
-	surfaces  []*Tree
-	surfaceID uint32
-	keyed     map[string]*Window
+	windows    *WindowOptions
+	tray       bool
+	surfaces   []*Tree
+	surfaceID  uint32
+	globalKeys []*globalKey
+	keyed      map[string]*Window
 	// overlay is the overlay over other apps opened last (OpenOverlay).
 	overlay *Window
 	// shutdown says when the app ends; main is its main window, ownMain
@@ -256,6 +257,14 @@ func (cx *Scope) tree() *Tree {
 		return cx.surf
 	}
 	return cx.rt.tree
+}
+
+func (rt *runtime) keyTrees() []*Tree {
+	trees := make([]*Tree, 0, len(rt.surfaces)+1)
+	if rt.tree != nil {
+		trees = append(trees, rt.tree)
+	}
+	return append(trees, rt.surfaces...)
 }
 
 // current is the scope that owns what code using cx creates now.

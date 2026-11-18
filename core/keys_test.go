@@ -38,6 +38,20 @@ func TestKeyBindingsFireAsTheirOptionsSay(t *testing.T) {
 	}
 }
 
+func TestAllSurfaceKeyBindingFollowsNewWindows(t *testing.T) {
+	w := newWindows(t, func(cx *Scope) {
+		cx.OnKeyWith("mod+r", KeyOptions{AllSurfaces: true}, func() {})
+		cx.SetMainView(func(*Scope) Node { return View{} })
+		cx.OpenWindow(WindowOptions{Title: "Settings"}, func(*Scope) Node { return View{} })
+	})
+	for _, id := range []uint32{0, 1, 2} {
+		items := w.take(id, driver.ItemKeymap)
+		if len(items) != 1 || len(items[0].Keys) != 1 || items[0].Keys[0].Key != "mod+r" {
+			t.Fatalf("surface %d keymap = %+v, want mod+r", id, items)
+		}
+	}
+}
+
 // TestBindingsYieldToTheFocusedControl holds KeyAuto bindings to leave a focused control the keys it uses, and KeyNotEditing and KeyAlways ones to take them, KeyNotEditing's none from a text input (#205).
 func TestBindingsYieldToTheFocusedControl(t *testing.T) {
 	var keymap []driver.KeyBinding

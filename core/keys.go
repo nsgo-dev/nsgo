@@ -22,6 +22,16 @@ type keyBinding struct {
 	fn           func()
 }
 
+// globalKey is a binding installed in every surface of a runtime, including
+// surfaces opened after it was registered.
+type globalKey struct {
+	opts     KeyOptions
+	owner    *Scope
+	key      string
+	fn       func()
+	bindings map[*Tree]*keyBinding
+}
+
 // KeyWhen says when a binding fires.
 type KeyWhen uint8
 
@@ -43,6 +53,9 @@ type KeyOptions struct {
 	OverModals bool
 	// YieldsToMenu leaves the key to the application menu while an enabled item takes the same shortcut where the focus is on macOS, Windows and Linux, which show the menu, for a default shortcut an app's menu may take over. An item that leaves its shortcut to a focused text input or web view does not suppress the binding. Else a binding takes its key before the menu does.
 	YieldsToMenu bool
+	// AllSurfaces installs the binding in every window, panel and the app's
+	// first surface, as an application-wide development shortcut.
+	AllSurfaces bool
 }
 
 // OnKey runs fn when key is pressed, while the current owner lives and the user can see what it shows. key names modifiers and a key joined by "+": "mod+s" (Command on Apple platforms, Control elsewhere), "ctrl+shift+z", "alt+left", "escape", "enter", "f5", "a". Of the bindings of a key that fire where the focus is, the newest wins, and only it runs. It fires once while the key is held, and not while the view with the keyboard focus uses the key itself, a text input its editing keys, a button Return and Space, a slider or a tab bar its arrows (KeyAuto); OnKeyWith says else. A control that binds its own keys while it has the focus binds them with KeyNotEditing, or the focus it holds would keep them from it.
@@ -63,20 +76,47 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 		yields = driver.KeyUsedBy(k)
 	}
 	owner := cx.current()
+	if opts.AllSurfaces {
+		g := &globalKey{key: k, opts: opts, owner: owner, fn: fn, bindings: map[*Tree]*keyBinding{}}
+		cx.rt.globalKeys = append(cx.rt.globalKeys, g)
+		for _, tree := range cx.rt.keyTrees() {
+			tree.addKeyBinding(owner, k, inText, yields, opts, fn, g.bindings)
+		}
+		owner.addCleanup(func() {
+			cx.rt.globalKeys = slices.DeleteFunc(cx.rt.globalKeys, func(o *globalKey) bool { return o == g })
+			for tree, binding := range g.bindings {
+				tree.removeKeyBinding(binding)
+			}
+		})
+		return
+	}
+	// IDs are never reused, so a press the platform matched to a binding since removed runs nothing (pressKey).
+	b := t.addKeyBinding(owner, k, inText, yields, opts, fn, nil)
+	b.owner.addCleanup(func() {
+		t.removeKeyBinding(b)
+	})
+}
+
+func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields driver.KeyUse, opts KeyOptions, fn func(), bindings map[*Tree]*keyBinding) *keyBinding {
 	// IDs are never reused, so a press the platform matched to a binding since removed runs nothing (pressKey).
 	t.keyID++
 	if t.keyID == 0 {
 		t.keyID++
 	}
-	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: k, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, yieldsToMenu: opts.YieldsToMenu, fn: fn}
+	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: key, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, yieldsToMenu: opts.YieldsToMenu, fn: fn}
 	t.keys = append(t.keys, b)
+	if bindings != nil {
+		bindings[t] = b
+	}
 	t.keysChanged = true
 	t.changed = true
-	b.owner.addCleanup(func() {
-		t.keys = slices.DeleteFunc(t.keys, func(k *keyBinding) bool { return k == b })
-		t.keysChanged = true
-		t.changed = true
-	})
+	return b
+}
+
+func (t *Tree) removeKeyBinding(binding *keyBinding) {
+	t.keys = slices.DeleteFunc(t.keys, func(k *keyBinding) bool { return k == binding })
+	t.keysChanged = true
+	t.changed = true
 }
 
 type backHandler struct {

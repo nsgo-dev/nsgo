@@ -88,7 +88,7 @@ func Wrap(app engine.App) engine.App {
 			}()
 		}
 		// Command or Control+R builds and starts the app again, as the overlay's Reload button does, over the overlay and the app's own modals too. It leaves the key to the app: bound before the app renders, it yields to the app's own binding of the key while that one may fire, and to an enabled item of the app's application menu with the key as its shortcut.
-		cx.OnKeyWith("mod+r", core.KeyOptions{OverModals: true, YieldsToMenu: true}, reload)
+		cx.OnKeyWith("mod+r", core.KeyOptions{OverModals: true, YieldsToMenu: true, AllSurfaces: true}, reload)
 		return core.Group{
 			core.Catch{
 				Try: app,
