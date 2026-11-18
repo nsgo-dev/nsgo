@@ -596,7 +596,7 @@ const (
 	// MenuPasteAndMatchStyle pastes the clipboard's text without its style, and MenuDelete removes the selection, in the focused text field or web view.
 	MenuPasteAndMatchStyle
 	MenuDelete
-	// MenuStartSpeaking, MenuStopSpeaking and MenuBringAllToFront are macOS's.
+	// MenuStartSpeaking reads the focused text field's selection aloud and MenuStopSpeaking stops it, on macOS and, where they speak, Windows and Linux. MenuBringAllToFront is macOS's.
 	MenuStartSpeaking
 	MenuStopSpeaking
 	MenuBringAllToFront

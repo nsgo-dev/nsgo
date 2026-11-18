@@ -446,13 +446,19 @@ func TestMenuKeysOfTheNewEditingRoles(t *testing.T) {
 
 func TestMenuHelpers(t *testing.T) {
 	for _, r := range []driver.MenuRole{driver.MenuAbout, driver.MenuHide, driver.MenuHideOthers, driver.MenuShowAll,
-		driver.MenuServices, driver.MenuStartSpeaking, driver.MenuStopSpeaking, driver.MenuBringAllToFront} {
+		driver.MenuServices, driver.MenuBringAllToFront} {
 		if !unsupported(r) {
 			t.Errorf("%v is supported", r)
 		}
 	}
 	if unsupported(driver.MenuQuit) || unsupported(driver.MenuCopy) {
 		t.Fatal("a supported role is unsupported")
+	}
+	for _, speaks := range []bool{false, true} {
+		speechAs(t, speaks)
+		if unsupported(driver.MenuStartSpeaking) == speaks || unsupported(driver.MenuStopSpeaking) == speaks {
+			t.Errorf("with speech %v, the Speech items are unsupported: %v", speaks, !speaks)
+		}
 	}
 	if got := shortcutOf(&driver.MenuEntry{Role: driver.MenuQuit}); got != "alt+f4" {
 		t.Fatalf("quit shortcut = %q", got)
@@ -783,6 +789,37 @@ func TestTextEllipsizesJustifiesAndReportsLines(t *testing.T) {
 	}
 	if len(l.decorations) == 0 || l.decorations[0].style != driver.DecorationWavy || l.decorations[0].color != driver.RGB(0xff0000) {
 		t.Errorf("decorations = %+v, want red and wavy", l.decorations)
+	}
+}
+
+// speechAs has the backend say speech is available, or not, for the rest of the test.
+func speechAs(t *testing.T, ok bool) {
+	t.Helper()
+	was := speakAvailable
+	speakAvailable = func() bool { return ok }
+	t.Cleanup(func() { speakAvailable = was })
+}
+
+// TestStartSpeakingReadsTheSelection checks what Start Speaking reads of a field: its selection, or its whole text without one, and nothing of a password field or of none.
+func TestStartSpeakingReadsTheSelection(t *testing.T) {
+	in := &textInput{model: *editModelOf("日本語のテキスト")}
+	if got := in.speechText(); got != "日本語のテキスト" {
+		t.Errorf("without a selection it reads %q", got)
+	}
+	in.model.anchor, in.model.caret = len(in.model.text), len("日本語の")
+	if got := in.speechText(); got != "テキスト" {
+		t.Errorf("a selection made backwards reads %q", got)
+	}
+	in.config.Masked = true
+	if got := in.speechText(); got != "" {
+		t.Errorf("a password field reads %q", got)
+	}
+	in.config.Multiline = true
+	if got := in.speechText(); got != "テキスト" {
+		t.Errorf("a masked multiline field, which shows its text, reads %q", got)
+	}
+	if got := (*textInput)(nil).speechText(); got != "" {
+		t.Errorf("no field reads %q", got)
 	}
 }
 

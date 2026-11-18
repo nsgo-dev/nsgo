@@ -187,6 +187,8 @@ func TestRadioMenuItemsActivate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
 	}
+	// The Speech item stays out of the menu, whose actions are the radios'.
+	speechAs(t, false)
 	var (
 		activate  func(group uintptr, name *byte, parameter uintptr)
 		getName   func(action uintptr) string
@@ -248,4 +250,87 @@ func TestRadioMenuItemsActivate(t *testing.T) {
 	}
 	w.onLoop(t, func() { activate(w.actionGroup, cstr(courses), gVariantNewString(cstr(radioTarget))) })
 	waitForTitle(t, w, title+"|Courses")
+}
+
+// TestStartSpeakingReadsTheFocusedField chooses the Speech items with a field focused: Start Speaking reads its selection, or its whole text with none, nothing of a password field, and Stop Speaking stops what it said.
+func TestStartSpeakingReadsTheFocusedField(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	speechAs(t, true)
+	type said struct {
+		id uint32
+		r  driver.SpeakRequest
+	}
+	heard := make(chan said, 8)
+	was := menuSpeak
+	menuSpeak = func(id uint32, r driver.SpeakRequest, _ func(driver.Event)) { heard <- said{id, r} }
+	t.Cleanup(func() { menuSpeak = was })
+	const title = "nsgo-menu-speech"
+	app := func(cx *core.Scope) core.Node {
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Edit", Items: []core.MenuItem{{Label: "Speech", Items: []core.MenuItem{
+			{Role: core.MenuStartSpeaking}, {Role: core.MenuStopSpeaking}}}}}})
+		cx.SetTitle(title)
+		return core.View{Style: core.Style{Width: driver.Pt(200), Height: driver.Pt(100)}, Children: []core.Node{
+			core.Input{TestID: "field", DefaultValue: "日本語のテキスト", Style: core.Style{Width: driver.Pt(180), Height: driver.Pt(30)}},
+			core.Input{TestID: "password", DefaultValue: "secret", Masked: true, Style: core.Style{Width: driver.Pt(180), Height: driver.Pt(30)}},
+		}}
+	}
+	w := startTestWindow(t, app, Options{Title: title, Width: 240, Height: 120})
+	waitForTitle(t, w, title)
+	field := func(id string) *view {
+		for _, v := range w.entries {
+			if v.props.TestID == id {
+				return v
+			}
+		}
+		t.Fatalf("no field %s", id)
+		return nil
+	}
+	choose := func(role driver.MenuRole) {
+		w.onLoop(t, func() {
+			if !w.menuChosen(menuRef{role: role}) {
+				t.Errorf("%v was not run", role)
+			}
+		})
+	}
+	next := func() (said, bool) {
+		select {
+		case s := <-heard:
+			return s, true
+		case <-time.After(500 * time.Millisecond):
+			return said{}, false
+		}
+	}
+	choose(driver.MenuStartSpeaking)
+	if s, ok := next(); ok {
+		t.Errorf("with no field focused, Start Speaking said %+v", s)
+	}
+	w.onLoop(t, func() {
+		v := field("field")
+		w.focusEntry(v)
+		gtkEditableSelectRegion(v.entry, 4, 8)
+	})
+	choose(driver.MenuStartSpeaking)
+	if s, ok := next(); !ok || s.id != menuUtterance || s.r.Command != driver.SpeakStart || s.r.Text != "テキスト" || s.r.Lang == "" {
+		t.Errorf("the selection was said as %+v (%v)", s, ok)
+	}
+	w.onLoop(t, func() { gtkEditableSelectRegion(field("field").entry, 2, 2) })
+	choose(driver.MenuStartSpeaking)
+	if s, ok := next(); !ok || s.r.Text != "日本語のテキスト" {
+		t.Errorf("the whole text was said as %+v (%v)", s, ok)
+	}
+	choose(driver.MenuStopSpeaking)
+	if s, ok := next(); !ok || s.id != menuUtterance || s.r.Command != driver.SpeakStop {
+		t.Errorf("Stop Speaking sent %+v (%v)", s, ok)
+	}
+	w.onLoop(t, func() {
+		v := field("password")
+		w.focusEntry(v)
+		gtkEditableSelectRegion(v.entry, 0, -1)
+	})
+	choose(driver.MenuStartSpeaking)
+	if s, ok := next(); ok {
+		t.Errorf("a password field was said as %+v", s)
+	}
 }

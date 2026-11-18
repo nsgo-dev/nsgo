@@ -399,13 +399,19 @@ func TestMenuKeysOfTheNewEditingRoles(t *testing.T) {
 
 func TestMenuHelpers(t *testing.T) {
 	for _, r := range []driver.MenuRole{driver.MenuAbout, driver.MenuHide, driver.MenuHideOthers, driver.MenuShowAll,
-		driver.MenuServices, driver.MenuStartSpeaking, driver.MenuStopSpeaking, driver.MenuBringAllToFront} {
+		driver.MenuServices, driver.MenuBringAllToFront} {
 		if !unsupported(r) {
 			t.Errorf("%v is supported", r)
 		}
 	}
 	if unsupported(driver.MenuQuit) || unsupported(driver.MenuCopy) {
 		t.Fatal("a supported role is unsupported")
+	}
+	for _, speaks := range []bool{false, true} {
+		speechAs(t, speaks)
+		if unsupported(driver.MenuStartSpeaking) == speaks || unsupported(driver.MenuStopSpeaking) == speaks {
+			t.Errorf("with speech %v, the Speech items are unsupported: %v", speaks, !speaks)
+		}
 	}
 	if got := shortcutOf(&driver.MenuEntry{Role: driver.MenuQuit}); got != "alt+f4" {
 		t.Fatalf("quit shortcut = %q", got)
@@ -492,22 +498,53 @@ func TestAStatusReadsItsWholeText(t *testing.T) {
 	}
 }
 
-// TestMenuShowsNoMacRolesNorEmptySubmenus checks which entries the GTK menu shows: neither macOS's roles, nor a Help holder with no items, nor a submenu none of whose items it shows.
+// TestMenuShowsNoMacRolesNorEmptySubmenus checks which entries the GTK menu shows: neither macOS's roles, nor the Speech items where nothing speaks, nor a Help holder with no items, nor a submenu none of whose items it shows.
 func TestMenuShowsNoMacRolesNorEmptySubmenus(t *testing.T) {
+	for _, speech := range []bool{false, true} {
+		speechAs(t, speech)
+		for _, c := range []struct {
+			e    driver.MenuEntry
+			want bool
+		}{
+			{driver.MenuEntry{Label: "Copy", Role: driver.MenuCopy}, true},
+			{driver.MenuEntry{Role: driver.MenuStartSpeaking}, speech},
+			{driver.MenuEntry{Role: driver.MenuServices, Items: []driver.MenuEntry{{Label: "Mine", ID: 1}}}, false},
+			{driver.MenuEntry{Label: "Help", Role: driver.MenuHelpMenu}, false},
+			{driver.MenuEntry{Label: "Help", Role: driver.MenuHelpMenu, Items: []driver.MenuEntry{{Label: "Docs", ID: 1}}}, true},
+			{driver.MenuEntry{Label: "Speech", Items: []driver.MenuEntry{{Role: driver.MenuStartSpeaking}, {Separator: true}, {Role: driver.MenuStopSpeaking}}}, speech},
+			{driver.MenuEntry{Label: "Empty"}, true},
+		} {
+			if got := shown(&c.e); got != c.want {
+				t.Errorf("with speech %v, shown(%+v) = %v, want %v", speech, c.e, got, c.want)
+			}
+		}
+	}
+}
+
+// speechAs has the backend say speech is available, or not, for the rest of the test.
+func speechAs(t *testing.T, ok bool) {
+	t.Helper()
+	was := speakAvailable
+	speakAvailable = func() bool { return ok }
+	t.Cleanup(func() { speakAvailable = was })
+}
+
+// TestStartSpeakingReadsTheSelection checks what Start Speaking reads of a field: the characters GTK's offsets select, in either order, which are not bytes, or the whole text without a selection.
+func TestStartSpeakingReadsTheSelection(t *testing.T) {
 	for _, c := range []struct {
-		e    driver.MenuEntry
-		want bool
+		text       string
+		start, end int
+		want       string
 	}{
-		{driver.MenuEntry{Label: "Copy", Role: driver.MenuCopy}, true},
-		{driver.MenuEntry{Role: driver.MenuStartSpeaking}, false},
-		{driver.MenuEntry{Role: driver.MenuServices, Items: []driver.MenuEntry{{Label: "Mine", ID: 1}}}, false},
-		{driver.MenuEntry{Label: "Help", Role: driver.MenuHelpMenu}, false},
-		{driver.MenuEntry{Label: "Help", Role: driver.MenuHelpMenu, Items: []driver.MenuEntry{{Label: "Docs", ID: 1}}}, true},
-		{driver.MenuEntry{Label: "Speech", Items: []driver.MenuEntry{{Role: driver.MenuStartSpeaking}, {Separator: true}, {Role: driver.MenuStopSpeaking}}}, false},
-		{driver.MenuEntry{Label: "Empty"}, true},
+		{"hello world", 6, 11, "world"},
+		{"hello world", 3, 3, "hello world"},
+		{"日本語のテキスト", 4, 8, "テキスト"},
+		{"日本語のテキスト", 3, 0, "日本語"},
+		{"a😀b", 1, 2, "😀"},
+		{"abc", 1, 9, "bc"},
 	} {
-		if got := shown(&c.e); got != c.want {
-			t.Errorf("shown(%+v) = %v, want %v", c.e, got, c.want)
+		if got := speechText(c.text, c.start, c.end); got != c.want {
+			t.Errorf("speechText(%q, %d, %d) = %q, want %q", c.text, c.start, c.end, got, c.want)
 		}
 	}
 }

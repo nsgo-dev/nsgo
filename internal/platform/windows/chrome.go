@@ -792,10 +792,11 @@ func (w *window) setMenu(entries []driver.MenuEntry) {
 	w.showMenuBar()
 }
 
-// unsupported reports the roles Windows has no use for.
+// unsupported reports the roles Windows has no use for: macOS's own, and the Speech items where nothing speaks (Env.CanSpeak).
 func unsupported(r driver.MenuRole) bool {
 	return r == driver.MenuAbout || r == driver.MenuHide || r == driver.MenuHideOthers || r == driver.MenuShowAll ||
-		r == driver.MenuServices || r == driver.MenuStartSpeaking || r == driver.MenuStopSpeaking || r == driver.MenuBringAllToFront
+		r == driver.MenuServices || r == driver.MenuBringAllToFront ||
+		(r == driver.MenuStartSpeaking || r == driver.MenuStopSpeaking) && !speakAvailable()
 }
 
 // shortcutOf returns e's shortcut, its role's when it has none.
@@ -1061,6 +1062,10 @@ func (w *window) chooseMenu(ref menuRef) {
 				driver.MenuCopy: 'C', driver.MenuPaste: 'V', driver.MenuSelectAll: 'A'}[ref.role]
 			w.editKey(vk, true, false, false)
 		}
+	case driver.MenuStartSpeaking:
+		w.speakMenu(true)
+	case driver.MenuStopSpeaking:
+		w.speakMenu(false)
 	}
 	if ref.id != 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: ref.id})

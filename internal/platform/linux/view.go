@@ -165,10 +165,11 @@ func (w *window) titleBarArea() driver.Edges {
 	return driver.Edges{Top: w.chrome.height}
 }
 
-// unsupported reports the roles GTK has no use for.
+// unsupported reports the roles GTK has no use for: macOS's own, and the Speech items where nothing speaks (Env.CanSpeak).
 func unsupported(r driver.MenuRole) bool {
 	return r == driver.MenuAbout || r == driver.MenuHide || r == driver.MenuHideOthers || r == driver.MenuShowAll ||
-		r == driver.MenuServices || r == driver.MenuStartSpeaking || r == driver.MenuStopSpeaking || r == driver.MenuBringAllToFront
+		r == driver.MenuServices || r == driver.MenuBringAllToFront ||
+		(r == driver.MenuStartSpeaking || r == driver.MenuStopSpeaking) && !speakAvailable()
 }
 
 // shortcutOf returns e's shortcut, its role's when it has none.

@@ -148,7 +148,7 @@ func TestHiddenTitleBarMenuPopsUp(t *testing.T) {
 	})
 }
 
-// TestMenuLeavesOutMacRolesAndDrawsRadios builds a menu with the roles only macOS has, which leave no separator at either end of their group nor an empty submenu, a Help holder with no items, which is left out, and radio items, which take MFT_RADIOCHECK.
+// TestMenuLeavesOutMacRolesAndDrawsRadios builds a menu with the roles only macOS has, which leave no separator at either end of their group nor an empty submenu, the Speech items, which show only where Windows speaks, a Help holder with no items, which is left out, and radio items, which take MFT_RADIOCHECK.
 func TestMenuLeavesOutMacRolesAndDrawsRadios(t *testing.T) {
 	getItem := user32.NewProc("GetMenuItemInfoW")
 	getString := user32.NewProc("GetMenuStringW")
@@ -189,11 +189,7 @@ func TestMenuLeavesOutMacRolesAndDrawsRadios(t *testing.T) {
 		}
 		return out
 	}
-	menu, _, _ := createPopupMenu.Call()
-	defer destroyMenu.Call(menu)
-	w := &window{}
-	var refs []menuRef
-	w.appendMenuTo(menu, []driver.MenuEntry{
+	entries := []driver.MenuEntry{
 		{Label: "App", Items: []driver.MenuEntry{{Role: driver.MenuAbout}, {Separator: true}, {Role: driver.MenuServices, Items: []driver.MenuEntry{{Label: "Mine", ID: 1}}},
 			{Separator: true}, {Role: driver.MenuQuit, Label: "Quit"}}},
 		{Label: "Edit", Items: []driver.MenuEntry{{Role: driver.MenuDelete, Label: "Delete"}, {Separator: true},
@@ -201,10 +197,22 @@ func TestMenuLeavesOutMacRolesAndDrawsRadios(t *testing.T) {
 		{Label: "Library", Items: []driver.MenuEntry{{Label: "Movies", ID: 2, Radio: true, Checkable: true, Checked: true}, {Label: "Courses", ID: 3, Radio: true, Checkable: true}}},
 		{Label: "Window", Role: driver.MenuWindowMenu, Items: []driver.MenuEntry{{Role: driver.MenuMinimize, Label: "Minimize"}, {Separator: true}, {Role: driver.MenuBringAllToFront}}},
 		{Label: "Help", Role: driver.MenuHelpMenu},
-	}, &refs)
-	got := strings.Join(items(menu), " ")
-	if want := "App [Quit\tAlt+F4] Edit [Delete] Library [Movies(o)* Courses(o)] Window [Minimize]"; got != want {
-		t.Errorf("the menu is %q, want %q", got, want)
+	}
+	for _, c := range []struct {
+		speech bool
+		want   string
+	}{
+		{false, "App [Quit\tAlt+F4] Edit [Delete] Library [Movies(o)* Courses(o)] Window [Minimize]"},
+		{true, "App [Quit\tAlt+F4] Edit [Delete - Speech [Start Speaking Stop Speaking]] Library [Movies(o)* Courses(o)] Window [Minimize]"},
+	} {
+		speechAs(t, c.speech)
+		menu, _, _ := createPopupMenu.Call()
+		var refs []menuRef
+		(&window{}).appendMenuTo(menu, entries, &refs)
+		if got := strings.Join(items(menu), " "); got != c.want {
+			t.Errorf("with speech %v, the menu is %q, want %q", c.speech, got, c.want)
+		}
+		destroyMenu.Call(menu)
 	}
 }
 

@@ -960,6 +960,10 @@ func (w *window) menuChosen(ref menuRef) bool {
 			return true
 		}
 		w.webEdit(ref.role)
+	case driver.MenuStartSpeaking:
+		w.speakMenu(true)
+	case driver.MenuStopSpeaking:
+		w.speakMenu(false)
 	default:
 		return false
 	}

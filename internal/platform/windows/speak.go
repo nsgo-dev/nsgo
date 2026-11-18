@@ -279,7 +279,7 @@ func endSpeaking(e driver.SpeakEvent) {
 		}
 	}
 	releaseSource()
-	if run != nil {
+	if run != nil && run.id != menuUtterance {
 		run.w.engine.Dispatch(driver.Event{Kind: driver.EventSpeak, Count: run.id, Data: &e})
 	}
 }
@@ -364,13 +364,13 @@ func windowsVoices() []driver.Voice {
 	return voices
 }
 
-// windowsVoice is the voice of id, or the voice for lang, the default one where it speaks lang, with a reference the caller releases; else nil and why.
+// windowsVoice is the voice of id, or the voice for lang, the default one where it speaks lang or lang is "", with a reference the caller releases; else nil and why.
 func windowsVoice(lang, id string) (*comObject, string) {
 	var found *comObject
 	speaks := func(v *comObject) bool {
 		tag := strings.ToLower(voiceString(v, voiceLanguage))
 		l := strings.ToLower(lang)
-		return tag == l || strings.HasPrefix(tag, l+"-")
+		return l == "" || tag == l || strings.HasPrefix(tag, l+"-")
 	}
 	if id == "" {
 		if statics := activationFactory(speakSynthesizerClass, &iidInstalledVoices); statics != nil {
