@@ -720,8 +720,10 @@ func checkTestTarget(target string, activate bool) (string, error) {
 // is not the one the target's tests run on, naming the spelling to use
 // instead (#589): a desktop target runs on this machine's architecture,
 // Android's tests always run arm64.
+//
+// A desktop target whose OS is not this machine's is left to buildTargetRunner, which says where it runs: suggesting the plain name would only lead to that error (#716).
 func checkTestTargetArch(target, normalized string) error {
-	if target == normalized {
+	if target == normalized || desktopTargetElsewhere(normalized) {
 		return nil
 	}
 	_, arch, _ := strings.Cut(target, "_")
@@ -737,6 +739,17 @@ func checkTestTargetArch(target, normalized string) error {
 		why = "Android's tests always run arm64"
 	}
 	return fmt.Errorf("test: -target %s asks for %s, but %s; use -target %s", target, arch, why, normalized)
+}
+
+// desktopTargetElsewhere reports whether target is a desktop target whose OS is not this machine's.
+func desktopTargetElsewhere(target string) bool {
+	switch target {
+	case "macos":
+		return runtime.GOOS != "darwin"
+	case "windows", "linux":
+		return runtime.GOOS != target
+	}
+	return false
 }
 
 // hostTestArch is the architecture this machine's tests run for, in the

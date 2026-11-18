@@ -783,11 +783,18 @@ func TestNormalizeTestTarget(t *testing.T) {
 }
 
 // checkTestTarget normalizes -target first, so -activate sees the plain
-// name, and refuses an architecture the target cannot run on (#589).
+// name, and refuses an architecture the target cannot run on (#589). A desktop target of another OS is left to the host check, as suggesting its plain name would only lead there (#716).
 func TestCheckTestTarget(t *testing.T) {
 	hostArch, otherArch := "x64", "arm64"
 	if runtime.GOARCH == "arm64" {
 		hostArch, otherArch = "arm64", "x64"
+	}
+	here, elsewhere := map[string]string{"darwin": "macos", "windows": "windows", "linux": "linux"}[runtime.GOOS], "windows"
+	if here == "windows" {
+		elsewhere = "linux"
+	}
+	if here == "" {
+		t.Skipf("no desktop test target runs on %s", runtime.GOOS)
 	}
 	for _, tc := range []struct {
 		in       string
@@ -798,9 +805,10 @@ func TestCheckTestTarget(t *testing.T) {
 		{"", false, "", ""},
 		{"", true, "", "-activate goes with -target macos"},
 		{"macos_" + hostArch, true, "macos", ""},
-		{"macos_" + otherArch, true, "", "use -target macos"},
-		{"windows_" + hostArch, false, "windows", ""},
-		{"windows_" + otherArch, false, "", "use -target windows"},
+		{here + "_" + hostArch, false, here, ""},
+		{here + "_" + otherArch, false, "", "use -target " + here},
+		{elsewhere + "_" + hostArch, false, elsewhere, ""},
+		{elsewhere + "_" + otherArch, false, elsewhere, ""},
 		{"android_arm64", false, "android", ""},
 		{"android_x64", false, "", "use -target android"},
 		{"all", true, "", "unknown test target"},
