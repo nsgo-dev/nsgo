@@ -350,7 +350,7 @@ func (x Text) mountIn(t *Tree, cx *Scope, parent *node) { t.mountText(cx, parent
 
 // Span is a run of a Text with a style of its own.
 type Span struct {
-	// Class is Tailwind CSS classes under Style, as View's.
+	// Class is Tailwind CSS classes under Style, as View's, except that a span has no siblings: peer-* variants are logged and ignored.
 	Class       string
 	Content     string
 	ContentFunc func() string
@@ -967,9 +967,7 @@ type Screen struct {
 	HeaderBackTitle string
 	HeaderStyle     Style
 	HeaderStyleFunc func() Style
-	// HeaderClass gives the system header its colors as classes: bg-*,
-	// text-* for the title, tint-* for the buttons. HeaderStyle wins over
-	// them.
+	// HeaderClass gives the system header its colors as classes: bg-*, text-* for the title, tint-* for the buttons. HeaderStyle wins over them. The header has no siblings: peer-* variants are logged and ignored.
 	HeaderClass string
 	// Animation is how the screen enters and leaves (iOS slides it by
 	// default).

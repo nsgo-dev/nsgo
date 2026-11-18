@@ -74,7 +74,7 @@ export interface NavPageProps extends NavPageHostProps {
   headerRight?: JSX.Element;
   headerTitle?: JSX.Element;
   headerStyle?: HeaderStyle;
-  /** The system header's colors as classes: bg-*, text-* for the title, tint-* for the buttons; headerStyle wins over them. */
+  /** The system header's colors as classes: bg-*, text-* for the title, tint-* for the buttons; headerStyle wins over them. The header has no siblings: peer-* variants are logged and ignored. */
   headerClass?: string;
   onDismiss?: () => void;
   onBackPress?: () => void;
