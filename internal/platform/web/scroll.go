@@ -609,6 +609,7 @@ func (s *surface) zoomContent(v *view, scale, cx, cy, fx, fy float64) {
 	v.el.Set("scrollTop", cy*scale+float64(in.Top)+v.sc.pull-fy)
 	s.scrollEvent(v, driver.EventScroll)
 	if changed {
+		s.smoothCanvases(v.content)
 		s.rasterAfterZoom(v)
 	}
 }

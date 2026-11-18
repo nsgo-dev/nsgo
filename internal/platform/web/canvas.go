@@ -64,6 +64,35 @@ func (s *surface) paint(v *view) {
 	for i := range ops {
 		p.Play(&ops[i])
 	}
+	s.setCanvasExact(v)
+}
+
+// setCanvasExact draws a canvas inside zoomed scroll contents pixel for pixel while its bitmap is exactly as large as the screen shows it. Chrome composes nested scale transforms with filtering even when they add up to one pixel per pixel, which greys a sharp edge; nearest sampling of a bitmap at that size changes nothing else. During a zoom, or past the raster bounds, the bitmap is scaled for the screen and keeps smooth sampling.
+func (s *surface) setCanvasExact(v *view) {
+	zoom, zoomed := s.canvasZoom(v)
+	w, h := v.canvasSize()
+	shown := float64(s.env.PixelRatio) * zoom
+	exact := zoomed && math.Abs(v.canvasRatio-shown) < 1e-9 && w*shown == math.Ceil(w*shown) && h*shown == math.Ceil(h*shown)
+	if exact == v.canvasExact {
+		return
+	}
+	v.canvasExact = exact
+	rendering := ""
+	if exact {
+		rendering = "pixelated"
+	}
+	v.inner.Get("style").Set("imageRendering", rendering)
+}
+
+// smoothCanvases returns the canvases under root to smooth sampling while a zoom changes how the screen shows their bitmaps; the replay after it sets them again.
+func (s *surface) smoothCanvases(root js.Value) {
+	canvases := root.Call("querySelectorAll", "canvas")
+	for i := range canvases.Length() {
+		if v := s.viewOf(canvases.Index(i).Get("parentElement")); v != nil && v.canvasExact {
+			v.canvasExact = false
+			v.inner.Get("style").Set("imageRendering", "")
+		}
+	}
 }
 
 // canvasSize is the size in points of a canvas view's <canvas>, inside its border.
@@ -81,19 +110,7 @@ const (
 
 // canvasScale is the pixels per point a canvas view draws at: the screen's pixel ratio times the zoom of the scroll views it is in, nested ones included, with the zoom between 1 and maxRasterZoom and the bitmap within maxZoomPixels and maxZoomSide.
 func (s *surface) canvasScale(v *view) float64 {
-	zoom := 1.0
-	// Only zoomed scroll contents carry the attribute, so this visits them alone rather than every ancestor.
-	const zoomed = "[" + zoomAttr + "]"
-	for el := v.el.Call("closest", zoomed); el.Truthy(); {
-		if z, err := strconv.ParseFloat(el.Call("getAttribute", zoomAttr).String(), 64); err == nil && z > 0 {
-			zoom *= z
-		}
-		parent := el.Get("parentElement")
-		if !parent.Truthy() {
-			break
-		}
-		el = parent.Call("closest", zoomed)
-	}
+	zoom, _ := s.canvasZoom(v)
 	ratio := float64(s.env.PixelRatio)
 	if ratio <= 0 {
 		ratio = 1
@@ -106,13 +123,38 @@ func (s *surface) canvasScale(v *view) float64 {
 	return ratio * zoom
 }
 
+// canvasZoom is the product of the zooms of the scroll views v is in, nested ones included, and whether any of them is zoomed.
+func (s *surface) canvasZoom(v *view) (zoom float64, zoomed bool) {
+	zoom = 1
+	// Only zoomed scroll contents carry the attribute, so this visits them alone rather than every ancestor.
+	const attr = "[" + zoomAttr + "]"
+	for el := v.el.Call("closest", attr); el.Truthy(); {
+		if z, err := strconv.ParseFloat(el.Call("getAttribute", zoomAttr).String(), 64); err == nil && z > 0 {
+			zoom *= z
+			zoomed = true
+		}
+		parent := el.Get("parentElement")
+		if !parent.Truthy() {
+			break
+		}
+		el = parent.Call("closest", attr)
+	}
+	return zoom, zoomed
+}
+
 // refreshCanvasScale replays the drawings under root whose raster scale changed. DOM placement is authoritative, including kept content moved to a new scroll view and sticky wrappers around list cells.
 func (s *surface) refreshCanvasScale(root js.Value) {
 	canvases := root.Call("querySelectorAll", "canvas")
 	for i := range canvases.Length() {
 		v := s.viewOf(canvases.Index(i).Get("parentElement"))
-		if v != nil && v.kind == driver.KindCanvas && v.drawing != nil && v.canvasRatio != s.canvasScale(v) {
+		if v == nil || v.kind != driver.KindCanvas || v.drawing == nil {
+			continue
+		}
+		if v.canvasRatio != s.canvasScale(v) {
 			s.paint(v)
+		} else {
+			// A zoom within the raster bounds' cap keeps the bitmap but can bring it back to the screen's size.
+			s.setCanvasExact(v)
 		}
 	}
 }

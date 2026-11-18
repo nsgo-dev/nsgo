@@ -245,6 +245,8 @@ type view struct {
 	moves     bool // pointermove is
 	// canvasRatio is the pixels per point of the last replay, including scroll zoom.
 	canvasRatio float64
+	// canvasExact is whether the canvas is drawn with image-rendering: pixelated, which it is while its bitmap matches the screen pixels a zoomed scroll view shows it at.
+	canvasExact bool
 	// focused is whether the view has the keyboard focus it reported.
 	focused bool
 	// panActivation decides when a drag on the view becomes its pan.
