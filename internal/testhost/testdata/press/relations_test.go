@@ -1,6 +1,7 @@
 package press_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/core"
@@ -20,7 +21,7 @@ func TestRelationalSelectorsFollowNativeInput(t *testing.T) {
 			}},
 		}}
 	}, nsgotest.Size(300, 240), nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
-	if got := app.Find("id:icon").Frame.Size; got.Width != 16 || got.Height != 16 {
+	if got := app.Find("id:icon").Frame.Size; !near(got.Width, 16) || !near(got.Height, 16) {
 		t.Fatalf("inherited icon size=%v", got)
 	}
 	// Touch targets have no pointer to hover with, and there only text fields take the keyboard focus, so hover and a pressable view's focus are checked headless and on desktops and the web.
@@ -40,11 +41,14 @@ func TestRelationalSelectorsFollowNativeInput(t *testing.T) {
 		}
 	}
 	app.Press("id:toggle")
-	if got := app.Find("id:focus").Frame.Origin.X; got != 32 {
+	if got := app.Find("id:focus").Frame.Origin.X; !near(got, 32) {
 		t.Fatalf("removing icon left parent padding=%v", got)
 	}
 	app.Press("id:toggle")
-	if got := app.Find("id:focus").Frame.Origin.X; got != 12 {
+	if got := app.Find("id:focus").Frame.Origin.X; !near(got, 12) {
 		t.Fatalf("adding icon did not restore parent padding=%v", got)
 	}
 }
+
+// near reports whether a frame value is want, give or take the pixel snapping of a screen whose scale is not a whole number, such as Android's 420 dpi (2.625 pixels a point), where 12 points are 31.5 pixels and show as 32.
+func near(got core.Points, want float64) bool { return math.Abs(float64(got)-want) < .5 }
