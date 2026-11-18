@@ -24,8 +24,9 @@ jobs:
       matrix:
         include:
           - target: web
-            os: ubuntu-24.04
+            os: depot-ubuntu-24.04-4
           - target: macos
+            # AVPlayer plays nothing on Depot's macOS runners.
             os: macos-15-intel
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -55,7 +56,7 @@ jobs:
           if-no-files-found: warn
 
   test:
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 60
     steps:
       - name: Check out
@@ -138,6 +139,7 @@ jobs:
         run: go tool nsgo test -target web ./tsx/pkg
 
   android:
+    # GitHub's runners give the emulator KVM, which Depot's are not known to.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -171,7 +173,7 @@ jobs:
             go tool nsgo test -target android -device emulator-5554 -timeout 2m ./internal/testhost/testdata/websource || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
 
   apple:
-    # Use the Intel pool while hosted arm64 capacity leaves jobs unallocated.
+    # AVPlayer plays nothing on Depot's macOS runners, so the desktop backend stays on GitHub's; use its Intel pool while hosted arm64 capacity leaves jobs unallocated.
     runs-on: macos-15-intel
     timeout-minutes: 30
     steps:
@@ -219,7 +221,7 @@ jobs:
 
   apple-simulator:
     # Simulator packages are arm64; the Intel desktop job cannot run them.
-    runs-on: macos-15
+    runs-on: depot-macos-15
     timeout-minutes: 40
     steps:
       - name: Check out
@@ -241,7 +243,7 @@ jobs:
           go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
 
   windows:
-    runs-on: windows-latest
+    runs-on: depot-windows-2025-4
     timeout-minutes: 30
     steps:
       - name: Check out

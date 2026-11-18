@@ -1,0 +1,7 @@
+# Depot's runners, which sponsor NSGo's CI, are self-hosted to actionlint.
+self-hosted-runner:
+  labels:
+    - depot-ubuntu-24.04
+    - depot-ubuntu-24.04-4
+    - depot-macos-15
+    - depot-windows-2025-4

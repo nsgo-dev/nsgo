@@ -18,7 +18,7 @@ permissions:
 jobs:
   format:
     name: Go formatting
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Check out
@@ -42,7 +42,7 @@ jobs:
   # go tool nsgo check -target all names the targets a Mac with Go and Xcode builds (cmd/nsgo/build.go, goAndXcodeTargets), and Apple's need cgo against Xcode's SDKs, which Linux has none of. So Linux vets the rest and a Mac only Apple's, side by side; a target added to cmd/nsgo/build.go's targets joins one of the two lists here.
   check:
     name: Build and vet
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 30
     steps:
       - name: Check out
@@ -59,8 +59,7 @@ jobs:
 
   apple:
     name: Build and vet (Apple)
-    # Xcode cross-compiles Apple's arm64 targets from an Intel host too, so use the Intel pool while hosted arm64 jobs fail to acquire a runner.
-    runs-on: macos-15-intel
+    runs-on: depot-macos-15
     timeout-minutes: 30
     steps:
       - name: Check out
