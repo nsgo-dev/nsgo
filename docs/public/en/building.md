@@ -71,7 +71,7 @@ build:
 # miniprogram: { appid: { wechat: wx0123456789abcdef, alipay: "2021000000000000" }, custom_navigation: false }  # the mini programs'
 ```
 
-A bare OS name in `targets` — or in `nsgo build -target` and `nsgo check -target` — means its architectures (`windows` is `windows_arm64` and `windows_x64`; `android` is `android_arm64` only, as the x86_64 build needs an NDK). `nsgo test -target` takes the same names the other way round: `windows_x64` runs the `windows` target.
+A bare OS name in `targets` — or in `nsgo build -target` and `nsgo check -target` — means its architectures (`windows` is `windows_arm64` and `windows_x64`; `android` is `android_arm64` only, as the x86_64 build needs an NDK). `nsgo test -target` also takes the name of the architecture its tests run for: a desktop OS's on this machine's architecture and Android's on `arm64`, so `windows_x64` runs the `windows` target on an x64 Windows machine, while an architecture the target does not run for is refused with the name to use.
 
 Flags replace the values they name, such as `-target`, `-version` or `-output`; `-h` lists them all.
 

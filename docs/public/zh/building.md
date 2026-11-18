@@ -71,7 +71,7 @@ build:
 # miniprogram: { appid: { wechat: wx0123456789abcdef, alipay: "2021000000000000" }, custom_navigation: false }  # 小程序的设置
 ```
 
-只写操作系统名的目标表示它的全部架构（`windows` 即 `windows_arm64` 和 `windows_x64`；`android` 仅表示 `android_arm64`，因 x86_64 构建需要 NDK），可用于 `targets`、`nsgo build -target` 和 `nsgo check -target`。`nsgo test -target` 反向也接受带架构的名字：`windows_x64` 即 `windows` 目标。
+只写操作系统名的目标表示它的全部架构（`windows` 即 `windows_arm64` 和 `windows_x64`；`android` 仅表示 `android_arm64`，因 x86_64 构建需要 NDK），可用于 `targets`、`nsgo build -target` 和 `nsgo check -target`。`nsgo test -target` 也接受测试实际运行的那个架构的名字：桌面系统是本机的架构，Android 是 `arm64`。所以在 x64 的 Windows 机器上 `windows_x64` 即 `windows` 目标；目标不在其上运行的架构会被拒绝，并提示应使用的名字。
 
 命令行参数会替换同名的值，例如 `-target`、`-version` 或 `-output`；`-h` 列出全部参数。
 

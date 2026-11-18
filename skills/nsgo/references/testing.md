@@ -62,7 +62,7 @@ Cleanup closes native context menus left open by an app, including between subte
 Test discovery follows the target's build tags, including target-only tests in packages that also have portable files.
 
 ```sh
-go tool nsgo test -target macos            # windows, linux, web, ios (a connected iPhone), ios_simulator, tvos_simulator, watchos_simulator, android; windows_x64 means windows
+go tool nsgo test -target macos            # windows, linux, web, ios (a connected iPhone), ios_simulator, tvos_simulator, watchos_simulator, android; windows_x64 means windows on an x64 machine (only the architecture the tests run for)
 go tool nsgo test -target macos -run TestAdd
 go tool nsgo test -target macos -activate  # allow the test app to take the keyboard
 ```
