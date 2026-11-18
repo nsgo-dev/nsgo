@@ -98,6 +98,8 @@ func TestReadResize(t *testing.T) {
 	w.byte(1) // the device can speak
 	w.byte(byte(driver.IdiomPhone))
 	w.str("en-US")
+	w.str("Ada's Pixel")
+	w.str("Google Pixel 8")
 	w.floats(56, 56)
 	w.u32(31)
 	r := reader{w.buf}
@@ -108,7 +110,7 @@ func TestReadResize(t *testing.T) {
 	if size != (driver.Size{Width: 846, Height: 411}) || len(g.Obstructions) != 0 || env == nil {
 		t.Fatalf("read %v %+v %+v, want the size with an environment", size, g, env)
 	}
-	if env.SafeArea != (driver.Edges{Right: 48, Left: 48}) || !env.Dark || !env.Speak || env.Idiom != driver.IdiomPhone || env.PixelRatio != 2.625 || env.Locale != "en-US" || env.OSVersion.Major != 31 {
+	if env.SafeArea != (driver.Edges{Right: 48, Left: 48}) || !env.Dark || !env.Speak || env.Idiom != driver.IdiomPhone || env.PixelRatio != 2.625 || env.Locale != "en-US" || env.DeviceName != "Ada's Pixel" || env.DeviceModel != "Google Pixel 8" || env.OSVersion.Major != 31 {
 		t.Errorf("read the environment %+v", *env)
 	}
 }

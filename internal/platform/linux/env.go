@@ -5,7 +5,6 @@ package linux
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"unsafe"
@@ -123,27 +122,58 @@ func (w *window) environment() driver.Environment {
 	}
 }
 
-// deviceIdentity follows the desktop conventions used by GNOME and KDE:
-// machine-info's PRETTY_HOSTNAME is the user-visible name, and DMI's product
-// name is the hardware model when the kernel exposes it.
+// deviceIdentity returns the name GNOME's and KDE's settings show, machine-info's PRETTY_HOSTNAME or else the hostname, read on every environment refresh so a rename reaches the app, and the hardware's model.
 func deviceIdentity() (name, model string) {
 	if data, err := os.ReadFile("/etc/machine-info"); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			key, value, ok := strings.Cut(line, "=")
-			if !ok || key != "PRETTY_HOSTNAME" {
-				continue
-			}
-			name = strings.Trim(strings.TrimSpace(value), "\"")
-			break
-		}
+		name = prettyHostname(string(data))
 	}
 	if name == "" {
 		name, _ = os.Hostname()
 	}
-	if data, err := os.ReadFile(filepath.Join("/sys/devices/virtual/dmi/id", "product_name")); err == nil {
-		model = strings.TrimSpace(string(data))
+	return name, hardwareModel()
+}
+
+// prettyHostname reads PRETTY_HOSTNAME from machine-info, an environment-like file whose values may be quoted as a shell quotes them.
+func prettyHostname(machineInfo string) string {
+	for line := range strings.Lines(machineInfo) {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
+		if !ok || strings.TrimSpace(key) != "PRETTY_HOSTNAME" {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if len(value) >= 2 && (value[0] == '"' || value[0] == '\'') && value[len(value)-1] == value[0] {
+			quote := value[0]
+			value = value[1 : len(value)-1]
+			if quote == '"' {
+				value = strings.NewReplacer(`\"`, `"`, `\\`, `\`, `\$`, `$`, "\\`", "`").Replace(value)
+			}
+		}
+		return value
 	}
-	return name, model
+	return ""
+}
+
+// hardwareModel is the firmware's product name, or a device tree's model on boards without DMI, such as a Raspberry Pi; empty when neither names one. It never changes while the app runs.
+var hardwareModel = sync.OnceValue(func() string {
+	if data, err := os.ReadFile("/sys/devices/virtual/dmi/id/product_name"); err == nil {
+		if model := firmwareModel(string(data)); model != "" {
+			return model
+		}
+	}
+	if data, err := os.ReadFile("/proc/device-tree/model"); err == nil {
+		return firmwareModel(string(data))
+	}
+	return ""
+})
+
+// firmwareModel trims a firmware string and drops the placeholders board makers leave in it, which name no model.
+func firmwareModel(s string) string {
+	s = strings.TrimSpace(strings.TrimRight(s, "\x00"))
+	switch strings.ToLower(s) {
+	case "to be filled by o.e.m.", "system product name", "default string", "not applicable", "not specified", "none", "unknown", "0123456789":
+		return ""
+	}
+	return s
 }
 
 // displays reads GDK's monitors in the same logical coordinate space as

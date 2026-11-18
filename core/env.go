@@ -247,12 +247,10 @@ func (e *Env) set(v Environment) {
 	e.headers = [2]Points{v.HeaderHeight, max(v.LargeHeaderHeight, v.HeaderHeight)}
 }
 
-// DeviceName returns the user's name for the device, where the platform
-// exposes it; it is empty where the platform keeps it private.
+// DeviceName returns the name the user gave the device, such as "Ada's MacBook Pro", as the system's settings show it; it is empty on the web and where the platform keeps it private, as iOS does from apps without Apple's user-assigned device name entitlement.
 func (e *Env) DeviceName() string { return e.deviceName.Get() }
 
-// DeviceModel returns the platform's human-readable hardware model, or its
-// hardware identifier when no mapping is available.
+// DeviceModel returns the device's hardware model: its model identifier on Apple's platforms, such as "iPhone15,2" or "Mac15,7", its maker and model on Android, such as "Google Pixel 8", and the firmware's product name on Windows and Linux; it is empty on the web and where the hardware names none.
 func (e *Env) DeviceModel() string { return e.deviceModel.Get() }
 
 // Window returns the surface's size.

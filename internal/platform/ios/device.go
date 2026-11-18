@@ -3,20 +3,32 @@
 package ios
 
 import (
+	"os"
+	"sync"
 	"syscall"
 
 	"github.com/ebitengine/purego/objc"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
+// hardwareModel is the hardware's model identifier, such as "iPhone15,2". A simulator's sysctl names the Mac's architecture, so there it is the simulated device's identifier from SIMULATOR_MODEL_IDENTIFIER; UIDevice's generic model, such as "iPhone", when neither says.
+var hardwareModel = sync.OnceValue(func() string {
+	if id := os.Getenv("SIMULATOR_MODEL_IDENTIFIER"); id != "" {
+		return id
+	}
+	if model, _ := syscall.Sysctl("hw.machine"); model != "" && model != "arm64" && model != "x86_64" {
+		return model
+	}
+	return apple.GoString(objc.ID(apple.Class("UIDevice")).Send(sel("currentDevice")).Send(sel("model")))
+})
+
+// deviceIdentity returns the name the user gave the device and its model identifier. Without the user-assigned-device-name entitlement, iOS 16 and later answer UIDevice's name with its generic model, such as "iPhone", which names no device, so the name is empty then.
 func deviceIdentity() (name, model string) {
-	device := objc.ID(apple.Class("UIDevice")).Send(sel("currentDevice"))
-	if device != 0 {
+	if device := objc.ID(apple.Class("UIDevice")).Send(sel("currentDevice")); device != 0 {
 		name = apple.GoString(device.Send(sel("name")))
+		if name == apple.GoString(device.Send(sel("model"))) {
+			name = ""
+		}
 	}
-	model, _ = syscall.Sysctl("hw.machine")
-	if model == "" && device != 0 {
-		model = apple.GoString(device.Send(sel("model")))
-	}
-	return name, model
+	return name, hardwareModel()
 }

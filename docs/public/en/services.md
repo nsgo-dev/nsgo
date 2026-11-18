@@ -195,13 +195,13 @@ if err == nil {
 
 `cx.Env().Lifecycle()` says whether the app is active, inactive or in the background: on desktops the window `cx` is in, so a minimized window's content can pause while another window shows, and in the app's own scope all its windows together. `desktop.Minimized(cx)` says whether that window is minimized, and `desktop.FrontmostApp(cx)` which application is in front on the desktop, the app itself included, and whether its window is in full screen, as a desktop pet or a time tracker follows it; `desktop.CanReadFrontmostApp(cx)` says whether it is followed, on macOS, Windows and X11. `cx.OnQuit` cleans up as it quits, however it does, with 200 ms for its work. `desktop.OnQuitRequest` hears a quit the user asks for on macOS, such as Cmd+Q, and may cancel it or defer it while it asks the user. `cx.SetAppearance` forces light or dark, `cx.SetLocale` chooses the language, `cx.OnKey` binds a keyboard shortcut, which rests while what its owner shows is hidden or under a dialog unless `core.KeyOptions{OverModals: true}` keeps it, which takes its key before the application menu does unless `YieldsToMenu` leaves it to an enabled menu item taking the same shortcut where the focus is (a `MenuNotEditing` item leaves the binding available in text fields and web views), and which leaves a focused control the keys it uses, a button its Return and Space and a slider, tab bar or radio group its arrows, unless bound with `core.KeyAlways` or `core.KeyNotEditing`; `cx.OnOpenFiles` hears the documents a macOS app opens.
 
-`cx.Env().DeviceName()` is the user's device name where the platform exposes one, and `cx.Env().DeviceModel()` is its hardware model or identifier. macOS, iOS, Android, Windows and Linux report these values; tests set them with `nsgotest.Environment`.
-
 ```go
 cx.OnKey("mod+k", func() { palette.Set(true) })
 cx.SetLocale("de")
 cx.OnQuit(func(ctx context.Context) { saveDraft(ctx) })
 ```
+
+`cx.Env().DeviceName()` is the name the user gave the device, and `cx.Env().DeviceModel()` its hardware model, such as `Mac15,7`, `iPhone15,2` or `Google Pixel 8`, so an app can tell two paired devices apart. macOS, Android, Windows and Linux give both; iOS gives the model, and the name only to an app with Apple's user-assigned device name entitlement; the web gives neither. Tests set them with `nsgotest.Environment`.
 
 `desktop.SetWindowLevel` floats a window above the others, and `desktop.SetWindowWorkspaces(cx, desktop.WindowWorkspacesAll)` or `WindowOptions.Workspaces` keeps it on every workspace, as a desktop pet, a HUD or a timer is: on macOS on every Space and over other apps' full screen spaces, out of Cmd-`, and on Linux on every virtual desktop of an X11 window manager. Windows and Wayland leave it on the one it opened on, and `desktop.CanSetWindowWorkspaces` says whether it takes effect: true on macOS and under an X11 window manager that supports `_NET_WM_DESKTOP`. A main window goes on every workspace by calling `desktop.SetWindowWorkspaces` from its content. In tests, `nsgotest.App.Window` lists the requests, and `nsgotest.Environment` sets `CanSetWindowWorkspaces`.
 

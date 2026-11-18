@@ -5,6 +5,7 @@ package windows
 import (
 	"fmt"
 	"math"
+	"os"
 	"strings"
 	"sync"
 	"syscall"
@@ -36,7 +37,6 @@ var (
 	isWindowVisible          = user32.NewProc("IsWindowVisible")
 	getForegroundWindow      = user32.NewProc("GetForegroundWindow")
 	getWindowThreadProcessID = user32.NewProc("GetWindowThreadProcessId")
-	getComputerNameExW       = kernel32.NewProc("GetComputerNameExW")
 )
 
 const (
@@ -121,24 +121,25 @@ func (w *window) environment() driver.Environment {
 	}
 }
 
-// deviceIdentity reads the name Windows exposes for the physical machine and
-// the firmware's product name. Both may be unavailable on a restricted host.
+// deviceIdentity returns the device name Settings' About page shows, the computer's physical DNS host name as os.Hostname reads it, and the firmware's product name. Either may be unavailable on a restricted host.
 func deviceIdentity() (name, model string) {
-	name = computerName()
-	model = regString(syscall.HKEY_LOCAL_MACHINE, 0,
-		`HARDWARE\DESCRIPTION\System\BIOS`, "SystemProductName")
-	return name, model
+	name, _ = os.Hostname()
+	return name, hardwareModel()
 }
 
-func computerName() string {
-	for _, kind := range []uint32{5, 1} { // Physical DNS hostname, DNS hostname.
-		buf := make([]uint16, 256)
-		size := uint32(len(buf))
-		if ok, _, _ := getComputerNameExW.Call(uintptr(kind), uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size))); ok != 0 && size > 0 {
-			return syscall.UTF16ToString(buf[:size])
-		}
+// hardwareModel is the firmware's product name, empty when the board maker left a placeholder there. It never changes while the app runs.
+var hardwareModel = sync.OnceValue(func() string {
+	return firmwareModel(regString(syscall.HKEY_LOCAL_MACHINE, 0, `HARDWARE\DESCRIPTION\System\BIOS`, "SystemProductName"))
+})
+
+// firmwareModel trims a firmware string and drops the placeholders board makers leave in it, which name no model.
+func firmwareModel(s string) string {
+	s = strings.TrimSpace(strings.TrimRight(s, "\x00"))
+	switch strings.ToLower(s) {
+	case "to be filled by o.e.m.", "system product name", "default string", "not applicable", "not specified", "none", "unknown", "0123456789":
+		return ""
 	}
-	return ""
+	return s
 }
 
 func highContrastEnabled() bool {

@@ -9,11 +9,9 @@ import (
 // Environment is what the platform reports about where the app runs. The
 // surface size is not part of it: Tree.Resize reports that.
 type Environment struct {
-	// DeviceName is the user's name for the device, where the platform
-	// exposes it; it is empty when the platform keeps it private.
+	// DeviceName is the name the user gave the device, empty where the platform keeps it private (core.Env.DeviceName).
 	DeviceName string
-	// DeviceModel is the platform's human-readable hardware model, or its
-	// hardware identifier when no mapping is available.
+	// DeviceModel is the device's hardware model, empty where it names none (core.Env.DeviceModel).
 	DeviceModel string
 	// Displays are the desktop's displays, in screen coordinates. They are
 	// empty on targets without desktop displays.

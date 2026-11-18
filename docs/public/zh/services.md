@@ -195,13 +195,13 @@ if err == nil {
 
 `cx.Env().Lifecycle()` 说明应用处于前台、非活动还是后台：在桌面上是 `cx` 所在窗口的状态，所以一个窗口最小化时其内容可以暂停，而其他窗口照常显示；在应用自身的作用域里则是所有窗口合起来的状态。`desktop.Minimized(cx)` 说明该窗口是否最小化，`desktop.FrontmostApp(cx)` 说明桌面上最前面的是哪个应用（包括应用自身）以及它的窗口是否全屏，桌面宠物或计时工具可以据此跟随用户正在用的应用；`desktop.CanReadFrontmostApp(cx)` 说明能否读到它，在 macOS、Windows 和 X11 上可以。`cx.OnQuit` 在应用退出时做清理，无论以何种方式退出，最多有 200 毫秒完成工作。`desktop.OnQuitRequest` 在 macOS 上听到用户发起的退出，例如 Cmd+Q，可以取消它，或推迟到询问过用户再答复。`cx.SetAppearance` 强制浅色或深色，`cx.SetLocale` 选择语言，`cx.OnKey` 绑定键盘快捷键，它的所有者显示的内容被隐藏或被对话框盖住时不生效，除非用 `core.KeyOptions{OverModals: true}` 保留；它先于应用菜单拿到按键，除非用 `YieldsToMenu` 把按键让给当前焦点下接收相同快捷键的已启用菜单项（`MenuNotEditing` 菜单项在文本框和网页视图获得焦点时保留该绑定）；获得焦点的控件自己要用的键也留给控件，按钮的 Return 和 Space，滑块、标签栏和单选组的方向键，除非用 `core.KeyAlways` 或 `core.KeyNotEditing` 绑定；`cx.OnOpenFiles` 听到 macOS 应用打开的文件。
 
-`cx.Env().DeviceName()` 是平台提供的设备名称，`cx.Env().DeviceModel()` 是硬件型号或标识符；平台不提供时为空。macOS、iOS、Android、Windows 和 Linux 都会报告这些值，测试可用 `nsgotest.Environment` 设置它们。
-
 ```go
 cx.OnKey("mod+k", func() { palette.Set(true) })
 cx.SetLocale("de")
 cx.OnQuit(func(ctx context.Context) { saveDraft(ctx) })
 ```
+
+`cx.Env().DeviceName()` 是用户给设备起的名字，`cx.Env().DeviceModel()` 是它的硬件型号，例如 `Mac15,7`、`iPhone15,2` 或 `Google Pixel 8`，应用可以据此区分两台配对的设备。macOS、Android、Windows 和 Linux 两者都提供；iOS 提供型号，名字只提供给拥有 Apple 用户自定义设备名权限（user-assigned device name entitlement）的应用；Web 两者都不提供。测试可用 `nsgotest.Environment` 设置它们。
 
 `desktop.SetWindowLevel` 让窗口浮在其他窗口之上；`desktop.SetWindowWorkspaces(cx, desktop.WindowWorkspacesAll)` 或 `WindowOptions.Workspaces` 让它出现在每个工作区，桌宠、HUD、计时器都是这样：macOS 上出现在每个空间（Space）和其他应用的全屏空间之上，不参与 Cmd-` 切换；Linux 上出现在 X11 窗口管理器的每个虚拟桌面。Windows 和 Wayland 上它留在打开时所在的那个。`desktop.CanSetWindowWorkspaces` 说明它是否生效：macOS 上以及支持 `_NET_WM_DESKTOP` 的 X11 窗口管理器下为 true。主窗口在自己的内容里调用 `desktop.SetWindowWorkspaces` 即可出现在每个工作区。测试中 `nsgotest.App.Window` 列出这些请求，`nsgotest.Environment` 可以设置 `CanSetWindowWorkspaces`。
 

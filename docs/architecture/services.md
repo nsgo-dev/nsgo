@@ -312,8 +312,6 @@ A playing `Video` keeps the display on only on iOS, where `AVPlayer`'s `prevents
 
 `Env.Minimized`, `desktop.Minimized` for apps, says the window is minimized. It is not `Window.Visible`, which follows only the app's own `Show` and `Hide`: a window the user minimizes, or an app hidden with Cmd+H, stays visible there.
 
-`Env.DeviceName` is the user's name for the device where the platform exposes one, and `Env.DeviceModel` is its human-readable hardware model (or the hardware identifier when no model mapping is available). macOS reads the computer name and `hw.model`, iOS reads the name and `hw.machine`, Android reads the system device name and manufacturer/model, Windows reads the physical computer name and firmware product name, and Linux reads `PRETTY_HOSTNAME` or the hostname and its DMI product name. Either value is empty when the platform does not expose it. Tests set both through `nsgotest.Environment`.
-
 | Target | Background while | Active while | `Minimized` |
 | --- | --- | --- | --- |
 | macOS | The app is hidden, or the window is not visible, miniaturized, or its `occlusionState` says none of it shows (covered, the screen locked) | The app is active | The window `isMiniaturized` |
@@ -324,6 +322,21 @@ A playing `Video` keeps the display on only on iOS, where `AVPlayer`'s `prevents
 | Web | The document is hidden | The document has the focus | Never |
 
 `core.App`, NSH's `appInfo()` and TSX's too, is the app's ID, name, version and build number as `nsgo.yaml` gives them, which the tool builds into `core` with `-X`, and whether it is a development build: any but `nsgo build`'s. It is the binary's, not an engine's, so every view a host embeds reads the host build's.
+
+## The device
+
+`Env.DeviceName` is the name the user gave the device, as the system's settings show it, and `Env.DeviceModel` its hardware model, so an app that pairs devices can tell two of a kind apart. Each is empty where the platform does not give it, and `nsgotest.Environment` sets both, also under `nsgo test -target`. The name is read with the rest of the environment, so a rename reaches the app at its next refresh; the model is read once.
+
+| Target | `DeviceName` | `DeviceModel` |
+| --- | --- | --- |
+| macOS | `SCDynamicStoreCopyComputerName`, Sharing's computer name; not `NSHost`, whose `currentHost` resolves the machine's addresses and can block for seconds | `hw.model`, such as `Mac15,7` |
+| iOS | `UIDevice.name`, empty when it is only the generic model, as iOS 16 and later answer apps without the user-assigned device name entitlement | `hw.machine`, such as `iPhone15,2`, or a simulator's `SIMULATOR_MODEL_IDENTIFIER` |
+| Android | `Settings.Global.DEVICE_NAME` | `Build.MANUFACTURER` and `Build.MODEL`, such as `Google Pixel 8`, the maker left out when the model starts with it |
+| Windows | The physical DNS host name, Settings' device name | The firmware's `SystemProductName` |
+| Linux | `/etc/machine-info`'s `PRETTY_HOSTNAME`, else the host name | DMI's `product_name`, else the device tree's `model` |
+| Web, watchOS, HarmonyOS and mini programs | Empty | Empty |
+
+On Windows and Linux, a firmware placeholder such as `To Be Filled By O.E.M.` or `System Product Name` leaves the model empty. Mapping Apple's identifiers to marketing names, such as `iPhone15,2` to iPhone 14 Pro, would need a table kept current with every release, so the identifier stays as the platform gives it.
 
 ## Displays and locale settings
 
