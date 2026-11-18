@@ -23,6 +23,7 @@ func fixture(answered *int) func(cx *core.Scope) core.Node {
 			{Label: "Reset", OnSelect: func() { count.Set(0) }},
 			{Label: "Never", Disabled: true, OnSelect: func() {}},
 		}}})
+		cx.SetDockMenu([]core.MenuItem{{Label: "New Window", OnSelect: func() { count.Set(count.Get() + 1) }}})
 		return core.View{Children: []core.Node{
 			core.View{Role: core.RoleButton, TestID: "add", OnPress: func(core.PressEvent) { count.Set(count.Get() + 1) },
 				Children: []core.Node{core.Text{Content: "Add"}}},
@@ -37,6 +38,12 @@ func fixture(answered *int) func(cx *core.Scope) core.Node {
 			}, Children: []core.Node{core.Text{Content: "Ask"}}},
 		}}
 	}
+}
+
+func TestAgentChoosesDockMenu(t *testing.T) {
+	g, app, _ := serving(t)
+	result(t, g, automation.Menu, automation.MenuParams{Dock: true, Path: []string{"New Window"}}, nil)
+	app.Find("text:Count: 1")
 }
 
 // serving starts the fixture headless and an agent answering for it as window 1.

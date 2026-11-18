@@ -491,6 +491,39 @@ func (g *agent) menu(p *automation.MenuParams) (any, *automation.Error) {
 		return g.step(id, "", p.Snapshot, func(a *App) { a.ChoosePopup(p.Path...) })
 	}
 	owner, ownerID := f, id
+	if p.Dock {
+		item, why := menuItemAt(f.app.DockMenu, p.Path)
+		if item == nil {
+			return nil, automation.Errorf(automation.NoMatch, "%s", why)
+		}
+		if item.Disabled {
+			return nil, automation.Errorf(automation.Failed, "the menu item %q is disabled", p.Path)
+		}
+		if owner.app.target == nil {
+			if err := g.tb.try(func() { owner.app.ChooseDockMenu(p.Path...) }); err != nil {
+				return nil, err
+			}
+		} else {
+			s := testhost.Live(ownerID)
+			if s == nil {
+				return nil, automation.Errorf(automation.Unsupported, "no surface shows the menu")
+			}
+			if err := s.ChooseDockMenu(item.ID); errors.Is(err, testhost.ErrNoMenu) {
+				return nil, automation.Errorf(automation.Unsupported, "%v", err)
+			} else if err != nil {
+				return nil, automation.Errorf(automation.Failed, "%v", err)
+			}
+			g.prepare(ownerID, owner)
+			if err := g.tb.try(func() { owner.app.target.settle() }); err != nil {
+				return nil, err
+			}
+		}
+		r := automation.StepResult{Settled: f.app.target == nil || f.app.target.quiet}
+		if p.Snapshot {
+			r.Snapshot = outline(f.app, false, false)
+		}
+		return r, nil
+	}
 	item, why := menuItemAt(f.app.Menu, p.Path)
 	if item == nil {
 		g.mu.Lock()
