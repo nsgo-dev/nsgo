@@ -22,14 +22,20 @@ type keyBinding struct {
 	fn           func()
 }
 
-// globalKey is a binding installed in every surface of a runtime, including
-// surfaces opened after it was registered.
+// globalKey is a binding made with KeyOptions.AllSurfaces: the binding it gives each surface's tree, the trees opened since included (newTree).
 type globalKey struct {
-	opts     KeyOptions
 	owner    *Scope
 	key      string
+	inText   bool
+	yields   driver.KeyUse
+	opts     KeyOptions
 	fn       func()
 	bindings map[*Tree]*keyBinding
+}
+
+// bind gives tree t the binding.
+func (g *globalKey) bind(t *Tree) {
+	g.bindings[t] = t.addKeyBinding(g.owner, g.key, g.inText, g.yields, g.opts, g.fn)
 }
 
 // KeyWhen says when a binding fires.
@@ -53,8 +59,7 @@ type KeyOptions struct {
 	OverModals bool
 	// YieldsToMenu leaves the key to the application menu while an enabled item takes the same shortcut where the focus is on macOS, Windows and Linux, which show the menu, for a default shortcut an app's menu may take over. An item that leaves its shortcut to a focused text input or web view does not suppress the binding. Else a binding takes its key before the menu does.
 	YieldsToMenu bool
-	// AllSurfaces installs the binding in every window, panel and the app's
-	// first surface, as an application-wide development shortcut.
+	// AllSurfaces binds the key in every surface of the app rather than only the one it is bound in: the app's own and each window, panel and tray view it opens, those it opens later too, for an app-wide shortcut. In each, the newest binding of the key wins, as OnKey says: one a surface makes after this one, such as any its content makes as it opens later, takes the key from it there. It ends in all of them as its owner goes. Where the platform opens no windows it is OnKey's.
 	AllSurfaces bool
 }
 
@@ -77,27 +82,29 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 	}
 	owner := cx.current()
 	if opts.AllSurfaces {
-		g := &globalKey{key: k, opts: opts, owner: owner, fn: fn, bindings: map[*Tree]*keyBinding{}}
-		cx.rt.globalKeys = append(cx.rt.globalKeys, g)
-		for _, tree := range cx.rt.keyTrees() {
-			tree.addKeyBinding(owner, k, inText, yields, opts, fn, g.bindings)
+		rt := cx.rt
+		g := &globalKey{owner: owner, key: k, inText: inText, yields: yields, opts: opts, fn: fn, bindings: map[*Tree]*keyBinding{}}
+		rt.globalKeys = append(rt.globalKeys, g)
+		g.bind(rt.tree)
+		for _, s := range rt.surfaces {
+			if !s.closed {
+				g.bind(s)
+			}
 		}
 		owner.addCleanup(func() {
-			cx.rt.globalKeys = slices.DeleteFunc(cx.rt.globalKeys, func(o *globalKey) bool { return o == g })
-			for tree, binding := range g.bindings {
-				tree.removeKeyBinding(binding)
+			rt.globalKeys = slices.DeleteFunc(rt.globalKeys, func(o *globalKey) bool { return o == g })
+			for tree, b := range g.bindings {
+				tree.removeKeyBinding(b)
 			}
 		})
 		return
 	}
-	// IDs are never reused, so a press the platform matched to a binding since removed runs nothing (pressKey).
-	b := t.addKeyBinding(owner, k, inText, yields, opts, fn, nil)
-	b.owner.addCleanup(func() {
-		t.removeKeyBinding(b)
-	})
+	b := t.addKeyBinding(owner, k, inText, yields, opts, fn)
+	owner.addCleanup(func() { t.removeKeyBinding(b) })
 }
 
-func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields driver.KeyUse, opts KeyOptions, fn func(), bindings map[*Tree]*keyBinding) *keyBinding {
+// addKeyBinding adds a binding of the normalized key to the tree's table.
+func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields driver.KeyUse, opts KeyOptions, fn func()) *keyBinding {
 	// IDs are never reused, so a press the platform matched to a binding since removed runs nothing (pressKey).
 	t.keyID++
 	if t.keyID == 0 {
@@ -105,16 +112,14 @@ func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields drive
 	}
 	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: key, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, yieldsToMenu: opts.YieldsToMenu, fn: fn}
 	t.keys = append(t.keys, b)
-	if bindings != nil {
-		bindings[t] = b
-	}
 	t.keysChanged = true
 	t.changed = true
 	return b
 }
 
-func (t *Tree) removeKeyBinding(binding *keyBinding) {
-	t.keys = slices.DeleteFunc(t.keys, func(k *keyBinding) bool { return k == binding })
+// removeKeyBinding takes b out of the tree's table.
+func (t *Tree) removeKeyBinding(b *keyBinding) {
+	t.keys = slices.DeleteFunc(t.keys, func(k *keyBinding) bool { return k == b })
 	t.keysChanged = true
 	t.changed = true
 }
@@ -247,11 +252,20 @@ func (t *Tree) keyActive(b *keyBinding, places *keyPlaces) bool {
 
 // menuHasKey reports whether an enabled item of the application menu takes the normalized key as its shortcut where the focus is (menuTakes), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.
 func (t *Tree) menuHasKey(key string) bool {
-	if len(t.menu) == 0 {
+	env := t.root.Env()
+	menu := t.menu
+	switch env.os.GetUntracked() {
+	case OSMacOS:
+		// One menu bar shows the menu the surface that sent one last sent, the app's own surface's while the window the focus is in sets none.
+		menu = nil
+		if bar := t.rt.menuBar; bar != nil && !bar.closed {
+			menu = bar.menu
+		}
+	case OSWindows, OSLinux:
+	default:
 		return false
 	}
-	env := t.root.Env()
-	if os := env.os.GetUntracked(); os != OSMacOS && os != OSWindows && os != OSLinux {
+	if len(menu) == 0 {
 		return false
 	}
 	command := "ctrl"
@@ -269,7 +283,7 @@ func (t *Tree) menuHasKey(key string) bool {
 		}
 	}
 	editing := t.focus != nil && (t.focus.kind == driver.KindInput || t.focus.kind == driver.KindWeb)
-	return menuTakes(t.menu, names, env.os.GetUntracked() == OSMacOS, editing)
+	return menuTakes(menu, names, env.os.GetUntracked() == OSMacOS, editing)
 }
 
 // keyPlaces is where the owners of views show, which decides the key bindings and back handlers that take part: read from the views each time a keymap, a key or a back press asks, so it follows a Holder's content in and out of its places, a modal shown or dismissed, and DisplayNone.

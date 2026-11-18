@@ -38,16 +38,117 @@ func TestKeyBindingsFireAsTheirOptionsSay(t *testing.T) {
 	}
 }
 
-func TestAllSurfaceKeyBindingFollowsNewWindows(t *testing.T) {
+// A binding made with AllSurfaces binds its key in the app's own surface and every window opened, before and after it was bound, and a press in any of them runs it; a binding a window's content makes takes the key from it there, a closed window lets it go, and it leaves every surface as its owner goes (#446).
+func TestAllSurfaceBindingsFollowEveryWindow(t *testing.T) {
+	var bound *Signal[bool]
+	var later func()
+	ran, own := 0, 0
 	w := newWindows(t, func(cx *Scope) {
-		cx.OnKeyWith("mod+r", KeyOptions{AllSurfaces: true}, func() {})
+		bound = NewSignal(cx, true)
 		cx.SetMainView(func(*Scope) Node { return View{} })
-		cx.OpenWindow(WindowOptions{Title: "Settings"}, func(*Scope) Node { return View{} })
+		cx.OpenWindow(WindowOptions{Title: "Before"}, func(*Scope) Node { return View{} })
+		cx.Effect(func() {
+			if bound.Get() {
+				cx.OnKeyWith("mod+r", KeyOptions{AllSurfaces: true}, func() { ran++ })
+			}
+		})
+		later = func() {
+			cx.OpenWindow(WindowOptions{Title: "After"}, func(*Scope) Node { return View{} })
+			cx.OpenWindow(WindowOptions{Title: "Own"}, func(cx *Scope) Node {
+				cx.OnKey("mod+r", func() { own++ })
+				return View{}
+			})
+		}
 	})
-	for _, id := range []uint32{0, 1, 2} {
+	later()
+	w.commit()
+	// keymap is the last keymap surface id was sent.
+	keymap := func(id uint32) []driver.KeyBinding {
+		t.Helper()
 		items := w.take(id, driver.ItemKeymap)
-		if len(items) != 1 || len(items[0].Keys) != 1 || items[0].Keys[0].Key != "mod+r" {
-			t.Fatalf("surface %d keymap = %+v, want mod+r", id, items)
+		if len(items) == 0 {
+			t.Fatalf("surface %d was sent no keymap", id)
+		}
+		return items[len(items)-1].Keys
+	}
+	press := func(id uint32) {
+		t.Helper()
+		keys := keymap(id)
+		key, _ := driver.FindKey(keys, []string{"mod+r"}, 0, false)
+		if key == 0 {
+			t.Fatalf("surface %d: keymap %+v has no mod+r", id, keys)
+		}
+		w.dispatch(id, driver.Event{Kind: driver.EventKey, Count: key})
+		// What the press asks for again, the keymap included, comes with the next commit.
+		w.commit()
+	}
+	for i, id := range []uint32{0, 1, 2, 3} {
+		press(id)
+		if ran != i+1 {
+			t.Fatalf("a press in surface %d: the binding ran %d times, want %d", id, ran, i+1)
+		}
+	}
+	press(4)
+	if ran != 4 || own != 1 {
+		t.Fatalf("a press in the window binding the key: ran %d and its own %d times, want 4 and 1", ran, own)
+	}
+	g := w.root.rt.globalKeys[0]
+	before := w.app.Surfaces()[1]
+	before.window.Close()
+	w.commit()
+	if _, ok := g.bindings[before]; ok {
+		t.Fatal("a closed window keeps the app-wide binding")
+	}
+	bound.Set(false)
+	w.commit()
+	for _, id := range []uint32{0, 1, 3, 4} {
+		for _, k := range keymap(id) {
+			if k.Key == "mod+r" && id != 4 {
+				t.Fatalf("surface %d keeps mod+r after its owner went", id)
+			}
+		}
+	}
+	if len(w.root.rt.globalKeys) != 0 {
+		t.Fatalf("%d app-wide bindings left after their owner went", len(w.root.rt.globalKeys))
+	}
+}
+
+// On macOS one menu bar shows the menu a surface sent last, the app's own surface's while a window sets none, so a YieldsToMenu binding in any window leaves its key to an enabled item of that menu, and takes it back as the item is disabled. On Windows and Linux each window shows its own menu bar, and the app surface's menu takes no window's key (#446).
+func TestYieldingBindingsFollowTheMenuBarShown(t *testing.T) {
+	for _, os := range []OS{OSMacOS, OSWindows, OSLinux} {
+		var enabled *Signal[bool]
+		w := newWindows(t, func(cx *Scope) {
+			enabled = NewSignal(cx, false)
+			cx.SetMainView(func(cx *Scope) Node {
+				cx.OnKeyWith("mod+r", KeyOptions{YieldsToMenu: true}, func() {})
+				return View{}
+			})
+			cx.Effect(func() {
+				cx.SetApplicationMenu([]MenuItem{{Label: "File", Items: []MenuItem{{Label: "Reload", Shortcut: "mod+r", Disabled: !enabled.Get()}}}})
+			})
+		})
+		for _, tree := range append([]*Tree{w.app}, w.app.Surfaces()...) {
+			tree.SetEnvironment(Environment{OS: os, Idiom: IdiomDesktop})
+		}
+		w.commit()
+		w.take(1, driver.ItemKeymap)
+		enabled.Set(true)
+		w.commit()
+		items := w.take(1, driver.ItemKeymap)
+		if os != OSMacOS {
+			if len(items) > 0 && len(items[len(items)-1].Keys) != 1 {
+				t.Fatalf("%s: with the app's menu item enabled, the main window was sent %+v, want mod+r kept", os, items)
+			}
+			continue
+		}
+		if len(items) == 0 || len(items[len(items)-1].Keys) != 0 {
+			t.Fatalf("%s: with the app's menu item enabled, the main window was sent %+v, want mod+r left to the menu", os, items)
+		}
+		enabled.Set(false)
+		w.commit()
+		items = w.take(1, driver.ItemKeymap)
+		if len(items) == 0 || len(items[len(items)-1].Keys) != 1 {
+			t.Fatalf("%s: with the app's menu item disabled, the main window was sent %+v, want mod+r back", os, items)
 		}
 	}
 }

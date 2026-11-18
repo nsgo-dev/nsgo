@@ -210,3 +210,74 @@ func TestDevReloadKey(t *testing.T) {
 	app.Key("mod+r")
 	waitFor("mod+r the app's menu has disabled", 3)
 }
+
+// Command or Control+R builds again from every window of an app that opens windows, as from its main window: one opened before the main view and one after, and a window that binds the key itself keeps it (#446).
+func TestDevReloadKeyInEveryWindow(t *testing.T) {
+	var reloads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/_nsgo/reload" && r.Method == http.MethodPost {
+			reloads.Add(1)
+		}
+	}))
+	defer server.Close()
+	devServer = server.URL
+	t.Setenv("NSGO_DEV_SERVER", "")
+	t.Cleanup(func() { devServer = "" })
+
+	root := core.NewRoot(core.RootOptions{Post: func(func()) {}, Windows: &core.WindowOptions{Width: 400, Height: 300}})
+	app := core.NewTree(root, core.ApproxTextEngine{})
+	own := 0
+	windows := map[string]*core.Window{}
+	app.Mount(core.AppRoot(func(cx *core.Scope) {
+		windows["Settings"] = cx.OpenWindow(core.WindowOptions{Title: "Settings"}, func(*core.Scope) core.Node { return core.View{} })
+		cx.SetMainView(Wrap(func(*core.Scope) core.Node { return core.View{} }))
+		windows["Editor"] = cx.OpenWindow(core.WindowOptions{Title: "Editor"}, func(cx *core.Scope) core.Node {
+			cx.OnKey("mod+r", func() { own++ })
+			return core.View{}
+		})
+	}))
+	app.Commit()
+	// keymaps are the keymaps the windows were sent, by their titles.
+	keymaps := map[string][]driver.KeyBinding{}
+	trees := map[string]*core.Tree{}
+	for _, s := range app.Surfaces() {
+		for title, w := range windows {
+			if s.Window() != w {
+				continue
+			}
+			trees[title] = s
+			if b := s.Commit(); b != nil {
+				for _, it := range b.Items {
+					if it.Kind == driver.ItemKeymap {
+						keymaps[title] = it.Keys
+					}
+				}
+			}
+		}
+	}
+	press := func(title string) {
+		t.Helper()
+		id, _ := driver.FindKey(keymaps[title], []string{"mod+r"}, 0, false)
+		if id == 0 {
+			t.Fatalf("the %q window's keymap %+v has no mod+r", title, keymaps[title])
+		}
+		trees[title].Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+	}
+	waitFor := func(what string, want int32) {
+		t.Helper()
+		for deadline := time.Now().Add(5 * time.Second); reloads.Load() < want && time.Now().Before(deadline); {
+			time.Sleep(5 * time.Millisecond)
+		}
+		time.Sleep(200 * time.Millisecond)
+		if got := reloads.Load(); got != want {
+			t.Fatalf("%s: %d reloads posted, want %d", what, got, want)
+		}
+	}
+	press("Settings")
+	waitFor("mod+r in a window opened before the main view", 1)
+	press("Editor")
+	waitFor("mod+r in a window that binds it", 1)
+	if own != 1 {
+		t.Fatalf("the Editor window's own mod+r ran %d times, want once", own)
+	}
+}

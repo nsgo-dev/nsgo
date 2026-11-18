@@ -178,20 +178,35 @@ func (cx *Scope) SetApplicationMenu(items []MenuItem) {
 			if t.menuGen == gen {
 				t.menuActions, t.menu = nil, nil
 				t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemMenu})
-				t.keysChanged = true
-				t.changed = true
+				t.menuSent()
 			}
 		})
 	}
 	// Bindings that yield to the menu (KeyOptions.YieldsToMenu) come and go with its shortcuts.
 	t.menu = entries
-	t.keysChanged = true
+	t.menuSent()
 	// It replaces a menu not sent yet, such as the default one the
 	// cleanup of the effect setting it again asked for, which would show
 	// for a moment.
 	t.commands = slices.DeleteFunc(t.commands, func(it driver.MountItem) bool { return it.Kind == driver.ItemMenu })
 	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemMenu, Menu: entries})
 	t.changed = true
+}
+
+// menuSent follows the application menu the tree sent: bindings that yield to the menu (KeyOptions.YieldsToMenu) come and go with its shortcuts, in every surface on macOS, whose one menu bar shows the menu a surface sent last.
+func (t *Tree) menuSent() {
+	t.rt.menuBar = t
+	t.keysChanged = true
+	t.changed = true
+	if t.root.Env().os.GetUntracked() != OSMacOS {
+		return
+	}
+	for _, o := range append([]*Tree{t.rt.tree}, t.rt.surfaces...) {
+		if o != nil && !o.closed {
+			o.keysChanged = true
+			o.changed = true
+		}
+	}
 }
 
 // dockMenu is the app icon's menu (SetDockMenu). It belongs to the app rather than a surface, as the platform has one, so it is the one a surface set last, and its tasks, named by their labels, reach it from any surface.

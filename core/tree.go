@@ -728,14 +728,15 @@ func newTree(root *Scope, text driver.TextEngine, id uint32) *Tree {
 	}
 	t.view = t.newNode(driver.KindView, nil, root)
 	t.view.style = Style{Direction: Column}
+	// The app-wide bindings (KeyOptions.AllSurfaces) come before what it shows binds, which then takes their keys from them here.
 	for _, g := range root.rt.globalKeys {
-		inText := g.opts.When == KeyAlways || g.opts.When == KeyAuto && !EditsText(g.key)
-		var yields driver.KeyUse
-		if g.opts.When == KeyAuto {
-			yields = driver.KeyUsedBy(g.key)
-		}
-		t.addKeyBinding(g.owner, g.key, inText, yields, g.opts, g.fn, g.bindings)
+		g.bind(t)
 	}
+	root.addCleanup(func() {
+		for _, g := range root.rt.globalKeys {
+			delete(g.bindings, t)
+		}
+	})
 	// Prepared texts belong to this tree even when its platform will receive no final commit, as when an embedded engine stops.
 	root.addCleanup(func() { t.discard(t.view) })
 	if root.rt.dev != nil {
