@@ -207,3 +207,36 @@ func TestMountingChildrenWalksSiblingsOnce(t *testing.T) {
 		}
 	}
 }
+
+// TestPositionalClassesBesideRelationalSelectors checks children that a relational selector also matches: they resolve their own positional classes with their place as the selector does, through reorders.
+func TestPositionalClassesBesideRelationalSelectors(t *testing.T) {
+	var items *Signal[[]string]
+	h := newHost(t, Size{Width: 200, Height: 200}, func(cx *Scope) Node {
+		items = NewSignalFunc(cx, []string{"a", "b", "c"}, nil)
+		return View{TestID: "parent", Class: "[&>view:last-child]:mr-2 [&>view]:h-1", Children: []Node{
+			Each(items.Get, func(id string) string { return id }, func(_ *Scope, item func() string, _ func() int) Node {
+				return View{TestID: item(), Class: "first:ml-1 odd:bg-red-500 even:bg-blue-500"}
+			}),
+		}}
+	})
+	for _, ids := range [][]string{{"a", "b", "c"}, {"c", "a", "b", "d"}, {"b"}, {"d", "b"}} {
+		items.Set(ids)
+		h.commit()
+		for i, id := range ids {
+			var left, right Points
+			if i == 0 {
+				left = 4
+			}
+			if i == len(ids)-1 {
+				right = 8
+			}
+			color := tailwindPalette["red"][5]
+			if i%2 != 0 {
+				color = tailwindPalette["blue"][5]
+			}
+			if s := h.find(id).style; s.Margin.Left != left || s.Margin.Right != right || s.Background != color || s.Height != Pt(4) {
+				t.Errorf("%s in %v: margin %v, height %v, background %#x", id, ids, s.Margin, s.Height, s.Background)
+			}
+		}
+	}
+}
