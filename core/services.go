@@ -312,19 +312,24 @@ func (cx *Scope) OpenURL(u string, done func(opened bool)) {
 	}
 }
 
-// LookUp is desktop.LookUp's core operation. It asks the platform's
-// dictionary to explain text near at, returning false where the platform has
-// no dictionary panel or text is empty. macOS shows its system Look Up panel;
-// other platforms currently report false.
-func (cx *Scope) LookUp(text string, at Bounds) bool {
-	if strings.TrimSpace(text) == "" || !Untracked(cx, cx.Env().CanLookUp) {
-		return false
-	}
+// LookUp is the core's part of desktop.LookUp, which apps use: it shows the platform's dictionary panel for text at at, a box in the view in refers to (the surface's without in), as a TextSelection's Bounds is in its view. It reports whether it asked the platform: false for blank text, an in that is not mounted, where Env.CanLookUp is false, and for a confined owner as Scope.Confine allows a PopupMenu.
+func (cx *Scope) LookUp(text string, in *Ref, at Bounds) bool {
 	t := cx.tree()
-	if t == nil {
+	if t == nil || strings.TrimSpace(text) == "" || !Untracked(cx, cx.Env().CanLookUp) {
 		return false
 	}
-	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemLookUp, Value: text, Point: at.Origin})
+	if in != nil {
+		b, ok := in.Bounds()
+		if !ok {
+			return false
+		}
+		at.Origin.X += b.Origin.X
+		at.Origin.Y += b.Origin.Y
+	}
+	if !t.confinedMay(cx.current(), refusedPresent, askedToPresent) {
+		return false
+	}
+	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemLookUp, Value: text, Frame: at})
 	t.changed = true
 	return true
 }

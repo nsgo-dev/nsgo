@@ -54,11 +54,15 @@ cx.Share(core.ShareOptions{
 }, func(shown bool, err error) {})
 ```
 
-`desktop.CanLookUp` says whether the system dictionary panel is available. `desktop.LookUp` opens it for text near a `core.Bounds` on macOS and returns false elsewhere or for empty text.
+`desktop.LookUp` shows the system's dictionary panel for a text, as a three-finger tap does on macOS, drawn over a box in a view: a selection's text and box with its `Selectable` view's `Ref`. `desktop.CanLookUp` says whether it can, in a window on macOS; Windows, Linux and the web have no such panel. In tests, `nsgotest.App.LookUps` lists the panels shown where `nsgotest.Environment` sets `CanLookUp`.
 
 ```go
+var area core.Ref
+var selected core.TextSelection
+core.View{Ref: &area, Selectable: true, OnTextSelection: func(s core.TextSelection) { selected = s }, Children: subtitles}
+// From a menu item or a shortcut:
 if desktop.CanLookUp(cx) {
-	desktop.LookUp(cx, selection.Text, selection.Bounds)
+	desktop.LookUp(cx, selected.Text, &area, selected.Bounds)
 }
 ```
 

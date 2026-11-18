@@ -167,25 +167,40 @@ func TestOpenURL(t *testing.T) {
 	}
 }
 
+// LookUp hands the platform the text and its box in the surface, a box in a view placed by the view's frame, only where the environment has the panel.
 func TestLookUp(t *testing.T) {
 	var cx *Scope
-	h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node { cx = c; return View{} })
+	var area Ref
+	h := newHost(t, Size{Width: 200, Height: 200}, func(c *Scope) Node {
+		cx = c
+		return View{Style: Style{Padding: Edges{Top: 30, Left: 20}}, Children: []Node{
+			View{Ref: &area, Style: Style{Width: Pt(100), Height: Pt(50)}},
+		}}
+	})
 	h.tree.SetEnvironment(Environment{OS: OSMacOS, CanLookUp: true})
 	h.commit()
-	if !cx.LookUp("word", Bounds{Origin: Point{X: 12, Y: 18}, Size: Size{Width: 40, Height: 20}}) {
-		t.Fatal("LookUp reported unavailable on macOS")
+	at := Bounds{Origin: Point{X: 12, Y: 18}, Size: Size{Width: 40, Height: 20}}
+	if !cx.LookUp("word", nil, at) {
+		t.Fatal("LookUp answered false where the environment has the panel")
 	}
-	it := command(h.commit(), driver.ItemLookUp)
-	if it == nil || it.Value != "word" || it.Point != (Point{X: 12, Y: 18}) {
-		t.Fatalf("lookup item = %+v", it)
+	if it := command(h.commit(), driver.ItemLookUp); it == nil || it.Value != "word" || it.Frame != at {
+		t.Fatalf("in the surface: %+v", it)
+	}
+	if !cx.LookUp("word", &area, at) {
+		t.Fatal("LookUp in a view answered false")
+	}
+	want := Bounds{Origin: Point{X: 32, Y: 48}, Size: at.Size}
+	if it := command(h.commit(), driver.ItemLookUp); it == nil || it.Frame != want {
+		t.Fatalf("in a view: %+v, want its frame %v", it, want)
+	}
+	var unmounted Ref
+	if cx.LookUp("word", &unmounted, at) || cx.LookUp(" \n", nil, at) || command(h.commit(), driver.ItemLookUp) != nil {
+		t.Fatal("LookUp went to the platform for a view not mounted or blank text")
 	}
 	h.tree.SetEnvironment(Environment{OS: OSWindows})
 	h.commit()
-	if cx.LookUp("word", Bounds{}) || command(h.commit(), driver.ItemLookUp) != nil {
-		t.Fatal("LookUp sent on an unsupported platform")
-	}
-	if cx.LookUp("   ", Bounds{}) {
-		t.Fatal("empty LookUp text was accepted")
+	if cx.LookUp("word", nil, at) || command(h.commit(), driver.ItemLookUp) != nil {
+		t.Fatal("LookUp went to a platform without the panel")
 	}
 }
 

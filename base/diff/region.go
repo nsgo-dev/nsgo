@@ -175,9 +175,9 @@ func (v *dv) region() core.Node {
 	return core.Group{frame, actions}
 }
 
-// textSelected frames the whole rows of the text selection in box, in the
-// rows' coordinates; none for no selection.
-func (v *dv) textSelected(box core.Bounds) {
+// textSelected frames the whole rows of the text selection in its box, in the rows' coordinates; none for no selection.
+func (v *dv) textSelected(s core.TextSelection) {
+	box := s.Bounds
 	if box.Size.Height <= 0 {
 		if v.cleared = v.onActions; !v.cleared {
 			v.rowSel.Set(noRows)

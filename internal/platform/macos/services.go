@@ -132,19 +132,15 @@ func (s *surface) openURL(u string, id uint32) {
 	s.engine.Dispatch(driver.Event{Kind: driver.EventOpenURL, Count: id, Finished: openSystemURL(u)})
 }
 
-// lookUp asks AppKit to show its dictionary panel for text at a point in the
-// surface's view coordinates.
-func (s *surface) lookUp(text string, at driver.Point) {
-	if strings.TrimSpace(text) == "" {
+// lookUp shows AppKit's dictionary panel for text, as a three-finger tap does, its highlight drawn over at, a box in the surface's flipped view: AppKit draws the string from a baseline point, which goes at the box's bottom left.
+func (s *surface) lookUp(text string, at driver.Bounds) {
+	if strings.TrimSpace(text) == "" || s.native == 0 {
 		return
 	}
 	attributed := objc.ID(apple.Class("NSAttributedString")).Send(selAlloc).Send(sel("initWithString:"), apple.NSString(text))
-	if attributed == 0 {
-		return
-	}
 	defer attributed.Send(selRelease)
 	s.native.Send(sel("showDefinitionForAttributedString:atPoint:"), attributed,
-		apple.CGPoint{X: float64(at.X), Y: float64(at.Y)})
+		apple.CGPoint{X: float64(at.Origin.X), Y: float64(at.Origin.Y + at.Size.Height)})
 }
 
 // openSystemURL opens u with the app the system picks, reporting whether one took it.

@@ -113,10 +113,7 @@ const (
 	// EventImageInfo answers ItemImageInfo Count with the image's Size in
 	// pixels, or the error in Text.
 	EventImageInfo
-	// EventSelectionChange carries a text field's selection after the
-	// user moved it: Index to Count, in UTF-16 units. On a selection area
-	// it carries the box of the texts its selection touches, in the area
-	// (Point and Size), no Size for no selection.
+	// EventSelectionChange carries a text field's selection after the user moved it: Index to Count, in UTF-16 units. On a selection area it carries the selected text as a copy gives it (Text) and the box of the texts its selection touches, in the area (Point and Size), no Text and no Size for no selection; the platform sends it again when either changes.
 	EventSelectionChange
 	// EventKeyPress is a key typed in a text field (Text: what it enters,
 	// "Backspace" or "Enter").

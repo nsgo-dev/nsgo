@@ -54,11 +54,15 @@ cx.Share(core.ShareOptions{
 }, func(shown bool, err error) {})
 ```
 
-`desktop.CanLookUp` 说明系统词典面板是否可用。`desktop.LookUp` 在 macOS 上为文本在 `core.Bounds` 附近打开词典面板，在其他平台或文本为空时返回 false。
+`desktop.LookUp` 为一段文本显示系统词典面板，如 macOS 上三指轻点所做，文本绘制在某个视图中的一个框上：通常是选区的文本和边界框，加上其 `Selectable` 视图的 `Ref`。`desktop.CanLookUp` 说明能否显示，即在 macOS 的窗口中；Windows、Linux 和 Web 没有这样的面板。测试中，在 `nsgotest.Environment` 设置了 `CanLookUp` 时，`nsgotest.App.LookUps` 列出显示过的面板。
 
 ```go
+var area core.Ref
+var selected core.TextSelection
+core.View{Ref: &area, Selectable: true, OnTextSelection: func(s core.TextSelection) { selected = s }, Children: subtitles}
+// 在菜单项或快捷键中：
 if desktop.CanLookUp(cx) {
-	desktop.LookUp(cx, selection.Text, selection.Bounds)
+	desktop.LookUp(cx, selected.Text, &area, selected.Bounds)
 }
 ```
 

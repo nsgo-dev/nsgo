@@ -105,13 +105,13 @@ func IsAvailable(cx *core.Scope) bool {
 	return false
 }
 
-// CanLookUp reports whether the system dictionary panel is available. macOS
-// provides it through AppKit; other platforms currently do not.
+// CanLookUp reports whether LookUp shows the system's dictionary panel: in a window on macOS. Windows, Linux and the web have no such panel, so it is false there, as for the app's own scope and a tray icon's, which show in no window.
 func CanLookUp(cx *core.Scope) bool { return cx.Env().CanLookUp() }
 
-// LookUp shows the system dictionary panel for text near at. It returns false
-// when the platform has no dictionary panel or text is empty.
-func LookUp(cx *core.Scope, text string, at core.Bounds) bool { return cx.LookUp(text, at) }
+// LookUp shows the system's dictionary panel for text, as a three-finger tap or Ctrl-Cmd-D does on macOS, with the text drawn over at, a box in the view in refers to (the surface's when in is nil), such as a TextSelection's Text and Bounds with its Selectable view's Ref. It reports whether the panel was asked for: false for blank text, an in that is not mounted, where CanLookUp is false, and for a confined view the user is not using (core.Scope.Confine).
+func LookUp(cx *core.Scope, text string, in *core.Ref, at core.Bounds) bool {
+	return cx.LookUp(text, in, at)
+}
 
 // SetTitle sets the window's title on desktops and the page's on the web.
 func SetTitle(cx *core.Scope, title string) { cx.SetTitle(title) }

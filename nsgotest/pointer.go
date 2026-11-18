@@ -2,7 +2,6 @@ package nsgotest
 
 import (
 	"math"
-	"strings"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -518,50 +517,65 @@ func (a *App) reveal(v *View) driver.Point {
 	return at
 }
 
-// SelectText has the selection of the Selectable view selector names touch
-// box of its texts, no Size clearing it, as the platforms report it.
+// SelectText has the selection of the Selectable view selector names touch box of its texts, in the view, no Size clearing it, as the platforms report it. The text OnTextSelection receives is that of the texts box overlaps, whole, as a copy gives it: texts on one row joined by a tab and the others by a line break, hidden spans left out.
 func (a *App) SelectText(selector string, box driver.Bounds) {
 	a.t.Helper()
 	a.step("selectText(%s, %v)", selector, box)
 	v := a.pick(selector, "view", func(m *View) (*View, bool) { return m, true })
-	text := selectedText(v)
-	if box.Size == (driver.Size{}) {
-		text = ""
+	text := ""
+	if box.Size.Width > 0 && box.Size.Height > 0 {
+		text = selectedText(v, box)
 	}
 	a.send(v, driver.Event{Kind: driver.EventSelectionChange, Point: box.Origin, Size: box.Size, Text: text})
 	a.done()
 }
 
-// selectedText returns the text represented by a headless selection. The
-// SelectText test action supplies the selection's box, but not character
-// offsets, so a text view contributes all of its content and an area joins
-// its descendant text views in document order.
-func selectedText(v *View) string {
-	if v == nil {
-		return ""
-	}
-	if v.Kind == driver.KindText {
-		if v.Props.Selectable == driver.SelectableOff {
-			return ""
-		}
-		return v.Text
-	}
-	var parts []string
+// selectedText is the text of area's selectable texts that box, in area, overlaps, whole, through the model the platforms copy a selection with.
+func selectedText(area *View, box driver.Bounds) string {
+	origin := area.surfaceFrame().Origin
+	var texts areaTexts
 	var walk func(*View)
 	walk = func(n *View) {
 		if n.Kind == driver.KindText {
-			if n.Props.Selectable != driver.SelectableOff && n.Text != "" {
-				parts = append(parts, n.Text)
+			f := n.surfaceFrame()
+			f.Origin.X -= origin.X
+			f.Origin.Y -= origin.Y
+			if n.Props.Selectable != driver.SelectableOff && overlaps(f, box) {
+				texts = append(texts, areaText{n, f})
 			}
 			return
 		}
-		for _, child := range n.Children {
-			walk(child)
+		for _, c := range n.Children {
+			walk(c)
 		}
 	}
-	walk(v)
-	return strings.Join(parts, "\n")
+	walk(area)
+	var m driver.SelectionModel
+	m.SelectAll(texts)
+	return m.Text(texts)
 }
+
+// overlaps reports whether a and b share some area.
+func overlaps(a, b driver.Bounds) bool {
+	return a.Origin.X < b.Origin.X+b.Size.Width && b.Origin.X < a.Origin.X+a.Size.Width &&
+		a.Origin.Y < b.Origin.Y+b.Size.Height && b.Origin.Y < a.Origin.Y+a.Size.Height
+}
+
+// areaText is a text of a selection area and its frame in the area.
+type areaText struct {
+	v     *View
+	frame driver.Bounds
+}
+
+// areaTexts are an area's texts as driver.SelectionModel reads them.
+type areaTexts []areaText
+
+func (t areaTexts) Len() int                           { return len(t) }
+func (t areaTexts) Content(i int) string               { return t[i].v.Text }
+func (t areaTexts) Frame(i int) driver.Bounds          { return t[i].frame }
+func (t areaTexts) OffsetAt(i int, _ driver.Point) int { return 0 }
+func (t areaTexts) Key(i int) uint64                   { return uint64(t[i].v.ID) }
+func (t areaTexts) Spans(i int) []driver.TextSpan      { return t[i].v.Spans }
 
 // HoverOut moves the mouse out of the surface: every view hovered hears
 // MouseLeave.

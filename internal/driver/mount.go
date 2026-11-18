@@ -360,7 +360,7 @@ const (
 	ItemPurchase
 	// ItemWebCookies adds or replaces Cookies in the persistent store the app's web views share; the platform answers with EventWebCookies carrying Count, Text why it failed.
 	ItemWebCookies
-	// ItemLookUp shows the platform's dictionary panel for Value at Point.
+	// ItemLookUp shows the platform's dictionary panel for Value, drawn over Frame, a box in the surface.
 	ItemLookUp
 )
 

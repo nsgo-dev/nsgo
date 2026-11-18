@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/desktop"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
@@ -340,20 +341,59 @@ func TestLongPressSelectsText(t *testing.T) {
 	app.LongPress("text:In an area")
 }
 
+// SelectText reports the texts its box overlaps, whole, as a copy gives them, with the box; no Size clears both.
 func TestSelectableTextReportsItsSelectedString(t *testing.T) {
-	var got core.TextSelection
+	var got []core.TextSelection
 	app := Start(t, func(cx *core.Scope) core.Node {
-		return core.View{TestID: "area", Selectable: true, OnTextSelectionText: func(s core.TextSelection) { got = s }, Children: []core.Node{
-			core.Text{Content: "Select me"},
+		return core.View{TestID: "area", Selectable: true, OnTextSelection: func(s core.TextSelection) { got = append(got, s) }, Children: []core.Node{
+			core.View{Style: core.Style{Direction: core.Row}, Children: []core.Node{
+				core.Text{Content: "One", Style: core.Style{Width: core.Pt(50), Height: core.Pt(20)}},
+				core.Text{Content: "Two", Style: core.Style{Width: core.Pt(50), Height: core.Pt(20)}},
+			}},
+			core.Text{Content: "Three", Style: core.Style{Height: core.Pt(20)}},
+			core.Text{Content: "Hidden", Selectable: core.SelectableOff, Style: core.Style{Height: core.Pt(20)}},
 		}}
 	})
-	app.SelectText("id:area", core.Bounds{Origin: core.Point{X: 4, Y: 8}, Size: core.Size{Width: 32, Height: 18}})
-	if got.Text != "Select me" || got.Bounds.Origin != (core.Point{X: 4, Y: 8}) || got.Bounds.Size != (core.Size{Width: 32, Height: 18}) {
-		t.Fatalf("selection = %+v", got)
+	steps := []struct {
+		box  core.Bounds
+		want string
+	}{
+		{core.Bounds{Origin: core.Point{X: 4, Y: 4}, Size: core.Size{Width: 20, Height: 10}}, "One"},
+		{core.Bounds{Origin: core.Point{X: 4, Y: 4}, Size: core.Size{Width: 80, Height: 10}}, "One\tTwo"},
+		{core.Bounds{Origin: core.Point{X: 60, Y: 4}, Size: core.Size{Width: 10, Height: 70}}, "Two\nThree"},
+		{core.Bounds{}, ""},
 	}
-	app.SelectText("id:area", core.Bounds{})
-	if got.Text != "" || got.Bounds != (core.Bounds{}) {
-		t.Fatalf("cleared selection = %+v", got)
+	for _, s := range steps {
+		app.SelectText("id:area", s.box)
+		if last := got[len(got)-1]; last.Text != s.want || last.Bounds != s.box {
+			t.Errorf("SelectText(%v) reported %+v, want %q", s.box, last, s.want)
+		}
+	}
+}
+
+// An app looks up what the user selected in the system's dictionary, at the selection's box in the surface; a platform without the panel shows none.
+func TestLookUpTheSelection(t *testing.T) {
+	for _, can := range []bool{true, false} {
+		var area core.Ref
+		var selected core.TextSelection
+		var shown bool
+		app := Start(t, func(cx *core.Scope) core.Node {
+			return core.View{Style: core.Style{Padding: core.Edges{Top: 40, Left: 10}}, Children: []core.Node{
+				core.View{TestID: "area", Ref: &area, Selectable: true, OnTextSelection: func(s core.TextSelection) { selected = s }, Children: []core.Node{
+					core.Text{Content: "word"},
+				}},
+				core.View{TestID: "look-up", Style: core.Style{Height: core.Pt(20)}, OnPress: func(core.PressEvent) { shown = desktop.LookUp(cx, selected.Text, &area, selected.Bounds) }},
+			}}
+		}, Environment(driver.Environment{OS: driver.OSMacOS, Idiom: driver.IdiomDesktop, CanLookUp: can}))
+		app.SelectText("id:area", core.Bounds{Origin: core.Point{X: 2, Y: 1}, Size: core.Size{Width: 20, Height: 10}})
+		app.Press("id:look-up")
+		want := []LookUp{{Text: "word", At: core.Bounds{Origin: core.Point{X: 12, Y: 41}, Size: core.Size{Width: 20, Height: 10}}}}
+		if !can {
+			want = nil
+		}
+		if shown != can || !slices.Equal(app.LookUps, want) {
+			t.Errorf("CanLookUp %v: LookUp answered %v and showed %+v, want %+v", can, shown, app.LookUps, want)
+		}
 	}
 }
 

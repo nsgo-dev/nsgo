@@ -165,12 +165,8 @@ type View struct {
 	// another is part of the outer one. The highlight is each text's
 	// SelectionColor.
 	Selectable bool
-	// OnTextSelection, with Selectable, receives the box of the texts the
-	// selection touches, in the view, as the user moves it: no Size when
-	// it clears.
-	OnTextSelection func(Bounds)
-	// OnTextSelectionText receives the selected text and its bounds.
-	OnTextSelectionText func(TextSelection)
+	// OnTextSelection, with Selectable, receives the selection as the user moves it: its text and the box of the texts it touches, in the view; no Text and no Size when it clears.
+	OnTextSelection func(TextSelection)
 
 	Ref *Ref
 	// Disabled stops presses and is reported to assistive technology.

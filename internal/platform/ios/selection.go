@@ -41,8 +41,9 @@ type selection struct {
 	handles  [2]objc.ID
 	grab     driver.Point
 	dragging driver.SelectionHandle
-	// told is the extent the area last reported.
-	told driver.Bounds
+	// told and toldText are the extent and the text the area last reported.
+	told     driver.Bounds
+	toldText string
 }
 
 // Len implements core.SelectionTexts.
@@ -110,11 +111,15 @@ func (s *selection) show(old []*view) {
 	s.placeHandles()
 }
 
-// tell reports the selection's extent to the area when it moved.
+// tell reports the selection's text and extent to the area when either changed: the extent stays while the selection moves within one text. No Size is no selection, which has no text.
 func (s *selection) tell(b driver.Bounds) {
-	if b != s.told {
-		s.told = b
-		s.area.report(driver.Event{Kind: driver.EventSelectionChange, Point: b.Origin, Size: b.Size})
+	text := ""
+	if b.Size.Height > 0 {
+		text = s.model.Text(s)
+	}
+	if b != s.told || text != s.toldText {
+		s.told, s.toldText = b, text
+		s.area.report(driver.Event{Kind: driver.EventSelectionChange, Point: b.Origin, Size: b.Size, Text: text})
 	}
 }
 

@@ -1795,7 +1795,7 @@ func TestConfinedViewsStayInTheirFrame(t *testing.T) {
 	}
 }
 
-// What a frame cannot clip, a confined owner's modal, alert and context menu, it shows only while the focus is in its views or as the user's input on them is handled; a modal so shown stays and hears back wherever the focus is, and back takes it away whether or not its owner removes it. An owner not confined shows them whenever it likes, and keeps its modal while it likes.
+// What a frame cannot clip, a confined owner's modal, alert, context menu and dictionary panel, it shows only while the focus is in its views or as the user's input on them is handled; a modal so shown stays and hears back wherever the focus is, and back takes it away whether or not its owner removes it. An owner not confined shows them whenever it likes, and keeps its modal while it likes.
 func TestConfinedPresentationsWaitForTheUser(t *testing.T) {
 	for _, confined := range []bool{true, false} {
 		name := map[bool]string{true: "confined", false: "not confined"}[confined]
@@ -1818,7 +1818,7 @@ func TestConfinedPresentationsWaitForTheUser(t *testing.T) {
 			})
 			return View{Children: []Node{Input{TestID: "host-field"}, View{TestID: "frame", Children: []Node{shown}}}}
 		})
-		h.tree.SetEnvironment(Environment{OS: OSMacOS, Idiom: IdiomDesktop})
+		h.tree.SetEnvironment(Environment{OS: OSMacOS, Idiom: IdiomDesktop, CanLookUp: true})
 		h.commit()
 		h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: h.find("host-field").id})
 		modalShown := func() bool {
@@ -1833,9 +1833,13 @@ func TestConfinedPresentationsWaitForTheUser(t *testing.T) {
 		open.Set(true)
 		plugin.ShowAlert(AlertConfig{Title: "A"}, func(i int) { alerted = i })
 		plugin.PopupMenu([]MenuItem{{Label: "A"}}, Point{}, func() { closed = true })
+		lookedUp := plugin.LookUp("word", nil, Bounds{})
 		b := h.commit()
 		if modalShown() == confined || (command(b, driver.ItemAlert) != nil) == confined || (command(b, driver.ItemPopupMenu) != nil) == confined {
 			t.Errorf("%s, on its own: modal %v, alert %v, menu %v", name, modalShown(), command(b, driver.ItemAlert) != nil, command(b, driver.ItemPopupMenu) != nil)
+		}
+		if lookedUp == confined || (command(b, driver.ItemLookUp) != nil) == confined {
+			t.Errorf("%s, on its own: LookUp answered %v and sent %v", name, lookedUp, command(b, driver.ItemLookUp) != nil)
 		}
 		if confined && (alerted != -1 || !closed) {
 			t.Errorf("%s, on its own: the alert answered %d and the menu closed %v, want -1 and true", name, alerted, closed)
@@ -1846,9 +1850,10 @@ func TestConfinedPresentationsWaitForTheUser(t *testing.T) {
 		h.tree.Dispatch(driver.Event{Kind: driver.EventPress, ID: h.find("plugin-button").id})
 		plugin.ShowAlert(AlertConfig{Title: "A"}, nil)
 		plugin.PopupMenu([]MenuItem{{Label: "A"}}, Point{}, nil)
+		lookedUp = plugin.LookUp("word", nil, Bounds{})
 		b = h.commit()
-		if !modalShown() || command(b, driver.ItemAlert) == nil || command(b, driver.ItemPopupMenu) == nil {
-			t.Errorf("%s, on a press: modal %v, alert %v, menu %v", name, modalShown(), command(b, driver.ItemAlert) != nil, command(b, driver.ItemPopupMenu) != nil)
+		if !modalShown() || command(b, driver.ItemAlert) == nil || command(b, driver.ItemPopupMenu) == nil || !lookedUp || command(b, driver.ItemLookUp) == nil {
+			t.Errorf("%s, on a press: modal %v, alert %v, menu %v, look up %v", name, modalShown(), command(b, driver.ItemAlert) != nil, command(b, driver.ItemPopupMenu) != nil, command(b, driver.ItemLookUp) != nil)
 		}
 		// Shown, it stays, and back asks it to close with the focus outside its owner; a confined owner's goes even though its owner keeps it.
 		modal := h.find("plugin-modal").id

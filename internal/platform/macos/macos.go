@@ -1086,7 +1086,6 @@ func (s *surface) environment() driver.Environment {
 		Speech:           apple.SpeechAvailable(),
 		Speak:            apple.SpeakAvailable(),
 		CanSendInput:     true,
-		CanLookUp:        true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
 		Purchases:        apple.PurchasesAvailable(),
@@ -1123,6 +1122,8 @@ func (s *surface) environment() driver.Environment {
 		CanPlaceWindows:   !s.embedded && s.window != 0,
 		// An embedding host owns its window, and the app's own surface and a tray icon's show in none.
 		CanSetWindowWorkspaces: !s.embedded && s.window != 0,
+		// The dictionary panel shows over the window the view is in.
+		CanLookUp: s.window != 0,
 
 		// A transparent window or panel draws nothing of its own wherever it is (look.go, newPanel).
 		WindowTransparent: s.transparent,
@@ -1702,7 +1703,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 			s.openURL(it.Value, it.Count)
 			continue
 		case driver.ItemLookUp:
-			s.lookUp(it.Value, it.Point)
+			s.lookUp(it.Value, it.Frame)
 			continue
 		case driver.ItemCheckForUpdates:
 			s.checkForUpdates(it.On, it.Count)

@@ -3,7 +3,9 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -75,5 +77,49 @@ func TestSelectingInAScrollViewKeepsItsPlace(t *testing.T) {
 		if got := offset(); got != at {
 			t.Fatalf("selecting scrolled the view from %v to %v", at, got)
 		}
+	}
+}
+
+// TestSelectingReportsTheText drags across a text under nsgo test -target and has the area hear the text selected as it grows within the text, with the box of the text, which stays the same (the range's box on the web), and nothing once Escape clears it.
+func TestSelectingReportsTheText(t *testing.T) {
+	if nsgotest.Target() == "" {
+		t.Skip("a headless drag is a finger's, which scrolls")
+	}
+	var mu sync.Mutex
+	var heard []core.TextSelection
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Style: core.Style{FlexGrow: 1, Padding: core.All(16)}, Children: []core.Node{
+			core.View{TestID: "area", Selectable: true, OnTextSelection: func(s core.TextSelection) {
+				mu.Lock()
+				heard = append(heard, s)
+				mu.Unlock()
+			}, Children: []core.Node{
+				core.Text{TestID: "line", Content: "serendipity happens every day", Style: core.Style{FontSize: 20}},
+			}},
+		}}
+	}, nsgotest.Size(400, 200))
+	box := app.Find("id:line").Bounds().Size
+	app.DragAt("id:line", core.Point{X: 2, Y: box.Height / 2}, core.Point{X: 60}, core.Point{X: 120}, core.Point{X: box.Width - 4})
+	app.Settle()
+	mu.Lock()
+	got := slices.Clone(heard)
+	mu.Unlock()
+	var texts []string
+	for _, s := range got {
+		texts = append(texts, s.Text)
+		if web := nsgotest.Target() == "web"; !web && s.Bounds.Size != box || web && (s.Bounds.Size.Width > box.Width || s.Bounds.Size.Height > box.Height) {
+			t.Errorf("heard %+v, want the text's box %v", s, box)
+		}
+	}
+	if len(texts) < 2 || texts[len(texts)-1] != "serendipity happens every day" {
+		t.Fatalf("heard %q as the drag grew within one text, want it to end with the whole text", texts)
+	}
+	app.Key("Escape")
+	app.Settle()
+	mu.Lock()
+	last := heard[len(heard)-1]
+	mu.Unlock()
+	if last.Text != "" || last.Bounds.Size != (core.Size{}) {
+		t.Errorf("after Escape heard %+v, want no selection", last)
 	}
 }
