@@ -33,6 +33,13 @@ ui.Select[string]{
 }
 ```
 
+`Style` 决定下拉框的布局，未设置宽度时为 200 点宽；其中的高度、内边距和字体作用于字段本身，与 [Input](input.md) 相同，因此下拉框可以与 `SizeSmall` 的按钮对齐：
+
+```go
+ui.Select[string]{Options: sizes, Value: size.Get, OnChange: size.Set, Label: "Size",
+	Style: core.Style{Height: core.Pt(ui.SizeSmall.Height()), FontSize: 12}}
+```
+
 ## 行为
 
 焦点在触发器上时，上、下、Return 和空格打开列表；方向键移动高亮，typeahead 按项标题跳转。选择一项会关闭列表并报告值。Escape、返回和点击外部会关闭列表而不改变值。`Empty` 是搜索无结果时显示的文字。

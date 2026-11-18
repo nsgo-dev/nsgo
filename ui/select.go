@@ -40,7 +40,9 @@ type Select[T comparable] struct {
 	Label string
 	// TestID names the field; each option adds "-" and its index.
 	TestID string
-	// Style merges over the field's, 200 pt wide.
+	// Style merges over the field's, 200 pt wide: its height, padding and
+	// type reach the field, as an Input's do, so a smaller one lines up
+	// with a SizeSmall Button.
 	Style core.Style
 }
 
@@ -95,7 +97,8 @@ func (s Select[T]) Render(cx *core.Scope) core.Node {
 		}
 		return ""
 	}
-	face := pickerField(cx, leading, pickerText(cx, title, s.Placeholder), lucide.ChevronDown, open.Get)
+	root, field := pickerStyle(s.Style)
+	face := pickerField(cx, field, leading, pickerText(cx, field, title, s.Placeholder), lucide.ChevronDown, open.Get)
 	row, look := listRowStyle(cx, s.Presentation)
 	group, groupLook := listGroupStyle(cx)
 	popup, backdrop := pickerSurface(cx, s.Presentation)
@@ -103,7 +106,6 @@ func (s Select[T]) Render(cx *core.Scope) core.Node {
 	if label == "" {
 		label = s.Placeholder
 	}
-	root := core.Style{Width: core.Pt(200), AlignSelf: core.AlignStart}.Merge(s.Style)
 	b := base.Select{Items: optionItems(s.Options), Disabled: s.Disabled, Presentation: s.Presentation, Open: open.Get, OnOpenChange: func(v bool, _ base.Reason) { open.Set(v) },
 		Value: func() *string {
 			if i := chosen.Get(); i >= 0 {

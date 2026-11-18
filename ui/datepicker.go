@@ -46,7 +46,8 @@ type DatePicker struct {
 	// Label names the field for assistive technology.
 	Label  string
 	TestID string
-	// Style merges over the field's, 200 pt wide.
+	// Style merges over the field's, 200 pt wide: its height, padding and
+	// type reach the field, as Select's do.
 	Style core.Style
 }
 
@@ -81,6 +82,7 @@ func (d DatePicker) Render(cx *core.Scope) core.Node {
 	if label == "" {
 		label = d.Placeholder
 	}
+	root, field := pickerStyle(d.Style)
 	b := base.DatePicker{Value: value, Range: d.Range, Open: open, Disabled: d.Disabled, Presentation: d.Presentation, TimePrecision: d.TimePrecision, HourCycle: d.HourCycle,
 		DefaultTime: d.DefaultTime, Presets: d.Presets, Cleanable: d.Cleanable,
 		CalendarConfig: calendarConfig(cx, d.NumberOfMonths, d.FirstDayOfWeek, d.DisabledMatcher),
@@ -97,9 +99,9 @@ func (d DatePicker) Render(cx *core.Scope) core.Node {
 				d.OnChange(v)
 			}
 		},
-		Offset: 4, Margin: 8, Label: label, TestID: d.TestID, RootStyle: core.Style{Width: core.Pt(200), AlignSelf: core.AlignStart}.Merge(d.Style),
+		Offset: 4, Margin: 8, Label: label, TestID: d.TestID, RootStyle: root,
 		Style: core.Style{Group: "button", CornerRadius: RadiusControl}, StyleFunc: func() core.Style { return core.Style{FocusVisible: FocusRing(cx, 2)} },
-		Trigger:        pickerField(cx, nil, pickerText(cx, text, d.Placeholder), lucide.Calendar, open),
+		Trigger:        pickerField(cx, field, nil, pickerText(cx, field, text, d.Placeholder), lucide.Calendar, open),
 		PopupStyle:     core.Style{Padding: core.All(12), Gap: 8},
 		PopupStyleFunc: popup, BackdropStyle: backdrop, ContentStyle: core.Style{Direction: core.Row, Gap: 12},
 		PresetsStyle: core.Style{Gap: 2, MinWidth: core.Pt(96)},

@@ -33,6 +33,13 @@ ui.Select[string]{
 }
 ```
 
+`Style` lays the select out, 200 points wide unless it sets a width; its height, padding and type reach the field, as an [Input's](input.md) do, so a select lines up with a `SizeSmall` button:
+
+```go
+ui.Select[string]{Options: sizes, Value: size.Get, OnChange: size.Set, Label: "Size",
+	Style: core.Style{Height: core.Pt(ui.SizeSmall.Height()), FontSize: 12}}
+```
+
 ## Behavior
 
 Up, Down, Return and Space open the list from the focused trigger; arrows move the highlight and typeahead jumps by the items' titles. Choosing an item closes the list and reports its value. Escape, back and a press outside close it without a change. `Empty` is the text shown while search finds nothing.

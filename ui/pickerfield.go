@@ -6,10 +6,20 @@ import (
 	"github.com/nsgo-dev/nsgo/icons/lucide"
 )
 
+// pickerStyle splits a picker's Style as an Input takes its own: the
+// height, padding and type are the field's, merged over its look, and the
+// rest lays out the view around it, 200 pt wide unless it says otherwise.
+func pickerStyle(s core.Style) (root, field core.Style) {
+	field = core.Style{Height: s.Height, MinHeight: s.MinHeight, MaxHeight: s.MaxHeight, Padding: s.Padding, FontSize: s.FontSize, LineHeight: s.LineHeight}
+	s.Padding, s.FontSize, s.LineHeight = core.Edges{}, 0, 0
+	return core.Style{Width: core.Pt(200), AlignSelf: core.AlignStart}.Merge(s), field
+}
+
 // pickerField is the look of what opens a list or a calendar: a field 28
-// pt tall with text, an optional leading part, and a mark at its end. Its
+// pt tall with text, an optional leading part, and a mark at its end, with
+// own, the field's part of the picker's Style (pickerStyle), over it. Its
 // rim takes the accent while open says so.
-func pickerField(cx *core.Scope, leading, text core.Node, mark func() *core.SVG, open func() bool) core.Node {
+func pickerField(cx *core.Scope, own core.Style, leading, text core.Node, mark func() *core.SVG, open func() bool) core.Node {
 	colors := ColorsOf(cx)
 	children := []core.Node{}
 	if leading != nil {
@@ -18,7 +28,7 @@ func pickerField(cx *core.Scope, leading, text core.Node, mark func() *core.SVG,
 	children = append(children, text, Icon(mark, iconSize-2, colors.Muted))
 	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, Height: core.Pt(ButtonHeight),
 		Padding: core.Edges{Left: 10, Right: 8}, CornerRadius: RadiusControl, BorderCurve: core.BorderCurveContinuous, BorderWidth: 1,
-		Transition: quick},
+		Transition: quick}.Merge(own),
 		StyleFunc: func() core.Style {
 			border := colors.FieldBorder()
 			if open() {
@@ -31,10 +41,11 @@ func pickerField(cx *core.Scope, leading, text core.Node, mark func() *core.SVG,
 }
 
 // pickerText is a field's words: value, else placeholder in the faint
-// color.
-func pickerText(cx *core.Scope, value func() string, placeholder string) core.Text {
+// color, in the body's type unless own, the field's part of the picker's
+// Style, sets another.
+func pickerText(cx *core.Scope, own core.Style, value func() string, placeholder string) core.Text {
 	colors := ColorsOf(cx)
-	return core.Text{MaxLines: 1, Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: 1}),
+	return core.Text{MaxLines: 1, Style: TypeBody.Merge(core.Style{FontSize: own.FontSize, LineHeight: own.LineHeight, FlexGrow: 1, FlexShrink: 1}),
 		ContentFunc: func() string {
 			if v := value(); v != "" {
 				return v

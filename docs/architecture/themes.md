@@ -81,6 +81,7 @@ A `Switch` has a track of its own: 30 × 16, 40 × 20 and 48 × 24 pt. `Size.Hei
 
 - `Size` is `core.Points` on `Avatar`, `AvatarGroup`, `IconButton`, `ProgressRing`, `Spinner` and `OtpInput`: each is one shape that lines up with what surrounds it at any scale. `Button.Side` is the same for a button of an icon alone, since `Menu` takes a `Button` as its trigger.
 - On touch idioms (as `ui.Touch` reports, including phones and tablets), buttons use 40, 44 and 48 pt for `SizeSmall`, `SizeDefault` and `SizeLarge`; desktop and TV idioms keep the table above. `Button.Style` is merged onto the pressable, whose face fills its content box, so an app can make a button fill its row or choose another size. `OtpInput` uses 36 pt cells on desktops and TVs and 44 pt cells on touch idioms; its `Size` in points overrides either default. Form rows and fields use a 48 pt minimum on touch idioms.
+- Fields take no `Size`: an `Input`'s, a `Select`'s or a `DatePicker`'s `Style` sets its height, padding and type, as `Height: core.Pt(ui.SizeSmall.Height())` with `FontSize: 12` lines one up with small buttons.
 - A field that changes a component's form or behavior is neither: `Pagination.Compact` and `Stepper.Compact` choose what shows, `Tabs.Equal` how tabs share the width, and `Dialog.Bare` what the surface leaves to its content.
 
 ## Departures from NSH

@@ -408,3 +408,33 @@ func TestSelectLaysItsChoiceOverTheField(t *testing.T) {
 		t.Fatalf("the popup starts at %v with a choice and %v without", over, below)
 	}
 }
+
+// TestPickerStyle gives a Select's and a DatePicker's field the height and
+// type their Style sets, as an Input's, so a small one lines up with a
+// SizeSmall Button, and leaves the field 28 pt in the body's type without.
+func TestPickerStyle(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		small := core.Style{Width: core.Pt(160), Height: core.Pt(SizeSmall.Height()), FontSize: 12}
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			return core.View{Style: core.Style{AlignItems: core.AlignStart, Gap: 8}, Children: []core.Node{
+				Select[string]{TestID: "small", Label: "Fruit", Placeholder: "Small fruit", Options: fruitOptions(), Style: small},
+				DatePicker{TestID: "date", Label: "Date", Placeholder: "Small date", Style: small},
+				Select[string]{TestID: "plain", Label: "Fruit", Placeholder: "Plain fruit", Options: fruitOptions()},
+			}}
+		})
+		for id, text := range map[string]string{"small": "Small fruit", "date": "Small date"} {
+			if f := app.Find(id).Frame.Size; f.Height != SizeSmall.Height() || f.Width != 160 {
+				t.Errorf("%s's field = %v, want 160 × %v", id, f, SizeSmall.Height())
+			}
+			if got := app.Find("text:" + text).TextStyle.Font.Size; got != 12 {
+				t.Errorf("%s's text is %v pt, want 12", id, got)
+			}
+		}
+		if h := app.Find("plain").Frame.Size.Height; h != ButtonHeight {
+			t.Errorf("a field of no style is %v tall, want %v", h, ButtonHeight)
+		}
+		if got := app.Find("text:Plain fruit").TextStyle.Font.Size; got != TypeBody.FontSize {
+			t.Errorf("a field of no style sets its text at %v, want the body's %v", got, TypeBody.FontSize)
+		}
+	})
+}
