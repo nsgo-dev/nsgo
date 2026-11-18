@@ -28,33 +28,30 @@ import (
 // and images inside them name them and are no elements of their own. A
 // canvas's named parts are its children.
 //
-// Each element has a control type, its TestID as the automation id, its
-// Hint as help text, and the patterns its role and state call for:
-// Invoke (presses), Toggle (Checked), ExpandCollapse, SelectionItem,
-// RangeValue (a range Value) and Value (fields). Live regions raise
-// LiveRegionChanged; Announce is a notification.
+// Each element has a control type, its TestID as the automation id, its Hint as help text, and the patterns its role and state call for: Invoke (presses), Toggle (Checked), ExpandCollapse, SelectionItem, RangeValue (a range Value) and Value (fields). An element clients were given raises a property-changed event when its name, description, toggle state, range value, expanded state, selection or field text changes, so a screen reader hears the change on the element it is on. Live regions raise LiveRegionChanged; Announce is a notification.
 
 var (
-	uiaCore                       = syscall.NewLazyDLL("uiautomationcore.dll")
-	uiaReturnRawElementProvider   = uiaCore.NewProc("UiaReturnRawElementProvider")
-	uiaHostProviderFromHwnd       = uiaCore.NewProc("UiaHostProviderFromHwnd")
-	uiaRaiseAutomationEvent       = uiaCore.NewProc("UiaRaiseAutomationEvent")
-	uiaRaiseStructureChangedEvent = uiaCore.NewProc("UiaRaiseStructureChangedEvent")
-	uiaRaiseNotificationEvent     = uiaCore.NewProc("UiaRaiseNotificationEvent")
-	uiaClientsAreListening        = uiaCore.NewProc("UiaClientsAreListening")
-	uiaDisconnectProvider         = uiaCore.NewProc("UiaDisconnectProvider")
-	safeArrayCreateVector         = oleaut32.NewProc("SafeArrayCreateVector")
-	safeArrayAccessData           = oleaut32.NewProc("SafeArrayAccessData")
-	safeArrayUnaccessData         = oleaut32.NewProc("SafeArrayUnaccessData")
-	iidRawElementProviderSimple   = parseGUID("d6dd68d1-86fd-4332-8666-9abedea2d24c")
-	iidRawElementProviderFragment = parseGUID("f7063da8-8359-439c-9297-bbc5299a7d87")
-	iidRawElementProviderFragRoot = parseGUID("620ce2a5-ab8f-40a9-86cb-de3c75599b58")
-	iidInvokeProvider             = parseGUID("54fcb24b-e18e-47a2-b4d3-eccbe77599a2")
-	iidToggleProvider             = parseGUID("56d00bd0-c4f4-433c-a836-1a52a57e0892")
-	iidRangeValueProvider         = parseGUID("36dc7aef-33e6-4691-afe1-2be7274b3d33")
-	iidExpandCollapseProvider     = parseGUID("d847d3a5-cab0-4a98-8c32-ecb45c59ad24")
-	iidSelectionItemProvider      = parseGUID("2acad808-b2d4-452d-a407-91ff1ad167b2")
-	iidValueProvider              = parseGUID("c7935180-6fb3-4201-b174-7df73adbf64a")
+	uiaCore                                = syscall.NewLazyDLL("uiautomationcore.dll")
+	uiaReturnRawElementProvider            = uiaCore.NewProc("UiaReturnRawElementProvider")
+	uiaHostProviderFromHwnd                = uiaCore.NewProc("UiaHostProviderFromHwnd")
+	uiaRaiseAutomationEvent                = uiaCore.NewProc("UiaRaiseAutomationEvent")
+	uiaRaiseAutomationPropertyChangedEvent = uiaCore.NewProc("UiaRaiseAutomationPropertyChangedEvent")
+	uiaRaiseStructureChangedEvent          = uiaCore.NewProc("UiaRaiseStructureChangedEvent")
+	uiaRaiseNotificationEvent              = uiaCore.NewProc("UiaRaiseNotificationEvent")
+	uiaClientsAreListening                 = uiaCore.NewProc("UiaClientsAreListening")
+	uiaDisconnectProvider                  = uiaCore.NewProc("UiaDisconnectProvider")
+	safeArrayCreateVector                  = oleaut32.NewProc("SafeArrayCreateVector")
+	safeArrayAccessData                    = oleaut32.NewProc("SafeArrayAccessData")
+	safeArrayUnaccessData                  = oleaut32.NewProc("SafeArrayUnaccessData")
+	iidRawElementProviderSimple            = parseGUID("d6dd68d1-86fd-4332-8666-9abedea2d24c")
+	iidRawElementProviderFragment          = parseGUID("f7063da8-8359-439c-9297-bbc5299a7d87")
+	iidRawElementProviderFragRoot          = parseGUID("620ce2a5-ab8f-40a9-86cb-de3c75599b58")
+	iidInvokeProvider                      = parseGUID("54fcb24b-e18e-47a2-b4d3-eccbe77599a2")
+	iidToggleProvider                      = parseGUID("56d00bd0-c4f4-433c-a836-1a52a57e0892")
+	iidRangeValueProvider                  = parseGUID("36dc7aef-33e6-4691-afe1-2be7274b3d33")
+	iidExpandCollapseProvider              = parseGUID("d847d3a5-cab0-4a98-8c32-ecb45c59ad24")
+	iidSelectionItemProvider               = parseGUID("2acad808-b2d4-452d-a407-91ff1ad167b2")
+	iidValueProvider                       = parseGUID("c7935180-6fb3-4201-b174-7df73adbf64a")
 )
 
 const (
@@ -78,28 +75,33 @@ const (
 	patternSelectionItem  = 10010
 	patternToggle         = 10015
 
-	propRuntimeID           = 30000
-	propBoundingRectangle   = 30001
-	propProcessID           = 30002
-	propControlType         = 30003
-	propLocalizedType       = 30004
-	propName                = 30005
-	propHasKeyboardFocus    = 30008
-	propIsKeyboardFocusable = 30009
-	propIsEnabled           = 30010
-	propAutomationID        = 30011
-	propClassName           = 30012
-	propHelpText            = 30013
-	propIsControlElement    = 30016
-	propIsContentElement    = 30017
-	propIsOffscreen         = 30022
-	propIsPassword          = 30019
-	propLabeledBy           = 30018
-	propLiveSetting         = 30135
-	propHeadingLevel        = 30173
-	propIsDialog            = 30174
-	propFullDescription     = 30159
-	propIsDataValidForForm  = 30103
+	propRuntimeID             = 30000
+	propBoundingRectangle     = 30001
+	propProcessID             = 30002
+	propControlType           = 30003
+	propLocalizedType         = 30004
+	propName                  = 30005
+	propHasKeyboardFocus      = 30008
+	propIsKeyboardFocusable   = 30009
+	propIsEnabled             = 30010
+	propAutomationID          = 30011
+	propClassName             = 30012
+	propHelpText              = 30013
+	propIsControlElement      = 30016
+	propIsContentElement      = 30017
+	propIsOffscreen           = 30022
+	propIsPassword            = 30019
+	propLabeledBy             = 30018
+	propLiveSetting           = 30135
+	propHeadingLevel          = 30173
+	propIsDialog              = 30174
+	propFullDescription       = 30159
+	propIsDataValidForForm    = 30103
+	propValueValue            = 30045
+	propRangeValueValue       = 30047
+	propExpandCollapseState   = 30070
+	propSelectionItemSelected = 30079
+	propToggleState           = 30086
 
 	ctButton      = 50000
 	ctCheckBox    = 50002
@@ -1018,6 +1020,111 @@ func (w *window) accessChanged(v *view, text bool) {
 			}
 		}
 	}
+}
+
+// uiaShown is what an element exposed before a change.
+type uiaShown struct {
+	e *uiaElement
+	s uiaSpec
+}
+
+// uiaHeld returns what the elements clients were given for v expose: its own, its canvas's parts' and, as a name may join the texts and labels inside, those of the ancestors whose name may join v's. A view no client asked for has no element and no client to tell. It returns none while no client listens; uiaChanged compares them once the change is applied.
+func (w *window) uiaHeld(v *view) []uiaShown {
+	if w.uia == nil || !uiaListening() {
+		return nil
+	}
+	var held []uiaShown
+	for part := 0; part <= len(v.canvasNodes()); part++ {
+		if e := w.uia[uiaKey(v.id, part)]; e != nil {
+			held = append(held, uiaShown{e, e.spec(v)})
+		}
+	}
+	for c := v; c.parent != nil; c = c.parent {
+		// groupedText reads no deeper than a view that is a control or has a label of its own.
+		if c != v && (c.props.Role != driver.RoleNone || c.props.Label != "" || takesPresses(c)) || hidesSubtree(c) {
+			break
+		}
+		if e := w.uia[uiaKey(c.parent.id, 0)]; e != nil {
+			held = append(held, uiaShown{e, e.spec(c.parent)})
+		}
+	}
+	return held
+}
+
+// uiaChanged raises a property-changed event for each property clients hear change that changed on the elements held: the name, the description, the toggle state, the range's value, the expanded state and whether it is selected.
+func (w *window) uiaChanged(held []uiaShown) {
+	for _, h := range held {
+		v, ok := h.e.alive()
+		if !ok || v == nil {
+			continue
+		}
+		was, now := h.s, h.e.spec(v)
+		if was.name != now.name {
+			h.e.raiseString(propName, was.name, now.name)
+		}
+		if was.description != now.description {
+			h.e.raiseString(propFullDescription, was.description, now.description)
+		}
+		// Without the pattern the state reads as off, as uiaToggleState answers.
+		if (was.toggle >= 0 || now.toggle >= 0) && max(was.toggle, 0) != max(now.toggle, 0) {
+			var a, b variant
+			a.setInt(max(was.toggle, 0))
+			b.setInt(max(now.toggle, 0))
+			h.e.raise(propToggleState, &a, &b)
+		}
+		if now.ranged && (!was.ranged || was.now != now.now) {
+			var a, b variant
+			if was.ranged {
+				a.setDouble(float64(was.now))
+			}
+			b.setDouble(float64(now.now))
+			h.e.raise(propRangeValueValue, &a, &b)
+		}
+		if (was.expandable || now.expandable) && was.expanded != now.expanded {
+			var a, b variant
+			a.setInt(expandState(was.expanded))
+			b.setInt(expandState(now.expanded))
+			h.e.raise(propExpandCollapseState, &a, &b)
+		}
+		if (was.selectable || now.selectable) && was.selected != now.selected {
+			var a, b variant
+			a.setBool(was.selected)
+			b.setBool(now.selected)
+			h.e.raise(propSelectionItemSelected, &a, &b)
+		}
+	}
+}
+
+// uiaValueChanged tells clients field in's text changed, by the user or the app; a masked field's text is not read, and the text before is not kept.
+func (w *window) uiaValueChanged(in *textInput) {
+	if in.masked() || w.uia == nil || in.v == nil || !uiaListening() {
+		return
+	}
+	if e := w.uia[uiaKey(in.v.id, 0)]; e != nil {
+		e.raiseString(propValueValue, "", in.model.text)
+	}
+}
+
+// expandState is the ExpandCollapseState uiaExpandState answers.
+func expandState(expanded bool) int32 {
+	if expanded {
+		return 1 // ExpandCollapseState_Expanded
+	}
+	return 0 // ExpandCollapseState_Collapsed
+}
+
+// raise raises the property-changed event of property on e.
+func (e *uiaElement) raise(property int32, was, now *variant) {
+	uiaRaiseAutomationPropertyChangedEvent.Call(uintptr(unsafe.Pointer(&e.simple)), uintptr(property), uintptr(unsafe.Pointer(was)), uintptr(unsafe.Pointer(now)))
+}
+
+// raiseString raises the change of a string property, both values strings, empty ones too.
+func (e *uiaElement) raiseString(property int32, was, now string) {
+	a, _, _ := sysAllocString.Call(uintptr(unsafe.Pointer(wide(was))))
+	b, _, _ := sysAllocString.Call(uintptr(unsafe.Pointer(wide(now))))
+	e.raise(property, &variant{vt: vtBSTR, val: uint64(a)}, &variant{vt: vtBSTR, val: uint64(b)})
+	sysFreeString.Call(a)
+	sysFreeString.Call(b)
 }
 
 // structureChanged tells clients the tree changed under the root.

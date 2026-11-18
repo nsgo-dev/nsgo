@@ -261,6 +261,8 @@ jobs:
         run: go tool nsgo test -target windows ./internal/testhost/testdata/websource
       - name: Test native focus, styles, activation and label relationships
         run: go tool nsgo test -run '^(TestRefFocusUsesNativeKeyboardStops|TestNativeLabeledByProvider)$' ./internal/platform/windows
+      - name: Test UI Automation property-changed events
+        run: go tool nsgo test -run '^TestUIAPropertyChangedEvents$' ./internal/platform/windows
       - name: Test menu yield with a focused WebView2 page
         run: go tool nsgo test -run '^TestMenuYieldFollowsNativeFocus$' ./internal/platform/windows
       - name: Test WebView2 accelerator shortcuts

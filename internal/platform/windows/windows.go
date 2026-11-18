@@ -1378,7 +1378,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemAccessibilityLabel:
 			if v := w.view(it.ID); v != nil {
+				held := w.uiaHeld(v)
 				v.props.Label = it.Value
+				w.uiaChanged(held)
 				w.accessChanged(v, true)
 			}
 			continue
@@ -1457,7 +1459,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			}
 			v.spans = it.Text.Spans
 			if v.plain != it.Text.Text {
+				held := w.uiaHeld(v)
 				v.plain = it.Text.Text
+				w.uiaChanged(held)
 				w.accessChanged(v, true)
 			}
 		case driver.ItemInput:
@@ -1480,7 +1484,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			w.dropEvents(v)
 		case driver.ItemViewProps:
 			if it.ViewProps != nil {
+				held := w.uiaHeld(v)
 				v.props = *it.ViewProps
+				w.uiaChanged(held)
 			}
 		case driver.ItemScrollConfig:
 			old, inset := scrollbar.RestInset(&v.scroll, v.refreshing), scrollbar.RestInset(it.Scroll, v.refreshing)
@@ -1510,7 +1516,9 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemModal:
 			// A modal is a view; it appears without animation.
 		case driver.ItemCanvas:
+			held := w.uiaHeld(v)
 			v.drawing = it.Drawing
+			w.uiaChanged(held)
 			w.animator.BindCanvas(v.id, it.Drawing.Slots)
 		case driver.ItemShader:
 			if v.kind == driver.KindShader && it.Shader != nil && it.Shader.Role == driver.ShaderFill {

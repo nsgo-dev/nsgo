@@ -1027,6 +1027,7 @@ func (in *textInput) afterEdit(changed bool) {
 	if changed {
 		in.relayout()
 		in.fs.Edited(in.model.text)
+		w.uiaValueChanged(in)
 	}
 	in.reportSelection()
 	in.wakeCaret()
@@ -1159,6 +1160,7 @@ func (in *textInput) setText(text string) {
 	if in.focused {
 		in.reveal()
 	}
+	in.w.uiaValueChanged(in)
 }
 
 // --- Pointer ---------------------------------------------------------------
