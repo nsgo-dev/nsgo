@@ -29,6 +29,7 @@
 - Open the output directory with `nsgo build -open` when nsgo leads its terminal's session, as in an app's terminal without a shell, instead of losing the opener as nsgo exits (#672).
 - Show a bundled macOS app's Dock badge without the notification permission until the app uses notifications (#190 by @houko).
 - Accept a bare OS name in `nsgo check -target`, `nsgo build -target` and `nsgo.yaml`'s `build.targets`, and an arch-qualified name in `nsgo test -target`, so the commands take each other's target spellings (#593 by @dhruv1220).
+- Keep an engine fault's `CheckCommits` re-panic ahead of its exit notification, so fault-isolation tests cannot mistake the notification for a swallowed panic (#703).
 
 ## [0.1.0] - 2026-11-16
 

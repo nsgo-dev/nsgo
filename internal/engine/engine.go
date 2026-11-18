@@ -402,10 +402,10 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			}
 			faultCleanup(func() { report(err) })
 		}
-		close(e.exited)
 		if fault != nil && opts.CheckCommits {
 			panic(fault)
 		}
+		close(e.exited)
 	}()
 	// Text engines such as Android's need the same OS thread each call.
 	runtime.LockOSThread()
