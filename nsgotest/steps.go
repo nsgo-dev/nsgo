@@ -794,7 +794,7 @@ func (a *App) Commit(selector, text string) {
 	a.Compose(selector, "")
 }
 
-// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, or mod+a selects all its text; else Escape goes back. A key nothing takes does nothing, as on a device.
+// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, or mod+a selects all its text; else, in a macOS, Windows or Linux environment, the enabled application-menu item with the key as its shortcut is chosen, unless it is NotInText and a field or web view has the focus; else Escape goes back. A key nothing takes does nothing, as on a device.
 func (a *App) Key(key string) {
 	a.t.Helper()
 	a.step("key(%s)", key)
@@ -884,8 +884,7 @@ func (a *App) Key(key string) {
 	a.done()
 }
 
-// menuShortcut finds the application-menu item a desktop platform would take
-// after the keymap, focused view and focused field decline the key.
+// menuShortcut finds the item of the application menu a key that the keymap, the keyboard focus and the focused field left goes to, as macOS's key equivalents and Windows' and Linux's menu shortcuts take it (driver.MenuShortcut): its ID, 0 for one with none, and whether an item takes the key. Only macOS, Windows and Linux show the menu.
 func (a *App) menuShortcut(names []string) (uint32, bool) {
 	if a.env == nil || a.env.OS != driver.OSMacOS && a.env.OS != driver.OSWindows && a.env.OS != driver.OSLinux {
 		return 0, false
@@ -897,37 +896,8 @@ func (a *App) menuShortcut(names []string) (uint32, bool) {
 			break
 		}
 	}
-	mac := a.env.OS == driver.OSMacOS
-	var find func([]driver.MenuEntry) (uint32, bool)
-	find = func(items []driver.MenuEntry) (uint32, bool) {
-		for _, item := range items {
-			if item.Separator {
-				continue
-			}
-			shortcut := item.Shortcut
-			if shortcut == "" && item.Role != driver.MenuRoleNone {
-				shortcut = driver.NormalizeKey(item.Role.Shortcut(mac))
-			}
-			matches := shortcut != "" && slices.Contains(names, shortcut)
-			if item.Disabled {
-				continue
-			}
-			if len(item.Items) > 0 {
-				if id, ok := find(item.Items); ok {
-					return id, true
-				}
-				continue
-			}
-			if item.NotInText && editing {
-				continue
-			}
-			if matches {
-				return item.ID, true
-			}
-		}
-		return 0, false
-	}
-	return find(a.Menu)
+	e, ok := driver.MenuShortcut(a.Menu, names, a.env.OS == driver.OSMacOS, editing)
+	return e.ID, ok
 }
 
 // keyModifiers reads normalized key prefixes; mod is Command on Apple platforms and Control elsewhere, while meta is Command or the system key.

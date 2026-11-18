@@ -663,34 +663,78 @@ func TestStartAppKeepsTheAppsScope(t *testing.T) {
 	app.Find("id:main")
 }
 
+// A key nothing else takes chooses the enabled application-menu item it is the shortcut of, in a submenu too and a role's own on a Mac; a disabled item takes nothing, leaving the key to a later item with it, and a NotInText one leaves it to a focused field.
 func TestApplicationMenuShortcuts(t *testing.T) {
 	if Target() != "" {
 		t.Skip("checks the headless menu shortcut path")
 	}
-	var chosen int
-	app := StartApp(t, func(cx *core.Scope) {
-		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{
-			{Label: "Reload", Shortcut: "mod+r", OnSelect: func() { chosen++ }},
-			{Label: "Disabled", Shortcut: "mod+d", Disabled: true, OnSelect: func() { chosen += 10 }},
-			{Label: "Refresh", Shortcut: "mod+i", When: core.MenuNotEditing, OnSelect: func() { chosen += 100 }},
-		}}})
-		cx.SetMainView(func(cx *core.Scope) core.Node {
-			return core.Input{TestID: "field", Style: core.Style{Width: core.Pt(100), Height: core.Pt(20)}}
-		})
-	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
-	app.Key("mod+r")
-	if chosen != 1 {
-		t.Fatalf("menu shortcut chose %d times, want 1", chosen)
+	var chosen []string
+	choose := func(name string) func() { return func() { chosen = append(chosen, name) } }
+	menu := []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{
+		{Label: "Reload", Shortcut: "mod+r", OnSelect: choose("reload")},
+		{Label: "Disabled", Shortcut: "mod+d", Disabled: true, OnSelect: choose("disabled")},
+		{Label: "Refresh", Shortcut: "mod+i", When: core.MenuNotEditing, OnSelect: choose("refresh")},
+		{Label: "Off", Shortcut: "mod+e", Disabled: true, OnSelect: choose("off")},
+		{Label: "Export", Items: []desktop.MenuItem{
+			{Label: "Again", Shortcut: "mod+e", OnSelect: choose("again")},
+			{Label: "Grayed", Disabled: true, Items: []desktop.MenuItem{{Label: "Inside", Shortcut: "mod+g", OnSelect: choose("inside")}}},
+		}},
+		{Role: core.MenuCopy, OnSelect: choose("copy")},
+	}}}
+	start := func(os core.OS) *App {
+		chosen = nil
+		return StartApp(t, func(cx *core.Scope) {
+			desktop.SetApplicationMenu(cx, menu)
+			cx.SetMainView(func(cx *core.Scope) core.Node {
+				return core.Input{TestID: "field", Style: core.Style{Width: core.Pt(100), Height: core.Pt(20)}}
+			})
+		}, Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
 	}
-	app.Key("mod+d")
-	if chosen != 1 {
-		t.Fatalf("disabled menu shortcut changed choice count to %d", chosen)
+	app := start(core.OSMacOS)
+	for _, key := range []string{"mod+r", "meta+r", "mod+d", "mod+i", "mod+e", "mod+g", "mod+c"} {
+		app.Key(key)
 	}
+	if want := []string{"reload", "reload", "refresh", "again", "copy"}; !slices.Equal(chosen, want) {
+		t.Errorf("on macOS: chose %q, want %q", chosen, want)
+	}
+	chosen = nil
 	app.Focus("id:field")
 	app.Key("mod+i")
-	if chosen != 1 {
-		t.Fatalf("NotInText menu shortcut changed choice count to %d", chosen)
+	app.Key("mod+r")
+	if want := []string{"reload"}; !slices.Equal(chosen, want) {
+		t.Errorf("with the field focused: chose %q, want %q", chosen, want)
 	}
+
+	// Elsewhere the focused field handles the editing roles' keys, which the menu leaves alone.
+	app = start(core.OSWindows)
+	app.Key("ctrl+c")
+	app.Key("ctrl+r")
+	if want := []string{"reload"}; !slices.Equal(chosen, want) {
+		t.Errorf("on Windows: chose %q, want %q", chosen, want)
+	}
+
+	// Phones show no application menu.
+	app = start(core.OSAndroid)
+	app.Key("ctrl+r")
+	if len(chosen) != 0 {
+		t.Errorf("on Android: chose %q", chosen)
+	}
+}
+
+// A root view's menu takes its shortcut as an app's does (#399).
+func TestApplicationMenuShortcutOfAView(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless menu shortcut path")
+	}
+	app := Start(t, func(cx *core.Scope) core.Node {
+		n := core.NewSignal(cx, 0)
+		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "View", Items: []desktop.MenuItem{
+			{Label: "Reload", Shortcut: "mod+r", OnSelect: func() { n.Set(n.Get() + 1) }},
+		}}})
+		return core.Text{ContentFunc: func() string { return fmt.Sprint(n.Get()) }}
+	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.Key("mod+r")
+	app.WaitFor("text:1", time.Second)
 }
 
 // Given a root view, Windows and Linux open no window, as nsgo.Run does there, and macOS shows it in the main window.

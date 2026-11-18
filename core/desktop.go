@@ -332,29 +332,6 @@ func (t *Tree) popupClosed(id uint32, user bool) {
 	}
 }
 
-// menuTakes reports whether an enabled item of entries or of their enabled submenus takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac (mac) every item's, elsewhere all but the editing roles', whose keys the focused field handles itself. While editing, NotInText items leave the key to the focused input or web view.
-func menuTakes(entries []MenuEntry, names []string, mac, editing bool) bool {
-	for _, e := range entries {
-		switch {
-		case e.Disabled || e.Separator:
-		case len(e.Items) > 0:
-			if menuTakes(e.Items, names, mac, editing) {
-				return true
-			}
-		case e.NotInText && editing:
-		case mac || !e.Role.EditsText():
-			shortcut := e.Shortcut
-			if shortcut == "" {
-				shortcut = driver.NormalizeKey(e.Role.Shortcut(mac))
-			}
-			if shortcut != "" && slices.Contains(names, shortcut) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (t *Tree) menuEntries(items []MenuItem, owner *Scope, actions map[uint32]menuAction) []MenuEntry {
 	out := make([]MenuEntry, 0, len(items))
 	for _, it := range items {

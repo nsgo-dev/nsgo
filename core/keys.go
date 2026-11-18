@@ -256,7 +256,7 @@ func (t *Tree) keyActive(b *keyBinding, places *keyPlaces) bool {
 		!(b.yieldsToMenu && t.menuHasKey(b.Key))
 }
 
-// menuHasKey reports whether an enabled item of the application menu takes the normalized key as its shortcut where the focus is (menuTakes), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.
+// menuHasKey reports whether an enabled item of the application menu takes the normalized key as its shortcut where the focus is (driver.MenuShortcut), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.
 func (t *Tree) menuHasKey(key string) bool {
 	env := t.root.Env()
 	menu := t.menu
@@ -289,7 +289,8 @@ func (t *Tree) menuHasKey(key string) bool {
 		}
 	}
 	editing := t.focus != nil && (t.focus.kind == driver.KindInput || t.focus.kind == driver.KindWeb)
-	return menuTakes(menu, names, env.os.GetUntracked() == OSMacOS, editing)
+	_, ok := driver.MenuShortcut(menu, names, env.os.GetUntracked() == OSMacOS, editing)
+	return ok
 }
 
 // keyPlaces is where the owners of views show, which decides the key bindings and back handlers that take part: read from the views each time a keymap, a key or a back press asks, so it follows a Holder's content in and out of its places, a modal shown or dismissed, and DisplayNone.

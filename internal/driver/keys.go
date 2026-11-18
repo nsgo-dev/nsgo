@@ -138,3 +138,26 @@ func FindKey(keymap []KeyBinding, names []string, focus KeyUse, repeat bool) (id
 	}
 	return 0, false
 }
+
+// MenuShortcut finds the enabled item of entries or of their enabled submenus that takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac (mac) every item's, elsewhere all but the editing roles', whose keys the focused field handles itself. While editing, NotInText items leave the key to the focused input or web view. The first such item in menu order takes the key, as the platforms' menus find it; a disabled one takes nothing.
+func MenuShortcut(entries []MenuEntry, names []string, mac, editing bool) (MenuEntry, bool) {
+	for _, e := range entries {
+		switch {
+		case e.Disabled || e.Separator:
+		case len(e.Items) > 0:
+			if found, ok := MenuShortcut(e.Items, names, mac, editing); ok {
+				return found, true
+			}
+		case e.NotInText && editing:
+		case mac || !e.Role.EditsText():
+			shortcut := e.Shortcut
+			if shortcut == "" {
+				shortcut = NormalizeKey(e.Role.Shortcut(mac))
+			}
+			if shortcut != "" && slices.Contains(names, shortcut) {
+				return e, true
+			}
+		}
+	}
+	return MenuEntry{}, false
+}
