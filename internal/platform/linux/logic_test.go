@@ -27,6 +27,8 @@ func TestKeyNamesMatchOnKeys(t *testing.T) {
 		{gdkPageUp, false, "pageup"}, {gdkDown, false, "down"},
 		{'?', true, "/"}, {'+', true, "="}, {'_', true, "-"},
 		{0, false, ""},
+		// Modifiers, Caps Lock, Print and Menu: keyvals that are no characters.
+		{0xffe1, false, ""}, {0xffe5, false, ""}, {0xff61, false, ""}, {0xff67, false, ""},
 	} {
 		if got := keyName(c.keyval, c.shift); got != c.want {
 			t.Errorf("keyName(0x%X, %v) = %q, want %q", c.keyval, c.shift, got, c.want)

@@ -794,7 +794,7 @@ func (a *App) Commit(selector, text string) {
 	a.Compose(selector, "")
 }
 
-// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a"): a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, or mod+a selects all its text; else, in a macOS, Windows or Linux environment, the enabled application-menu item with the key as its shortcut is chosen, unless it is NotInText and a field or web view has the focus; else Escape goes back. A key nothing takes does nothing, as on a device.
+// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a", or a modifier alone, "shift"): the focused view's OnKeyDown hears it first, and a key it consumes goes no further; else a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, or mod+a selects all its text; else, in a macOS, Windows or Linux environment, the enabled application-menu item with the key as its shortcut is chosen, unless it is NotInText and a field or web view has the focus; else Escape goes back. A key nothing takes does nothing, as on a device.
 func (a *App) Key(key string) {
 	a.t.Helper()
 	a.step("key(%s)", key)
@@ -806,19 +806,9 @@ func (a *App) Key(key string) {
 	k := driver.NormalizeKey(key)
 	a.inputBy(driver.ModalityKeyboard)
 	names := a.keyNames(k)
-	parts := strings.Split(k, "+")
-	keyName := parts[len(parts)-1]
-	mods := a.keyModifiers(parts[:len(parts)-1])
-	for _, v := range a.views {
-		if !v.Focused || !v.Events.Has(driver.EventKeyDown) {
-			continue
-		}
-		consumed := false
-		a.send(v, driver.Event{Kind: driver.EventKeyDown, Text: keyName, Modifiers: mods, Data: &consumed})
-		if consumed {
-			a.done()
-			return
-		}
+	if a.keyDown(k) {
+		a.done()
+		return
 	}
 	if id, consumed := driver.FindKey(a.keyBindings, names, a.focusKeyUse(), false); consumed {
 		if id != 0 {
@@ -912,6 +902,48 @@ func (a *App) menuShortcut(names []string) (uint32, bool) {
 	}
 	e, ok := driver.MenuShortcut(a.Menu, names, a.env.OS == driver.OSMacOS, editing)
 	return e.ID, ok
+}
+
+// keyDown offers key k, normalized, to the focused view that hears keys go down (View.OnKeyDown), as the platforms do before the keymap, and reports whether it consumed the key. A modifier alone ("shift", "mod") is reported with its own modifier held and never consumed.
+func (a *App) keyDown(k string) bool {
+	var focused *View
+	for _, v := range a.shown() {
+		if v.Focused && v.Kind != driver.KindInput && v.Events.Has(driver.EventKeyDown) {
+			focused = v
+			break
+		}
+	}
+	if focused == nil {
+		return false
+	}
+	parts := strings.Split(k, "+")
+	name := parts[len(parts)-1]
+	held := parts[:len(parts)-1]
+	modifier := true
+	switch name {
+	case "shift", "ctrl", "alt", "meta", "mod":
+	case "control":
+		name = "ctrl"
+	case "option":
+		name = "alt"
+	case "cmd", "command", "super", "win":
+		name = "meta"
+	default:
+		modifier = false
+	}
+	if modifier {
+		held = append(held, name)
+	}
+	mods := a.keyModifiers(held)
+	if name == "mod" {
+		name = "ctrl"
+		if mods.Platform {
+			name = "meta"
+		}
+	}
+	consumed := a.tree.KeyDown(driver.Event{Kind: driver.EventKeyDown, ID: focused.ID, Text: name, Modifiers: mods})
+	a.Settle()
+	return consumed && !modifier
 }
 
 // keyModifiers reads normalized key prefixes; mod is Command on Apple platforms and Control elsewhere, while meta is Command or the system key.

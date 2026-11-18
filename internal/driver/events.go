@@ -282,9 +282,8 @@ const (
 // EventVideoPause reports that the platform paused video ID, not the app's Paused: Index is why (VideoPauseInterruption, ...). An EventMask has no room for another kind, so it shares EventImageInfo's, an answer that names no view and is never in a mask; Android's Protocol.java mirrors it.
 const EventVideoPause EventKind = EventImageInfo
 
-// EventKeyDown reports a raw key press to a focused view before the keymap.
-// It shares EventImageInfo's unused view-mask slot.
-const EventKeyDown EventKind = EventVideoPause
+// EventKeyDown reports a key going down on view ID, which has the keyboard focus, before the keymap matches it: Text is the key's name as NormalizeKey writes it without modifiers ("k", "space", "f5", or "shift", "ctrl", "alt" and "meta" for a modifier pressed alone), Modifiers the keys held, the pressed one included, and Repeat whether it is a held key's auto-repeat. The platform asks the engine synchronously (Engine.DispatchKeyDown) and takes the key from the keymap and the view when the view's handler consumes it. An EventMask has no room for another kind, so it shares EventKey's, a binding's press that names no view and so is never in a view's mask: one with an ID is a key down.
+const EventKeyDown EventKind = EventKey
 
 // EventVideoPlay reports that the platform played video ID, not the app's Paused. It shares EventMenuClosed's kind as EventVideoPause shares EventImageInfo's.
 const EventVideoPlay EventKind = EventMenuClosed
@@ -353,7 +352,7 @@ type Event struct {
 	URIs []string
 	// Data is what a native component emitted.
 	Data any
-	// Repeat says a key is an auto-repeat for EventKeyDown.
+	// Repeat is whether EventKeyDown's key is a held key's auto-repeat.
 	Repeat bool
 	// Finished is whether an animation ran to its end, or the platform
 	// closed a modal.

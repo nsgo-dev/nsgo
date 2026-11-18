@@ -13,27 +13,58 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+// TestFocusedViewReceivesKeyDownBeforeTheKeymap holds Key to give the focused view's OnKeyDown each key first, with its modifiers, a modifier alone included: a key it consumes reaches neither a binding nor the view's own Return, and one it leaves goes on to them (#287).
 func TestFocusedViewReceivesKeyDownBeforeTheKeymap(t *testing.T) {
-	var got core.KeyEvent
-	var bindings int
-	app := Start(t, func(cx *core.Scope) core.Node {
-		cx.OnKey("ctrl+shift+k", func() { bindings++ })
-		return core.View{Children: []core.Node{core.View{
-			TestID: "recorder", Focusable: func() bool { return true },
-			OnKeyDown: func(event core.KeyEvent) bool { got = event; return true },
-			Style:     core.Style{Width: core.Pt(100), Height: core.Pt(30)},
-		}}}
-	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
-	app.Focus("id:recorder")
-	app.Key("ctrl+shift+k")
-	if got.Key != "k" || !got.Modifiers.Control || !got.Modifiers.Shift || got.Modifiers.Alt || got.Modifiers.Platform || got.Repeat {
-		t.Fatalf("key event = %+v", got)
-	}
-	if got.Shortcut() != "ctrl+shift+k" {
-		t.Fatalf("shortcut = %q", got.Shortcut())
-	}
-	if bindings != 0 {
-		t.Fatalf("keymap binding ran %d times", bindings)
+	for _, system := range []core.OS{core.OSMacOS, core.OSWindows} {
+		t.Run(string(system), func(t *testing.T) {
+			var got []core.KeyEvent
+			var bindings, presses int
+			app := Start(t, func(cx *core.Scope) core.Node {
+				for _, key := range []string{"ctrl+shift+k", "mod+s", "alt+space", "f5", "x"} {
+					cx.OnKeyWith(key, core.KeyOptions{When: core.KeyAlways}, func() { bindings++ })
+				}
+				return core.View{Children: []core.Node{core.View{
+					TestID: "recorder", Focusable: func() bool { return true },
+					OnPress:   func(core.PressEvent) { presses++ },
+					OnKeyDown: func(e core.KeyEvent) bool { got = append(got, e); return e.Key != "x" },
+					Style:     core.Style{Width: core.Pt(100), Height: core.Pt(30)},
+				}}}
+			}, Environment(core.Environment{OS: system, Idiom: core.IdiomDesktop}))
+			app.Focus("id:recorder")
+			platform := core.Modifiers{Platform: true}
+			if system != core.OSMacOS {
+				platform = core.Modifiers{Control: true}
+			}
+			for _, c := range []struct {
+				key      string
+				want     core.KeyEvent
+				shortcut string
+			}{
+				{"ctrl+shift+k", core.KeyEvent{Key: "k", Modifiers: core.Modifiers{Control: true, Shift: true}}, "ctrl+shift+k"},
+				{"mod+s", core.KeyEvent{Key: "s", Modifiers: platform}, map[bool]string{true: "meta+s", false: "ctrl+s"}[system == core.OSMacOS]},
+				{"alt+space", core.KeyEvent{Key: "space", Modifiers: core.Modifiers{Alt: true}}, "alt+space"},
+				{"F5", core.KeyEvent{Key: "f5"}, "f5"},
+				{"Return", core.KeyEvent{Key: "enter"}, "enter"},
+				{"shift", core.KeyEvent{Key: "shift", Modifiers: core.Modifiers{Shift: true}}, ""},
+			} {
+				got = nil
+				app.Key(c.key)
+				if len(got) != 1 || got[0] != c.want {
+					t.Fatalf("Key(%q) delivered %+v, want %+v", c.key, got, c.want)
+				}
+				if s := got[0].Shortcut(); s != c.shortcut {
+					t.Errorf("Key(%q).Shortcut() = %q, want %q", c.key, s, c.shortcut)
+				}
+			}
+			if bindings != 0 || presses != 0 {
+				t.Fatalf("consumed keys reached the app: %d bindings, %d presses", bindings, presses)
+			}
+			got = nil
+			app.Key("x")
+			if len(got) != 1 || bindings != 1 {
+				t.Fatalf("a key the view leaves: %d key events, %d bindings; want 1 and 1", len(got), bindings)
+			}
+		})
 	}
 }
 

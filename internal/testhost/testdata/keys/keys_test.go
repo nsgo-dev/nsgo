@@ -107,3 +107,58 @@ func TestEditingKeysKeepTheirUnboundActions(t *testing.T) {
 		})
 	}
 }
+
+// A focused view hears the keys that go down on it before the keymap, with their modifiers, and a key it consumes fires no binding (#287).
+func TestAFocusedViewHearsItsKeysBeforeTheKeymap(t *testing.T) {
+	switch nsgotest.Target() {
+	case "", "macos", "windows", "linux", "web":
+	default:
+		t.Skip("key downs on mobile are tracked in the roadmap")
+	}
+	var got []core.KeyEvent
+	var bindings atomic.Int32
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		for _, key := range []string{"alt+space", "mod+shift+k", "f5", "x"} {
+			cx.OnKeyWith(key, core.KeyOptions{When: core.KeyAlways}, func() { bindings.Add(1) })
+		}
+		return core.View{Style: core.Style{Padding: core.All(20)}, Children: []core.Node{core.View{
+			TestID: "recorder", Focusable: func() bool { return true },
+			OnKeyDown: func(e core.KeyEvent) bool { got = append(got, e); return e.Key != "x" },
+			Style:     core.Style{Width: core.Pt(200), Height: core.Pt(40)},
+		}}}
+	}, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}), nsgotest.Size(300, 120))
+	app.Focus("id:recorder")
+	mod := core.Modifiers{Control: true}
+	if target := nsgotest.Target(); target == "" || target == "macos" {
+		mod = core.Modifiers{Platform: true}
+	}
+	modShiftK := "ctrl+shift+k"
+	if mod.Platform {
+		modShiftK = "shift+meta+k"
+	}
+	for _, c := range []struct {
+		key, shortcut string
+		want          core.KeyEvent
+	}{
+		{"alt+space", "alt+space", core.KeyEvent{Key: "space", Modifiers: core.Modifiers{Alt: true}}},
+		{"mod+shift+k", modShiftK, core.KeyEvent{Key: "k", Modifiers: core.Modifiers{Control: mod.Control, Shift: true, Platform: mod.Platform}}},
+		{"f5", "f5", core.KeyEvent{Key: "f5"}},
+	} {
+		got = nil
+		app.Key(c.key)
+		if len(got) != 1 || got[0] != c.want {
+			t.Fatalf("%s: the view heard %+v, want %+v", c.key, got, c.want)
+		}
+		if s := got[0].Shortcut(); s != c.shortcut {
+			t.Fatalf("%s: shortcut %q, want %q", c.key, s, c.shortcut)
+		}
+	}
+	if n := bindings.Load(); n != 0 {
+		t.Fatalf("keys the view consumed fired %d bindings", n)
+	}
+	got = nil
+	app.Key("x")
+	if len(got) != 1 || bindings.Load() != 1 {
+		t.Fatalf("a key the view left: heard %d times, %d bindings; want 1 and 1", len(got), bindings.Load())
+	}
+}

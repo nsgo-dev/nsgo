@@ -2432,7 +2432,9 @@ func (s *surface) listen() {
 			if !modifierKey(args[0].Get("key").String()) {
 				s.engine.InputModality(driver.ModalityKeyboard)
 			}
-			s.shortcut(args[0])
+			if !s.focusKeyDown(args[0]) {
+				s.shortcut(args[0])
+			}
 		}
 		return nil
 	}), true)

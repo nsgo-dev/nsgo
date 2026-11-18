@@ -108,14 +108,15 @@ func (w *window) editing() bool {
 // setKeymap replaces the keyboard shortcuts.
 func (w *window) setKeymap(keys []driver.KeyBinding) { w.keys = keys }
 
-// dispatchKeyDown offers a raw key to the focused view before the keymap.
-func (w *window) dispatchKeyDown(vk, lParam uintptr) bool {
+// keyDown offers a key going down to the focused view that hears keys (View.OnKeyDown), before the keymap and the view's own keys, and reports whether it consumed the key. A modifier alone is reported but never consumed: no binding takes one, and the window follows the modifiers through its messages.
+func (w *window) keyDown(vk, lParam uintptr) bool {
 	v := w.focusedView()
-	if w.engine == nil || v == nil || !v.events.Has(driver.EventKeyDown) {
+	if w.engine == nil || v == nil || v.deleted || v.field != nil || !v.events.Has(driver.EventKeyDown) {
 		return false
 	}
-	name := keyName(vk)
+	name, modifier := keyName(vk), false
 	if name == "" {
+		modifier = true
 		switch vk {
 		case vkShift:
 			name = "shift"
@@ -125,13 +126,12 @@ func (w *window) dispatchKeyDown(vk, lParam uintptr) bool {
 			name = "alt"
 		case vkLWin, vkRWin:
 			name = "meta"
+		default:
+			return false
 		}
 	}
-	if name == "" {
-		return false
-	}
-	consumed := false
-	return w.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name, Modifiers: modifiers(), Repeat: repeated(lParam), Data: &consumed}) || consumed
+	consumed := w.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name, Modifiers: modifiers(), Repeat: repeated(lParam)})
+	return consumed && !modifier
 }
 
 // shortcut reports a key press matching a shortcut, by its name with

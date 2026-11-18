@@ -814,3 +814,88 @@ func TestMenuYieldFollowsTextFocus(t *testing.T) {
 		}
 	}
 }
+
+// TestKeyEventShortcutNamesEachModifier holds Shortcut to OnKey's and RegisterHotKey's form with each modifier by its own name, which NormalizeKey keeps, and "" for a modifier alone (#287).
+func TestKeyEventShortcutNamesEachModifier(t *testing.T) {
+	for _, c := range []struct {
+		event KeyEvent
+		want  string
+	}{
+		{KeyEvent{Key: "space", Modifiers: Modifiers{Alt: true}}, "alt+space"},
+		{KeyEvent{Key: "k", Modifiers: Modifiers{Control: true, Shift: true}}, "ctrl+shift+k"},
+		// Command on macOS, the Windows key elsewhere: never "mod", which is Control off Apple platforms.
+		{KeyEvent{Key: "k", Modifiers: Modifiers{Platform: true, Shift: true}}, "shift+meta+k"},
+		{KeyEvent{Key: "f5"}, "f5"},
+		{KeyEvent{Key: "f5", Repeat: true}, "f5"},
+		{KeyEvent{Key: "a", Modifiers: Modifiers{Control: true, Alt: true, Shift: true, Platform: true}}, "ctrl+alt+shift+meta+a"},
+		{KeyEvent{Key: "shift", Modifiers: Modifiers{Shift: true}}, ""},
+		{KeyEvent{Key: "meta", Modifiers: Modifiers{Platform: true, Control: true}}, ""},
+		{KeyEvent{}, ""},
+	} {
+		got := c.event.Shortcut()
+		if got != c.want {
+			t.Errorf("%+v.Shortcut() = %q, want %q", c.event, got, c.want)
+		}
+		if got != "" && driver.NormalizeKey(got) != got {
+			t.Errorf("NormalizeKey(%q) = %q, want it unchanged", got, driver.NormalizeKey(got))
+		}
+	}
+}
+
+// TestAKeyDownReachesTheFocusedViewInItsOwner holds OnKeyDown to put the key kind in the view's events, run in the view's owner, so what it sets renders, and answer whether it consumed the key; a view without one, or one gone, consumes nothing, and a binding's press, of the same kind, still runs the binding.
+func TestAKeyDownReachesTheFocusedViewInItsOwner(t *testing.T) {
+	var got []KeyEvent
+	var bound int
+	h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+		shown := NewSignal(cx, "")
+		cx.OnKey("ctrl+k", func() { bound++ })
+		return View{Children: []Node{
+			View{TestID: "recorder", Focusable: func() bool { return true }, OnKeyDown: func(e KeyEvent) bool {
+				got = append(got, e)
+				shown.Set(e.Shortcut())
+				return e.Key != "x"
+			}},
+			View{TestID: "plain", Focusable: func() bool { return true }},
+			Text{TestID: "shown", ContentFunc: shown.Get},
+		}}
+	})
+	var keymap []driver.KeyBinding
+	b := h.commit()
+	recorder, plain := h.find("recorder"), h.find("plain")
+	masks := map[driver.NodeID]driver.EventMask{}
+	for _, it := range b.Items {
+		switch it.Kind {
+		case driver.ItemEvents:
+			masks[it.ID] = it.Events
+		case driver.ItemKeymap:
+			keymap = it.Keys
+		}
+	}
+	if !masks[recorder.id].Has(driver.EventKeyDown) || masks[plain.id].Has(driver.EventKeyDown) {
+		t.Fatalf("key down in the masks: recorder %v, plain %v", masks[recorder.id].Has(driver.EventKeyDown), masks[plain.id].Has(driver.EventKeyDown))
+	}
+	press := driver.Event{Kind: driver.EventKeyDown, ID: recorder.id, Text: "k", Modifiers: Modifiers{Control: true, Shift: true}, Repeat: true}
+	if !h.tree.KeyDown(press) {
+		t.Fatal("the recorder did not consume ctrl+shift+k")
+	}
+	if len(got) != 1 || got[0] != (KeyEvent{Key: "k", Modifiers: Modifiers{Control: true, Shift: true}, Repeat: true}) {
+		t.Fatalf("key events = %+v", got)
+	}
+	h.commit()
+	if s := h.find("shown").text.content; s != "ctrl+shift+k" {
+		t.Fatalf("the recorder shows %q after the key", s)
+	}
+	if h.tree.KeyDown(driver.Event{Kind: driver.EventKeyDown, ID: recorder.id, Text: "x"}) {
+		t.Fatal("a key the handler returned false for was consumed")
+	}
+	if h.tree.KeyDown(driver.Event{Kind: driver.EventKeyDown, ID: plain.id, Text: "k"}) || h.tree.KeyDown(driver.Event{Kind: driver.EventKeyDown, ID: 9999, Text: "k"}) {
+		t.Fatal("a view without OnKeyDown, or none, consumed a key")
+	}
+	if len(keymap) != 1 {
+		t.Fatalf("keymap = %v", keymap)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventKey, Count: keymap[0].ID})
+	if bound != 1 || len(got) != 2 {
+		t.Fatalf("a binding's press: bound %d, key events %d", bound, len(got))
+	}
+}

@@ -230,7 +230,20 @@ lookup := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 380, Height: 520, Tr
 desktop.RegisterHotKey(cx, "alt+space", lookup.Toggle)
 ```
 
-`View.OnKeyDown` receives a focused hardware key before the keymap with its normalized name, modifiers and repeat state. Return `true` to consume the key.
+A shortcut recorder lets the user choose such a key. A `Focusable` view's `OnKeyDown` hears each key that goes down while it has the focus, before the app's bindings, with the modifiers held, a modifier pressed alone included; returning `true` keeps the key from the bindings, so recording Command+S does not save. `KeyEvent.Shortcut` writes the press as `OnKey` and `RegisterHotKey` take it, each modifier by name ("ctrl+shift+k", "alt+space", "shift+meta+k" for Command+Shift+K), and "" for a modifier alone. It works on macOS, Windows, Linux and the web, where the browser keeps the shortcuts it gives no page, and in `nsgotest`; Android and iOS report no keys to it yet. A shortcut the app registered globally takes its key before the view, so a recorder unregisters it while it records.
+
+```go
+core.View{
+	Focusable: func() bool { return true },
+	OnKeyDown: func(e core.KeyEvent) bool {
+		if s := e.Shortcut(); s != "" {
+			shortcut.Set(s)
+		}
+		return true
+	},
+	Children: []core.Node{core.Text{ContentFunc: shortcut.Get}},
+}
+```
 
 ## Speaking text
 

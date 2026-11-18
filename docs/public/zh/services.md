@@ -230,7 +230,20 @@ lookup := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 380, Height: 520, Tr
 desktop.RegisterHotKey(cx, "alt+space", lookup.Toggle)
 ```
 
-聚焦的 `View.OnKeyDown` 会在键盘映射前收到硬件按键、标准化名称、修饰键和重复状态，返回 `true` 可消耗该按键。
+快捷键录制控件让用户自己选这样的按键。`Focusable` 视图的 `OnKeyDown` 在它有焦点时、应用的绑定之前，收到每个按下的键和当时按住的修饰键，单独按下的修饰键也算；返回 `true` 让这个键不再交给绑定，所以录制 Command+S 时不会触发保存。`KeyEvent.Shortcut` 把按键写成 `OnKey` 和 `RegisterHotKey` 接受的形式，每个修饰键用自己的名字（"ctrl+shift+k"、"alt+space"，Command+Shift+K 是 "shift+meta+k"），单独的修饰键为 ""。它在 macOS、Windows、Linux 和 Web 上可用，Web 上浏览器不交给页面的快捷键仍归浏览器，`nsgotest` 中也可用；Android 和 iOS 还不向它报告按键。应用自己注册的全局快捷键会先于视图拿到按键，所以录制期间要先注销它。
+
+```go
+core.View{
+	Focusable: func() bool { return true },
+	OnKeyDown: func(e core.KeyEvent) bool {
+		if s := e.Shortcut(); s != "" {
+			shortcut.Set(s)
+		}
+		return true
+	},
+	Children: []core.Node{core.Text{ContentFunc: shortcut.Get}},
+}
+```
 
 ## 登录
 

@@ -516,6 +516,11 @@ func keyPressedCallback(controller uintptr, keyval, keycode, state uint32, data 
 	if keyval < gdkShiftL || keyval > gdkHyperR {
 		w.engine.InputModality(driver.ModalityKeyboard)
 	}
+	if w.keyDown(keyval, state, repeat) {
+		// Alt released after a key it took does not toggle the menu bar.
+		w.chrome.altAlone = false
+		return 1
+	}
 	w.menuBarKey(keyval, state, true)
 	if w.selectKey(keyval, state) {
 		return 1
@@ -776,6 +781,35 @@ func descendant(v, child *view) bool {
 	return false
 }
 
+// modifierKeyvals name the modifier keys' keyvals as KeyEvent does, with the state bit each sets: GDK's state at a key press holds the modifiers held before it, not the one going down.
+var modifierKeyvals = map[uint32]struct {
+	name string
+	bit  uint32
+}{
+	0xffe1: {"shift", gdkShift}, 0xffe2: {"shift", gdkShift}, 0xffe3: {"ctrl", gdkControl}, 0xffe4: {"ctrl", gdkControl},
+	0xffe9: {"alt", gdkAlt}, 0xffea: {"alt", gdkAlt}, 0xffeb: {"meta", gdkSuper}, 0xffec: {"meta", gdkSuper},
+	0xffe7: {"meta", gdkMeta}, 0xffe8: {"meta", gdkMeta},
+}
+
+// keyDown offers a key going down to the focused view that hears keys (View.OnKeyDown), before the keymap and the view's own keys, and reports whether it consumed the key. A modifier alone is reported but never consumed, as no binding takes one.
+func (w *window) keyDown(keyval, state uint32, repeat bool) bool {
+	v := w.controlFocus
+	if v == nil || v.deleted || w.focus != nil || w.focusedWeb() != nil || !v.events.Has(driver.EventKeyDown) {
+		return false
+	}
+	name, modifier := keyName(keyval, state&gdkShift != 0), false
+	if m, ok := modifierKeyvals[keyval]; ok {
+		name, modifier = m.name, true
+		state |= m.bit
+	}
+	if name == "" {
+		return false
+	}
+	mods := driver.Modifiers{Control: state&gdkControl != 0, Alt: state&gdkAlt != 0, Shift: state&gdkShift != 0, Platform: state&(gdkSuper|gdkMeta) != 0}
+	consumed := w.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name, Modifiers: mods, Repeat: repeat})
+	return consumed && !modifier
+}
+
 // shortcut reports a key press matching the app's keymap or the
 // application menu's shortcuts, and whether it took it.
 func (w *window) shortcut(keyval, state uint32, repeat bool) bool {
@@ -883,6 +917,9 @@ func keyName(keyval uint32, shifted bool) string {
 		return "f" + itoa(int(keyval-gdkF1)+1)
 	case keyval >= gdkKP0 && keyval <= gdkKP9:
 		return itoa(int(keyval - gdkKP0))
+	case keyval >= 0xfe00 && keyval <= 0xffff:
+		// Function and modifier keys, whose keyvals are no characters.
+		return ""
 	}
 	r := rune(keyval)
 	if unicode.IsPrint(r) && r != ' ' {

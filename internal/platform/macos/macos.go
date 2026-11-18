@@ -1307,6 +1307,7 @@ func (s *surface) filterEvent(event objc.ID) objc.ID {
 	switch objc.Send[uint](event, sel("type")) {
 	case typeFlagsChanged:
 		s.modifiersChanged(event)
+		s.modifierDown(event)
 	case typeMouseMoved:
 		// The hovers the move reports and the cursor follow where the
 		// content shows.
@@ -1321,13 +1322,13 @@ func (s *surface) filterEvent(event objc.ID) objc.ID {
 			return 0
 		}
 	case typeKeyDown:
-		if s.dispatchKeyDown(event) {
-			return 0
-		}
 		if !s.hasKeys() {
 			break
 		}
 		s.engine.InputModality(driver.ModalityKeyboard)
+		if name := keyName(event); name != "" && s.keyDown(name, event, objc.Send[bool](event, sel("isARepeat"))) {
+			return 0
+		}
 		if id, consumed := s.binding(event); consumed {
 			if id != 0 {
 				s.engine.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
@@ -1375,33 +1376,42 @@ func (s *surface) filterEvent(event objc.ID) objc.ID {
 	return event
 }
 
-// dispatchKeyDown offers a raw key to the focused view before the keymap.
-func (s *surface) dispatchKeyDown(event objc.ID) bool {
-	first := s.window.Send(sel("firstResponder"))
-	v := views[first]
-	if v == nil || !v.events.Has(driver.EventKeyDown) {
+// keyFocus returns the view of the surface's that has the keyboard focus itself and hears its keys go down (View.OnKeyDown), or nil.
+func (s *surface) keyFocus() *view {
+	v := views[s.window.Send(sel("firstResponder"))]
+	if v == nil || v.surface != s || !v.events.Has(driver.EventKeyDown) {
+		return nil
+	}
+	return v
+}
+
+// keyDown offers a key going down to the focused view that hears keys, before the keymap and AppKit, and reports whether it consumed the key.
+func (s *surface) keyDown(name string, event objc.ID, repeat bool) bool {
+	v := s.keyFocus()
+	if v == nil {
 		return false
 	}
-	name, ok := keyNames[objc.Send[uint16](event, sel("keyCode"))]
-	if !ok {
-		name = strings.ToLower(apple.GoString(event.Send(sel("charactersByApplyingModifiers:"), uint(0))))
+	return s.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name,
+		Modifiers: apple.Modifiers(objc.Send[uint](event, sel("modifierFlags"))), Repeat: repeat})
+}
+
+// modifierKeys are the AppKit key codes of the modifier keys, with the device-dependent flag that is set while each is down, as flagsChanged reports a modifier going down or up.
+var modifierKeys = map[uint16]struct {
+	name string
+	flag uint
+}{
+	56: {"shift", 0x02}, 60: {"shift", 0x04}, 59: {"ctrl", 0x01}, 62: {"ctrl", 0x2000},
+	58: {"alt", 0x20}, 61: {"alt", 0x40}, 55: {"meta", 0x08}, 54: {"meta", 0x10},
+}
+
+// modifierDown reports a modifier key going down alone to the focused view that hears keys. AppKit sends it as flagsChanged, not keyDown; the event goes on to AppKit whatever the view answers, as no binding takes a modifier alone.
+func (s *surface) modifierDown(event objc.ID) {
+	m, ok := modifierKeys[objc.Send[uint16](event, sel("keyCode"))]
+	if !ok || objc.Send[uint](event, sel("modifierFlags"))&m.flag == 0 || !s.hasKeys() {
+		return
 	}
-	if name == "" {
-		switch objc.Send[uint16](event, sel("keyCode")) {
-		case 56, 60:
-			name = "shift"
-		case 59, 62:
-			name = "ctrl"
-		case 58, 61:
-			name = "alt"
-		case 54, 55:
-			name = "meta"
-		}
-	}
-	if name == "" {
-		return false
-	}
-	return s.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name, Modifiers: apple.Modifiers(objc.Send[uint](event, sel("modifierFlags"))), Repeat: objc.Send[bool](event, sel("isARepeat"))})
+	// isARepeat is a key event's alone: a modifier does not repeat.
+	s.keyDown(m.name, event, false)
 }
 
 // hasKeys reports whether the window's keys are the surface's: the
@@ -1435,18 +1445,22 @@ var keyNames = map[uint16]string{
 	109: "f10", 103: "f11", 111: "f12",
 }
 
+// keyName names a key event's key as driver.NormalizeKey does, without modifiers: a key of keyNames, else its character without Shift or Option in the current layout, or "" for none.
+func keyName(event objc.ID) string {
+	if name, ok := keyNames[objc.Send[uint16](event, sel("keyCode"))]; ok {
+		return name
+	}
+	return strings.ToLower(apple.GoString(event.Send(sel("charactersByApplyingModifiers:"), uint(0))))
+}
+
 // binding returns the ID of the keymap's binding a key event presses, as driver.FindKey decides for the focused view, and whether the event is consumed. It names the press both with "mod", Command here, and with "meta". Keys go to an input method composing text, as arrows choose its candidates.
 func (s *surface) binding(event objc.ID) (uint32, bool) {
 	if len(s.keys) == 0 || s.composing() {
 		return 0, false
 	}
-	name, ok := keyNames[objc.Send[uint16](event, sel("keyCode"))]
-	if !ok {
-		// The key's character without Shift or Option, in the current layout.
-		name = strings.ToLower(apple.GoString(event.Send(sel("charactersByApplyingModifiers:"), uint(0))))
-		if name == "" {
-			return 0, false
-		}
+	name := keyName(event)
+	if name == "" {
+		return 0, false
 	}
 	return driver.FindKey(s.keys, apple.KeyNames(name, objc.Send[uint](event, sel("modifierFlags"))), s.focusKeyUse(),
 		objc.Send[bool](event, sel("isARepeat")))

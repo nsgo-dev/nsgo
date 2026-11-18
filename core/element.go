@@ -88,8 +88,7 @@ type View struct {
 	// OnFocus and OnBlur follow the keyboard focus to and from a view that takes presses or is Focusable, on desktops and the web; a click presses without focusing. A focused view that leaves the tree hears OnBlur once, after the commit that removed it, or before the next view's OnFocus when the platform reports that first.
 	OnFocus func()
 	OnBlur  func()
-	// OnKeyDown receives a hardware key before the keymap while this view has
-	// the keyboard focus. Returning true consumes the key.
+	// OnKeyDown hears each key going down on a hardware keyboard while the view itself has the keyboard focus, as a Tab stop, before the keymap's bindings and the view's own Return and Space do, a modifier pressed alone included; returning true consumes the key, so no binding fires and the view does not press, as a shortcut recorder takes Command+S without the app's Save running. Global shortcuts (desktop.RegisterHotKey) take their keys before the app sees them. It reports on macOS, Windows, Linux and the web, where the browser keeps the shortcuts it gives no page; Android and iOS do not report it yet.
 	OnKeyDown func(KeyEvent) bool
 	// OnFocusIn and OnFocusOut hear the keyboard focus come to the view or a view inside it from elsewhere, and leave them: a move inside the view is neither, as CSS's :focus-within sees it. A view that stays hears OnFocusOut as the focused view inside it leaves the tree.
 	OnFocusIn, OnFocusOut func()

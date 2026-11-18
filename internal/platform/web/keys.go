@@ -73,6 +73,37 @@ func keyName(e js.Value) string {
 	return strings.ToLower(key)
 }
 
+// focusKeyDown offers a key going down to the focused view that hears keys (View.OnKeyDown), before the keymap and the view's own keys, and reports whether it consumed the key, which then goes no further in the page. A modifier alone is reported but never consumed, as no binding takes one.
+func (s *surface) focusKeyDown(e js.Value) bool {
+	v := s.viewOf(s.doc.Get("activeElement"))
+	if v == nil || v.kind == driver.KindInput || !v.events.Has(driver.EventKeyDown) || e.Get("isComposing").Bool() {
+		return false
+	}
+	name, modifier := keyName(e), true
+	switch e.Get("key").String() {
+	case "Shift":
+		name = "shift"
+	case "Control":
+		name = "ctrl"
+	case "Alt":
+		name = "alt"
+	case "Meta", "OS":
+		name = "meta"
+	default:
+		modifier = false
+	}
+	if name == "" {
+		return false
+	}
+	mods := driver.Modifiers{Control: e.Get("ctrlKey").Bool(), Alt: e.Get("altKey").Bool(), Shift: e.Get("shiftKey").Bool(), Platform: e.Get("metaKey").Bool()}
+	if !s.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name, Modifiers: mods, Repeat: e.Get("repeat").Bool()}) || modifier {
+		return false
+	}
+	e.Call("preventDefault")
+	e.Call("stopPropagation")
+	return true
+}
+
 // shortcut consumes a key press that a binding of the keymap names,
 // with "mod" or with the literal modifier, and reports it, as
 // driver.FindKey decides for the focused element and a held key.

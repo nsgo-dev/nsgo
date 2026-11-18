@@ -8,33 +8,32 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// KeyEvent is a hardware key going down while a view has the keyboard focus.
+// KeyEvent is a key going down on a hardware keyboard while a view has the keyboard focus (View.OnKeyDown).
 type KeyEvent struct {
-	Key       string
+	// Key names the key as OnKey does, without modifiers: "k", "1", "space", "enter", "f5", "left", "escape"; a modifier pressed alone is "shift", "ctrl", "alt" or "meta", which is Command on macOS and the Windows or Super key elsewhere. A letter or a digit is the one the keyboard layout types unshifted.
+	Key string
+	// Modifiers are the modifier keys held, the one pressed alone included.
 	Modifiers Modifiers
-	Repeat    bool
+	// Repeat is whether the press is a held key's auto-repeat.
+	Repeat bool
 }
 
-// Shortcut returns Key in the normalized shortcut form, using mod for the
-// platform modifier and the explicit modifier names for the rest.
+// Shortcut returns the press in OnKey's and desktop.RegisterHotKey's form, with each modifier by its own name, as driver.NormalizeKey writes it: "ctrl+shift+k" or "alt+space" on Windows and Linux, "shift+meta+k" for Command+Shift+K on macOS. A modifier pressed alone is "".
 func (e KeyEvent) Shortcut() string {
-	parts := make([]string, 0, 5)
-	if e.Modifiers.Platform {
-		parts = append(parts, "mod")
+	switch e.Key {
+	case "", "shift", "ctrl", "alt", "meta":
+		return ""
 	}
-	if e.Modifiers.Control {
-		parts = append(parts, "ctrl")
+	var parts []string
+	for _, m := range []struct {
+		on   bool
+		name string
+	}{{e.Modifiers.Control, "ctrl"}, {e.Modifiers.Alt, "alt"}, {e.Modifiers.Shift, "shift"}, {e.Modifiers.Platform, "meta"}} {
+		if m.on {
+			parts = append(parts, m.name)
+		}
 	}
-	if e.Modifiers.Alt {
-		parts = append(parts, "alt")
-	}
-	if e.Modifiers.Shift {
-		parts = append(parts, "shift")
-	}
-	if e.Key != "" {
-		parts = append(parts, e.Key)
-	}
-	return driver.NormalizeKey(strings.Join(parts, "+"))
+	return driver.NormalizeKey(strings.Join(append(parts, e.Key), "+"))
 }
 
 // Keyboard shortcuts: the surface's table of bindings goes to the platform, which matches each key press on the main thread, consumes the presses that match and reports the binding each matched with EventKey, which runs it.

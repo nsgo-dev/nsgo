@@ -286,6 +286,7 @@ type message struct {
 	hidden chan struct{}
 }
 
+// keyDownRequest is a key down a platform waits on (DispatchKeyDown): done hears once whether the view consumed it, false when the engine ends first.
 type keyDownRequest struct {
 	event driver.Event
 	done  chan bool
@@ -605,6 +606,10 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			}
 			s := surfaces[m.surface]
 			if s == nil {
+				if m.keyDown != nil {
+					m.keyDown.done <- false
+					taken[i].keyDown = nil
+				}
 				continue
 			}
 			t := s.tree
@@ -626,10 +631,8 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			case m.at != nil:
 				t.PressAt(*m.at)
 			case m.keyDown != nil:
-				consumed := false
-				m.keyDown.event.Data = &consumed
-				t.Dispatch(m.keyDown.event)
-				m.keyDown.done <- consumed
+				// The platform waits for the answer, not for the commit.
+				m.keyDown.done <- t.KeyDown(m.keyDown.event)
 				taken[i].keyDown = nil
 			default:
 				t.Dispatch(m.event)
@@ -775,18 +778,13 @@ func (e *Engine) DispatchBeforeFrame(ev driver.Event) {
 	e.enqueue(message{surface: e.surface, event: ev})
 }
 
-// DispatchKeyDown synchronously offers a raw key to the focused view before
-// the platform matches its keymap. It reports whether the view consumed it.
+// DispatchKeyDown reports EventKeyDown ev and waits for the engine to run the view's OnKeyDown, after what is queued before it, returning whether it consumed the key: the platform calls it on its main thread before matching the keymap, which a consumed key skips. It returns false once the engine has ended. It must not be called from the engine goroutine.
 func (e *Engine) DispatchKeyDown(ev driver.Event) bool {
 	if e.event != nil && e.surface == 0 {
 		e.event(ev)
 	}
 	request := &keyDownRequest{event: ev, done: make(chan bool, 1)}
-	e.enqueue(message{surface: e.surface, keyDown: request})
-	select {
-	case e.wake <- struct{}{}:
-	default:
-	}
+	e.push(message{surface: e.surface, keyDown: request})
 	return <-request.done
 }
 

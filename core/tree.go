@@ -2162,19 +2162,15 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		return
 	}
 	// A video's pause and play share their kinds with the answers EventImageInfo and EventMenuClosed, which name no view: one for a view is the video's, or a removed video's.
-	if (ev.Kind != driver.EventKeyDown || ev.Data == nil) && (ev.Kind == driver.EventVideoPause || ev.Kind == driver.EventVideoPlay) && ev.ID != 0 {
+	if (ev.Kind == driver.EventVideoPause || ev.Kind == driver.EventVideoPlay) && ev.ID != 0 {
 		if n := t.node(ev.ID); n != nil && n.video != nil {
 			t.dispatchVideo(n, ev)
 		}
 		return
 	}
-	if ev.Kind == driver.EventKeyDown && ev.ID != 0 && ev.Data != nil {
-		if n := t.node(ev.ID); n != nil && n.h.keyDown != nil {
-			consumed := n.h.keyDown(KeyEvent{Key: ev.Text, Modifiers: ev.Modifiers, Repeat: ev.Repeat})
-			if out, ok := ev.Data.(*bool); ok {
-				*out = consumed
-			}
-		}
+	// A key down shares its kind with a binding's press, which names no view.
+	if ev.Kind == driver.EventKeyDown && ev.ID != 0 {
+		t.keyDown(ev)
 		return
 	}
 	switch ev.Kind {
@@ -2594,6 +2590,23 @@ func (tn *textNode) spanAt(i int) *spanNode {
 func (t *Tree) HitTest(p Point) NodeID {
 	id, _ := hit(t.view, p)
 	return id
+}
+
+// KeyDown dispatches EventKeyDown ev to its view's OnKeyDown, as Dispatch does, and reports whether the handler consumed the key, for the platform that waits to know whether the keymap and the view still take it (Engine.DispatchKeyDown).
+func (t *Tree) KeyDown(ev driver.Event) bool {
+	if f := t.follower; f != nil {
+		f.Event(ev)
+	}
+	return t.keyDown(ev)
+}
+
+func (t *Tree) keyDown(ev driver.Event) bool {
+	n := t.node(ev.ID)
+	if n == nil || n.h.keyDown == nil {
+		return false
+	}
+	fn, e := n.h.keyDown, KeyEvent{Key: ev.Text, Modifiers: ev.Modifiers, Repeat: ev.Repeat}
+	return t.within2(n, func() bool { return fn(e) })
 }
 
 // PressAt dispatches ev as a press on the innermost pressable view at its
