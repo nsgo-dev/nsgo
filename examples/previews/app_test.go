@@ -17,11 +17,38 @@ import (
 // TestMain hands the main thread to the platform under nsgo test -target.
 func TestMain(m *testing.M) { nsgotest.Main(m) }
 
-// start runs the demo id as the website mounts it.
-func start(t *testing.T, id string) *nsgotest.App {
+// start runs the demo id as the website mounts it, in the machine's locale.
+func start(t *testing.T, id string) *nsgotest.App { return startIn(t, "", id) }
+
+// startIn runs the demo id as the website mounts it, in locale, or in the machine's where locale is "".
+func startIn(t *testing.T, locale, id string) *nsgotest.App {
 	h := core.NewHost()
 	h.SetParams(map[string]any{"demo": id})
-	return nsgotest.Start(t, Root, nsgotest.Host(h), nsgotest.Size(480, 320))
+	return nsgotest.Start(t, in(locale), nsgotest.Host(h), nsgotest.Size(480, 320))
+}
+
+// locales are what the tests of the demos' words run in: the demos say them in the app's locale, which on a target is the machine's, so each test also forces English and Chinese to pass whatever the machine runs in.
+var locales = []string{"", "en-US", "zh-CN"}
+
+// in returns Root running in locale, or in the machine's where locale is "".
+func in(locale string) func(cx *core.Scope) core.Node {
+	return func(cx *core.Scope) core.Node {
+		if locale != "" {
+			cx.SetLocale(locale)
+		}
+		return Root(cx)
+	}
+}
+
+// eachLocale runs test once per locale.
+func eachLocale(t *testing.T, test func(t *testing.T, locale string)) {
+	for _, locale := range locales {
+		name := locale
+		if name == "" {
+			name = "machine"
+		}
+		t.Run(name, func(t *testing.T) { test(t, locale) })
+	}
 }
 
 func TestEveryDemoShows(t *testing.T) {
@@ -36,31 +63,36 @@ func TestEveryDemoShows(t *testing.T) {
 }
 
 func TestButtonSays(t *testing.T) {
-	app := start(t, "button/basic")
-	app.Press("text:/^(Save|保存)$/")
-	app.WaitFor("text:/^(Saved|已保存)$/", time.Second)
+	eachLocale(t, func(t *testing.T, locale string) {
+		app := startIn(t, locale, "button/basic")
+		app.Press("text:/^(Save|保存)$/")
+		app.WaitFor("text:/^(Saved|已保存)$/", time.Second)
+	})
 }
 
 // TestButtonBusy shows a save running, its button busy until it is saved.
 func TestButtonBusy(t *testing.T) {
-	app := start(t, "button/busy")
-	// The demo's words follow the locale, which a target's is.
-	const save, saved = "role:button /^(Save|保存)$/ >> nth=0", "text:/^(Saved|已保存)$/"
-	app.Press(save)
-	if !app.Find(save).Props.Busy {
-		t.Fatal("the saving button is not busy")
-	}
-	app.Advance(2500 * time.Millisecond)
-	app.Find(saved)
-	if app.Find(save).Props.Busy {
-		t.Fatal("the button stays busy once saved")
-	}
+	eachLocale(t, func(t *testing.T, locale string) {
+		app := startIn(t, locale, "button/busy")
+		const save, saved = "role:button /^(Save|保存)$/ >> nth=0", "text:/^(Saved|已保存)$/"
+		app.Press(save)
+		if !app.Find(save).Props.Busy {
+			t.Fatal("the saving button is not busy")
+		}
+		app.Advance(2500 * time.Millisecond)
+		app.Find(saved)
+		if app.Find(save).Props.Busy {
+			t.Fatal("the button stays busy once saved")
+		}
+	})
 }
 
 func TestPickerWithoutHost(t *testing.T) {
-	app := nsgotest.Start(t, Root, nsgotest.Size(480, 320))
-	app.Find("text:button/basic")
-	app.Find("text:/^(Save|保存)$/")
+	eachLocale(t, func(t *testing.T, locale string) {
+		app := nsgotest.Start(t, in(locale), nsgotest.Size(480, 320))
+		app.Find("text:button/basic")
+		app.Find("text:/^(Save|保存)$/")
+	})
 }
 
 // previewMark is a code block's preview mark in the docs.
