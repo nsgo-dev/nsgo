@@ -443,6 +443,7 @@ final class Protocol {
     static final int SPOKEN_PARTIALLY_CHECKED = 13;
     static final int SPOKEN_EXPANDED = 14;
     static final int SPOKEN_COLLAPSED = 15;
+    static final int SPOKEN_SEPARATOR = 16;
 
     // Keyboard types, as in core/mount.go.
     static final int KEYBOARD_EMAIL = 1;

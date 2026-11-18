@@ -114,6 +114,7 @@ const (
 	textStatePartiallyChecked
 	textStateExpanded
 	textStateCollapsed
+	textSpokenSeparator
 	numTexts
 )
 
@@ -174,6 +175,7 @@ var keyOfText = [numTexts]string{
 	"statePartiallyChecked",
 	"stateExpanded",
 	"stateCollapsed",
+	"spokenSeparator",
 }
 
 // textsEn are the messages without arguments in en.
@@ -231,7 +233,8 @@ var textsEn = i18n.NewTexts(""+
 	"cell"+
 	"partially checked"+
 	"expanded"+
-	"collapsed",
+	"collapsed"+
+	", ",
 	[]uint16{
 		4,
 		6,
@@ -287,6 +290,7 @@ var textsEn = i18n.NewTexts(""+
 		17,
 		8,
 		9,
+		2,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -344,7 +348,8 @@ var textsZhHans = i18n.NewTexts(""+
 	"单元格"+
 	"部分选中"+
 	"已展开"+
-	"已收起",
+	"已收起"+
+	"，",
 	[]uint16{
 		6,
 		6,
@@ -400,6 +405,7 @@ var textsZhHans = i18n.NewTexts(""+
 		12,
 		9,
 		9,
+		3,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -1034,3 +1040,12 @@ func StateCollapsed(cx *core.Scope) string { return For(cx).StateCollapsed() }
 
 // StateCollapsed is the package's StateCollapsed in the language of msgs.
 func (msgs Messages) StateCollapsed() string { return msgs.text(textStateCollapsed) }
+
+// SpokenSeparator says ", "
+// in the language the app shows under cx.
+//
+// The separator Android's screen reader reads between a node's localized state parts.
+func SpokenSeparator(cx *core.Scope) string { return For(cx).SpokenSeparator() }
+
+// SpokenSeparator is the package's SpokenSeparator in the language of msgs.
+func (msgs Messages) SpokenSeparator() string { return msgs.text(textSpokenSeparator) }

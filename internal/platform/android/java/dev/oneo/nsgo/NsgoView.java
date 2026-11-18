@@ -4751,9 +4751,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     /** Adds part, unless null, to the state TalkBack reads after the role. */
-    private static void appendState(StringBuilder state, String part) {
+    private void appendState(StringBuilder state, String part) {
         if (part == null) return;
-        if (state.length() > 0) state.append(", ");
+        if (state.length() > 0) {
+            String separator = spoken(Protocol.SPOKEN_SEPARATOR);
+            state.append(separator != null ? separator : ", ");
+        }
         state.append(part);
     }
 

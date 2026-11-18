@@ -270,7 +270,7 @@ func spoken(lang string) []string {
 	return []string{
 		m.RoleLink(), m.RoleTab(), m.RoleSearchBox(), m.RoleStatus(), m.RoleMenu(), m.RoleMenuItem(), m.RoleDialog(), m.RoleAlert(),
 		m.RoleTable(), m.RoleGrid(), m.RoleRow(), m.RoleColumnHeader(), m.RoleCell(),
-		m.StatePartiallyChecked(), m.StateExpanded(), m.StateCollapsed(),
+		m.StatePartiallyChecked(), m.StateExpanded(), m.StateCollapsed(), m.SpokenSeparator(),
 	}
 }
 

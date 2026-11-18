@@ -190,6 +190,9 @@ func TestSpokenWordsMatchJava(t *testing.T) {
 	for _, m := range regexp.MustCompile(`static final int SPOKEN_(\w+) = (\d+);`).FindAllStringSubmatch(string(java), -1) {
 		i, _ := strconv.Atoi(m[2])
 		want := strings.ToLower(strings.ReplaceAll(m[1], "_", " "))
+		if m[1] == "SEPARATOR" {
+			want = ", "
+		}
 		if i >= len(words) || words[i] != want {
 			t.Errorf("Protocol.java's SPOKEN_%s is %d, which spoken says as %q", m[1], i, words[min(i, len(words)-1)])
 		}
@@ -208,11 +211,12 @@ func TestDirectionSaysTheWordsInTheAppsLanguage(t *testing.T) {
 		rtl       bool
 		searchBox string
 		partly    string
+		separator string
 	}{
-		{"en", false, "search box", "partially checked"},
-		{"zh-Hans", false, "搜索框", "部分选中"},
-		{"zh-CN", false, "搜索框", "部分选中"},
-		{"de", true, "search box", "partially checked"},
+		{"en", false, "search box", "partially checked", ", "},
+		{"zh-Hans", false, "搜索框", "部分选中", "，"},
+		{"zh-CN", false, "搜索框", "部分选中", "，"},
+		{"de", true, "search box", "partially checked", ", "},
 	} {
 		var w writer
 		writeDirection(&w, &driver.MountItem{Kind: driver.ItemDirection, RTL: c.rtl, Language: c.lang})
@@ -227,8 +231,8 @@ func TestDirectionSaysTheWordsInTheAppsLanguage(t *testing.T) {
 		if len(r.buf) != 0 || len(words) != len(english) {
 			t.Fatalf("%s: %d words, %d bytes left", c.lang, len(words), len(r.buf))
 		}
-		if words[2] != c.searchBox || words[13] != c.partly {
-			t.Errorf("%s: a search box is %q and partially checked %q", c.lang, words[2], words[13])
+		if words[2] != c.searchBox || words[13] != c.partly || words[len(words)-1] != c.separator {
+			t.Errorf("%s: a search box is %q, partially checked %q and separator %q", c.lang, words[2], words[13], words[len(words)-1])
 		}
 		for i, s := range words {
 			if s == "" || c.searchBox != english[2] && s == english[i] {

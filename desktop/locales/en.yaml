@@ -133,3 +133,6 @@ stateExpanded:
 stateCollapsed:
   message: "collapsed"
   description: What Android's screen reader announces an expandable element that hides its content as.
+spokenSeparator:
+  message: ", "
+  description: The separator Android's screen reader reads between a node's localized state parts.
