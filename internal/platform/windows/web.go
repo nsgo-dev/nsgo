@@ -1184,12 +1184,12 @@ var webEditCommands = map[driver.MenuRole]string{
 	driver.MenuDelete: "Delete", driver.MenuSelectAll: "SelectAll",
 }
 
-// webEdit runs role's editing command in the focused page, if one has the focus. WebView2 has no call for editing commands, and document.execCommand from a script runs as the page's own, which Chromium lets paste nothing and which deletes a character where nothing is selected, so CDP carries the command on a key event with no key, as Blink runs a key's editing commands: in the focused frame, as a menu's, and unless the page cancels the key.
-func (w *window) webEdit(role driver.MenuRole) {
+// webEdit runs role's editing command in the focused page, if one has the focus, reporting whether one has. WebView2 has no call for editing commands, and document.execCommand from a script runs as the page's own, which Chromium lets paste nothing and which deletes a character where nothing is selected, so CDP carries the command on a key event with no key, as Blink runs a key's editing commands: in the focused frame, as a menu's, and unless the page cancels the key.
+func (w *window) webEdit(role driver.MenuRole) bool {
 	wv := w.focusedWeb()
 	command := webEditCommands[role]
 	if wv == nil || command == "" {
-		return
+		return false
 	}
 	report := func(_ string, err error) {
 		if err != nil {
@@ -1199,6 +1199,7 @@ func (w *window) webEdit(role driver.MenuRole) {
 	what := "run the menu's " + command
 	wv.devTools("Input.dispatchKeyEvent", `{"type":"rawKeyDown","commands":["`+command+`"]}`, what, report)
 	wv.devTools("Input.dispatchKeyEvent", `{"type":"keyUp"}`, what, report)
+	return true
 }
 
 // close lets the page go, with its visuals.

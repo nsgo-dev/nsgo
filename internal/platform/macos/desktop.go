@@ -45,6 +45,8 @@ type chrome struct {
 	menuEntries []driver.MenuEntry
 	language    string // what the menus say (driver.ItemDirection)
 	menuTarget  objc.ID
+	// roleFallback are the roles of the editing items with an ID, which menuRoleChosen carries out or reports.
+	roleFallback map[uint32]driver.MenuRole
 	// notInText are the IDs of the items whose shortcuts a field or a
 	// web view with the keyboard focus keeps (MenuEntry.NotInText).
 	notInText  map[uint32]bool
@@ -84,6 +86,7 @@ var (
 var rawHit bool
 
 var selMenuChosen = sel("nsgoMenuChosen:")
+var selMenuRoleChosen = sel("nsgoMenuRoleChosen:")
 var selDockMenuChosen = sel("nsgoDockMenuChosen:")
 
 // The action of the full screen role's item, in place of AppKit's
@@ -505,6 +508,7 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 	}
 	s.ensureMenuTarget()
 	clear(s.notInText)
+	clear(s.roleFallback)
 	bar := objc.ID(apple.Class("NSMenu")).Send(selNew)
 	for _, e := range entries {
 		if e.Separator {
@@ -859,7 +863,11 @@ func (s *surface) item(e driver.MenuEntry) objc.ID {
 	case fullScreen:
 		action = selMenuFullScreen
 	case e.Role != driver.MenuRoleNone:
-		action = sel(roleActions[e.Role])
+		if e.ID != 0 && (e.Role.EditsText() || e.Role == driver.MenuPasteAndMatchStyle) {
+			action = selMenuRoleChosen
+		} else {
+			action = sel(roleActions[e.Role])
+		}
 	case e.ID != 0:
 		action = selMenuChosen
 	}
@@ -874,6 +882,14 @@ func (s *surface) item(e driver.MenuEntry) objc.ID {
 		if titled {
 			it.Send(sel("setTag:"), fullScreenTitled)
 		}
+	}
+	if action == selMenuRoleChosen {
+		if s.roleFallback == nil {
+			s.roleFallback = map[uint32]driver.MenuRole{}
+		}
+		s.roleFallback[uint32(e.ID)] = e.Role
+		it.Send(selSetTarget, s.menuTarget)
+		it.Send(sel("setTag:"), int(e.ID))
 	}
 	if action == selMenuChosen {
 		it.Send(selSetTarget, s.menuTarget)
@@ -1019,6 +1035,54 @@ func menuChosen(self objc.ID, _ objc.SEL, item objc.ID) {
 	if id := objc.Send[int](item, sel("tag")); id > 0 && s != nil && s.engine != nil && !s.closed {
 		s.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: uint32(id)})
 	}
+}
+
+// menuRoleChosen carries out an editing role with an ID: AppKit's action goes down the responder chain when an editor takes it, otherwise the item's ID is reported.
+func menuRoleChosen(self objc.ID, _ objc.SEL, item objc.ID) {
+	s := menuTargets[self]
+	if s == nil || s.engine == nil || s.closed {
+		return
+	}
+	id := uint32(objc.Send[int](item, sel("tag")))
+	action := sel(roleActions[s.roleFallback[id]])
+	if action == 0 {
+		return
+	}
+	app := nsApp()
+	w := app.Send(sel("keyWindow"))
+	if w == 0 {
+		w = app.Send(sel("mainWindow"))
+	}
+	ws := windowSurface(w)
+	if w == 0 && !s.embedded {
+		// No window has the keyboard, as while the app is not active: the menu's own window.
+		w, ws = s.window, s
+	}
+	switch {
+	case ws == nil:
+		// A window of AppKit's own, such as a panel, edits by its responder.
+		target := app.Send(sel("targetForAction:to:from:"), action, objc.ID(0), objc.ID(0))
+		if target != 0 && !objc.Send[bool](target, sel("isKindOfClass:"), apple.Class("NSWindow")) {
+			app.Send(sel("sendAction:to:from:"), action, target, item)
+			return
+		}
+	case ws.edits(action):
+		w.Send(sel("firstResponder")).Send(sel("tryToPerform:with:"), action, item)
+		return
+	}
+	s.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: id})
+}
+
+// edits reports whether an editor in the surface's window takes an editing role's action: a field or a web view with the keyboard focus, or the surface's text selection for Copy (when something is selected) and Select All. A responder for the action does not settle it, since every window answers undo: and redo: and the surface answers copy: and selectAll: with no selection.
+func (s *surface) edits(action objc.SEL) bool {
+	if s.editing() {
+		return true
+	}
+	sl := s.selecting
+	if sl == nil || s.window.Send(sel("firstResponder")) != s.native {
+		return false
+	}
+	return action == sel("selectAll:") || action == sel("copy:") && !sl.model.IsEmpty()
 }
 
 // dockMenuChosen reports a chosen Dock menu item's ID to the surface that set the menu.

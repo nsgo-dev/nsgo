@@ -334,3 +334,86 @@ func TestStartSpeakingReadsTheFocusedField(t *testing.T) {
 		t.Errorf("a password field was said as %+v", s)
 	}
 }
+
+// TestEditingRolesFallBackToOnSelect chooses Edit menu role items that carry an OnSelect: the focused field and the text selection take Select All and Copy, and with neither the items' OnSelect runs.
+func TestEditingRolesFallBackToOnSelect(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	const title = "nsgo-menu-fallback"
+	app := func(cx *core.Scope) core.Node {
+		selected, copied, undone := core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0)
+		count := func(s *core.Signal[int]) func() { return func() { s.Update(func(n int) int { return n + 1 }) } }
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Edit", Items: []core.MenuItem{
+			{Role: core.MenuUndo, OnSelect: count(undone)},
+			{Role: core.MenuCopy, OnSelect: count(copied)},
+			{Role: core.MenuSelectAll, OnSelect: count(selected)},
+		}}})
+		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%d|%d|%d", title, selected.Get(), copied.Get(), undone.Get())) })
+		return core.View{Style: core.Style{Width: driver.Pt(240), Height: driver.Pt(120)}, Children: []core.Node{
+			core.Input{TestID: "field", DefaultValue: "hello", Style: core.Style{Width: driver.Pt(180), Height: driver.Pt(30)}},
+			core.View{Selectable: true, Children: []core.Node{core.Text{Content: "Hello world", Style: core.Style{FontSize: 16}}}},
+		}}
+	}
+	w := startTestWindow(t, app, Options{Title: title, Width: 240, Height: 120})
+	waitForTitle(t, w, title+"|0|0|0")
+	choose := func(role driver.MenuRole) {
+		w.onLoop(t, func() {
+			for _, e := range w.chrome.menu[0].Items {
+				if e.Role == role {
+					if !w.menuChosen(menuRef{id: e.ID, role: e.Role}) {
+						t.Errorf("%s was not taken", role.Label())
+					}
+					return
+				}
+			}
+			t.Errorf("no %s item", role.Label())
+		})
+	}
+	choose(driver.MenuSelectAll)
+	choose(driver.MenuCopy)
+	waitForTitle(t, w, title+"|1|1|0")
+
+	var field *view
+	w.onLoop(t, func() {
+		for _, v := range w.entries {
+			if v.props.TestID == "field" {
+				field = v
+				w.focusEntry(v)
+			}
+		}
+	})
+	choose(driver.MenuSelectAll)
+	w.onLoop(t, func() {
+		if start, end := w.selection(field); start != 0 || end != len("hello") {
+			t.Errorf("Select All selected %d-%d of the field, want all of it", start, end)
+		}
+		gtkWindowSetFocus(w.win, 0)
+	})
+	// Undo falls back with the field blurred, after the menu's reports above, so the counts are final once it shows.
+	choose(driver.MenuUndo)
+	waitForTitle(t, w, title+"|1|1|1")
+
+	w.onLoop(t, func() {
+		for _, v := range w.views {
+			if v != nil && v.kind == driver.KindText && v.plain == "Hello world" {
+				b, _ := w.surfaceBounds(v)
+				at := driver.Point{X: b.Origin.X + 10, Y: b.Origin.Y + b.Size.Height/2}
+				w.pointerDown(at, 1, 0, 0, 2)
+				w.pointerUp(at)
+			}
+		}
+		if w.selecting == nil || w.selecting.Model.Text(w.selecting) != "Hello" {
+			t.Error("double click selected no word")
+		}
+	})
+	choose(driver.MenuSelectAll)
+	choose(driver.MenuCopy)
+	choose(driver.MenuUndo)
+	waitForTitle(t, w, title+"|1|1|2")
+	w.onLoop(t, func() {
+		if got := w.selecting.Model.Text(w.selecting); got != "Hello world" {
+			t.Errorf("Select All selected %q of the text, want all of it", got)
+		}
+	})
+}

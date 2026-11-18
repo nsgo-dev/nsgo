@@ -557,6 +557,7 @@ func loadAppKit() {
 	registerCanvasNodes()
 	classMenuTarget = register("NsgoMenuTarget", apple.Class("NSObject"), nil, []objc.MethodDef{
 		{Cmd: selMenuChosen, Fn: menuChosen},
+		{Cmd: selMenuRoleChosen, Fn: menuRoleChosen},
 		{Cmd: selDockMenuChosen, Fn: dockMenuChosen},
 		{Cmd: selMenuFullScreen, Fn: menuFullScreen},
 		{Cmd: sel("validateMenuItem:"), Fn: validateMenu},

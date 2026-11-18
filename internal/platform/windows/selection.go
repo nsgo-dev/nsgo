@@ -164,16 +164,30 @@ func (w *window) selectKey(key uintptr) bool {
 	ctrl := keyDown(vkControl)
 	switch {
 	case ctrl && key == 'C':
-		if !sl.Model.IsEmpty() {
-			w.listSelection()
-			w.setClipboard(sl.Model.Text(sl))
-		}
+		w.selectionEdit(driver.MenuCopy)
 	case ctrl && key == 'A':
+		w.selectionEdit(driver.MenuSelectAll)
+	case !ctrl && key == vkEscape && !sl.Model.IsEmpty():
+		w.clearSelection()
+	default:
+		return false
+	}
+	return true
+}
+
+// selectionEdit copies the text selection or selects its whole area, as the Copy and Select All roles do, reporting whether it did: there is no selection, or nothing selected to copy, otherwise.
+func (w *window) selectionEdit(role driver.MenuRole) bool {
+	sl := w.textSelection
+	switch {
+	case sl == nil:
+		return false
+	case role == driver.MenuCopy && !sl.Model.IsEmpty():
+		w.listSelection()
+		w.setClipboard(sl.Model.Text(sl))
+	case role == driver.MenuSelectAll:
 		w.listSelection()
 		sl.Model.SelectAll(sl)
 		w.showSelection()
-	case !ctrl && key == vkEscape && !sl.Model.IsEmpty():
-		w.clearSelection()
 	default:
 		return false
 	}

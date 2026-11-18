@@ -1028,8 +1028,9 @@ func (w *window) menuShortcut(key string) bool {
 	return ok
 }
 
-// chooseMenu carries out an item's role and tells the app about it.
+// chooseMenu carries out an item's role and tells the app about it. An editing role tells the app only when neither the focused field, the focused page nor the text selection takes it.
 func (w *window) chooseMenu(ref menuRef) {
+	edited := false
 	switch ref.role {
 	case driver.MenuQuit:
 		// The app's root window, whose closing ends the loop, even from a window the app opened.
@@ -1047,29 +1048,34 @@ func (w *window) chooseMenu(ref menuRef) {
 	case driver.MenuToggleFullScreen:
 		w.toggleFullScreen()
 	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuPasteAndMatchStyle, driver.MenuDelete, driver.MenuSelectAll:
-		// The focused field's own keys, else the focused page's editing command.
-		in := w.focusedField()
-		switch {
-		case in == nil:
-			w.webEdit(ref.role)
-		case ref.role == driver.MenuPasteAndMatchStyle:
-			w.paste(in)
-		case ref.role == driver.MenuDelete:
-			// Delete removes the selection alone, as the field's context menu does; with none it would remove the character after the caret.
-			if in.model.hasSelection() {
-				w.editKey(vkDelete, false, false, false)
-			}
-		default:
-			vk := map[driver.MenuRole]uintptr{driver.MenuUndo: 'Z', driver.MenuRedo: 'Y', driver.MenuCut: 'X',
-				driver.MenuCopy: 'C', driver.MenuPaste: 'V', driver.MenuSelectAll: 'A'}[ref.role]
-			w.editKey(vk, true, false, false)
-		}
+		edited = w.menuEdit(ref.role)
 	case driver.MenuStartSpeaking:
 		w.speakMenu(true)
 	case driver.MenuStopSpeaking:
 		w.speakMenu(false)
 	}
-	if ref.id != 0 {
+	if ref.id != 0 && !edited {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: ref.id})
 	}
+}
+
+// menuEdit carries out an editing role with the focused field's own keys, else the focused page's editing command, else on the text selection (Copy and Select All), reporting whether one of them took it. A focused field takes every editing role, even one it has nothing to do for.
+func (w *window) menuEdit(role driver.MenuRole) bool {
+	in := w.focusedField()
+	switch {
+	case in == nil:
+		return w.webEdit(role) || w.selectionEdit(role)
+	case role == driver.MenuPasteAndMatchStyle:
+		w.paste(in)
+	case role == driver.MenuDelete:
+		// Delete removes the selection alone, as the field's context menu does; with none it would remove the character after the caret.
+		if in.model.hasSelection() {
+			w.editKey(vkDelete, false, false, false)
+		}
+	default:
+		vk := map[driver.MenuRole]uintptr{driver.MenuUndo: 'Z', driver.MenuRedo: 'Y', driver.MenuCut: 'X',
+			driver.MenuCopy: 'C', driver.MenuPaste: 'V', driver.MenuSelectAll: 'A'}[role]
+		w.editKey(vk, true, false, false)
+	}
+	return true
 }

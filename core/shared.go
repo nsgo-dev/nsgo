@@ -209,7 +209,7 @@ type (
 	LiveRegion = driver.LiveRegion
 	// MenuEntry is a MenuItem as an ItemMenu carries it: the item's handler
 	// replaced by an ID the platform reports with EventMenu (0: none), its
-	// shortcut normalized and its role's label filled in.
+	// shortcut normalized and its role's label filled in. An editing role with an ID reports it only when no focused field, web view or text selection takes the role.
 	MenuEntry = driver.MenuEntry
 	// MenuRole is a standard menu item the platform carries out, labelling it
 	// and giving it its usual shortcut when the item has none of its own.

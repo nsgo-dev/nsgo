@@ -964,8 +964,11 @@ func (w *window) menuShortcut(key string) bool {
 	return w.menuChosen(ref)
 }
 
-// menuChosen runs an application menu item's role, or reports its ID.
+// menuChosen runs an application menu item's role, or reports its ID. An editing role goes to the focused field, the focused page or the text selection first, and reports its ID only when none of them takes it.
 func (w *window) menuChosen(ref menuRef) bool {
+	if (ref.role.EditsText() || ref.role == driver.MenuPasteAndMatchStyle) && w.menuEdit(ref.role) {
+		return true
+	}
 	if ref.id != 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: ref.id})
 		return true
@@ -986,17 +989,7 @@ func (w *window) menuChosen(ref menuRef) bool {
 		w.chrome.fullScreen = !w.chrome.fullScreen
 		w.updateEnvironment()
 	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuPasteAndMatchStyle, driver.MenuDelete, driver.MenuSelectAll:
-		if w.focus != nil {
-			action := map[driver.MenuRole]string{
-				driver.MenuUndo: "text.undo", driver.MenuRedo: "text.redo",
-				driver.MenuCut: "clipboard.cut", driver.MenuCopy: "clipboard.copy",
-				driver.MenuPaste: "clipboard.paste", driver.MenuPasteAndMatchStyle: "clipboard.paste",
-				driver.MenuDelete: "selection.delete", driver.MenuSelectAll: "selection.select-all",
-			}[ref.role]
-			gtkWidgetActivateAction(w.focus.entry, cstr(action), 0)
-			return true
-		}
-		w.webEdit(ref.role)
+		// Nothing took the edit; the item still takes its key, as it does with an editor.
 	case driver.MenuStartSpeaking:
 		w.speakMenu(true)
 	case driver.MenuStopSpeaking:
@@ -1005,6 +998,21 @@ func (w *window) menuChosen(ref menuRef) bool {
 		return false
 	}
 	return true
+}
+
+// menuEdit carries out an editing role in the focused field, else the focused page, else the text selection (Copy and Select All), reporting whether one of them took it.
+func (w *window) menuEdit(role driver.MenuRole) bool {
+	if w.focus != nil {
+		action := map[driver.MenuRole]string{
+			driver.MenuUndo: "text.undo", driver.MenuRedo: "text.redo",
+			driver.MenuCut: "clipboard.cut", driver.MenuCopy: "clipboard.copy",
+			driver.MenuPaste: "clipboard.paste", driver.MenuPasteAndMatchStyle: "clipboard.paste",
+			driver.MenuDelete: "selection.delete", driver.MenuSelectAll: "selection.select-all",
+		}[role]
+		gtkWidgetActivateAction(w.focus.entry, cstr(action), 0)
+		return true
+	}
+	return w.webEdit(role) || w.selectionEdit(role)
 }
 
 // GDK's event types and modifier bits the shield reads.

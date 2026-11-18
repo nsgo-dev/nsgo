@@ -220,6 +220,11 @@ func TestMenuRoleItems(t *testing.T) {
 			t.Error("a checked radio shows no check mark")
 		}
 		it.Send(selRelease)
+		it = s.item(driver.MenuEntry{Label: "Select All", Role: driver.MenuSelectAll, ID: 7})
+		if got := objc.Send[objc.SEL](it, sel("action")); got != selMenuRoleChosen || objc.Send[int](it, sel("tag")) != 7 || s.roleFallback[7] != driver.MenuSelectAll {
+			t.Errorf("role fallback action = %v, tag %d, role %v", got, objc.Send[int](it, sel("tag")), s.roleFallback[7])
+		}
+		it.Send(selRelease)
 		delete(menuTargets, s.menuTarget)
 	})
 }

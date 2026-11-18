@@ -575,3 +575,85 @@ func sendKeys(t *testing.T, hwnd uintptr, keys ...byte) {
 	}
 	time.Sleep(150 * time.Millisecond)
 }
+
+// TestEditingRolesFallBackToOnSelect chooses Edit menu role items that carry an OnSelect: the focused field and the text selection take Select All and Copy, and with neither the items' OnSelect runs.
+func TestEditingRolesFallBackToOnSelect(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	const title = "nsgo-menu-fallback"
+	app := func(cx *core.Scope) core.Node {
+		selected, copied, undone := core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0)
+		count := func(s *core.Signal[int]) func() { return func() { s.Update(func(n int) int { return n + 1 }) } }
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Edit", Items: []core.MenuItem{
+			{Role: core.MenuUndo, OnSelect: count(undone)},
+			{Role: core.MenuCopy, OnSelect: count(copied)},
+			{Role: core.MenuSelectAll, OnSelect: count(selected)},
+		}}})
+		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%d|%d|%d", title, selected.Get(), copied.Get(), undone.Get())) })
+		return core.View{Style: core.Style{Width: driver.Pt(240), Height: driver.Pt(120), Background: driver.RGB(0xffffff)}, Children: []core.Node{
+			core.Input{TestID: "field", DefaultValue: "hello", Style: core.Style{Width: driver.Pt(180), Height: driver.Pt(30)}},
+			core.View{Selectable: true, Children: []core.Node{core.Text{Content: "Hello world", Style: core.Style{FontSize: 16}}}},
+		}}
+	}
+	hwnd := startApp(t, title, app, 240, 120)
+	waitForTitle(t, hwnd, title+"|0|0|0", 5*time.Second)
+	choose := func(r core.MenuRole) {
+		t.Helper()
+		onMain(t, hwnd, func(w *window) {
+			i := slices.IndexFunc(w.chrome.entries, func(ref menuRef) bool { return ref.role == r })
+			if i < 0 {
+				t.Fatalf("the menu has no item of role %d", r)
+			}
+			w.chooseMenu(w.chrome.entries[i])
+		})
+	}
+	choose(core.MenuSelectAll)
+	choose(core.MenuCopy)
+	waitForTitle(t, hwnd, title+"|1|1|0", 5*time.Second)
+
+	onMain(t, hwnd, func(w *window) {
+		for _, v := range w.views {
+			if v != nil && v.field != nil {
+				w.setFocus(v.field)
+			}
+		}
+	})
+	choose(core.MenuSelectAll)
+	onMain(t, hwnd, func(w *window) {
+		in := w.focusedField()
+		if in == nil {
+			t.Fatal("the field did not take the focus")
+		}
+		if got := in.model.selected(); got != "hello" {
+			t.Errorf("Select All selected %q of the field, want all of it", got)
+		}
+		w.blurAll()
+	})
+	// Undo falls back with the field blurred, after the menu's reports above, so the counts are final once it shows.
+	choose(core.MenuUndo)
+	waitForTitle(t, hwnd, title+"|1|1|1", 5*time.Second)
+
+	onMain(t, hwnd, func(w *window) {
+		for _, v := range w.views {
+			if v != nil && v.kind == driver.KindText && v.plain == "Hello world" {
+				b, _ := w.surfaceBounds(v)
+				at := driver.Point{X: b.Origin.X + 10, Y: b.Origin.Y + b.Size.Height/2}
+				w.selectPress(at, 2, false)
+				w.selectUp()
+			}
+		}
+		if w.textSelection == nil || w.textSelection.Model.Text(w.textSelection) != "Hello" {
+			t.Error("double click selected no word")
+		}
+	})
+	choose(core.MenuSelectAll)
+	choose(core.MenuCopy)
+	choose(core.MenuUndo)
+	waitForTitle(t, hwnd, title+"|1|1|2", 5*time.Second)
+	onMain(t, hwnd, func(w *window) {
+		if got := w.textSelection.Model.Text(w.textSelection); got != "Hello world" {
+			t.Errorf("Select All selected %q of the text, want all of it", got)
+		}
+	})
+}
