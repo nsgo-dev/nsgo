@@ -726,8 +726,10 @@ func Run(app engine.App, opts Options) {
 		// Shortcuts take key presses before they become characters, in the window the keys go to: this one or a surface the app opened.
 		if t := windows[m.Hwnd]; t != nil && (t == w || t.hostWindow == w) {
 			t.reportModality(m.Message, m.WParam)
-			if (m.Message == wmKeyDown || m.Message == wmSysKeyDown) && t.shortcut(m.WParam, m.LParam) {
-				continue
+			if (m.Message == wmKeyDown || m.Message == wmSysKeyDown) && !t.embedded {
+				if t.dispatchKeyDown(m.WParam, m.LParam) || t.shortcut(m.WParam, m.LParam) {
+					continue
+				}
 			}
 		}
 		translateMessage.Call(uintptr(unsafe.Pointer(&m)))
@@ -2504,7 +2506,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		}
 		// The host's loop translated the key before it came here; Run's
 		// loop asks the shortcuts first.
-		if w.embedded && w.shortcut(wParam, lParam) {
+		if w.embedded && (w.dispatchKeyDown(wParam, lParam) || w.shortcut(wParam, lParam)) {
 			w.skipChar = true
 			return 0
 		}

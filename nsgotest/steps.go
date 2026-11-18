@@ -806,6 +806,20 @@ func (a *App) Key(key string) {
 	k := driver.NormalizeKey(key)
 	a.inputBy(driver.ModalityKeyboard)
 	names := a.keyNames(k)
+	parts := strings.Split(k, "+")
+	keyName := parts[len(parts)-1]
+	mods := a.keyModifiers(parts[:len(parts)-1])
+	for _, v := range a.views {
+		if !v.Focused || !v.Events.Has(driver.EventKeyDown) {
+			continue
+		}
+		consumed := false
+		a.send(v, driver.Event{Kind: driver.EventKeyDown, Text: keyName, Modifiers: mods, Data: &consumed})
+		if consumed {
+			a.done()
+			return
+		}
+	}
 	if id, consumed := driver.FindKey(a.keyBindings, names, a.focusKeyUse(), false); consumed {
 		if id != 0 {
 			a.dispatch(driver.Event{Kind: driver.EventKey, Count: id})

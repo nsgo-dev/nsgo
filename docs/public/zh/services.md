@@ -230,6 +230,8 @@ lookup := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 380, Height: 520, Tr
 desktop.RegisterHotKey(cx, "alt+space", lookup.Toggle)
 ```
 
+聚焦的 `View.OnKeyDown` 会在键盘映射前收到硬件按键、标准化名称、修饰键和重复状态，返回 `true` 可消耗该按键。
+
 ## 登录
 
 `cx.AuthSession` 在系统的认证会话里用 OAuth 服务登录，而不是在网页视图里：macOS 和 iOS 用 `ASWebAuthenticationSession`，Windows、Linux 以及没有设置 scheme 的 Mac 用默认浏览器加回环地址重定向，Web 用弹出窗口。协议由应用负责：它生成 PKCE 校验码和 state，为传给它的重定向地址拼出授权 URL，并在用 code 换令牌前检查回调。取消不算失败：`errors.Is(err, core.AuthCancelled)` 表示用户关闭了会话，或返回的 `cancel` 结束了它。

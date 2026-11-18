@@ -272,17 +272,23 @@ type message struct {
 	// resized are closed once the commit after the resize is mounted.
 	resized []chan struct{}
 	// synced is closed once this pass's commits have been mounted.
-	synced chan struct{}
-	env    *driver.Environment
-	at     *driver.Event // a press to hit test
-	tokens *core.Tokens
-	fn     func()
-	fonts  bool
+	synced  chan struct{}
+	env     *driver.Environment
+	at      *driver.Event // a press to hit test
+	keyDown *keyDownRequest
+	tokens  *core.Tokens
+	fn      func()
+	fonts   bool
 	// attach is the platform of an opened surface; detach ends it.
 	attach Platform
 	detach bool
 	// hidden is closed once the OnQuit handlers ran for a hidden app.
 	hidden chan struct{}
+}
+
+type keyDownRequest struct {
+	event driver.Event
+	done  chan bool
 }
 
 // Trace, when set, hears each commit's batch, before the platform, and
@@ -619,6 +625,12 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 				t.SetEnvironment(*m.env)
 			case m.at != nil:
 				t.PressAt(*m.at)
+			case m.keyDown != nil:
+				consumed := false
+				m.keyDown.event.Data = &consumed
+				t.Dispatch(m.keyDown.event)
+				m.keyDown.done <- consumed
+				taken[i].keyDown = nil
 			default:
 				t.Dispatch(m.event)
 			}
@@ -648,6 +660,9 @@ func discardMessage(m message) {
 	}
 	if m.hidden != nil {
 		close(m.hidden)
+	}
+	if m.keyDown != nil {
+		m.keyDown.done <- false
 	}
 	if m.attach != nil {
 		faultCleanup(func() { m.attach.Mount(destroyed()) })
@@ -758,6 +773,21 @@ func (e *Engine) DispatchBeforeFrame(ev driver.Event) {
 		e.event(ev)
 	}
 	e.enqueue(message{surface: e.surface, event: ev})
+}
+
+// DispatchKeyDown synchronously offers a raw key to the focused view before
+// the platform matches its keymap. It reports whether the view consumed it.
+func (e *Engine) DispatchKeyDown(ev driver.Event) bool {
+	if e.event != nil && e.surface == 0 {
+		e.event(ev)
+	}
+	request := &keyDownRequest{event: ev, done: make(chan bool, 1)}
+	e.enqueue(message{surface: e.surface, keyDown: request})
+	select {
+	case e.wake <- struct{}{}:
+	default:
+	}
+	return <-request.done
 }
 
 // InputModality reports what the user gives the surface input with

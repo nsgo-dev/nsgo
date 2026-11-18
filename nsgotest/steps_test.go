@@ -13,6 +13,30 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+func TestFocusedViewReceivesKeyDownBeforeTheKeymap(t *testing.T) {
+	var got core.KeyEvent
+	var bindings int
+	app := Start(t, func(cx *core.Scope) core.Node {
+		cx.OnKey("ctrl+shift+k", func() { bindings++ })
+		return core.View{Children: []core.Node{core.View{
+			TestID: "recorder", Focusable: func() bool { return true },
+			OnKeyDown: func(event core.KeyEvent) bool { got = event; return true },
+			Style:     core.Style{Width: core.Pt(100), Height: core.Pt(30)},
+		}}}
+	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.Focus("id:recorder")
+	app.Key("ctrl+shift+k")
+	if got.Key != "k" || !got.Modifiers.Control || !got.Modifiers.Shift || got.Modifiers.Alt || got.Modifiers.Platform || got.Repeat {
+		t.Fatalf("key event = %+v", got)
+	}
+	if got.Shortcut() != "ctrl+shift+k" {
+		t.Fatalf("shortcut = %q", got.Shortcut())
+	}
+	if bindings != 0 {
+		t.Fatalf("keymap binding ran %d times", bindings)
+	}
+}
+
 // failing is a testing.TB whose fatal failures end only the goroutine
 // running the test body, so a test can check that a step fails.
 type failing struct {

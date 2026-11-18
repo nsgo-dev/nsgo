@@ -133,6 +133,7 @@ const (
 	EventClipboard             = driver.EventClipboard
 	EventContextMenu           = driver.EventContextMenu
 	EventKey                   = driver.EventKey
+	EventKeyDown               = driver.EventKeyDown
 	EventPan                   = driver.EventPan
 	EventPinch                 = driver.EventPinch
 	EventWheel                 = driver.EventWheel

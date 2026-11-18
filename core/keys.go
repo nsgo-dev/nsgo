@@ -8,6 +8,35 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
+// KeyEvent is a hardware key going down while a view has the keyboard focus.
+type KeyEvent struct {
+	Key       string
+	Modifiers Modifiers
+	Repeat    bool
+}
+
+// Shortcut returns Key in the normalized shortcut form, using mod for the
+// platform modifier and the explicit modifier names for the rest.
+func (e KeyEvent) Shortcut() string {
+	parts := make([]string, 0, 5)
+	if e.Modifiers.Platform {
+		parts = append(parts, "mod")
+	}
+	if e.Modifiers.Control {
+		parts = append(parts, "ctrl")
+	}
+	if e.Modifiers.Alt {
+		parts = append(parts, "alt")
+	}
+	if e.Modifiers.Shift {
+		parts = append(parts, "shift")
+	}
+	if e.Key != "" {
+		parts = append(parts, e.Key)
+	}
+	return driver.NormalizeKey(strings.Join(parts, "+"))
+}
+
 // Keyboard shortcuts: the surface's table of bindings goes to the platform, which matches each key press on the main thread, consumes the presses that match and reports the binding each matched with EventKey, which runs it.
 
 type keyBinding struct {

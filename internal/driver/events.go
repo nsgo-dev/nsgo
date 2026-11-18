@@ -282,6 +282,10 @@ const (
 // EventVideoPause reports that the platform paused video ID, not the app's Paused: Index is why (VideoPauseInterruption, ...). An EventMask has no room for another kind, so it shares EventImageInfo's, an answer that names no view and is never in a mask; Android's Protocol.java mirrors it.
 const EventVideoPause EventKind = EventImageInfo
 
+// EventKeyDown reports a raw key press to a focused view before the keymap.
+// It shares EventImageInfo's unused view-mask slot.
+const EventKeyDown EventKind = EventVideoPause
+
 // EventVideoPlay reports that the platform played video ID, not the app's Paused. It shares EventMenuClosed's kind as EventVideoPause shares EventImageInfo's.
 const EventVideoPlay EventKind = EventMenuClosed
 
@@ -349,6 +353,8 @@ type Event struct {
 	URIs []string
 	// Data is what a native component emitted.
 	Data any
+	// Repeat says a key is an auto-repeat for EventKeyDown.
+	Repeat bool
 	// Finished is whether an animation ran to its end, or the platform
 	// closed a modal.
 	Finished bool

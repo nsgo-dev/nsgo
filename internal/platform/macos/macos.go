@@ -1321,6 +1321,9 @@ func (s *surface) filterEvent(event objc.ID) objc.ID {
 			return 0
 		}
 	case typeKeyDown:
+		if s.dispatchKeyDown(event) {
+			return 0
+		}
 		if !s.hasKeys() {
 			break
 		}
@@ -1370,6 +1373,35 @@ func (s *surface) filterEvent(event objc.ID) objc.ID {
 		}
 	}
 	return event
+}
+
+// dispatchKeyDown offers a raw key to the focused view before the keymap.
+func (s *surface) dispatchKeyDown(event objc.ID) bool {
+	first := s.window.Send(sel("firstResponder"))
+	v := views[first]
+	if v == nil || !v.events.Has(driver.EventKeyDown) {
+		return false
+	}
+	name, ok := keyNames[objc.Send[uint16](event, sel("keyCode"))]
+	if !ok {
+		name = strings.ToLower(apple.GoString(event.Send(sel("charactersByApplyingModifiers:"), uint(0))))
+	}
+	if name == "" {
+		switch objc.Send[uint16](event, sel("keyCode")) {
+		case 56, 60:
+			name = "shift"
+		case 59, 62:
+			name = "ctrl"
+		case 58, 61:
+			name = "alt"
+		case 54, 55:
+			name = "meta"
+		}
+	}
+	if name == "" {
+		return false
+	}
+	return s.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name, Modifiers: apple.Modifiers(objc.Send[uint](event, sel("modifierFlags"))), Repeat: objc.Send[bool](event, sel("isARepeat"))})
 }
 
 // hasKeys reports whether the window's keys are the surface's: the

@@ -355,6 +355,7 @@ type handlers struct {
 	mouseEnter, mouseLeave, mouseMove    func(MouseEvent)
 	textSelection                        func(Bounds)
 	focus, blur                          func()
+	keyDown                              func(KeyEvent) bool
 	touch, touchCapture                  func(TouchEvent)
 	contextMenu                          func(ContextMenuEvent)
 	change, submit                       func(string)
@@ -1744,7 +1745,7 @@ func (t *Tree) setViewParts(n *node, v View) {
 		layout:        v.OnLayout, contextMenu: v.OnContextMenu, touch: v.OnTouch, touchCapture: v.OnTouchCapture,
 		pan: v.OnPan, pinch: v.OnPinch, rotation: v.OnRotation, wheel: v.OnWheel,
 		fileEnter: v.OnFileDragEnter, fileLeave: v.OnFileDragLeave, fileDrop: v.OnFileDrop,
-		focus: v.OnFocus, blur: v.OnBlur, transitionEnd: v.OnTransitionEnd}
+		focus: v.OnFocus, blur: v.OnBlur, keyDown: v.OnKeyDown, transitionEnd: v.OnTransitionEnd}
 	n.h.action = v.OnAccessibilityAction
 	n.responder = v.Responder
 	n.match = v.MatchID
@@ -2161,9 +2162,18 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		return
 	}
 	// A video's pause and play share their kinds with the answers EventImageInfo and EventMenuClosed, which name no view: one for a view is the video's, or a removed video's.
-	if (ev.Kind == driver.EventVideoPause || ev.Kind == driver.EventVideoPlay) && ev.ID != 0 {
+	if (ev.Kind != driver.EventKeyDown || ev.Data == nil) && (ev.Kind == driver.EventVideoPause || ev.Kind == driver.EventVideoPlay) && ev.ID != 0 {
 		if n := t.node(ev.ID); n != nil && n.video != nil {
 			t.dispatchVideo(n, ev)
+		}
+		return
+	}
+	if ev.Kind == driver.EventKeyDown && ev.ID != 0 && ev.Data != nil {
+		if n := t.node(ev.ID); n != nil && n.h.keyDown != nil {
+			consumed := n.h.keyDown(KeyEvent{Key: ev.Text, Modifiers: ev.Modifiers, Repeat: ev.Repeat})
+			if out, ok := ev.Data.(*bool); ok {
+				*out = consumed
+			}
 		}
 		return
 	}
@@ -2765,6 +2775,7 @@ func (n *node) events() driver.EventMask {
 	focusStyled := s.Focus != nil || s.FocusVisible != nil || peer || watched&(classFocused|classFocusVisible|classFocusWithin) != 0
 	bit(driver.EventFocus, h.focus != nil || focusStyled || focusable)
 	bit(driver.EventBlur, h.blur != nil || focusStyled || focusable)
+	bit(driver.EventKeyDown, h.keyDown != nil)
 	bit(driver.EventSubmitEditing, h.submit != nil)
 	bit(driver.EventScroll, h.scroll != nil)
 	bit(driver.EventPressOutside, h.pressOutside != nil)

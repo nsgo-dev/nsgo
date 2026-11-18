@@ -88,6 +88,9 @@ type View struct {
 	// OnFocus and OnBlur follow the keyboard focus to and from a view that takes presses or is Focusable, on desktops and the web; a click presses without focusing. A focused view that leaves the tree hears OnBlur once, after the commit that removed it, or before the next view's OnFocus when the platform reports that first.
 	OnFocus func()
 	OnBlur  func()
+	// OnKeyDown receives a hardware key before the keymap while this view has
+	// the keyboard focus. Returning true consumes the key.
+	OnKeyDown func(KeyEvent) bool
 	// OnFocusIn and OnFocusOut hear the keyboard focus come to the view or a view inside it from elsewhere, and leave them: a move inside the view is neither, as CSS's :focus-within sees it. A view that stays hears OnFocusOut as the focused view inside it leaves the tree.
 	OnFocusIn, OnFocusOut func()
 	// PointerEvents says which of the view and its children take

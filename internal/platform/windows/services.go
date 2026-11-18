@@ -108,6 +108,32 @@ func (w *window) editing() bool {
 // setKeymap replaces the keyboard shortcuts.
 func (w *window) setKeymap(keys []driver.KeyBinding) { w.keys = keys }
 
+// dispatchKeyDown offers a raw key to the focused view before the keymap.
+func (w *window) dispatchKeyDown(vk, lParam uintptr) bool {
+	v := w.focusedView()
+	if w.engine == nil || v == nil || !v.events.Has(driver.EventKeyDown) {
+		return false
+	}
+	name := keyName(vk)
+	if name == "" {
+		switch vk {
+		case vkShift:
+			name = "shift"
+		case vkControl:
+			name = "ctrl"
+		case vkMenu:
+			name = "alt"
+		case vkLWin, vkRWin:
+			name = "meta"
+		}
+	}
+	if name == "" {
+		return false
+	}
+	consumed := false
+	return w.engine.DispatchKeyDown(driver.Event{Kind: driver.EventKeyDown, ID: v.id, Text: name, Modifiers: modifiers(), Repeat: repeated(lParam), Data: &consumed}) || consumed
+}
+
 // shortcut reports a key press matching a shortcut, by its name with
 // "mod" for Control or with "ctrl" itself, and whether it was consumed:
 // the app's own first, as driver.FindKey decides for a focused field and a
