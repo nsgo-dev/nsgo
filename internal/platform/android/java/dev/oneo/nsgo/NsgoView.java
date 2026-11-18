@@ -3837,13 +3837,14 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      */
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+        // A key the window delivers is the keyboard's input. An IME's action or committed Return, which a field offers to keyBinding, leaves the modality, as a software Return does on iOS.
+        if (e.getAction() == KeyEvent.ACTION_DOWN && !KeyEvent.isModifierKey(e.getKeyCode())) modality(Protocol.MODALITY_KEYBOARD);
         return keyBinding(e) || super.dispatchKeyEvent(e);
     }
 
     /** The one matcher for hardware keys and Return delivered through an IME. */
     private boolean keyBinding(KeyEvent e) {
         int code = e.getKeyCode();
-        if (e.getAction() == KeyEvent.ACTION_DOWN && !KeyEvent.isModifierKey(code)) modality(Protocol.MODALITY_KEYBOARD);
         if (e.getAction() == KeyEvent.ACTION_UP && consumedKeys.remove(code)) return true;
         if (e.getAction() == KeyEvent.ACTION_DOWN && keys.length > 0) {
             String[] names = names(e);
