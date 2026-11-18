@@ -194,15 +194,15 @@ type AuthSession struct {
 // AuthLoopback is where the model serves a loopback redirect, before the session's path.
 const AuthLoopback = "http://127.0.0.1:49152"
 
-// App is an app running in a test. Its methods run on the test's
-// goroutine; the app's goroutines reach it through Scope.Post, which App
-// runs when it settles.
 // LookUp is a dictionary panel the app showed: its text and the box the text is drawn over, in the surface.
 type LookUp struct {
 	Text string
 	At   core.Bounds
 }
 
+// App is an app running in a test. Its methods run on the test's
+// goroutine; the app's goroutines reach it through Scope.Post, which App
+// runs when it settles.
 type App struct {
 	touchGeometry driver.TouchTracker
 	// LocationCache is the last fix the platform keeps, which Locate takes when its MaxAge allows; the location and motion permissions are in Permissions, and the fixes and samples come from FeedLocation and FeedMotion.
