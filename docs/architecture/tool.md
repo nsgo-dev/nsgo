@@ -33,7 +33,7 @@ The web target is served from the same server; its page shows the overlay itself
 
 `nsgo mcp` (`mcp.go`, on `github.com/modelcontextprotocol/go-sdk`) serves MCP on standard input and output, the tool's other output going to standard error. It uses the session the file names, or starts `nsgo dev -automation` with its own flags as a child, which it stops as the client leaves. Each tool is a request with that request's params as its input, so one definition gives both their schemas: `status`, `windows`, `snapshot`, `find`, `press`, `type`, `key`, `scroll`, `drag`, `hover`, `menu`, `alert`, `wait`, `screenshot` (an `image/png`), `logs` and `reload`. A rebuild restarts the app, so `status`'s run count grows and the `view:` refs of an earlier run are stale. What tools list, find and press is the app's alone: under `-devtools`, `-highlight` or `-layout` the agent leaves DevTools' overlay (`devtools.OverlayTestID`) out, as the page's `Elements` does.
 
-`TestAutomationEndToEnd` builds `testdata/automation` with the tags and drives it through a hub with posted events, the menu bar and alerts; it opens a window and makes it key, so it runs only with `NSGO_AUTOMATION_E2E=1`.
+`TestAutomationEndToEnd` builds `testdata/automation` with the tags and drives it through a hub with posted events, the menu bar, the Dock menu and alerts; it opens a window and makes it key, so it runs only with `NSGO_AUTOMATION_E2E=1`.
 
 ## TSX apps
 

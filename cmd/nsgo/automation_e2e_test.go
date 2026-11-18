@@ -34,7 +34,7 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// TestAutomationEndToEnd builds testdata/automation as nsgo dev -automation does, runs it against a hub and drives it with posted events, the real menu bar and alerts. It opens a window and makes it key, so it runs only when asked, on a Mac with a GUI session:
+// TestAutomationEndToEnd builds testdata/automation as nsgo dev -automation does, runs it against a hub and drives it with posted events, the real menu bar, Dock menu and alerts. It opens a window and makes it key, so it runs only when asked, on a Mac with a GUI session:
 //
 //	NSGO_AUTOMATION_E2E=1 go tool nsgo test -run TestAutomationEndToEnd ./cmd/nsgo
 func TestAutomationEndToEnd(t *testing.T) {
@@ -110,6 +110,11 @@ func TestAutomationEndToEnd(t *testing.T) {
 	must(automation.Key, automation.KeyParams{Selector: "id:name", Key: "Backspace"}, nil)
 	shows(`text:"Hello, "`)
 	// The menu and its alert are the app function's, which the app's own surface holds.
+	must(automation.Menu, automation.MenuParams{Path: []string{"Actions", "Reset"}}, nil)
+	shows(`text:"Count: 0"`)
+	// So is the Dock menu, which AppKit asks the app delegate for.
+	must(automation.Menu, automation.MenuParams{Dock: true, Path: []string{"Add Ten"}}, nil)
+	shows(`text:"Count: 10"`)
 	must(automation.Menu, automation.MenuParams{Path: []string{"Actions", "Reset"}}, nil)
 	shows(`text:"Count: 0"`)
 	must(automation.Menu, automation.MenuParams{Path: []string{"Actions", "Ask"}}, nil)

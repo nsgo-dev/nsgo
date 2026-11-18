@@ -1,4 +1,4 @@
-// Command automation is the app cmd/nsgo's end-to-end test drives through nsgo dev -automation: its menu and an alert come from the app's function, and its window has a counter, a field echoing its text, an alert of its own, whether the token nsgo dev gave it is still in its environment and a long list.
+// Command automation is the app cmd/nsgo's end-to-end test drives through nsgo dev -automation: its menu, its Dock menu and an alert come from the app's function, and its window has a counter, a field echoing its text, an alert of its own, whether the token nsgo dev gave it is still in its environment and a long list.
 package main
 
 import (
@@ -13,7 +13,7 @@ import (
 
 func main() { nsgo.Run(App) }
 
-// App sets the menu, which on macOS the app's own surface holds, and the main window's view.
+// App sets the menu and the Dock menu, which on macOS the app's own surface holds, and the main window's view.
 func App(app *core.Scope) {
 	count := core.NewSignal(app, 0)
 	answer := core.NewSignal(app, "none")
@@ -25,6 +25,7 @@ func App(app *core.Scope) {
 		{Label: "Reset", OnSelect: func() { count.Set(0) }},
 		{Label: "Ask", OnSelect: func() { ask(app) }},
 	}}})
+	desktop.SetDockMenu(app, []desktop.MenuItem{{Label: "Add Ten", OnSelect: func() { count.Set(count.Get() + 10) }}})
 	nsgo.SetMainView(app, func(cx *core.Scope) core.Node {
 		name := core.NewSignal(cx, "")
 		button := func(id, label string, press func()) core.Node {

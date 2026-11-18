@@ -32,6 +32,8 @@ type agent struct {
 	// graph is the graph whose surfaces the agent follows, the first that registers one: another graph's surfaces have the same IDs (the roadmap's Automation section).
 	graph    int
 	surfaces map[uint32]*followed
+	// dock is the surface that set the app icon's menu last, as the batches came: the platform shows that surface's menu alone, and drops it as the surface goes. Nil while none did, as for nsgotest's own apps, whose model has the app's.
+	dock *followed
 
 	// work is held while a request runs or the models take what came, so one goroutine at a time reads and changes them.
 	work sync.Mutex
@@ -42,6 +44,7 @@ type agent struct {
 // followed is a surface the agent follows: its model, and what the app opened it as. It hears the surface as its devtools.Follower.
 type followed struct {
 	g   *agent
+	id  uint32
 	app *App
 	// opened is set for a window, a panel or a tray icon's view the app opened, of kind and title.
 	opened bool
@@ -89,7 +92,7 @@ func newLiveApp(tb testing.TB) *App {
 func (g *agent) follow(surface uint32) *followed {
 	f := g.surfaces[surface]
 	if f == nil {
-		f = &followed{g: g, app: newLiveApp(g.tb)}
+		f = &followed{g: g, id: surface, app: newLiveApp(g.tb)}
 		g.surfaces[surface] = f
 	}
 	return f
@@ -99,7 +102,7 @@ func (g *agent) follow(surface uint32) *followed {
 func (g *agent) serve(id uint32, a *App, title string) {
 	a.t = g.tb
 	g.mu.Lock()
-	g.surfaces[id] = &followed{g: g, app: a, opened: true, kind: driver.SurfaceWindow, title: title}
+	g.surfaces[id] = &followed{g: g, id: id, app: a, opened: true, kind: driver.SurfaceWindow, title: title}
 	g.mu.Unlock()
 }
 
@@ -140,6 +143,9 @@ func (f *followed) Batch(b *driver.MountBatch) {
 		if it.Kind == driver.ItemOpenSurface && it.Surface != nil {
 			o := g.follow(it.Surface.ID)
 			o.opened, o.kind, o.title = true, it.Surface.Kind, it.Surface.Title
+		}
+		if it.Kind == driver.ItemDockMenu {
+			g.dock = f
 		}
 	}
 	g.mu.Unlock()
@@ -478,10 +484,13 @@ func (g *agent) find(p *automation.FindParams) (any, *automation.Error) {
 	return r, nil
 }
 
-// menu chooses an item of the application menu, the window's or the app's own (on macOS set from the app's function), or of the context menu showing.
+// menu chooses an item of the application menu, the window's or the app's own (on macOS set from the app's function), of the context menu showing, or of the app icon's menu, the app's whichever surface set it.
 func (g *agent) menu(p *automation.MenuParams) (any, *automation.Error) {
 	if len(p.Path) == 0 {
 		return nil, automation.Errorf(automation.InvalidRequest, "menu needs a path")
+	}
+	if p.Popup && p.Dock {
+		return nil, automation.Errorf(automation.InvalidRequest, "popup and dock name different menus")
 	}
 	id, f, err := g.window(p.Window)
 	if err != nil {
@@ -491,47 +500,33 @@ func (g *agent) menu(p *automation.MenuParams) (any, *automation.Error) {
 		return g.step(id, "", p.Snapshot, func(a *App) { a.ChoosePopup(p.Path...) })
 	}
 	owner, ownerID := f, id
+	var item *driver.MenuEntry
+	var why string
 	if p.Dock {
-		item, why := menuItemAt(f.app.DockMenu, p.Path)
-		if item == nil {
-			return nil, automation.Errorf(automation.NoMatch, "%s", why)
-		}
-		if item.Disabled {
-			return nil, automation.Errorf(automation.Failed, "the menu item %q is disabled", p.Path)
-		}
-		if owner.app.target == nil {
-			if err := g.tb.try(func() { owner.app.ChooseDockMenu(p.Path...) }); err != nil {
-				return nil, err
-			}
-		} else {
-			s := testhost.Live(ownerID)
-			if s == nil {
-				return nil, automation.Errorf(automation.Unsupported, "no surface shows the menu")
-			}
-			if err := s.ChooseDockMenu(item.ID); errors.Is(err, testhost.ErrNoMenu) {
-				return nil, automation.Errorf(automation.Unsupported, "%v", err)
-			} else if err != nil {
-				return nil, automation.Errorf(automation.Failed, "%v", err)
-			}
-			g.prepare(ownerID, owner)
-			if err := g.tb.try(func() { owner.app.target.settle() }); err != nil {
-				return nil, err
-			}
-		}
-		r := automation.StepResult{Settled: f.app.target == nil || f.app.target.quiet}
-		if p.Snapshot {
-			r.Snapshot = outline(f.app, false, false)
-		}
-		return r, nil
-	}
-	item, why := menuItemAt(f.app.Menu, p.Path)
-	if item == nil {
+		// The app has one Dock menu, the one a surface set last, whichever window the request names.
 		g.mu.Lock()
-		own := g.surfaces[0]
+		if g.dock != nil {
+			owner, ownerID = g.dock, g.dock.id
+		}
+		gone := owner.closed
 		g.mu.Unlock()
-		if own != nil && own != f {
-			if it, w := menuItemAt(own.app.Menu, p.Path); it != nil || len(f.app.Menu) == 0 {
-				item, why, owner, ownerID = it, w, own, 0
+		if lost := owner.lost(); lost != "" && !gone {
+			return nil, automation.Errorf(automation.Failed, "the automation stopped following surface %d, which set the Dock menu: %s", ownerID, lost)
+		}
+		if gone || len(owner.app.DockMenu) == 0 {
+			return nil, automation.Errorf(automation.NoMatch, "the app shows no Dock menu")
+		}
+		item, why = menuItemAt(owner.app.DockMenu, p.Path)
+	} else {
+		item, why = menuItemAt(f.app.Menu, p.Path)
+		if item == nil {
+			g.mu.Lock()
+			own := g.surfaces[0]
+			g.mu.Unlock()
+			if own != nil && own != f {
+				if it, w := menuItemAt(own.app.Menu, p.Path); it != nil || len(f.app.Menu) == 0 {
+					item, why, owner, ownerID = it, w, own, 0
+				}
 			}
 		}
 	}
@@ -543,7 +538,11 @@ func (g *agent) menu(p *automation.MenuParams) (any, *automation.Error) {
 	}
 	if owner.app.target == nil {
 		// A model of nsgotest's own runs the menu as a test does.
-		if err := g.tb.try(func() { owner.app.ChooseMenu(p.Path...) }); err != nil {
+		choose := owner.app.ChooseMenu
+		if p.Dock {
+			choose = owner.app.ChooseDockMenu
+		}
+		if err := g.tb.try(func() { choose(p.Path...) }); err != nil {
 			return nil, err
 		}
 	} else {
@@ -552,7 +551,11 @@ func (g *agent) menu(p *automation.MenuParams) (any, *automation.Error) {
 		if s == nil {
 			return nil, automation.Errorf(automation.Unsupported, "no surface shows the menu")
 		}
-		if err := s.ChooseMenu(item.ID); errors.Is(err, testhost.ErrNoMenu) {
+		choose := s.ChooseMenu
+		if p.Dock {
+			choose = s.ChooseDockMenu
+		}
+		if err := choose(item.ID); errors.Is(err, testhost.ErrNoMenu) {
 			return nil, automation.Errorf(automation.Unsupported, "%v", err)
 		} else if err != nil {
 			return nil, automation.Errorf(automation.Failed, "%v", err)

@@ -14,7 +14,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
-// fixture is a counter, a field echoing its text, a disabled button, a menu and an alert.
+// fixture is a counter, a field echoing its text, a disabled button, a menu, a Dock menu and an alert.
 func fixture(answered *int) func(cx *core.Scope) core.Node {
 	return func(cx *core.Scope) core.Node {
 		count := core.NewSignal(cx, 0)
@@ -23,7 +23,10 @@ func fixture(answered *int) func(cx *core.Scope) core.Node {
 			{Label: "Reset", OnSelect: func() { count.Set(0) }},
 			{Label: "Never", Disabled: true, OnSelect: func() {}},
 		}}})
-		cx.SetDockMenu([]core.MenuItem{{Label: "New Window", OnSelect: func() { count.Set(count.Get() + 1) }}})
+		cx.SetDockMenu([]core.MenuItem{
+			{Label: "New Window", OnSelect: func() { count.Set(count.Get() + 1) }},
+			{Label: "Later", Disabled: true, OnSelect: func() {}},
+		})
 		return core.View{Children: []core.Node{
 			core.View{Role: core.RoleButton, TestID: "add", OnPress: func(core.PressEvent) { count.Set(count.Get() + 1) },
 				Children: []core.Node{core.Text{Content: "Add"}}},
@@ -38,12 +41,6 @@ func fixture(answered *int) func(cx *core.Scope) core.Node {
 			}, Children: []core.Node{core.Text{Content: "Ask"}}},
 		}}
 	}
-}
-
-func TestAgentChoosesDockMenu(t *testing.T) {
-	g, app, _ := serving(t)
-	result(t, g, automation.Menu, automation.MenuParams{Dock: true, Path: []string{"New Window"}}, nil)
-	app.Find("text:Count: 1")
 }
 
 // serving starts the fixture headless and an agent answering for it as window 1.
@@ -225,6 +222,9 @@ func TestAgentFailures(t *testing.T) {
 		{automation.Press, automation.PressParams{Window: 7, Selector: "id:add"}, automation.NoWindow},
 		{automation.Menu, automation.MenuParams{Path: []string{"Actions", "Gone"}}, automation.NoMatch},
 		{automation.Menu, automation.MenuParams{Path: []string{"Actions", "Never"}}, automation.Failed},
+		{automation.Menu, automation.MenuParams{Dock: true, Path: []string{"Reset"}}, automation.NoMatch},
+		{automation.Menu, automation.MenuParams{Dock: true, Path: []string{"Later"}}, automation.Failed},
+		{automation.Menu, automation.MenuParams{Dock: true, Popup: true, Path: []string{"New Window"}}, automation.InvalidRequest},
 		{automation.Wait, automation.WaitParams{Selector: "text:Count: 9", TimeoutMS: 50}, automation.Timeout},
 		{automation.Screenshot, automation.ScreenshotParams{}, automation.Unsupported},
 		{automation.Status, nil, automation.UnknownMethod},
@@ -425,7 +425,7 @@ func TestAgentWaitsForTheFirstWindow(t *testing.T) {
 // chooser is a live surface that records the menu items it chose and the alerts it answered.
 type chooser struct {
 	*fakeLive
-	chose, answered []uint32
+	chose, answered, docked []uint32
 }
 
 func (c *chooser) ChooseMenu(id uint32) error {
@@ -436,6 +436,76 @@ func (c *chooser) ChooseMenu(id uint32) error {
 func (c *chooser) Answer(id uint32, index int) error {
 	c.answered = append(c.answered, id)
 	return nil
+}
+
+func (c *chooser) ChooseDockMenu(id uint32) error {
+	c.docked = append(c.docked, id)
+	return nil
+}
+
+// TestAgentChoosesDockMenu chooses in the app icon's menu of nsgotest's own app, which its model holds whichever window set it.
+func TestAgentChoosesDockMenu(t *testing.T) {
+	g, app, _ := serving(t)
+	result(t, g, automation.Menu, automation.MenuParams{Dock: true, Path: []string{"New Window"}}, nil)
+	app.Find("text:Count: 1")
+}
+
+// TestAgentChoosesTheAppsDockMenu follows the app's own surface and a window, whose items are numbered alike: the Dock menu is the one a surface set last, chosen through that surface whichever window the request names, and none once that surface goes, as the platform drops it.
+func TestAgentChoosesTheAppsDockMenu(t *testing.T) {
+	g := newAgent()
+	t.Cleanup(g.close)
+	trees := map[uint32]*chooser{}
+	var library func()
+	for _, id := range []uint32{0, 1} {
+		root := core.NewRoot(core.RootOptions{CheckCommits: !automationBuild})
+		t.Cleanup(root.Dispose)
+		tree := core.NewTree(root, core.ApproxTextEngine{})
+		tree.Resize(driver.Size{Width: 300, Height: 200}, driver.Geometry{})
+		tree.Mount(func(cx *core.Scope) core.Node {
+			if id == 0 {
+				cx.SetDockMenu([]core.MenuItem{{Label: "New Window", OnSelect: func() {}}})
+				return core.Text{Content: "app"}
+			}
+			shown := core.NewSignal(cx, false)
+			library = func() { shown.Set(true) }
+			return core.Show{When: shown.Get, Then: func(cx *core.Scope) core.Node {
+				cx.SetDockMenu([]core.MenuItem{{Label: "Next Library", OnSelect: func() {}}})
+				return core.Text{Content: "library"}
+			}, Else: func(*core.Scope) core.Node { return core.Text{Content: "window"} }}
+		})
+		trees[id] = &chooser{fakeLive: &fakeLive{surface: register(g, int(id)), tree: tree}}
+	}
+	testhost.RegisterLive(func(id uint32) testhost.Surface {
+		if c := trees[id]; c != nil {
+			return c
+		}
+		return nil
+	})
+	t.Cleanup(func() { testhost.RegisterLive(nil) })
+	opens(trees[0].surface)
+	trees[0].commit()
+	trees[1].commit()
+
+	// The app's function set it, so the app's own surface chooses it, though the request names the window.
+	result(t, g, automation.Menu, automation.MenuParams{Window: 1, Dock: true, Path: []string{"New Window"}}, nil)
+	if len(trees[0].docked) != 1 || len(trees[1].docked) != 0 {
+		t.Fatalf("the app chose %v and the window %v", trees[0].docked, trees[1].docked)
+	}
+	// The window's replaces it.
+	library()
+	trees[1].commit()
+	if got := code(t, g, automation.Menu, automation.MenuParams{Dock: true, Path: []string{"New Window"}}); got != automation.NoMatch {
+		t.Errorf("the replaced Dock menu answered %s", got)
+	}
+	result(t, g, automation.Menu, automation.MenuParams{Dock: true, Path: []string{"Next Library"}}, nil)
+	if len(trees[0].docked) != 1 || len(trees[1].docked) != 1 || trees[0].docked[0] != trees[1].docked[0] {
+		t.Fatalf("the app chose %v and the window %v", trees[0].docked, trees[1].docked)
+	}
+	// The window goes, and its menu with it.
+	g.Unregistered(trees[1].surface)
+	if got := code(t, g, automation.Menu, automation.MenuParams{Dock: true, Path: []string{"Next Library"}}); got != automation.NoMatch {
+		t.Errorf("the Dock menu of a window gone answered %s", got)
+	}
 }
 
 // TestAgentTellsSurfacesApart follows the app's own surface and a window, whose menu items and alerts are numbered alike, as each tree numbers its own.

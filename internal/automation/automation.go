@@ -184,7 +184,7 @@ type MenuParams struct {
 	Window   uint32   `json:"window,omitempty" jsonschema:"a window ID as windows lists it; the newest window by default"`
 	Path     []string `json:"path" jsonschema:"the item's labels from the menu bar down, such as File, New"`
 	Popup    bool     `json:"popup,omitempty" jsonschema:"choose in the context menu showing instead of the application menu"`
-	Dock     bool     `json:"dock,omitempty" jsonschema:"choose in the app icon's Dock menu or Windows Jump List instead of the application menu"`
+	Dock     bool     `json:"dock,omitempty" jsonschema:"choose in the app icon's menu (desktop.SetDockMenu), the Dock menu on macOS and the Jump List's tasks on Windows, instead of the application menu: the app's, whichever window set it last"`
 	Snapshot bool     `json:"snapshot,omitempty" jsonschema:"answer with the window's snapshot after the step"`
 }
 
