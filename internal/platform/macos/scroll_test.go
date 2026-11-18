@@ -97,3 +97,29 @@ func TestAScrollUnderWayNeedsNoRouting(t *testing.T) {
 	s.wheels.momentum = gone
 	check("momentum on an unmounted view", 0, phaseChanged, false)
 }
+
+func TestScrollIndicatorOnlyShowsForUserScroll(t *testing.T) {
+	v := &view{sc: &scrollState{}}
+	for _, test := range []struct {
+		name     string
+		phase    scrollPhase
+		userMove bool
+	}{
+		{name: "rest", phase: scrollPhase{kind: atRest}},
+		{name: "programmatic easing", phase: scrollPhase{kind: easing}},
+		{name: "thumb", phase: scrollPhase{kind: onThumb}, userMove: true},
+		{name: "wheel", phase: scrollPhase{kind: wheeling}, userMove: true},
+		{name: "momentum wait", phase: scrollPhase{kind: awaitingMomentum}, userMove: true},
+		{name: "momentum", phase: scrollPhase{kind: inMomentum}, userMove: true},
+		{name: "bounce", phase: scrollPhase{kind: bouncing}, userMove: true},
+		{name: "pinch", phase: scrollPhase{kind: pinching}, userMove: true},
+		{name: "snap", phase: scrollPhase{kind: easing, momentum: true}, userMove: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			v.sc.phase = test.phase
+			if got := v.userScrolling(); got != test.userMove {
+				t.Fatalf("userScrolling = %v, want %v", got, test.userMove)
+			}
+		})
+	}
+}

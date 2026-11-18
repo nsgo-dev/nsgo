@@ -268,6 +268,20 @@ func (v *view) reported() driver.Point {
 // too when the app says so, as on NSGo's other desktops.
 func (v *view) indicates() bool { return !v.sc.config.HideIndicator }
 
+// userScrolling reports whether the current offset change came from input.
+// Programmatic scroll commands use atRest or a non-momentum easing phase and
+// do not flash AppKit's overlay indicator.
+func (v *view) userScrolling() bool {
+	switch p := v.sc.phase; p.kind {
+	case onThumb, wheeling, awaitingMomentum, inMomentum, bouncing, pinching:
+		return true
+	case easing:
+		return p.momentum
+	default:
+		return false
+	}
+}
+
 // moveTo moves the offset along the axis to pos, unclamped since gestures
 // rubber-band, with what follows it: the translation, the sticky cells,
 // the indicator, the values bound to the offset and what comes into view.
@@ -286,7 +300,7 @@ func (v *view) moveZoom(at driver.Point, z float64) {
 	}
 	pos := v.main(at)
 	s.at, s.zoom = at, z
-	if v.indicates() {
+	if v.indicates() && v.userScrolling() {
 		s.shown, s.alpha, s.dark = mediaTime(), 1, v.surface.env.Dark
 	}
 	s.report = true
