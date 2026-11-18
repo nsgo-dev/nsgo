@@ -47,6 +47,8 @@ Headless runs use the phone idiom by default, whatever the project targets, so `
 
 ## Run the tests
 
+`nsgotest.Clock` supplies a custom manual clock, and `nsgotest.WallTime` sets its wall time before the first render.
+
 ```sh
 go tool nsgo test
 ```

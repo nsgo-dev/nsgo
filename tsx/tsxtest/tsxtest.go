@@ -360,7 +360,7 @@ func (r *runner) open(call goja.FunctionCall) goja.Value {
 			if d, ok := at.Export().(time.Time); ok {
 				wall = d
 			}
-			opts = append(opts, func(a *nsgotest.App) { a.Clock.SetWallTime(wall) })
+			opts = append(opts, nsgotest.WallTime(wall))
 		}
 	}
 	if v := opt("clipboard"); v != nil {

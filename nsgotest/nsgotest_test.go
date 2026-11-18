@@ -209,6 +209,35 @@ func TestFramesFollowTheClock(t *testing.T) {
 	}
 }
 
+func TestWallTimeOptionSetsTheFirstFrame(t *testing.T) {
+	want := time.Date(2031, 4, 5, 6, 7, 8, 0, time.FixedZone("test", 9*60*60))
+	var got time.Time
+	Start(t, func(cx *core.Scope) core.Node {
+		got = cx.WallTime()
+		return core.View{}
+	}, WallTime(want))
+	if !got.Equal(want) || got.Location() != want.Location() {
+		t.Fatalf("first wall time = %v (%v), want %v (%v)", got, got.Location(), want, want.Location())
+	}
+}
+
+func TestClockOptionRunsAppTimers(t *testing.T) {
+	clock := core.NewManualClock(time.Date(2032, 1, 1, 0, 0, 0, 0, time.UTC))
+	var fired int
+	app := Start(t, func(cx *core.Scope) core.Node {
+		cx.AfterFunc(time.Hour, func() { fired++ })
+		return core.View{}
+	}, Clock(clock))
+	if app.Clock != clock {
+		t.Fatal("Clock option did not install the supplied clock")
+	}
+	clock.Advance(time.Hour)
+	app.Settle()
+	if fired != 1 {
+		t.Fatalf("timer fired %d times, want 1", fired)
+	}
+}
+
 // The app's directories are the test's own, made before the app starts, so a test never writes to the user's data, cache or logs; in a browser they are empty, as the web backend's are.
 func TestAppDirectoriesAreTemporary(t *testing.T) {
 	if Target() == "web" {

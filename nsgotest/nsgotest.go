@@ -62,6 +62,21 @@ func Storage(entries map[string]string) Option {
 	return func(a *App) { a.store = core.NewStore(seed(entries)) }
 }
 
+// Clock runs the app on c instead of a new ManualClock. The clock must be
+// non-nil and is available as App.Clock after Start returns.
+func Clock(c *core.ManualClock) Option {
+	return func(a *App) { a.Clock = c }
+}
+
+// WallTime starts the app with its wall time at t, as ManualClock.SetWallTime
+// sets it, so the first render reads t. It moves no timer.
+func WallTime(t time.Time) Option {
+	return func(a *App) {
+		wall := t
+		a.wallTime = &wall
+	}
+}
+
 // Secrets starts the app with values kept in its secure store, by account under the app's own service (core.Secrets.Service), as if kept from an earlier run; it starts empty otherwise.
 func Secrets(values map[string]string) Option {
 	return func(a *App) { a.seedSecrets = values }
@@ -383,6 +398,7 @@ type App struct {
 	root     *core.Scope
 	store    *core.Store
 	Clock    *core.ManualClock
+	wallTime *time.Time
 	// Secrets is the app's secure store, in memory: what Scope.Secrets keeps, by item, for a test to read or change, so no test touches the machine's keychain, also on a target. seedSecrets are what the Secrets option starts it with.
 	Secrets     *core.MemorySecrets
 	seedSecrets map[string]string
@@ -486,6 +502,12 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 	}
 	for _, o := range opts {
 		o(a)
+	}
+	if a.Clock == nil {
+		t.Fatalf("nsgotest: Clock needs a manual clock")
+	}
+	if a.wallTime != nil {
+		a.Clock.SetWallTime(*a.wallTime)
 	}
 	if a.microphone != nil && !onTarget() {
 		a.microphone.connect(t)

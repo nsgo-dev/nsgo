@@ -47,6 +47,8 @@ func TestMain(m *testing.M) {
 
 ## 运行测试
 
+`nsgotest.Clock` 提供自定义手动时钟，`nsgotest.WallTime` 在首帧渲染前设置墙上时间。
+
 ```sh
 go tool nsgo test
 ```
