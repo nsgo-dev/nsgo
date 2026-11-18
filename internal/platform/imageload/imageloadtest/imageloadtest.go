@@ -64,9 +64,12 @@ func CheckHTTP(t *testing.T, get func(ctx context.Context, url string, header im
 	}
 }
 
-var slowRun atomic.Int64
+var (
+	slowRun   atomic.Int64
+	slowStart = time.Now().UnixNano()
+)
 
-// Slow has imageload answer every http(s) source with body after delay, as a slow network does, until the test ends, and returns n distinct addresses for it. Each call's addresses are new, so imageload's own cache holds none of them yet.
+// Slow has imageload answer every http(s) source with body after delay, as a slow network does, until the test ends, and returns n distinct addresses for it. Each call's addresses are new, also to a disk cache an earlier test process filled, so imageload's caches hold none of them yet.
 func Slow(t *testing.T, n int, delay time.Duration, body []byte) []string {
 	saved := imageload.HTTP
 	t.Cleanup(func() { imageload.HTTP = saved })
@@ -81,7 +84,7 @@ func Slow(t *testing.T, n int, delay time.Duration, body []byte) []string {
 	run := slowRun.Add(1)
 	uris := make([]string, n)
 	for i := range uris {
-		uris[i] = fmt.Sprintf("https://slow.invalid/%d/%d.png", run, i)
+		uris[i] = fmt.Sprintf("https://slow.invalid/%d-%d/%d.png", slowStart, run, i)
 	}
 	return uris
 }

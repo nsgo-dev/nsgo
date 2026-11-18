@@ -14,6 +14,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/canvastest"
+	"github.com/nsgo-dev/nsgo/internal/platform/imageload/imageloadtest"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
@@ -47,21 +48,7 @@ func TestCanvasImageNativeCacheBoundAndReload(t *testing.T) {
 	}
 	s := surface.(*testSurface)
 	s.Sync()
-	state := func(src driver.ImageSource) (int, bool) {
-		t.Helper()
-		data, err := s.ask(map[string]any{"op": "canvas-images", "key": src.Key()})
-		if err != nil {
-			t.Fatal(err)
-		}
-		var result struct {
-			Count int
-			Ready bool
-		}
-		if err := json.Unmarshal([]byte(data), &result); err != nil {
-			t.Fatal(err)
-		}
-		return result.Count, result.Ready
-	}
+	state := func(src driver.ImageSource) (int, bool) { return canvasImageState(t, s, src) }
 	checkPixels := func(red bool) {
 		t.Helper()
 		deadline := time.Now().Add(5 * time.Second)
@@ -129,21 +116,7 @@ func TestCanvasImageNativeCacheKeepsAWideDrawing(t *testing.T) {
 	}
 	s := surface.(*testSurface)
 	s.Sync()
-	state := func(src driver.ImageSource) (int, bool) {
-		t.Helper()
-		data, err := s.ask(map[string]any{"op": "canvas-images", "key": src.Key()})
-		if err != nil {
-			t.Fatal(err)
-		}
-		var result struct {
-			Count int
-			Ready bool
-		}
-		if err := json.Unmarshal([]byte(data), &result); err != nil {
-			t.Fatal(err)
-		}
-		return result.Count, result.Ready
-	}
+	state := func(src driver.ImageSource) (int, bool) { return canvasImageState(t, s, src) }
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		ready := 0
 		count := 0
@@ -164,4 +137,84 @@ func TestCanvasImageNativeCacheKeepsAWideDrawing(t *testing.T) {
 			t.Fatalf("%d of %d sources drawn, %d cached", ready, len(sources), count)
 		}
 	}
+}
+
+// canvasImageState returns how many entries s's canvas cache holds and whether src's has decoded, without making it recently drawn.
+func canvasImageState(t *testing.T, s *testSurface, src driver.ImageSource) (int, bool) {
+	t.Helper()
+	data, err := s.ask(map[string]any{"op": "canvas-images", "key": src.Key()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result struct {
+		Count int
+		Ready bool
+	}
+	if err := json.Unmarshal([]byte(data), &result); err != nil {
+		t.Fatal(err)
+	}
+	return result.Count, result.Ready
+}
+
+// Drawings that follow each other with more slow images together than the bound keep every load under way, past the bound, rather than cancel the earlier ones' loads, and every image arrives; drawing others then shrinks the cache back to the bound.
+func TestCanvasImageNativeCacheKeepsLoadsUnderWay(t *testing.T) {
+	var sets [][]driver.ImageSource
+	var scope *core.Scope
+	var choose func(int)
+	surface, err := testhost.Current().Open(func(cx *core.Scope) core.Node {
+		scope = cx
+		selected := core.NewSignal(cx, -1)
+		choose = selected.Set
+		return core.Canvas{Style: core.Style{Width: core.Pct(100), Height: core.Pct(100)}, Draw: func(d *core.Drawing, size core.Size) {
+			if i := selected.Get(); i >= 0 {
+				for j, src := range sets[i] {
+					d.DrawImageIn(src, float32(j%16)*4, float32(j/16)*4, 4, 4)
+				}
+			}
+		}}
+	}, testhost.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := surface.(*testSurface)
+	s.Sync()
+	// The surface set imageload.HTTP as it started: Slow replaces it from here on.
+	var slow []driver.ImageSource
+	for _, uri := range imageloadtest.Slow(t, 88, 2*time.Second, canvastest.RedPNG()) {
+		slow = append(slow, driver.ImageSource{URI: uri})
+	}
+	sets = [][]driver.ImageSource{slow[:40], slow[40:80], slow[80:], canvastest.CacheSources(maxCanvasImages)}
+	show := func(i, want int) {
+		t.Helper()
+		scope.Post(func() { choose(i) })
+		s.Sync()
+		for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+			count, _ := canvasImageState(t, s, sets[i][0])
+			if count == want {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("drawing set %d: %d cached, want %d", i, count, want)
+			}
+		}
+	}
+	// Each set draws in a pass of its own while the earlier sets' images still load.
+	show(0, 40)
+	show(1, 80)
+	show(2, 88)
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		ready := 0
+		for _, src := range slow {
+			if _, ok := canvasImageState(t, s, src); ok {
+				ready++
+			}
+		}
+		if ready == len(slow) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d of %d slow images arrived", ready, len(slow))
+		}
+	}
+	show(3, maxCanvasImages)
 }
