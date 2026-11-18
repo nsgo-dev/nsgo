@@ -477,8 +477,6 @@ func groupedText(v *view) string {
 	return strings.Join(parts, " ")
 }
 
-// children returns the elements inside element e: its view's, flattened,
-// and a canvas's parts.
 // language is the language the app shows in e's window (driver.ItemDirection), "" before it says one or without a window.
 func (e *uiaElement) language() string {
 	if e.w == nil {
@@ -487,6 +485,7 @@ func (e *uiaElement) language() string {
 	return e.w.language
 }
 
+// children returns the elements inside element e: its view's, flattened, and a canvas's parts.
 func (e *uiaElement) children() []*uiaElement {
 	v, ok := e.alive()
 	if !ok || e.part > 0 {
