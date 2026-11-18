@@ -589,7 +589,10 @@ func (s *surface) environment() driver.Environment {
 	}
 	const dark = 2
 	locale, rtl := apple.Locale()
+	deviceName, deviceModel := deviceIdentity()
 	env := driver.Environment{
+		DeviceName:  deviceName,
+		DeviceModel: deviceModel,
 		SafeArea: driver.Edges{Top: driver.Points(in.Top), Right: driver.Points(in.Right),
 			Bottom: driver.Points(in.Bottom), Left: driver.Points(in.Left)},
 		KeyboardHeight:   s.keyboard,

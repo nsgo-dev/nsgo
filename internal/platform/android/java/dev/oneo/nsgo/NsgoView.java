@@ -973,6 +973,17 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             d.writeByte(idiom);
             java.util.Locale locale = hostLocale != null ? hostLocale : config.getLocales().get(0);
             Protocol.writeString(d, locale.toLanguageTag());
+            String deviceName = Settings.Global.getString(getContext().getContentResolver(), "device_name");
+            Protocol.writeString(d, deviceName == null ? "" : deviceName);
+            String manufacturer = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.trim();
+            String model = Build.MODEL == null ? "" : Build.MODEL.trim();
+            if (!manufacturer.isEmpty() && !model.isEmpty()
+                    && !model.toLowerCase(java.util.Locale.ROOT).startsWith(manufacturer.toLowerCase(java.util.Locale.ROOT))) {
+                model = manufacturer + " " + model;
+            } else if (model.isEmpty()) {
+                model = manufacturer;
+            }
+            Protocol.writeString(d, model);
             // The system header's heights, without and with a large title.
             d.writeFloat(Header.BAR);
             d.writeFloat(Header.BAR);

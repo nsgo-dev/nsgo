@@ -12,28 +12,29 @@ import (
 // Env is the environment as signals, one per part, so a binding runs
 // again only when a part it read changes.
 type Env struct {
-	window               *Signal[Size]
-	safe, titleBar       *Signal[Edges]
-	maximized            *Signal[bool]
-	fullScreen           *Signal[bool]
-	minimized            *Signal[bool]
-	windowFrame          *Signal[WindowFrame]
-	keyboard             *Signal[Points]
-	keyboardDuration     *Signal[time.Duration]
-	dark, reduce, reader *Signal[bool]
-	contrast             *Signal[bool]
-	screenColor, speech  *Signal[bool]
-	audio, speak         *Signal[bool]
-	camera               *Signal[bool]
-	canSendInput         *Signal[bool]
-	level, place         *Signal[bool]
-	workspaces           *Signal[bool]
-	hasWebView           *Signal[bool]
-	appleSignIn          *Signal[bool]
-	purchases            *Signal[bool]
-	scheduled            *Signal[bool]
-	transparent, taskbar *Signal[bool]
-	fontScale, ratio     *Signal[float32]
+	deviceName, deviceModel *Signal[string]
+	window                  *Signal[Size]
+	safe, titleBar          *Signal[Edges]
+	maximized               *Signal[bool]
+	fullScreen              *Signal[bool]
+	minimized               *Signal[bool]
+	windowFrame             *Signal[WindowFrame]
+	keyboard                *Signal[Points]
+	keyboardDuration        *Signal[time.Duration]
+	dark, reduce, reader    *Signal[bool]
+	contrast                *Signal[bool]
+	screenColor, speech     *Signal[bool]
+	audio, speak            *Signal[bool]
+	camera                  *Signal[bool]
+	canSendInput            *Signal[bool]
+	level, place            *Signal[bool]
+	workspaces              *Signal[bool]
+	hasWebView              *Signal[bool]
+	appleSignIn             *Signal[bool]
+	purchases               *Signal[bool]
+	scheduled               *Signal[bool]
+	transparent, taskbar    *Signal[bool]
+	fontScale, ratio        *Signal[float32]
 	// locale and systemRTL are the platform's or the host's; forced is
 	// the locale Scope.SetLocale forces.
 	locale, forced *Signal[string]
@@ -75,6 +76,8 @@ type displayList struct{ values []DisplayInfo }
 // app sets for all of them with the first's, app.
 func newEnv(cx *Scope, app *Env) *Env {
 	e := &Env{
+		deviceName:       NewSignal(cx, ""),
+		deviceModel:      NewSignal(cx, ""),
 		window:           NewSignal(cx, Size{}),
 		geometry:         NewSignalFunc(cx, driver.Divide(Size{}, nil), Geometry.Equal),
 		verticalBar:      NewSignal(cx, VerticalBarUnspecified),
@@ -191,6 +194,8 @@ func (e *Env) set(v Environment) {
 		v.KeyboardDuration = 250 * time.Millisecond
 	}
 	e.safe.Set(v.SafeArea)
+	e.deviceName.Set(v.DeviceName)
+	e.deviceModel.Set(v.DeviceModel)
 	e.titleBar.Set(v.TitleBar)
 	e.maximized.Set(v.Maximized)
 	e.fullScreen.Set(v.FullScreen)
@@ -241,6 +246,14 @@ func (e *Env) set(v Environment) {
 	e.verticalBar.Set(v.VerticalBarEdge)
 	e.headers = [2]Points{v.HeaderHeight, max(v.LargeHeaderHeight, v.HeaderHeight)}
 }
+
+// DeviceName returns the user's name for the device, where the platform
+// exposes it; it is empty where the platform keeps it private.
+func (e *Env) DeviceName() string { return e.deviceName.Get() }
+
+// DeviceModel returns the platform's human-readable hardware model, or its
+// hardware identifier when no mapping is available.
+func (e *Env) DeviceModel() string { return e.deviceModel.Get() }
 
 // Window returns the surface's size.
 func (e *Env) Window() Size { return e.window.Get() }

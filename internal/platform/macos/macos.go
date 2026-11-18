@@ -1070,9 +1070,12 @@ func mainMenu(lang string) objc.ID {
 // environment returns what AppKit tells about where the app runs.
 func (s *surface) environment() driver.Environment {
 	ws := objc.ID(apple.Class("NSWorkspace")).Send(sel("sharedWorkspace"))
+	deviceName, deviceModel := deviceIdentity()
 	locale, rtl := apple.Locale()
 	appearance := apple.GoString(s.native.Send(sel("effectiveAppearance")).Send(sel("name")))
 	return driver.Environment{
+		DeviceName:       deviceName,
+		DeviceModel:      deviceModel,
 		Dark:             strings.Contains(appearance, "Dark"),
 		FontScale:        1,
 		ReduceMotion:     objc.Send[bool](ws, sel("accessibilityDisplayShouldReduceMotion")),

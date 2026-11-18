@@ -1000,6 +1000,23 @@ func TestEnvironment(t *testing.T) {
 	}
 }
 
+func TestDeviceIdentityFollowsEnvironment(t *testing.T) {
+	var names, models []string
+	h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+		cx.Effect(func() {
+			names = append(names, cx.Env().DeviceName())
+			models = append(models, cx.Env().DeviceModel())
+		})
+		return Text{Content: "Aa"}
+	})
+	h.commit()
+	h.tree.SetEnvironment(Environment{DeviceName: "Ada's Mac", DeviceModel: "Mac15,7"})
+	h.commit()
+	if !slices.Equal(names, []string{"", "Ada's Mac"}) || !slices.Equal(models, []string{"", "Mac15,7"}) {
+		t.Fatalf("names %v, models %v", names, models)
+	}
+}
+
 func TestPlaceFlipsAndClamps(t *testing.T) {
 	area := Bounds{Size: Size{Width: 100, Height: 100}}
 	anchor := Bounds{Origin: Point{X: 40, Y: 80}, Size: Size{Width: 20, Height: 10}}

@@ -36,6 +36,7 @@ var (
 	isWindowVisible          = user32.NewProc("IsWindowVisible")
 	getForegroundWindow      = user32.NewProc("GetForegroundWindow")
 	getWindowThreadProcessID = user32.NewProc("GetWindowThreadProcessId")
+	getComputerNameExW       = kernel32.NewProc("GetComputerNameExW")
 )
 
 const (
@@ -73,7 +74,10 @@ type highContrast struct {
 // software keyboard, so its inset stays 0.
 func (w *window) environment() driver.Environment {
 	locale := userLocale()
+	deviceName, deviceModel := deviceIdentity()
 	return driver.Environment{
+		DeviceName:       deviceName,
+		DeviceModel:      deviceModel,
 		Dark:             regDWORD(`Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, "AppsUseLightTheme", 1) == 0,
 		FontScale:        float32(regDWORD(`Software\Microsoft\Accessibility`, "TextScaleFactor", 100)) / 100,
 		ReduceMotion:     !systemFlag(spiGetClientAreaAnimation, true),
@@ -115,6 +119,26 @@ func (w *window) environment() driver.Environment {
 		// A window or a panel opened transparent with DirectComposition draws nothing of its own until SetWindowTransparent frames the window (look.go).
 		WindowTransparent: w.transparent,
 	}
+}
+
+// deviceIdentity reads the name Windows exposes for the physical machine and
+// the firmware's product name. Both may be unavailable on a restricted host.
+func deviceIdentity() (name, model string) {
+	name = computerName()
+	model = regString(syscall.HKEY_LOCAL_MACHINE, 0,
+		`HARDWARE\DESCRIPTION\System\BIOS`, "SystemProductName")
+	return name, model
+}
+
+func computerName() string {
+	for _, kind := range []uint32{5, 1} { // Physical DNS hostname, DNS hostname.
+		buf := make([]uint16, 256)
+		size := uint32(len(buf))
+		if ok, _, _ := getComputerNameExW.Call(uintptr(kind), uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size))); ok != 0 && size > 0 {
+			return syscall.UTF16ToString(buf[:size])
+		}
+	}
+	return ""
 }
 
 func highContrastEnabled() bool {

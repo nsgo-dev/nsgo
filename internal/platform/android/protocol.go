@@ -412,6 +412,8 @@ func readEnvironment(r *reader) driver.Environment {
 	env.Speak = r.byte()&1 != 0
 	env.Idiom = driver.Idiom(r.byte())
 	env.Locale = r.str()
+	env.DeviceName = r.str()
+	env.DeviceModel = r.str()
 	// The toolbar's heights, without and with a large title.
 	env.HeaderHeight, env.LargeHeaderHeight = r.points(), r.points()
 	env.OSVersion.Major = int(r.u32()) // the API level

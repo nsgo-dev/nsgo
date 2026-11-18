@@ -5,6 +5,7 @@ package linux
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"unsafe"
@@ -68,6 +69,7 @@ func (w *window) environment() driver.Environment {
 		fontScale = float32(float64(dpi) / float64(96*xftDPIUnit))
 	}
 	locale := sessionLocale()
+	deviceName, deviceModel := deviceIdentity()
 	var frame driver.WindowFrame
 	if w.win != 0 {
 		var width, height int32
@@ -82,6 +84,8 @@ func (w *window) environment() driver.Environment {
 	}
 	front, followed := frontmostApp()
 	return driver.Environment{
+		DeviceName:       deviceName,
+		DeviceModel:      deviceModel,
 		Dark:             dark,
 		FontScale:        fontScale,
 		ReduceMotion:     reduce,
@@ -117,6 +121,29 @@ func (w *window) environment() driver.Environment {
 		// A window or panel cleared of its background shows through only while the display composites (look.go).
 		WindowTransparent: w.transparent && displayComposites(),
 	}
+}
+
+// deviceIdentity follows the desktop conventions used by GNOME and KDE:
+// machine-info's PRETTY_HOSTNAME is the user-visible name, and DMI's product
+// name is the hardware model when the kernel exposes it.
+func deviceIdentity() (name, model string) {
+	if data, err := os.ReadFile("/etc/machine-info"); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			key, value, ok := strings.Cut(line, "=")
+			if !ok || key != "PRETTY_HOSTNAME" {
+				continue
+			}
+			name = strings.Trim(strings.TrimSpace(value), "\"")
+			break
+		}
+	}
+	if name == "" {
+		name, _ = os.Hostname()
+	}
+	if data, err := os.ReadFile(filepath.Join("/sys/devices/virtual/dmi/id", "product_name")); err == nil {
+		model = strings.TrimSpace(string(data))
+	}
+	return name, model
 }
 
 // displays reads GDK's monitors in the same logical coordinate space as

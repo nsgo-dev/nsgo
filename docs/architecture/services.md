@@ -312,6 +312,8 @@ A playing `Video` keeps the display on only on iOS, where `AVPlayer`'s `prevents
 
 `Env.Minimized`, `desktop.Minimized` for apps, says the window is minimized. It is not `Window.Visible`, which follows only the app's own `Show` and `Hide`: a window the user minimizes, or an app hidden with Cmd+H, stays visible there.
 
+`Env.DeviceName` is the user's name for the device where the platform exposes one, and `Env.DeviceModel` is its human-readable hardware model (or the hardware identifier when no model mapping is available). macOS reads the computer name and `hw.model`, iOS reads the name and `hw.machine`, Android reads the system device name and manufacturer/model, Windows reads the physical computer name and firmware product name, and Linux reads `PRETTY_HOSTNAME` or the hostname and its DMI product name. Either value is empty when the platform does not expose it. Tests set both through `nsgotest.Environment`.
+
 | Target | Background while | Active while | `Minimized` |
 | --- | --- | --- | --- |
 | macOS | The app is hidden, or the window is not visible, miniaturized, or its `occlusionState` says none of it shows (covered, the screen locked) | The app is active | The window `isMiniaturized` |
