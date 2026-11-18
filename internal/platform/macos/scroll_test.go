@@ -5,6 +5,9 @@ package macos
 import (
 	"testing"
 	"time"
+
+	"github.com/ebitengine/purego/objc"
+	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
 func TestALongScrollCommitsOnlyWhenItEnds(t *testing.T) {
@@ -98,28 +101,61 @@ func TestAScrollUnderWayNeedsNoRouting(t *testing.T) {
 	check("momentum on an unmounted view", 0, phaseChanged, false)
 }
 
-func TestScrollIndicatorOnlyShowsForUserScroll(t *testing.T) {
-	v := &view{sc: &scrollState{}}
-	for _, test := range []struct {
-		name     string
-		phase    scrollPhase
-		userMove bool
-	}{
-		{name: "rest", phase: scrollPhase{kind: atRest}},
-		{name: "programmatic easing", phase: scrollPhase{kind: easing}},
-		{name: "thumb", phase: scrollPhase{kind: onThumb}, userMove: true},
-		{name: "wheel", phase: scrollPhase{kind: wheeling}, userMove: true},
-		{name: "momentum wait", phase: scrollPhase{kind: awaitingMomentum}, userMove: true},
-		{name: "momentum", phase: scrollPhase{kind: inMomentum}, userMove: true},
-		{name: "bounce", phase: scrollPhase{kind: bouncing}, userMove: true},
-		{name: "pinch", phase: scrollPhase{kind: pinching}, userMove: true},
-		{name: "snap", phase: scrollPhase{kind: easing, momentum: true}, userMove: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			v.sc.phase = test.phase
-			if got := v.userScrolling(); got != test.userMove {
-				t.Fatalf("userScrolling = %v, want %v", got, test.userMove)
+// The indicator shows while the user scrolls, as AppKit's overlay scrollers do, and stays hidden while the app scrolls (#343).
+func TestTheIndicatorShowsOnlyForTheUsersScrolls(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		s := &surface{native: objc.ID(classView).Send(selNew), animator: driver.NewAnimator(nil)}
+		defer s.native.Send(selRelease)
+		defer func() { s.closed = true }() // what the moves put off stays undone
+		v := s.create(driver.KindScroll, 1)
+		defer v.native.Send(selRelease)
+		defer delete(views, v.native)
+		s.views = []*view{nil, v}
+		v.frame = driver.Bounds{Size: driver.Size{Width: 100, Height: 200}}
+		v.sc.content = driver.Size{Width: 100, Height: 1000}
+		v.sc.ticking = true // the test steps the frames
+		check := func(what string, wantAt driver.Points, shown bool) {
+			t.Helper()
+			if v.pos() != wantAt {
+				t.Fatalf("%s: offset %v, want %v", what, v.pos(), wantAt)
 			}
-		})
-	}
+			if got := v.sc.alpha > 0; got != shown {
+				t.Errorf("%s: indicator shown %v, want %v", what, got, shown)
+			}
+		}
+		ease := func() {
+			p := v.sc.phase
+			if p.kind != easing {
+				t.Fatalf("phase %v, want easing", p.kind)
+			}
+			v.tickScroll(p.start + p.duration/2)
+			if v.pos() == p.from {
+				t.Fatal("the easing did not move")
+			}
+		}
+
+		v.scrollTo(driver.Point{Y: 300}, false)
+		check("ScrollTo", 300, false)
+		v.scrollTo(driver.Point{Y: 600}, true)
+		ease()
+		check("an animated ScrollTo under way", v.pos(), false)
+		v.tickScroll(v.sc.phase.start + v.sc.phase.duration)
+		check("an animated ScrollTo", 600, false)
+		v.scrollBy(driver.Point{Y: 20})
+		check("ScrollBy", 620, false)
+
+		v.wheelBy(0, -20, 0)
+		check("a mouse wheel", 600, true)
+
+		// A trackpad gesture pulled past the top springs back as the fingers lift.
+		v.sc.phase, v.sc.alpha = scrollPhase{}, 0
+		v.moveTo(-40)
+		check("the test's own move", -40, false)
+		v.sc.phase = scrollPhase{kind: wheeling, gesture: true, raw: -40}
+		v.wheelEnd(0, 0)
+		v.sc.alpha = 0
+		ease()
+		check("a spring back", v.pos(), true)
+	})
 }

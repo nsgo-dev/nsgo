@@ -116,10 +116,10 @@ func (v *view) panTo(at driver.Point, animated bool) {
 	v.easeZoomTo(driver.Point{X: (at.X + f.X) / z, Y: (at.Y + f.Y) / z}, f, v.sc.zoom, animated)
 }
 
-// settleZoom springs the view back within its zoom scales around
-// viewport point f, and its offset within the limits.
+// settleZoom springs the view back within its zoom scales around viewport point f, and its offset within the limits, after the user's pinch or gesture.
 func (v *view) settleZoom(f driver.Point) {
 	v.easeZoomTo(v.contentAt(f), f, v.limitZoom(v.sc.zoom, false), true)
+	v.sc.phase.user = v.sc.phase.kind == easing
 }
 
 // easeZoomTo eases the view to zoom z with content point c at viewport

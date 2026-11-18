@@ -289,6 +289,7 @@ func (s *surface) autoscrollSelection(dt time.Duration) bool {
 	if to == v.pos() {
 		return false
 	}
+	v.showIndicator() // the user's drag moves the view
 	v.moveTo(to)
 	v.commit()
 	sl.drag()

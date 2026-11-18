@@ -86,20 +86,18 @@ const (
 	// bouncing: the momentum hit the edge at to at velocity, shown at
 	// start; the view bounces back to it.
 	bouncing
-	// easing: an eased move from from to to, from start for duration;
-	// momentum for a snap after a release, settles to let the values that
-	// snap settle as it arrives. A zooming view eases its zoom too.
+	// easing: an eased move from from to to, from start for duration; momentum for a snap after a release, user for any move that follows the user's input (a snap or a spring back after a release or a pinch), settles to let the values that snap settle as it arrives. A zooming view eases its zoom too.
 	easing
 	// pinching: a trackpad pinch zooms the view.
 	pinching
 )
 
 type scrollPhase struct {
-	kind                       phaseKind
-	from, to, raw, total       driver.Points
-	velocity                   float32
-	last, start, duration      time.Duration
-	gesture, momentum, settles bool
+	kind                             phaseKind
+	from, to, raw, total             driver.Points
+	velocity                         float32
+	last, start, duration            time.Duration
+	gesture, momentum, user, settles bool
 	// A zooming view's: rawAt and rawZoom are where a gesture's deltas
 	// and a pinch's put the offset and the zoom before the rubber band,
 	// and zoom is an easing (zoom.go).
@@ -268,17 +266,22 @@ func (v *view) reported() driver.Point {
 // too when the app says so, as on NSGo's other desktops.
 func (v *view) indicates() bool { return !v.sc.config.HideIndicator }
 
-// userScrolling reports whether the current offset change came from input.
-// Programmatic scroll commands use atRest or a non-momentum easing phase and
-// do not flash AppKit's overlay indicator.
+// userScrolling reports whether the offset moves under the user's input, which shows the indicator, as AppKit's overlay scrollers do: the wheel, the trackpad and the system's momentum, the indicator dragged, a pinch, and the snap or spring back after them. The app's scrolls (ScrollTo, ScrollBy, a field revealed, a refresh's room, content that shrank) leave it as it is.
 func (v *view) userScrolling() bool {
 	switch p := v.sc.phase; p.kind {
 	case onThumb, wheeling, awaitingMomentum, inMomentum, bouncing, pinching:
 		return true
 	case easing:
-		return p.momentum
-	default:
-		return false
+		return p.user
+	}
+	// Frames still catch up with the trackpad's events.
+	return v.sc.resampled.Active()
+}
+
+// showIndicator shows the indicator from now, as the user moves the view.
+func (v *view) showIndicator() {
+	if s := v.sc; v.indicates() {
+		s.shown, s.alpha, s.dark = mediaTime(), 1, v.surface.env.Dark
 	}
 }
 
@@ -300,8 +303,8 @@ func (v *view) moveZoom(at driver.Point, z float64) {
 	}
 	pos := v.main(at)
 	s.at, s.zoom = at, z
-	if v.indicates() && v.userScrolling() {
-		s.shown, s.alpha, s.dark = mediaTime(), 1, v.surface.env.Dark
+	if v.userScrolling() {
+		v.showIndicator()
 	}
 	s.report = true
 	apple.WithoutAnimation(func() {
@@ -530,10 +533,10 @@ func (v *view) tickScroll(t time.Duration) bool {
 		// A little more than an interval back: the event after it has come
 		// by then, even a little late.
 		pos, past := s.resampled.Sample(t - s.resampled.Interval - 2*time.Millisecond)
+		v.moveTo(pos)
 		if past && !input {
 			s.resampled.Reset()
 		}
-		v.moveTo(pos)
 	}
 	_, hi := v.limits()
 	switch p = s.phase; {
@@ -663,8 +666,8 @@ func (v *view) interrupt() {
 // else moves it from there.
 func (v *view) showGoal() {
 	if goal, ok := v.sc.resampled.Goal(); ok {
+		v.moveTo(goal) // the trackpad's: the indicator shows
 		v.sc.resampled.Reset()
-		v.moveTo(goal)
 	}
 }
 
@@ -738,6 +741,8 @@ func (v *view) release(velocity, snapVelocity float32) {
 		s.phase = scrollPhase{}
 		v.scrollEnded()
 	}
+	// What moves after the release follows the user's input.
+	s.phase.user = s.phase.kind == easing
 }
 
 // configureScroll applies a scroll view's configuration.
