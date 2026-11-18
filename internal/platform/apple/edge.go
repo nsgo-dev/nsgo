@@ -3,6 +3,8 @@
 package apple
 
 import (
+	"unsafe"
+
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -76,10 +78,37 @@ func EdgeBlur(s driver.Side, d driver.EdgeEffect) objc.ID {
 
 // GaussianBackdrop returns a CABackdropLayer's filters for an even blur of radius points, the standard deviation as CSS's blur() has it: hard scroll edges and macOS's backdrop blurs. The array is autoreleased.
 func GaussianBackdrop(radius float64) objc.ID {
+	return objc.ID(Class("NSArray")).Send(sel("arrayWithObject:"), gaussianBackdropFilter(radius))
+}
+
+func gaussianBackdropFilter(radius float64) objc.ID {
 	f := objc.ID(Class("CAFilter")).Send(sel("filterWithType:"), NSString("gaussianBlur"))
 	f.Send(sel("setValue:forKey:"), nsNumber(radius), NSString("inputRadius"))
 	normalizeEdges(f)
-	return objc.ID(Class("NSArray")).Send(sel("arrayWithObject:"), f)
+	return f
+}
+
+// colorMatrixType is the Objective-C type of QuartzCore's CAColorMatrix: twenty floats, the red, green, blue and alpha rows with each row's bias last, as driver.ColorMatrix lays them out.
+var colorMatrixType = []byte("{CAColorMatrix=ffffffffffffffffffff}\x00")
+
+// BackdropFilters returns a CABackdropLayer's filters for filters: their widest blur, then their color filters as one matrix, the order Windows draws them in; 0 when they change nothing. CAFilter's colorMatrix reads the matrix as a CAColorMatrix under inputColorMatrix and ignores Core Image's inputRVector keys. Drop shadows are left out, as CSS's backdrop-filter has no shadow to draw. The array is autoreleased.
+func BackdropFilters(filters []driver.Filter) objc.ID {
+	matrix, color, blur, _ := driver.SplitFilters(filters)
+	if !color && blur <= 0 {
+		return 0
+	}
+	list := objc.ID(Class("NSMutableArray")).Send(sel("array"))
+	if blur > 0 {
+		list.Send(selAddObject, gaussianBackdropFilter(float64(blur)))
+	}
+	if color {
+		f := objc.ID(Class("CAFilter")).Send(sel("filterWithType:"), NSString("colorMatrix"))
+		// NSValue copies the bytes it is given.
+		value := objc.ID(Class("NSValue")).Send(sel("valueWithBytes:objCType:"), unsafe.Pointer(&matrix), unsafe.Pointer(&colorMatrixType[0]))
+		f.Send(selSetValueForKey, value, NSString("inputColorMatrix"))
+		list.Send(selAddObject, f)
+	}
+	return list
 }
 
 // nsNumber returns an autoreleased NSNumber of f.

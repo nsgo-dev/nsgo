@@ -146,16 +146,23 @@ func drawsGlass(vs *driver.ViewStyle) bool {
 	return vs.Glass != driver.GlassNone && apple.Class("NSGlassEffectView") != 0
 }
 
-// blursByRadius reports whether vs's backdrop is a Gaussian blur of the style's radius, as CSS's backdrop-filter draws it: a blur with neither glass to draw nor a material named. BackdropMaterial's zero value names none, so a bare Blur follows its radius and an iOS material keeps AppKit's closest one.
+// blursByRadius reports whether vs's backdrop is drawn by its filters, as CSS's backdrop-filter draws it: a Gaussian blur of the style's radius and its color filters as a matrix, with no glass to draw and no material for a blur. BackdropMaterial's zero value names none, so a bare blur follows its radius and an iOS material keeps AppKit's closest one; color filters without a blur draw no material, as on iOS, and change the colors behind.
 func blursByRadius(vs *driver.ViewStyle, glass bool) bool {
-	return vs.Effects.BackdropBlur() > 0 && !glass && vs.Material == driver.BackdropUltraThin
+	if glass || vs.Effects == nil {
+		return false
+	}
+	_, color, blur, _ := driver.SplitFilters(vs.Effects.BackdropFilters)
+	if blur > 0 {
+		return vs.Material == driver.BackdropUltraThin
+	}
+	return color
 }
 
 // setBackdrop gives v the backdrop its style asks for, or takes it away.
 func (v *view) setBackdrop(vs *driver.ViewStyle) {
 	glass := drawsGlass(vs)
 	gaussian := blursByRadius(vs, glass)
-	want := vs.Effects.BackdropBlur() > 0 || glass
+	want := glass || gaussian || vs.Effects.BackdropBlur() > 0
 	if !want || glass != v.glass || gaussian != v.gaussian {
 		if v.backdrop != 0 {
 			v.backdrop.Send(sel("removeFromSuperview"))
@@ -196,7 +203,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		return
 	}
 	if gaussian {
-		v.backdropLayer.Send(sel("setFilters:"), apple.GaussianBackdrop(float64(vs.Effects.BackdropBlur())))
+		v.backdropLayer.Send(sel("setFilters:"), apple.BackdropFilters(vs.Effects.BackdropFilters))
 	} else {
 		v.backdrop.Send(selSetMaterial, backdropMaterial(vs.Material))
 		v.backdrop.Send(selSetBlendingMode, blendingWithinWindow)

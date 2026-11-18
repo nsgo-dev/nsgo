@@ -3,6 +3,7 @@
 package macos
 
 import (
+	"image/color"
 	"testing"
 
 	"github.com/ebitengine/purego/objc"
@@ -180,4 +181,83 @@ func aBareBackdropBlurFollowsItsRadius(t *testing.T) {
 	if v.backdrop != 0 || v.backdropLayer != 0 || v.tint != 0 || !ownBackground() {
 		t.Fatal("taking the blur away left its backdrop or kept the background off the view's layer")
 	}
+}
+
+// TestBackdropColorFiltersChangeWhatIsBehind puts a backdrop with filters over the right half of a red window and reads the window as WindowServer composites it, as CSS's backdrop-filter draws them: a brightness of a half darkens the red behind with no blur, an invert turns it cyan, a blur with saturate(0) greys it, and taking the filters away leaves the red. A named material does not stand in for color filters without a blur.
+func TestBackdropColorFiltersChangeWhatIsBehind(t *testing.T) {
+	onMain(func() { backdropColorFiltersChangeWhatIsBehind(t) })
+}
+
+func backdropColorFiltersChangeWhatIsBehind(t *testing.T) {
+	loadAppKit()
+	pool := objc.ID(apple.Class("NSAutoreleasePool")).Send(selNew)
+	defer pool.Send(sel("drain"))
+	window := objc.ID(classWindow).Send(selAlloc).Send(sel("initWithContentRect:styleMask:backing:defer:"), apple.Rect(200, 200, 200, 100), uint(0), uint(2), false)
+	window.Send(sel("setReleasedWhenClosed:"), false)
+	defer func() {
+		window.Send(sel("close"))
+		window.Send(selRelease)
+	}()
+	root := window.Send(sel("contentView"))
+	root.Send(selSetWantsLayer, true)
+	red := apple.CGColor(driver.RGB(0xff0000))
+	defer apple.Release(red)
+	root.Send(selLayer).Send(sel("setBackgroundColor:"), red)
+	native := objc.ID(classView).Send(selNew)
+	native.Send(selSetWantsLayer, true)
+	native.Send(selSetFrame, apple.Rect(100, 0, 100, 100))
+	root.Send(selAddSubview, native)
+	native.Send(selRelease)
+	v := &view{kind: driver.KindView, native: native, content: native, surface: &surface{window: window}}
+	views[native] = v
+	defer delete(views, native)
+	defer v.setBackdrop(&driver.ViewStyle{})
+	window.Send(sel("orderFrontRegardless"))
+
+	// shown applies filters and returns the colors composited behind the plain left half and the filtered right half, ok false when WindowServer gives no picture of the window.
+	shown := func(m driver.BackdropMaterial, filters ...driver.Filter) (left, right color.RGBA, ok bool) {
+		vs := driver.ViewStyle{Opacity: 1, Material: m, Effects: &driver.Effects{BackdropFilters: filters}}
+		v.style = vs
+		v.setBackdrop(&vs)
+		v.styleLayer(&vs)
+		for range 20 {
+			objc.ID(apple.Class("NSRunLoop")).Send(sel("mainRunLoop")).Send(sel("runUntilDate:"), objc.ID(apple.Class("NSDate")).Send(sel("dateWithTimeIntervalSinceNow:"), 0.05))
+		}
+		img := captureView(root)
+		if img == nil {
+			return left, right, false
+		}
+		b := img.Bounds()
+		at := func(fx float64) color.RGBA {
+			return color.RGBAModel.Convert(img.At(b.Min.X+int(fx*float64(b.Dx())), b.Min.Y+b.Dy()/2)).(color.RGBA)
+		}
+		return at(0.25), at(0.75), true
+	}
+
+	left, right, ok := shown(driver.BackdropUltraThin, driver.Filter{Kind: driver.FilterBrightness, Amount: 0.5})
+	if !ok {
+		t.Skip("WindowServer gives no picture of the window here, so the composited pixels are not checked")
+	}
+	if v.backdropLayer == 0 || int(right.R) > int(left.R)*3/4 || right.R < 40 {
+		t.Errorf("brightness(0.5) over red shows %v beside the red %v, want a darker red", right, left)
+	}
+	if _, right, _ := shown(driver.BackdropUltraThin, driver.Filter{Kind: driver.FilterInvert, Amount: 1}); right.R > 100 || right.G < 150 || right.B < 150 {
+		t.Errorf("invert(1) over red shows %v, want cyan", right)
+	}
+	if _, right, _ := shown(driver.BackdropUltraThin, driver.Filter{Kind: driver.FilterBlur, Amount: 8}, driver.Filter{Kind: driver.FilterSaturate, Amount: 0}); absDiff(right.R, right.G) > 30 || absDiff(right.G, right.B) > 30 {
+		t.Errorf("blur(8) saturate(0) over red shows %v, want a grey", right)
+	}
+	if _, right, _ := shown(driver.BackdropThin, driver.Filter{Kind: driver.FilterBrightness, Amount: 0.5}); !objc.Send[bool](v.backdrop, sel("isKindOfClass:"), classOverlay) || int(right.R) > int(left.R)*3/4 {
+		t.Errorf("brightness(0.5) with a named material shows %v in %v, want the darker red of a CABackdropLayer", right, v.backdrop)
+	}
+	if left, right, _ := shown(driver.BackdropUltraThin); v.backdrop != 0 || absDiff(left.R, right.R) > 10 || absDiff(left.G, right.G) > 10 {
+		t.Errorf("with no backdrop filters the right half shows %v beside %v, want the same red (backdrop %v)", right, left, v.backdrop)
+	}
+}
+
+func absDiff(a, b uint8) int {
+	if a > b {
+		return int(a - b)
+	}
+	return int(b - a)
 }

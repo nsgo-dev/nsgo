@@ -141,7 +141,7 @@ type Style struct {
 	Shadows []BoxShadow
 	// Filters change what the node and its children draw, in order.
 	Filters []Filter
-	// BackdropFilters change what is behind the node, seen through its background: Blur frosts it by its radius, but for iOS, which draws the system material a view's IOS.BackdropMaterial names, and macOS, which draws its closest material for one other than BackdropUltraThin. GlassEffect draws Liquid Glass in its place on iOS and macOS 26; give a glass view a blur to fall back to.
+	// BackdropFilters change what is behind the node, seen through its background, as CSS's backdrop-filter does: Blur frosts it by its radius, and brightness, contrast, grayscale, hue rotation, invert, opacity, saturate and sepia change its colors; a drop shadow draws nothing. iOS draws the system material a view's IOS.BackdropMaterial names for a blur and leaves the color filters out, as macOS does for a blur under a material other than BackdropUltraThin, drawn as AppKit's closest one. Linux and Android draw no backdrop filters. GlassEffect draws Liquid Glass in its place on iOS and macOS 26; give a glass view a blur to fall back to.
 	BackdropFilters []Filter
 	GlassEffect     GlassEffect
 	// Mask draws the node, backdrop included, as much as the gradient's

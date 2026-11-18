@@ -258,6 +258,11 @@ func captureVideo() image.Image {
 	if view == 0 {
 		return nil
 	}
+	return captureView(view)
+}
+
+// captureView is the picture WindowServer composites of view in its window, nil when view is in no window or WindowServer gives none.
+func captureView(view objc.ID) image.Image {
 	window := view.Send(sel("window"))
 	cg, err := purego.Dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", purego.RTLD_NOW)
 	if err != nil || window == 0 {
