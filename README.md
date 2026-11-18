@@ -90,6 +90,17 @@ Questions, ideas and what you build with NSGo are welcome in nsgo-dev-community,
   <a href="https://t.me/nsgo_dev"><img src="website/src/assets/telegram-qr.png" alt="The QR code of the Telegram group @nsgo_dev" width="200"></a>
 </p>
 
+## Sponsors
+
+[Depot](https://depot.dev) sponsors NSGo's CI: its runners build and test NSGo on Linux, macOS and Windows.
+
+<p align="center">
+  <a href="https://depot.dev"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/src/assets/sponsors/depot-dark.svg">
+    <img src="website/src/assets/sponsors/depot-light.svg" alt="Depot" height="40">
+  </picture></a>
+</p>
+
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE). NSGo is a port of NSH, and [NOTICE](NOTICE) records the attribution that port owes.

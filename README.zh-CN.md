@@ -90,6 +90,17 @@ go tool nsgo test                   # 运行所有包的测试
   <a href="https://t.me/nsgo_dev"><img src="website/src/assets/telegram-qr.png" alt="Telegram 群组 @nsgo_dev 的二维码" width="200"></a>
 </p>
 
+## 赞助
+
+[Depot](https://depot.dev) 赞助了 NSGo 的 CI：它的 runner 在 Linux、macOS 和 Windows 上构建并测试 NSGo。
+
+<p align="center">
+  <a href="https://depot.dev"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="website/src/assets/sponsors/depot-dark.svg">
+    <img src="website/src/assets/sponsors/depot-light.svg" alt="Depot" height="40">
+  </picture></a>
+</p>
+
 ## 许可证
 
 本项目以 [Apache License 2.0](LICENSE) 授权。NSGo 是 NSH 的移植，[NOTICE](NOTICE) 记录了移植所需的署名。

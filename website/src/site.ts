@@ -67,6 +67,8 @@ export const links = {
   blog: 'https://oneo.me',
   x: 'https://x.com/oneo666',
   nsh: 'https://github.com/longbridge/nsh',
+  /** Depot, whose runners sponsor NSGo's CI. */
+  depot: 'https://depot.dev',
 };
 
 export const install = 'go get -tool github.com/nsgo-dev/nsgo/cmd/nsgo';

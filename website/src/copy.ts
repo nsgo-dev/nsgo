@@ -204,6 +204,7 @@ const en = {
   },
   footer: {
     tagline: 'Native apps for every platform, written in Go.',
+    sponsor: 'CI sponsored by',
     columns: {
       product: 'Product',
       resources: 'Resources',
@@ -423,6 +424,7 @@ const zh: Copy = {
   },
   footer: {
     tagline: '用 Go 编写，在每个平台原生运行。',
+    sponsor: 'CI 赞助方',
     columns: {
       product: '产品',
       resources: '资源',

@@ -1,4 +1,6 @@
 ---
+import depotDark from '../assets/sponsors/depot-dark.svg?url';
+import depotLight from '../assets/sponsors/depot-light.svg?url';
 import { copies } from '../copy';
 import { docUrl, links, navPages, pageUrl, type Lang } from '../site';
 import Icon from './Icon.astro';
@@ -85,6 +87,11 @@ const external = (href: string) => href.startsWith('http') || href === links.gal
           <span class="brand__name">NSGo</span>
         </a>
         <p>{f.tagline}</p>
+        <a class="footer__sponsor" href={links.depot} target="_blank" rel="noopener noreferrer">
+          {f.sponsor}
+          <img class="logo--dark" src={depotDark} width="73" height="16" alt="Depot" draggable="false" />
+          <img class="logo--light" src={depotLight} width="73" height="16" alt="Depot" draggable="false" />
+        </a>
       </div>
       {columns.map((column) => (
         <div class="footer__column">
