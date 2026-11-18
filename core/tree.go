@@ -1743,7 +1743,7 @@ func (t *Tree) setViewParts(n *node, v View) {
 	n.h = handlers{focusIn: v.OnFocusIn, focusOut: v.OnFocusOut, press: v.OnPress, longPress: v.OnLongPress, pressDown: v.OnPressDown, pressUp: v.OnPressUp,
 		mouseEnter: v.OnMouseEnter, mouseLeave: v.OnMouseLeave, mouseMove: v.OnMouseMove,
 		textSelection: v.OnTextSelection, textSelectionText: v.OnTextSelectionText,
-		layout:        v.OnLayout, contextMenu: v.OnContextMenu, touch: v.OnTouch, touchCapture: v.OnTouchCapture,
+		layout: v.OnLayout, contextMenu: v.OnContextMenu, touch: v.OnTouch, touchCapture: v.OnTouchCapture,
 		pan: v.OnPan, pinch: v.OnPinch, rotation: v.OnRotation, wheel: v.OnWheel,
 		fileEnter: v.OnFileDragEnter, fileLeave: v.OnFileDragLeave, fileDrop: v.OnFileDrop,
 		focus: v.OnFocus, blur: v.OnBlur, keyDown: v.OnKeyDown, transitionEnd: v.OnTransitionEnd}
@@ -2432,7 +2432,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 			t.within(n.owner, func() { h.textSelection(Bounds{Origin: ev.Point, Size: ev.Size}) })
 		}
 		if h.textSelectionText != nil {
-			t.within(n.owner, func() { h.textSelectionText(TextSelection{Text: ev.Text, Bounds: Bounds{Origin: ev.Point, Size: ev.Size}}) })
+			t.within(n.owner, func() {
+				h.textSelectionText(TextSelection{Text: ev.Text, Bounds: Bounds{Origin: ev.Point, Size: ev.Size}})
+			})
 		}
 	case driver.EventKeyPress:
 		if in := n.input; in != nil && in.keyPress != nil {
