@@ -45,9 +45,9 @@ func TestMain(m *testing.M) {
 
 没有绑定消费按键时，`app.Key("mod+a")` 会全选当前文本框的内容。在无头测试、桌面目标和 Web 上，`KeyAlways` 绑定会在文本框编辑之前消费 Return、Backspace 和全选；`KeyAuto` 和 `KeyNotEditing` 则把这些键留给已聚焦的文本框。Android 和 iOS 的测试宿主还不会先把这些键交给键位绑定。
 
-## 运行测试
+无论无头运行还是在目标平台上，应用都运行在 `app.Clock` 上，它是一个从 2026-01-01 00:00 UTC 开始的 `core.ManualClock`。首屏依赖日期的界面（例如今天到期的内容）用 `nsgotest.WallTime(t0)` 启动：首次渲染时 `cx.WallTime()` 就是 `t0`，保留它的时区，计时器仍按时钟自身的时间运行。`nsgotest.Clock(c)` 让应用运行在测试自己的时钟上，供应用之外的代码共用；`c.Advance` 推进它时，应用的计时器随之触发。
 
-`nsgotest.Clock` 提供自定义手动时钟，`nsgotest.WallTime` 在首帧渲染前设置墙上时间。
+## 运行测试
 
 ```sh
 go tool nsgo test

@@ -221,6 +221,18 @@ func TestWallTimeOptionSetsTheFirstFrame(t *testing.T) {
 	}
 }
 
+// Without an option the first render reads the clock's documented start, in UTC.
+func TestWallTimeStartsAtTheClocksStart(t *testing.T) {
+	var got time.Time
+	app := Start(t, func(cx *core.Scope) core.Node {
+		got = cx.WallTime()
+		return core.View{}
+	})
+	if want := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC); !got.Equal(want) || !app.Clock.Now().Equal(want) {
+		t.Fatalf("first wall time = %v, clock = %v, want both %v", got, app.Clock.Now(), want)
+	}
+}
+
 func TestClockOptionRunsAppTimers(t *testing.T) {
 	clock := core.NewManualClock(time.Date(2032, 1, 1, 0, 0, 0, 0, time.UTC))
 	var fired int
@@ -231,10 +243,46 @@ func TestClockOptionRunsAppTimers(t *testing.T) {
 	if app.Clock != clock {
 		t.Fatal("Clock option did not install the supplied clock")
 	}
-	clock.Advance(time.Hour)
+	clock.Advance(time.Hour - time.Millisecond)
+	app.Settle()
+	if fired != 0 {
+		t.Fatalf("timer fired %d times before its hour, want 0", fired)
+	}
+	clock.Advance(time.Millisecond)
 	app.Settle()
 	if fired != 1 {
 		t.Fatalf("timer fired %d times, want 1", fired)
+	}
+}
+
+// WallTime applies over the Clock option's clock whichever comes first, and moves none of its timers.
+func TestWallTimeAppliesToTheClockOption(t *testing.T) {
+	want := time.Date(2040, 6, 1, 12, 0, 0, 0, time.UTC)
+	for _, order := range []string{"wall first", "clock first"} {
+		t.Run(order, func(t *testing.T) {
+			clock := core.NewManualClock(time.Date(2032, 1, 1, 0, 0, 0, 0, time.UTC))
+			opts := []Option{WallTime(want), Clock(clock)}
+			if order == "clock first" {
+				opts = []Option{Clock(clock), WallTime(want)}
+			}
+			var got time.Time
+			var fired int
+			app := Start(t, func(cx *core.Scope) core.Node {
+				got = cx.WallTime()
+				cx.AfterFunc(time.Hour, func() { fired++ })
+				return core.View{}
+			}, opts...)
+			if !got.Equal(want) {
+				t.Fatalf("first wall time = %v, want %v", got, want)
+			}
+			if !app.Clock.Now().Equal(time.Date(2032, 1, 1, 0, 0, 0, 0, time.UTC)) {
+				t.Fatalf("clock = %v, want the clock's own start", app.Clock.Now())
+			}
+			app.Settle()
+			if fired != 0 {
+				t.Fatalf("timer fired %d times, want 0", fired)
+			}
+		})
 	}
 }
 

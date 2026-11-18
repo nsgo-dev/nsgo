@@ -62,14 +62,12 @@ func Storage(entries map[string]string) Option {
 	return func(a *App) { a.store = core.NewStore(seed(entries)) }
 }
 
-// Clock runs the app on c instead of a new ManualClock. The clock must be
-// non-nil and is available as App.Clock after Start returns.
+// Clock runs the app on c instead of a new ManualClock, for a test that shares one clock with code of its own: App.Clock is c, and the app's timers and frames run as c moves. c must not be nil. Under Measure the app runs on the system's clock instead.
 func Clock(c *core.ManualClock) Option {
 	return func(a *App) { a.Clock = c }
 }
 
-// WallTime starts the app with its wall time at t, as ManualClock.SetWallTime
-// sets it, so the first render reads t. It moves no timer.
+// WallTime starts the app with its wall time (Scope.WallTime, a TSX app's Date) at t, in t's location, as ManualClock.SetWallTime sets it, so the first render reads t. The clock's own time, which timers and frames run on, starts where it would, and no timer moves. It applies after every option, Clock's included, in any order. Under Measure the app reads the system's time instead.
 func WallTime(t time.Time) Option {
 	return func(a *App) {
 		wall := t
@@ -397,7 +395,9 @@ type App struct {
 	clear    map[uint32]bool
 	root     *core.Scope
 	store    *core.Store
-	Clock    *core.ManualClock
+	// Clock is the app's clock, which Advance and FastForward move: a ManualClock starting at 2026-01-01 00:00 UTC, its wall time with it, unless the Clock or WallTime option sets it. Options apply before the first render, so what they set is what it reads. Under Measure the app runs on the system's clock instead.
+	Clock *core.ManualClock
+	// wallTime is what the WallTime option sets.
 	wallTime *time.Time
 	// Secrets is the app's secure store, in memory: what Scope.Secrets keeps, by item, for a test to read or change, so no test touches the machine's keychain, also on a target. seedSecrets are what the Secrets option starts it with.
 	Secrets     *core.MemorySecrets
@@ -504,7 +504,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		o(a)
 	}
 	if a.Clock == nil {
-		t.Fatalf("nsgotest: Clock needs a manual clock")
+		t.Fatalf("nsgotest: the Clock option needs a clock, not nil")
 	}
 	if a.wallTime != nil {
 		a.Clock.SetWallTime(*a.wallTime)

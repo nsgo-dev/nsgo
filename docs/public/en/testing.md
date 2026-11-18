@@ -45,9 +45,9 @@ Headless runs use the phone idiom by default, whatever the project targets, so `
 
 `app.Key("mod+a")` selects the focused field's text when no binding takes it. Headless, on desktop targets and on the web, a `KeyAlways` binding takes Return, Backspace and select-all before the field acts; `KeyAuto` and `KeyNotEditing` leave them to the focused field. The Android and iOS test hosts do not yet give the keymap these keys first.
 
-## Run the tests
+Headless and on a target, the app runs on `app.Clock`, a `core.ManualClock` that starts at 2026-01-01 00:00 UTC. A screen that depends on the date, such as what is due today, starts with `nsgotest.WallTime(t0)`: the first render's `cx.WallTime()` is `t0`, in its location, and timers keep running on the clock's own time. `nsgotest.Clock(c)` runs the app on a clock of the test's own, so code outside the app shares it; the app's timers fire as `c.Advance` moves it.
 
-`nsgotest.Clock` supplies a custom manual clock, and `nsgotest.WallTime` sets its wall time before the first render.
+## Run the tests
 
 ```sh
 go tool nsgo test
