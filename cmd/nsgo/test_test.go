@@ -782,8 +782,7 @@ func TestNormalizeTestTarget(t *testing.T) {
 	}
 }
 
-// checkTestTarget normalizes -target first, so -activate sees the plain
-// name, and refuses an architecture the target cannot run on (#589). A desktop target of another OS is left to the host check, as suggesting its plain name would only lead there (#716).
+// checkTestTarget normalizes -target first, so -activate sees the plain name, and refuses an architecture the target cannot run on (#589). A desktop target of another OS is left to the host check, as suggesting its plain name would only lead there (#716).
 func TestCheckTestTarget(t *testing.T) {
 	hostArch, otherArch := "x64", "arm64"
 	if runtime.GOARCH == "arm64" {
