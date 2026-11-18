@@ -211,7 +211,7 @@ func TestDevReloadKey(t *testing.T) {
 	waitFor("mod+r the app's menu has disabled", 3)
 }
 
-// Command or Control+R builds again from every window of an app that opens windows, as from its main window: one opened before the main view and one after, and a window that binds the key itself keeps it (#446).
+// Command or Control+R builds again from every window of an app that opens windows, as from its main window: one opened before the main view and one after, and a window that binds the key itself keeps it, opened before or after (#446).
 func TestDevReloadKeyInEveryWindow(t *testing.T) {
 	var reloads atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -230,6 +230,10 @@ func TestDevReloadKeyInEveryWindow(t *testing.T) {
 	windows := map[string]*core.Window{}
 	app.Mount(core.AppRoot(func(cx *core.Scope) {
 		windows["Settings"] = cx.OpenWindow(core.WindowOptions{Title: "Settings"}, func(*core.Scope) core.Node { return core.View{} })
+		windows["Preview"] = cx.OpenWindow(core.WindowOptions{Title: "Preview"}, func(cx *core.Scope) core.Node {
+			cx.OnKey("mod+r", func() { own++ })
+			return core.View{}
+		})
 		cx.SetMainView(Wrap(func(*core.Scope) core.Node { return core.View{} }))
 		windows["Editor"] = cx.OpenWindow(core.WindowOptions{Title: "Editor"}, func(cx *core.Scope) core.Node {
 			cx.OnKey("mod+r", func() { own++ })
@@ -275,9 +279,10 @@ func TestDevReloadKeyInEveryWindow(t *testing.T) {
 	}
 	press("Settings")
 	waitFor("mod+r in a window opened before the main view", 1)
+	press("Preview")
 	press("Editor")
-	waitFor("mod+r in a window that binds it", 1)
-	if own != 1 {
-		t.Fatalf("the Editor window's own mod+r ran %d times, want once", own)
+	waitFor("mod+r in windows that bind it", 1)
+	if own != 2 {
+		t.Fatalf("the windows' own mod+r ran %d times, want twice", own)
 	}
 }

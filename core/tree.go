@@ -728,9 +728,9 @@ func newTree(root *Scope, text driver.TextEngine, id uint32) *Tree {
 	}
 	t.view = t.newNode(driver.KindView, nil, root)
 	t.view.style = Style{Direction: Column}
-	// The app-wide bindings (KeyOptions.AllSurfaces) come before what it shows binds, which then takes their keys from them here.
+	// The app-wide bindings (KeyOptions.AllSurfaces) come before what it shows binds.
 	for _, g := range root.rt.globalKeys {
-		g.bind(t)
+		g.bind(t, false)
 	}
 	root.addCleanup(func() {
 		for _, g := range root.rt.globalKeys {

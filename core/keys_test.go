@@ -38,7 +38,7 @@ func TestKeyBindingsFireAsTheirOptionsSay(t *testing.T) {
 	}
 }
 
-// A binding made with AllSurfaces binds its key in the app's own surface and every window opened, before and after it was bound, and a press in any of them runs it; a binding a window's content makes takes the key from it there, a closed window lets it go, and it leaves every surface as its owner goes (#446).
+// A binding made with AllSurfaces binds its key in the app's own surface and every window opened, before and after it was bound, and a press in any of them runs it; a window's own binding of the key takes it there, made before or after, a closed window lets it go, and it leaves every surface as its owner goes (#446).
 func TestAllSurfaceBindingsFollowEveryWindow(t *testing.T) {
 	var bound *Signal[bool]
 	var later func()
@@ -47,6 +47,10 @@ func TestAllSurfaceBindingsFollowEveryWindow(t *testing.T) {
 		bound = NewSignal(cx, true)
 		cx.SetMainView(func(*Scope) Node { return View{} })
 		cx.OpenWindow(WindowOptions{Title: "Before"}, func(*Scope) Node { return View{} })
+		cx.OpenWindow(WindowOptions{Title: "Own before"}, func(cx *Scope) Node {
+			cx.OnKey("mod+r", func() { own++ })
+			return View{}
+		})
 		cx.Effect(func() {
 			if bound.Get() {
 				cx.OnKeyWith("mod+r", KeyOptions{AllSurfaces: true}, func() { ran++ })
@@ -82,15 +86,17 @@ func TestAllSurfaceBindingsFollowEveryWindow(t *testing.T) {
 		// What the press asks for again, the keymap included, comes with the next commit.
 		w.commit()
 	}
-	for i, id := range []uint32{0, 1, 2, 3} {
+	for i, id := range []uint32{0, 1, 2, 4} {
 		press(id)
 		if ran != i+1 {
 			t.Fatalf("a press in surface %d: the binding ran %d times, want %d", id, ran, i+1)
 		}
 	}
-	press(4)
-	if ran != 4 || own != 1 {
-		t.Fatalf("a press in the window binding the key: ran %d and its own %d times, want 4 and 1", ran, own)
+	for i, id := range []uint32{3, 5} {
+		press(id)
+		if ran != 4 || own != i+1 {
+			t.Fatalf("a press in window %d, which binds the key: ran %d and its own %d times, want 4 and %d", id, ran, own, i+1)
+		}
 	}
 	g := w.root.rt.globalKeys[0]
 	before := w.app.Surfaces()[1]
@@ -101,11 +107,10 @@ func TestAllSurfaceBindingsFollowEveryWindow(t *testing.T) {
 	}
 	bound.Set(false)
 	w.commit()
-	for _, id := range []uint32{0, 1, 3, 4} {
-		for _, k := range keymap(id) {
-			if k.Key == "mod+r" && id != 4 {
-				t.Fatalf("surface %d keeps mod+r after its owner went", id)
-			}
+	for _, id := range []uint32{0, 1, 3, 4, 5} {
+		want := map[uint32]int{3: 1, 5: 1}[id]
+		if got := len(keymap(id)); got != want {
+			t.Fatalf("surface %d has %d bindings after the app-wide one's owner went, want %d", id, got, want)
 		}
 	}
 	if len(w.root.rt.globalKeys) != 0 {

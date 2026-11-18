@@ -33,9 +33,9 @@ type globalKey struct {
 	bindings map[*Tree]*keyBinding
 }
 
-// bind gives tree t the binding.
-func (g *globalKey) bind(t *Tree) {
-	g.bindings[t] = t.addKeyBinding(g.owner, g.key, g.inText, g.yields, g.opts, g.fn)
+// bind gives tree t the binding: as OnKey's in the tree it was bound in, else before the tree's own bindings, which win over it whenever they were made.
+func (g *globalKey) bind(t *Tree, own bool) {
+	g.bindings[t] = t.addKeyBinding(g.owner, g.key, g.inText, g.yields, g.opts, g.fn, !own)
 }
 
 // KeyWhen says when a binding fires.
@@ -59,7 +59,7 @@ type KeyOptions struct {
 	OverModals bool
 	// YieldsToMenu leaves the key to the application menu while an enabled item takes the same shortcut where the focus is on macOS, Windows and Linux, which show the menu, for a default shortcut an app's menu may take over. An item that leaves its shortcut to a focused text input or web view does not suppress the binding. Else a binding takes its key before the menu does.
 	YieldsToMenu bool
-	// AllSurfaces binds the key in every surface of the app rather than only the one it is bound in: the app's own and each window, panel and tray view it opens, those it opens later too, for an app-wide shortcut. In each, the newest binding of the key wins, as OnKey says: one a surface makes after this one, such as any its content makes as it opens later, takes the key from it there. It ends in all of them as its owner goes. Where the platform opens no windows it is OnKey's.
+	// AllSurfaces binds the key in every surface of the app rather than only the one it is bound in: the app's own and each window, panel and tray view it opens, those it opens later too, for an app-wide shortcut. In the surface it is bound in it is as OnKey says; in each other one it comes before that surface's own bindings, so one of the same key there wins over it, whenever it was made. It ends in all of them as its owner goes. Where the platform opens no windows it is OnKey's.
 	AllSurfaces bool
 }
 
@@ -85,10 +85,10 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 		rt := cx.rt
 		g := &globalKey{owner: owner, key: k, inText: inText, yields: yields, opts: opts, fn: fn, bindings: map[*Tree]*keyBinding{}}
 		rt.globalKeys = append(rt.globalKeys, g)
-		g.bind(rt.tree)
+		g.bind(rt.tree, rt.tree == t)
 		for _, s := range rt.surfaces {
 			if !s.closed {
-				g.bind(s)
+				g.bind(s, s == t)
 			}
 		}
 		owner.addCleanup(func() {
@@ -99,19 +99,23 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 		})
 		return
 	}
-	b := t.addKeyBinding(owner, k, inText, yields, opts, fn)
+	b := t.addKeyBinding(owner, k, inText, yields, opts, fn, false)
 	owner.addCleanup(func() { t.removeKeyBinding(b) })
 }
 
-// addKeyBinding adds a binding of the normalized key to the tree's table.
-func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields driver.KeyUse, opts KeyOptions, fn func()) *keyBinding {
+// addKeyBinding adds a binding of the normalized key to the tree's table, as its newest, or its oldest if first.
+func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields driver.KeyUse, opts KeyOptions, fn func(), first bool) *keyBinding {
 	// IDs are never reused, so a press the platform matched to a binding since removed runs nothing (pressKey).
 	t.keyID++
 	if t.keyID == 0 {
 		t.keyID++
 	}
 	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: key, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, yieldsToMenu: opts.YieldsToMenu, fn: fn}
-	t.keys = append(t.keys, b)
+	if first {
+		t.keys = slices.Insert(t.keys, 0, b)
+	} else {
+		t.keys = append(t.keys, b)
+	}
 	t.keysChanged = true
 	t.changed = true
 	return b
