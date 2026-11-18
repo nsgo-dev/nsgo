@@ -26,9 +26,9 @@ func TestTouchCoordinatesFollowTheCamera(t *testing.T) {
 	}
 	app := nsgotest.Start(t, func(*core.Scope) core.Node {
 		return camera.View{TestID: "camera", State: &state,
-			Style:    core.Style{Width: core.Pt(400), Height: core.Pt(300)},
+			Style:    core.Style{Width: core.Pt(300), Height: core.Pt(300)},
 			Children: []core.Node{core.View{TestID: "zoom", Style: core.Style{Position: core.Absolute, Right: core.Pt(0), Top: core.Pt(0), Width: core.Pt(30), Height: core.Pt(30)}, OnPress: func(core.PressEvent) { state.ZoomIn() }}},
-			Content: core.View{Style: core.Style{Width: core.Pt(1000), Height: core.Pt(800)}, Children: []core.Node{
+			Content: core.View{Style: core.Style{Width: core.Pt(600), Height: core.Pt(500)}, Children: []core.Node{
 				core.View{TestID: "pad", Style: core.Style{Position: core.Absolute,
 					Left: core.Pt(300), Top: core.Pt(200), Width: core.Pt(80), Height: core.Pt(60)},
 					OnTouchCapture: func(e core.TouchEvent) {
@@ -40,7 +40,7 @@ func TestTouchCoordinatesFollowTheCamera(t *testing.T) {
 						OnGrant: note("grant"), OnStart: note("start"), OnMove: note("move"),
 						OnEnd: note("end"), OnRelease: note("release")}},
 			}}}
-	}, nsgotest.Size(400, 300), nsgotest.Environment(core.Environment{ReduceMotion: true}))
+	}, nsgotest.Size(300, 300), nsgotest.Environment(core.Environment{ReduceMotion: true}))
 	near := func(a, b core.Point) bool {
 		// Native input rounds to device pixels, amplified by a camera below 1×.
 		return math.Abs(float64(a.X-b.X)) < 3 && math.Abs(float64(a.Y-b.Y)) < 3
