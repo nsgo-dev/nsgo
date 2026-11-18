@@ -108,7 +108,7 @@ func TestEditingKeysKeepTheirUnboundActions(t *testing.T) {
 	}
 }
 
-// A focused view hears the keys that go down on it before the keymap, with their modifiers, and a key it consumes fires no binding (#287).
+// A focused view hears the keys that go down on it before the keymap, with their modifiers, a modifier alone included, and a key it consumes fires no binding (#287).
 func TestAFocusedViewHearsItsKeysBeforeTheKeymap(t *testing.T) {
 	switch nsgotest.Target() {
 	case "", "macos", "windows", "linux", "web":
@@ -128,8 +128,10 @@ func TestAFocusedViewHearsItsKeysBeforeTheKeymap(t *testing.T) {
 		}}}
 	}, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}), nsgotest.Size(300, 120))
 	app.Focus("id:recorder")
+	// "mod" is Command on a Mac, where a browser runs too, and Control elsewhere.
+	app.Key("mod+shift+k")
 	mod := core.Modifiers{Control: true}
-	if target := nsgotest.Target(); target == "" || target == "macos" {
+	if len(got) == 1 && got[0].Modifiers.Platform {
 		mod = core.Modifiers{Platform: true}
 	}
 	modShiftK := "ctrl+shift+k"
@@ -143,6 +145,8 @@ func TestAFocusedViewHearsItsKeysBeforeTheKeymap(t *testing.T) {
 		{"alt+space", "alt+space", core.KeyEvent{Key: "space", Modifiers: core.Modifiers{Alt: true}}},
 		{"mod+shift+k", modShiftK, core.KeyEvent{Key: "k", Modifiers: core.Modifiers{Control: mod.Control, Shift: true, Platform: mod.Platform}}},
 		{"f5", "f5", core.KeyEvent{Key: "f5"}},
+		{"shift", "", core.KeyEvent{Key: "shift", Modifiers: core.Modifiers{Shift: true}}},
+		{"alt", "", core.KeyEvent{Key: "alt", Modifiers: core.Modifiers{Alt: true}}},
 	} {
 		got = nil
 		app.Key(c.key)

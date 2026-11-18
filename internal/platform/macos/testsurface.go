@@ -299,6 +299,35 @@ func (t *testSurface) Hover(at driver.Point) error {
 // presses.
 var editActions = map[string]string{"a": "selectAll:", "c": "copy:", "v": "paste:", "x": "cut:", "z": "undo:"}
 
+// testModifiers are the left modifier keys' codes and the flags each sets, its device-dependent one included, by the names tests press them alone with.
+var testModifiers = map[string]struct {
+	code  uint16
+	flags uint
+}{
+	"shift": {56, flagShift | 0x02}, "ctrl": {59, flagControl | 0x01}, "control": {59, flagControl | 0x01},
+	"alt": {58, flagOption | 0x20}, "option": {58, flagOption | 0x20},
+	"mod": {55, flagCommand | 0x08}, "meta": {55, flagCommand | 0x08}, "cmd": {55, flagCommand | 0x08}, "command": {55, flagCommand | 0x08},
+}
+
+// modifier presses and releases a modifier key alone, as AppKit reports it: flagsChanged with its flags set, then cleared.
+func (t *testSurface) modifier(code uint16, held, flags uint) {
+	const evFlagsChanged = 12
+	for _, f := range []uint{held | flags, held} {
+		onMainSync(func() {
+			ev := apple.KeyEvent(evFlagsChanged, f, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), "", "", false, code)
+			rememberTestInput(ev)
+			if objc.Send[bool](t.s.window, sel("isKeyWindow")) {
+				nsApp().Send(sel("postEvent:atStart:"), ev, false)
+			} else if ev = t.s.filter(ev); ev != 0 {
+				if r := t.s.window.Send(sel("firstResponder")); r != 0 {
+					r.Send(sel("flagsChanged:"), ev)
+				}
+			}
+		})
+	}
+	time.Sleep(10 * time.Millisecond)
+}
+
 // key sends a key down and up with chars, ignoring is what it types without modifiers. A background window receives its keys directly.
 func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 	for _, kind := range []uint{evKeyDown, evKeyUp} {
@@ -476,6 +505,10 @@ func (t *testSurface) Key(key string) error {
 		default:
 			return fmt.Errorf("unknown modifier %q in %q", m, key)
 		}
+	}
+	if m, ok := testModifiers[name]; ok {
+		t.modifier(m.code, flags, m.flags)
+		return nil
 	}
 	code, ok := keyCodes[name]
 	if !ok {

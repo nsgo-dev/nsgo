@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -335,6 +336,8 @@ var keyvals = map[string]uint32{
 	"enter": 0xff0d, "return": 0xff0d, "escape": 0xff1b, "backspace": 0xff08, "tab": 0xff09, "space": 0x20,
 	"left": 0xff51, "up": 0xff52, "right": 0xff53, "down": 0xff54, "home": 0xff50, "end": 0xff57,
 	"pageup": 0xff55, "pagedown": 0xff56, "delete": 0xffff,
+	"shift": 0xffe1, "ctrl": 0xffe3, "control": 0xffe3, "mod": 0xffe3, "alt": 0xffe9, "option": 0xffe9,
+	"meta": 0xffeb, "super": 0xffeb, "cmd": 0xffeb,
 }
 
 // Key presses a key with modifiers through the window's controller first, then lets the focused field edit if the controller leaves it the key, and releases the key either way.
@@ -359,6 +362,9 @@ func (t *testSurface) Key(key string) error {
 	keyval, ok := keyvals[name]
 	if !ok && len(name) == 1 {
 		keyval, ok = uint32(name[0]), true
+	}
+	if n, err := strconv.Atoi(strings.TrimPrefix(name, "f")); !ok && err == nil && name[0] == 'f' && n >= 1 && n <= 35 {
+		keyval, ok = gdkF1+uint32(n-1), true
 	}
 	if !ok {
 		return fmt.Errorf("unknown key %q", key)

@@ -10,6 +10,7 @@ import (
 	"image/png"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf16"
@@ -278,9 +279,11 @@ var virtualKeys = map[string]uintptr{
 	"enter": vkReturn, "return": vkReturn, "escape": 0x1B, "backspace": 0x08, "tab": 0x09, "space": 0x20,
 	"left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28, "home": 0x24, "end": 0x23, "pageup": 0x21,
 	"pagedown": 0x22, "delete": 0x2E,
+	"shift": vkShift, "ctrl": vkControl, "control": vkControl, "mod": vkControl, "alt": vkMenu, "option": vkMenu,
+	"meta": vkLWin, "super": vkLWin, "win": vkLWin,
 }
 
-// Key presses key with the modifiers held in the thread's keyboard state, in the order the message loop and the window procedure take a real key: a keymap binding or menu shortcut first, then the focused field's editing, and else the window's own key handling.
+// Key presses key with the modifiers held in the thread's keyboard state, in the order the message loop and the window procedure take a real key: the focused view's OnKeyDown, then a keymap binding or menu shortcut, then the focused field's editing, and else the window's own key handling.
 func (t *testSurface) Key(key string) error {
 	parts := strings.Split(strings.ToLower(key), "+")
 	name := parts[len(parts)-1]
@@ -306,8 +309,22 @@ func (t *testSurface) Key(key string) error {
 			vk, ok = uintptr(c), true
 		}
 	}
+	if n, err := strconv.Atoi(strings.TrimPrefix(name, "f")); !ok && err == nil && name[0] == 'f' && n >= 1 && n <= 24 {
+		vk, ok = uintptr(0x6F+n), true
+	}
 	if !ok {
 		return fmt.Errorf("unknown key %q", key)
+	}
+	// A modifier pressed alone is down as its own key goes down.
+	switch vk {
+	case vkShift:
+		shift = true
+	case vkControl:
+		ctrl = true
+	case vkMenu:
+		alt = true
+	case vkLWin:
+		meta = true
 	}
 	t.onMain(func() {
 		var saved, state [256]byte
@@ -324,7 +341,7 @@ func (t *testSurface) Key(key string) error {
 		hold(vkLWin, meta)
 		hostSetKeyboardState.Call(uintptr(unsafe.Pointer(&state)))
 		defer hostSetKeyboardState.Call(uintptr(unsafe.Pointer(&saved)))
-		if t.w.shortcut(vk, 1) {
+		if t.w.keyDown(vk, 1) || t.w.shortcut(vk, 1) {
 			return
 		}
 		if w := t.w; w.focusedField() != nil && w.editKey(vk, ctrl, shift, alt) {

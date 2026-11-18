@@ -3,6 +3,7 @@
 package macos
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/ebitengine/purego/objc"
@@ -46,6 +47,14 @@ var keyChars = map[string]string{
 	"enter": "\r", "return": "\r", "tab": "\t", "space": " ", "backspace": "\x7f", "escape": "\x1b",
 	"delete": "", "left": "", "right": "", "down": "", "up": "",
 	"home": "", "end": "", "pageup": "", "pagedown": "",
+}
+
+// The function keys F1 to F12, which type the characters AppKit gives them from NSF1FunctionKey on.
+func init() {
+	for i, code := range []uint16{122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111} {
+		name := "f" + strconv.Itoa(i+1)
+		keyCodes[name], keyChars[name] = code, string(rune(0xf704+i))
+	}
 }
 
 // noKey is the code of a key no US key types, which pages read as

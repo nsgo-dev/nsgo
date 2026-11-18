@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -384,7 +385,10 @@ var cdpKeys = map[string]struct {
 	"delete": {"Delete", "Delete", 46, ""}, "left": {"ArrowLeft", "ArrowLeft", 37, ""}, "up": {"ArrowUp", "ArrowUp", 38, ""},
 	"right": {"ArrowRight", "ArrowRight", 39, ""}, "down": {"ArrowDown", "ArrowDown", 40, ""},
 	"home": {"Home", "Home", 36, ""}, "end": {"End", "End", 35, ""}, "pageup": {"PageUp", "PageUp", 33, ""},
-	"pagedown": {"PageDown", "PageDown", 34, ""},
+	"pagedown": {"PageDown", "PageDown", 34, ""}, "shift": {"Shift", "ShiftLeft", 16, ""},
+	"ctrl": {"Control", "ControlLeft", 17, ""}, "control": {"Control", "ControlLeft", 17, ""},
+	"alt": {"Alt", "AltLeft", 18, ""}, "option": {"Alt", "AltLeft", 18, ""},
+	"meta": {"Meta", "MetaLeft", 91, ""}, "cmd": {"Meta", "MetaLeft", 91, ""}, "command": {"Meta", "MetaLeft", 91, ""},
 }
 
 // macCommands are the editing commands Chrome on macOS runs for keys, as
@@ -433,8 +437,23 @@ func (p *webPage) key(key string) error {
 		}
 		ok = true
 	}
+	if n, err := strconv.Atoi(strings.TrimPrefix(name, "f")); !ok && err == nil && name[0] == 'f' && n >= 1 && n <= 24 {
+		f := "F" + strconv.Itoa(n)
+		k.key, k.code, k.vk, ok = f, f, 111+n, true
+	}
 	if !ok {
 		return fmt.Errorf("unknown key %q", key)
+	}
+	// A modifier pressed alone is held as its own key goes down, as the browser reports it.
+	switch k.key {
+	case "Shift":
+		mods |= 8
+	case "Control":
+		mods |= 2
+	case "Alt":
+		mods |= 1
+	case "Meta":
+		mods |= 4
 	}
 	down := map[string]any{"type": "rawKeyDown", "key": k.key, "code": k.code, "windowsVirtualKeyCode": k.vk, "modifiers": mods}
 	if k.text != "" && mods&^8 == 0 {
