@@ -197,7 +197,7 @@ jobs:
   apple-simulator:
     # Simulator packages are arm64; the Intel desktop job cannot run them.
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -212,7 +212,8 @@ jobs:
         env:
           NSGO_SIMULATOR_E2E: "1"
         run: |
-          go tool nsgo test -run '^TestSimulatorProcessResults$' ./cmd/nsgo
+          # Booting a simulator on a hosted runner takes from about three to ten minutes, and the three cases run in one package, so go test's default ten-minute limit can end the last case before it starts.
+          go tool nsgo test -run '^TestSimulatorProcessResults$' ./cmd/nsgo -- -timeout=25m
           go tool nsgo test -target ios_simulator -timeout 30s -run '^TestFoldGeometry$' ./internal/platform/ios
 
   windows:
