@@ -201,7 +201,6 @@ func TestDevReloadKey(t *testing.T) {
 	}), nsgotest.Environment(driver.Environment{OS: driver.OSMacOS, Idiom: driver.IdiomDesktop}))
 	app.Key("mod+r")
 	waitFor("mod+r the app's menu has", 2)
-	app.ChooseMenu("File", "Run")
 	if chosen != 1 {
 		t.Fatalf("the menu's Run ran %d times, want once", chosen)
 	}

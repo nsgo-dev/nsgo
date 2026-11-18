@@ -480,13 +480,13 @@ function App() {
 }
 mount(App);`, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
 	app.Key("mod+r")
-	if got := app.Find("id:log").Text; got != "log " {
-		t.Errorf("with the menu's item: %q, want %q", got, "log ")
+	if got := app.Find("id:log").Text; got != "log menu;" {
+		t.Errorf("with the menu's item: %q, want %q", got, "log menu;")
 	}
 	app.Key("f2")
 	app.Key("mod+r")
-	if got := app.Find("id:log").Text; got != "log key;" {
-		t.Errorf("with the item disabled: %q, want %q", got, "log key;")
+	if got := app.Find("id:log").Text; got != "log menu;key;" {
+		t.Errorf("with the item disabled: %q, want %q", got, "log menu;key;")
 	}
 }
 

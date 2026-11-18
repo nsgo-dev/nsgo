@@ -663,6 +663,36 @@ func TestStartAppKeepsTheAppsScope(t *testing.T) {
 	app.Find("id:main")
 }
 
+func TestApplicationMenuShortcuts(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless menu shortcut path")
+	}
+	var chosen int
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{
+			{Label: "Reload", Shortcut: "mod+r", OnSelect: func() { chosen++ }},
+			{Label: "Disabled", Shortcut: "mod+d", Disabled: true, OnSelect: func() { chosen += 10 }},
+			{Label: "Refresh", Shortcut: "mod+i", When: core.MenuNotEditing, OnSelect: func() { chosen += 100 }},
+		}}})
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			return core.Input{TestID: "field", Style: core.Style{Width: core.Pt(100), Height: core.Pt(20)}}
+		})
+	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.Key("mod+r")
+	if chosen != 1 {
+		t.Fatalf("menu shortcut chose %d times, want 1", chosen)
+	}
+	app.Key("mod+d")
+	if chosen != 1 {
+		t.Fatalf("disabled menu shortcut changed choice count to %d", chosen)
+	}
+	app.Focus("id:field")
+	app.Key("mod+i")
+	if chosen != 1 {
+		t.Fatalf("NotInText menu shortcut changed choice count to %d", chosen)
+	}
+}
+
 // Given a root view, Windows and Linux open no window, as nsgo.Run does there, and macOS shows it in the main window.
 func TestStartOpensWindowsWhereRunDoes(t *testing.T) {
 	if Target() != "" {

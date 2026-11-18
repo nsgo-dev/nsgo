@@ -871,10 +871,63 @@ func (a *App) Key(key string) {
 		a.done()
 		return
 	}
+	if id, consumed := a.menuShortcut(names); consumed {
+		if id != 0 {
+			a.dispatchOn(a.menuTree, driver.Event{Kind: driver.EventMenu, Count: id})
+		}
+		a.done()
+		return
+	}
 	if k == "escape" {
 		a.dispatch(driver.Event{Kind: driver.EventBack, ID: a.rootID})
 	}
 	a.done()
+}
+
+// menuShortcut finds the application-menu item a desktop platform would take
+// after the keymap, focused view and focused field decline the key.
+func (a *App) menuShortcut(names []string) (uint32, bool) {
+	if a.env == nil || a.env.OS != driver.OSMacOS && a.env.OS != driver.OSWindows && a.env.OS != driver.OSLinux {
+		return 0, false
+	}
+	editing := false
+	for _, v := range a.views {
+		if v.Focused && (v.Kind == driver.KindInput || v.Kind == driver.KindWeb) {
+			editing = true
+			break
+		}
+	}
+	mac := a.env.OS == driver.OSMacOS
+	var find func([]driver.MenuEntry) (uint32, bool)
+	find = func(items []driver.MenuEntry) (uint32, bool) {
+		for _, item := range items {
+			if item.Separator {
+				continue
+			}
+			shortcut := item.Shortcut
+			if shortcut == "" && item.Role != driver.MenuRoleNone {
+				shortcut = driver.NormalizeKey(item.Role.Shortcut(mac))
+			}
+			matches := shortcut != "" && slices.Contains(names, shortcut)
+			if item.Disabled {
+				continue
+			}
+			if len(item.Items) > 0 {
+				if id, ok := find(item.Items); ok {
+					return id, true
+				}
+				continue
+			}
+			if item.NotInText && editing {
+				continue
+			}
+			if matches {
+				return item.ID, true
+			}
+		}
+		return 0, false
+	}
+	return find(a.Menu)
 }
 
 // keyModifiers reads normalized key prefixes; mod is Command on Apple platforms and Control elsewhere, while meta is Command or the system key.
