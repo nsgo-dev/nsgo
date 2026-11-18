@@ -745,7 +745,7 @@ func (a *App) done() {
 	}
 	a.Settle()
 	limit := a.Clock.Now().Add(settleLimit)
-	for !a.manualFrames && (a.anim.Ending() || a.tree.Pacing()) && a.Clock.Now().Before(limit) {
+	for !a.manualFrames && (a.anim.Ending() || a.tree.Pacing() || a.tree.PendingTransitionEnds()) && a.Clock.Now().Before(limit) {
 		a.Clock.Advance(driver.FrameInterval)
 		a.runFrame()
 		a.Settle()

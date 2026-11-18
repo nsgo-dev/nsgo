@@ -190,7 +190,7 @@ func TestAMenuGoingTakesNoKeys(t *testing.T) {
 				base.MenuItem{Label: "Copy", OnSelect: func() { chosen = append(chosen, "Copy") }, Style: core.Style{Height: core.Pt(30), Width: core.Pt(100)}},
 				base.MenuItem{Label: "Paste", OnSelect: func() { chosen = append(chosen, "Paste") }, Style: core.Style{Height: core.Pt(30), Width: core.Pt(100)}},
 			}}
-	}, nsgotest.Environment(core.Environment{Idiom: core.IdiomDesktop, OS: core.OSMacOS}))
+	}, nsgotest.Environment(core.Environment{Idiom: core.IdiomDesktop, OS: core.OSMacOS}), nsgotest.ManualFrames())
 	app.Key("tab")
 	app.Key("enter")
 	app.Key("enter")

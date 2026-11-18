@@ -155,6 +155,17 @@ func (t *Tree) timeTransitionEnds() {
 	t.ending = t.ending[:0]
 }
 
+// PendingTransitionEnds reports whether a live view has a style transition
+// whose OnTransitionEnd callback has not run yet.
+func (t *Tree) PendingTransitionEnds() bool {
+	for _, n := range t.nodes {
+		if n != nil && !n.deleted && !n.owner.disposed && n.endStop != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // shrinkItems drops the items' slice for a smaller one once a commit of n
 // items left most of it unused: the slice the first commit grew would stay
 // this tree's capacity for good, and a long list keep megabytes for the

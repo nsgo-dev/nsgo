@@ -10,10 +10,67 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/desktop"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
+
+func TestStepsWaitForEndingStyleTransition(t *testing.T) {
+	var open *core.Signal[bool]
+	app := Start(t, func(cx *core.Scope) core.Node {
+		open = core.NewSignal(cx, true)
+		return base.Dialog{
+			Open: open.Get, Animation: core.ModalNone, TestID: "dialog",
+			PopupStyle: core.Style{
+				Width: core.Pt(100), Height: core.Pt(100),
+				Transition: core.Transition{Duration: 200 * time.Millisecond, Properties: core.TransitionOpacity},
+			},
+			EndingStyle: core.Style{Opacity: core.Alpha(0)},
+			After: []core.Node{core.View{
+				Role: core.RoleButton, Label: "close", TestID: "close",
+				OnPress: func(core.PressEvent) { open.Set(false) },
+				Style:   core.Style{Width: core.Pt(40), Height: core.Pt(40)},
+			}},
+		}
+	})
+	app.Press("id:close")
+	if app.Exists("id:dialog") {
+		t.Fatal("Press returned while the dialog's ending transition still runs")
+	}
+}
+
+func TestManualFramesKeepsEndingStyleTransitionPending(t *testing.T) {
+	var open *core.Signal[bool]
+	app := Start(t, func(cx *core.Scope) core.Node {
+		open = core.NewSignal(cx, true)
+		return base.Dialog{
+			Open: open.Get, Animation: core.ModalNone, TestID: "dialog",
+			PopupStyle: core.Style{
+				Width:  core.Pt(100),
+				Height: core.Pt(100),
+				Transition: core.Transition{
+					Duration:   200 * time.Millisecond,
+					Properties: core.TransitionOpacity,
+				},
+			},
+			EndingStyle: core.Style{Opacity: core.Alpha(0)},
+			After: []core.Node{core.View{
+				Role: core.RoleButton, Label: "close", TestID: "close",
+				OnPress: func(core.PressEvent) { open.Set(false) },
+				Style:   core.Style{Width: core.Pt(40), Height: core.Pt(40)},
+			}},
+		}
+	}, ManualFrames())
+	app.Press("id:close")
+	if !app.Exists("id:dialog") {
+		t.Fatal("ManualFrames advanced the ending transition")
+	}
+	app.Advance(200 * time.Millisecond)
+	if app.Exists("id:dialog") {
+		t.Fatal("ending transition did not finish after Advance")
+	}
+}
 
 // Frames follow the manual clock: Advance runs the frame an app waits for
 // at each display interval, with the frame's time from that clock.

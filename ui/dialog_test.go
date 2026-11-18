@@ -7,6 +7,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
 // TestDialog opens a dialog, centered on desktops and a sheet on phones,
@@ -15,6 +16,10 @@ import (
 func TestDialog(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		var confirmed bool
+		var opts []nsgotest.Option
+		if e.Idiom == core.IdiomDesktop {
+			opts = append(opts, nsgotest.ManualFrames())
+		}
 		app, p := start(t, e, func(cx *core.Scope) core.Node {
 			open, alert := core.NewSignal(cx, false), core.NewSignal(cx, false)
 			return core.View{Style: core.Style{AlignItems: core.AlignStart, Gap: 8}, Children: []core.Node{
@@ -30,7 +35,7 @@ func TestDialog(t *testing.T) {
 					Actions: []AlertAction{{Text: "Cancel", Variant: ButtonSecondary, TestID: "keep"},
 						{Text: "Delete", Color: ColorsOf(cx).Danger, TestID: "confirm", OnPress: func() { confirmed = true }}}},
 			}}
-		})
+		}, opts...)
 		app.Press("open")
 		d := app.Find("dialog")
 		if e.Idiom == core.IdiomDesktop {

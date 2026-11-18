@@ -40,7 +40,7 @@ func TestReturnRunsTheDefaultActionOnce(t *testing.T) {
 					AccessibilityDescription: "They are lost otherwise.", TestID: "layer", Children: content, Animation: core.ModalNone,
 					PopupStyle:  core.Style{Transition: core.Transition{Duration: 200 * time.Millisecond, Properties: core.TransitionOpacity}},
 					EndingStyle: core.Style{Opacity: core.Alpha(0)}}
-			}, nsgotest.Environment(c.env))
+			}, nsgotest.Environment(c.env), nsgotest.ManualFrames())
 			layer := app.Find("role:alertdialog")
 			if layer.Props.Label != "Save" || layer.Props.Description != "They are lost otherwise." {
 				t.Fatalf("layer accessibility = %+v", layer.Props)

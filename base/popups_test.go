@@ -223,12 +223,12 @@ func TestPopoversOnTouchScreensTakeThePressOutside(t *testing.T) {
 
 func TestDesktopPopupsComeInAndGoThroughTheirPhases(t *testing.T) {
 	var log []string
-	app := startDesktop(t, func(cx *core.Scope) core.Node {
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		return base.Popover{Trigger: core.Text{Content: "Pop"}, Label: "Pop",
 			OnOpen: func() { log = append(log, "open") }, OnClose: func() { log = append(log, "close") },
 			PopupClass: "transition-opacity duration-200", StartingClass: "opacity-0", EndingClass: "opacity-0",
 			Children: []core.Node{core.Text{Content: "inside"}}}
-	})
+	}, nsgotest.Environment(core.Environment{Idiom: core.IdiomDesktop}), nsgotest.ManualFrames())
 	opacity := func() float32 { return app.Find("text:inside").Parent.Style.Opacity }
 	app.Press("label:Pop")
 	if got := opacity(); got != 0 {
@@ -624,7 +624,7 @@ func TestPopoverGivesTheFocusBackAsItCloses(t *testing.T) {
 				Children:    []core.Node{core.Input{Ref: field, TestID: "field", Style: core.Style{Width: core.Pt(80), Height: core.Pt(20)}}}},
 			base.Button{Label: "Other", TestID: "other", OnPress: func(core.PressEvent) {}, Style: core.Style{Height: core.Pt(20)}},
 		}}
-	}, nsgotest.Environment(core.Environment{Idiom: core.IdiomDesktop, OS: core.OSMacOS}))
+	}, nsgotest.Environment(core.Environment{Idiom: core.IdiomDesktop, OS: core.OSMacOS}), nsgotest.ManualFrames())
 	app.Key("tab")
 	app.Key("enter")
 	if !app.Find("id:field").Focused {

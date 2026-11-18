@@ -79,7 +79,7 @@ An Android test that panics or exits before reporting its result fails with the 
 
 On `web` the tests run in a headless Chrome, Chromium or Edge the tool finds, or in the browser executable `NSGO_BROWSER` names. The tool waits up to 30 seconds for it to start, stops waiting when the command is cancelled, and reports the browser's error output if it exits or never answers.
 
-Each step, and `app.Settle()`, waits for the engine's pending commit before counting 100 ms without batches or finite animations. The whole wait stops after five seconds even if the app keeps changing; a slow first dialog needs no extra post or sleep in the test.
+Each step, and `app.Settle()`, waits for the engine's pending commit before counting 100 ms without batches or finite animations. Headless steps also advance style transitions until their `OnTransitionEnd` callbacks run. The whole wait stops after five seconds even if the app keeps changing; a slow first dialog needs no extra post or sleep in the test.
 
 On Android, the tool wakes a sleeping screen and dismisses a lock screen without a credential before building and before each test. A device locked with a PIN, password or pattern must be unlocked before the run can continue; the error names the device.
 

@@ -92,7 +92,7 @@ func TestTabsContent(t *testing.T) {
 // TestTabsSlide slides the indicator on a change of tab alone.
 func TestTabsSlide(t *testing.T) {
 	headless(t)
-	app, _ := start(t, desktopEnv, tabsContent)
+	app, _ := start(t, desktopEnv, tabsContent, nsgotest.ManualFrames())
 	thumb := func() *nsgotest.View { return app.Find("segmented").Children[0] }
 	if d := thumb().Style.Transition.Duration; d != 0 {
 		t.Fatalf("the first placement slides for %v", d)
