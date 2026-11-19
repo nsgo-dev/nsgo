@@ -16,12 +16,17 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
 )
 
-var goMediumRegistered atomic.Bool
+// goSmallcapsRegistered and goMediumRegistered say an earlier run in this process registered the test's family; fontconfig keeps a family's first registration for the life of the process, so a later run cannot measure the font before or after it registers.
+var goSmallcapsRegistered, goMediumRegistered atomic.Bool
 
 // TestRegisteredFontsLayOut registers a font file from the resources and
 // checks that text in its family lays out in it: in small capitals, which
 // the system's fallback draws narrower.
 func TestRegisteredFontsLayOut(t *testing.T) {
+	// The first run's file went with its temporary directory, and fontconfig keeps resolving the family to it.
+	if goSmallcapsRegistered.Load() {
+		t.Skip("Go Smallcaps remains registered from an earlier run in this process")
+	}
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "fonts"), 0o755); err != nil {
 		t.Fatal(err)
@@ -36,6 +41,7 @@ func TestRegisteredFontsLayOut(t *testing.T) {
 		t.Skip(err)
 	}
 	registerFonts([]string{"fonts/smallcaps.ttf"})
+	goSmallcapsRegistered.Store(true)
 	w := &window{}
 	width := func(family string) driver.Points {
 		p := w.Prepare(&driver.AttributedText{Text: "lowercase letters",
