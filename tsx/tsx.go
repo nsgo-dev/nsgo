@@ -106,6 +106,9 @@ type runtime struct {
 	// the outermost of which has the time budget.
 	limits Limits
 	depth  int
+	// regexTimeout is the shortest sandbox budget, applied to regexp2
+	// patterns because its matcher does not observe goja's interrupt flag.
+	regexTimeout time.Duration
 	// sandbox is a sandboxed runtime's state (Sandbox), nil for the
 	// app's own code.
 	sandbox *sandboxed

@@ -91,6 +91,8 @@ trust.Accept(p) // 运行之后，更旧的构建会被拒绝
 
 `Sandbox.Grant` 让它得到比声明更少的权限，`Sandbox.Limits` 设置其他时间预算和配额，`Sandbox.Modules` 给它 NSGo 自带之外的 Go 函数和组件。它的快捷键、返回处理器和导航栈只在键盘焦点位于它的视图内时生效；它自己移动焦点（`focus()`、`autoFocus`、`Keyboard.dismiss`、`setAccessibilityFocus`）也只在焦点已在其中、或响应用户在其中的按压时才生效。它显示在自己的视图中，这个视图占满且不超出父视图给它的空间，并裁剪它的内容，菜单、弹出框和提示也在其中；放在滚动视图中时，用一个视图包住它，它才会按内容的高度显示。它的对话框、警告框、上下文菜单和读屏播报也只按同样的规则显示；即使它不移除自己的对话框，返回也会关闭它。入口导出函数的包是函数型插件：`tsx.Load(cx, p, tsx.Sandbox{})` 在后台运行它，入口模块加载时抛出错误则返回这个错误，`Plugin.Call` 调用这些函数。`go tool nsgo dev -limits` 像这样的视图一样运行应用，`go tool nsgo revoke` 签署吊销发布密钥和包的列表，供 `Trust.UpdateRevocations` 使用。`examples/plugins` 会请用户授予包声明的权限，再安装并运行它。
 
+原生沙箱中的回溯正则表达式使用加载和调用预算中较短的值作为匹配超时。未处理的超时会变成 `tsx.ErrBudget`，因此有问题的表达式不会无限期占用引擎。
+
 Web 上暂时无法把包与页面隔离：包的代码能绕过它的权限，直接访问页面自己的网络、剪贴板和存储，信任库所在的存储也包括在内。因此在 Web 上 `tsx.View` 和 `tsx.Load` 会以 `tsx.ErrUnisolated` 拒绝运行包，除非设置 `Sandbox.WebUnisolated`，让它以页面的权限运行；这只适合你愿意像对待应用自身代码一样信任的包。
 
 ## 编辑器与测试

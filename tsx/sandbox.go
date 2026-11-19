@@ -6,8 +6,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/dlclark/regexp2/v2"
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 	"github.com/nsgo-dev/nsgo/tsx/pkg"
 	"github.com/nsgo-dev/nsgo/tsx/websrc"
@@ -54,6 +56,10 @@ var DefaultLimits = Limits{Load: 10 * time.Second, Call: 2 * time.Second, Stack:
 
 // ErrBudget is what a call cut at its time budget fails with.
 var ErrBudget = errors.New("tsx: the script ran past its time budget")
+
+// regexpTimeoutMu protects regexp2's process-wide default while a sandbox
+// compiles or runs a regular expression.
+var regexpTimeoutMu sync.Mutex
 
 // ParseLimits reads limits as nsgo dev -limits writes them: DefaultLimits
 // with the fields spec names set, as "nodes=1000,call=500ms". Its keys
@@ -167,6 +173,11 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 	}
 	r := newRuntime(cx)
 	r.limits = limits
+	if limits.Call > 0 && (limits.Load <= 0 || limits.Call < limits.Load) {
+		r.regexTimeout = limits.Call
+	} else {
+		r.regexTimeout = limits.Load
+	}
 	r.sandbox = &sandboxed{caps: s.Capabilities != nil || s.Grant != nil, modules: s.Modules}
 	if limits.Stack > 0 {
 		r.vm.SetMaxCallStackSize(limits.Stack)
@@ -187,6 +198,10 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 func (r *runtime) failure(err error) error {
 	if stopped := r.stoppedErr(); stopped != nil {
 		return stopped
+	}
+	var exception *js.Exception
+	if errors.As(err, &exception) && strings.Contains(exception.Value().String(), "match timeout after") {
+		return ErrBudget
 	}
 	return err
 }
@@ -312,18 +327,30 @@ func (r *runtime) within(budget time.Duration, fn func()) {
 	if r.stoppedErr() != nil {
 		return
 	}
-	if budget <= 0 || r.depth > 0 {
-		r.depth++
-		defer func() { r.depth-- }()
+	outer := r.depth == 0
+	r.depth++
+	defer func() { r.depth-- }()
+	var unlockRegexp func()
+	if r.sandbox != nil && r.regexTimeout > 0 && outer && !js.Browser {
+		regexpTimeoutMu.Lock()
+		previous := regexp2.DefaultMatchTimeout
+		regexp2.DefaultMatchTimeout = r.regexTimeout
+		unlockRegexp = func() {
+			regexp2.DefaultMatchTimeout = previous
+			regexpTimeoutMu.Unlock()
+		}
+	}
+	if unlockRegexp != nil {
+		defer unlockRegexp()
+	}
+	if budget <= 0 || !outer {
 		fn()
 		return
 	}
-	r.depth++
 	timer := time.AfterFunc(budget, func() { r.vm.Interrupt(ErrBudget) })
 	defer func() {
 		timer.Stop()
 		r.vm.ClearInterrupt()
-		r.depth--
 	}()
 	fn()
 }

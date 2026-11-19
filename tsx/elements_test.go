@@ -615,6 +615,35 @@ mount(() => <Text testID="spin" onPress={() => { for (;;) {} }}>{made + " " + fr
 	}
 }
 
+func TestSandboxLimitsCutBacktrackingRegExp(t *testing.T) {
+	code, err := bundler.Compile(fstest.MapFS{"App.tsx": {Data: []byte(`import { mount, Text } from "nsgo";
+mount(() => <Text testID="regex" onPress={() => /(a+)+\1$/.test("a".repeat(28) + "!")}>regex</Text>);`)}}, "App.tsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := tsx.DefaultLimits
+	limits.Load = 0
+	limits.Call = 100 * time.Millisecond
+	var failed error
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.Catch{Try: tsx.Sandboxed("App.tsx", code, tsx.Sandbox{Limits: &limits}), Fallback: func(cx *core.Scope, err error, _ func()) core.Node {
+			failed = err
+			return core.Text{Content: "cut"}
+		}}
+	})
+	if runtime.GOOS == "js" {
+		t.Skip("the page's engine cannot be interrupted: a web app's time budgets are the browser's")
+	}
+	started := time.Now()
+	app.Press("id:regex")
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("backtracking match took %v", elapsed)
+	}
+	if failed == nil || !strings.Contains(failed.Error(), "time budget") {
+		t.Fatalf("backtracking handler ended with %v", failed)
+	}
+}
+
 func TestTouchesCaptureThenBubbleUntilStopped(t *testing.T) {
 	app := run(t, `import { mount, signal, Text, View } from "nsgo";
 const log = signal("");
