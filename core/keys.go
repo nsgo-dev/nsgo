@@ -361,7 +361,7 @@ func (t *Tree) menuHasKey(key string) bool {
 		}
 	}
 	editing := t.focus != nil && (t.focus.kind == driver.KindInput || t.focus.kind == driver.KindWeb)
-	_, ok := driver.MenuShortcut(menu, names, env.os.GetUntracked() == OSMacOS, editing)
+	_, ok := driver.MenuShortcut(menu, names, env.os.GetUntracked(), editing)
 	return ok
 }
 

@@ -866,7 +866,7 @@ func TestMenuYieldFollowsTextFocus(t *testing.T) {
 				{"auto editing key", "mod+a", []MenuItem{{Label: "Action", Shortcut: "mod+a", When: MenuAuto}}, false, true},
 				{"submenu", "mod+r", []MenuItem{{Label: "Actions", Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}}}, false, true},
 				{"disabled submenu", "mod+r", []MenuItem{{Label: "Actions", Disabled: true, Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAlways}}}}, true, true},
-				{"another item takes the key", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}, {Label: "Run", Shortcut: "mod+r", When: MenuAlways}}, false, false},
+				{"a NotInText item stops the search", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}, {Label: "Run", Shortcut: "mod+r", When: MenuAlways}}, false, true},
 			} {
 				t.Run(string(os)+"/"+map[bool]string{false: "input", true: "web"}[web]+"/"+c.name, func(t *testing.T) {
 					var shown *Signal[bool]
