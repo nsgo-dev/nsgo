@@ -699,22 +699,18 @@ func (g *gallery) desktopLayout(cx *core.Scope) core.Node {
 		cx.OnKey("mod+b", g.toggleSidebar)
 	}
 	tr := locales.For(cx)
-	// The shell keeps its headers clear of the safe area but not the sidebar, its footer or the content: the sidebar keeps clear of the left, the content of the right, and of the left too while the sidebar is closed.
-	sidebar := core.View{Style: ui.FillRest.Merge(core.Style{PaddingEnv: core.EnvEdges{Left: core.EnvSafeArea}}),
-		Children: append([]core.Node{g.searchButton(tr)}, g.sidebar(tr)...)}
-	footer := core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 4, FlexGrow: 1, PaddingEnv: core.EnvEdges{Left: core.EnvSafeArea}},
-		Children: []core.Node{g.settingsButton(cx), ui.Spacer{}, themeMenu(cx)}}
-	return ui.SidebarShell{TestID: "shell", SidebarActions: []core.Node{g.sidebarTabs(tr)}, Sidebar: []core.Node{sidebar}, SidebarFooter: []core.Node{footer},
+	// The shell keeps its sidebar, footer and content clear of the side safe area itself.
+	return ui.SidebarShell{TestID: "shell", SidebarActions: []core.Node{g.sidebarTabs(tr)}, Sidebar: append([]core.Node{g.searchButton(tr)}, g.sidebar(tr)...), SidebarFooter: []core.Node{g.settingsButton(cx), ui.Spacer{}, themeMenu(cx)},
 		Open: g.sidebarOpen.Get, OnOpenChange: g.sidebarOpen.Set, ToggleLabel: tr.AppToggleSidebar(),
 		Width: g.sidebarWidth.Get, OnWidthChange: g.sidebarWidth.Set, DefaultWidth: sidebarWidth, MinWidth: 212, MaxWidth: 360,
 		ResizeLabel: tr.AppResizeSidebar(),
 		Header:      []core.Node{g.demoTitle()},
-		Content: []core.Node{clearSides(func() bool { return !g.sidebarOpen.Get() }, g.nav.Stack(fillPage, func(cx *core.Scope, r route, _ func() int) base.NavPage {
+		Content: []core.Node{g.nav.Stack(fillPage, func(cx *core.Scope, r route, _ func() int) base.NavPage {
 			if r.page != nil {
 				return r.page(cx)
 			}
 			return base.NavPage{HeaderHidden: true, Children: []core.Node{g.demoPane()}}
-		}))}}
+		})}}
 }
 
 // sidebarTabs are the desktop layout's small tabs, at the end of the

@@ -131,44 +131,60 @@ func TestSidebarShell(t *testing.T) {
 	}
 }
 
-// TestSidebarShellSafeArea keeps both sides of the shell clear of the window's
-// horizontal safe area while the sidebar is open or closed.
+// TestSidebarShellSafeArea keeps the shell's sidebar, footer, headers and content clear of the window's side safe area, open and closed, on both sides or one, while the panes run to the window's edges, and leaves none of it to their content: a NavHeader in the content pads by its own 12 points alone, and content padded by EnvSafeArea is not padded twice.
 func TestSidebarShellSafeArea(t *testing.T) {
-	e := desktopEnv
-	e.SafeArea = core.Edges{Left: 62, Right: 62}
-	open := true
-	var setOpen func(bool)
-	app, _ := shell(t, e, func(cx *core.Scope) core.Node {
-		o := core.NewSignal(cx, open)
-		setOpen = o.Set
-		return SidebarShell{TestID: "shell", Open: o.Get, OnOpenChange: o.Set, DefaultWidth: 240,
-			Sidebar:       []core.Node{core.Text{Content: "Inbox"}},
-			SidebarFooter: []core.Node{Button{Text: "Settings"}},
-			Content:       []core.Node{core.Text{Content: "Body"}}}
-	})
-	check := func(name string) {
-		t.Helper()
-		sidebar := within(app.Find("shell"), "sidebar-panel")
-		footer := within(app.Find("shell"), "sidebar-footer")
-		content := app.Find("content")
-		slot := within(app.Find("shell"), "sidebar-slot")
-		if got := x(app, "shell", slot); got != 62 {
-			t.Fatalf("%s: sidebar slot at %v, want 62", name, got)
-		}
-		if sidebar != nil && x(app, "shell", sidebar) != 62 {
-			t.Fatalf("%s: sidebar at %v, want 62", name, x(app, "shell", sidebar))
-		}
-		if footer != nil && x(app, "shell", footer) != 62 {
-			t.Fatalf("%s: footer at %v, want 62", name, x(app, "shell", footer))
-		}
-		if got := content.Frame.Origin.X + content.Frame.Size.Width; got != 1000-62 {
-			t.Fatalf("%s: content ends at %v, want %v", name, got, 1000-62)
-		}
+	for _, safe := range []core.Edges{{Left: 62, Right: 62}, {Right: 84}, {Left: 84}} {
+		t.Run(fmt.Sprintf("left %v right %v", safe.Left, safe.Right), func(t *testing.T) {
+			e := desktopEnv
+			e.SafeArea = safe
+			l, r := safe.Left, safe.Right
+			var setOpen func(bool)
+			app, _ := shell(t, e, func(cx *core.Scope) core.Node {
+				o := core.NewSignal(cx, true)
+				setOpen = o.Set
+				return SidebarShell{TestID: "shell", ToggleLabel: "Toggle sidebar", Open: o.Get, OnOpenChange: o.Set, DefaultWidth: 240,
+					Sidebar:       []core.Node{core.View{Style: core.Style{PaddingEnv: core.EnvAll(core.EnvSafeArea)}, Children: []core.Node{core.Text{Content: "Mail", TestID: "mail"}}}},
+					SidebarFooter: []core.Node{Button{Text: "Settings"}},
+					Header:        []core.Node{core.Text{Content: "Inbox", TestID: "title"}},
+					Actions:       []core.Node{Button{Text: "Compose"}},
+					Content: []core.Node{NavHeader{Title: "Page", OnBack: func() {}, BackLabel: "Back"},
+						core.View{Style: core.Style{PaddingEnv: core.EnvAll(core.EnvSafeArea)}, Children: []core.Node{core.Text{Content: "Body", TestID: "body"}}}}}
+			})
+			at := func(name, what string, got, want core.Points) {
+				t.Helper()
+				if got != want {
+					t.Errorf("%s: %s at %v, want %v", name, what, got, want)
+				}
+			}
+			end := func(v *nsgotest.View) core.Points { return x(app, "shell", v) + v.Frame.Size.Width }
+			check := func(name string, open bool) {
+				t.Helper()
+				at(name, "toggle", x(app, "shell", app.Find("role:button Toggle sidebar")), l+12)
+				at(name, "content end", end(app.Find("content")), 1000)
+				at(name, "trailing action end", end(app.Find("role:button Compose")), 1000-r-12)
+				at(name, "content padded by EnvSafeArea, end", end(app.Find("body")), 1000-r)
+				if open {
+					at(name, "sidebar", x(app, "shell", app.Find("sidebar-panel")), 0)
+					at(name, "sidebar content padded by EnvSafeArea", x(app, "shell", app.Find("mail")), l)
+					at(name, "footer", x(app, "shell", app.Find("sidebar-footer")), l)
+					at(name, "content", x(app, "shell", app.Find("content")), 240)
+					at(name, "title", x(app, "shell", app.Find("title")), 240+12)
+					at(name, "page back button", x(app, "shell", app.Find("role:button Back")), 240+12)
+					at(name, "content padded by EnvSafeArea", x(app, "shell", app.Find("body")), 240)
+					at(name, "resize handle", x(app, "shell", app.Find("sidebar-resize")), 240-2)
+				} else {
+					at(name, "content", x(app, "shell", app.Find("content")), 0)
+					at(name, "title", x(app, "shell", app.Find("title")), l+12+32+8)
+					at(name, "page back button", x(app, "shell", app.Find("role:button Back")), l+12)
+					at(name, "content padded by EnvSafeArea", x(app, "shell", app.Find("body")), l)
+				}
+			}
+			check("open", true)
+			app.Post(func() { setOpen(false) })
+			app.Settle()
+			check("closed", false)
+		})
 	}
-	check("open")
-	app.Post(func() { open = false; setOpen(false) })
-	app.Settle()
-	check("closed")
 }
 
 // TestNavHeaderSafeArea adds the horizontal safe area to its usual padding.

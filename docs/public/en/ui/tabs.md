@@ -37,7 +37,7 @@ An option can carry an `Icon`, a `Disabled` function, a `Content` node and a `Te
 
 `mobile.TabBar` is the system's tab bar on iOS and Android, with `Items`, `Selected` and `OnChange`. Each `mobile.TabBarItem` takes a `Title` and a platform icon name in `Icon`; on Android, `SVG: lucide.House()` shows wherever `Icon` names no drawable, fitted into 24 points and tinted for selection. iOS uses only the SF Symbol in `Icon`. In TSX, `svg` takes an SVG document. Elsewhere `mobile.TabBar` takes no room, so show `ui.Tabs` there.
 
-`ui.SidebarShell` and `ui.NavHeader` keep their horizontal content clear of the window's leading and trailing safe-area insets. `SidebarShell` applies the insets to its sidebar, footer, content pane and right panel. Content inside those panes remains responsible for its own padding.
+`ui.SidebarShell` keeps what its sidebar, footer, headers, content and right panel hold clear of the left and right safe area itself, their backgrounds running to the window's edges, so `core.EnvSafeArea` on those sides is 0 inside them, and `ui.NavHeader` adds the side safe area to its padding. A `ui.NavPage`'s or a `TabShell` section's content keeps clear of the safe area itself, with `PaddingEnv`, so what should run to the edges, such as a full-bleed image, can.
 
 ## Accessibility
 

@@ -179,11 +179,11 @@ func (s SidebarShell) Render(cx *core.Scope) core.Node {
 	sidebar := []core.Node{
 		shellHeader(cx, "sidebar-header", func() core.Points { return reserve() - margin() }, false, func() core.Color { return 0 },
 			append([]core.Node{Spacer{}}, s.SidebarActions...)),
-		core.View{Style: FillRest, Children: s.Sidebar},
+		clearOfSides(FillRest, func() core.EnvEdges { return core.EnvEdges{Left: core.EnvSafeArea} }, core.View{Style: FillRest, Children: s.Sidebar}),
 	}
 	if s.SidebarFooter != nil {
-		sidebar = append(sidebar, core.View{TestID: "sidebar-footer", Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 4,
-			FlexShrink: 0, Padding: core.All(8)}, Children: s.SidebarFooter})
+		sidebar = append(sidebar, clearOfSides(core.Style{FlexShrink: 0}, func() core.EnvEdges { return core.EnvEdges{Left: core.EnvSafeArea} },
+			core.View{TestID: "sidebar-footer", Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 4, Padding: core.All(8)}, Children: s.SidebarFooter}))
 	}
 	// The slot narrows over the sidebar, which keeps its width.
 	slot := core.View{TestID: "sidebar-slot", StyleFunc: func() core.Style {
@@ -217,7 +217,17 @@ func (s SidebarShell) Render(cx *core.Scope) core.Node {
 			}
 			return reserve()
 		}, true, headerFill, append(append(head, s.Actions...), s.rightToggle()...)),
-		core.View{Style: FillRest, Children: s.Content},
+		// The content keeps clear of the right inset unless the right panel is open there, and of the left while the sidebar is closed.
+		clearOfSides(FillRest, func() core.EnvEdges {
+			var e core.EnvEdges
+			if !s.rightOpen() {
+				e.Right = core.EnvSafeArea
+			}
+			if !open() {
+				e.Left = core.EnvSafeArea
+			}
+			return e
+		}, core.View{Style: FillRest, Children: s.Content}),
 		rightHandle,
 	}}
 	if inset {
@@ -271,8 +281,7 @@ func (s SidebarShell) Render(cx *core.Scope) core.Node {
 		children = append(children, core.View{TestID: "backdrop", Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Left: core.Pt(0),
 			Right: core.Pt(0), Bottom: core.Pt(0), PointerEvents: core.PointerEventsNone}, Children: s.Backdrop})
 	}
-	children = append(children, core.View{Style: FillRest.Merge(core.Style{Direction: core.Row,
-		PaddingEnv: core.EnvEdges{Left: core.EnvSafeArea, Right: core.EnvSafeArea}}), StyleFunc: func() core.Style {
+	children = append(children, core.View{Style: FillRest.Merge(core.Style{Direction: core.Row}), StyleFunc: func() core.Style {
 		return core.Style{Margin: core.All(margin())}
 	}, Children: row}, handle)
 	if toggle != nil {
@@ -284,6 +293,19 @@ func (s SidebarShell) Render(cx *core.Scope) core.Node {
 		}
 		return core.Style{Background: Chrome(cx), Color: colors.Text()}
 	}, Children: children}
+}
+
+// clearOfSides is a pane's body, inner, padded by the side safe area on the edges that edges names, the ones at the window's edge. What inner holds keeps clear of insets without the sides, so a NavHeader or a page that pads itself by core.EnvSafeArea is not padded twice, as ui.TabShell's sections keep clear of insets without the bottom its bar keeps clear of.
+func clearOfSides(style core.Style, edges func() core.EnvEdges, inner core.View) core.Node {
+	return core.View{Style: style, StyleFunc: func() core.Style { return core.Style{PaddingEnv: edges()} }, Children: []core.Node{core.Func(func(cx *core.Scope) core.Node {
+		outer := core.InsetsFunc(cx)
+		core.ProvideInsets(cx, func() core.Edges {
+			in := outer()
+			in.Left, in.Right = 0, 0
+			return in
+		})
+		return inner
+	})}}
 }
 
 // insetCard is SidebarShellInset's card around the content, which clips
@@ -445,7 +467,7 @@ func (s SidebarShell) rightPanel(cx *core.Scope) (panel, handle core.Node) {
 		head := []core.Node{shellHeader(cx, "right-header", func() core.Points { return 0 }, false, func() core.Color { return 0 }, s.RightHeader)}
 		return core.View{TestID: "right-panel", Disabled: closed, StyleFunc: func() core.Style {
 			return core.Style{Width: core.Pt(width()), FlexShrink: 0, Height: core.Pct(100), MinHeight: core.Pt(0), Background: Alpha(colors.Background(), 0.8), Color: colors.Text()}
-		}, Children: append(head, core.View{Style: FillRest, Children: s.Right})}
+		}, Children: append(head, clearOfSides(FillRest, func() core.EnvEdges { return core.EnvEdges{Right: core.EnvSafeArea} }, core.View{Style: FillRest, Children: s.Right}))}
 	}}}}
 	handle = core.View{TestID: "right-resize", Disabled: closed, StyleFunc: func() core.Style {
 		st := core.Style{Position: core.Absolute, Top: core.Pt(0), Bottom: core.Pt(0), Right: core.Pt(0), Width: core.Pt(3), ZIndex: 1}

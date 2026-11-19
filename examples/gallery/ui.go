@@ -356,18 +356,10 @@ var transparent = core.RGBA(0xffffff, 0)
 // past the window (React Native's flex items do not shrink by default).
 var fillPage = core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), MinWidth: core.Pt(0)}
 
-// clearSides keeps children clear of the left and right safe area (core.EnvSafeArea), such as the vertical status bar beside a foldable's outer display or an iPhone's camera in landscape, and of the left one only while left says so (nil: always). It takes both insets away from what the children keep clear of (core.Insets), so a page that pads by the safe area itself does not pad twice. Its own padding shows the background of the page around it.
-func clearSides(left func() bool, children ...core.Node) core.Node {
-	clearsLeft := func() bool { return left == nil || left() }
-	return core.View{Style: fillPage, StyleFunc: func() core.Style {
-		env := core.EnvEdges{Right: core.EnvSafeArea}
-		if clearsLeft() {
-			env.Left = core.EnvSafeArea
-		}
-		return core.Style{PaddingEnv: env}
-	}, Children: []core.Node{core.Func(func(cx *core.Scope) core.Node {
+// clearSides keeps children clear of the left and right safe area (core.EnvSafeArea), such as the vertical status bar beside a foldable's outer display or an iPhone's camera in landscape. It takes both insets away from what the children keep clear of (core.Insets), so a page that pads by the safe area itself does not pad twice. Its own padding shows the background of the page around it. The desktop layout's ui.SidebarShell does the same for its panes itself.
+func clearSides(children ...core.Node) core.Node {
+	return core.View{Style: fillPage.Merge(core.Style{PaddingEnv: core.EnvEdges{Left: core.EnvSafeArea, Right: core.EnvSafeArea}}), Children: []core.Node{core.Func(func(cx *core.Scope) core.Node {
 		outer := core.InsetsFunc(cx)
-		// While the left is not cleared, something else covers it, such as the desktop layout's sidebar.
 		core.ProvideInsets(cx, func() core.Edges {
 			in := outer()
 			in.Left, in.Right = 0, 0
@@ -379,7 +371,7 @@ func clearSides(left func() bool, children ...core.Node) core.Node {
 
 // clearPageSides keeps page p's content clear of the left and right safe area (clearSides).
 func clearPageSides(p base.NavPage) base.NavPage {
-	p.Children = []core.Node{clearSides(nil, p.Children...)}
+	p.Children = []core.Node{clearSides(p.Children...)}
 	return p
 }
 
