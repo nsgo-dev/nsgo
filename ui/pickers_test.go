@@ -46,6 +46,8 @@ func TestSelectSearchesAndClears(t *testing.T) {
 	})
 }
 
+// OptionsFunc updates the list in place, keeping the field's focus, and the
+// field follows its chosen option's label or the placeholder when it leaves.
 func TestSelectOptionsFuncUpdatesInPlace(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {
 		var options *core.Signal[[]Option[string]]
@@ -53,7 +55,7 @@ func TestSelectOptionsFuncUpdatesInPlace(t *testing.T) {
 		app, _ := start(t, e, func(cx *core.Scope) core.Node {
 			options = core.NewSignalFunc(cx, fruitOptions(), nil)
 			value = core.NewSignal(cx, "pear")
-			return Select[string]{TestID: "fruit", Label: "Fruit", OptionsFunc: options.Get, Value: value.Get, OnChange: value.Set}
+			return Select[string]{TestID: "fruit", Label: "Fruit", Placeholder: "Pick", OptionsFunc: options.Get, Value: value.Get, OnChange: value.Set}
 		})
 		if e.Idiom == core.IdiomDesktop {
 			app.Focus("id:fruit")
@@ -80,6 +82,20 @@ func TestSelectOptionsFuncUpdatesInPlace(t *testing.T) {
 		app.Press("role:option Pear (new)")
 		if value.Get() != "pear" {
 			t.Fatalf("selected value = %q, want pear", value.Get())
+		}
+		app.Settle()
+		app.Advance(time.Second)
+		if !app.Exists("text:Pear (new)") {
+			t.Fatal("the field did not show the chosen option's new label")
+		}
+		// A value no longer offered shows the placeholder and stays the app's.
+		options.Set([]Option[string]{{Value: "apple", Label: "Apple"}})
+		app.Settle()
+		if !app.Exists("text:Pick") || app.Exists("text:Pear (new)") {
+			t.Fatal("the field did not fall back to the placeholder when its value left the options")
+		}
+		if value.Get() != "pear" {
+			t.Fatalf("value = %q after its option left, want it unchanged", value.Get())
 		}
 	})
 }

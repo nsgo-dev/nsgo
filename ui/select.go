@@ -21,8 +21,7 @@ type Select[T comparable] struct {
 	LabelledBy []*core.Ref
 	Invalid    func() bool
 	Options    []Option[T]
-	// OptionsFunc returns the options and updates the open list in place when
-	// the values it reads change, keeping the field's value and focus.
+	// OptionsFunc, when set, returns the options in place of Options and updates the open list in place when the values it reads change, keeping the field's value and focus. A Value no longer offered shows Placeholder; OnChange is not called for it.
 	OptionsFunc func() []Option[T]
 	Value       func() T
 	OnChange    func(value T)
