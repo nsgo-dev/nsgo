@@ -9,6 +9,8 @@ order: 56
 
 `base.NewNav` 保存一种路由类型的栈：`Push` 添加页面，`Pop` 移除顶部页面，`PopToRoot` 回到第一页，`Replace` 替换顶部页面。它的 `Stack` 把每个路由渲染成一页，顶部页面显示时，下面的页面保持挂载和状态。`ui.NavPage` 给每页加上 `ui` 的背景和一个 `ui.NavHeader`，包含标题、返回按钮和其他按钮。
 
+watchOS 没有系统的导航栏、标签栏和开关，所以在那里 `ui.NavPage` 会在页面上方绘制它的 `ui.NavHeader`（包括返回按钮），`ui.TabShell` 绘制自己的标签栏，`ui.SwitchSystem` 使用 `ui` 自己的开关。
+
 ```go
 nav := base.NewNav(cx, "inbox")
 

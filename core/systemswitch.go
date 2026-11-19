@@ -24,10 +24,10 @@ type SystemSwitch struct {
 	TestID string
 }
 
-// SystemSwitchAvailable reports whether the platform has a SystemSwitch: macOS and iOS, not a web build that runs as them.
+// SystemSwitchAvailable reports whether the platform has a SystemSwitch: macOS and iOS, not a watch, which reports iOS, or a web build that runs as them.
 func SystemSwitchAvailable(cx *Scope) bool {
 	os := cx.Env().host()
-	return os == OSMacOS || os == OSIOS
+	return os == OSMacOS || (os == OSIOS && cx.Env().Idiom() != IdiomWatch)
 }
 
 // Render implements Node.

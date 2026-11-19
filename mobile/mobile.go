@@ -49,10 +49,10 @@ const (
 // haptics, and every other platform, play nothing.
 func PlayHaptic(cx *core.Scope, h Haptic) { cx.PlayHaptic(h) }
 
-// IsAvailable reports whether the app runs on iOS or Android, where this package's components show; a web build that runs as one (core.Env.Simulated) does not.
+// IsAvailable reports whether the app runs on iOS or Android, where this package's components show; a watch, which reports iOS, and a web build that runs as one (core.Env.Simulated) do not.
 func IsAvailable(cx *core.Scope) bool {
 	os := cx.Env().OS()
-	return (os == core.OSIOS || os == core.OSAndroid) && !cx.Env().Simulated()
+	return (os == core.OSIOS || os == core.OSAndroid) && cx.Env().Idiom() != core.IdiomWatch && !cx.Env().Simulated()
 }
 
 // IsAppClip reports whether the app runs as an iOS App Clip, the part of

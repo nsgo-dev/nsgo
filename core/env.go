@@ -499,6 +499,12 @@ func (e *Env) host() OS {
 	return os
 }
 
+// mobileBars reports whether the platform draws iOS's or Android's own navigation and tab bars: not on a watch, which reports iOS but draws neither, nor in a web build that runs as them.
+func (e *Env) mobileBars() bool {
+	os := e.host()
+	return (os == OSIOS || os == OSAndroid) && e.Idiom() != IdiomWatch
+}
+
 func (e *Env) hostUntracked() OS {
 	if e.simulated {
 		return OSWeb

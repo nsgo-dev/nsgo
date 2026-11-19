@@ -40,24 +40,13 @@ func (g *gallery) watch(cx *core.Scope) core.Node {
 	})
 }
 
-// watchScreen is a page of the watch's stack under its own header, with a back button above the index: the system draws none on a watch. The content fills the screen below the header.
+// watchScreen is a page of the watch's stack under a NavHeader, which has a back button above the index.
 func watchScreen(cx *core.Scope, title, testID string, back bool, content core.Node) base.NavPage {
-	colors := ui.ColorsOf(cx)
-	tr := locales.For(cx)
-	heading := ui.Text(title, 15, ui.Semibold, colors.Text)
-	heading.MaxLines, heading.Role, heading.Style.FlexShrink = 1, core.RoleHeader, 1
-	header := []core.Node{heading}
+	header := ui.NavHeader{TestID: "header"}
 	if back {
-		header = []core.Node{core.View{OnPress: func(core.PressEvent) { shell.nav.Pop(1) }, Role: core.RoleButton, Label: tr.UiBack(), TestID: "back",
-			HitSlop: core.All(8), Style: core.Style{Width: core.Pt(28), Height: core.Pt(28), CornerRadius: 14, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
-			StyleFunc: ui.Filled(colors.Inset), Children: []core.Node{ui.Icon(lucide.ChevronLeft, 18, colors.Accent)}}, heading}
+		header.OnBack, header.BackLabel = func() { shell.nav.Pop(1) }, locales.For(cx).UiBack()
 	}
-	return base.NavPage{Title: title, TestID: testID, HeaderHidden: true, StyleFunc: pageStyle(cx), Children: []core.Node{
-		core.View{Style: fillPage, Children: []core.Node{
-			core.View{Style: core.Style{Height: core.Pt(watchHeader), FlexShrink: 0, Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, Padding: core.Symmetric(0, 8)}, Children: header},
-			content,
-		}},
-	}}
+	return ui.NavPage(cx, base.NavPage{Title: title, TestID: testID, Children: []core.Node{content}}, header)
 }
 
 // watchIndex is the demos a watch shows, by group, each a row that pushes it.
@@ -86,9 +75,6 @@ func (g *gallery) watchIndex(cx *core.Scope) core.Node {
 	}
 	return watchScroll("home", rows...)
 }
-
-// watchHeader is the height of a watch page's header.
-const watchHeader core.Points = 32
 
 // watchScroll scrolls a watch page's content under its header, a column on narrow gutters.
 func watchScroll(testID string, children ...core.Node) core.Node {

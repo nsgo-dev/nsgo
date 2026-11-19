@@ -36,7 +36,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 - Use `ui.Slider.MinFunc`, `MaxFunc` and `StepFunc` for changing ranges and steps; `base.Slider.Min`, `Max` and `Step` already take getters. This keeps focus and an active drag mounted.
 - `ui.Dialog` and `ui.AlertDialog` take `Style` and `StyleFunc` for their surface; use `StyleFunc` for colors that follow the theme or other signals, merged after `Style` on both centered dialogs and sheets.
 - Give each control a label screen readers hear (`Label`, or the button's text); icon-only buttons need one. An input's `Placeholder` is a separate hint, exposed on macOS for single-line, masked and multiline fields; keep its `Label` meaningful when that hint changes or clears.
-- `ui.NavPage` and `ui.NavHeader` draw the system's own header and back gesture on phones; do not build a header of views there.
+- `ui.NavPage` and `ui.NavHeader` draw the system's own header and back gesture on phones, and `NavHeader` with its back button elsewhere, an Apple Watch included; do not build a header of views.
 - `ui.Menu` and `ui.Select` open beside their trigger on any device, or as a sheet when their `Presentation` asks; choose it explicitly instead of switching by device.
 - `core.Ref` focus, blur, scroll and zoom requests are dropped while the element is in unplaced `core.Holder` content, or when it leaves the tree before the commit; showing the content again does not replay them, so ask again once it is placed.
 - Web canvases in a zoomed `core.Scroll` replay at the cumulative scroll zoom once it rests, up to four times the screen's pixel ratio, without rerunning `Draw` ([canvas](https://nsgo.dev/docs/canvas.md)).

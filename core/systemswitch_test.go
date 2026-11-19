@@ -34,6 +34,17 @@ func TestSystemSwitchShowsNothingElsewhere(t *testing.T) {
 	}
 }
 
+func TestSystemSwitchShowsNothingOnWatch(t *testing.T) {
+	available := true
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		available = core.SystemSwitchAvailable(cx)
+		return core.SystemSwitch{TestID: "switch"}
+	}, nsgotest.Environment(driver.Environment{OS: driver.OSIOS, Idiom: driver.IdiomWatch}))
+	if available || app.FindMounted("id:switch").Component != "" {
+		t.Fatalf("watchOS: available %v, mounted component %q", available, app.FindMounted("id:switch").Component)
+	}
+}
+
 // A web build that runs as macOS or iOS has no UISwitch or NSSwitch to show.
 func TestSystemSwitchShowsNothingSimulated(t *testing.T) {
 	for _, os := range []driver.OS{driver.OSMacOS, driver.OSIOS} {

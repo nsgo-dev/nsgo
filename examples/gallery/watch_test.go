@@ -98,7 +98,7 @@ func TestWatchGallery(t *testing.T) {
 		app.FastForward(time.Second)
 		app.Screenshot("watch/" + strings.ToLower(d.name))
 		if i%2 == 0 {
-			app.Press("id:back")
+			app.Press("id:screen-" + d.name + " >> role:button Back")
 		} else {
 			app.Back()
 		}
@@ -128,6 +128,6 @@ func TestWatchLayout(t *testing.T) {
 	}
 	app.Press("id:nav-Slider")
 	app.WaitFor("id:screen-Slider", time.Second)
-	app.Press("id:back")
+	app.Press("id:screen-Slider >> role:button Back")
 	app.WaitForGone("id:screen-Slider", time.Second)
 }

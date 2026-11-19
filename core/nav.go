@@ -61,11 +61,10 @@ var fill = Style{Position: Absolute, Top: Pt(0), Right: Pt(0), Bottom: Pt(0), Le
 
 func (t *Tree) mountScreen(cx *Scope, parent *node, s Screen) {
 	n := t.newNode(driver.KindView, parent, cx)
-	// iOS and Android draw the header, not a web build that runs as them; elsewhere a platform does where it reports a header's height.
+	// iOS and Android draw the header, not a watch or a web build that runs as them; elsewhere a platform does where it reports a header's height.
 	env := t.root.Env()
-	os := Untracked(cx, env.host)
 	sn := &screenNode{screen: &s, title: s.Title, headerStyle: s.HeaderStyle,
-		native: env.headers[0] > 0 || os == OSIOS || os == OSAndroid, top: NewSignal(cx, Points(0)),
+		native: env.headers[0] > 0 || Untracked(cx, env.mobileBars), top: NewSignal(cx, Points(0)),
 		reported: NewSignal[*Edges](cx, nil)}
 	for p := parent; p != nil; p = p.parent {
 		if p.isStack {

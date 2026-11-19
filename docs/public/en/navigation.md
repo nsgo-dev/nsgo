@@ -9,6 +9,8 @@ order: 56
 
 `base.NewNav` keeps a stack of routes of one type: `Push` adds a page, `Pop` removes the top page, `PopToRoot` returns to the first and `Replace` swaps the top. Its `Stack` renders every route as a page, keeping the pages below mounted with their state while the top one shows. `ui.NavPage` gives each page `ui`'s background and a `ui.NavHeader` with its title, back button and buttons.
 
+watchOS has no system navigation bar, tab bar or switch, so there `ui.NavPage` draws its `ui.NavHeader` above the page, back button included, `ui.TabShell` draws its own tab bar and `ui.SwitchSystem` is `ui`'s own switch.
+
 ```go
 nav := base.NewNav(cx, "inbox")
 

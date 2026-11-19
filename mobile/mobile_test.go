@@ -23,3 +23,14 @@ func TestIsAvailableSimulated(t *testing.T) {
 		}
 	}
 }
+
+func TestIsUnavailableOnWatch(t *testing.T) {
+	var available bool
+	nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		available = mobile.IsAvailable(cx)
+		return core.View{}
+	}, nsgotest.Environment(core.Environment{OS: core.OSIOS, Idiom: core.IdiomWatch}))
+	if available {
+		t.Fatal("watchOS reported mobile system components")
+	}
+}
