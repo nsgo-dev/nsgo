@@ -37,6 +37,8 @@ ui.Tabs[string]{Variant: ui.TabsUnderline, Equal: true, Size: ui.SizeSmall, Opti
 
 `mobile.TabBar` 是 iOS 和 Android 的系统标签栏，接收 `Items`、`Selected` 和 `OnChange`。每个 `mobile.TabBarItem` 带 `Title` 和平台图标名 `Icon`；在 Android 上，`Icon` 找不到对应 drawable 时显示 `SVG: lucide.House()`，适配到 24 点并按选中状态着色。iOS 只使用 `Icon` 中的 SF Symbol。TSX 的 `svg` 接收 SVG 文档。其他平台上 `mobile.TabBar` 不占空间，因此在那里显示 `ui.Tabs`。
 
+`ui.SidebarShell` 和 `ui.NavHeader` 会让横向内容避开窗口左右两侧的安全区域。`SidebarShell` 会将安全区域应用到侧栏、页脚、内容面板和右侧面板；这些面板中的内容仍需自行负责内部留白。
+
 ## 无障碍
 
 列表报告 `RoleTabList`，每个标签报告 `RoleTab`，选中的标签报告自己的状态。列表是一个 Tab 停靠点；左/上、右/下、Home 和 End 在启用的标签间移动，到达的标签会报告按压。`Label` 命名列表。

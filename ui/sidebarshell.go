@@ -271,7 +271,8 @@ func (s SidebarShell) Render(cx *core.Scope) core.Node {
 		children = append(children, core.View{TestID: "backdrop", Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Left: core.Pt(0),
 			Right: core.Pt(0), Bottom: core.Pt(0), PointerEvents: core.PointerEventsNone}, Children: s.Backdrop})
 	}
-	children = append(children, core.View{Style: FillRest.Merge(core.Style{Direction: core.Row}), StyleFunc: func() core.Style {
+	children = append(children, core.View{Style: FillRest.Merge(core.Style{Direction: core.Row,
+		PaddingEnv: core.EnvEdges{Left: core.EnvSafeArea, Right: core.EnvSafeArea}}), StyleFunc: func() core.Style {
 		return core.Style{Margin: core.All(margin())}
 	}, Children: row}, handle)
 	if toggle != nil {

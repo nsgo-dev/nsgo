@@ -131,6 +131,65 @@ func TestSidebarShell(t *testing.T) {
 	}
 }
 
+// TestSidebarShellSafeArea keeps both sides of the shell clear of the window's
+// horizontal safe area while the sidebar is open or closed.
+func TestSidebarShellSafeArea(t *testing.T) {
+	e := desktopEnv
+	e.SafeArea = core.Edges{Left: 62, Right: 62}
+	open := true
+	var setOpen func(bool)
+	app, _ := shell(t, e, func(cx *core.Scope) core.Node {
+		o := core.NewSignal(cx, open)
+		setOpen = o.Set
+		return SidebarShell{TestID: "shell", Open: o.Get, OnOpenChange: o.Set, DefaultWidth: 240,
+			Sidebar:       []core.Node{core.Text{Content: "Inbox"}},
+			SidebarFooter: []core.Node{Button{Text: "Settings"}},
+			Content:       []core.Node{core.Text{Content: "Body"}}}
+	})
+	check := func(name string) {
+		t.Helper()
+		sidebar := within(app.Find("shell"), "sidebar-panel")
+		footer := within(app.Find("shell"), "sidebar-footer")
+		content := app.Find("content")
+		slot := within(app.Find("shell"), "sidebar-slot")
+		if got := x(app, "shell", slot); got != 62 {
+			t.Fatalf("%s: sidebar slot at %v, want 62", name, got)
+		}
+		if sidebar != nil && x(app, "shell", sidebar) != 62 {
+			t.Fatalf("%s: sidebar at %v, want 62", name, x(app, "shell", sidebar))
+		}
+		if footer != nil && x(app, "shell", footer) != 62 {
+			t.Fatalf("%s: footer at %v, want 62", name, x(app, "shell", footer))
+		}
+		if got := content.Frame.Origin.X + content.Frame.Size.Width; got != 1000-62 {
+			t.Fatalf("%s: content ends at %v, want %v", name, got, 1000-62)
+		}
+	}
+	check("open")
+	app.Post(func() { open = false; setOpen(false) })
+	app.Settle()
+	check("closed")
+}
+
+// TestNavHeaderSafeArea adds the horizontal safe area to its usual padding.
+func TestNavHeaderSafeArea(t *testing.T) {
+	e := desktopEnv
+	e.SafeArea = core.Edges{Left: 62, Right: 62}
+	app, _ := shell(t, e, func(cx *core.Scope) core.Node {
+		return NavHeader{TestID: "header", Title: "Inbox", OnBack: func() {}, BackLabel: "Back",
+			Trailing: []core.Node{Button{Text: "More"}}}
+	})
+	header := app.Find("header")
+	back := app.Find("role:button Back")
+	more := app.Find("role:button More")
+	if got := x(app, "header", back); got < 62+12 {
+		t.Fatalf("back starts at %v, want at least %v", got, 62+12)
+	}
+	if got := x(app, "header", more) + more.Frame.Size.Width; got > header.Frame.Size.Width-62-12 {
+		t.Fatalf("trailing button ends at %v, want at most %v", got, header.Frame.Size.Width-62-12)
+	}
+}
+
 // TestSidebarShellFixed keeps a fixed sidebar at its width, its edge a
 // line with no handle.
 func TestSidebarShellFixed(t *testing.T) {
