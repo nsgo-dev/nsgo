@@ -277,7 +277,7 @@ go tool nsgo dev -target miniprogram_alipay
 go tool nsgo build -target harmonyos -run
 ```
 
-`harmonyos` 在 `dist/releases` 写出 `<name>-<version>-harmonyos.hap`。引擎以 WebAssembly 运行在 ArkWeb 中，ArkTS 宿主用 ArkUI 视图绘制它挂载的内容，文字、输入框、滚动和对话框都是系统自己的。`PATH` 中有 `hdc` 时，`-run` 把 HAP 安装到连接的设备或模拟器上并启动，`nsgo test -target harmonyos` 在模拟器上运行应用的测试。
+`harmonyos` 在 `dist/releases` 写出 `<name>-<version>-harmonyos.hap`。引擎以 WebAssembly 运行在 ArkWeb 中，ArkTS 宿主用 ArkUI 视图绘制它挂载的内容，文字、输入框、滚动和对话框都是系统自己的。`PATH` 中有 `hdc` 时，`-run` 把 HAP 安装到连接的设备或模拟器上并启动，`nsgo test -target harmonyos` 使用独立的 `.nsgotest` bundle 标识在模拟器上运行测试，并在结束后删除测试 HAP，因此已安装的应用仍然可用。
 
 本机装有 OpenHarmony SDK（`PATH` 中有 `hvigorw` 且设置了 `OHOS_BASE_SDK_HOME`）时，包名取自应用的 `id`；没有时，`build` 把 id 填充到已提交宿主的固定长度。`build.harmonyos_bundles` 可选 `auto`（默认）、`exact`（没有 SDK 时报错）或 `padded`。`harmonyos.permissions` 列出应用要申请的 `ohos.permission` 名称，如 `MICROPHONE` 和 `CAMERA`；`widget.title` 是桌面卡片显示的标题。
 

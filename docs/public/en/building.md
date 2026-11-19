@@ -277,7 +277,7 @@ Mini programs are experimental. A mini program runs Go apps alone, not TSX, and 
 go tool nsgo build -target harmonyos -run
 ```
 
-`harmonyos` writes `<name>-<version>-harmonyos.hap` to `dist/releases`. The engine runs as WebAssembly in ArkWeb, and an ArkTS host draws what it mounts with ArkUI views, so text, fields, scrolling and dialogs are the system's own. With `hdc` on `PATH`, `-run` installs the HAP on the connected device or emulator and starts it, and `nsgo test -target harmonyos` runs an app's tests on an emulator.
+`harmonyos` writes `<name>-<version>-harmonyos.hap` to `dist/releases`. The engine runs as WebAssembly in ArkWeb, and an ArkTS host draws what it mounts with ArkUI views, so text, fields, scrolling and dialogs are the system's own. With `hdc` on `PATH`, `-run` installs the HAP on the connected device or emulator and starts it, and `nsgo test -target harmonyos` runs an app's tests on an emulator under a separate `.nsgotest` bundle identity, removing that test HAP after the run so the installed app remains available.
 
 The bundle name comes from the app's `id` when the machine has the OpenHarmony SDK (`hvigorw` on `PATH` and `OHOS_BASE_SDK_HOME` set); without it, `build` pads the id to the committed host's fixed length. `build.harmonyos_bundles` picks `auto`, the default, `exact`, which fails without the SDK, or `padded`. `harmonyos.permissions` lists the `ohos.permission` names the app asks for, such as `MICROPHONE` and `CAMERA`, and `widget.title` is what its home-screen card shows.
 

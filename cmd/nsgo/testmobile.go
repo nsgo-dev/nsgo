@@ -247,6 +247,7 @@ func readMarkedRun(lines io.Reader, token string, out io.Writer, ended func() er
 // activity for each test, the test's arguments and environment in the
 // intent; the app's output comes back through the device's log.
 func androidTestRunner(ctx context.Context, p *project, dir string, opts testOptions) (targetRunner, error) {
+	test := testProject(p)
 	d, err := adbDevice(ctx, opts.device)
 	if err != nil {
 		return targetRunner{}, err
@@ -258,14 +259,17 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 	if err != nil {
 		return targetRunner{}, err
 	}
-	apk, err := buildAndroidAPK(ctx, p, dir, goarch)
+	apk, err := buildAndroidAPK(ctx, test, dir, goarch)
 	if err != nil {
 		return targetRunner{}, err
 	}
 	if err := d.run(ctx, "install", "-r", apk); err != nil {
 		return targetRunner{}, err
 	}
-	stop := func() { d.run(context.Background(), "shell", "am", "force-stop", p.ID) }
+	stop := func() {
+		d.run(context.Background(), "shell", "am", "force-stop", test.ID)
+		d.run(context.Background(), "uninstall", test.ID)
+	}
 	return targetRunner{
 		run: func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
 			if err := d.prepareTestScreen(ctx); err != nil {
@@ -279,7 +283,7 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 				k, v, _ := strings.Cut(kv, "=")
 				envMap[k] = v
 			}
-			test, _ := json.Marshal(map[string]any{"args": args, "env": envMap})
+			payload, _ := json.Marshal(map[string]any{"args": args, "env": envMap})
 			cmd := exec.CommandContext(ctx, d.adb, "-s", d.serial, "logcat", "-v", "raw", "-s", "nsgo:I")
 			logs, err := cmd.StdoutPipe()
 			if err != nil {
@@ -293,8 +297,8 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 				cmd.Wait()
 				stop()
 			}()
-			if err := d.run(ctx, "shell", "am", "start", "-S", "-n", p.ID+androidComponent,
-				"--es", "nsgo.test", base64.StdEncoding.EncodeToString(test)); err != nil {
+			if err := d.run(ctx, "shell", "am", "start", "-S", "-n", test.ID+androidComponent,
+				"--es", "nsgo.test", base64.StdEncoding.EncodeToString(payload)); err != nil {
 				return -1, err
 			}
 			return readMarkedRun(logs, token, out, func() error {

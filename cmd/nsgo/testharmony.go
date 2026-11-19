@@ -23,8 +23,13 @@ func harmonyTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 	if err != nil {
 		return targetRunner{}, fmt.Errorf("the harmonyos target needs hdc to install the HAP")
 	}
+	test := testProject(p)
+	bundle, err := harmony.BundleName(test.ID)
+	if err != nil {
+		return targetRunner{}, err
+	}
 	site := filepath.Join(dir, "web")
-	if err := buildHarmony(ctx, p, site); err != nil {
+	if err := buildHarmony(ctx, test, site); err != nil {
 		return targetRunner{}, err
 	}
 	device := []string(nil)
@@ -43,11 +48,11 @@ func harmonyTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 			if err := os.WriteFile(filepath.Join(site, "test.json"), cfg, 0o644); err != nil {
 				return -1, err
 			}
-			code := p.BuildNumber
+			code := test.BuildNumber
 			if code == 0 {
 				code = 1
 			}
-			hap, err := harmony.Package(dir, site, p.Name, p.ID, p.Version, code, p.Harmonyos.Permissions)
+			hap, err := harmony.Package(dir, site, test.Name, test.ID, test.Version, code, test.Harmonyos.Permissions)
 			if err != nil {
 				return -1, err
 			}
@@ -72,7 +77,7 @@ func harmonyTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 			hdcAt(ctx, hdc, device, "shell", "aa", "force-stop", bundle)
 			return exitCode, testErr
 		},
-		close: func() {},
+		close: func() { hdcAt(context.Background(), hdc, device, "uninstall", bundle) },
 	}, nil
 }
 
