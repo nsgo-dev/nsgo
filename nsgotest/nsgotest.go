@@ -982,7 +982,7 @@ func (a *App) SetEnvironment(env driver.Environment) {
 	a.Settle()
 }
 
-// SetWindowEnvironment reports one window's environment changed by change, as a platform reports a window minimized, zoomed, full screen or out of sight while the app's other windows stay as they are, and settles: the window the app opened titled title, or the main window for "". The app's own surface, whose Lifecycle is every window's together, and the other windows keep the app's environment. Changes add up until SetEnvironment sets every window's again. It needs a desktop environment, where the app opens windows, and runs headless only.
+// SetWindowEnvironment reports one window's environment changed by change, as a platform reports a window minimized, zoomed, full screen or out of sight while the app's other windows stay as they are, and settles: the window the app opened titled title, or the main window for "". The app's own surface, whose Lifecycle is every window's together, and the other windows keep the app's environment. Changes add up until SetEnvironment sets every window's again; each is applied again whenever the window's environment is reported, so change should only set fields of env. It needs a desktop environment, where the app opens windows, and runs headless only.
 func (a *App) SetWindowEnvironment(title string, change func(*driver.Environment)) {
 	a.t.Helper()
 	if a.target != nil {

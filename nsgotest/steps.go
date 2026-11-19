@@ -935,7 +935,7 @@ func (a *App) chooseMenuEntry(e driver.MenuEntry) {
 	a.menuRole(e.Role)
 }
 
-// menuRole carries out a standard role of an item without OnSelect: Close closes the main window as its close button does, running its OnClosing handlers; Quit asks the app's OnQuitRequest handlers on macOS, where an approved request counts in Quits, and quits at once on Windows and Linux, which do not ask; Minimize, Zoom and Toggle Full Screen change the window state the environment reports; an editing role with no focused field to take it does nothing, as on the platforms. A role the model cannot carry out fails the step, so that its key is not swallowed unnoticed.
+// menuRole carries out a standard role of an item without OnSelect: Close closes the main window as its close button does, running its OnClosing handlers; Quit asks the app's OnQuitRequest handlers on macOS, where an approved request counts in Quits, and quits at once on Windows and Linux, which do not ask; Minimize, Zoom and Toggle Full Screen change the main window's state its environment reports, the other windows staying as they are; an editing role with no focused field to take it does nothing, as on the platforms. A role the model cannot carry out fails the step, so that its key is not swallowed unnoticed.
 func (a *App) menuRole(role driver.MenuRole) {
 	a.t.Helper()
 	switch role {
