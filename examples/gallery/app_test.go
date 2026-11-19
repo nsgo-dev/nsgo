@@ -858,8 +858,7 @@ func TestWebInput(t *testing.T) {
 	app := startDesktop(t)
 	open(app, "WebView")
 	app.WaitFor("id:bridge", 10*time.Second)
-	// The page posts where its button is as it loads.
-	time.Sleep(2 * time.Second)
+	app.WaitUntil(10*time.Second, func() bool { return app.Enabled("id:click-page") })
 	app.Press("id:click-page")
 	app.WaitFor("text:hello from the page", 10*time.Second)
 	app.Press("id:save-note")

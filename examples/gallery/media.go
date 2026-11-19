@@ -83,10 +83,13 @@ func messaging(cx *core.Scope) core.Node {
 	}
 	// Where the page's button and link are, which it posts as it loads.
 	var at struct{ Post, Save [2]core.Points }
+	positioned := core.NewSignal(cx, false)
 	web := &core.Ref{}
 	got := func(data string) {
 		if rest, ok := strings.CutPrefix(data, "at:"); ok {
-			_ = json.Unmarshal([]byte(rest), &at)
+			if json.Unmarshal([]byte(rest), &at) == nil {
+				positioned.Set(true)
+			}
 			return
 		}
 		message.Set(data)
@@ -122,7 +125,8 @@ func messaging(cx *core.Scope) core.Node {
 				web.PostMessage(fmt.Sprintf("hi #%d", sent.GetUntracked()))
 			}},
 			ui.Button{Text: tr.MediaClickThePage(), Variant: ui.ButtonSecondary, TestID: "click-page",
-				OnPress: func() { web.SendInput(core.WebClick(at.Post[0], at.Post[1])) }},
+				Disabled: func() bool { return !positioned.Get() },
+				OnPress:  func() { web.SendInput(core.WebClick(at.Post[0], at.Post[1])) }},
 			ui.Button{Text: tr.MediaSaveANote(), Variant: ui.ButtonSecondary, TestID: "save-note",
 				OnPress: func() { web.SendInput(core.WebClick(at.Save[0], at.Save[1])) }},
 			// A promise the page settles, answered as JSON.
