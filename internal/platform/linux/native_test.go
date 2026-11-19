@@ -210,6 +210,29 @@ func TestWindowRunsAnAppAndTakesNativeInput(t *testing.T) {
 	})
 }
 
+// TestWindowCloseReleasesEditorProviders keeps a primary window's display CSS
+// providers from outliving the window that created its inputs.
+func TestWindowCloseReleasesEditorProviders(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	before := editorProviders.Load()
+	title := "nsgo-editor-provider-cleanup"
+	w := startTestWindow(t, nativeApp(title), Options{Title: title, Width: 360, Height: 240})
+	waitForTitle(t, w, title+"|0||0|0")
+	if got := editorProviders.Load(); got <= before {
+		t.Fatalf("editor providers = %d, want more than %d while the window is open", got, before)
+	}
+	w.onLoop(t, w.close)
+	deadline := time.Now().Add(10 * time.Second)
+	for editorProviders.Load() != before && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := editorProviders.Load(); got != before {
+		t.Fatalf("editor providers = %d after close, want %d", got, before)
+	}
+}
+
 // pixels is the surface as GTK draws it, premultiplied ARGB32.
 type pixels struct {
 	data   []byte

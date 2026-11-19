@@ -552,6 +552,17 @@ func (w *window) closeNatives() {
 	}
 }
 
+// closeEditors removes display-wide CSS providers before the stopped window
+// leaves the GTK main loop. The primary window's views stay registered for
+// callbacks, so releaseSurface cannot perform this cleanup on its path.
+func (w *window) closeEditors() {
+	for _, v := range w.views {
+		if v != nil {
+			w.releaseEditor(v)
+		}
+	}
+}
+
 // toplevel is the window the surface is in: its own, or the host's.
 func (w *window) toplevel() uintptr {
 	if w.win != 0 {
@@ -573,6 +584,7 @@ func (w *window) run() {
 func (w *window) stop() {
 	w.engine.Close()
 	w.closeNatives()
+	w.closeEditors()
 	engine.SyncStorage()
 	w.releaseTextContexts()
 	if w.loop != 0 {

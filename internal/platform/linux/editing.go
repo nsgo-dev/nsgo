@@ -66,6 +66,7 @@ var (
 
 	cbEntryInsert, cbEntryDelete, cbEntrySelection, cbPreedit                uintptr
 	cbBufferChanged, cbBufferInsert, cbBufferDelete, cbBufferMark, cbAreaKey uintptr
+	editorProviders                                                          atomic.Int64
 )
 
 func bindEditing() {
@@ -352,6 +353,7 @@ func (w *window) makeEditor(v *view, multiline bool) {
 	if v.provider == 0 {
 		v.provider = gtkCssProviderNew()
 		gtkStyleContextAddForDisplay(gdkDisplayGetDefault(), v.provider, 800)
+		editorProviders.Add(1)
 	}
 }
 
@@ -380,6 +382,7 @@ func (w *window) releaseEditor(v *view) {
 	if v.provider != 0 {
 		gtkStyleContextRemoveDisplay(gdkDisplayGetDefault(), v.provider)
 		gObjectUnref(v.provider)
+		editorProviders.Add(-1)
 		v.provider = 0
 	}
 	if v.entry != 0 {
