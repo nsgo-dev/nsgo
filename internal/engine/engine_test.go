@@ -648,6 +648,48 @@ func TestRotationShowsItsSafeAreaWithItsSize(t *testing.T) {
 	}
 }
 
+func TestDisplaySwitchShowsItsEnvironmentWithItsSize(t *testing.T) {
+	// iOS on the iPhone Duo: closing moves the app from the inner display, its status bar on top, to the outer one, its vertical bar trailing. The backend reports each layout's size, geometry and environment as one, the vertical bar's edge following in a layout of its own at the same size, so no effect sees the outer display's safe area at the inner display's size.
+	inner, outer := driver.Size{Width: 669, Height: 951}, driver.Size{Width: 466, Height: 678}
+	top := driver.Environment{SafeArea: driver.Edges{Top: 82, Bottom: 34}}
+	bar := driver.Environment{SafeArea: driver.Edges{Right: 84, Bottom: 34}}
+	trailing := bar
+	trailing.VerticalBarEdge = driver.VerticalBarTrailing
+	closed := driver.Geometry{State: driver.HingeClosed, HasAngle: true}
+	type seen struct {
+		size driver.Size
+		safe driver.Edges
+		edge driver.VerticalBarEdge
+		g    driver.HingeState
+	}
+	var mu sync.Mutex
+	var runs []seen
+	p := &recorder{mounted: make(chan struct{}, 1)}
+	e := Start(p, func(cx *core.Scope) core.Node {
+		cx.Effect(func() {
+			s := seen{cx.Env().Window(), cx.Env().SafeArea(), cx.Env().VerticalBarEdge(), cx.Env().Geometry().State}
+			mu.Lock()
+			runs = append(runs, s)
+			mu.Unlock()
+		})
+		return core.View{}
+	}, Options{Size: inner, Environment: top, Geometry: driver.Geometry{State: driver.HingeOpen}})
+	defer e.Close()
+	<-p.mounted
+
+	e.ResizeWithEnvironment(outer, closed, bar)
+	e.Sync()
+	e.ResizeWithEnvironment(outer, closed, trailing)
+	e.Sync()
+
+	mu.Lock()
+	defer mu.Unlock()
+	want := []seen{{inner, top.SafeArea, driver.VerticalBarUnspecified, driver.HingeOpen}, {outer, bar.SafeArea, driver.VerticalBarUnspecified, driver.HingeClosed}, {outer, bar.SafeArea, driver.VerticalBarTrailing, driver.HingeClosed}}
+	if !slices.Equal(runs, want) {
+		t.Errorf("runs %+v, want %+v", runs, want)
+	}
+}
+
 func TestStartLaysOutWithItsGeometry(t *testing.T) {
 	// An app started on a half-open foldable: its first commit has the two regions the start's size came with, not one replaced by them in the next.
 	p := &recorder{mounted: make(chan struct{}, 1)}

@@ -361,13 +361,13 @@ func loadUIKit() {
 		objc.MethodDef{Cmd: sel("safeAreaInsetsDidChange"), Fn: func(self objc.ID, cmd objc.SEL) {
 			apple.Super(self, cmd)
 			if v := views[self]; v != nil {
-				v.surface.refresh()
+				v.surface.layoutChanged()
 			}
 		}},
 		objc.MethodDef{Cmd: sel("traitCollectionDidChange:"), Fn: func(self objc.ID, cmd objc.SEL, previous objc.ID) {
 			apple.Super(self, cmd, previous)
 			if v := views[self]; v != nil {
-				v.surface.refresh()
+				v.surface.layoutChanged()
 			}
 		}},
 	)
@@ -661,6 +661,15 @@ func appLifecycle() driver.Lifecycle {
 		return driver.LifecycleBackground
 	}
 	return driver.LifecycleActive
+}
+
+// layoutChanged follows a change of the surface view's safe area or traits. UIKit makes them as it rotates the view or moves it to another display, after it set the new bounds and before it lays the view out at them, so for a view in a window the environment goes with the size from the layout that follows (surfaceLayout): reported now, it would reach the app at the previous size.
+func (s *surface) layoutChanged() {
+	if s.engine != nil && s.uiWindow() != 0 {
+		s.native.Send(selSetNeedsLayout)
+		return
+	}
+	s.refresh()
 }
 
 // refresh reports the environment to the engine if it changed.
@@ -1796,9 +1805,16 @@ func surfaceLayout(self objc.ID, cmd objc.SEL) {
 	apple.Super(self, cmd)
 	if v := views[self]; v != nil && v.surface.engine != nil {
 		b := objc.Send[apple.CGRect](self, selBounds)
-		// The geometry is read at the size reported now, so it goes with it.
+		// The geometry is read at the size reported now, so it goes with it, as does the environment that changed with the size, such as the safe area.
+		s := v.surface
 		size := driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}
-		v.surface.engine.Resize(size, v.surface.geometry(size))
+		g := s.geometry(size)
+		if env := s.environment(); !env.Equal(s.env) {
+			s.env = env
+			s.engine.ResizeWithEnvironment(size, g, env)
+		} else {
+			s.engine.Resize(size, g)
+		}
 		if h := v.surface.hud; h != nil {
 			h.layout()
 		}
