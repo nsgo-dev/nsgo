@@ -149,6 +149,8 @@ type project struct {
 		SignInWithApple bool `yaml:"sign_in_with_apple"`
 		// Purchases puts StoreKit's library, which in-app purchases go through, into the macOS, iOS and tvOS packages (storekit.go).
 		Purchases bool `yaml:"purchases"`
+		// Privacy adds the app's required-reason APIs, tracking settings and collected data to PrivacyInfo.xcprivacy.
+		Privacy privacySettings `yaml:"privacy"`
 	} `yaml:"apple"`
 	// FileTypes are the kinds of documents the app opens, which its macOS
 	// package registers (filetypes.go).
@@ -265,6 +267,13 @@ type project struct {
 		dynamic      bool
 		device, team string
 	} `yaml:"build"`
+}
+
+type privacySettings struct {
+	AccessedAPIs    map[string][]string `yaml:"accessed_apis"`
+	CollectedData   []map[string]any    `yaml:"collected_data"`
+	Tracking        *bool               `yaml:"tracking"`
+	TrackingDomains []string            `yaml:"tracking_domains"`
 }
 
 // icons are an app's icon files.

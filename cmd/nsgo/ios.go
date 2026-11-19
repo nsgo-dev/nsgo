@@ -154,6 +154,9 @@ func buildIOSApp(ctx context.Context, p *project, sys *appleOS, dir string, simu
 	if err := writePlist(filepath.Join(app, "Info.plist"), p, sys.plist, extra); err != nil {
 		return "", err
 	}
+	if err := p.writePrivacyManifest(app); err != nil {
+		return "", err
+	}
 	if err := addIOSFrameworks(ctx, p, sys, app, env, simulator); err != nil {
 		return "", err
 	}

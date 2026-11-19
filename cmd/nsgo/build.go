@@ -772,6 +772,9 @@ func buildMacApp(ctx context.Context, p *project, dir, arch string) (string, err
 		icon+"\n"+names+"\n"+p.fileTypesPlist()+"\n"+p.urlSchemesPlist()+"\n"+p.widgetPlist(false)+"\n"+p.sparklePlist("macos_"+goArchName(arch))); err != nil {
 		return "", err
 	}
+	if err := p.writePrivacyManifest(resources); err != nil {
+		return "", err
+	}
 	if err := addMacWidgets(ctx, p, app, arch); err != nil {
 		return "", err
 	}

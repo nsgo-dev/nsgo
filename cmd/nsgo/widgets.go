@@ -628,6 +628,9 @@ func addIOSWidgets(ctx context.Context, p *project, app string, simulator bool) 
 	if err := os.WriteFile(filepath.Join(appex, "Info.plist"), info, 0o644); err != nil {
 		return err
 	}
+	if err := p.writePrivacyManifest(appex); err != nil {
+		return err
+	}
 	fw := filepath.Join(app, "Frameworks", widgetKit+".framework")
 	if err := copyLibrary(lib, filepath.Join(fw, widgetKit)); err != nil {
 		return err

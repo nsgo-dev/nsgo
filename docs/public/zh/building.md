@@ -61,6 +61,7 @@ build:
   targets: [macos_arm64, macos_x64, windows_arm64, windows_x64, linux_arm64, linux_x64, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android_arm64, web]
 # apple: { sign_in_with_apple: true }  # 「通过 Apple 登录」的授权，用于 iOS、tvOS 和 Mac App Store 构建
 # apple: { purchases: true }  # App 内购买所经由的 StoreKit 库，放进 macOS、iOS 和 tvOS 包
+# apple: { privacy: { accessed_apis: { NSPrivacyAccessedAPICategoryDiskSpace: [E174.1] }, tracking: false } }  # 向 PrivacyInfo.xcprivacy 添加应用使用的 API 和跟踪声明
 # apple: { requires_full_screen: false }  # 让 iPad 在分屏、侧拉和台前调度中运行 App，支持全部四种方向
 # apple: { orientations: [portrait, landscape_left] }  # 全屏 App 在 iPad 上支持的方向
 # apple: { info: { UIBackgroundModes: [audio] } }  # iOS 画中画的后台播放模式

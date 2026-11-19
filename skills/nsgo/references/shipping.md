@@ -66,6 +66,8 @@ For an adaptive Android launcher icon, set `icon.android.foreground` and `backgr
 
 Ask for a permission where the app uses it, through `cx`'s permission calls, and explain it in `apple.info`'s usage descriptions; on Android, `android.permissions` adds manifest permissions beyond the runtime's. An app calling `cx.SignInWithApple` sets `apple.sign_in_with_apple: true`, which signs it with the entitlement the sheet needs, one used beside other apps on an iPad sets `apple.requires_full_screen: false`, for Split View, Slide Over and Stage Manager, and lays out at whatever size `Env` reports; and one selling in-app purchases sets `apple.purchases: true`, which bundles StoreKit's library; it shows the store's `DisplayPrice`, never a price of its own, has its server verify a transaction's `Signed` JWS before delivering it, finishes it with `cx.FinishTransaction`, and registers `cx.OnPurchaseUpdate` as it starts. Check `cx.Env()` (`CanRecognizeSpeech`, `CanSpeak`, `CanPurchase`, `HasWebView` and the rest) before using a service a target may lack, rather than testing the target's name.
 
+Apple bundles include `PrivacyInfo.xcprivacy` with NSGo's required-reason API declarations. Add app-specific declarations under `apple.privacy` in `nsgo.yaml`.
+
 ## Embedding
 
 `go tool nsgo build -embed -target ios|android_arm64` packages an app as an XCFramework or an AAR for a host app of your own, `nsgo.NewView` shows one in a Go desktop program, and the web build's loader puts apps in a page. `examples/embed-*` show each host ([Embedding](https://nsgo.dev/docs/embedding.md)).
