@@ -491,6 +491,30 @@ func TestFramesMovedByWholePixelsAreNotSentAgain(t *testing.T) {
 	}
 }
 
+// TestFarEdgesRoundAgainWhenMovedByWholePixels is #809: a box 3,000,000 points tall, a DataTable's scroll extent, keeps its far edge on float32's quarter points, so moved by whole pixels from a half pixel at 3.5 pixels a point it rounds to another pixel count, and its frame must follow, as a full layout (CheckCommits) finds it.
+func TestFarEdgesRoundAgainWhenMovedByWholePixels(t *testing.T) {
+	const ratio = 3.5
+	var top *Signal[Points]
+	h := newHost(t, Size{Width: 200, Height: 800}, func(cx *Scope) Node {
+		top = NewSignal(cx, Points(157.5/ratio))
+		return View{Children: []Node{
+			View{StyleFunc: func() Style { return Style{Height: Pt(top.Get())} }},
+			View{Style: Style{AlignItems: AlignStart}, Children: []Node{
+				View{Style: Style{Width: Pt(100), Height: Pt(3_000_000)}, Children: []Node{View{Style: Style{Height: Pt(3_000_000)}, TestID: "far"}}},
+			}},
+		}}
+	})
+	h.tree.SetEnvironment(Environment{PixelRatio: ratio})
+	h.commit()
+	for px := 1; px < 20; px++ {
+		top.Set(Points((157.5 + float32(px)) / ratio))
+		h.commit() // panics where the commit kept a frame a full layout rounds otherwise
+	}
+	if f := h.find("far").frame; f.Size.Height < 2_999_999 {
+		t.Errorf("far = %v", f)
+	}
+}
+
 // TestATextShrinksInARowWithFlexShrink is the Sizes section of layout.md (#308): a text in a row shrinks below its one-line width and wraps only with FlexShrink, an unset minimum being 0 already, so MinWidth: Pt(0) alone leaves it overflowing the row. With an unset minimum it shrinks into less than its widest word and breaks its words; AutoMinimum stops it at its widest word, as CSS's automatic minimum does.
 func TestATextShrinksInARowWithFlexShrink(t *testing.T) {
 	for _, c := range []struct {

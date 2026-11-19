@@ -369,6 +369,14 @@ func sameSnap(a, b Point[float32], ratio float64) bool {
 	return a == b || frac(a.X, ratio) == frac(b.X, ratio) && frac(a.Y, ratio) == frac(b.Y, ratio)
 }
 
+// exactSums reports whether the edges under a box at x, y with layout u are float32 sums whose rounding error stays far below the 64th of a pixel pixel snaps to, so that moving the box by whole pixels moves them by the same pixels, as sameSnap assumes. Below 2^14 pixels from the root a float32 step is at most a 512th of a pixel; past that the steps grow until a box 3,000,000 points tall, a DataTable's scroll extent, has its far edge on quarter points, which a move of whole pixels can round to another pixel (#809).
+func exactSums(x, y float32, u *Layout, ratio float64) bool {
+	right := max(u.Size.Width, u.ScrollableOverflow.Right)
+	bottom := max(u.Size.Height, u.ScrollableOverflow.Bottom)
+	far := max(abs32(x)+abs32(right), abs32(y)+abs32(bottom))
+	return float64(far)*ratio < 1<<14
+}
+
 // frac is where in its device pixel v falls, in 64ths.
 func frac(v float32, ratio float64) float64 {
 	p := math.Round(float64(v) * ratio * 64)
@@ -417,7 +425,7 @@ func roundLayout(n Node, cumulativeX, cumulativeY float32, ratio float64) {
 	// they were snapped with: their rounding stands.
 	origin := Point[float32]{cumulativeX, cumulativeY}
 	if st.kidsRounded && st.kidsPerformed == st.performed && st.kidsRatio == ratio &&
-		sameSnap(st.kidsOrigin, origin, ratio) {
+		sameSnap(st.kidsOrigin, origin, ratio) && exactSums(x, y, &u, ratio) {
 		return
 	}
 	st.kidsRounded, st.kidsPerformed, st.kidsOrigin, st.kidsRatio = true, st.performed, origin, ratio
