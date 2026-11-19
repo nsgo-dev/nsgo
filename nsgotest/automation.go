@@ -653,7 +653,8 @@ func (g *agent) alert(p *automation.AlertParams) (any, *automation.Error) {
 	a := s.f.app
 	if a.target == nil {
 		// By its place, as a model's surfaces number their alerts alike, answered to the surface that showed it.
-		if err := g.tb.try(func() { a.answerAt(s.index, index) }); err != nil {
+		// As a step, so what the answer starts, as a sheet's exit, runs its frames.
+		if err := g.tb.try(func() { a.answerAt(s.index, index); a.done() }); err != nil {
 			return nil, err
 		}
 		return list(), nil

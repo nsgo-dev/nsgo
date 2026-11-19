@@ -120,6 +120,28 @@ func TestAnswerRunsOnTransitionEnd(t *testing.T) {
 	}
 }
 
+// An OnAlert answer that brings its alert back each time fails the step, naming it, rather than holding the test for good.
+func TestOnAlertThatNeverEndsFailsTheStep(t *testing.T) {
+	msg := fails(t, func(tb testing.TB) {
+		app := Start(tb, func(cx *core.Scope) core.Node {
+			var ask func()
+			ask = func() {
+				cx.ShowAlert(core.AlertConfig{Title: "Retry?", Actions: []core.AlertAction{{Label: "Retry"}, {Label: "Cancel", Role: core.AlertCancel}}}, func(i int) {
+					if i == 0 {
+						ask()
+					}
+				})
+			}
+			return core.View{Role: core.RoleButton, Label: "load", TestID: "load", Style: core.Style{Width: core.Pt(40), Height: core.Pt(40)}, OnPress: func(core.PressEvent) { ask() }}
+		})
+		app.OnAlert = func(driver.AlertConfig) int { return 0 }
+		app.Press("id:load")
+	})
+	if !strings.Contains(msg, "press(id:load)") || !strings.Contains(msg, `"Retry?"`) {
+		t.Fatalf("an answer that brings its alert back failed with %q, want the step and the alert named", msg)
+	}
+}
+
 // A view whose OnTransitionEnd restyles it again holds a step for settleLimit at most.
 func TestEndlessTransitionsHoldAStepForTheLimit(t *testing.T) {
 	app := Start(t, func(cx *core.Scope) core.Node {

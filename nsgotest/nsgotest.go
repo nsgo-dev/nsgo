@@ -769,17 +769,21 @@ func (a *App) step(format string, args ...any) {
 // done ends a step: it settles, then takes display frames while an animation that ends runs, a style transition waits for its OnTransitionEnd or lists bind the rows they pace, for at most settleLimit of the clock's time, and has OnAlert answer the alerts shown, taking the frames of what those answers start in turn. Frames the app asks for itself do not hold a step, since its own loops may never end: Advance runs them.
 func (a *App) done() {
 	a.t.Helper()
+	answered := 0
 	for {
 		if a.target != nil {
 			a.target.settle()
 		} else {
 			a.takeFrames()
 		}
-		if !a.answerAlerts() {
+		if !a.answerAlerts(&answered) {
 			return
 		}
 	}
 }
+
+// alertAnswers is how many alerts OnAlert answers in one step before the step fails: an answer that brings its alert back each time would never end the step.
+const alertAnswers = 100
 
 // takeFrames settles, then takes display frames while an animation that ends runs, a style transition waits for its OnTransitionEnd or lists bind the rows they pace, for at most settleLimit of the clock's time.
 func (a *App) takeFrames() {
@@ -793,15 +797,19 @@ func (a *App) takeFrames() {
 	}
 }
 
-// answerAlerts has OnAlert answer the alerts shown, and reports whether it answered any.
-func (a *App) answerAlerts() bool {
+// answerAlerts has OnAlert answer the alerts shown, counting them in answered, and reports whether it answered any; the step fails once the step's answers pass alertAnswers.
+func (a *App) answerAlerts(answered *int) bool {
 	a.t.Helper()
-	answered := false
+	took := false
 	for a.OnAlert != nil && len(a.alerts) > 0 {
+		if *answered == alertAnswers {
+			a.t.Fatalf("nsgotest: %s: OnAlert answered %d alerts and another shows (%q): an answer that brings its alert back each time never ends the step", a.stepName, alertAnswers, a.alerts[0].Title)
+		}
+		*answered++
 		a.answerAt(0, a.OnAlert(a.alerts[0]))
-		answered = true
+		took = true
 	}
-	return answered
+	return took
 }
 
 // defaultAnswer is how a user backing out answers alert: its cancel
