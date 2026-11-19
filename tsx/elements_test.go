@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"math"
 	"runtime"
 	"slices"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/dlclark/regexp2/v2"
 	"golang.org/x/image/font/gofont/gomedium"
 
 	"github.com/nsgo-dev/nsgo/core"
@@ -21,6 +23,7 @@ import (
 	"github.com/nsgo-dev/nsgo/tsx"
 	"github.com/nsgo-dev/nsgo/tsx/bundler"
 	"github.com/nsgo-dev/nsgo/tsx/compiler"
+	"github.com/nsgo-dev/nsgo/tsx/pkg"
 )
 
 func TestOverlayFloatsAboveAndReportsOutsidePresses(t *testing.T) {
@@ -641,6 +644,60 @@ mount(() => <Text testID="regex" onPress={() => /(a+)+\1$/.test("a".repeat(28) +
 	}
 	if failed == nil || !strings.Contains(failed.Error(), "time budget") {
 		t.Fatalf("backtracking handler ended with %v", failed)
+	}
+}
+
+// nestedPlugin is what host/nested's call calls, from a sandboxed bundle, and nestedResult what that call heard.
+var (
+	nestedPlugin *tsx.Plugin
+	nestedResult string
+)
+
+func init() {
+	tsx.RegisterFunctions("host/nested", map[string]any{"call": func() {
+		nestedPlugin.Call("f", nil, func(v any, err error) { nestedResult = fmt.Sprint(v, " ", err) })
+	}})
+}
+
+// A sandboxed call that runs a plugin's on the same goroutine, through a host function, neither waits on itself nor loses its own match timeout when the plugin's call returns, and the process-wide default comes back once both end.
+func TestSandboxRegExpTimeoutsNest(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("the page's engine runs its own regular expressions")
+	}
+	p := verified(t, `export function f() { return "b"; }`, pkg.Capabilities{})
+	code, err := bundler.Compile(fstest.MapFS{"App.tsx": {Data: []byte(`import { mount, Text } from "nsgo";
+import { call } from "host/nested";
+mount(() => <Text testID="a" onPress={() => { call(); new RegExp("(a+)+\\1$").test("a".repeat(28) + "!"); }}>a</Text>);`)}}, "App.tsx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := tsx.DefaultLimits
+	limits.Call = 100 * time.Millisecond
+	var loadErr, failed error
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		nestedPlugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{})
+		return core.Catch{Try: tsx.Sandboxed("App.tsx", code, tsx.Sandbox{Limits: &limits, Modules: []string{"host/nested.call"}}), Fallback: func(cx *core.Scope, err error, _ func()) core.Node {
+			failed = err
+			return core.Text{Content: "cut"}
+		}}
+	})
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	before := regexp2.DefaultMatchTimeout
+	started := time.Now()
+	app.Press("id:a")
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("the nested call took %v", elapsed)
+	}
+	if nestedResult != "b <nil>" {
+		t.Errorf("the plugin's call gave %q", nestedResult)
+	}
+	if failed == nil || !strings.Contains(failed.Error(), "time budget") {
+		t.Errorf("the handler ended with %v", failed)
+	}
+	if regexp2.DefaultMatchTimeout != before || before != time.Duration(math.MaxInt64) {
+		t.Errorf("regexp2's default is %v after the calls, %v before", regexp2.DefaultMatchTimeout, before)
 	}
 }
 

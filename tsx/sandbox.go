@@ -57,9 +57,34 @@ var DefaultLimits = Limits{Load: 10 * time.Second, Call: 2 * time.Second, Stack:
 // ErrBudget is what a call cut at its time budget fails with.
 var ErrBudget = errors.New("tsx: the script ran past its time budget")
 
-// regexpTimeoutMu protects regexp2's process-wide default while a sandbox
-// compiles or runs a regular expression.
-var regexpTimeoutMu sync.Mutex
+// regexpTimeouts are the match timeouts of the sandboxed calls running, whose shortest is regexp2's process-wide default while any runs, as a regular expression takes it when it compiles, and the default before them once none runs. The lock is held only while the default changes, never across a call: a sandboxed call can run another sandbox's on the same goroutine, as a host function calling a plugin does.
+var regexpTimeouts struct {
+	sync.Mutex
+	running []time.Duration
+	before  time.Duration
+}
+
+// limitRegexps makes d a match timeout of the regular expressions compiled until the returned func runs.
+func limitRegexps(d time.Duration) (restore func()) {
+	regexpTimeouts.Lock()
+	defer regexpTimeouts.Unlock()
+	if len(regexpTimeouts.running) == 0 {
+		regexpTimeouts.before = regexp2.DefaultMatchTimeout
+	}
+	regexpTimeouts.running = append(regexpTimeouts.running, d)
+	regexp2.DefaultMatchTimeout = slices.Min(regexpTimeouts.running)
+	return func() {
+		regexpTimeouts.Lock()
+		defer regexpTimeouts.Unlock()
+		i := slices.Index(regexpTimeouts.running, d)
+		regexpTimeouts.running = slices.Delete(regexpTimeouts.running, i, i+1)
+		if len(regexpTimeouts.running) == 0 {
+			regexp2.DefaultMatchTimeout = regexpTimeouts.before
+		} else {
+			regexp2.DefaultMatchTimeout = slices.Min(regexpTimeouts.running)
+		}
+	}
+}
 
 // ParseLimits reads limits as nsgo dev -limits writes them: DefaultLimits
 // with the fields spec names set, as "nodes=1000,call=500ms". Its keys
@@ -200,7 +225,7 @@ func (r *runtime) failure(err error) error {
 		return stopped
 	}
 	var exception *js.Exception
-	if errors.As(err, &exception) && strings.Contains(exception.Value().String(), "match timeout after") {
+	if errors.As(err, &exception) && strings.HasPrefix(exception.Value().String(), "RangeError: match timeout after") {
 		return ErrBudget
 	}
 	return err
@@ -330,18 +355,8 @@ func (r *runtime) within(budget time.Duration, fn func()) {
 	outer := r.depth == 0
 	r.depth++
 	defer func() { r.depth-- }()
-	var unlockRegexp func()
 	if r.sandbox != nil && r.regexTimeout > 0 && outer && !js.Browser {
-		regexpTimeoutMu.Lock()
-		previous := regexp2.DefaultMatchTimeout
-		regexp2.DefaultMatchTimeout = r.regexTimeout
-		unlockRegexp = func() {
-			regexp2.DefaultMatchTimeout = previous
-			regexpTimeoutMu.Unlock()
-		}
-	}
-	if unlockRegexp != nil {
-		defer unlockRegexp()
+		defer limitRegexps(r.regexTimeout)()
 	}
 	if budget <= 0 || !outer {
 		fn()
