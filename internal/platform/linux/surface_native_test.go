@@ -11,7 +11,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// TestOpenedWindowCloseIsTheApps asks to close an opened window from its title bar: the window stays while OnClosing cancels, and goes with its handle once the app lets it close.
+// TestOpenedWindowCloseIsTheApps asks to close an opened window from its menu and title bar: the window stays while OnClosing cancels, and goes with its handle once the app lets it close.
 func TestOpenedWindowCloseIsTheApps(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
@@ -21,6 +21,7 @@ func TestOpenedWindowCloseIsTheApps(t *testing.T) {
 	app := core.AppRoot(func(cx *core.Scope) {
 		cx.SetShutdownMode(core.ShutdownOnExplicit)
 		win := cx.OpenWindow(core.WindowOptions{Title: "nsgo-opened", Width: 160, Height: 120}, func(cx *core.Scope) core.Node {
+			cx.SetApplicationMenu([]core.MenuItem{{Label: "File", Items: []core.MenuItem{{Role: core.MenuClose}}}})
 			return core.View{Style: core.Style{Width: driver.Pt(160), Height: driver.Pt(120)}}
 		})
 		win.OnClosing(cx, func(c *core.WindowClosing) {
@@ -65,8 +66,19 @@ func TestOpenedWindowCloseIsTheApps(t *testing.T) {
 			t.Error("the app's surface is in the background while its window shows")
 		}
 	})
-	w.onLoop(t, func() { gtkWindowClose(opened.win) })
+	w.onLoop(t, func() { opened.menuChosen(menuRef{role: driver.MenuClose}) })
 	for deadline := time.Now().Add(10 * time.Second); asked.Load() == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("menu Close did not run OnClosing")
+		}
+	}
+	w.onLoop(t, func() {
+		if opened.win == 0 || gtkWidgetGetVisible(opened.win) == 0 || windowOf(opened.handle) == nil {
+			t.Error("a canceled menu Close took the window away")
+		}
+	})
+	w.onLoop(t, func() { gtkWindowClose(opened.win) })
+	for deadline := time.Now().Add(10 * time.Second); asked.Load() < 2; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("OnClosing did not run")
 		}
@@ -81,7 +93,7 @@ func TestOpenedWindowCloseIsTheApps(t *testing.T) {
 	allow.Store(true)
 	w.onLoop(t, func() { gtkWindowClose(opened.win) })
 	wait("the window stayed after its close", func() bool { return opened.win == 0 && windowOf(opened.handle) == nil })
-	if asked.Load() != 2 {
+	if asked.Load() != 3 {
 		t.Errorf("OnClosing ran %d times", asked.Load())
 	}
 }

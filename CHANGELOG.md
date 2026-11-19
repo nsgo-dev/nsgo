@@ -6,6 +6,7 @@
 - Add `nsgotest.App.SetWindowEnvironment`, which changes one window's environment apart from the app's other windows, so a test can put the main window in the background while another window shows, and have the Minimize, Zoom and Toggle Full Screen roles change only the main window, as the desktops do (#783 by @houko).
 - Take the frames of what an alert's answer starts in `nsgotest`'s `Answer` and `App.OnAlert`, as every other step does, so a sheet closed from an alert's callback is gone once `Answer` returns instead of staying until the test advances the clock (#782 by @houko).
 - Report a malformed SVG string in a TSX `icon` prop once, naming the parse error, instead of silently drawing nothing (#594 by @dhruv1220).
+- Route Linux application-menu Close and Quit roles through the owning window and app teardown (#768 by @houko).
 
 ## [0.2.0] - 2026-11-19
 

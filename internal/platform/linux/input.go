@@ -1044,8 +1044,31 @@ func (w *window) menuChosen(ref menuRef) bool {
 		return true
 	}
 	switch ref.role {
-	case driver.MenuQuit, driver.MenuClose:
-		w.close()
+	case driver.MenuClose:
+		if w.primary || w.embedded {
+			w.close()
+		} else if w.engine != nil && !w.closing {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventWindowClose})
+		}
+	case driver.MenuQuit:
+		if w.primary || w.embedded {
+			w.close()
+			break
+		}
+		var root *window
+		windowHandles.Range(func(_, value any) bool {
+			candidate := value.(*window)
+			if candidate.primary && !candidate.embedded {
+				root = candidate
+				return false
+			}
+			return true
+		})
+		if root != nil {
+			root.close()
+		} else {
+			w.close()
+		}
 	case driver.MenuMinimize:
 		w.minimize()
 	case driver.MenuZoom:
