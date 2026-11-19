@@ -6,7 +6,12 @@
 // other names, and the browser's implements the part tsx uses.
 package js
 
-import "github.com/dop251/goja"
+import (
+	"reflect"
+	"unsafe"
+
+	"github.com/dop251/goja"
+)
 
 type (
 	Value              = goja.Value
@@ -23,6 +28,7 @@ type (
 	Program            = goja.Program
 	InterruptedError   = goja.InterruptedError
 	StackOverflowError = goja.StackOverflowError
+	String             = goja.String
 )
 
 const (
@@ -58,4 +64,19 @@ func Caller(r *Runtime) (file string, line int, ok bool) {
 		}
 	}
 	return "", 0, false
+}
+
+// StringData is the memory goja keeps s, a string it made, in: its first byte and its size in bytes. goja keeps an ASCII string as a Go string, a byte a unit, and others as UTF-16 with a leading BOM; a concatenation it has not read yet, which keeps its parts, and a value that is no string have none (nil).
+func StringData(s Value) (*byte, int) {
+	switch v := reflect.ValueOf(s); v.Kind() {
+	case reflect.String:
+		if str := v.String(); str != "" {
+			return unsafe.StringData(str), len(str)
+		}
+	case reflect.Slice:
+		if v.Len() > 0 {
+			return (*byte)(v.UnsafePointer()), v.Len() * 2
+		}
+	}
+	return nil, 0
 }

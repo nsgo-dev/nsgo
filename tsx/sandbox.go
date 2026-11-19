@@ -46,6 +46,8 @@ type Limits struct {
 	// Storage is the most bytes its partition of the app's storage may
 	// hold (Sandbox.Storage).
 	Storage int
+	// Memory is the most bytes the built-ins that allocate by a size may hold for the bundle at once on goja, as ArrayBuffer, the typed arrays, String.prototype.repeat, Array.prototype.join and fill, and JSON.stringify do (memory_goja.go): each checks before it allocates, what it made is charged until it is collected, and past it the bundle stops. What JS makes as it runs, its objects, closures and concatenated strings, is not counted, nor anything on the web, whose page's engine keeps its own heap. Zero, the default, leaves it unlimited.
+	Memory int
 }
 
 // DefaultLimits are NSH's: 10 seconds to load, 2 per call, 1000 frames,
@@ -86,10 +88,7 @@ func limitRegexps(d time.Duration) (restore func()) {
 	}
 }
 
-// ParseLimits reads limits as nsgo dev -limits writes them: DefaultLimits
-// with the fields spec names set, as "nodes=1000,call=500ms". Its keys
-// are load, call, stack, nodes, timers, requests, body and storage;
-// "default" or "" is DefaultLimits.
+// ParseLimits reads limits as nsgo dev -limits writes them: DefaultLimits with the fields spec names set, as "nodes=1000,call=500ms". Its keys are load, call, stack, nodes, timers, requests, body, storage and memory; "default" or "" is DefaultLimits.
 func ParseLimits(spec string) (Limits, error) {
 	l := DefaultLimits
 	if spec == "" || spec == "default" {
@@ -111,15 +110,15 @@ func ParseLimits(spec string) (Limits, error) {
 					l.Call = d
 				}
 			}
-		case "stack", "nodes", "timers", "requests", "body", "storage":
+		case "stack", "nodes", "timers", "requests", "body", "storage", "memory":
 			var n int
 			if n, err = strconv.Atoi(v); err == nil && n < 0 {
 				err = errors.New("is negative")
 			}
 			*map[string]*int{"stack": &l.Stack, "nodes": &l.Nodes, "timers": &l.Timers, "requests": &l.Requests,
-				"body": &l.Body, "storage": &l.Storage}[k] = n
+				"body": &l.Body, "storage": &l.Storage, "memory": &l.Memory}[k] = n
 		default:
-			return l, fmt.Errorf("tsx: no limit %q: load, call, stack, nodes, timers, requests, body or storage", k)
+			return l, fmt.Errorf("tsx: no limit %q: load, call, stack, nodes, timers, requests, body, storage or memory", k)
 		}
 		if err != nil {
 			return l, fmt.Errorf("tsx: limit %s: %v", k, err)
@@ -207,6 +206,9 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 	if limits.Stack > 0 {
 		r.vm.SetMaxCallStackSize(limits.Stack)
 	}
+	if limits.Memory > 0 {
+		r.limitMemory(int64(limits.Memory))
+	}
 	if limits.Harden {
 		r.harden()
 	}
@@ -250,6 +252,8 @@ type sandboxed struct {
 	nodes, timers, requests int
 	// stopped is why it stopped: no JS runs after.
 	stopped error
+	// memory is what the built-ins hold for it under Limits.Memory, nil without one.
+	memory *memory
 }
 
 // importsModule reports whether the bundle may import module: one of

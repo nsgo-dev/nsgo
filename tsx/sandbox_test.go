@@ -34,6 +34,16 @@ import (
 	_ "github.com/nsgo-dev/nsgo/tsx/ui/richeditor"
 )
 
+func TestParseLimitsMemory(t *testing.T) {
+	limits, err := tsx.ParseLimits("memory=123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if limits.Memory != 123456 {
+		t.Fatalf("memory limit = %d, want 123456", limits.Memory)
+	}
+}
+
 // verified compiles source and signs it with caps as com.example.plugin,
 // returning it verified.
 func verified(t *testing.T, source string, caps pkg.Capabilities) *pkg.Package {

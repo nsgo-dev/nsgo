@@ -171,8 +171,8 @@ func (l *limitsFlag) Set(v string) error {
 	}
 	for _, kv := range strings.Split(v, ",") {
 		if k, _, _ := strings.Cut(kv, "="); v != "" && v != "default" &&
-			!slices.Contains([]string{"load", "call", "stack", "nodes", "timers", "requests", "body", "storage"}, k) {
-			return fmt.Errorf("no limit %q: load, call, stack, nodes, timers, requests, body or storage", k)
+			!slices.Contains([]string{"load", "call", "stack", "nodes", "timers", "requests", "body", "storage", "memory"}, k) {
+			return fmt.Errorf("no limit %q: load, call, stack, nodes, timers, requests, body, storage or memory", k)
 		}
 	}
 	*l = limitsFlag(v)
