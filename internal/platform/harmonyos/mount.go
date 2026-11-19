@@ -699,10 +699,7 @@ func (m *mounter) edited(id driver.NodeID, text string) {
 	}
 }
 
-// pressTarget returns the view a press at p goes to: the deepest view
-// that asks for a press and holds p, the latest inserted among equally
-// deep ones. A page gets the view from ArkUI's hit test; a test has only
-// the point, so it asks the frames the engine sent.
+// pressTarget returns the view a press at p goes to: the deepest view that asks for a press and holds p within every scroll view around it, the latest inserted among equally deep ones. A page gets the view from ArkUI's hit test; a test has only the point, so it asks the frames the engine sent. ArkUI's Scroll clips its content, so a row scrolled out of its viewport, such as one under a tab bar below the scroll view, takes no press there.
 func (m *mounter) pressTarget(p driver.Point) driver.NodeID {
 	var best *view
 	bestDepth := -1
@@ -711,7 +708,7 @@ func (m *mounter) pressTarget(p driver.Point) driver.NodeID {
 			continue
 		}
 		b, depth := m.surfaceBounds(v)
-		if p.X < b.Origin.X || p.Y < b.Origin.Y || p.X >= b.Origin.X+b.Size.Width || p.Y >= b.Origin.Y+b.Size.Height {
+		if !holds(b, p) || !m.inScrollViewports(v, p) {
 			continue
 		}
 		if best == nil || depth > bestDepth || (depth == bestDepth && v.order > best.order) {
@@ -722,6 +719,26 @@ func (m *mounter) pressTarget(p driver.Point) driver.NodeID {
 		return 0
 	}
 	return best.id
+}
+
+// holds reports whether b holds p.
+func holds(b driver.Bounds, p driver.Point) bool {
+	return p.X >= b.Origin.X && p.Y >= b.Origin.Y && p.X < b.Origin.X+b.Size.Width && p.Y < b.Origin.Y+b.Size.Height
+}
+
+// inScrollViewports reports whether p is inside the viewport of every scroll view around v.
+func (m *mounter) inScrollViewports(v *view, p driver.Point) bool {
+	seen := map[driver.NodeID]bool{v.id: true}
+	for a := m.views[v.parent]; a != nil && !seen[a.id]; a = m.views[a.parent] {
+		seen[a.id] = true
+		if a.kind != driver.KindScroll {
+			continue
+		}
+		if b, _ := m.surfaceBounds(a); !holds(b, p) {
+			return false
+		}
+	}
+	return true
 }
 
 // surfaceBounds returns v's frame on the page and how deep it is: its
