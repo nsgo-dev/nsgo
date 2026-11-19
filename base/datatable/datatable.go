@@ -171,8 +171,7 @@ type Cell struct {
 	Row, Column int
 	Key, Text   string
 	Selected    bool
-	// Tooltip is shown while the pointer rests over this cell. It is also
-	// exposed to assistive technology as the cell's description.
+	// Tooltip is what CellTooltip says of the cell, empty without one.
 	Tooltip string
 }
 
@@ -220,6 +219,8 @@ type Styles struct {
 	// above them; FixedEdge the line at the fixed columns' trailing edge;
 	// Empty the box of the Empty node.
 	RowHeader, RowHeaderCorner, FixedEdge, Empty core.Style
+	// CellTooltip is the box of a cell's tooltip (DataTable.CellTooltip), around its text.
+	CellTooltip core.Style
 }
 
 // Classes are the Tailwind classes of a DataTable's parts, named
@@ -235,6 +236,7 @@ type Classes struct {
 	Row, RowOdd, RowHover, RowSelected, RowActive            string
 	Cell, CellSelected, CellActive, CellColumnSelected       string
 	RowHeader, RowHeaderCorner, FixedEdge, Empty             string
+	CellTooltip                                              string
 }
 
 // DataTable shows rows and columns as a spreadsheet does and scrolls both ways over any number of either, as gpui-component's: only the cells in view and a reach around them exist as views, made once and given other rows and columns as it scrolls. Rows, columns or cells select with the pointer and the keyboard; columns resize with a drag of their edge (a double press fits them), move with a drag of their title, stay at the left when Fixed and ask for a sort. MultiSelect makes rows toggle and extend with the usual modifiers. It has no look of its own: Styles gives every part its padding, colors and borders.
@@ -309,11 +311,12 @@ type DataTable struct {
 	Bar core.ScrollbarMaker
 	// RenderCell and RenderHeaderCell draw the cells and the titles in
 	// place of their texts, once per slot, the cell it shows changing as
-	// the table scrolls.
+	// the table scrolls. What they draw takes no pointer, the table hit
+	// testing for it, so a ui.Tooltip in a cell never shows: CellTooltip
+	// gives a cell its tooltip.
 	RenderCell       func(cx *core.Scope, cell func() Cell) core.Node
 	RenderHeaderCell func(cx *core.Scope, cell func() HeaderCell) core.Node
-	// CellTooltip describes a cell while the pointer rests over it, and to
-	// assistive technology. It is called for cells rendered by RenderCell.
+	// CellTooltip is a body cell's tooltip, by row and column index as Text: on desktops it shows above the cell once the pointer has rested on the cell for half a second, until the pointer leaves the cell or presses, and it is the cell's accessibility description. Styles.CellTooltip gives it its look; an empty text shows none. RenderCell's cells read it as Cell.Tooltip.
 	CellTooltip func(row, column int) string
 	// Empty shows when there are no rows; LoadingView while Loading.
 	Empty, LoadingView core.Node
@@ -555,10 +558,13 @@ type dataTable struct {
 	scrollX, scrollY   *core.Signal[core.Points]
 	viewport           *core.Signal[core.Size]
 	hover              *core.Signal[int]
-	hoverCol           *core.Signal[int]
 	focused            *core.Signal[bool]
 	focusRef           *core.Ref
 	drag               *core.Signal[tableDrag]
+	// tip is the cell whose tooltip shows, tipAt the cell under the pointer it waits on and tipStop that wait.
+	tip     *core.Signal[tableHit]
+	tipAt   tableHit
+	tipStop func() bool
 	// sizes is the geometry without the offsets, so what reads only sizes
 	// does not run again at each scroll.
 	sizes            *core.Memo[tableGeo]
@@ -588,7 +594,7 @@ func newDataTable(cx *core.Scope, p DataTable) *dataTable {
 	t := &dataTable{p: p, cx: cx, st: &tableState{columns: newTableColumns(nil), loadMoreAt: -1, anchorRow: -1},
 		layoutRev: core.NewSignal(cx, 0), dataRev: core.NewSignal(cx, 0),
 		scrollX: core.NewSignal(cx, core.Points(0)), scrollY: core.NewSignal(cx, core.Points(0)),
-		viewport: core.NewSignal(cx, core.Size{}), hover: core.NewSignal(cx, -1), hoverCol: core.NewSignal(cx, -1), focused: core.NewSignal(cx, false), focusRef: &core.Ref{},
+		viewport: core.NewSignal(cx, core.Size{}), hover: core.NewSignal(cx, -1), tip: core.NewSignal(cx, noHit), tipAt: noHit, focused: core.NewSignal(cx, false), focusRef: &core.Ref{},
 		drag: core.NewSignal(cx, tableDrag{from: -1}), vscroll: &core.Ref{}, hscroll: &core.Ref{},
 		stripRef: &core.Ref{},
 		colsWin:  window.New(1, 3), resizing: -1, handleTap: -1}
@@ -1250,6 +1256,7 @@ func (t *dataTable) selectsOn(mods core.Modifiers) bool {
 // row when rows select, of a press of its number or of a row whose cells
 // do not select.
 func (t *dataTable) press(h tableHit, clicks int, mods core.Modifiers) {
+	t.hideTip()
 	t.focusRef.Focus()
 	t.focused.Set(true)
 	t.st.active = false
@@ -1324,9 +1331,42 @@ func (t *dataTable) hoverAt(p core.Point) {
 	if t.hover.GetUntracked() != h.row {
 		t.hover.Set(h.row)
 	}
-	if t.hoverCol.GetUntracked() != h.col {
-		t.hoverCol.Set(h.col)
+	cell := noHit
+	if h.row >= 0 && h.col >= 0 && !h.lead {
+		cell = tableHit{row: h.row, col: h.col}
 	}
+	if cell == t.tipAt {
+		return
+	}
+	t.hideTip()
+	t.tipAt = cell
+	if cell != noHit && t.p.CellTooltip != nil && t.cx.Env().Desktop() {
+		t.tipStop = t.cx.AfterFunc(cellTooltipDelay, func() { t.tipStop = nil; t.tip.Set(cell) })
+	}
+}
+
+// noHit is no cell.
+var noHit = tableHit{row: -1, col: -1}
+
+// cellTooltipDelay is how long the pointer rests on a cell before its tooltip shows, as a View's Tooltip waits.
+const cellTooltipDelay = 500 * time.Millisecond
+
+// hideTip hides the cell tooltip that shows or waits to; it shows again only once the pointer moves to another cell.
+func (t *dataTable) hideTip() {
+	if t.tipStop != nil {
+		t.tipStop()
+		t.tipStop = nil
+	}
+	if t.tip.GetUntracked() != noHit {
+		t.tip.Set(noHit)
+	}
+}
+
+// leave is the pointer leaving the table.
+func (t *dataTable) leave() {
+	t.hover.Set(-1)
+	t.hideTip()
+	t.tipAt = noHit
 }
 
 // headerPress selects the column def when columns select (sorting is the

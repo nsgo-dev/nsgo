@@ -12,23 +12,26 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// cellTooltip anchors a cell's text to the cell view while the table's hit
-// layer reports that cell under the pointer.
+// cellTooltip is a cell's tooltip, shown above it while open says: the cell takes no pointer, so the table's hit layer, not the view's hover, opens it.
 type cellTooltip struct {
+	t    *dataTable
 	open func() bool
 	text func() string
 }
 
-func (t cellTooltip) Render(*core.Scope) core.Node { return t }
+// Render implements core.Node; a View mounts a cellTooltip through Hint only.
+func (cellTooltip) Render(*core.Scope) core.Node { return nil }
 
-func (t cellTooltip) Hint(_ *core.Scope, anchor *core.Ref) (core.Node, func(core.HintChange)) {
-	return core.Overlay{Anchor: anchor, Placement: core.PlaceTop, Offset: 4, Margin: 4,
-		PointerEvents: core.PointerEventsNone, StyleFunc: func() core.Style {
-			if !t.open() {
+// Hint implements core.HintTooltip.
+func (c cellTooltip) Hint(_ *core.Scope, anchor *core.Ref) (core.Node, func(core.HintChange)) {
+	return core.Overlay{Anchor: anchor, Placement: core.PlaceTop, Offset: 4, Margin: 4, PointerEvents: core.PointerEventsNone,
+		Class: c.t.p.Classes.CellTooltip,
+		StyleFunc: func() core.Style {
+			if !c.open() {
 				return core.Style{Display: core.DisplayNone}
 			}
-			return core.Style{}
-		}, Children: []core.Node{core.Text{ContentFunc: t.text}}}, func(core.HintChange) {}
+			return c.t.styles().CellTooltip
+		}, Children: []core.Node{core.Text{ContentFunc: c.text}}}, func(core.HintChange) {}
 }
 
 // The table's view, in layers:
@@ -133,7 +136,7 @@ func (t *dataTable) hitLayer() core.Node {
 				t.hoverAt(e.Position)
 			}
 		},
-		OnMouseLeave:  func(core.MouseEvent) { t.hover.Set(-1) },
+		OnMouseLeave:  func(core.MouseEvent) { t.leave() },
 		OnContextMenu: func(e core.ContextMenuEvent) { t.contextMenu(t.hitAt(e.Position), e.PagePosition) },
 		TestID:        "data-table-hit",
 	}
@@ -849,27 +852,37 @@ func (t *dataTable) cell(cx *core.Scope, row, def *core.Memo[int], which tableRe
 		}
 		return core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: px(0), MinWidth: px(0), TextAlign: align}
 	}}
+	tooltip := func() string { return "" }
+	if t.p.CellTooltip != nil {
+		tooltip = core.NewMemo(cx, func() string {
+			r, d := row.Get(), def.Get()
+			t.dataRev.Get()
+			if r < 0 || d < 0 {
+				return ""
+			}
+			return t.p.CellTooltip(r, d)
+		}).Get
+	}
 	if t.p.RenderCell != nil {
-		cellValue := func() Cell {
+		content = core.View{Style: core.Style{FlexGrow: 1, MinWidth: px(0)}, Children: []core.Node{t.p.RenderCell(cx, func() Cell {
 			r, d := row.Get(), def.Get()
 			t.dataRev.Get()
 			sel := t.st.sel
-			tooltip := ""
-			if t.p.CellTooltip != nil && r >= 0 && d >= 0 {
-				tooltip = t.p.CellTooltip(r, d)
-			}
-			return Cell{Row: r, Column: d, Key: t.column(d).Key, Text: text(),
-				Selected: t.rowSelected(r) || sel == tableSel{kind: selCell, row: r, col: d}, Tooltip: tooltip}
-		}
-		content = core.View{Style: core.Style{FlexGrow: 1, MinWidth: px(0)},
-			AccessibilityDescriptionFunc: func() string { return cellValue().Tooltip },
-			Tooltip: cellTooltip{open: func() bool {
-				c := cellValue()
-				return t.hover.Get() == c.Row && t.hoverCol.Get() == c.Column && c.Tooltip != ""
-			}, text: func() string { return cellValue().Tooltip }},
-			Children: []core.Node{t.p.RenderCell(cx, cellValue)}}
+			return Cell{Row: r, Column: d, Key: t.column(d).Key, Text: text(), Tooltip: tooltip(),
+				Selected: t.rowSelected(r) || sel == tableSel{kind: selCell, row: r, col: d}}
+		})}}
+	}
+	var tip core.Node
+	var describe func() string
+	if t.p.CellTooltip != nil {
+		describe = tooltip
+		tip = cellTooltip{t: t, text: tooltip, open: func() bool {
+			return t.tip.Get() == tableHit{row: row.Get(), col: def.Get()} && tooltip() != ""
+		}}
 	}
 	return core.View{
+		Tooltip:                      tip,
+		AccessibilityDescriptionFunc: describe,
 		OnContextMenu: func(e core.ContextMenuEvent) {
 			if r, d := row.GetUntracked(), def.GetUntracked(); r >= 0 && d >= 0 {
 				t.contextMenu(tableHit{row: r, col: d}, e.PagePosition)

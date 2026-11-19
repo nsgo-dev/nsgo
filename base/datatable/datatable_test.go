@@ -90,27 +90,76 @@ func TestDataTableMakesOnlyTheCellsInView(t *testing.T) {
 }
 
 func TestDataTableCellTooltip(t *testing.T) {
-	var selected datatable.Selection
-	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
-		return datatable.DataTable{
-			Columns:           func() []datatable.Column { return []datatable.Column{{Key: "name", Width: 200}} },
-			RowCount:          func() int { return 1 },
-			Text:              func(int, int) string { return "Shared" },
-			CellTooltip:       func(int, int) string { return "Shared with 3 people" },
-			OnSelectionChange: func(s datatable.Selection) { selected = s },
-			RenderCell: func(_ *core.Scope, cell func() datatable.Cell) core.Node {
-				return core.Text{ContentFunc: func() string { return cell().Text }, TestID: "shared"}
-			},
-			Style: core.Style{Width: core.Pt(300), Height: core.Pt(200)},
+	desktop := nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop})
+	texts := []string{"Shared", "Private"}
+	tips := []string{"Shared with 3 people", ""}
+	table := func(render bool, selected *datatable.Selection) func(cx *core.Scope) core.Node {
+		return func(cx *core.Scope) core.Node {
+			p := datatable.DataTable{
+				Columns:           func() []datatable.Column { return []datatable.Column{{Key: "name", Width: 200}} },
+				RowCount:          func() int { return len(texts) },
+				Text:              func(row, _ int) string { return texts[row] },
+				CellTooltip:       func(row, _ int) string { return tips[row] },
+				OnSelectionChange: func(s datatable.Selection) { *selected = s },
+				Styles:            datatable.Styles{CellTooltip: core.Style{Padding: core.All(4)}},
+				Style:             core.Style{Width: core.Pt(300), Height: core.Pt(200)},
+			}
+			if render {
+				// What RenderCell draws takes no pointer: the table shows the tooltip it is given.
+				p.RenderCell = func(_ *core.Scope, cell func() datatable.Cell) core.Node {
+					return core.Text{ContentFunc: func() string { return cell().Text + "|" + cell().Tooltip }}
+				}
+			}
+			return p
 		}
-	}, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}), nsgotest.Size(400, 300))
-	// The tooltip is supplied by the table's cell-aware callback.
-	app.Hover("id:shared")
-	app.Advance(600 * time.Millisecond)
-	app.Find("Shared with 3 people")
-	app.Press("id:shared")
-	if selected.Row != 0 {
-		t.Fatalf("selected = %+v, want row 0", selected)
+	}
+	for _, render := range []bool{false, true} {
+		var selected datatable.Selection
+		app := nsgotest.Start(t, table(render, &selected), desktop, nsgotest.Size(400, 300))
+		shared, private := "Shared", "Private"
+		if render {
+			shared, private = "Shared|Shared with 3 people", "Private|"
+		}
+		// The tooltip waits for the pointer to rest, as a View's does.
+		app.Hover(shared)
+		app.Advance(300 * time.Millisecond)
+		if app.Exists("Shared with 3 people") {
+			t.Fatalf("render=%v: the tooltip showed before the pointer rested", render)
+		}
+		app.Advance(300 * time.Millisecond)
+		app.Find("Shared with 3 people")
+		// It is the cell's description, and the other cell has none.
+		var described []string
+		for _, c := range app.QueryMounted("role:cell") {
+			if c.Props.Description != "" {
+				described = append(described, c.Props.Description)
+			}
+		}
+		if !slices.Equal(described, []string{"Shared with 3 people"}) {
+			t.Fatalf("render=%v: cell descriptions = %q", render, described)
+		}
+		// A press hides it and still selects the cell's row.
+		app.Press(shared)
+		if app.Exists("Shared with 3 people") {
+			t.Fatalf("render=%v: the tooltip stayed after a press", render)
+		}
+		if selected.Row != 0 {
+			t.Fatalf("render=%v: selected = %+v, want row 0", render, selected)
+		}
+		// A cell without a tooltip shows none, and leaving the table hides it.
+		app.Hover(private)
+		app.Advance(time.Second)
+		if app.Exists("Shared with 3 people") {
+			t.Fatalf("render=%v: another cell showed the tooltip", render)
+		}
+		app.Hover(shared)
+		app.Advance(time.Second)
+		app.Find("Shared with 3 people")
+		app.HoverOut()
+		app.Advance(time.Second)
+		if app.Exists("Shared with 3 people") {
+			t.Fatalf("render=%v: the tooltip stayed after the pointer left", render)
+		}
 	}
 }
 
