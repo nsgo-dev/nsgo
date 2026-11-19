@@ -350,6 +350,9 @@ func TestSuppliedHours(t *testing.T) {
 	if err := p.prepareCatalogs(ctx, "./...", true); err != nil {
 		t.Errorf("check after a CRLF checkout: %v", err)
 	}
+	if source, app, ok := generatedCatalog(filepath.Join(dir, "locales")); !ok || !app || source != "en" {
+		t.Errorf("a CRLF checkout of the app's catalogs reads as source %q, app %v, ok %v", source, app, ok)
+	}
 	for _, want := range []string{
 		"i18n.SetApp(Catalog)", `baselocales.Supply("de"`, "func Type(cx *core.Scope, type_ string, string_ string) string",
 		// Messages with dates take the hour cycle; others keep their parameters alone, and one that writes no date makes no Messages.

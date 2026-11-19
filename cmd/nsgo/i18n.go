@@ -513,11 +513,13 @@ func catalogPackage(dir string) string {
 // their source language and whether they are the app's. ok is false when
 // dir has none the tool wrote.
 func generatedCatalog(dir string) (source string, app, ok bool) {
-	data, err := os.ReadFile(filepath.Join(dir, genFile))
-	if err != nil || !strings.HasPrefix(string(data), genHeader) {
+	raw, err := os.ReadFile(filepath.Join(dir, genFile))
+	// A checkout with CRLF line endings says the same as one with LF.
+	data := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	if err != nil || !strings.HasPrefix(data, genHeader) {
 		return "", false, false
 	}
-	_, rest, found := strings.Cut(string(data), "\nconst Source = ")
+	_, rest, found := strings.Cut(data, "\nconst Source = ")
 	if !found {
 		return "", false, false
 	}
@@ -526,5 +528,5 @@ func generatedCatalog(dir string) (source string, app, ok bool) {
 	if err != nil {
 		return "", false, false
 	}
-	return source, strings.Contains(string(data), "\n\ti18n.SetApp(Catalog)\n"), true
+	return source, strings.Contains(data, "\n\ti18n.SetApp(Catalog)\n"), true
 }
