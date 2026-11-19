@@ -124,8 +124,22 @@ func TestVerifyReturnsSignedExtra(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(p.Extra, extra) {
-		t.Fatalf("extra = %v, want %v", p.Extra, extra)
+	if !bytes.Equal(p.Extra, extra) || len(p.Ignored) != 0 {
+		t.Fatalf("extra = %v, ignored %v, want %v", p.Extra, p.Ignored, extra)
+	}
+	if info, err := Inspect(data); err != nil || !bytes.Equal(info.Extra, extra) {
+		t.Fatalf("Inspect: extra = %v, %v", info, err)
+	}
+	platform := newKeys(t)
+	again, err := Resign(data, platform.release, platform.cert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err := platform.trust().Verify(again); err != nil || !bytes.Equal(p.Extra, extra) {
+		t.Fatalf("resigned: %v, %v", p, err)
+	}
+	if p, err := k.trust().Verify(k.build(t, 2)); err != nil || p.Extra != nil {
+		t.Fatalf("without extra: %v, %v", p, err)
 	}
 	if at := bytes.Index(data, extra); at < 0 {
 		t.Fatal("extra is not in the package")
@@ -134,6 +148,16 @@ func TestVerifyReturnsSignedExtra(t *testing.T) {
 		if _, err := k.trust().Verify(data); !errors.Is(err, ErrSignature) {
 			t.Fatalf("tampered extra error = %v, want signature error", err)
 		}
+	}
+	// A package holds one: which of two the app would read is not for the runtime to pick.
+	body := []byte("mount(1)ab")
+	two := k.craft(t, map[string]any{"files": []map[string]any{
+		fileOf("bundle.js", "source", 0, body[:8]),
+		fileOf("metadata", "extra", 8, body[8:9]),
+		fileOf("metadata", "extra", 9, body[9:]),
+	}}, body)
+	if _, err := k.trust().Verify(two); !errors.Is(err, ErrFormat) {
+		t.Fatalf("two extras: got %v", err)
 	}
 }
 

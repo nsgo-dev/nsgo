@@ -42,6 +42,8 @@
 // so a package is trusted for where it came from, never for memory
 // safety, as NSH's bytecode is.
 //
+// A package may also hold metadata of the app's own (Contents.Extra), a file of kind "extra" after the source, at most one: signed and hashed as the source is, returned as Info.Extra and never parsed by the runtime, so an app reads what a plugin declares without running its code. A runtime that does not know the kind leaves it unused and lists it in Info.Ignored.
+//
 // # Format evolution
 //
 // Packages outlive the runtime that reads them, so what a runtime does not
@@ -54,8 +56,5 @@
 //     "critical" list, and a runtime that does not know a field listed
 //     there refuses the package.
 //
-// Build may add opaque signed metadata through Contents.Extra, which Verify
-// returns as Info.Extra. The runtime does not parse it. What was ignored is in Info.Ignored. An incompatible change bumps the
-// format version, which runtimes require to match. Certificates and
-// revocation lists refuse fields they do not know.
+// What was ignored is in Info.Ignored. An incompatible change bumps the format version, which runtimes require to match. Certificates and revocation lists refuse fields they do not know.
 package pkg
