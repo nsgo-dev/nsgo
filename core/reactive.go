@@ -352,6 +352,9 @@ func (cx *Scope) Abort() {
 // Disposed reports whether the scope has been disposed.
 func (cx *Scope) Disposed() bool { return cx.disposed }
 
+// HasTree reports whether the scope belongs to a view tree.
+func (cx *Scope) HasTree() bool { return cx.tree() != nil }
+
 func (cx *Scope) disposeOwned() {
 	for c := cx.last; c != nil; {
 		prev := c.prev

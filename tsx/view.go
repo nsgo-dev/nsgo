@@ -71,8 +71,14 @@ var ErrNoViewExport = errors.New("tsx: the view exports no such component")
 // ErrViewExportNotComponent is the failure of a View.Export the package exports as something other than a function.
 var ErrViewExportNotComponent = errors.New("tsx: the view export is not a component")
 
-// Load runs package p as a plugin under cx, within s as View runs it, and returns it once its entry module ran, or a nil Plugin and what that threw, which goes to no Catch above cx and not to the app's report, or ErrUnisolated on the web as View panics with it. Call it on the engine's goroutine.
+// ErrNoTree is what Load reports when its scope has no view tree.
+var ErrNoTree = errors.New("tsx: Load needs a scope attached to a view tree")
+
+// Load runs package p as a plugin under cx, within s as View runs it, and returns it once its entry module ran, or a nil Plugin and what that threw, which goes to no Catch above cx and not to the app's report, or ErrNoTree when cx is not attached to a view tree, or ErrUnisolated on the web as View panics with it. It runs synchronously on the caller's goroutine. Call it on the engine's goroutine.
 func Load(cx *core.Scope, p *pkg.Package, s Sandbox) (plugin *Plugin, err error) {
+	if cx == nil || !cx.HasTree() {
+		return nil, ErrNoTree
+	}
 	s = s.of(p)
 	// Refused before the scope runs it, which would send the panic to a Catch rather than to the caller.
 	if err := s.isolation(js.Browser); err != nil {

@@ -79,7 +79,7 @@ var gated = map[string]service{
 
 // exempt are the exported Scope methods that do not ask gate, by why.
 var exempt = map[string][]string{
-	"the graph, its scopes and what they read": {"Child", "Dispose", "Abort", "Disposed", "Cleanup", "Context", "Post", "AfterFunc",
+	"the graph, its scopes and what they read": {"Child", "Dispose", "Abort", "Disposed", "HasTree", "Cleanup", "Context", "Post", "AfterFunc",
 		"Untrack", "PauseTracking", "Batch", "Effect", "RenderEffect", "Run", "Env", "Theme", "Dark", "Palette", "Now",
 		"WallTime", "KeyLabel", "Present", "OnExit", "CurrentWindow", "MainWindow", "Quitting", "Hiding", "LaunchAtLogin"},
 	"Access itself, Confine, and what ProvideHost, ProvideStorage and ProvideSecrets scope to the owner": {"ProvideAccess", "CheckAccess",

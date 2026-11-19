@@ -163,3 +163,16 @@ export function Panel(props) {
 		t.Fatalf("the export wrote the host's props: %v", props)
 	}
 }
+
+func TestLoadNeedsTree(t *testing.T) {
+	data, trust := signedPackage(t, `export function greet() { return "hello"; }`, 1)
+	p, err := trust.Verify(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := core.NewRoot(core.RootOptions{})
+	defer root.Dispose()
+	if _, err := tsx.Load(root, p, tsx.Sandbox{}); !errors.Is(err, tsx.ErrNoTree) {
+		t.Fatalf("Load without a tree = %v, want ErrNoTree", err)
+	}
+}
