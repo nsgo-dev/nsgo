@@ -76,22 +76,25 @@ func TestBlankWebNavigationHasNoSyntheticTitle(t *testing.T) {
 func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	var ref Ref
 	var src *Signal[WebSource]
+	var before *Signal[string]
 	var loaded []WebNavigation
 	var messages []string
 	h := newHost(t, Size{Width: 300, Height: 400}, func(cx *Scope) Node {
 		src = NewSignal(cx, WebSrc("https://example.com"))
+		before = NewSignal(cx, "before")
 		return WebView{
-			SourceFunc:         src.Get,
-			InjectedJavaScript: "1",
-			Headers:            map[string]string{"X-Test": "one"},
-			Incognito:          true,
-			PinchZoom:          true,
-			Mobile:             true,
-			Ref:                &ref,
-			TestID:             "web",
-			Style:              Style{Width: Pt(300), Height: Pt(200)},
-			OnLoad:             func(n WebNavigation) { loaded = append(loaded, n) },
-			OnMessage:          func(d string) { messages = append(messages, d) },
+			SourceFunc:                          src.Get,
+			InjectedJavaScriptBeforeContentFunc: before.Get,
+			InjectedJavaScript:                  "1",
+			Headers:                             map[string]string{"X-Test": "one"},
+			Incognito:                           true,
+			PinchZoom:                           true,
+			Mobile:                              true,
+			Ref:                                 &ref,
+			TestID:                              "web",
+			Style:                               Style{Width: Pt(300), Height: Pt(200)},
+			OnLoad:                              func(n WebNavigation) { loaded = append(loaded, n) },
+			OnMessage:                           func(d string) { messages = append(messages, d) },
 		}
 	})
 	b := h.commit()
@@ -110,7 +113,7 @@ func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	if n := h.find("web"); n.kind != driver.KindWeb {
 		t.Fatalf("kind %v, want KindWeb", n.kind)
 	}
-	if cfg == nil || cfg.Source.Src != "https://example.com" || cfg.InjectedJavaScript != "1" || cfg.Headers["X-Test"] != "one" || !cfg.Incognito || !cfg.PinchZoom || !cfg.Mobile {
+	if cfg == nil || cfg.Source.Src != "https://example.com" || cfg.InjectedJavaScriptBeforeContent != "before" || cfg.InjectedJavaScript != "1" || cfg.Headers["X-Test"] != "one" || !cfg.Incognito || !cfg.PinchZoom || !cfg.Mobile {
 		t.Fatalf("config %+v", cfg)
 	}
 	if !mask.Has(driver.EventLoad) || !mask.Has(driver.EventMessage) || mask.Has(driver.EventLoadStart) {
@@ -118,6 +121,12 @@ func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	}
 	if k := kinds(h.commit()); k[driver.ItemWeb] != 0 {
 		t.Fatalf("resent an unchanged config: %v", k)
+	}
+
+	before.Set("changed")
+	b = h.commit()
+	if len(b.Items) != 1 || b.Items[0].Kind != driver.ItemWeb || b.Items[0].Web.InjectedJavaScriptBeforeContent != "changed" {
+		t.Fatalf("script change sent %v", b.Items)
 	}
 
 	src.Set(WebHTML("<p>hi</p>", ""))

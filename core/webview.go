@@ -23,6 +23,8 @@ type WebView struct {
 	// InjectedJavaScriptBeforeContent before each page's own scripts.
 	InjectedJavaScript              string
 	InjectedJavaScriptBeforeContent string
+	// The page loads again when InjectedJavaScriptBeforeContentFunc's script changes.
+	InjectedJavaScriptBeforeContentFunc func() string
 	// UserAgent replaces the platform's.
 	UserAgent string
 	// Headers are sent with the initial URL request where the platform
@@ -159,6 +161,14 @@ func (t *Tree) mountWebView(cx *Scope, parent *node, w WebView) {
 		cx.renderEffect(func() {
 			if src := w.SourceFunc(); src != n.web.config.Source {
 				n.web.config.Source = src
+				t.touch(n)
+			}
+		})
+	}
+	if f := w.InjectedJavaScriptBeforeContentFunc; f != nil {
+		cx.renderEffect(func() {
+			if script := f(); script != n.web.config.InjectedJavaScriptBeforeContent {
+				n.web.config.InjectedJavaScriptBeforeContent = script
 				t.touch(n)
 			}
 		})
