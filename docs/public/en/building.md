@@ -44,9 +44,9 @@ icon:
   tvos: assets/AppIconTV.brandassets  # the Apple TV's layered icon and top shelf art, or a wide PNG
   watchos: assets/AppIconWatch.icon   # the Apple Watch's own, drawn in circles, or a square PNG
   android:
-    foreground: assets/IconForeground.png  # adaptive icon foreground, 432 px square
+    foreground: assets/IconForeground.png  # Android's adaptive icon: 432 px, the logo within the center 264 px
     background: "#1F1F1F"                 # a color or a square PNG
-    monochrome: assets/IconMonochrome.png  # optional themed icon layer
+    monochrome: assets/IconMonochrome.png  # optional: the shape Android 13's themed icons tint
 dev:
   target: native        # native, web, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android, harmonyos or miniprogram_<platform>
   hot_reload: true      # false builds once, watching no files
@@ -86,7 +86,7 @@ Every go command the tool runs for the app takes `build.tags`, in `dev` and its 
 
 An Apple TV's icon is a layered card, not a square: `tvos` takes Xcode's `.brandassets`, its `App Icon` stacks and top shelf images, or a wide image such as 1280×768, which the tool draws to fit the card over its edge color and centers on the top shelf images. Without either, the PNG sits at three quarters of the card's height. An Apple Watch masks its icon to a circle, so `watchos` takes an `.icon` drawn for watchOS's circles or a square PNG; without it the app uses `apple`, then `png`. Both fall back to `assets/AppIconTV.*` and `assets/AppIconWatch.*`, as `apple` and `png` do.
 
-On Android, `icon.android` adds an adaptive launcher icon. `foreground` and `background` are required, and `monochrome` adds the Android 13 themed layer. The legacy PNG remains the fallback for older launchers.
+On Android, `icon.android` makes the launcher icon adaptive, so launchers mask it to their shape and move it as they like instead of shrinking `png` onto a plate of their own. Each layer is 108 dp square, a PNG scaled to 432 px; the launcher shows the center 72 dp, 288 px, and masks it to a shape that may cut into everything outside the center 66 dp, 264 px, so keep the logo in that circle and let the background fill the whole square. `background` is a PNG or a color such as `"#1F1F1F"`. `monochrome`, a shape whose alpha is all that counts, is what Android 13 and later tint when the user turns on themed icons; without it the icon keeps its colors there. The package keeps `png` as the plain bitmap icon, which no launcher of Android 9 or later, the oldest NSGo runs on, picks over the adaptive one; without `png`, the tool draws it from the foreground over the background. Without `icon.android`, the launcher shows `png` as before.
 
 Every build also takes NSGo's own flags as it starts, such as `--nsgo-fps` ([Running and debugging](debugging.md#flags-of-every-build)).
 

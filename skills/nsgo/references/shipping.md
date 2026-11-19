@@ -58,7 +58,7 @@ Declare `file_types` in `nsgo.yaml` and handle paths with `desktop.OnOpenFiles`.
 
 Never commit secret keys or passwords. The tool reads them from the environment: `NSGO_UPDATES_KEY` for update feeds, `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD` for Android keystores, `NSGO_CERTIFICATE_PASSWORD` for a Windows code signing certificate, `NSGO_NOTARY_KEY`, `NSGO_NOTARY_KEY_ID` and `NSGO_NOTARY_ISSUER` for notarizing in CI, `NSGO_ROOT_KEY` and `NSGO_RELEASE_KEY` for signed TSX packages. Public keys belong in `nsgo.yaml` and the app's code.
 
-Android launcher icons can add `icon.android.foreground`, `background` and optional `monochrome` layers for adaptive and themed icons. Keep the foreground and background square and 432 pixels where possible. The legacy `icon.png` remains the fallback layer for older launchers.
+For an adaptive Android launcher icon, set `icon.android.foreground` and `background` (a PNG or a `"#RRGGBB"` color), and `monochrome` for Android 13's themed icons: square 432 px layers with the logo inside the center 264 px, which every launcher mask keeps ([Building](https://nsgo.dev/docs/building.md)).
 
 ## Permissions and platform entries
 

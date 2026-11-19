@@ -43,11 +43,13 @@ func WriteBundle(w io.Writer, template []byte, m Manifest, files []File, key *Ke
 		all = append(all, File{Name: "base/" + iconFile, Data: m.Icon, Stored: true})
 	}
 	if m.Adaptive != nil {
-		adaptive, err := adaptiveFiles(m.Adaptive)
+		// A bundle's XML resources are protobuf XmlNodes, as its manifest is; bundletool turns them into binary XML for the APKs it makes.
+		icon, err := protoElement(adaptiveIcon(len(m.Adaptive.Monochrome) > 0), true, true)
 		if err != nil {
 			return err
 		}
-		for _, file := range adaptive {
+		all = append(all, File{Name: "base/" + adaptiveIconFile, Data: pbBytes(nil, 1, icon)})
+		for _, file := range adaptiveLayers(m.Adaptive) {
 			file.Name = "base/" + file.Name
 			all = append(all, file)
 		}
@@ -189,7 +191,7 @@ func resourcesProto(pkg string, icon bool, names map[string]string, adaptive *Ad
 			anydpi := pbVarint(nil, 18, 0xfffe)
 			anydpi = pbVarint(anydpi, 24, 26)
 			xml := pbString(nil, 1, adaptiveIconFile)
-			xml = pbVarint(xml, 2, 2) // XML
+			xml = pbVarint(xml, 2, 3) // PROTO_XML
 			entries[0].values = append(entries[0].values, [2][]byte{anydpi, pbBytes(nil, 5, xml)})
 			for i, name := range []string{"ic_launcher_foreground", "ic_launcher_background", "ic_launcher_monochrome"} {
 				if i == 2 && len(adaptive.Monochrome) == 0 {
@@ -236,12 +238,10 @@ type protoEntry struct {
 }
 
 func protoTypeEntries(id uint64, name string, entries []protoEntry) []byte {
-	var out []byte
-	out = pbVarint(out, 1, id)
+	out := pbBytes(nil, 1, pbVarint(nil, 1, id))
 	out = pbString(out, 2, name)
-	for _, entry := range entries {
-		var e []byte
-		e = pbBytes(e, 1, nil)
+	for i, entry := range entries {
+		e := pbBytes(nil, 1, pbVarint(nil, 1, uint64(i)))
 		e = pbString(e, 2, entry.key)
 		for _, value := range entry.values {
 			cv := pbBytes(nil, 1, value[0])

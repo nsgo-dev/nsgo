@@ -12,23 +12,26 @@ import (
 
 // The resource table chunk types, from Android's ResourceTypes.h.
 const (
-	tableHeader      = 0x0002
-	tablePackage     = 0x0200
-	tableType        = 0x0201
-	tableTypeSpec    = 0x0202
-	appPackageID     = 0x7f
-	configSize       = 64
-	densityXXXHigh   = 640
-	iconFile         = "res/mipmap-xxxhdpi-v4/ic_launcher.png"
-	adaptiveIconFile = "res/mipmap-anydpi-v26/ic_launcher.xml"
-	foregroundFile   = "res/mipmap-xxxhdpi-v4/ic_launcher_foreground.png"
-	backgroundFile   = "res/mipmap-xxxhdpi-v4/ic_launcher_background.png"
-	monochromeFile   = "res/mipmap-xxxhdpi-v4/ic_launcher_monochrome.png"
-	iconResource     = "@mipmap/ic_launcher"
-	iconResourceID   = appPackageID<<24 | 1<<16 // package 0x7f, type 1, entry 0
-	nameResource     = "@string/app_name"
-	utf8PoolFlag     = 1 << 8
-	resStringHeader  = 28
+	tableHeader        = 0x0002
+	tablePackage       = 0x0200
+	tableType          = 0x0201
+	tableTypeSpec      = 0x0202
+	appPackageID       = 0x7f
+	configSize         = 64
+	densityXXXHigh     = 640
+	iconFile           = "res/mipmap-xxxhdpi-v4/ic_launcher.png"
+	adaptiveIconFile   = "res/mipmap-anydpi-v26/ic_launcher.xml"
+	foregroundFile     = "res/mipmap-xxxhdpi-v4/ic_launcher_foreground.png"
+	backgroundFile     = "res/mipmap-xxxhdpi-v4/ic_launcher_background.png"
+	monochromeFile     = "res/mipmap-xxxhdpi-v4/ic_launcher_monochrome.png"
+	iconResource       = "@mipmap/ic_launcher"
+	foregroundResource = "@mipmap/ic_launcher_foreground"
+	backgroundResource = "@mipmap/ic_launcher_background"
+	monochromeResource = "@mipmap/ic_launcher_monochrome"
+	iconResourceID     = appPackageID<<24 | 1<<16 // package 0x7f, type 1, entry 0
+	nameResource       = "@string/app_name"
+	utf8PoolFlag       = 1 << 8
+	resStringHeader    = 28
 
 	// What a type's entry varies by (ResTable_config's CONFIG_*).
 	configLocale  = 0x0004
@@ -212,6 +215,8 @@ func table(pkg string, types []resType) []byte {
 	for i, t := range types {
 		id := uint8(i + 1)
 		typeNames = append(typeNames, t.name)
+		// The key pool holds every type's keys in turn; an entry names its key by its index there.
+		firstKey := len(keys)
 		for _, entry := range t.entries {
 			keys = append(keys, entry.key)
 		}
@@ -242,22 +247,18 @@ func table(pkg string, types []resType) []byte {
 			put(&chunks, uint32(len(t.entries)))
 			put(&chunks, uint32(typeHeader+4*len(t.entries)))
 			chunks.Write(config)
-			for _, entry := range t.entries {
-				value, ok := valueForConfig(entry.values, config)
-				if !ok {
+			// Each entry's offset among the entries present, or none (ResTable_type::NO_ENTRY).
+			for entryID := range t.entries {
+				if i := slices.Index(present, entryID); i >= 0 {
+					put(&chunks, uint32(i*16))
+				} else {
 					put(&chunks, uint32(0xffffffff))
-					continue
 				}
-				put(&chunks, uint32(slices.IndexFunc(present, func(id int) bool { return t.entries[id].key == entry.key })*16))
-				_ = value
 			}
-			for entryID, entry := range t.entries {
-				value, ok := valueForConfig(entry.values, config)
-				if !ok {
-					continue
-				}
+			for _, entryID := range present {
+				value, _ := valueForConfig(t.entries[entryID].values, config)
 				put(&chunks, [2]uint16{8, 0})
-				put(&chunks, uint32(entryID))
+				put(&chunks, uint32(firstKey+entryID))
 				put(&chunks, uint16(8))
 				put(&chunks, [2]uint8{0, typeString})
 				put(&chunks, uint32(len(values)))

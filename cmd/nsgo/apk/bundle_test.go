@@ -9,6 +9,9 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -153,8 +156,51 @@ func TestWriteBundleAdaptiveIcon(t *testing.T) {
 			t.Errorf("bundle lacks %s", name)
 		}
 	}
-	if root := decodeXML(t, files["base/"+adaptiveIconFile]).root; root.name != "adaptive-icon" {
-		t.Errorf("adaptive icon root = %q", root.name)
+	if bytes.HasPrefix(files["base/"+adaptiveIconFile], []byte{3, 0, 8, 0}) {
+		t.Error("the bundle's adaptive icon is binary XML, not a protobuf XmlNode")
+	}
+	aapt2, err := tool("aapt2")
+	if err != nil {
+		t.Skip("aapt2 is not installed")
+	}
+	// The base module as a proto APK, which aapt2 converts as bundletool does.
+	var proto bytes.Buffer
+	zw := zip.NewWriter(&proto)
+	for name, data := range files {
+		rel, ok := strings.CutPrefix(name, "base/")
+		if !ok || strings.HasPrefix(rel, "dex/") {
+			continue
+		}
+		rel = strings.TrimPrefix(rel, "manifest/")
+		w, err := zw.Create(rel)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write(data)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	in, out := filepath.Join(dir, "proto.apk"), filepath.Join(dir, "binary.apk")
+	if err := os.WriteFile(in, proto.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := exec.Command(aapt2, "convert", "--output-format", "binary", "-o", out, in).CombinedOutput(); err != nil {
+		t.Fatalf("aapt2 convert: %v\n%s", err, b)
+	}
+	dump, err := exec.Command(aapt2, "dump", "resources", out).CombinedOutput()
+	if err != nil {
+		t.Fatalf("aapt2 dump resources: %v\n%s", err, dump)
+	}
+	for _, want := range []string{"0x7f010000 mipmap/ic_launcher\n", "mipmap/ic_launcher_foreground", "mipmap/ic_launcher_background", "mipmap/ic_launcher_monochrome", adaptiveIconFile} {
+		if !strings.Contains(string(dump), want) {
+			t.Errorf("resource dump lacks %q:\n%s", want, dump)
+		}
+	}
+	tree, err := exec.Command(aapt2, "dump", "xmltree", out, "--file", adaptiveIconFile).CombinedOutput()
+	if err != nil || !strings.Contains(string(tree), "monochrome") || !strings.Contains(string(tree), "@0x7f010003") {
+		t.Errorf("adaptive icon XML (%v):\n%s", err, tree)
 	}
 }
 

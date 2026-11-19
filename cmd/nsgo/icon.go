@@ -70,7 +70,14 @@ func (p *project) resolveIconSet(set *icons, key, suffix string) error {
 		return fmt.Errorf("%s.watchos: %s is neither an .icon nor a .png", key, rel(set.WatchOS))
 	}
 	if set.Android != nil {
-		if set.Android.Background != "" && !strings.HasPrefix(set.Android.Background, "#") {
+		if set.Android.Foreground == "" || set.Android.Background == "" {
+			return fmt.Errorf("%s.android needs foreground and background", key)
+		}
+		if strings.HasPrefix(set.Android.Background, "#") {
+			if _, err := androidIconLayer(set.Android.Background); err != nil {
+				return err
+			}
+		} else {
 			resolved := p.resolve(set.Android.Background)
 			if _, err := os.Stat(resolved); err != nil {
 				return fmt.Errorf("%s.android.background: %w", key, err)
@@ -133,31 +140,40 @@ func (p *project) iconImage() (image.Image, error) {
 	return readOptionalIcon(p.Icon.PNG)
 }
 
-func (p *project) androidAdaptiveIcon() (*apk.AdaptiveIcon, error) {
+// adaptiveLayerSize is an adaptive icon layer's side in pixels: 108 dp at xxxhdpi, where the table puts the layers.
+const adaptiveLayerSize = 432
+
+// androidAdaptiveIcon decodes icon.android's layers, nil when it has none, and returns with them the legacy icon they make, the foreground over the background within the 72 dp a launcher shows of them, for an app without icon.png.
+func (p *project) androidAdaptiveIcon() (*apk.AdaptiveIcon, image.Image, error) {
 	if p.Icon.Android == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	a := p.Icon.Android
 	if a.Foreground == "" || a.Background == "" {
-		return nil, errors.New("icon.android needs foreground and background")
+		return nil, nil, errors.New("icon.android needs foreground and background")
 	}
 	foreground, err := readSquareIcon(a.Foreground)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	background, err := androidIconLayer(a.Background)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	adaptive := &apk.AdaptiveIcon{Foreground: scaledPNG(foreground, 432), Background: scaledPNG(background, 432)}
+	fg, bg := scaled(foreground, adaptiveLayerSize), scaled(background, adaptiveLayerSize)
+	adaptive := &apk.AdaptiveIcon{Foreground: scaledPNG(fg, adaptiveLayerSize), Background: scaledPNG(bg, adaptiveLayerSize)}
 	if a.Monochrome != "" {
 		mono, err := readSquareIcon(a.Monochrome)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		adaptive.Monochrome = scaledPNG(mono, 432)
+		adaptive.Monochrome = scaledPNG(mono, adaptiveLayerSize)
 	}
-	return adaptive, nil
+	inset := adaptiveLayerSize / 6 // 18 of 108 dp
+	legacy := image.NewNRGBA(image.Rect(0, 0, adaptiveLayerSize-2*inset, adaptiveLayerSize-2*inset))
+	draw.Draw(legacy, legacy.Bounds(), bg, image.Pt(inset, inset), draw.Src)
+	draw.Draw(legacy, legacy.Bounds(), fg, image.Pt(inset, inset), draw.Over)
+	return adaptive, legacy, nil
 }
 
 func androidIconLayer(value string) (image.Image, error) {

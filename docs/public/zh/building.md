@@ -44,9 +44,9 @@ icon:
   tvos: assets/AppIconTV.brandassets  # Apple TV 的分层图标和顶部横幅，或一张宽图
   watchos: assets/AppIconWatch.icon   # Apple Watch 自己的图标，按圆形绘制，或一张方图
   android:
-    foreground: assets/IconForeground.png  # 自适应图标前景，432 像素方形
+    foreground: assets/IconForeground.png  # Android 自适应图标：432 像素，标志放在中央 264 像素内
     background: "#1F1F1F"                 # 颜色或方形 PNG
-    monochrome: assets/IconMonochrome.png  # 可选的主题图标图层
+    monochrome: assets/IconMonochrome.png  # 可选：Android 13 主题图标着色的形状
 dev:
   target: native        # native、web、ios、ios_simulator、tvos、tvos_simulator、watchos、watchos_simulator、android、harmonyos 或 miniprogram_<平台>
   hot_reload: true      # false 时只构建一次，不监听文件
@@ -86,7 +86,7 @@ build:
 
 Apple TV 的图标不是方形，而是一张分层卡片：`tvos` 取 Xcode 的 `.brandassets`（其中的 `App Icon` 堆栈和顶部横幅），或一张如 1280×768 的宽图，工具用它的边缘色铺底、让图铺满卡片，并居中生成顶部横幅；两者都没有时，`png` 按卡片高度的四分之三居中。Apple Watch 会把图标裁成圆形，所以 `watchos` 取按 watchOS 圆形绘制的 `.icon` 或一张方图；没有它时依次用 `apple` 和 `png`。两者与 `apple`、`png` 一样默认取 `assets/AppIconTV.*` 和 `assets/AppIconWatch.*`。
 
-在 Android 上，`icon.android` 会增加自适应启动图标。`foreground` 和 `background` 必须同时提供，`monochrome` 会增加 Android 13 的主题图标图层。旧版 PNG 仍作为较旧启动器的后备图标。
+在 Android 上，`icon.android` 让启动图标成为自适应图标，启动器按自己的形状裁剪、按需移动它，而不是把 `png` 缩小放在启动器自己的底板上。每个图层是 108 dp 的方形，PNG 缩放到 432 像素；启动器显示中央 72 dp（288 像素），并用一个可能裁到中央 66 dp（264 像素）以外任何部分的形状遮罩它，所以标志要放在这个圆内，背景铺满整个方形。`background` 是一张 PNG，或 `"#1F1F1F"` 这样的颜色。`monochrome` 是一个只看透明度的形状，用户打开主题图标时，Android 13 及以后的版本给它着色；没有它时，图标在那里保持原色。安装包仍保留 `png` 作为普通位图图标，但 Android 9（NSGo 支持的最低版本）及以后的启动器都会选用自适应图标；没有 `png` 时，工具用前景叠在背景上画出它。没有 `icon.android` 时，启动器照旧显示 `png`。
 
 每个构建在启动时还接受 NSGo 自己的参数，例如 `--nsgo-fps`（[运行与调试](debugging.md#所有构建都接受的参数)）。
 

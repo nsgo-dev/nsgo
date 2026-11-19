@@ -53,5 +53,10 @@ func TestNames(t *testing.T) {
 		if icon && !strings.Contains(string(out), "application-icon-640:'"+iconFile+"'") {
 			t.Errorf("no icon in\n%s", out)
 		}
+		// The names' entry keeps its own key after the icon's type.
+		out, err = exec.CommandContext(ctx, aapt2, "dump", "resources", path).CombinedOutput()
+		if err != nil || !strings.Contains(string(out), "string/app_name") {
+			t.Errorf("icon %v: no string/app_name (%v) in\n%s", icon, err, out)
+		}
 	}
 }

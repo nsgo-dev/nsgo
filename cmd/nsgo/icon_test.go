@@ -229,9 +229,13 @@ func TestAndroidAdaptiveIcon(t *testing.T) {
 		return path
 	}
 	p := &project{Icon: icons{Android: &androidIcon{Foreground: write("foreground.png"), Background: "#123456", Monochrome: write("mono.png")}}}
-	icon, err := p.androidAdaptiveIcon()
+	icon, legacy, err := p.androidAdaptiveIcon()
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The legacy icon is the 72 dp of the 108 a launcher shows: the foreground over the background, 288 of 432 pixels.
+	if b := legacy.Bounds(); b.Dx() != 288 || b.Dy() != 288 {
+		t.Errorf("legacy icon size = %v", b)
 	}
 	if len(icon.Foreground) == 0 || len(icon.Background) == 0 || len(icon.Monochrome) == 0 {
 		t.Fatalf("adaptive icon layers = %+v", icon)

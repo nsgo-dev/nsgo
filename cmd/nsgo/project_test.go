@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -326,5 +327,11 @@ func TestIcons(t *testing.T) {
 	}
 	if p.Icon.Android == nil || p.Icon.Android.Foreground != filepath.Join(dir, "art", "foreground.png") || p.Icon.Android.Background != "#123456" || p.Icon.Android.Monochrome != filepath.Join(dir, "art", "mono.png") {
 		t.Fatalf("android icon = %+v", p.Icon.Android)
+	}
+	if _, err := load("icon:\n  android:\n    foreground: art/foreground.png\n"); err == nil || !strings.Contains(err.Error(), "needs foreground and background") {
+		t.Errorf("an Android icon without a background loaded: %v", err)
+	}
+	if _, err := load("icon:\n  android:\n    foreground: art/foreground.png\n    background: '#12345'\n"); err == nil {
+		t.Error("an Android icon with a five-digit color loaded")
 	}
 }

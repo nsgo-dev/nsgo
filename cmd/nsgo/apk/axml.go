@@ -25,7 +25,7 @@ type Manifest struct {
 	VersionCode int
 	// Icon is the launcher icon, an IconSize PNG; nil keeps the system's.
 	Icon []byte
-	// Adaptive is the optional Android adaptive icon layers.
+	// Adaptive is the adaptive launcher icon's layers, which @mipmap/ic_launcher names from API 26 on, Icon below it; nil leaves Icon alone.
 	Adaptive *AdaptiveIcon
 	// Theme replaces the application's theme, a framework style; empty
 	// keeps the runtime's.
@@ -108,7 +108,7 @@ var androidAttrs = map[string]attrSpec{
 	"windowSoftInputMode":         {0x0101022b, typeHex, parseSoftInputMode},
 	"foregroundServiceType":       {0x01010599, typeHex, parseForegroundServiceType},
 	"value":                       {0x01010024, typeString, nil},
-	"drawable":                    {0x01010199, typeReference, nil},
+	"drawable":                    {0x01010199, typeReference, parseAppResource},
 }
 
 // foregroundServiceTypes are the ServiceInfo.FOREGROUND_SERVICE_TYPE_* names a service lists, as attrs_manifest.xml has them.
@@ -227,6 +227,10 @@ func EncodeManifest(template []byte, m Manifest) ([]byte, error) {
 func appManifest(template []byte, m Manifest) (*node, error) {
 	if err := validPackage(m.Package); err != nil {
 		return nil, err
+	}
+	// The table holds the adaptive icon's layers beside the legacy icon, @mipmap/ic_launcher's value before API 26.
+	if m.Adaptive != nil && m.Icon == nil {
+		return nil, errors.New("manifest: an adaptive icon needs Icon too")
 	}
 	root, err := parseXML(template)
 	if err != nil {
@@ -385,10 +389,19 @@ func parseBool(s string) (uint32, error) {
 // parseAppResource resolves a reference to the app's own resources,
 // which the table packaging writes defines.
 func parseAppResource(s string) (uint32, error) {
-	if s != iconResource {
+	id, ok := appResources[s]
+	if !ok {
 		return 0, fmt.Errorf("unknown resource %q", s)
 	}
-	return iconResourceID, nil
+	return id, nil
+}
+
+// appResources are the resources of the app's table an attribute can refer to: the launcher icon and its adaptive layers.
+var appResources = map[string]uint32{
+	iconResource:       iconResourceID,
+	foregroundResource: foregroundResourceID,
+	backgroundResource: backgroundResourceID,
+	monochromeResource: monochromeResourceID,
 }
 
 func parseStyle(s string) (uint32, error) {
@@ -424,7 +437,6 @@ var (
 // encoder builds the element chunks and the string pool they index.
 type encoder struct {
 	icon    bool // the table has the icon, before the names
-	refs    map[string]uint32
 	strings []string
 	index   map[string]int
 	ids     []uint32 // the framework ID of each leading attribute name
@@ -491,19 +503,7 @@ func (e *encoder) element(n *node) error {
 				attr.raw = int32(attr.data)
 				break
 			}
-			var v uint32
-			var err error
-			if spec.kind == typeReference && e.refs != nil {
-				var ok bool
-				v, ok = e.refs[a.Value]
-				if !ok {
-					err = fmt.Errorf("unknown resource %q", a.Value)
-				}
-			} else if spec.parse != nil {
-				v, err = spec.parse(a.Value)
-			} else {
-				err = fmt.Errorf("cannot parse %q", a.Value)
-			}
+			v, err := spec.parse(a.Value)
 			if err != nil {
 				return fmt.Errorf("manifest: android:%s: %w", a.Name.Local, err)
 			}
@@ -566,21 +566,25 @@ func (e *encoder) element(n *node) error {
 	return nil
 }
 
-// EncodeAdaptiveIcon writes the binary XML resource for an Android adaptive
-// icon. refs maps the drawable references used by its layers to resource IDs.
-func EncodeAdaptiveIcon(refs map[string]uint32, monochrome bool) ([]byte, error) {
+// adaptiveIcon is res/mipmap-anydpi-v26/ic_launcher.xml's <adaptive-icon>, whose layers are the table's mipmaps, with the themed icon's monochrome layer when the app has one.
+func adaptiveIcon(monochrome bool) *node {
 	root := &node{name: xml.Name{Local: "adaptive-icon"}}
-	background := &node{name: xml.Name{Local: "background"}}
-	setAttr(background, androidNS, "drawable", "@mipmap/ic_launcher_background")
-	foreground := &node{name: xml.Name{Local: "foreground"}}
-	setAttr(foreground, androidNS, "drawable", "@mipmap/ic_launcher_foreground")
-	root.kids = append(root.kids, background, foreground)
+	layers := [][2]string{{"background", backgroundResource}, {"foreground", foregroundResource}}
 	if monochrome {
-		mono := &node{name: xml.Name{Local: "monochrome"}}
-		setAttr(mono, androidNS, "drawable", "@mipmap/ic_launcher_monochrome")
-		root.kids = append(root.kids, mono)
+		layers = append(layers, [2]string{"monochrome", monochromeResource})
 	}
-	e := &encoder{index: map[string]int{}, refs: refs}
+	for _, l := range layers {
+		n := &node{name: xml.Name{Local: l[0]}}
+		setAttr(n, androidNS, "drawable", l[1])
+		root.kids = append(root.kids, n)
+	}
+	return root
+}
+
+// encodeAdaptiveIcon is the adaptive icon's binary XML, as an APK holds it.
+func encodeAdaptiveIcon(monochrome bool) ([]byte, error) {
+	root := adaptiveIcon(monochrome)
+	e := &encoder{index: map[string]int{}, icon: true}
 	for _, name := range attrNames(root) {
 		e.str(name)
 		e.ids = append(e.ids, androidAttrs[name].id)
@@ -607,25 +611,25 @@ func EncodeAdaptiveIcon(refs map[string]uint32, monochrome bool) ([]byte, error)
 	return out.Bytes(), nil
 }
 
+// adaptiveFiles are the adaptive icon's files in an APK: its XML, binary, and its layers' PNGs.
 func adaptiveFiles(adaptive *AdaptiveIcon) ([]File, error) {
-	refs := map[string]uint32{
-		"@mipmap/ic_launcher_foreground": foregroundResourceID,
-		"@mipmap/ic_launcher_background": backgroundResourceID,
-		"@mipmap/ic_launcher_monochrome": monochromeResourceID,
-	}
-	xml, err := EncodeAdaptiveIcon(refs, len(adaptive.Monochrome) > 0)
+	xml, err := encodeAdaptiveIcon(len(adaptive.Monochrome) > 0)
 	if err != nil {
 		return nil, err
 	}
+	return append([]File{{Name: adaptiveIconFile, Data: xml, Stored: true}}, adaptiveLayers(adaptive)...), nil
+}
+
+// adaptiveLayers are the adaptive icon's layer PNGs.
+func adaptiveLayers(adaptive *AdaptiveIcon) []File {
 	files := []File{
-		{Name: adaptiveIconFile, Data: xml, Stored: true},
 		{Name: foregroundFile, Data: adaptive.Foreground, Stored: true},
 		{Name: backgroundFile, Data: adaptive.Background, Stored: true},
 	}
 	if len(adaptive.Monochrome) > 0 {
 		files = append(files, File{Name: monochromeFile, Data: adaptive.Monochrome, Stored: true})
 	}
-	return files, nil
+	return files
 }
 
 // pool encodes the strings as a UTF-16 string pool, as aapt2 does.

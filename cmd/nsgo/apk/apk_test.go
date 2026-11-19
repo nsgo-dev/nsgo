@@ -128,6 +128,7 @@ func TestAdaptiveIconResources(t *testing.T) {
 	if err := Write(&buf, androidruntime.Manifest, Manifest{
 		Package: "dev.oneo.nsgo.test", Label: "Test", VersionName: "1", VersionCode: 1,
 		Icon: []byte("legacy"), Adaptive: &AdaptiveIcon{Foreground: []byte("fg"), Background: []byte("bg"), Monochrome: []byte("mono")},
+		Names: map[string]string{"": "Test", "zh-Hans": "测试"},
 	}, nil, key); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +144,7 @@ func TestAdaptiveIconResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aapt2 dump resources: %v\n%s", err, resources)
 	}
-	for _, want := range []string{"mipmap/ic_launcher_foreground", "mipmap/ic_launcher_background", "mipmap/ic_launcher_monochrome", "res/mipmap-anydpi-v26/ic_launcher.xml"} {
+	for _, want := range []string{"0x7f010000 mipmap/ic_launcher\n", "mipmap/ic_launcher_foreground", "mipmap/ic_launcher_background", "mipmap/ic_launcher_monochrome", iconFile, adaptiveIconFile, "string/app_name"} {
 		if !strings.Contains(string(resources), want) {
 			t.Errorf("resource dump lacks %q:\n%s", want, resources)
 		}
@@ -152,7 +153,7 @@ func TestAdaptiveIconResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("aapt2 dump adaptive XML: %v\n%s", err, xml)
 	}
-	for _, want := range []string{"adaptive-icon", "foreground", "background", "monochrome"} {
+	for _, want := range []string{"adaptive-icon", "foreground", "background", "monochrome", "@0x7f010001", "@0x7f010002", "@0x7f010003"} {
 		if !strings.Contains(string(xml), want) {
 			t.Errorf("adaptive XML lacks %q:\n%s", want, xml)
 		}
