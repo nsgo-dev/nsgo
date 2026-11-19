@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"golang.org/x/image/font/gofont/gomedium"
@@ -14,6 +15,8 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
 )
+
+var goMediumRegistered atomic.Bool
 
 // TestRegisteredFontsLayOut registers a font file from the resources and
 // checks that text in its family lays out in it: in small capitals, which
@@ -50,6 +53,9 @@ func TestRegisteredFontsLayOut(t *testing.T) {
 // family was measured, as a TSX module's import does as the app runs:
 // text prepared after it lays out in it.
 func TestAFontRegisteredLaterReplacesItsFallback(t *testing.T) {
+	if goMediumRegistered.Load() {
+		t.Skip("Go Medium remains registered from an earlier run in this process")
+	}
 	if err := openLibs(); err != nil {
 		t.Skip(err)
 	}
@@ -67,6 +73,7 @@ func TestAFontRegisteredLaterReplacesItsFallback(t *testing.T) {
 	if err := w.RegisterFont(gomedium.TTF); err != nil {
 		t.Fatal(err)
 	}
+	goMediumRegistered.Store(true)
 	if after := width(); math.Abs(float64(after-before)) < float64(before)*0.03 {
 		t.Fatalf("Go Medium measures %v after it registered, %v before: still the fallback", after, before)
 	}

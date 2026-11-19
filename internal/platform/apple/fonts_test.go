@@ -5,6 +5,7 @@ package apple
 import (
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"golang.org/x/image/font/gofont/gomono"
@@ -13,6 +14,8 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
 )
+
+var goMonoRegistered atomic.Bool
 
 // TestRegisteredFontsLayOut registers a font file from the resources
 // and checks that text in its family lays out in it: in small capitals,
@@ -45,6 +48,9 @@ func TestRegisteredFontsLayOut(t *testing.T) {
 // family was looked up, as a TSX module's import does as the app runs:
 // text prepared after it lays out in it, not in the fallback found first.
 func TestAFontRegisteredLaterReplacesItsFallback(t *testing.T) {
+	if goMonoRegistered.Load() {
+		t.Skip("Go Mono remains registered from an earlier run in this process")
+	}
 	width := func() driver.Points {
 		p := TextEngine{}.Prepare(&driver.AttributedText{Text: "iiiiiiii",
 			Style: driver.TextStyle{Font: driver.Font{Family: "Go Mono", Size: 20, Weight: 400}, Color: driver.RGB(0)}})
@@ -55,6 +61,7 @@ func TestAFontRegisteredLaterReplacesItsFallback(t *testing.T) {
 	if err := RegisterFont(gomono.TTF); err != nil {
 		t.Fatal(err)
 	}
+	goMonoRegistered.Store(true)
 	// Monospaced, its i is as wide as any letter, wider than a fallback's.
 	if after := width(); after <= before*1.2 {
 		t.Fatalf("Go Mono measures %v after it registered, %v before: still the fallback", after, before)
