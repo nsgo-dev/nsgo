@@ -183,6 +183,32 @@ func TestPhoneLargeTitles(t *testing.T) {
 	}
 }
 
+// TestSimulatedPhone runs the gallery as a web build that runs as iOS (--nsgo-os=ios): the drawn tab bar and the app's own header, its back button included, stand in for the system's, which the web has not, and its usage is reported as the web's.
+func TestSimulatedPhone(t *testing.T) {
+	headless(t)
+	var sys core.OS
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		sys = statsOS(cx.Env())
+		return Root(cx)
+	}, nsgotest.Size(390, 844), nsgotest.Environment(core.Environment{OS: core.OSIOS, Idiom: core.IdiomPhone, Locale: "en-US", Simulated: true}))
+	if sys != core.OSWeb {
+		t.Fatalf("usage is reported from %q, want the web", sys)
+	}
+	if v := app.FindMounted("id:tab-bar"); v.Component != "" {
+		t.Fatalf("the tab bar is the system's %q", v.Component)
+	}
+	if app.Find("id:index").Screen.LargeTitle {
+		t.Fatal("the index asks for the system's large title")
+	}
+	name := tabs[0].groups[0].demos[0].name
+	app.Press("id:nav-" + name)
+	app.Find("id:screen-" + name)
+	app.Press("id:screen-" + name + " >> role:button Back")
+	if app.Exists("id:screen-" + name) {
+		t.Fatal("the header's back button left the demo shown")
+	}
+}
+
 func iosNavigation(t *testing.T) {
 	t.Helper()
 	if target := nsgotest.Target(); target != "" && target != "ios" && target != "ios_simulator" {

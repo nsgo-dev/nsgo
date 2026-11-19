@@ -9,6 +9,7 @@ import (
 	"github.com/nsgo-dev/nsgo/icons/lucide"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/desktop"
 
 	"github.com/nsgo-dev/nsgo/examples/gallery/locales"
 	"github.com/nsgo-dev/nsgo/i18n"
@@ -66,8 +67,7 @@ func messaging(cx *core.Scope) core.Node {
 	sent := core.NewSignal(cx, 0)
 	saved := core.NewSignal(cx, "")
 	result := core.NewSignal(cx, "")
-	// Desktop native hosts serve the same page through an app-owned scheme;
-	// targets without that bridge keep the inline HTML source.
+	// Desktop native hosts serve the same page through an app-owned scheme; targets without that bridge, a web build that runs as a desktop OS included, keep the inline HTML source.
 	schemePage := inlinePage(cx)
 	_ = cx.ServeScheme("gallery", func(url string) []byte {
 		if url == "gallery://inline/index.html" {
@@ -76,12 +76,10 @@ func messaging(cx *core.Scope) core.Node {
 		return nil
 	})
 	source := func() core.WebSource {
-		switch cx.Env().OS() {
-		case core.OSMacOS, core.OSWindows, core.OSLinux:
+		if desktop.IsAvailable(cx) {
 			return core.WebSrc("gallery://inline/index.html")
-		default:
-			return core.WebHTML(inlinePage(cx), "")
 		}
+		return core.WebHTML(inlinePage(cx), "")
 	}
 	// Where the page's button and link are, which it posts as it loads.
 	var at struct{ Post, Save [2]core.Points }

@@ -86,11 +86,12 @@ func reportUsage(cx *core.Scope, g *gallery) {
 		return
 	}
 	env := cx.Env()
+	sys := statsOS(env)
 	tag, id := "gallery-web", ""
-	if env.OS() != core.OSWeb {
+	if sys != core.OSWeb {
 		tag, id = "gallery-app", installID(cx)
 	}
-	agent := statsAgent(env.OS())
+	agent := statsAgent(sys)
 	queue := make(chan statsPayload, 32)
 	go sendStats(queue, agent)
 
@@ -165,6 +166,14 @@ func sendStats(queue <-chan statsPayload, agent string) {
 			resp.Body.Close()
 		}
 	}
+}
+
+// statsOS is the system the gallery runs on, which its usage is reported from: the web for a web build that runs as another OS (--nsgo-os), whose visitors are no app's.
+func statsOS(env *core.Env) core.OS {
+	if env.Simulated() {
+		return core.OSWeb
+	}
+	return env.OS()
 }
 
 // statsAgent is the User-Agent a native gallery sends, as a browser on

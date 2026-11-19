@@ -531,8 +531,8 @@ func demoScreen(cx *core.Scope, name string) base.NavPage {
 	tr := locales.For(cx)
 	d, _ := findDemo(name)
 	style := pageStyle(cx)
-	// The app's own header draws its hairline; the system's does not.
-	if os := cx.Env().OS(); isApp(d.name) && (os == core.OSIOS || os == core.OSAndroid) {
+	// The app's own header draws its hairline; the system's does not, and a web build that runs as iOS or Android draws the app's.
+	if os := cx.Env().OS(); isApp(d.name) && (os == core.OSIOS || os == core.OSAndroid) && !cx.Env().Simulated() {
 		style = underHeader(cx)
 	}
 	p := base.NavPage{Title: d.title(tr), TestID: "screen-" + d.name, HeaderStyleFunc: headerStyle(cx),
@@ -587,10 +587,9 @@ func underHeader(cx *core.Scope) func() core.Style {
 var fixedDemos = map[string]bool{"Stocks": true, "AI Chat": true, "Conversation": true, "Photos": true, "Lists": true, "DataTable": true, "CommitGraph": true, "DiffView": true, "Dock": true,
 	"Editor": true, "RichEditor": true, "Plot": true, "Resizable": true, "Terminal": true, "TextView": true, "Physics": true, "Collapsing header": true}
 
-// largeTitle gives page p iOS's large title, over no background until the
-// content scrolls under the system's blurred bar.
+// largeTitle gives page p iOS's large title, over no background until the content scrolls under the system's blurred bar, which a web build that runs as iOS does not have.
 func largeTitle(cx *core.Scope, p base.NavPage) base.NavPage {
-	if cx.Env().OS() != core.OSIOS {
+	if cx.Env().OS() != core.OSIOS || cx.Env().Simulated() {
 		return p
 	}
 	colors := ui.ColorsOf(cx)

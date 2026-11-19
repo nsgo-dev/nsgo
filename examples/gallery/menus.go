@@ -346,7 +346,7 @@ func menusDemo(cx *core.Scope) core.Node {
 			Note{Text: tr.MenusSetapplicationmenuSetsTheMenuBar()},
 			Caption{Label: tr.MenusLastChosen(), Note: shell.chosen.Get},
 		}
-		if env := cx.Env(); env.Desktop() && env.OS() != core.OSMacOS && env.OS() != core.OSWeb {
+		if desktop.IsAvailable(cx) && cx.Env().OS() != core.OSMacOS {
 			children = append(children, Note{Text: tr.MenusSetmenubarHidesTheBarWindows()},
 				ui.HStack{Gap: 8, Children: []core.Node{
 					ui.Button{Text: tr.MenusAlwaysShown(), Variant: ui.ButtonSecondary, Size: ui.SizeSmall, OnPress: func() { desktop.SetMenuBar(cx, desktop.MenuBarShown) }},
