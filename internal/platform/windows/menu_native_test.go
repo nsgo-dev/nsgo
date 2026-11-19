@@ -226,9 +226,7 @@ func TestMenuYieldFollowsNativeFocus(t *testing.T) {
 	if _, err := findWebView2(); err != nil {
 		t.Skip(err)
 	}
-	// WebView2 can leave the test process in E_UNEXPECTED after its
-	// composition controller closes. Keep its browser environment and COM
-	// apartment out of the process that runs the other native tests.
+	// WebView2 can leave the test process in E_UNEXPECTED after its composition controller closes. Keep its browser environment and COM apartment out of the process that runs the other native tests, with a profile of its own under temporary APPDATA and LOCALAPPDATA.
 	if os.Getenv("NSGO_TEST_WEBVIEW2_MENU_PROCESS") != t.Name() {
 		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
 		dir, err := os.MkdirTemp("", "nsgo-menu-webview2-")
