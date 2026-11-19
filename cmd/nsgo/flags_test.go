@@ -260,6 +260,35 @@ func TestBuildFlagsApply(t *testing.T) {
 	}
 }
 
+func TestBuildSigningProfileFlags(t *testing.T) {
+	fs := flag.NewFlagSet("build", flag.ContinueOnError)
+	f := bindBuildFlags(fs)
+	if err := fs.Parse([]string{
+		"-profile", "profiles/app.mobileprovision",
+		"-widgets-profile", "profiles/widgets.mobileprovision",
+		"-clip-profile", "profiles/clip.mobileprovision",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	p := &project{Dir: t.TempDir(), Sign: signing{
+		Profile:        "from-yaml.mobileprovision",
+		WidgetsProfile: "from-yaml-widgets.mobileprovision",
+		ClipProfile:    "from-yaml-clip.mobileprovision",
+	}}
+
+	f.apply(p)
+
+	if got, want := p.Sign.Profile, filepath.Join(p.Dir, "profiles/app.mobileprovision"); got != want {
+		t.Errorf("sign.profile: got %q, want %q", got, want)
+	}
+	if got, want := p.Sign.WidgetsProfile, filepath.Join(p.Dir, "profiles/widgets.mobileprovision"); got != want {
+		t.Errorf("sign.widgets_profile: got %q, want %q", got, want)
+	}
+	if got, want := p.Sign.ClipProfile, filepath.Join(p.Dir, "profiles/clip.mobileprovision"); got != want {
+		t.Errorf("sign.clip_profile: got %q, want %q", got, want)
+	}
+}
+
 func TestBuildFlagsLdflags(t *testing.T) {
 	fs := flag.NewFlagSet("build", flag.ContinueOnError)
 	f := bindBuildFlags(fs)

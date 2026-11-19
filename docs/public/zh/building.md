@@ -314,7 +314,7 @@ sign:
   sign_command: "signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a %1"
 ```
 
-在安装包里签卸载器需要 NSIS 3.08 或更高版本，且只能由 `.pfx` 完成，`sign.sign_command` 无法签卸载器。命令行可用 `-certificate`、`-sign-command` 和 `-timestamp-url` 指定这些值。
+在安装包里签卸载器需要 NSIS 3.08 或更高版本，且只能由 `.pfx` 完成，`sign.sign_command` 无法签卸载器。命令行可用 `-profile`、`-widgets-profile` 和 `-clip-profile` 替换 iOS 描述文件，用 `-certificate`、`-sign-command` 和 `-timestamp-url` 指定 Windows 签名值。
 
 ### 公证
 

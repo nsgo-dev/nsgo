@@ -74,13 +74,16 @@ type signing struct {
 
 // signFlags are nsgo build's flags that replace nsgo.yaml's sign values.
 type signFlags struct {
-	identity, profile, keystore, alias, notarize *override[string]
-	certificate, signCommand, timestamp          *override[string]
+	identity, profile, widgetsProfile, clipProfile *override[string]
+	keystore, alias, notarize                      *override[string]
+	certificate, signCommand, timestamp            *override[string]
 }
 
 func (f *signFlags) bind(fs *flag.FlagSet) {
 	f.identity = stringFlag(fs, "sign", "the macOS and iOS codesign `identity` (default: nsgo.yaml's sign.identity, else ad hoc on macOS and the profile's in the keychain on iOS)")
 	f.profile = stringFlag(fs, "profile", "the iOS provisioning `profile` (default: nsgo.yaml's sign.profile)")
+	f.widgetsProfile = stringFlag(fs, "widgets-profile", "the iOS widget extension's provisioning `profile` (default: nsgo.yaml's sign.widgets_profile)")
+	f.clipProfile = stringFlag(fs, "clip-profile", "the iOS App Clip's provisioning `profile` (default: nsgo.yaml's sign.clip_profile)")
 	f.keystore = stringFlag(fs, "keystore", "the Android `keystore`, PKCS#12 or JKS; NSGO_KEYSTORE_PASSWORD and NSGO_KEY_PASSWORD give its passwords (default: nsgo.yaml's sign.keystore)")
 	f.alias = stringFlag(fs, "key-alias", "the `alias` of the keystore's key (default: nsgo.yaml's sign.key_alias, else its only key)")
 	f.notarize = stringFlag(fs, "notarize", "the notarytool keychain `profile` the macOS package is notarized with (default: nsgo.yaml's sign.notarize)")
@@ -93,6 +96,12 @@ func (f *signFlags) apply(p *project) {
 	f.identity.replace(&p.Sign.Identity)
 	if f.profile.set {
 		p.Sign.Profile = p.resolve(f.profile.value)
+	}
+	if f.widgetsProfile.set {
+		p.Sign.WidgetsProfile = p.resolve(f.widgetsProfile.value)
+	}
+	if f.clipProfile.set {
+		p.Sign.ClipProfile = p.resolve(f.clipProfile.value)
 	}
 	if f.keystore.set {
 		p.Sign.Keystore = p.resolve(f.keystore.value)

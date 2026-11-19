@@ -314,7 +314,7 @@ sign:
   sign_command: "signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a %1"
 ```
 
-Signing the uninstaller inside the installer needs NSIS 3.08 or later, and a certificate that is not a `.pfx` cannot sign it through `sign.certificate`. `-certificate`, `-sign-command` and `-timestamp-url` set these from the command line.
+Signing the uninstaller inside the installer needs NSIS 3.08 or later, and a certificate that is not a `.pfx` cannot sign it through `sign.certificate`. `-profile`, `-widgets-profile` and `-clip-profile` replace the iOS provisioning profiles from the command line; `-certificate`, `-sign-command` and `-timestamp-url` set the Windows signing values.
 
 ### Notarize
 
