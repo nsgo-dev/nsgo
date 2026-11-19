@@ -128,7 +128,8 @@ func messaging(cx *core.Scope) core.Node {
 				Disabled: func() bool { return !positioned.Get() },
 				OnPress:  func() { web.SendInput(core.WebClick(at.Post[0], at.Post[1])) }},
 			ui.Button{Text: tr.MediaSaveANote(), Variant: ui.ButtonSecondary, TestID: "save-note",
-				OnPress: func() { web.SendInput(core.WebClick(at.Save[0], at.Save[1])) }},
+				Disabled: func() bool { return !positioned.Get() },
+				OnPress:  func() { web.SendInput(core.WebClick(at.Save[0], at.Save[1])) }},
 			// A promise the page settles, answered as JSON.
 			ui.Button{Text: tr.MediaRunAScript(), Variant: ui.ButtonSecondary, TestID: "run-script", OnPress: func() {
 				web.Evaluate("Promise.resolve(document.body.childElementCount).then(n => ({elements: n > 0, sum: 6 * 7}))",
