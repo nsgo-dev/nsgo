@@ -560,6 +560,46 @@ func TestAttachmentsGrowLinesOfAFixedHeight(t *testing.T) {
 	}
 }
 
+// TestInputLinesTakeTheLineHeight checks that a multiline field lays its lines out at its style's line height from its first layout on, each baseline where a text with the same style puts it, and that the field's lines go back to DirectWrite's own height when the style drops it (#310).
+func TestInputLinesTakeTheLineHeight(t *testing.T) {
+	w := testWindow()
+	style := driver.TextStyle{Font: driver.Font{Family: "Segoe UI", Size: 16, Weight: 400}, Color: driver.RGB(0), LineHeight: 25.5}
+	p := w.Prepare(&driver.AttributedText{Text: "ab", Style: style})
+	want := p.(*preparedText).baseline
+	p.Release()
+	in := &textInput{config: driver.InputConfig{Multiline: true, Style: style}, width: 300}
+	defer in.release()
+	units := []uint16{'a', 'b', '\n', 'c', 'd', '\n', 'e', 'f'}
+	lines := func() []lineMetrics {
+		layout := in.makeLayout(units, dwAlignLeading)
+		if layout == nil {
+			t.Fatal("no layout")
+		}
+		defer layout.release()
+		m := make([]lineMetrics, 8)
+		var count uint32
+		layout.call(layoutGetLineMetrics, uintptr(unsafe.Pointer(&m[0])), uintptr(len(m)), uintptr(unsafe.Pointer(&count)))
+		return m[:count]
+	}
+	for i := range 2 {
+		got := lines()
+		if len(got) != 3 {
+			t.Fatalf("layout %d: %d lines, want 3", i, len(got))
+		}
+		for _, l := range got {
+			if l.height != 25.5 || math.Abs(float64(l.baseline-want)) > 0.01 {
+				t.Errorf("layout %d: a line %v tall with its baseline at %v, want 25.5 and a text's %v", i, l.height, l.baseline, want)
+			}
+		}
+	}
+	in.config.Style.LineHeight = 0
+	for _, l := range lines() {
+		if l.height == 25.5 {
+			t.Errorf("without a line height a line is still %v tall", l.height)
+		}
+	}
+}
+
 func TestSpanAttachmentsPastTheLineLimitAreCut(t *testing.T) {
 	w := testWindow()
 	style := driver.TextStyle{Font: driver.Font{Family: "Segoe UI", Size: 16, Weight: 400}, Color: driver.RGB(0)}
