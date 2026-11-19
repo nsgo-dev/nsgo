@@ -346,7 +346,7 @@ func start(app engine.App, opts Options) (*window, error) {
 	if err := registerViewType(); err != nil {
 		return nil, fmt.Errorf("the Linux backend needs GTK 4: %w", err)
 	}
-	readUIFont()
+	startUIFont()
 	w := newWindow(opts, false)
 	w.primary, w.app, w.opts = true, app, opts
 	w.createWindow(opts)
@@ -498,7 +498,7 @@ func NewView(app engine.App, opts Options) (*View, error) {
 	if err := registerViewType(); err != nil {
 		return nil, fmt.Errorf("the Linux backend needs GTK 4: %w", err)
 	}
-	readUIFont()
+	startUIFont()
 	if opts.Host.Settings == nil {
 		opts.Host.Settings = &engine.HostSettings{}
 	}

@@ -74,6 +74,7 @@ type view struct {
 	// of buffer; hint is a text view's placeholder label.
 	entry, textView, buffer, hint uintptr
 	provider                      uintptr // the editor's CSS, for the display
+	editorNum                     uint64  // names the editor's widgets for its CSS (editorName)
 	input                         driver.InputConfig
 	fs                            field.State
 	// setting is the window setting the text, not the user; clipping an

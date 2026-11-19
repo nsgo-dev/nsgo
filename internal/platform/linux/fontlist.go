@@ -37,6 +37,14 @@ func readUIFont() bool {
 	return old == nil || *old != family
 }
 
+// startUIFont reads the UI font once GTK is initialized, before any widget is styled, and has GTK take gtk-font-name up again. GtkSettings fills a setting from the display lazily, and a read that comes first fills it without notifying, so GTK's own default font, which its CSS gives every widget without a family or size of its own, stays "Sans 10" while gtk-font-name says the desktop's font (#764). Notifying the setting has GTK compute that default from it, as it does when the session changes it.
+func startUIFont() {
+	readUIFont()
+	if settings := gtkSettingsGetDefault(); settings != 0 {
+		gObjectNotify(settings, cstr("gtk-font-name"))
+	}
+}
+
 // fontNameFamily returns the family of a Pango font name such as gtk-font-name's "Cantarell Bold 11": "Cantarell". Pango parses it, as GTK does, so styles, weights and sizes are not taken for words of the family.
 func fontNameFamily(name string) string {
 	desc := pangoFontDescriptionFromString(cstr(name))

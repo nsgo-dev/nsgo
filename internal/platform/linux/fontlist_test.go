@@ -81,6 +81,77 @@ func TestEditorsFollowTheUIFont(t *testing.T) {
 	}
 }
 
+// TestInputsDrawTheirTextAsTextDoes draws one string in a text, a field and a multiline input of the same style and no family, and compares the width and height of their ink, at the session's UI font and after gtk-font-name changes (#764). An input's font comes from GTK's default font, which follows gtk-font-name, where a text's comes from the UI font read from it.
+func TestInputsDrawTheirTextAsTextDoes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	const content = "Hxg text one"
+	title := "nsgo-input-text-font"
+	row := func(n core.Node) core.Node {
+		return core.View{Style: core.Style{Height: core.Pt(40)}, Children: []core.Node{n}}
+	}
+	style := core.Style{FontSize: 16, Color: driver.RGB(0)}
+	w := startTestWindow(t, func(cx *core.Scope) core.Node {
+		cx.SetTitle(title + "|ready")
+		return core.View{Style: core.Style{AlignItems: core.AlignStart, Background: driver.RGB(0xffffff)}, Children: []core.Node{
+			row(core.Text{Content: content, Style: style}),
+			row(core.Input{DefaultValue: content, HideCaret: true, Style: style.Merge(core.Style{Width: core.Pt(300), Height: core.Pt(30)})}),
+			row(core.Input{Multiline: true, DefaultValue: content, HideCaret: true, Style: style.Merge(core.Style{Width: core.Pt(300), Height: core.Pt(40)})}),
+		}}
+	}, Options{Title: title, Width: 320, Height: 200})
+	waitForTitle(t, w, title+"|ready")
+	var gObjectSet func(object uintptr, name, value *byte, end uintptr)
+	purego.RegisterLibFunc(&gObjectSet, gobjectLib, "g_object_set")
+	var before string
+	w.onLoop(t, func() { before = settingString(gtkSettingsGetDefault(), "gtk-font-name") })
+	t.Cleanup(func() {
+		w.onLoop(t, func() { gObjectSet(gtkSettingsGetDefault(), cstr("gtk-font-name"), cstr(before), 0) })
+	})
+	// ink is the size of what is drawn darker than mid-grey in the row from y.
+	ink := func(p pixels, y int) (width, height int) {
+		minX, maxX, minY, maxY := p.width, -1, y+40, -1
+		for yy := y; yy < y+40 && yy < p.height; yy++ {
+			for x := 0; x < p.width; x++ {
+				if px := p.at(x, yy); int(px[0])+int(px[1])+int(px[2]) < 3*128 {
+					minX, maxX, minY, maxY = min(minX, x), max(maxX, x), min(minY, yy), max(maxY, yy)
+				}
+			}
+		}
+		if maxX < 0 {
+			return 0, 0
+		}
+		return maxX - minX + 1, maxY - minY + 1
+	}
+	// near allows a pixel either way: a line placed at another fraction of a pixel antialiases into a row or column more, where another font differs by several.
+	near := func(a, b [2]int) bool {
+		return a[0]-b[0] <= 1 && b[0]-a[0] <= 1 && a[1]-b[1] <= 1 && b[1]-a[1] <= 1
+	}
+	alike := func(font string) {
+		t.Helper()
+		var got [3][2]int
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			p := w.surfacePixels(t)
+			for i := range got {
+				got[i][0], got[i][1] = ink(p, 40*i)
+			}
+			if got[0][0] > 0 && near(got[1], got[0]) && near(got[2], got[0]) {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("in %s, the ink of the text, the field and the multiline input is %v wide and tall", font, got)
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	alike(before)
+	for _, next := range []string{"Monospace 11", "Serif 13"} {
+		w.onLoop(t, func() { gObjectSet(gtkSettingsGetDefault(), cstr("gtk-font-name"), cstr(next), 0) })
+		alike(next)
+	}
+}
+
 // TestFontNameFamilyIsPangosParse reads gtk-font-name's family as GTK does: styles, weights and the size are not words of it.
 func TestFontNameFamilyIsPangosParse(t *testing.T) {
 	if err := openLibs(); err != nil {

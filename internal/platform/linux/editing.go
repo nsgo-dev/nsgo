@@ -5,6 +5,7 @@ package linux
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"unicode/utf8"
 	"unsafe"
 
@@ -127,8 +128,11 @@ func cssColor(c driver.Color) string {
 	return fmt.Sprintf("rgba(%d,%d,%d,%.3f)", int(r*255), int(g*255), int(b*255), a)
 }
 
+// editorNames numbers editors across the process. Each editor's CSS is the display's, so it reaches every window, and node ids start again in each window: named by its id, an editor took the CSS of another window's editor with the same id, one still open or one closed with its provider left, such as a family its own CSS leaves to GTK's default.
+var editorNames atomic.Uint64
+
 // editorName is the widget name v's CSS selects.
-func editorName(v *view) string { return fmt.Sprintf("nsgo-input-%d", v.id) }
+func editorName(v *view) string { return fmt.Sprintf("nsgo-input-%d", v.editorNum) }
 
 // entryStyle is the CSS an editor takes: no look of GTK's own, the view
 // draws its box, and the input's text style, caret, selection and
@@ -287,6 +291,9 @@ func inputPurpose(in *driver.InputConfig) (purpose, hints int32) {
 
 // makeEditor makes v's editor and connects its signals.
 func (w *window) makeEditor(v *view, multiline bool) {
+	if v.editorNum == 0 {
+		v.editorNum = editorNames.Add(1)
+	}
 	v.fs.ID, v.fs.Dispatch = v.id, func(ev driver.Event) {
 		if !w.closing && !v.deleted {
 			w.engine.Dispatch(ev)
