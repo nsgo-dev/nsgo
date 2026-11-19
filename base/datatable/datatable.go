@@ -171,6 +171,9 @@ type Cell struct {
 	Row, Column int
 	Key, Text   string
 	Selected    bool
+	// Tooltip is shown while the pointer rests over this cell. It is also
+	// exposed to assistive technology as the cell's description.
+	Tooltip string
 }
 
 // HeaderCell is what RenderHeaderCell draws: a column's title,
@@ -309,6 +312,9 @@ type DataTable struct {
 	// the table scrolls.
 	RenderCell       func(cx *core.Scope, cell func() Cell) core.Node
 	RenderHeaderCell func(cx *core.Scope, cell func() HeaderCell) core.Node
+	// CellTooltip describes a cell while the pointer rests over it, and to
+	// assistive technology. It is called for cells rendered by RenderCell.
+	CellTooltip func(row, column int) string
 	// Empty shows when there are no rows; LoadingView while Loading.
 	Empty, LoadingView core.Node
 	Classes            Classes
@@ -549,6 +555,7 @@ type dataTable struct {
 	scrollX, scrollY   *core.Signal[core.Points]
 	viewport           *core.Signal[core.Size]
 	hover              *core.Signal[int]
+	hoverCol           *core.Signal[int]
 	focused            *core.Signal[bool]
 	focusRef           *core.Ref
 	drag               *core.Signal[tableDrag]
@@ -581,7 +588,7 @@ func newDataTable(cx *core.Scope, p DataTable) *dataTable {
 	t := &dataTable{p: p, cx: cx, st: &tableState{columns: newTableColumns(nil), loadMoreAt: -1, anchorRow: -1},
 		layoutRev: core.NewSignal(cx, 0), dataRev: core.NewSignal(cx, 0),
 		scrollX: core.NewSignal(cx, core.Points(0)), scrollY: core.NewSignal(cx, core.Points(0)),
-		viewport: core.NewSignal(cx, core.Size{}), hover: core.NewSignal(cx, -1), focused: core.NewSignal(cx, false), focusRef: &core.Ref{},
+		viewport: core.NewSignal(cx, core.Size{}), hover: core.NewSignal(cx, -1), hoverCol: core.NewSignal(cx, -1), focused: core.NewSignal(cx, false), focusRef: &core.Ref{},
 		drag: core.NewSignal(cx, tableDrag{from: -1}), vscroll: &core.Ref{}, hscroll: &core.Ref{},
 		stripRef: &core.Ref{},
 		colsWin:  window.New(1, 3), resizing: -1, handleTap: -1}
@@ -1313,8 +1320,12 @@ func (t *dataTable) contextMenu(h tableHit, at core.Point) {
 }
 
 func (t *dataTable) hoverAt(p core.Point) {
-	if row := t.hitAt(p).row; t.hover.GetUntracked() != row {
-		t.hover.Set(row)
+	h := t.hitAt(p)
+	if t.hover.GetUntracked() != h.row {
+		t.hover.Set(h.row)
+	}
+	if t.hoverCol.GetUntracked() != h.col {
+		t.hoverCol.Set(h.col)
 	}
 }
 

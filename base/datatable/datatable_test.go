@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/base/datatable"
@@ -85,6 +86,31 @@ func TestDataTableMakesOnlyTheCellsInView(t *testing.T) {
 	}
 	if d := ref.Dump(0, 2); len(d.Rows) != 2 || d.Headers[0] != "Col 0" || d.Rows[1][1] != "R1C1" {
 		t.Errorf("dump %+v", d)
+	}
+}
+
+func TestDataTableCellTooltip(t *testing.T) {
+	var selected datatable.Selection
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return datatable.DataTable{
+			Columns:           func() []datatable.Column { return []datatable.Column{{Key: "name", Width: 200}} },
+			RowCount:          func() int { return 1 },
+			Text:              func(int, int) string { return "Shared" },
+			CellTooltip:       func(int, int) string { return "Shared with 3 people" },
+			OnSelectionChange: func(s datatable.Selection) { selected = s },
+			RenderCell: func(_ *core.Scope, cell func() datatable.Cell) core.Node {
+				return core.Text{ContentFunc: func() string { return cell().Text }, TestID: "shared"}
+			},
+			Style: core.Style{Width: core.Pt(300), Height: core.Pt(200)},
+		}
+	}, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}), nsgotest.Size(400, 300))
+	// The tooltip is supplied by the table's cell-aware callback.
+	app.Hover("id:shared")
+	app.Advance(600 * time.Millisecond)
+	app.Find("Shared with 3 people")
+	app.Press("id:shared")
+	if selected.Row != 0 {
+		t.Fatalf("selected = %+v, want row 0", selected)
 	}
 }
 

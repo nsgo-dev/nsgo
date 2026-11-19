@@ -12,6 +12,25 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
+// cellTooltip anchors a cell's text to the cell view while the table's hit
+// layer reports that cell under the pointer.
+type cellTooltip struct {
+	open func() bool
+	text func() string
+}
+
+func (t cellTooltip) Render(*core.Scope) core.Node { return t }
+
+func (t cellTooltip) Hint(_ *core.Scope, anchor *core.Ref) (core.Node, func(core.HintChange)) {
+	return core.Overlay{Anchor: anchor, Placement: core.PlaceTop, Offset: 4, Margin: 4,
+		PointerEvents: core.PointerEventsNone, StyleFunc: func() core.Style {
+			if !t.open() {
+				return core.Style{Display: core.DisplayNone}
+			}
+			return core.Style{}
+		}, Children: []core.Node{core.Text{ContentFunc: t.text}}}, func(core.HintChange) {}
+}
+
 // The table's view, in layers:
 //
 //   - the body, taking no pointer: the cells of the rows and columns in
@@ -831,13 +850,24 @@ func (t *dataTable) cell(cx *core.Scope, row, def *core.Memo[int], which tableRe
 		return core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: px(0), MinWidth: px(0), TextAlign: align}
 	}}
 	if t.p.RenderCell != nil {
-		content = core.View{Style: core.Style{FlexGrow: 1, MinWidth: px(0)}, Children: []core.Node{t.p.RenderCell(cx, func() Cell {
+		cellValue := func() Cell {
 			r, d := row.Get(), def.Get()
 			t.dataRev.Get()
 			sel := t.st.sel
+			tooltip := ""
+			if t.p.CellTooltip != nil && r >= 0 && d >= 0 {
+				tooltip = t.p.CellTooltip(r, d)
+			}
 			return Cell{Row: r, Column: d, Key: t.column(d).Key, Text: text(),
-				Selected: t.rowSelected(r) || sel == tableSel{kind: selCell, row: r, col: d}}
-		})}}
+				Selected: t.rowSelected(r) || sel == tableSel{kind: selCell, row: r, col: d}, Tooltip: tooltip}
+		}
+		content = core.View{Style: core.Style{FlexGrow: 1, MinWidth: px(0)},
+			AccessibilityDescriptionFunc: func() string { return cellValue().Tooltip },
+			Tooltip: cellTooltip{open: func() bool {
+				c := cellValue()
+				return t.hover.Get() == c.Row && t.hoverCol.Get() == c.Column && c.Tooltip != ""
+			}, text: func() string { return cellValue().Tooltip }},
+			Children: []core.Node{t.p.RenderCell(cx, cellValue)}}
 	}
 	return core.View{
 		OnContextMenu: func(e core.ContextMenuEvent) {

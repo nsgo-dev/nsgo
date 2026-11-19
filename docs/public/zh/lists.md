@@ -64,7 +64,7 @@ core.List{Ref: list, Count: count, EstimatedSize: 64, Row: row, OnLoadMore: load
 
 ## 表格
 
-`base/datatable` 显示百万行的表格，行和列都虚拟化，带固定表头，可以把列固定在左侧（`Fixed`）或右侧（`FixedRight`），其余列在它们下面滚动，支持单选或多行选择、排序、调整和移动列，以及应用自己的单元格。`MultiSelect` 支持 Command 或 Control 切换、Shift 范围选择和 Shift 键盘扩展，`SelectedRows` 与 `OnSelectedRowsChange` 可让应用控制所选行。`base.Table` 用于较小数据的普通表格，`base/plot` 绘制图表。
+`base/datatable` 显示百万行的表格，行和列都虚拟化，带固定表头，可以把列固定在左侧（`Fixed`）或右侧（`FixedRight`），其余列在它们下面滚动，支持单选或多行选择、排序、调整和移动列，以及应用自己的单元格。`MultiSelect` 支持 Command 或 Control 切换、Shift 范围选择和 Shift 键盘扩展，`SelectedRows` 与 `OnSelectedRowsChange` 可让应用控制所选行。自定义单元格可以用 `CellTooltip` 提供提示文字，该文字也会提供给辅助技术。`base.Table` 用于较小数据的普通表格，`base/plot` 绘制图表。
 
 ## 下一步
 
