@@ -86,10 +86,10 @@ func overlaps(a, b driver.Bounds) bool {
 		a.Origin.Y < b.Origin.Y+b.Size.Height && b.Origin.Y < a.Origin.Y+a.Size.Height
 }
 
-// regionHold is how long after the surface view changes size its reserved regions go unread: during a rotation or a move to the other display, reservedRegionsOfKind: can answer for a layout pass or more in the previous coordinate space, and nothing tells when it stops, so the regions are read again once it has passed and later still (regionReads).
+// regionHold is how long after the surface view changes size its reserved regions go unread. On the iPhone Duo simulator (iOS 27.2), as the app moves to the other display, reservedRegionsOfKind: answers in the previous display's coordinate space for the rest of the main thread's turn that changed the size, then with no region or a frame still moving, and settles 5 to 140 ms after the change. Nothing reports when it settles: the transition coordinator's completion and windowScene:didUpdateEffectiveGeometry: come in that same turn, before the answer is current, and no trait, safe area or layout callback follows it. So the regions wait for time to pass, read again at regionReads.
 const regionHold = 250 * time.Millisecond
 
-// regionReads are when, after a size change, the surface view is laid out again so its reserved regions are read at the new size, as UIKit tells nothing when they change.
+// regionReads are when, after a size change, the surface view is laid out again so its reserved regions are read at the new size: once the hold has passed, and twice later as a fallback for a device slower to settle than the simulator. Each resends the size the view has, which the engine applies only if the regions changed; a newer size change cancels the reads still to come, as it schedules its own.
 var regionReads = []time.Duration{regionHold, 3 * regionHold, 8 * regionHold}
 
 // regionClock follows the sizes the surface view's reserved regions are read at.

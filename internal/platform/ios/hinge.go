@@ -52,7 +52,7 @@ func (s *surface) reservedRegions() []reservedRegion {
 	return out
 }
 
-// geometry is the surface view's fold geometry at size, as layoutSubviews reports it: its active reserved regions, read with its safe area, and the hinge's latest reading. Regions that may be in another coordinate space, read within regionHold of a size change or reaching past the bounds, are left out, giving the one-region form with the hinge's state, and the view is laid out again to read them later.
+// geometry is the surface view's fold geometry at size, as layoutSubviews reports it: its active reserved regions, read with its safe area, and the hinge's latest reading. Regions that may be in another coordinate space, read within regionHold of a size change or reaching past the bounds, are left out, giving the one-region form with the hinge's state; after a size change the view is laid out again to read them (regionReads).
 func (s *surface) geometry(size driver.Size) driver.Geometry {
 	trusted, changed := s.regionClock.read(size, time.Now())
 	if changed {
@@ -62,8 +62,8 @@ func (s *surface) geometry(size driver.Size) driver.Geometry {
 	if trusted {
 		regions = s.reservedRegions()
 		if !regionsFit(size, regions) {
+			// Not read again for this alone: a region that never fits, as one past an embedded view's edge might, would lay the view out forever.
 			regions = nil
-			s.layOutAfter(regionHold)
 		}
 	}
 	in := objc.Send[edgeInsets](s.native, sel("safeAreaInsets"))
@@ -71,12 +71,13 @@ func (s *surface) geometry(size driver.Size) driver.Geometry {
 	return foldGeometry(size, safe, regions, s.hinge)
 }
 
-// layOutAfter lays the surface view out again after each delay, unless it closed.
+// layOutAfter lays the surface view out again after each delay, unless it closed or changed size again since.
 func (s *surface) layOutAfter(delays ...time.Duration) {
+	since := s.regionClock.since
 	for _, d := range delays {
 		time.AfterFunc(d, func() {
 			apple.OnMain(func() {
-				if !s.closed {
+				if !s.closed && s.regionClock.since == since {
 					s.native.Send(sel("setNeedsLayout"))
 				}
 			})

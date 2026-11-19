@@ -130,6 +130,14 @@ func TestStaleRegions(t *testing.T) {
 	if !regionsFit(driver.Size{Width: 900, Height: 640}, []reservedRegion{{frame: bounds(450, 0, 0, 640.25), division: true}}) {
 		t.Error("a division rounded past the edge does not fit")
 	}
+	// Once the hold has passed after closing, the vertical bar is still sliding in: read at 6 ms and at 136 ms, it lies along the edge at either frame and the camera within the safe area's inset, so the outer display has one region throughout.
+	for _, bar := range []driver.Bounds{bounds(596, 266, 82, 200), bounds(596, 382, 82, 84)} {
+		regions := []reservedRegion{{frame: bounds(611.6666666666666, 399.6666666666667, 37, 37)}, {frame: bar}}
+		g := foldGeometry(outer, driver.Edges{Right: 84, Bottom: 34}, regions, hingeReading{true, hingeStatusClosed, 0})
+		if !regionsFit(outer, regions) || len(g.Regions) != 1 || len(g.Obstructions) != 0 {
+			t.Errorf("the bar at %v: %+v, want one region", bar, g)
+		}
+	}
 
 	var c regionClock
 	start := time.Unix(1000, 0)
