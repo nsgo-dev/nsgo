@@ -1,6 +1,8 @@
 package main
 
 import (
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,11 +13,11 @@ import (
 )
 
 // startTV runs root on an Apple TV, whose remote moves a focus.
-func startTV(t *testing.T, root func(cx *core.Scope) core.Node) *nsgotest.App {
+func startTV(t *testing.T, root func(cx *core.Scope) core.Node, opts ...nsgotest.Option) *nsgotest.App {
 	if nsgotest.Target() != "tvos_simulator" {
 		t.Skip("needs an Apple TV: nsgo test -target tvos_simulator")
 	}
-	return nsgotest.Start(t, root)
+	return nsgotest.Start(t, root, opts...)
 }
 
 // focusedID is the test ID of the view with the focus, or "".
@@ -109,5 +111,62 @@ func TestTVModalFocus(t *testing.T) {
 	}
 	if got := focusedID(app, "other", "open"); got != "open" {
 		t.Fatalf("the focus went back to %q, want the button that opened the dialog", got)
+	}
+}
+
+// TestTVGallery opens demos from the gallery's sidebar, moves the remote's focus down the sidebar and opens the next demo with its select button, pushes a page from a demo and goes back with the Menu button, and leaves out the demos a TV cannot use.
+func TestTVGallery(t *testing.T) {
+	app := startTV(t, Root, nsgotest.Environment(core.Environment{Locale: "en-US"}))
+	for _, name := range []string{"Gestures", "WebView", "Editor", "Dock"} {
+		if app.Exists("id:nav-" + name) {
+			t.Fatalf("the TV's sidebar lists %s", name)
+		}
+	}
+	app.WaitFor("id:demo-Stocks", 5*time.Second)
+	app.Screenshot("tv/stocks")
+	for _, name := range []string{"Button", "Checkbox", "Progress", "Tabs"} {
+		app.Press("id:nav-" + name)
+		app.WaitFor("id:demo-"+name, 5*time.Second)
+		app.FastForward(time.Second)
+		app.Screenshot("tv/" + strings.ToLower(name))
+	}
+	var rows []string
+	for _, d := range tvDemos() {
+		rows = append(rows, "nav-"+d.name)
+	}
+	at := slices.Index(rows, focusedID(app, rows...))
+	if at < 0 || at == len(rows)-1 {
+		t.Fatalf("the focus is on %q, want a row of the sidebar above its last", focusedID(app, rows...))
+	}
+	app.Key("down")
+	next := rows[at+1]
+	if got := focusedID(app, rows...); got != next {
+		t.Fatalf("down moved the focus to %q, want %s", got, next)
+	}
+	app.Key("enter")
+	app.WaitFor("id:demo-"+strings.TrimPrefix(next, "nav-"), 5*time.Second)
+	app.Press("id:nav-NavStack")
+	app.WaitFor("id:demo-NavStack", 5*time.Second)
+	app.Press("text:Large title")
+	app.WaitFor("text:Row 20", 5*time.Second)
+	app.FastForward(time.Second)
+	app.Screenshot("tv/pushed")
+	app.Key("escape")
+	app.WaitForGone("text:Row 20", 5*time.Second)
+	app.WaitFor("id:demo-NavStack", 5*time.Second)
+}
+
+// TestTVLayout lays the gallery out as a TV does, headless: the sidebar leaves out the demos a TV cannot use, and opens the others beside it.
+func TestTVLayout(t *testing.T) {
+	app := nsgotest.Start(t, Root, nsgotest.Size(1920, 1080), nsgotest.Environment(core.Environment{OS: core.OSIOS, Idiom: core.IdiomTV, Locale: "en-US"}))
+	for _, d := range allDemos() {
+		if got := app.Exists("id:nav-" + d.name); got == tvLeftOut[d.name] {
+			t.Errorf("the sidebar lists %s: %v", d.name, got)
+		}
+	}
+	app.Press("id:nav-Checkbox")
+	app.WaitFor("id:demo-Checkbox", time.Second)
+	if got := app.Find("id:title").Text; got != "Checkbox" {
+		t.Fatalf("the title says %q, want Checkbox", got)
 	}
 }

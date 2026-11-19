@@ -344,9 +344,7 @@ func (g *gallery) open(name string) {
 // next launch.
 const lastDemo = "lastDemo"
 
-// Root builds the gallery again when the window's width calls for the
-// other layout, keeping its state in shell; a change of theme or
-// appearance restyles it in place.
+// Root builds the gallery again when the window's width calls for the other layout, keeping its state in shell; a change of theme or appearance restyles it in place. A watch and a TV have layouts of their own, which show the demos made for them (watch.go, tv.go).
 // NSGO_GALLERY_OPEN names a demo to open at start, for screenshots.
 func Root(cx *core.Scope) core.Node {
 	rememberTheme(cx)
@@ -383,6 +381,7 @@ func Root(cx *core.Scope) core.Node {
 		return env.Window().Width >= limit
 	})
 	g.desktop = desktopLayout.Get
+	idiom := core.Untracked(cx, env.Idiom)
 	shell = g
 	showWidgets(cx)
 
@@ -411,12 +410,16 @@ func Root(cx *core.Scope) core.Node {
 		return core.Func(func(cx *core.Scope) core.Node {
 			colors := ui.ColorsOf(cx)
 			var children []core.Node
-			if wide {
-				children = []core.Node{g.desktopLayout(cx), g.settingsDialog(cx)}
-			} else {
-				children = []core.Node{g.phone(cx)}
+			switch {
+			case idiom == core.IdiomWatch:
+				children = []core.Node{g.watch(cx), g.toastView(true)}
+			case idiom == core.IdiomTV:
+				children = []core.Node{g.tv(cx), g.toastView(true)}
+			case wide:
+				children = []core.Node{g.desktopLayout(cx), g.settingsDialog(cx), g.searchDialog(cx), g.toastView(wide)}
+			default:
+				children = []core.Node{g.phone(cx), g.searchDialog(cx), g.toastView(wide)}
 			}
-			children = append(children, g.searchDialog(cx), g.toastView(wide))
 			return core.View{StyleFunc: func() core.Style {
 				return fillPage.Merge(core.Style{Background: ui.Chrome(cx), Color: colors.Text()})
 			}, Children: children}
@@ -446,7 +449,7 @@ func rememberDemo(cx *core.Scope, g *gallery) {
 	if open := os.Getenv("NSGO_GALLERY_OPEN"); open != "" {
 		name = open
 	}
-	if d, ok := findDemo(name); ok {
+	if d, ok := findDemo(name); ok && offered(cx, d.name) {
 		g.selectDemo(d.name)
 		if !g.desktop() {
 			g.pushDemo(d.name)
@@ -463,6 +466,17 @@ func rememberDemo(cx *core.Scope, g *gallery) {
 			return true
 		})
 	})
+}
+
+// offered reports whether the device shows the demo named name: a watch and a TV show some.
+func offered(cx *core.Scope, name string) bool {
+	switch core.Untracked(cx, cx.Env().Idiom) {
+	case core.IdiomWatch:
+		return watchPages[name] != nil
+	case core.IdiomTV:
+		return !tvLeftOut[name]
+	}
+	return true
 }
 
 // shownDemo is the demo shown: the selected one on a desktop, the one

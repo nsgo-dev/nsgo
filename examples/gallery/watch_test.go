@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/nsgotest"
@@ -10,11 +12,11 @@ import (
 )
 
 // startWatch runs root on an Apple Watch.
-func startWatch(t *testing.T, root func(cx *core.Scope) core.Node) *nsgotest.App {
+func startWatch(t *testing.T, root func(cx *core.Scope) core.Node, opts ...nsgotest.Option) *nsgotest.App {
 	if nsgotest.Target() != "watchos_simulator" {
 		t.Skip("needs an Apple Watch: nsgo test -target watchos_simulator")
 	}
-	return nsgotest.Start(t, root)
+	return nsgotest.Start(t, root, opts...)
 }
 
 // TestWatchPressAndScroll presses a button, scrolls a list longer than
@@ -83,9 +85,49 @@ func TestWatchAlert(t *testing.T) {
 	}
 }
 
-// TestWatchGallery opens the gallery's first demo from its home page on a
-// watch's screen.
+// TestWatchGallery lists the demos a watch shows, opens each from the index and goes back to it, by the header's button and by the system's back, and answers the Dialog demo's alert.
 func TestWatchGallery(t *testing.T) {
-	app := startWatch(t, Root)
-	app.Screenshot("watch-gallery")
+	app := startWatch(t, Root, nsgotest.Environment(core.Environment{Locale: "en-US"}))
+	if app.Exists("id:nav-Stocks") || app.Exists("id:nav-WebView") {
+		t.Fatal("the watch's index lists a demo made for wider screens")
+	}
+	app.Screenshot("watch/index")
+	for i, d := range watchDemos() {
+		app.Press("id:nav-" + d.name)
+		app.WaitFor("id:screen-"+d.name, 5*time.Second)
+		if d.name == "Checkbox" {
+			app.Press("id:switch")
+		}
+		app.FastForward(time.Second)
+		app.Screenshot("watch/" + strings.ToLower(d.name))
+		if i%2 == 0 {
+			app.Press("id:back")
+		} else {
+			app.Back()
+		}
+		app.WaitForGone("id:screen-"+d.name, 5*time.Second)
+		if !app.Exists("id:index") {
+			t.Fatalf("back from %s left the index", d.name)
+		}
+	}
+	app.Press("id:nav-Dialog")
+	app.Press("id:alert-open")
+	app.Answer(1)
+	if got := app.Find("id:alert-answer").Text; got != "Done" {
+		t.Fatalf("the alert answered %q, want Done", got)
+	}
+}
+
+// TestWatchLayout lays the gallery out as a watch does, headless: the index lists only the watch's demos, and a demo goes back to it.
+func TestWatchLayout(t *testing.T) {
+	app := nsgotest.Start(t, Root, nsgotest.Size(162, 197), nsgotest.Environment(core.Environment{OS: core.OSIOS, Idiom: core.IdiomWatch, Locale: "en-US"}))
+	for _, d := range allDemos() {
+		if got, want := app.Exists("id:nav-"+d.name), watchPages[d.name] != nil; got != want {
+			t.Errorf("the index lists %s: %v, want %v", d.name, got, want)
+		}
+	}
+	app.Press("id:nav-Slider")
+	app.WaitFor("id:screen-Slider", time.Second)
+	app.Press("id:back")
+	app.WaitForGone("id:screen-Slider", time.Second)
 }
