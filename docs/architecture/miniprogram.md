@@ -42,7 +42,7 @@ One module and one logic layer serve every platform; `config.js` names the platf
 | Douyin and ByteDance's other apps | `tt` | `TTWebAssembly`, then `WebAssembly` | `wechat/` as `.ttml`, `.ttss`, `sjs` and `tt:` | `project.config.json` | its app on macOS |
 | Alipay | `my` | `WebAssembly` | `alipay/` | `mini.project.json` | its app on macOS |
 
-WeChat DevTools is refreshed with `cli close --project <dir>` followed by `cli auto --project <dir>` for every `-run` and `dev` build. This sequence was checked against DevTools 2.01.2510290 and removes the manual compile and reopen step reported by older `cli open` flows.
+WeChat DevTools is refreshed with `cli close --project <dir>` followed by `cli auto --project <dir>` for every `-run` and `dev` build, as `cli open` neither compiles a project nor loads a rebuild into one already open; checked with DevTools 2.01.2510290. The other tools are opened once a `dev` session.
 
 - Go calls the platform only through `nsgoMP.api`, which `api.js` makes from its object: WeChat's as it is, QQ and Douyin's with `chooseImage` standing in for `chooseMedia` where it is missing, and Alipay's translated call by call (`confirm` and `alert` for `showModal`, `{ key }` storage, `setNavigationBar`). An API a platform lacks stays undefined, and Go answers its request as failed.
 - The runtime tries the platform's loaders in order, each with the module's path in the package; a platform that loads none fails to start, with the loaders it tried.

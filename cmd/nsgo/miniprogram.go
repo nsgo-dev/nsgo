@@ -375,17 +375,25 @@ func writeFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-// miniprogramSession writes the project into the dev cache and opens it in
-// mp's developer tool after each successful build.
+// miniprogramSession writes the project into the dev cache and opens it in mp's developer tool: WeChat DevTools after each successful build, as it loads a rebuild only when the project is opened again, and the other tools once, as opening again would only bring their window forward on every rebuild.
 func miniprogramSession(mp miniProgramPlatform) session {
 	dir := func(p *project) string { return p.cache("dev", "miniprogram_"+mp.name) }
+	opened := false
 	return session{
 		build: func(ctx context.Context, p *project) error {
 			return buildMiniProgram(ctx, p, mp, dir(p))
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
+			running := app{stop: func() {}}
+			if opened && mp.name != "wechat" {
+				return running, nil
+			}
 			note("%s", rel(dir(p)))
-			return app{stop: func() {}}, openMiniProgram(ctx, mp, dir(p))
+			if err := openMiniProgramProject(ctx, mp, dir(p)); err != nil {
+				return running, err
+			}
+			opened = true
+			return running, nil
 		},
 	}
 }
@@ -435,14 +443,15 @@ func openMiniProgram(ctx context.Context, mp miniProgramPlatform, dir string) er
 	return openMiniProgramAt(ctx, mp, abs, devToolsCLI())
 }
 
-var runMiniProgramCommand = run
+// openMiniProgramProject and runMiniProgramCommand are openMiniProgram and run, replaced by tests.
+var (
+	openMiniProgramProject = openMiniProgram
+	runMiniProgramCommand  = run
+)
 
 func openMiniProgramAt(ctx context.Context, mp miniProgramPlatform, abs, cli string) error {
 	if mp.name == "wechat" {
-		// WeChat DevTools' open command only opens an existing project. Closing
-		// it first makes the following auto command compile and load the fresh
-		// files on every -run and dev rebuild. Closing an unopened project
-		// returns an error, which is safe to ignore.
+		// WeChat DevTools' open command neither compiles a project nor loads a rebuild into one already open. Closing it first makes the following auto command compile and load the fresh files on every -run and dev rebuild. Closing a project that is not open fails, which is safe to ignore.
 		if err := runMiniProgramCommand(ctx, cli, "close", "--project", abs); err != nil && ctx.Err() != nil {
 			return ctx.Err()
 		}

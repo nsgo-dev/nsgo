@@ -39,6 +39,28 @@ func TestOpenMiniProgramRefreshesWeChatProject(t *testing.T) {
 	}
 }
 
+func TestMiniProgramSessionReopensOnlyWeChat(t *testing.T) {
+	var opened []string
+	openMiniProgramProject = func(_ context.Context, mp miniProgramPlatform, _ string) error {
+		opened = append(opened, mp.name)
+		return nil
+	}
+	t.Cleanup(func() { openMiniProgramProject = openMiniProgram })
+	p := &project{Dir: t.TempDir()}
+	for _, target := range []string{"miniprogram_wechat", "miniprogram_alipay"} {
+		mp, _ := miniProgramPlatformOf(target)
+		s := miniprogramSession(mp)
+		for range 3 {
+			if _, err := s.start(t.Context(), p); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if want := []string{"wechat", "wechat", "wechat", "alipay"}; !slices.Equal(opened, want) {
+		t.Fatalf("opened = %v, want %v", opened, want)
+	}
+}
+
 // runTree runs the runtime's tree.js on goja and returns a function that
 // applies a batch of operations (JSON) and returns the page's setData
 // object as JSON.
