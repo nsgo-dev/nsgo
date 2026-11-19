@@ -3,8 +3,10 @@
 package macos
 
 import (
+	"math"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/ebitengine/purego/objc"
 
@@ -102,31 +104,102 @@ func multilineEditorWraps(t *testing.T) {
 	}
 }
 
-// TestMultilineEditorLineHeightStylesTyping checks that an explicit line
-// height reaches AppKit's typing attributes, which are what text inserted
-// after the first layout inherits.
-func TestMultilineEditorLineHeightStylesTyping(t *testing.T) {
+// TestMultilineInputTakesTheLineHeight checks that a multiline input draws its lines at the style's line height, their baselines where a core.Text with the same style puts them, for a value set before and after the style and for its placeholder; that what is typed next takes it; and that dropping the line height keeps the alignment (#310).
+func TestMultilineInputTakesTheLineHeight(t *testing.T) {
 	onMain(func() {
 		loadAppKit()
-		_, tv := newMultilineEditor()
-		font := apple.Font(driver.Font{Size: 13})
-		color := nsColor(driver.RGB(0x202020))
-		setEditorParagraph(tv, objc.ID(font), color, 24, nsAlignCenter)
-		attrs := tv.Send(sel("typingAttributes"))
-		para := attrs.Send(sel("objectForKey:"), textAttrs().paragraph)
-		if para == 0 {
-			t.Fatal("typing attributes have no paragraph style")
+		s := &surface{views: make([]*view, 2), animator: driver.NewAnimator(func(driver.Event) {})}
+		v := s.create(driver.KindInput, 1)
+		s.views[v.id] = v
+		defer s.delete(v, false)
+		v.native.Send(selSetFrame, apple.Rect(0, 0, 300, 200))
+		in := v.input
+		const text = "HHHH\nHHHH\nHHHH"
+		paragraph := textAttrs().paragraph
+		lineHeights := func(id objc.ID) (lo, hi float64, align int) {
+			if id == 0 {
+				return 0, 0, -1
+			}
+			return objc.Send[float64](id, sel("minimumLineHeight")), objc.Send[float64](id, sel("maximumLineHeight")), objc.Send[int](id, sel("alignment"))
 		}
-		if got := objc.Send[float64](para, sel("minimumLineHeight")); got != 24 {
-			t.Errorf("minimum line height = %v, want 24", got)
+		at := func(i int) objc.ID {
+			return in.field.Send(selTextStorage).Send(sel("attribute:atIndex:effectiveRange:"), paragraph, uint(i), uintptr(0))
 		}
-		if got := objc.Send[float64](para, sel("maximumLineHeight")); got != 24 {
-			t.Errorf("maximum line height = %v, want 24", got)
+		for _, lineHeight := range []driver.Points{25.5, 40, 15} {
+			style := driver.TextStyle{Font: driver.Font{Size: 16, Weight: 400}, Color: driver.RGB(0), LineHeight: lineHeight, Align: driver.TextAlignCenter}
+			config := driver.InputConfig{Multiline: true, Style: style, Placeholder: "HHHH", PlaceholderColor: driver.RGB(0),
+				Content: driver.Bounds{Size: driver.Size{Width: 300, Height: 200}}}
+			// Where core.Text puts the baselines of the same lines, from its top.
+			p := apple.TextEngine{}.Prepare(&driver.AttributedText{Text: text, Style: style})
+			l := p.Layout(p.Measure(300)).(*apple.Layout)
+			var want []float64
+			for _, line := range l.TextLines() {
+				b := line.Bounds
+				want = append(want, float64(b.Origin.Y+line.Ascender+(b.Size.Height-line.Ascender-line.Descender)/2))
+			}
+			l.Release()
+			p.Release()
+			check := func(when string, lines int) {
+				v.native.Send(sel("layoutSubtreeIfNeeded"))
+				got := baselines(v.native, 300, 200)
+				if len(got) != lines {
+					t.Errorf("%v pt lines, %s: baselines %v, want %d lines", lineHeight, when, got, lines)
+					return
+				}
+				for k, b := range got {
+					if math.Abs(b-want[k]) > 1 {
+						t.Errorf("%v pt lines, %s: baselines %v, want core.Text's %v", lineHeight, when, got, want[:lines])
+						break
+					}
+				}
+			}
+			in.replaceText(text)
+			v.configure(&config)
+			check("styled after the value", 3)
+			in.replaceText("")
+			check("the placeholder", 1)
+			in.replaceText(text)
+			check("value set after the style", 3)
+			for _, i := range []int{0, 5, 10} {
+				if lo, hi, align := lineHeights(at(i)); lo != float64(lineHeight) || hi != float64(lineHeight) || align != nsAlignCenter {
+					t.Errorf("character %d's lines are %v to %v pt, aligned %d; want %v and %d", i, lo, hi, align, lineHeight, nsAlignCenter)
+				}
+			}
+			if lo, hi, _ := lineHeights(in.field.Send(sel("typingAttributes")).Send(sel("objectForKey:"), paragraph)); lo != float64(lineHeight) || hi != float64(lineHeight) {
+				t.Errorf("typed text gets lines %v to %v pt, want %v", lo, hi, lineHeight)
+			}
+			config.Style.LineHeight = 0
+			v.configure(&config)
+			if lo, _, align := lineHeights(at(0)); lo != 0 || align != nsAlignCenter {
+				t.Errorf("without a line height the text's lines are at least %v pt, aligned %d; want 0 and centered", lo, align)
+			}
+			if in.lift != 0 {
+				t.Errorf("without a line height the lines are lifted %v pt", in.lift)
+			}
 		}
-		if got := objc.Send[int](para, sel("alignment")); got != nsAlignCenter {
-			t.Errorf("alignment = %d, want %d", got, nsAlignCenter)
-		}
-		apple.Release(font)
-		tv.Send(selRelease)
 	})
+}
+
+// baselines returns the baselines of the lines of dark ink v draws in a w by h box, from its top: the bottom of each band of rows with ink, which is where capitals stand.
+func baselines(v objc.ID, w, h float64) []float64 {
+	rep := v.Send(sel("bitmapImageRepForCachingDisplayInRect:"), apple.Rect(0, 0, w, h))
+	v.Send(sel("cacheDisplayInRect:toBitmapImageRep:"), apple.Rect(0, 0, w, h), rep)
+	pw, ph := objc.Send[int](rep, sel("pixelsWide")), objc.Send[int](rep, sel("pixelsHigh"))
+	bpr, spp := objc.Send[int](rep, sel("bytesPerRow")), objc.Send[int](rep, sel("samplesPerPixel"))
+	data := unsafe.Slice(objc.Send[*byte](rep, sel("bitmapData")), bpr*ph)
+	inked := func(y int) bool {
+		for x := range pw {
+			if p := data[y*bpr+x*spp:]; p[3] > 128 && p[0] < 100 {
+				return true
+			}
+		}
+		return false
+	}
+	var out []float64
+	for y := range ph {
+		if inked(y) && (y+1 == ph || !inked(y+1)) {
+			out = append(out, float64(y+1)*h/float64(ph))
+		}
+	}
+	return out
 }

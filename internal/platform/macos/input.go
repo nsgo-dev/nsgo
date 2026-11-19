@@ -30,10 +30,12 @@ import (
 
 // input is an input view's editor and what it tracks.
 type input struct {
-	fs        field.State
-	field     objc.ID // the responder: an NSTextField or an NSTextView
-	host      objc.ID // what is placed: the field, or the text view's scroll view
-	label     objc.ID // a text view's placeholder
+	fs    field.State
+	field objc.ID // the responder: an NSTextField or an NSTextView
+	host  objc.ID // what is placed: the field, or the text view's scroll view
+	label objc.ID // a text view's placeholder
+	// lift is how far a text view's lines, and its placeholder's, are drawn above where AppKit puts them: AppKit sets a line's extra height above its glyphs, where core.Text centers the font in the line.
+	lift      float64
 	multiline bool
 	masked    bool
 	focused   bool
@@ -73,7 +75,6 @@ var (
 	selSetTypingAttributes = sel("setTypingAttributes:")
 	selTextStorage         = sel("textStorage")
 	selAddAttribute        = sel("addAttribute:value:range:")
-	selRemoveAttribute     = sel("removeAttribute:range:")
 
 	classField, classSecureField, classTextView, classSecureEditor, classSecureFieldCell objc.Class
 
@@ -139,7 +140,7 @@ func registerInput() {
 					return apple.CGPoint{}
 				}
 				p := in.fs.Config.Padding
-				return apple.CGPoint{X: float64(p.Left), Y: float64(p.Top)}
+				return apple.CGPoint{X: float64(p.Left), Y: float64(p.Top) - in.lift}
 			}},
 			{Cmd: sel("keyDown:"), Fn: func(self objc.ID, cmd objc.SEL, event objc.ID) {
 				in := inputOf(self)
@@ -425,7 +426,7 @@ func (in *input) replaceText(text string) {
 	caret, ok := in.selection()
 	in.applying = true
 	in.setText(text)
-	in.styleParagraph()
+	in.styleLines()
 	if ok {
 		n := driver.UTF16Len(text)
 		at := min(caret.End, n)
@@ -439,7 +440,11 @@ func (in *input) replaceText(text string) {
 	in.selectionChanged()
 }
 
-func (in *input) styleParagraph() {
+// styleLines styles a text view's lines after its text is replaced.
+func (in *input) styleLines() {
+	if !in.multiline {
+		return
+	}
 	c := &in.fs.Config
 	font := apple.Font(c.Style.Font)
 	defer apple.Release(font)
@@ -450,7 +455,7 @@ func (in *input) styleParagraph() {
 	case driver.TextAlignEnd:
 		align = nsAlignRight
 	}
-	setEditorParagraph(in.editor(), objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
+	styleLines(in.field, objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
 }
 
 func (in *input) updatePlaceholder() {
@@ -789,15 +794,20 @@ func (v *view) configure(c *driver.InputConfig) {
 		in.label.Send(selSetTextColor, nsColor(placeholderColor(c)))
 		in.label.Send(selSetAlignment, align)
 		setPlaceholderLabel(in.label, c.Placeholder, objc.ID(font), placeholderColor(c), align, c.Style.LineHeight)
-		setEditorParagraph(in.field, objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
+		styleLines(in.field, objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
+		in.lift = 0
+		if c.Style.LineHeight > 0 {
+			natural := objc.Send[float64](objc.ID(font), sel("ascender")) - objc.Send[float64](objc.ID(font), sel("descender"))
+			in.lift = (float64(c.Style.LineHeight) - natural) / 2
+		}
+		in.field.Send(sel("invalidateTextContainerOrigin"))
 	} else {
 		in.field.Send(selSetEnabled, !c.Disabled)
-		setPlaceholder(in.field, c.Placeholder, objc.ID(font), placeholderColor(c), align, c.Style.LineHeight)
+		setPlaceholder(in.field, c.Placeholder, objc.ID(font), placeholderColor(c), align)
 		if e := in.field.Send(selCurrentEditor); e != 0 {
 			e.Send(selSetFont, objc.ID(font))
 			e.Send(selSetTextColor, nsColor(c.Style.Color))
 			e.Send(selSetAlignment, align)
-			setEditorParagraph(e, objc.ID(font), nsColor(c.Style.Color), c.Style.LineHeight, align)
 		}
 		setContentType(in.field, c.AutoComplete, in.masked)
 	}
@@ -829,8 +839,7 @@ var textAttrs = sync.OnceValue(func() (a struct{ font, color, background, paragr
 	return a
 })
 
-// setPlaceholder gives a field its placeholder in its font, color and
-// alignment: an attributed placeholder keeps to the start otherwise.
+// newParagraph returns a paragraph style aligned as align whose lines are lineHeight tall when that is set, as a core.Text's are (apple/text.go): the extra height goes above each line's glyphs. The caller releases it.
 func newParagraph(lineHeight driver.Points, align int) objc.ID {
 	para := objc.ID(apple.Class("NSMutableParagraphStyle")).Send(selAlloc).Send(sel("init"))
 	para.Send(selSetAlignment, align)
@@ -841,41 +850,28 @@ func newParagraph(lineHeight driver.Points, align int) objc.ID {
 	return para
 }
 
-// setEditorParagraph applies the line height to existing text and to text
-// inserted afterward. AppKit otherwise keeps the default paragraph spacing
-// even when the input's TextStyle has an explicit line height.
-func setEditorParagraph(e, font, color objc.ID, lineHeight driver.Points, align int) {
-	if e == 0 {
-		return
-	}
+// styleLines gives a text view's text, and what is typed or pasted into it later, the input's alignment and line height. AppKit lays a text view's lines at its font's own height otherwise, and a new string drops the paragraph style its old text had, so this goes over the whole text each time.
+func styleLines(tv, font, color objc.ID, lineHeight driver.Points, align int) {
 	a := textAttrs()
-	if font == 0 || color == 0 || a.font == 0 || a.color == 0 || a.paragraph == 0 {
+	if tv == 0 || font == 0 || color == 0 || a.font == 0 || a.color == 0 || a.paragraph == 0 {
 		return
 	}
 	para := newParagraph(lineHeight, align)
-	e.Send(selSetDefaultParagraph, para)
+	tv.Send(selSetDefaultParagraph, para)
 	attrs := objc.ID(apple.Class("NSMutableDictionary")).Send(sel("dictionary"))
 	attrs.Send(sel("setObject:forKey:"), font, a.font)
 	attrs.Send(sel("setObject:forKey:"), color, a.color)
 	attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
-	e.Send(selSetTypingAttributes, attrs)
-	storage := e.Send(selTextStorage)
-	if storage != 0 && a.paragraph != 0 {
-		text := e.Send(selString)
-		n := objc.Send[uint](text, selLength)
-		if n > 0 {
-			r := apple.NSRange{Length: n}
-			if lineHeight > 0 {
-				storage.Send(selAddAttribute, a.paragraph, para, r)
-			} else {
-				storage.Send(selRemoveAttribute, a.paragraph, r)
-			}
-		}
+	tv.Send(selSetTypingAttributes, attrs)
+	if n := objc.Send[uint](tv.Send(selString), selLength); n > 0 {
+		tv.Send(selTextStorage).Send(selAddAttribute, a.paragraph, para, apple.NSRange{Length: n})
 	}
 	para.Send(selRelease)
 }
 
-func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, align int, lineHeight driver.Points) {
+// setPlaceholder gives a field its placeholder in its font, color and
+// alignment: an attributed placeholder keeps to the start otherwise.
+func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, align int) {
 	a := textAttrs()
 	if a.font == 0 || a.color == 0 {
 		f.Send(selSetPlaceholder, apple.NSString(text))
@@ -885,7 +881,7 @@ func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, al
 	attrs.Send(sel("setObject:forKey:"), font, a.font)
 	attrs.Send(sel("setObject:forKey:"), nsColor(color), a.color)
 	if a.paragraph != 0 {
-		para := newParagraph(lineHeight, align)
+		para := newParagraph(0, align)
 		attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
 		para.Send(selRelease)
 	}
@@ -895,13 +891,10 @@ func setPlaceholder(f objc.ID, text string, font objc.ID, color driver.Color, al
 	str.Send(selRelease)
 }
 
+// setPlaceholderLabel sets a text view's placeholder label, its lines as tall as the text view's.
 func setPlaceholderLabel(label objc.ID, text string, font objc.ID, color driver.Color, align int, lineHeight driver.Points) {
-	if lineHeight <= 0 {
-		label.Send(selSetString, apple.NSString(text))
-		return
-	}
 	a := textAttrs()
-	if a.font == 0 || a.color == 0 || a.paragraph == 0 {
+	if lineHeight <= 0 || a.font == 0 || a.color == 0 || a.paragraph == 0 {
 		label.Send(selSetString, apple.NSString(text))
 		return
 	}
@@ -963,7 +956,7 @@ func inputLayout(self objc.ID, cmd objc.SEL) {
 		p := in.fs.Config.Padding
 		in.host.Send(selSetFrame, apple.Rect(x-float64(p.Left), float64(box.Origin.Y-p.Top), w+float64(p.Left+p.Right), float64(box.Size.Height+p.Top+p.Bottom)))
 		h := objc.Send[apple.CGSize](in.label, selIntrinsicContentSize).Height
-		in.label.Send(selSetFrame, apple.Rect(x, float64(box.Origin.Y), w, max(h, float64(box.Size.Height))))
+		in.label.Send(selSetFrame, apple.Rect(x, float64(box.Origin.Y)-in.lift, w, max(h, float64(box.Size.Height)+in.lift)))
 		return
 	}
 	h := objc.Send[apple.CGSize](in.field, selIntrinsicContentSize).Height
