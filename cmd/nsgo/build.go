@@ -132,6 +132,7 @@ func buildPackages(ctx context.Context, p *project, targets []string, jobs int) 
 			defer func() { <-slots }()
 			dir := filepath.Join(p.Build.Output, fmt.Sprintf("%s-%s-%s", p.Name, p.Version, target))
 			q := *p
+			q.buildParallel = max(1, runtime.NumCPU()/jobs)
 			q.released = nil
 			err := os.RemoveAll(dir)
 			if err == nil {
@@ -170,9 +171,9 @@ func buildPackages(ctx context.Context, p *project, targets []string, jobs int) 
 	return total, firstErr
 }
 
-// buildJobs is how many targets nsgo build builds at once: build.jobs,
-// else half the CPUs, as each go build uses them all, and no more than
-// there are targets.
+// buildJobs is how many targets nsgo build builds at once: build.jobs, or
+// half the CPUs by default, and no more than there are targets. Each target's
+// Go compile workers are reduced to keep the total near the CPU count.
 func (p *project) buildJobs(targets int) (int, error) {
 	jobs := p.Build.Jobs
 	switch {
@@ -181,6 +182,7 @@ func (p *project) buildJobs(targets int) (int, error) {
 	case jobs == 0:
 		jobs = max(1, runtime.NumCPU()/2)
 	}
+	jobs = min(jobs, max(1, runtime.NumCPU()))
 	return max(1, min(jobs, targets)), nil
 }
 
@@ -561,6 +563,9 @@ func goBuildWith(ctx context.Context, p *project, out string, env []string, extr
 func goBuildCommand(ctx context.Context, p *project, out string, env []string, extra buildExtra, ldflags ...string) (cmd *exec.Cmd, done func(), err error) {
 	done = func() {}
 	args := append([]string{"build"}, extra.flags...)
+	if p.buildParallel > 0 {
+		args = append(args, "-p", strconv.Itoa(p.buildParallel))
+	}
 	args = append(args, "-ldflags", p.ldflags(append(append([]string(nil), ldflags...), p.updateLdflags(env)...)...), "-o", out)
 	tags, err := goTags(ctx, p, env, extra.tags...)
 	if err != nil {

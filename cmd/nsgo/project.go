@@ -49,6 +49,9 @@ type project struct {
 	// released lists the files nsgo build put in the release directory
 	// for the target it builds.
 	released []string
+	// buildParallel bounds Go's compile workers for one target while several
+	// targets build together. Zero keeps Go's default.
+	buildParallel int
 
 	Name    string `yaml:"name"`
 	ID      string `yaml:"id"`

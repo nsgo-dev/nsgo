@@ -218,6 +218,38 @@ func TestBuildJobs(t *testing.T) {
 	if _, err := p.buildJobs(2); err == nil {
 		t.Error("build.jobs -1: got no error")
 	}
+	p.Build.Jobs = runtime.NumCPU() * 2
+	if got, _ := p.buildJobs(100); got > runtime.NumCPU() {
+		t.Errorf("explicit build.jobs oversubscribes: got %d, want at most %d", got, runtime.NumCPU())
+	}
+}
+
+func TestBuildParallelKeepsCompilersWithinTheCPUCount(t *testing.T) {
+	for _, jobs := range []int{1, 2, max(1, runtime.NumCPU()/2), runtime.NumCPU()} {
+		p := &project{buildParallel: max(1, runtime.NumCPU()/max(1, jobs))}
+		if got := jobs * p.buildParallel; got > runtime.NumCPU() {
+			t.Errorf("%d targets use %d compile workers, want at most %d", jobs, got, runtime.NumCPU())
+		}
+	}
+}
+
+func TestGoBuildCommandUsesBuildParallel(t *testing.T) {
+	p := checkFixture(t)
+	p.buildParallel = 3
+	cmd, done, err := goBuildCommand(t.Context(), p, filepath.Join(t.TempDir(), "app"), nil, buildExtra{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer done()
+	for i, arg := range cmd.Args {
+		if arg == "-p" {
+			if i+1 >= len(cmd.Args) || cmd.Args[i+1] != "3" {
+				t.Fatalf("go build args %q, want -p 3", cmd.Args)
+			}
+			return
+		}
+	}
+	t.Fatalf("go build args %q lack -p 3", cmd.Args)
 }
 
 // The companion is a console program, which the shell waits for and whose streams and exit code it keeps; the app stays a GUI one.
