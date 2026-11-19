@@ -142,11 +142,15 @@ func (p *Plugin) Call(name string, args []any, done func(result any, err error))
 	p.cx.Run(func() {
 		defer func() {
 			if x := recover(); x != nil {
-				err, ok := x.(error)
-				if !ok {
-					err = fmt.Errorf("%v", x)
+				var callErr error
+				if ex, ok := x.(*js.Exception); ok {
+					callErr = r.rejection(ex.Value())
+				} else if e, ok := x.(error); ok {
+					callErr = e
+				} else {
+					callErr = fmt.Errorf("%v", x)
 				}
-				finish(nil, err)
+				finish(nil, callErr)
 			}
 		}()
 		in := make([]js.Value, len(args))

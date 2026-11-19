@@ -620,6 +620,7 @@ mount(() => <View>
 func TestLoadCallsWhatAPluginExports(t *testing.T) {
 	p := verified(t, `export function add(a, b) { return a + b; }
 export async function search(q) { const r = await fetch("https://api.example.com/" + q.term); return { url: await r.text() }; }
+export function syncFails() { const e = new Error("no such word"); e.code = "notFound"; throw e; }
 export async function fails() { throw new Error("no luck"); }
 export const notAFunction = 1;`, pkg.Capabilities{Network: &pkg.Network{Hosts: []string{"api.example.com"}}})
 	var plugin *tsx.Plugin
@@ -633,7 +634,7 @@ export const notAFunction = 1;`, pkg.Capabilities{Network: &pkg.Network{Hosts: [
 	}
 	exports := plugin.Exports()
 	slices.Sort(exports)
-	if !slices.Equal(exports, []string{"add", "fails", "search"}) {
+	if !slices.Equal(exports, []string{"add", "fails", "search", "syncFails"}) {
 		t.Fatalf("exports %v", exports)
 	}
 	got := map[string]any{}
@@ -650,14 +651,18 @@ export const notAFunction = 1;`, pkg.Capabilities{Network: &pkg.Network{Hosts: [
 	}
 	call("add", 1, 2)
 	call("search", map[string]any{"term": "cats"})
+	call("syncFails")
 	call("fails")
 	call("missing")
-	app.WaitUntil(5*time.Second, func() bool { return len(got) == 4 })
+	app.WaitUntil(5*time.Second, func() bool { return len(got) == 5 })
 	if got["add"] != int64(3) && got["add"] != float64(3) {
 		t.Errorf("add gave %#v", got["add"])
 	}
 	if m, _ := got["search"].(map[string]any); m["url"] != "https://api.example.com/cats" {
 		t.Errorf("search gave %#v", got["search"])
+	}
+	if err, _ := got["syncFails"].(error); core.ErrorCode(err) != "notFound" || err.Error() != "no such word" {
+		t.Errorf("syncFails gave %v", got["syncFails"])
 	}
 	if err, _ := got["fails"].(error); err == nil || err.Error() != "no luck" {
 		t.Errorf("fails gave %v", got["fails"])
