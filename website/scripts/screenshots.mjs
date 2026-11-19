@@ -4,8 +4,7 @@
 // <layout>-<lang>-<theme>.jpg. Run `bun run gallery` first; it needs Google Chrome
 // and macOS's sips.
 //
-// The gallery is served from public/gallery/ and driven through Chrome's
-// DevTools protocol, which waits for the wasm to start before capturing.
+// The gallery is served from public/gallery/ and driven through Chrome's DevTools protocol, which waits for the wasm to start before capturing. It is app.html, the gallery without the platform frames of index.html.
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,7 +20,7 @@ const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // Long enough to download, compile and start the gallery from disk.
 const startWait = 30000;
 
-if (!existsSync(path.join(publicDir, 'gallery', 'index.html'))) {
+if (!existsSync(path.join(publicDir, 'gallery', 'app.html'))) {
   throw new Error('public/gallery/ is missing: run `bun run gallery` first');
 }
 
@@ -117,7 +116,7 @@ try {
       shots.map((shot) => {
         const query = new URLSearchParams({ theme, 'nsgo-lang': locales[lang].app, 'nsgo-appearance': theme });
         return {
-          url: `http://localhost:${server.port}/gallery/?${query}`,
+          url: `http://localhost:${server.port}/gallery/app.html?${query}`,
           shot,
           locale: locales[lang].browser,
           out: path.join(outDir, `${shot.name}-${lang}-${theme}.jpg`),

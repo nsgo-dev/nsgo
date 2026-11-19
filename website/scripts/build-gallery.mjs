@@ -1,9 +1,4 @@
-// Builds the gallery for the web and puts it in public/gallery/ for the
-// site's Live demo links at /gallery/: the tool's site, its wasm compressed
-// (web-build.mjs), behind gallery-loader.html, which reports its download,
-// decompression, compilation and start progress and is written over
-// index.html. loader.html, the gallery's old address, redirects to /gallery/.
-// nsgo.json goes, as nothing mounts the gallery.
+// Builds the gallery for the web and puts it in public/gallery/ for the site's Live demo links at /gallery/: the tool's site, its wasm compressed (web-build.mjs), behind gallery-loader.html, which reports its download, decompression, compilation and start progress and is written to app.html. index.html is gallery-frame.html, which runs app.html in a frame drawn as the platform the visitor chooses. loader.html, the gallery's old address, redirects to /gallery/. nsgo.json goes, as nothing mounts the gallery.
 //
 // public/gallery/ is generated: do not edit it.
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,7 +17,9 @@ const loader = readFileSync(path.join(website, 'scripts', 'gallery-loader.html')
   .replaceAll('__RESOURCES__', JSON.stringify(app.resources ?? {}))
   .replaceAll('__GZIP_SIZE__', String(app.gzipSize))
   .replaceAll('__ICON__', icon);
-writeFileSync(path.join(galleryDir, 'index.html'), loader);
+writeFileSync(path.join(galleryDir, 'app.html'), loader);
+const frame = readFileSync(path.join(website, 'scripts', 'gallery-frame.html'), 'utf8').replaceAll('__ICON__', icon);
+writeFileSync(path.join(galleryDir, 'index.html'), frame);
 writeFileSync(
   path.join(galleryDir, 'loader.html'),
   '<!doctype html><meta charset="utf-8"><link rel="canonical" href="./">' +

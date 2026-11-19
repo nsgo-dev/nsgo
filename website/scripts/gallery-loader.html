@@ -128,9 +128,7 @@
         if (params.get('embed') === '1') document.documentElement.setAttribute('data-embed', '');
       })();
     </script>
-    <!-- The page's arrival is the event load-gallery in the site's Umami
-         (src/layouts/Layout.astro), tagged "gallery-web"; the app counts its pages
-         once it starts (examples/gallery/stats.go). -->
+    <!-- The page's arrival is the event load-gallery in the site's Umami (src/layouts/Layout.astro), tagged "gallery-web"; the app counts its pages once it starts (examples/gallery/stats.go). Embedded, the frame page (gallery-frame.html) counts the arrival once, however many platforms it starts the app as. -->
     <script
       defer
       src="https://umami.oneo.me/script.js"
@@ -138,7 +136,7 @@
       data-domains="nsgo.dev,nsgo-dev.github.io,nsgo.oneo.me"
       data-auto-track="false"
       data-tag="gallery-web"
-      onload="umami.track('load-gallery')"></script>
+      onload="document.documentElement.hasAttribute('data-embed') || umami.track('load-gallery')"></script>
   </head>
   <body>
     <div class="boot" role="status" aria-live="polite">

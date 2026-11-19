@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-platform="web">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Gallery · NSGo</title>
+    <meta name="description" content="Every NSGo component, running in the browser as macOS, Windows, Linux, iOS, Android or the web." />
+    <link rel="icon" href="__ICON__" />
+    <style>
+      /* The site's colors (src/styles/global.css) for the page, and the loader's (gallery-loader.html) for the app's screen and the bars beside it. */
+      :root {
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --border: #e7e8ec;
+        --text: #0c0d10;
+        --muted: #666a73;
+        --faint: #8d919a;
+        --blue: #007aff;
+        --danger: #b4444c;
+        --veil: rgb(246 247 249 / 82%);
+        --shadow-sm: 0 1px 2px rgb(16 24 40 / 8%);
+        --shadow-lg: 0 2px 6px rgb(16 24 40 / 5%), 0 40px 80px -32px rgb(16 24 40 / 28%);
+        --app-bg: #f3f3f3;
+        --app-text: #2b2b2b;
+        --chrome: #e9e9eb;
+        --chrome-line: #d4d4d8;
+        --chrome-text: #1f1f1f;
+        --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', Roboto, sans-serif;
+        --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+        color-scheme: light;
+      }
+      html[data-theme='dark'] {
+        --bg: #0b0c0f;
+        --surface: #14161b;
+        --border: #23262d;
+        --text: #f3f4f6;
+        --muted: #a0a4ad;
+        --faint: #7d818b;
+        --blue: #3d9bff;
+        --danger: #e58f95;
+        --veil: rgb(11 12 15 / 82%);
+        --shadow-sm: none;
+        --shadow-lg: 0 40px 80px -32px rgb(0 0 0 / 80%);
+        --app-bg: #181818;
+        --app-text: #eaeaea;
+        --chrome: #2b2b2e;
+        --chrome-line: #1a1a1c;
+        --chrome-text: #e8e8e8;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        color: var(--text);
+        font: 14px/1.5 var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      /* ---- Toolbar ---- */
+      .toolbar {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: 12px;
+        height: 52px;
+        padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .brand {
+        display: flex;
+        flex: none;
+        align-items: center;
+        gap: 8px;
+        border-radius: 8px;
+        color: inherit;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .brand img {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+      }
+      .brand:focus-visible,
+      .theme:focus-visible,
+      .retry:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      .platforms {
+        display: flex;
+        min-width: 0;
+        margin: 0 auto;
+        padding: 3px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--bg);
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .platforms label {
+        position: relative;
+        flex: none;
+      }
+      .platforms input {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .platforms span {
+        display: block;
+        padding: 4px 12px;
+        border-radius: 7px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .platforms input:hover + span {
+        color: var(--text);
+      }
+      .platforms input:checked + span {
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
+        color: var(--text);
+      }
+      html[data-theme='dark'] .platforms input:checked + span {
+        background: #262a32;
+      }
+      .platforms input:focus-visible + span {
+        outline: 2px solid var(--blue);
+        outline-offset: -2px;
+      }
+      .theme {
+        display: grid;
+        flex: none;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .theme:hover {
+        color: var(--text);
+      }
+      .theme svg {
+        width: 16px;
+        height: 16px;
+      }
+      html[data-theme='dark'] .theme__moon,
+      html:not([data-theme='dark']) .theme__sun {
+        display: none;
+      }
+      @media (max-width: 600px) {
+        .brand span {
+          display: none;
+        }
+        .platforms span {
+          padding: 4px 7px;
+          font-size: 12px;
+        }
+      }
+      @media (max-width: 420px) {
+        .brand {
+          display: none;
+        }
+      }
+
+      /* ---- Stage ---- */
+      /* The stage keeps out of the notch and the home indicator; the page's background shows there. */
+      .stage {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        margin: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        overflow: hidden;
+      }
+      .device {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        display: flex;
+        flex-direction: column;
+        transform-origin: center;
+      }
+      .display {
+        position: relative;
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        background: var(--app-bg);
+      }
+      .screen {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+      }
+      .screen iframe {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: var(--app-bg);
+      }
+      .bar {
+        position: relative;
+        display: flex;
+        flex: none;
+        align-items: center;
+        pointer-events: none;
+        user-select: none;
+      }
+      .bar:empty {
+        display: none;
+      }
+      .bar svg {
+        display: block;
+        fill: currentColor;
+      }
+
+      /* The web: the app fills the stage, as the gallery did before it had frames. */
+      html[data-platform='web'] .device {
+        inset: 0;
+        transform: none !important;
+      }
+
+      /* A desktop window. */
+      .device--window .display {
+        border: 1px solid var(--chrome-line);
+        border-radius: 10px;
+        box-shadow: var(--shadow-lg);
+      }
+      .device--window .bar--top {
+        border-bottom: 1px solid var(--chrome-line);
+        background: var(--chrome);
+        color: var(--chrome-text);
+        font-size: 13px;
+      }
+      .bar__title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lights {
+        position: absolute;
+        left: 12px;
+        display: flex;
+        gap: 8px;
+      }
+      .lights i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ff5f57;
+        box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 18%);
+      }
+      .lights i:nth-child(2) {
+        background: #febc2e;
+      }
+      .lights i:nth-child(3) {
+        background: #28c840;
+      }
+      html[data-platform='macos'] .bar--top {
+        justify-content: center;
+        font-weight: 600;
+      }
+      html[data-platform='windows'] .device--window .display {
+        border-radius: 8px;
+      }
+      html[data-platform='windows'] .bar--top {
+        gap: 10px;
+        padding-left: 12px;
+        border-bottom: 0;
+        font-family: 'Segoe UI Variable Text', 'Segoe UI', var(--font-sans);
+        font-size: 12px;
+      }
+      html[data-platform='windows'] .bar--top img {
+        width: 16px;
+        height: 16px;
+      }
+      .caption {
+        display: flex;
+        align-self: stretch;
+        margin-left: auto;
+      }
+      .caption i {
+        display: grid;
+        place-items: center;
+        width: 46px;
+      }
+      html[data-platform='linux'] .device--window .display {
+        border-radius: 12px 12px 0 0;
+      }
+      html[data-platform='linux'] .bar--top {
+        justify-content: center;
+        font-family: Cantarell, 'Noto Sans', 'Ubuntu', var(--font-sans);
+        font-weight: 700;
+      }
+      .gnome-close {
+        position: absolute;
+        right: 8px;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgb(127 127 127 / 18%);
+      }
+
+      /* A phone, its body as the home page's (.phone in src/styles/global.css). */
+      .device--phone {
+        border-radius: 58px;
+        background: #0c0d10;
+        box-shadow: var(--shadow-lg);
+      }
+      html[data-theme='dark'] .device--phone {
+        outline: 1px solid #31353e;
+      }
+      .device--phone .bar {
+        color: var(--app-text);
+        background: var(--app-bg);
+      }
+      html[data-platform='ios'] .device--phone {
+        padding: 12px;
+      }
+      html[data-platform='ios'] .display {
+        border-radius: 47px;
+      }
+      html[data-platform='android'] .device--phone {
+        padding: 10px;
+        border-radius: 44px;
+      }
+      html[data-platform='android'] .display {
+        border-radius: 34px;
+      }
+      .status {
+        justify-content: space-between;
+      }
+      html[data-platform='ios'] .status {
+        padding: 6px 30px 0 44px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      html[data-platform='android'] .status {
+        padding: 0 18px 0 22px;
+        font-family: Roboto, 'Google Sans', var(--font-sans);
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .status__icons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .island {
+        position: absolute;
+        top: 11px;
+        left: 50%;
+        width: 124px;
+        height: 36px;
+        margin-left: -62px;
+        border-radius: 18px;
+        background: #000;
+      }
+      .punch {
+        position: absolute;
+        top: 5px;
+        left: 50%;
+        width: 14px;
+        height: 14px;
+        margin-left: -7px;
+        border-radius: 50%;
+        background: #000;
+      }
+      .handle {
+        margin: auto;
+        border-radius: 99px;
+        background: currentColor;
+      }
+      html[data-platform='ios'] .handle {
+        width: 134px;
+        height: 5px;
+        margin-bottom: 8px;
+      }
+      html[data-platform='android'] .handle {
+        width: 108px;
+        height: 4px;
+        opacity: 0.7;
+      }
+
+      /* ---- Progress ---- */
+      .boot {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: var(--veil);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+      }
+      .boot[hidden] {
+        display: none;
+      }
+      .boot__card {
+        display: grid;
+        justify-items: center;
+        gap: 14px;
+        width: min(320px, 100%);
+        text-align: center;
+      }
+      .boot__name {
+        color: var(--blue);
+        font: 600 10px/1 var(--font-mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .boot__title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .boot__bar {
+        width: 100%;
+        height: 3px;
+        border-radius: 99px;
+        background: var(--border);
+        overflow: hidden;
+      }
+      .boot__fill {
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--blue);
+        transition: width 0.18s linear;
+      }
+      .boot__meta {
+        margin: 0;
+        min-height: 1.5em;
+        color: var(--faint);
+        font: 11px/1.5 var(--font-mono);
+      }
+      .boot__meta--error {
+        max-width: 38ch;
+        color: var(--danger);
+      }
+      .retry {
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot__fill {
+          transition: none;
+        }
+      }
+    </style>
+    <script>
+      // The theme comes from the URL, otherwise from the site's stored preference (src/scripts/theme.ts): light, dark or the system's, light when there is none, as the loader's does, so the page and the app never disagree before the app starts.
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var theme = params.get('theme');
+        if (theme !== 'light' && theme !== 'dark') {
+          var stored = null;
+          try {
+            stored = localStorage.getItem('nsgo-theme');
+          } catch (error) {}
+          var dark = stored === 'dark' || (stored === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          theme = dark ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <!-- The page's arrival is the event load-gallery in the site's Umami, tagged "gallery-web", once a visit; the app in the frame does not count it again (gallery-loader.html), and each platform chosen is the event switch-platform. -->
+    <script
+      defer
+      src="https://umami.oneo.me/script.js"
+      data-website-id="e8174058-eb31-40f8-bf9c-4ddc9ca5f4ac"
+      data-domains="nsgo.dev,nsgo-dev.github.io,nsgo.oneo.me"
+      data-auto-track="false"
+      data-tag="gallery-web"
+      onload="umami.track('load-gallery')"></script>
+  </head>
+  <body>
+    <header class="toolbar">
+      <a class="brand" href="../"><img src="__ICON__" alt="" /><span>NSGo Gallery</span></a>
+      <fieldset class="platforms" id="platforms">
+        <legend class="visually-hidden">Platform</legend>
+        <label><input type="radio" name="platform" value="macos" /><span>macOS</span></label>
+        <label><input type="radio" name="platform" value="windows" /><span>Windows</span></label>
+        <label><input type="radio" name="platform" value="linux" /><span>Linux</span></label>
+        <label><input type="radio" name="platform" value="ios" /><span>iOS</span></label>
+        <label><input type="radio" name="platform" value="android" /><span>Android</span></label>
+        <label><input type="radio" name="platform" value="web" /><span>Web</span></label>
+      </fieldset>
+      <button class="theme" id="theme" type="button" aria-label="Dark appearance" aria-pressed="false">
+        <svg class="theme__moon" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M13.5 10.1A5.8 5.8 0 0 1 5.9 2.5a.5.5 0 0 0-.7-.6 6.8 6.8 0 1 0 8.9 8.9.5.5 0 0 0-.6-.7Z" /></svg>
+        <svg class="theme__sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3.2" fill="currentColor" /><path stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M3 13l1.1-1.1M11.9 4.1 13 3" /></svg>
+      </button>
+    </header>
+    <main class="stage" id="stage">
+      <div class="device" id="device">
+        <div class="display">
+          <div class="bar bar--top" id="bar-top" aria-hidden="true"></div>
+          <div class="screen" id="screen"></div>
+          <div class="bar bar--bottom" id="bar-bottom" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="boot" id="boot" role="status" aria-live="polite">
+        <div class="boot__card">
+          <span class="boot__name">NSGo</span>
+          <h1 class="boot__title" id="boot-title">Loading the gallery</h1>
+          <div class="boot__bar"><div class="boot__fill" id="boot-fill"></div></div>
+          <p class="boot__meta" id="boot-meta">Preparing WebAssembly…</p>
+          <button class="retry" id="retry" type="button" hidden>Try again</button>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        'use strict';
+
+        // Each platform's frame: its kind, its size in CSS pixels, the bars above and below the app's screen, and their markup, drawn here as the app on the web has none of them. A phone's size is its screen's; its body adds a border.
+        var signal =
+          '<svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>';
+        var wifi =
+          '<svg width="15" height="11" viewBox="0 0 15 11"><path d="M7.5 2.2c2.1 0 4 .8 5.5 2.1l1.1-1.2A9.6 9.6 0 0 0 7.5.5 9.6 9.6 0 0 0 .9 3.1L2 4.3a8 8 0 0 1 5.5-2.1Zm0 3.3c1.2 0 2.3.4 3.2 1.2l1.1-1.2a6.4 6.4 0 0 0-8.6 0l1.1 1.2c.9-.8 2-1.2 3.2-1.2Zm0 3.2c-.4 0-.8.1-1 .4l1 1.4 1-1.4c-.2-.3-.6-.4-1-.4Z"/></svg>';
+        var battery =
+          '<svg width="26" height="12" viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity="0.4"/><rect x="2" y="2" width="17" height="8" rx="2"/><path d="M24 4v4a2 2 0 0 0 0-4Z" opacity="0.4"/></svg>';
+        var androidIcons =
+          '<svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 12.5 0 3.6A11 11 0 0 1 7 1a11 11 0 0 1 7 2.6Z"/></svg>' +
+          '<svg width="13" height="13" viewBox="0 0 13 13"><path d="M13 0v13H0Z"/></svg>' +
+          '<svg width="8" height="14" viewBox="0 0 8 14"><path d="M2.5 0h3v1.2H7a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V2.2a1 1 0 0 1 1-1h1.5Z"/></svg>';
+        var glyph = function (d) {
+          return '<i><svg width="10" height="10" viewBox="0 0 10 10"><path d="' + d + '" fill="none" stroke="currentColor" stroke-width="1"/></svg></i>';
+        };
+        var title = '<span class="bar__title">Gallery</span>';
+        var icon = document.querySelector('link[rel="icon"]').getAttribute('href');
+        var frames = {
+          macos: { kind: 'window', width: 1280, height: 800, top: 28, top_html: '<span class="lights"><i></i><i></i><i></i></span>' + title },
+          windows: {
+            kind: 'window',
+            width: 1280,
+            height: 800,
+            top: 32,
+            top_html: '<img src="' + icon + '" alt="" />' + title + '<span class="caption">' + glyph('M0 5.5h10') + glyph('M.5.5h9v9h-9Z') + glyph('M.5.5l9 9M9.5.5l-9 9') + '</span>',
+          },
+          linux: {
+            kind: 'window',
+            width: 1280,
+            height: 800,
+            top: 38,
+            top_html: title + '<span class="gnome-close"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M.5.5l7 7M7.5.5l-7 7" stroke="currentColor" stroke-width="1.5"/></svg></span>',
+          },
+          ios: {
+            kind: 'phone',
+            width: 390,
+            height: 844,
+            border: 12,
+            top: 47,
+            bottom: 34,
+            top_html: '<span>9:41</span><span class="island"></span><span class="status__icons">' + signal + wifi + battery + '</span>',
+            bottom_html: '<span class="handle"></span>',
+          },
+          android: {
+            kind: 'phone',
+            width: 412,
+            height: 915,
+            border: 10,
+            top: 24,
+            bottom: 24,
+            top_html: '<span>12:00</span><span class="punch"></span><span class="status__icons">' + androidIcons + '</span>',
+            bottom_html: '<span class="handle"></span>',
+          },
+          web: {},
+        };
+        var names = { macos: 'macOS', windows: 'Windows', linux: 'Linux', ios: 'iOS', android: 'Android', web: 'the web' };
+        var storageKey = 'nsgo-gallery-platform';
+        var systemDark = matchMedia('(prefers-color-scheme: dark)');
+
+        var root = document.documentElement;
+        var params = new URLSearchParams(location.search);
+        var stage = document.getElementById('stage');
+        var device = document.getElementById('device');
+        var barTop = document.getElementById('bar-top');
+        var barBottom = document.getElementById('bar-bottom');
+        var screen = document.getElementById('screen');
+        var boot = document.getElementById('boot');
+        var bootTitle = document.getElementById('boot-title');
+        var fill = document.getElementById('boot-fill');
+        var meta = document.getElementById('boot-meta');
+        var retry = document.getElementById('retry');
+        var themeButton = document.getElementById('theme');
+        var radios = document.querySelectorAll('#platforms input');
+        var frame = null;
+
+        function known(value) {
+          return Object.prototype.hasOwnProperty.call(frames, value) ? value : null;
+        }
+
+        var platform = known(params.get('platform'));
+        if (!platform) {
+          try {
+            platform = known(localStorage.getItem(storageKey));
+          } catch (error) {}
+        }
+        platform = platform || 'web';
+
+        function theme() {
+          return root.dataset.theme === 'dark' ? 'dark' : 'light';
+        }
+
+        // preference is the theme the page follows: the URL's, otherwise the site's stored light, dark or system, light when there is none.
+        function preference() {
+          var value = params.get('theme');
+          if (value === 'light' || value === 'dark') return value;
+          try {
+            value = localStorage.getItem('nsgo-theme');
+          } catch (error) {
+            value = null;
+          }
+          return value === 'dark' || value === 'system' ? value : 'light';
+        }
+
+        // setTheme shows the theme and tells the running app, which follows without a reload.
+        function setTheme(next) {
+          root.dataset.theme = next;
+          root.style.colorScheme = next;
+          showTheme();
+          if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'nsgo-gallery-theme', theme: next }, location.origin);
+        }
+
+        // Every load passes on the URL's nsgo- flags, so a switch or a retry starts the app as the URL asks.
+        function appURL() {
+          var query = new URLSearchParams({ embed: '1', theme: theme() });
+          if (platform !== 'web') query.set('nsgo-os', platform);
+          params.forEach(function (value, key) {
+            if (key.indexOf('nsgo-') !== 0 || key === 'nsgo-os') return;
+            query.append(key, value);
+          });
+          return 'app.html?' + query;
+        }
+
+        // fit scales a frame to the stage, never above its own size, so the app keeps its CSS size and with it its layout and media queries.
+        function fit() {
+          var f = frames[platform];
+          if (!f.kind) return;
+          var border = f.border || 0;
+          var width = f.width + 2 * border;
+          var height = f.height + 2 * border;
+          var pad = stage.clientWidth < 640 ? 12 : 32;
+          var scale = Math.min((stage.clientWidth - 2 * pad) / width, (stage.clientHeight - 2 * pad) / height, 1);
+          device.style.width = width + 'px';
+          device.style.height = height + 'px';
+          device.style.transform = 'translate(-50%, -50%) scale(' + Math.max(scale, 0.1) + ')';
+        }
+
+        function showProgress(percent, message) {
+          fill.style.width = Math.max(0, Math.min(100, percent)) + '%';
+          meta.className = 'boot__meta';
+          meta.textContent = message;
+        }
+
+        function formatBytes(bytes) {
+          if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+          return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function progressText(data) {
+          switch (data.phase) {
+            case 'download':
+              return data.loaded <= data.total ? formatBytes(data.loaded) + ' of ' + formatBytes(data.total) + ' downloaded' : formatBytes(data.loaded) + ' downloaded';
+            case 'decompress':
+              return 'Decompressing the engine…';
+            case 'compile':
+              return 'Compiling WebAssembly…';
+            case 'start':
+              return 'Starting the gallery…';
+            default:
+              return 'Preparing WebAssembly…';
+          }
+        }
+
+        // load starts the app as the chosen platform in a new frame: the OS is a start flag, and a Go program cannot be stopped, so a switch replaces the frame and with it the old program. A new frame's first page adds no entry to the session history, as a changed src would. The frame's data-nsgo-history gives the app the page's history, so the browser's back goes back through the app's pages. The wasm comes from the HTTP cache after the first load.
+        function load() {
+          var f = frames[platform];
+          root.dataset.platform = platform;
+          device.className = 'device' + (f.kind ? ' device--' + f.kind : '');
+          barTop.className = 'bar bar--top' + (f.kind === 'phone' ? ' status' : '');
+          barTop.innerHTML = f.top_html || '';
+          barTop.style.height = f.top ? f.top + 'px' : '';
+          barBottom.innerHTML = f.bottom_html || '';
+          barBottom.style.height = f.bottom ? f.bottom + 'px' : '';
+          if (!f.kind) {
+            device.style.width = device.style.height = device.style.transform = '';
+          }
+          fit();
+
+          bootTitle.textContent = 'Loading the gallery';
+          retry.hidden = true;
+          showProgress(0, 'Preparing WebAssembly…');
+          boot.hidden = false;
+
+          var next = document.createElement('iframe');
+          next.title = 'NSGo gallery as ' + names[platform];
+          next.allow = 'autoplay; clipboard-read; clipboard-write; fullscreen; picture-in-picture';
+          next.setAttribute('data-nsgo-history', '');
+          next.src = appURL();
+          var depth = pushed(frame);
+          if (frame) frame.remove();
+          screen.appendChild(next);
+          frame = next;
+          if (depth > 0) history.go(-depth);
+        }
+
+        // pushed is how many entries the app in f pushed (its history.state.nsgo, internal/platform/web/history.go). The browser keeps a removed frame's entries, and Back would stop at each without a visible change, so load goes back over them once the old app is gone and can no longer follow the back.
+        function pushed(f) {
+          try {
+            var state = f && f.contentWindow.history.state;
+            return state && typeof state.nsgo === 'number' ? state.nsgo : 0;
+          } catch (error) {
+            return 0;
+          }
+        }
+
+        function select(value) {
+          for (var i = 0; i < radios.length; i++) radios[i].checked = radios[i].value === value;
+        }
+
+        function choose(value) {
+          if (!known(value) || value === platform) return;
+          platform = value;
+          try {
+            localStorage.setItem(storageKey, platform);
+          } catch (error) {}
+          var url = new URL(location.href);
+          url.searchParams.set('platform', platform);
+          history.replaceState(history.state, '', url);
+          if (window.umami) window.umami.track('switch-platform', { platform: platform });
+          load();
+        }
+
+        function showTheme() {
+          var dark = theme() === 'dark';
+          themeButton.setAttribute('aria-pressed', String(dark));
+        }
+
+        // The theme switch is the site's: it keeps an explicit light or dark as the site does, in the URL when it has one.
+        themeButton.addEventListener('click', function () {
+          var next = theme() === 'dark' ? 'light' : 'dark';
+          try {
+            localStorage.setItem('nsgo-theme', next);
+          } catch (error) {}
+          if (params.has('theme')) {
+            params.set('theme', next);
+            var url = new URL(location.href);
+            url.searchParams.set('theme', next);
+            history.replaceState(history.state, '', url);
+          }
+          setTheme(next);
+        });
+
+        // A system preference follows the system's appearance as it changes.
+        systemDark.addEventListener('change', function () {
+          if (preference() === 'system') setTheme(systemDark.matches ? 'dark' : 'light');
+        });
+
+        document.getElementById('platforms').addEventListener('change', function (event) {
+          choose(event.target.value);
+        });
+
+        retry.addEventListener('click', load);
+
+        // The loader in the frame reports its progress (gallery-loader.html, embedded); messages of a frame already replaced are dropped.
+        window.addEventListener('message', function (event) {
+          if (event.origin !== location.origin || !frame || event.source !== frame.contentWindow) return;
+          var data = event.data;
+          if (!data || data.type !== 'nsgo-gallery') return;
+          if (data.event === 'progress') {
+            showProgress(data.percent, progressText(data));
+          } else if (data.event === 'ready') {
+            showProgress(100, 'Ready');
+            boot.hidden = true;
+            // Keys go to the app unless the visitor is elsewhere on the page; arrow keys left on the platforms would switch again.
+            var active = document.activeElement;
+            if (!active || active === document.body || active.name === 'platform') {
+              frame.focus();
+              frame.contentWindow.focus();
+            }
+          } else if (data.event === 'error') {
+            bootTitle.textContent = 'The gallery could not start';
+            meta.className = 'boot__meta boot__meta--error';
+            meta.textContent = String(data.message || 'Unknown error');
+            retry.hidden = false;
+          }
+        });
+
+        if (window.ResizeObserver) new ResizeObserver(fit).observe(stage);
+        else window.addEventListener('resize', fit);
+
+        select(platform);
+        showTheme();
+        load();
+      })();
+    </script>
+  </body>
+</html>
