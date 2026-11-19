@@ -267,6 +267,8 @@ jobs:
         run: go tool nsgo test -run '^TestUIAPropertyChangedEvents$' ./internal/platform/windows
       - name: Test menu yield with a focused WebView2 page
         run: go tool nsgo test -run '^TestMenuYieldFollowsNativeFocus$' ./internal/platform/windows
+      - name: Test menu yield to the shortcuts the menu leaves a focused field
+        run: go tool nsgo test -run '^TestMenuYieldReachesTheBindingTheMenuLeaves$' ./internal/platform/windows
       - name: Test WebView2 accelerator shortcuts
         run: go tool nsgo test -run '^TestFocusedPageKeysReachShortcutsFirst$' ./internal/platform/windows
       - name: Test Edit menu roles in a focused WebView2 page and their OnSelect fallback
