@@ -186,23 +186,17 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Mark the job's start for crash reports
+        run: touch "$RUNNER_TEMP/apple-start"
       - name: Vet
         run: go tool nsgo check ./internal/platform/apple
       - name: Test
-        run: |
-          set +e
-          ulimit -c unlimited
-          go tool nsgo test ./internal/platform/apple
-          status=$?
-          if [ "$status" -ne 0 ]; then
-            echo 'Recent macOS crash reports:'
-            find "$HOME/Library/Logs/DiagnosticReports" -type f -mmin -10 -print -exec cat {} \; 2>/dev/null || true
-          fi
-          exit "$status"
-      - name: Stress overlapping sound playback
+        run: go tool nsgo test ./internal/platform/apple
+      # A native fault ends the test process without a Go stack; the crash report printed below names the faulting thread (#801).
+      - name: Stress overlapping sound playback in fresh processes
         run: |
           for i in $(seq 1 200); do
-            go tool nsgo test -run '^TestASoundDecodesOnceAndPlaysOverlapping$' ./internal/platform/apple || exit
+            go tool nsgo test -run '^TestASoundDecodesOnceAndPlaysOverlapping$' ./internal/platform/apple || { echo "run $i failed"; exit 1; }
           done
       - name: Test main-thread failure propagation
         run: go tool nsgo test -run '^TestOnMainExitPropagation$' ./internal/platform/macos -- -race
@@ -232,6 +226,12 @@ jobs:
         run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test composited captures
         run: go tool nsgo test -target macos ./internal/testhost/testdata/capture
+      - name: Print crash reports
+        if: failure()
+        run: |
+          # ReportCrash writes a report a few seconds after the process dies.
+          sleep 10
+          find "$HOME/Library/Logs/DiagnosticReports" -type f -newer "$RUNNER_TEMP/apple-start" -print -exec cat {} \;
 
   apple-simulator:
     # Simulator packages are arm64; the Intel desktop job cannot run them.
