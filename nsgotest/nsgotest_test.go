@@ -783,6 +783,44 @@ func TestFieldClipboardKeys(t *testing.T) {
 	}
 }
 
+// A focused field selects all with mod+a unless an application-menu item has
+// that shortcut, in which case the item wins as it does on each desktop.
+func TestFieldSelectAllKeyYieldsToApplicationMenu(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless field model")
+	}
+	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux} {
+		t.Run(string(os), func(t *testing.T) {
+			app := Start(t, func(cx *core.Scope) core.Node {
+				return core.Input{TestID: "field", DefaultValue: "hello"}
+			}, Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
+			app.Focus("id:field")
+			app.Key("mod+a")
+			if s := app.Find("id:field").Selection; s.Start != 0 || s.End != 5 {
+				t.Fatalf("without a menu item, mod+a selected %+v", s)
+			}
+
+			chosen := 0
+			app = StartApp(t, func(cx *core.Scope) {
+				desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "Edit", Items: []desktop.MenuItem{
+					{Label: "Select Layer", Shortcut: "mod+a", OnSelect: func() { chosen++ }},
+				}}})
+				cx.SetMainView(func(cx *core.Scope) core.Node {
+					return core.Input{TestID: "field", DefaultValue: "hello"}
+				})
+			}, Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
+			app.Focus("id:field")
+			app.Key("mod+a")
+			if chosen != 1 {
+				t.Fatalf("the menu item ran %d times, want once", chosen)
+			}
+			if s := app.Find("id:field").Selection; s.Start != 0 || s.End != 0 {
+				t.Fatalf("the menu item left field selection %+v", s)
+			}
+		})
+	}
+}
+
 // Another window the app opens runs beside the main one without disturbing the views steps reach, and each window's alerts are answered to the window that showed them, though both number them alike.
 func TestOtherWindowsLeaveTheMainOnesViews(t *testing.T) {
 	if Target() != "" {
