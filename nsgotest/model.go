@@ -658,10 +658,12 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemPickImages:
 			a.Picks = append(a.Picks, *it.Pick)
 			var files []driver.PickedFile
-			if a.PickImages != nil {
+			if a.target == nil && a.PickImages != nil {
 				files = a.PickImages(*it.Pick)
 			}
-			a.post(driver.Event{Kind: driver.EventPick, Count: it.Count, Data: files})
+			if a.target == nil {
+				a.post(driver.Event{Kind: driver.EventPick, Count: it.Count, Data: files})
+			}
 		case driver.ItemTakePhoto:
 			a.Photos = append(a.Photos, *it.Pick)
 			ev := driver.Event{Kind: driver.EventPick, Count: it.Count}

@@ -280,12 +280,19 @@ func (a *App) targetOptions(t *target) testhost.Options {
 		// The main window opens at the desktop's default size, as the app's does.
 		size = driver.Size{}
 	}
+	var pickImages func(driver.PickRequest, func([]driver.PickedFile))
+	if a.PickImages != nil {
+		pickImages = func(r driver.PickRequest, done func([]driver.PickedFile)) {
+			testhost.PostToTest(a, func() { done(a.PickImages(r)) })
+		}
+	}
 	return testhost.Options{
 		CheckCommits: !automationBuild && !a.measure,
 		Size:         size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
-		FPS:     os.Getenv("NSGO_TEST_FPS") != "",
-		Observe: t.observe,
-		Event:   t.surfaceEvent,
+		FPS:        os.Getenv("NSGO_TEST_FPS") != "",
+		Observe:    t.observe,
+		Event:      t.surfaceEvent,
+		PickImages: pickImages,
 	}
 }
 

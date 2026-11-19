@@ -70,6 +70,8 @@ if desktop.CanLookUp(cx) {
 
 `cx.PickImages` shows the system's photo picker and answers with `core.PickedFile`s, whose bytes, name, type and pixel size the app reads. `cx.TakePhoto` shows the camera where the platform has one; `cx.Env().CanTakePhoto` says whether it does.
 
+`nsgotest.App.PickImages` supplies fake results in headless and target tests, including macOS target runs.
+
 ```go
 cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.PickedFile) {
 	if len(files) == 1 {

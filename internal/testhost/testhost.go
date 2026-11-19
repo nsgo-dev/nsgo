@@ -55,6 +55,10 @@ type Options struct {
 	// has one: macOS, iOS, Windows and Linux; the web and Android measure
 	// only the engine, with no frame readings.
 	FPS bool
+	// PickImages answers a photo picker request for a target test. The host
+	// invokes done after the test's callback has run, so test state stays on
+	// the test goroutine while the answer is dispatched to the app.
+	PickImages func(driver.PickRequest, func([]driver.PickedFile))
 }
 
 // Surface is an app shown on a platform. Its methods act as the user

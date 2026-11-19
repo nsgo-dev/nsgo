@@ -232,6 +232,12 @@ func (s *surface) share(r driver.ShareRequest, id uint32) {
 // pickImages shows an open panel as a sheet on the window for the
 // images r asks for, then prepares the ones chosen off the main thread.
 func (s *surface) pickImages(r driver.PickRequest, id uint32) {
+	if s.test != nil && s.test.options.PickImages != nil {
+		s.test.options.PickImages(r, func(files []driver.PickedFile) {
+			s.engine.Dispatch(driver.Event{Kind: driver.EventPick, Count: id, Data: driver.FinishPick(r, files, nil)})
+		})
+		return
+	}
 	panel := objc.ID(apple.Class("NSOpenPanel")).Send(sel("openPanel"))
 	panel.Send(sel("setCanChooseFiles:"), true)
 	panel.Send(sel("setCanChooseDirectories:"), false)
