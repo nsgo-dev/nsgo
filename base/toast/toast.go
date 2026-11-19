@@ -91,6 +91,8 @@ type Toast struct {
 	SwipingClass   string
 	SwipingStyle   core.Style
 	Label          string
+	// LabelFunc follows a label that changes while the toast remains in the stack.
+	LabelFunc func() string
 	// OnDismissRequest: the user swiped it away; dismiss it. It stays
 	// where the swipe took it.
 	OnDismissRequest func()
@@ -112,8 +114,12 @@ func (t Toast) Render(cx *core.Scope) core.Node {
 		}
 		return t.Status()
 	}
-	if t.Label != "" {
-		cx.Announce(t.Label)
+	label := t.Label
+	if t.LabelFunc != nil {
+		label = t.LabelFunc()
+	}
+	if label != "" {
+		cx.Announce(label)
 	}
 	threshold := t.SwipeThreshold
 	if threshold == 0 {
@@ -162,7 +168,11 @@ func (t Toast) Render(cx *core.Scope) core.Node {
 	}
 
 	startingClass, endingClass, swipingClass := parts.Important(t.StartingClass), parts.Important(t.EndingClass), parts.Important(t.SwipingClass)
-	root := core.View{Role: core.RoleAlert, Label: t.Label, TestID: t.TestID, Tooltip: t.Tooltip, Class: t.Class,
+	rootLabel := label
+	if t.LabelFunc != nil {
+		rootLabel = ""
+	}
+	root := core.View{Role: core.RoleAlert, Label: rootLabel, LabelFunc: t.LabelFunc, TestID: t.TestID, Tooltip: t.Tooltip, Class: t.Class,
 		// The state's classes win over Class and Style, as its styles do
 		// and as CSS's state selectors do by their specificity.
 		ClassFunc: func() string {

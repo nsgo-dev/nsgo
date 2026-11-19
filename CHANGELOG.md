@@ -35,6 +35,7 @@
 - Keep an engine fault's `CheckCommits` re-panic ahead of its exit notification, so fault-isolation tests cannot mistake the notification for a swallowed panic (#703).
 - Stop canvases and shaders on Apple platforms and the web from drawing an earlier image for an image's inline `Data` once the earlier buffer was freed and its address reused, by keeping a cached image's bytes alive (#715, #737, #751).
 - Localize the separator between Android TalkBack's state parts with the app's language, including Chinese punctuation (#704).
+- Keep a toast's title, description, leading view and action current when showing a replacement with the same ID (#749).
 
 ## [0.1.0] - 2026-11-16
 

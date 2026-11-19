@@ -270,30 +270,38 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 	t := ts.Toaster
 	colors := ColorsOf(cx)
 	first := core.Untracked(cx, e)
-	id, c := first.ID, first.Value
-	label := strings.Join(slices.DeleteFunc([]string{c.Title, c.Description}, func(s string) bool { return s == "" }), ". ")
-	texts := []core.Node{core.Text{Content: c.Title, Style: TypeLabel, StyleFunc: Colored(colors.Text)}}
-	if c.Description != "" {
-		texts = append(texts, core.Text{Content: c.Description, Style: TypeCaption, StyleFunc: Colored(colors.Muted)})
+	id := first.ID
+	label := func() string {
+		c := e().Value
+		return strings.Join(slices.DeleteFunc([]string{c.Title, c.Description}, func(s string) bool { return s == "" }), ". ")
 	}
-	var children []core.Node
-	if lead := toastLeading(c); lead != nil {
-		children = append(children, core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{lead}})
-	}
-	children = append(children, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 2}, Children: texts})
-	if c.Action != "" {
-		children = append(children, Button{Text: c.Action, Variant: ButtonSecondary, TestID: id + "-action", OnPress: func() {
-			if c.OnAction != nil {
-				c.OnAction()
+	leading := core.Dynamic(func(*core.Scope) core.Node {
+		if lead := toastLeading(e().Value); lead != nil {
+			return core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{lead}}
+		}
+		return core.View{}
+	})
+	textBody := core.Dynamic(func(*core.Scope) core.Node {
+		c := e().Value
+		texts := []core.Node{core.Text{Content: c.Title, Style: TypeLabel, StyleFunc: Colored(colors.Text)}}
+		if c.Description != "" {
+			texts = append(texts, core.Text{Content: c.Description, Style: TypeCaption, StyleFunc: Colored(colors.Muted)})
+		}
+		return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 2}, Children: texts}
+	})
+	action := core.Dynamic(func(*core.Scope) core.Node {
+		c := e().Value
+		if c.Action == "" {
+			return core.View{}
+		}
+		return Button{Text: c.Action, Variant: ButtonSecondary, TestID: id + "-action", OnPress: func() {
+			if latest := e().Value.OnAction; latest != nil {
+				latest()
 			}
 			t.Dismiss(id)
-		}})
-	}
-	children = append(children, IconButton{Icon: lucide.X, Label: ts.CloseLabel, Size: 24, TestID: id + "-close", OnPress: func() { t.Dismiss(id) }})
-	align := core.AlignCenter
-	if c.Description != "" {
-		align = core.AlignStart
-	}
+		}}
+	})
+	children := []core.Node{leading, textBody, action, IconButton{Icon: lucide.X, Label: ts.CloseLabel, Size: 24, TestID: id + "-close", OnPress: func() { t.Dismiss(id) }}}
 	swipe := ts.Swipe.direction(ts.Placement, core.Untracked(cx, cx.Env().RTL))
 	var enter core.Transform
 	switch {
@@ -306,13 +314,18 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 	default:
 		enter.TranslateY = 16
 	}
-	return toast.Toast{TestID: id, Label: label, SwipeDirection: swipe,
+	return toast.Toast{TestID: id, SwipeDirection: swipe,
+		LabelFunc:        label,
 		Status:           func() toast.Status { return e().Status },
 		OnDismissRequest: func() { t.Dismiss(id) },
 		StartingStyle:    core.Style{Opacity: core.Alpha(0), Transform: enter},
 		EndingStyle:      core.Style{Opacity: core.Alpha(0), Transform: core.Transform{Scale: 0.96}},
 		SwipingStyle:     core.Style{Transition: core.Transition{}},
 		StyleFunc: func() core.Style {
+			align := core.AlignCenter
+			if e().Value.Description != "" {
+				align = core.AlignStart
+			}
 			glass := FinOf(cx).Glass()
 			return core.Style{Direction: core.Row, AlignItems: align, Gap: 12,
 				Padding: core.Edges{Top: 12, Right: 8, Bottom: 12, Left: 16}, CornerRadius: RadiusCard, BorderCurve: core.BorderCurveContinuous,

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -41,6 +42,41 @@ func TestToasts(t *testing.T) {
 		app.Advance(2 * time.Second)
 		if app.Exists("brief") {
 			t.Fatal("a toast stayed past its duration")
+		}
+	})
+}
+
+// TestToastReplacementFollowsNewContent keeps a toast's mounted view when its
+// content is replaced with the same ID, while updating what it shows and does.
+func TestToastReplacementFollowsNewContent(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var toaster *Toaster
+		firstAction, nextAction := false, false
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			toaster = NewToaster(cx)
+			return Toasts{Toaster: toaster, TestID: "toasts", CloseLabel: "Close"}
+		})
+
+		toaster.Show(ToastContent{ID: "same", Title: "First", Description: "old", Leading: core.Text{Content: "first-leading"}, Action: "First action", Duration: -1,
+			OnAction: func() { firstAction = true }})
+		app.Advance(time.Second)
+		oldY := toastY(app, "same")
+
+		toaster.Show(ToastContent{ID: "same", Title: "Second", Description: "new", Leading: core.Text{Content: "second-leading"}, Action: "Second action", Duration: -1,
+			OnAction: func() { nextAction = true }})
+		app.Advance(time.Second)
+
+		texts := app.Texts()
+		if slices.Contains(texts, "First") || slices.Contains(texts, "old") || slices.Contains(texts, "first-leading") || slices.Contains(texts, "First action") ||
+			!slices.Contains(texts, "Second") || !slices.Contains(texts, "new") || !slices.Contains(texts, "second-leading") || !slices.Contains(texts, "Second action") {
+			t.Fatalf("replacement showed texts %v", texts)
+		}
+		if got := toastY(app, "same"); got != oldY {
+			t.Fatalf("replacement moved toast from %v to %v", oldY, got)
+		}
+		app.Press("same-action")
+		if !nextAction || firstAction {
+			t.Fatalf("replacement action states are first=%v next=%v", firstAction, nextAction)
 		}
 	})
 }
