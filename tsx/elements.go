@@ -110,6 +110,7 @@ func webViewFace(p *props) core.Node {
 		NoScroll:                        !p.boolOr("scrollable", true),
 		NoJavaScript:                    !p.boolOr("javaScriptEnabled", true),
 		BackForwardGestures:             p.bool("allowsBackForwardNavigationGestures"),
+		Mobile:                          p.bool("mobile"),
 		Media:                           r.webMedia(p.get("media")),
 		MessageOrigins:                  r.stringList(p.get("messageOrigins")),
 		Class:                           p.class(),

@@ -522,6 +522,8 @@ export interface WebViewHostProps {
   scrollable?: boolean;
   javaScriptEnabled?: boolean;
   allowsBackForwardNavigationGestures?: boolean;
+  /** Presents pages as a phone sees them on Windows, macOS and Linux: a phone's user agent unless `userAgent` is set, a touch screen, and mouse drags as touches. */
+  mobile?: boolean;
   /** What the pages may capture through `getUserMedia`; a package needs
    * them in its `webview` capability's `media` too. */
   media?: readonly ("microphone" | "camera")[];

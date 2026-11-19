@@ -226,6 +226,7 @@ func bindWebKit(webkit, jsc, soup uintptr) {
 
 // WebKit's enums.
 const (
+	webkitAllFrames        = 0 // WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES
 	webkitTopFrame         = 1 // WEBKIT_USER_CONTENT_INJECT_TOP_FRAME
 	webkitAtStart          = 0 // WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START
 	webkitAtEnd            = 1 // WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_END
@@ -328,6 +329,11 @@ func (dl *webDownload) report() {
 	dl.window.report(dl.view, driver.Event{Kind: driver.EventDownload, ID: dl.view.id, Data: &item})
 }
 
+// What a Mobile web view presents without a user agent of its own: Android Chrome's, of a version as recent as this code, and the platform such a phone reports. Sites take iPhone Safari's for WebKit on iOS, which WebKitGTK is not: given it, x.com showed "Something went wrong" where it loads with Android Chrome's (2026-11).
+var mobileUserAgent = fmt.Sprintf(driver.WebMobileUserAgentAndroid, "157")
+
+const mobilePlatform = "Linux armv8l"
+
 // webWarned is the warning, once, that web views show a placeholder.
 var webWarned sync.Once
 
@@ -351,9 +357,12 @@ func (w *window) configureWeb(v *view, c *driver.WebConfig) {
 	old, first := wv.config, !wv.made
 	wv.config, wv.made = *c, true
 	scripts := first || c.InjectedJavaScript != old.InjectedJavaScript ||
-		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent
+		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent || c.Mobile != old.Mobile
 	if scripts {
 		webkitContentRemoveAllScripts(wv.content)
+		if c.Mobile {
+			addScriptIn(wv.content, driver.WebMobileScript(mobilePlatform, true), webkitAllFrames, webkitAtStart)
+		}
 		addScript(wv.content, webBridge(wv.token), webkitAtStart)
 		addScript(wv.content, c.InjectedJavaScriptBeforeContent, webkitAtStart)
 		addScript(wv.content, c.InjectedJavaScript, webkitAtEnd)
@@ -372,10 +381,14 @@ func (w *window) configureWeb(v *view, c *driver.WebConfig) {
 	// Markup's scripts only: injected ones still run, as WebKit's
 	// allowsContentJavaScript has it on Apple's platforms.
 	webkitSettingsSetEnableJSMarkup(settings, boolInt(!c.NoJavaScript))
-	if c.UserAgent == "" {
+	ua := c.UserAgent
+	if ua == "" && c.Mobile {
+		ua = mobileUserAgent
+	}
+	if ua == "" {
 		webkitSettingsSetUserAgent(settings, nil)
 	} else {
-		webkitSettingsSetUserAgent(settings, cstr(c.UserAgent))
+		webkitSettingsSetUserAgent(settings, cstr(ua))
 	}
 	webkitSettingsSetBackForwardGestures(settings, boolInt(c.BackForwardGestures))
 	// WebKitGTK has no setting for pinches, so PinchZoom keeps its own handling.
@@ -419,10 +432,14 @@ func webPlaceholder() uintptr {
 }
 
 func addScript(content uintptr, source string, at int32) {
+	addScriptIn(content, source, webkitTopFrame, at)
+}
+
+func addScriptIn(content uintptr, source string, frames, at int32) {
 	if source == "" {
 		return
 	}
-	script := webkitUserScriptNew(cstr(source), webkitTopFrame, at, 0, 0)
+	script := webkitUserScriptNew(cstr(source), frames, at, 0, 0)
 	webkitContentAddScript(content, script)
 	webkitUserScriptUnref(script)
 }

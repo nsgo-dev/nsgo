@@ -39,6 +39,8 @@ type WebView struct {
 	// BackForwardGestures lets swipes go back and forward where the
 	// platform has them (iOS, macOS trackpads).
 	BackForwardGestures bool
+	// Mobile shows the page as a phone sees it on Windows, macOS and Linux, for sites such as YouTube's Shorts that give their swipe-driven layout only to phones: the page gets a phone's user agent unless UserAgent is set, sees a touch screen without hover (navigator.maxTouchPoints, ontouchstart, and matchMedia's pointer: coarse and hover: none), and a drag with the mouse's primary button reaches it as a finger's touches, as does a wheel or trackpad scroll that nothing under it would scroll. Windows emulates Android Chrome through WebView2's DevTools protocol, as Chrome's device mode does, so stylesheets and native scrolling follow too. macOS, presenting iPhone Safari, and Linux, presenting Android Chrome, run a script before each page's own that makes the touch events, which pages see as untrusted, and pans what a drag the page leaves alone is over; stylesheets' media queries keep the desktop's pointer there. Phones, the web and mini programs show pages as they are.
+	Mobile bool
 	// Media is what the pages may capture through getUserMedia:
 	// WebMicrophone, WebCamera or both. The system still asks the user
 	// for each device once, and a page asking for one Media leaves out is
@@ -144,7 +146,8 @@ func (t *Tree) mountWebView(cx *Scope, parent *node, w WebView) {
 			Headers: cloneWebHeaders(w.Headers), Incognito: w.Incognito,
 			SchemeHandlers: webSchemesOf(cx),
 			NoScroll:       w.NoScroll, NoJavaScript: w.NoJavaScript, PinchZoom: w.PinchZoom, BackForwardGestures: w.BackForwardGestures,
-			Media: w.Media},
+			Mobile: w.Mobile,
+			Media:  w.Media},
 		loadStart: w.OnLoadStart, load: w.OnLoad, navigation: w.OnNavigationStateChange,
 		loadError: w.OnError, message: w.OnMessage, messageFrom: w.OnMessageFrom, download: w.OnDownload,
 		origins: messageOrigins(w.MessageOrigins),

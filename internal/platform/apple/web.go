@@ -371,15 +371,19 @@ func (w *Web) Configure(c *driver.WebConfig) {
 		w.make()
 	}
 	scripts := first || c.InjectedJavaScript != old.InjectedJavaScript ||
-		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent
+		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent || c.Mobile != old.Mobile
 	// NoScroll's script (macOS) applies from the next page on.
 	if scripts || c.NoScroll != old.NoScroll {
 		w.addScripts()
 	}
-	if c.UserAgent == "" {
+	ua := c.UserAgent
+	if ua == "" && w.mobile() {
+		ua = driver.WebMobileUserAgentIPhone
+	}
+	if ua == "" {
 		w.web.Send(sel("setCustomUserAgent:"), objc.ID(0))
 	} else {
-		w.web.Send(sel("setCustomUserAgent:"), NSString(c.UserAgent))
+		w.web.Send(sel("setCustomUserAgent:"), NSString(ua))
 	}
 	w.web.Send(sel("setAllowsBackForwardNavigationGestures:"), c.BackForwardGestures)
 	if runtime.GOOS != "ios" {
@@ -432,19 +436,26 @@ func (w *Web) make() {
 	w.made = true
 }
 
+// mobile reports whether the page is presented as a phone's (WebConfig.Mobile), which only macOS does: iOS shows pages as they are.
+func (w *Web) mobile() bool { return w.config.Mobile && runtime.GOOS != "ios" }
+
 func (w *Web) addScripts() {
 	content := w.web.Send(sel("configuration")).Send(sel("userContentController"))
 	content.Send(sel("removeAllUserScripts"))
-	add := func(source string, at int) {
+	addIn := func(source string, at int, mainFrameOnly bool) {
 		if source == "" {
 			return
 		}
 		script := objc.ID(Class("WKUserScript")).Send(sel("alloc")).Send(
-			sel("initWithSource:injectionTime:forMainFrameOnly:"), NSString(source), at, true)
+			sel("initWithSource:injectionTime:forMainFrameOnly:"), NSString(source), at, mainFrameOnly)
 		content.Send(sel("addUserScript:"), script)
 		script.Send(sel("release"))
 	}
+	add := func(source string, at int) { addIn(source, at, true) }
 	const atStart, atEnd = 0, 1 // WKUserScriptInjectionTime
+	if w.mobile() {
+		addIn(driver.WebMobileScript("iPhone", true), atStart, false)
+	}
 	add(bridge, atStart)
 	add(w.config.InjectedJavaScriptBeforeContent, atStart)
 	if w.config.NoScroll && runtime.GOOS != "ios" {

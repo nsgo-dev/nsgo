@@ -152,6 +152,8 @@ type WebConfig struct {
 	// PinchZoom enables the platform web view's pinch magnification where it has a setting for it. Platforms without one keep their native behavior.
 	PinchZoom           bool
 	BackForwardGestures bool
+	// Mobile presents the page as a phone sees it on desktop platforms: a phone's user agent unless UserAgent is set, touch support and touches from the mouse. Platforms load the source again when it changes.
+	Mobile bool
 	// DownloadDir is where the view saves what its pages download, a
 	// directory of its own for each (<id>/<file name>); "" saves nothing.
 	DownloadDir string

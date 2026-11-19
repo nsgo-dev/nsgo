@@ -42,6 +42,7 @@ package windows
 //     and a style keeps the page's viewport from scrolling while scripts
 //     still may.
 //   - BackForwardGestures: WebView2's swipe navigation.
+//   - Mobile: the DevTools protocol's emulation of a phone (webmobile.go).
 //
 // The source loads again only when it or the injected scripts change,
 // once the document scripts asked for are added.
@@ -700,6 +701,9 @@ func (wv *webView) apply() {
 	if s := wv.settings; s != nil {
 		s.call(settingsPutIsScriptEnabled, boolArg(!c.NoJavaScript))
 		ua := c.UserAgent
+		if ua == "" && c.Mobile {
+			ua = mobileUserAgent(wv.userAgent)
+		}
 		if ua == "" {
 			ua = wv.userAgent
 		}
@@ -719,7 +723,10 @@ func (wv *webView) apply() {
 		s.call(settingsPutIsZoomControlEnabled, boolArg(c.PinchZoom))
 	}
 	scripts := first || c.InjectedJavaScript != old.InjectedJavaScript ||
-		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent
+		c.InjectedJavaScriptBeforeContent != old.InjectedJavaScriptBeforeContent || c.Mobile != old.Mobile
+	if c.Mobile || !first && old.Mobile {
+		wv.emulatePhone(c)
+	}
 	if scripts {
 		for _, id := range wv.scripts {
 			wv.web.call(webRemoveScriptOnDocumentCreated, uintptr(unsafe.Pointer(wide(id))))
@@ -733,6 +740,9 @@ func (wv *webView) apply() {
 			}
 			wv.scripts = append(wv.scripts, id)
 			return true
+		}
+		if c.Mobile {
+			wv.addScript(driver.WebMobileScript("", false), keep)
 		}
 		if js := c.InjectedJavaScriptBeforeContent; js != "" {
 			wv.addScript(beforeContent(js), keep)
