@@ -783,17 +783,16 @@ func TestFieldClipboardKeys(t *testing.T) {
 	}
 }
 
-// A focused field selects all with mod+a unless an application-menu item has
-// that shortcut, in which case the item wins as it does on each desktop.
+// A focused field selects all with mod+a unless an application-menu item has that shortcut, in which case the item wins as it does on each desktop.
 func TestFieldSelectAllKeyYieldsToApplicationMenu(t *testing.T) {
 	if Target() != "" {
 		t.Skip("checks the headless field model")
 	}
-	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux} {
-		t.Run(string(os), func(t *testing.T) {
+	for _, system := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux} {
+		t.Run(string(system), func(t *testing.T) {
 			app := Start(t, func(cx *core.Scope) core.Node {
 				return core.Input{TestID: "field", DefaultValue: "hello"}
-			}, Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
+			}, Environment(core.Environment{OS: system, Idiom: core.IdiomDesktop}))
 			app.Focus("id:field")
 			app.Key("mod+a")
 			if s := app.Find("id:field").Selection; s.Start != 0 || s.End != 5 {
@@ -808,7 +807,7 @@ func TestFieldSelectAllKeyYieldsToApplicationMenu(t *testing.T) {
 				cx.SetMainView(func(cx *core.Scope) core.Node {
 					return core.Input{TestID: "field", DefaultValue: "hello"}
 				})
-			}, Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
+			}, Environment(core.Environment{OS: system, Idiom: core.IdiomDesktop}))
 			app.Focus("id:field")
 			app.Key("mod+a")
 			if chosen != 1 {
