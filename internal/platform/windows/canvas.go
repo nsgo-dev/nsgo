@@ -35,6 +35,7 @@ const (
 	brushSetOpacity       = 4
 	brushSetTransform     = 5
 	bitmapCopyFromBitmap  = 8
+	bitmapCopyFromMemory  = 9
 	layoutDraw            = 58
 	fontFaceGlyphOutline  = 14
 

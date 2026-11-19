@@ -76,10 +76,11 @@ type imageSlot struct {
 	playing, ended bool
 	// bitmap is frame as a Direct2D bitmap, tinted with tint, made in
 	// generation.
-	bitmap      *comObject
-	bitmapFrame int
-	tint        driver.Color
-	generation  uint64
+	bitmap                    *comObject
+	bitmapFrame               int
+	bitmapWidth, bitmapHeight int
+	tint                      driver.Color
+	generation                uint64
 	// blur is the Gaussian blur effect a blurred picture draws through,
 	// made in blurGeneration.
 	blur           *comObject
@@ -107,17 +108,33 @@ func (s *imageSlot) reset(src driver.ImageSource) {
 	s.fade = 0
 }
 
-// showPixels makes src's pixels the slot's picture, in place of the one it shows: no load, no blank, no fade. The bitmap is made again when it is drawn.
+// showPixels makes src's pixels the slot's picture, in place of the one it shows: no load, no blank, no fade. The converted pixels stay in the slot so the Direct2D bitmap can be updated in place.
 func (s *imageSlot) showPixels(src driver.ImageSource) {
 	if s.load != nil {
 		s.load.cancel()
 		s.load = nil
 	}
-	releaseAll(&s.bitmap)
-	img := imagedecode.FromPixels(src.Pixels, imagedecode.BGRA)
-	s.pic = &picture{width: img.Width, height: img.Height, frames: img.Frames, size: img.Size}
+	p := src.Pixels
+	w, h := p.Rect.Dx(), p.Rect.Dy()
+	var pix []byte
+	if s.pic != nil && s.pic.width == w && s.pic.height == h && len(s.pic.frames) == 1 && len(s.pic.frames[0].Pix) == w*h*4 {
+		pix = s.pic.frames[0].Pix
+	} else {
+		pix = make([]byte, w*h*4)
+	}
+	for y := range h {
+		from := p.PixOffset(p.Rect.Min.X, p.Rect.Min.Y+y)
+		to := y * w * 4
+		for x := range w {
+			src := p.Pix[from+x*4:]
+			dst := pix[to+x*4:]
+			dst[0], dst[1], dst[2], dst[3] = src[2], src[1], src[0], src[3]
+		}
+	}
+	s.pic = &picture{width: w, height: h, frames: []imagedecode.Frame{{Pix: pix}}, size: driver.Size{Width: driver.Points(w), Height: driver.Points(h)}}
 	s.src = src
 	s.frame, s.playing, s.ended = 0, false, false
+	s.bitmapFrame = -1
 	s.fade = 0
 }
 
@@ -292,6 +309,17 @@ func (s *imageSlot) bitmapOf(dc *comObject, tint driver.Color) *comObject {
 		if s.tint == tint && s.generation == gfxGeneration && s.bitmapFrame == frame {
 			return s.bitmap
 		}
+		pix := s.pic.frames[frame].Pix
+		if s.generation == gfxGeneration && s.bitmapWidth == s.pic.width && s.bitmapHeight == s.pic.height {
+			if tint&0xff != 0 {
+				pix = make([]byte, len(pix))
+				tintInto(pix, s.pic.frames[frame].Pix, tint)
+			}
+			if !failed(s.bitmap.call(bitmapCopyFromMemory, 0, uintptr(unsafe.Pointer(&pix[0])), uintptr(s.pic.width*4))) {
+				s.tint, s.bitmapFrame = tint, frame
+				return s.bitmap
+			}
+		}
 		releaseAll(&s.bitmap)
 	}
 	pix := s.pic.frames[frame].Pix
@@ -306,6 +334,7 @@ func (s *imageSlot) bitmapOf(dc *comObject, tint driver.Color) *comObject {
 		return nil
 	}
 	s.tint, s.generation, s.bitmapFrame = tint, gfxGeneration, frame
+	s.bitmapWidth, s.bitmapHeight = s.pic.width, s.pic.height
 	return s.bitmap
 }
 

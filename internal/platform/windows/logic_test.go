@@ -1399,9 +1399,14 @@ func TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn(t *testing.T) {
 
 func TestPixelsReplaceThePictureInPlace(t *testing.T) {
 	s := &imageSlot{}
+	bitmap := &comObject{}
+	s.bitmap = bitmap
 	frame := image.NewRGBA(image.Rect(0, 0, 2, 1))
 	copy(frame.Pix, []byte{0, 0, 0, 0, 0xff, 0, 0, 0xff})
 	s.showPixels(driver.ImageSource{Pixels: frame, Version: 1})
+	if s.bitmap != bitmap {
+		t.Fatal("a pixel frame dropped the reusable bitmap")
+	}
 	if s.pic == nil || s.pic.width != 2 || s.pic.height != 1 || s.load != nil || s.fade != 0 {
 		t.Fatalf("slot = %+v, want the frame's picture at once", s)
 	}
@@ -1414,5 +1419,11 @@ func TestPixelsReplaceThePictureInPlace(t *testing.T) {
 	}
 	if !sameSource(s.src, driver.ImageSource{Pixels: frame, Version: 1}) || sameSource(s.src, driver.ImageSource{Pixels: frame, Version: 2}) {
 		t.Fatal("a source is the same frame only at its version")
+	}
+	old := &s.pic.frames[0].Pix[0]
+	frame.Pix[0] = 0x80
+	s.showPixels(driver.ImageSource{Pixels: frame, Version: 2})
+	if &s.pic.frames[0].Pix[0] != old || s.pic.frames[0].Pix[2] != 0x80 || sameSource(s.src, driver.ImageSource{Pixels: frame, Version: 1}) {
+		t.Fatal("same-sized pixel frames did not reuse the upload buffer")
 	}
 }
