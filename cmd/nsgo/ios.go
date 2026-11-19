@@ -853,8 +853,7 @@ func pickSimulator(sys *appleOS, sims []simulator, wanted string) (simulator, er
 	return simulator{}, fmt.Errorf("no %s simulator is installed; add one in Xcode", sys.device)
 }
 
-// bootSimulator boots the simulator wanted names (or picks one) unless it
-// runs, shows the Simulator app and returns its UDID.
+// bootSimulator boots the simulator wanted names (or picks one) unless it runs, shows its window (showSimulators) and returns its UDID.
 func bootSimulator(ctx context.Context, sys *appleOS, wanted string) (string, error) {
 	sims, err := simulators(ctx, sys)
 	if err != nil {
@@ -875,10 +874,26 @@ func bootSimulator(ctx context.Context, sys *appleOS, wanted string) (string, er
 		return "", err
 	}
 	// Show the simulator's window; the app runs without it.
-	if xcode, err := output(ctx, "xcode-select", "-p"); err == nil {
-		exec.CommandContext(ctx, "open", filepath.Join(xcode, "Applications", "Simulator.app")).Run()
+	if err := showSimulators(ctx); err != nil {
+		warnIn(ctx, "no simulator window: %v", err)
 	}
 	return sim.UDID, nil
+}
+
+// simulatorApps are the bundle IDs of the apps that show simulators' windows, newest first: Xcode 27 replaced Simulator with DeviceHub.
+var simulatorApps = []string{"com.apple.dt.Devices", "com.apple.iphonesimulator"}
+
+// showSimulators opens the first of simulatorApps that Launch Services finds, which shows the booted simulators' windows.
+func showSimulators(ctx context.Context) error {
+	var errs []error
+	for _, id := range simulatorApps {
+		err := run(ctx, "open", "-b", id)
+		if err == nil {
+			return nil
+		}
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 // iosProject is an Xcode project whose app target signs the build product

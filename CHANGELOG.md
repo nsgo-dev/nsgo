@@ -21,6 +21,7 @@
 - Lay the gallery out for Apple Watch, as a list of the demos a watch can show, and for Apple TV, as a sidebar the remote's focus moves through, each leaving out the demos the device cannot use (#803 by @houko).
 - Leave a camera cutout inside the safe area's insets to the safe area on iOS 27.1, instead of reporting it in `Env.Geometry` as an occluding obstruction with a reserved rectangle, as the iPhone Duo's outer display did (#821 by @houko).
 - Wait for the gallery's web page to report its button before its trusted-input test clicks it, so macOS tests do not race page loading (#753).
+- Show the simulator's window in `nsgo run`, `nsgo dev` and `nsgo test` on Xcode 27, which replaced Simulator with DeviceHub: open the app by its bundle ID, DeviceHub's first and Simulator's on older Xcode, and warn when neither opens instead of ignoring it (#826 by @houko).
 
 ## [0.2.0] - 2026-11-19
 

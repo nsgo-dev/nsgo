@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -22,12 +23,7 @@ bootstatus) if [ "$NSGO_SIMULATOR_STATE" = NotReady ]; then exit 7; fi ;;
 esac
 `)
 			// Keep this process fixture independent of the Mac's desktop.
-			bin := t.TempDir()
-			writeFiles(t, bin, map[string]string{"xcode-select": "#!/bin/sh\nexit 1\n"})
-			if err := os.Chmod(filepath.Join(bin, "xcode-select"), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			stubOpen(t, `printf 'open %s\n' "$*" >> "$NSGO_SIMULATOR_COMMANDS"`)
 			udid, err := bootSimulator(t.Context(), iOS, "test-device")
 			if state == "NotReady" {
 				if err == nil || udid != "" || !strings.Contains(err.Error(), "bootstatus") {
@@ -46,9 +42,63 @@ esac
 			if state == "Shutdown" {
 				want += "simctl boot test-device\n"
 			}
-			want += "simctl bootstatus test-device -b\n"
+			want += "simctl bootstatus test-device -b\nopen -b com.apple.dt.Devices\n"
 			if string(data) != want {
 				t.Fatalf("simulator commands:\n%s\nwant:\n%s", data, want)
+			}
+		})
+	}
+}
+
+// stubOpen puts an open command running body first on PATH.
+func stubOpen(t *testing.T, body string) {
+	t.Helper()
+	bin := t.TempDir()
+	writeFiles(t, bin, map[string]string{"open": "#!/bin/sh\n" + body + "\n"})
+	if err := os.Chmod(filepath.Join(bin, "open"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestShowSimulators(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the open fixture uses a shell script")
+	}
+	for _, tc := range []struct {
+		name      string
+		installed string // the bundle IDs open finds
+		want      string // the opens tried
+		fails     bool
+	}{
+		{"DeviceHub", "com.apple.dt.Devices com.apple.iphonesimulator", "-b com.apple.dt.Devices\n", false},
+		{"Simulator", "com.apple.iphonesimulator", "-b com.apple.dt.Devices\n-b com.apple.iphonesimulator\n", false},
+		{"neither", "", "-b com.apple.dt.Devices\n-b com.apple.iphonesimulator\n", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			commands := filepath.Join(t.TempDir(), "commands")
+			t.Setenv("NSGO_OPEN_COMMANDS", commands)
+			t.Setenv("NSGO_OPEN_INSTALLED", tc.installed)
+			stubOpen(t, `printf '%s\n' "$*" >> "$NSGO_OPEN_COMMANDS"
+case " $NSGO_OPEN_INSTALLED " in
+*" $2 "*) exit 0 ;;
+esac
+echo "Unable to find application with bundle identifier $2" >&2
+exit 1`)
+			err := showSimulators(t.Context())
+			if tc.fails {
+				if err == nil || !strings.Contains(err.Error(), "com.apple.iphonesimulator") || !strings.Contains(err.Error(), "Unable to find application") {
+					t.Fatalf("no app: %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(commands)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(data) != tc.want {
+				t.Fatalf("opens:\n%s\nwant:\n%s", data, tc.want)
 			}
 		})
 	}
