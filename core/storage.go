@@ -307,8 +307,7 @@ func (cx *Scope) Storage() Storage {
 	return st
 }
 
-// Store returns the app's underlying store, which a host may pass to another
-// root so its graphs share the app's entries and persistence.
+// Store returns the graph's Store, the host's or the one in memory Storage makes, which a host may pass to another root's RootOptions.Storage so its graphs share the app's entries, quota and persistence. It is the whole store, not the partition ProvideStorage gives the current owner.
 func (cx *Scope) Store() *Store {
 	rt := cx.rt
 	if rt.store == nil {

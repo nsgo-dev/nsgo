@@ -83,7 +83,7 @@ var exempt = map[string][]string{
 		"Untrack", "PauseTracking", "Batch", "Effect", "RenderEffect", "Run", "Env", "Theme", "Dark", "Palette", "Now",
 		"WallTime", "KeyLabel", "Present", "OnExit", "CurrentWindow", "MainWindow", "Quitting", "Hiding", "LaunchAtLogin"},
 	"Access itself, Confine, and what ProvideHost, ProvideStorage and ProvideSecrets scope to the owner": {"ProvideAccess", "CheckAccess",
-		"ProvideHost", "HasHost", "HostParams", "OnHostEvent", "ProvideStorage", "Storage", "Store", "ProvideSecrets", "Confine"},
+		"ProvideHost", "HasHost", "HostParams", "OnHostEvent", "ProvideStorage", "Storage", "ProvideSecrets", "Confine"},
 	"the view the code shows and the user's input to it, which no capability holds": {"StartAnimation", "AnimateLayout",
 		"MeasureText", "RequestAnimationFrame", "RunFrame", "Animate", "PlayHaptic", "OnKey", "OnKeyWith", "OnBackPress",
 		"SetTitle", "DismissKeyboard", "Announce", "SetScrollbars", "WatchScroll", "PopupMenu", "ShowAlert", "RegisterFont",
@@ -96,7 +96,7 @@ var exempt = map[string][]string{
 		"SetApplicationMenu", "ExitApp", "OnQuitRequest", "OnQuit", "Quit", "Restart",
 		"SetShutdownMode", "SetMainWindow", "OnReopen", "NewTray", "RegisterHotKey", "SetDockVisible",
 		"SetLaunchAtLogin", "OnOpenFiles", "OnOpenLinks", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
-		"OpenInstallSettings", "DataDir", "CacheDir", "LogsDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
+		"OpenInstallSettings", "Store", "DataDir", "CacheDir", "LogsDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
 		"SetTaskProgress", "SetDockMenu", "AddRecentFile", "ClearRecentFiles", "LookUp"},
 	"stopping what the code's own requests started, which asked the gate": {"StopSpeaking"},
 }
