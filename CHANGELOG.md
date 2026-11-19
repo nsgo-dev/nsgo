@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add Xcode SDK metadata and the arm64 device requirement to iOS, tvOS and watchOS device bundles and their extensions (#889 by @houko).
 - Make WebView mobile drag tests tolerate WebKit and WebView2 coalescing intermediate moves while still requiring a touch drag (#891 by @houko).
 - Name inline image data by a SHA-256 digest of its bytes rather than their address in `ImageSource.Key`, so a buffer freed and reused at the same address cannot draw an earlier image in Android's canvas bitmap cache, the Linux and Windows shader textures or the mini program's images, which did not keep the bytes alive as the Apple and web canvas caches did since 0.2.0 (#738 by @houko).
 - Document that a page on Windows takes no press, tap or drag until its first contentful paint, or for up to 500 ms when it paints none, as Chromium drops them while it holds the previous page's paint, and have the Windows `WebView.Mobile` test drag once after that paint instead of dragging again until one got through (#851 by @houko).
