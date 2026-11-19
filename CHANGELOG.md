@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-19
+
 - Add HarmonyOS as a preview target, whose ArkTS host runs the engine in ArkWeb and draws it with ArkUI views, in `nsgo build`, `nsgo run` and `nsgo test -target harmonyos` (#79 by @togotop).
 - Add in-app purchases on macOS, iOS and tvOS through StoreKit 2: the store's products and prices, purchases answering cancelled and pending apart from failed with the signed transaction, updates made outside the app, finishing, current entitlements and restoring, in Go, TSX and `nsgotest`, when `nsgo.yaml` sets `apple.purchases` (#353 by @houko).
 - Add `desktop.SetWindowWorkspaces` and `WindowOptions.Workspaces`, which keep a window on every Space and over other apps' full screen spaces on macOS, at any level but the desktop's, which stays behind them, and on every virtual desktop on X11, with `desktop.CanSetWindowWorkspaces`, which says whether it takes effect (#572 by @houko).

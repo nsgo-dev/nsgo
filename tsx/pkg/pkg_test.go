@@ -134,7 +134,7 @@ func TestRefuses(t *testing.T) {
 		{"another root's", other.build(t, 1), ErrUntrusted},
 		{"signed outside the certificate", k.craft(t, map[string]any{"createdAt": time.Now().Add(-2 * time.Hour).Unix()}, []byte("x")), ErrCertificate},
 		{"of an app it does not cover", k.craft(t, map[string]any{"app": App{ID: "org.other.app"}}, []byte("x")), ErrCertificate},
-		{"for a newer runtime", k.craft(t, map[string]any{"minRuntime": "0.2.0"}, []byte("x")), ErrRuntime},
+		{"for a newer runtime", k.craft(t, map[string]any{"minRuntime": "99.0.0"}, []byte("x")), ErrRuntime},
 		{"needing a field unknown", k.craft(t, map[string]any{"critical": []string{"quota"}, "quota": 3}, []byte("x")), ErrRuntime},
 		{"a file not matching its hash", k.craft(t, map[string]any{"files": []map[string]any{fileOf("bundle.js", "source", 0, []byte("y"))}}, []byte("x")), ErrIntegrity},
 		{"a file table with a gap", k.craft(t, map[string]any{"files": []map[string]any{fileOf("bundle.js", "source", 1, []byte("x"))}}, []byte("xx")), ErrFormat},

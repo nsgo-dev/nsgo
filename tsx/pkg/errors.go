@@ -8,7 +8,7 @@ import (
 
 // RuntimeVersion is this runtime's version. A package names the lowest
 // it runs on, which defaults to the signing tool's.
-const RuntimeVersion = "0.1.0"
+const RuntimeVersion = "0.2.0"
 
 // Why a package, certificate or revocation list is refused; errors wrap
 // them with the details.
