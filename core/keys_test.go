@@ -811,6 +811,9 @@ func TestBindingsYieldToTheMenuAsAsked(t *testing.T) {
 			{"other keys", []MenuItem{{Label: "Rerun", Shortcut: "mod+shift+r"}, {Label: "Save", Shortcut: "mod+s"}}, []string{"mod+r", "mod+q", "mod+s"}},
 			// Quit's own shortcut is Command+Q on a Mac, Alt+F4 elsewhere.
 			{"a role", []MenuItem{{Role: MenuQuit}}, map[bool][]string{true: {"mod+r", "mod+s"}, false: {"mod+r", "mod+q", "mod+s"}}[os == OSMacOS]},
+			// Windows and Linux leave macOS's own roles out of their menus, and the Speech items where nothing speaks, as this environment says.
+			{"a macOS role", []MenuItem{{Role: MenuAbout, Shortcut: "mod+r"}}, map[bool][]string{true: {"mod+q", "mod+s"}, false: {"mod+r", "mod+q", "mod+s"}}[os == OSMacOS]},
+			{"speech without a voice", []MenuItem{{Role: MenuStartSpeaking, Shortcut: "mod+r"}}, map[bool][]string{true: {"mod+q", "mod+s"}, false: {"mod+r", "mod+q", "mod+s"}}[os == OSMacOS]},
 		} {
 			var shown *Signal[bool]
 			var ran []string

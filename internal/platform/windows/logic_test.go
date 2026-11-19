@@ -447,16 +447,16 @@ func TestMenuKeysOfTheNewEditingRoles(t *testing.T) {
 func TestMenuHelpers(t *testing.T) {
 	for _, r := range []driver.MenuRole{driver.MenuAbout, driver.MenuHide, driver.MenuHideOthers, driver.MenuShowAll,
 		driver.MenuServices, driver.MenuBringAllToFront} {
-		if !unsupported(r) {
+		if !driver.MenuRoleUnsupported(r, driver.OSWindows, false) {
 			t.Errorf("%v is supported", r)
 		}
 	}
-	if unsupported(driver.MenuQuit) || unsupported(driver.MenuCopy) {
+	if driver.MenuRoleUnsupported(driver.MenuQuit, driver.OSWindows, false) || driver.MenuRoleUnsupported(driver.MenuCopy, driver.OSWindows, false) {
 		t.Fatal("a supported role is unsupported")
 	}
 	for _, speaks := range []bool{false, true} {
 		speechAs(t, speaks)
-		if unsupported(driver.MenuStartSpeaking) == speaks || unsupported(driver.MenuStopSpeaking) == speaks {
+		if driver.MenuRoleUnsupported(driver.MenuStartSpeaking, driver.OSWindows, speaks) == speaks || driver.MenuRoleUnsupported(driver.MenuStopSpeaking, driver.OSWindows, speaks) == speaks {
 			t.Errorf("with speech %v, the Speech items are unsupported: %v", speaks, !speaks)
 		}
 	}

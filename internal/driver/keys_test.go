@@ -35,9 +35,26 @@ func TestMenuShortcutEditing(t *testing.T) {
 		{"windows unmodified key while editing", OSWindows, []MenuEntry{{Label: "Reload", Shortcut: "f5"}}, []string{"f5"}, true, "Reload"},
 		{"mac unmodified key while editing", OSMacOS, []MenuEntry{{Label: "Reload", Shortcut: "f5"}}, []string{"f5"}, true, "Reload"},
 	} {
-		e, ok := MenuShortcut(c.entries, c.names, c.os, c.editing)
+		e, ok := MenuShortcut(c.entries, c.names, c.os, c.editing, true)
 		if got := map[bool]string{true: e.Label}[ok]; got != c.want {
 			t.Errorf("%s: item %q (found %v), want %q", c.name, got, ok, c.want)
+		}
+	}
+}
+
+func TestMenuShortcutSkipsUnsupportedRoles(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		os   OS
+		role MenuRole
+	}{
+		{"linux macOS role", OSLinux, MenuAbout},
+		{"windows speech role", OSWindows, MenuStartSpeaking},
+	} {
+		entries := []MenuEntry{{Label: "Unsupported", Role: c.role, Shortcut: "mod+r"}, {Label: "Run", Shortcut: "mod+r"}}
+		e, ok := MenuShortcut(entries, []string{"mod+r", "ctrl+r"}, c.os, false, false)
+		if !ok || e.Label != "Run" {
+			t.Errorf("%s: got %+v, found %v, want Run", c.name, e, ok)
 		}
 	}
 }

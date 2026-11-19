@@ -120,7 +120,7 @@ func (w *window) buildSubmenu(entries []driver.MenuEntry) uintptr {
 
 // shown reports whether the menu shows e: not a role GTK has no use for, nor a submenu none of whose items it shows, such as a Help holder with no items or a Speech submenu of macOS's roles.
 func shown(e *driver.MenuEntry) bool {
-	if unsupported(e.Role) {
+	if driver.MenuRoleUnsupported(e.Role, driver.OSLinux, speakAvailable()) {
 		return false
 	}
 	if len(e.Items) == 0 {

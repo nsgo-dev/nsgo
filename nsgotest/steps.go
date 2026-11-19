@@ -919,7 +919,7 @@ func (a *App) menuShortcut(names []string) (driver.MenuEntry, bool) {
 			break
 		}
 	}
-	e, ok := driver.MenuShortcut(a.Menu, names, a.env.OS, editing)
+	e, ok := driver.MenuShortcut(a.Menu, names, a.env.OS, editing, a.env.Speak)
 	return e, ok
 }
 

@@ -792,19 +792,9 @@ func (w *window) setMenu(entries []driver.MenuEntry) {
 	w.showMenuBar()
 }
 
-// unsupported reports the roles Windows has no use for: macOS's own, and the Speech items where nothing speaks (Env.CanSpeak).
-func unsupported(r driver.MenuRole) bool {
-	return r == driver.MenuAbout || r == driver.MenuHide || r == driver.MenuHideOthers || r == driver.MenuShowAll ||
-		r == driver.MenuServices || r == driver.MenuBringAllToFront ||
-		(r == driver.MenuStartSpeaking || r == driver.MenuStopSpeaking) && !speakAvailable()
-}
-
 // shortcutOf returns e's shortcut, its role's when it has none.
 func shortcutOf(e *driver.MenuEntry) string {
-	if e.Shortcut != "" {
-		return e.Shortcut
-	}
-	return e.Role.Shortcut(false)
+	return driver.MenuShortcutKey(*e, false)
 }
 
 // menuKeys gathers the shortcuts of entries' items, but the editing
@@ -813,7 +803,7 @@ func (w *window) menuKeys(entries []driver.MenuEntry) {
 	for i := range entries {
 		e := &entries[i]
 		switch {
-		case e.Separator, e.Disabled, unsupported(e.Role):
+		case e.Separator, e.Disabled, driver.MenuRoleUnsupported(e.Role, driver.OSWindows, speakAvailable()):
 		case len(e.Items) > 0:
 			w.menuKeys(e.Items)
 		default:
@@ -855,7 +845,7 @@ func (w *window) menuChar(char uintptr) bool {
 	key := unicode.ToLower(rune(char))
 	for i := range w.chrome.menu {
 		e := &w.chrome.menu[i]
-		if e.Separator || e.Disabled || unsupported(e.Role) || menuMnemonic(menutext.Label(w.language, e, "")) != key {
+		if e.Separator || e.Disabled || driver.MenuRoleUnsupported(e.Role, driver.OSWindows, speakAvailable()) || menuMnemonic(menutext.Label(w.language, e, "")) != key {
 			continue
 		}
 		if len(e.Items) > 0 {
@@ -936,7 +926,7 @@ func (w *window) appendMenuTo(menu uintptr, entries []driver.MenuEntry, refs *[]
 		case e.Separator:
 			separate = n > 0
 			continue
-		case unsupported(e.Role), e.Role.HoldsMenu() && len(e.Items) == 0:
+		case driver.MenuRoleUnsupported(e.Role, driver.OSWindows, speakAvailable()), e.Role.HoldsMenu() && len(e.Items) == 0:
 			continue
 		}
 		label := strings.ReplaceAll(menutext.Label(w.language, e, ""), "&", "&&")

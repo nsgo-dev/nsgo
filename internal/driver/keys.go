@@ -139,35 +139,32 @@ func FindKey(keymap []KeyBinding, names []string, focus KeyUse, repeat bool) (id
 	return 0, false
 }
 
-// MenuShortcut finds the enabled item of entries or of their enabled submenus that takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac every item's, elsewhere all but the editing roles', whose keys the focused field handles itself. On a Mac the first such item in menu order takes the key, as AppKit's menu does; Windows and Linux try the press's names in order and take the first item registered for that spelling. A disabled item takes nothing, and on a Mac it keeps the key from the items after it too, as AppKit stops at the first key equivalent that matches. While editing (a text input or web view has the focus), a NotInText item takes nothing and keeps its key from the items after it, since each desktop stops at it: macOS disables it during the key press, and Windows and Linux keep the first item of each shortcut. Linux offers no key pressed without Control, Alt or a logo key to the menu while editing.
-func MenuShortcut(entries []MenuEntry, names []string, os OS, editing bool) (MenuEntry, bool) {
+// MenuShortcut finds the enabled item of entries or of their enabled submenus that takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac every item's, elsewhere all but the editing roles', whose keys the focused field handles itself, and on Windows and Linux none whose role their menus leave out (MenuRoleUnsupported, with speak saying whether the platform can speak). On a Mac the first such item in menu order takes the key, as AppKit's menu does; Windows and Linux try the press's names in order and take the first item registered for that spelling. A disabled item takes nothing, and on a Mac it keeps the key from the items after it too, as AppKit stops at the first key equivalent that matches. While editing (a text input or web view has the focus), a NotInText item takes nothing and keeps its key from the items after it, since each desktop stops at it: macOS disables it during the key press, and Windows and Linux keep the first item of each shortcut. Linux offers no key pressed without Control, Alt or a logo key to the menu while editing.
+func MenuShortcut(entries []MenuEntry, names []string, os OS, editing, speak bool) (MenuEntry, bool) {
 	if os == OSLinux && editing && !slices.ContainsFunc(names, commandKey) {
 		return MenuEntry{}, false
 	}
 	if os != OSMacOS {
-		return menuShortcutByName(entries, names, editing)
+		return menuShortcutByName(entries, names, os, editing, speak)
 	}
 	e, ok, _ := menuShortcut(entries, names, editing)
 	return e, ok
 }
 
 // menuShortcutByName follows Windows and Linux, which register the first enabled item of each spelling and then try the press's spellings in order.
-func menuShortcutByName(entries []MenuEntry, names []string, editing bool) (MenuEntry, bool) {
+func menuShortcutByName(entries []MenuEntry, names []string, os OS, editing, speak bool) (MenuEntry, bool) {
 	items := map[string]MenuEntry{}
 	kept := map[string]bool{}
 	var visit func([]MenuEntry)
 	visit = func(entries []MenuEntry) {
 		for _, e := range entries {
 			switch {
-			case e.Separator, e.Disabled:
+			case e.Separator, e.Disabled, MenuRoleUnsupported(e.Role, os, speak):
 			case len(e.Items) > 0:
 				visit(e.Items)
 			case e.Role.EditsText():
 			default:
-				shortcut := e.Shortcut
-				if shortcut == "" {
-					shortcut = NormalizeKey(e.Role.Shortcut(false))
-				}
+				shortcut := MenuShortcutKey(e, false)
 				if shortcut == "" || kept[shortcut] {
 					continue
 				}
@@ -190,6 +187,21 @@ func menuShortcutByName(entries []MenuEntry, names []string, editing bool) (Menu
 	return MenuEntry{}, false
 }
 
+// MenuRoleUnsupported reports whether os's menus leave out an item of role, which then takes no key: Windows and Linux leave out macOS's own roles (About, Hide, Hide Others, Show All, Services and Bring All to Front), and the Speech items where nothing speaks (speak, Env.CanSpeak).
+func MenuRoleUnsupported(role MenuRole, os OS, speak bool) bool {
+	return os != OSMacOS && (role == MenuAbout || role == MenuHide || role == MenuHideOthers || role == MenuShowAll ||
+		role == MenuServices || role == MenuBringAllToFront ||
+		(role == MenuStartSpeaking || role == MenuStopSpeaking) && !speak)
+}
+
+// MenuShortcutKey returns an item's shortcut, or its role's when it has none, normalized as key bindings are.
+func MenuShortcutKey(e MenuEntry, mac bool) string {
+	if e.Shortcut != "" {
+		return e.Shortcut
+	}
+	return NormalizeKey(e.Role.Shortcut(mac))
+}
+
 // commandKey reports whether the normalized key is pressed with Control, Alt or a logo key, Shift not counting.
 func commandKey(key string) bool {
 	parts := strings.Split(key, "+")
@@ -199,10 +211,7 @@ func commandKey(key string) bool {
 // menuShortcut is MenuShortcut on a Mac, also reporting whether an item ended the search: AppKit stops at the first key equivalent that matches, a disabled item's or, while editing, a NotInText one's.
 func menuShortcut(entries []MenuEntry, names []string, editing bool) (found MenuEntry, ok, stopped bool) {
 	for _, e := range entries {
-		shortcut := e.Shortcut
-		if shortcut == "" {
-			shortcut = NormalizeKey(e.Role.Shortcut(true))
-		}
+		shortcut := MenuShortcutKey(e, true)
 		has := shortcut != "" && slices.Contains(names, shortcut)
 		switch {
 		case e.Separator:
