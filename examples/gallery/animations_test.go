@@ -76,3 +76,77 @@ func TestResistingDragsSlowPastTheEnds(t *testing.T) {
 		t.Fatalf("let go, the knob rests at %v, want the track's end at 80", x)
 	}
 }
+
+// TestDemoSwitchFades fades a demo selected in the desktop layout in, the one it starts with shown at once; a demo selected before the last finished fading goes at once, and reduced motion shows the next at once.
+func TestDemoSwitchFades(t *testing.T) {
+	headless(t)
+	app := startDesktop(t, nsgotest.ManualFrames())
+	if o := app.Animated("id:demo-body").Opacity; o != 1 {
+		t.Fatalf("the first demo shows at opacity %v", o)
+	}
+	open(app, "Checkbox")
+	app.Advance(100 * time.Millisecond)
+	if o := app.Animated("id:demo-Checkbox >> id:demo-body").Opacity; o <= 0 || o >= 1 {
+		t.Fatalf("fading in, the demo shows at opacity %v", o)
+	}
+	app.Advance(time.Second)
+	if o := app.Animated("id:demo-Checkbox >> id:demo-body").Opacity; o != 1 {
+		t.Fatalf("faded in, the demo shows at opacity %v", o)
+	}
+	open(app, "Slider")
+	app.Advance(50 * time.Millisecond)
+	open(app, "Input")
+	if n := len(app.QueryMounted("id:demo-body")); n != 1 {
+		t.Fatalf("%d demos are mounted after a quick switch, want 1", n)
+	}
+	if o := app.Animated("id:demo-Input >> id:demo-body").Opacity; o >= 1 {
+		t.Fatalf("a quick switch shows the demo at opacity %v, not fading in", o)
+	}
+
+	reduced := desktopEnv
+	reduced.ReduceMotion = true
+	app = startDesktop(t, nsgotest.ManualFrames(), nsgotest.Environment(reduced))
+	open(app, "Checkbox")
+	if o := app.Animated("id:demo-Checkbox >> id:demo-body").Opacity; o != 1 {
+		t.Fatalf("under reduced motion, the demo shows at opacity %v", o)
+	}
+}
+
+// TestTabSwitchFades fades a tab of the phone layout in each time it is chosen, the one it starts with shown at once.
+func TestTabSwitchFades(t *testing.T) {
+	headless(t)
+	app := nsgotest.Start(t, Root, nsgotest.ManualFrames(), nsgotest.Size(390, 844), nsgotest.Environment(core.Environment{OS: core.OSIOS, Idiom: core.IdiomPhone, Locale: "en-US"}))
+	first, second := "id:tab-content-"+tabs[0].id, "id:tab-content-"+tabs[1].id
+	if o := app.Animated(first).Opacity; o != 1 {
+		t.Fatalf("the first tab shows at opacity %v", o)
+	}
+	for range 2 {
+		openTab(app, 1)
+		if o := app.Animated(second).Opacity; o >= 1 {
+			t.Fatalf("chosen, the tab shows at opacity %v, not fading in", o)
+		}
+		app.Advance(time.Second)
+		if o := app.Animated(second).Opacity; o != 1 {
+			t.Fatalf("faded in, the tab shows at opacity %v", o)
+		}
+		openTab(app, 0)
+		if o := app.Animated(first).Opacity; o >= 1 {
+			t.Fatalf("chosen again, the first tab shows at opacity %v, not fading in", o)
+		}
+		app.Advance(time.Second)
+		if o := app.Animated(first).Opacity; o != 1 {
+			t.Fatalf("faded in again, the first tab shows at opacity %v", o)
+		}
+	}
+
+	// The settings' shortcut builds the tabs' page again on the settings, so the settings show at once and the first tab, chosen after, fades in.
+	app.Key(settingsKey)
+	app.Advance(time.Second)
+	if o := app.Animated("id:tab-content-settings").Opacity; o != 1 {
+		t.Fatalf("opened by its shortcut, the settings show at opacity %v", o)
+	}
+	openTab(app, 0)
+	if o := app.Animated(first).Opacity; o >= 1 {
+		t.Fatalf("after the settings' shortcut, the first tab shows at opacity %v, not fading in", o)
+	}
+}

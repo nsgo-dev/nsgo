@@ -493,13 +493,31 @@ func (g *gallery) phone(cx *core.Scope) core.Node {
 		}
 	}
 	g.wasDesktop = false
+	// start is the tab shown as the tabs' page is built, which shows at once; one chosen after fades in, each time it is chosen. The page is built again under the routes SetRoutes sets, as the settings' shortcut and a demo opened from the search do, without this function running again.
+	start := g.tab.GetUntracked()
 	shellTab := func(i int, id, title string, icon func() *core.SVG, ios, android string) ui.ShellTab {
 		system := ios
 		if cx.Env().OS() == core.OSAndroid {
 			system = android
 		}
 		return ui.ShellTab{Text: title, Icon: icon, SystemIcon: system, TestID: "tab-" + id, Content: func(cx *core.Scope) core.Node {
-			return core.Stack{Style: fillPage, Children: []core.Node{g.section(cx, i)}}
+			m := core.NewMotion(cx, nil)
+			first := i == start
+			cx.Effect(func() {
+				if g.tab.Get() != i {
+					return
+				}
+				if first {
+					first = false
+					return
+				}
+				// From hidden, so the section never shows a frame at rest before it fades in.
+				m.Value(core.MotionOpacity).Set(0)
+				m.Play(core.FadeIn.Spec(), nil)
+			})
+			return core.View{TestID: "tab-content-" + id, Style: fillPage.Merge(core.Style{Animated: m.Style()}), Children: []core.Node{
+				core.Stack{Style: fillPage, Children: []core.Node{g.section(cx, i)}},
+			}}
 		}}
 	}
 	var sections []ui.ShellTab
@@ -520,6 +538,7 @@ func (g *gallery) phone(cx *core.Scope) core.Node {
 		case r.demo != "":
 			return demoScreen(cx, r.demo)
 		}
+		start = g.tab.GetUntracked()
 		return base.NavPage{TitleFunc: title, HeaderHidden: true, Children: []core.Node{
 			ui.TabShell{Tabs: sections, Selected: g.tab.Get, OnChange: g.tab.Set, Label: tr.AppSections()},
 		}}
@@ -749,16 +768,26 @@ func (g *gallery) demoTitle() core.Node {
 	})
 }
 
-// demoPane is the selected demo.
+// demoPane is the selected demo. One selected after the layout is built fades in inside its page, whose background and edge stay; the one the layout is built with, at launch, in a new language or across the breakpoint, shows at once, as every one does under reduced motion. Only the new one moves: the one it replaces could leave as it enters once core.Presence switches on a value (https://github.com/nsgo-dev/nsgo/issues/786).
 func (g *gallery) demoPane() core.Node {
+	shown := ""
 	return core.Dynamic(func(cx *core.Scope) core.Node {
 		d, _ := findDemo(g.selected.Get())
+		enter := shown != "" && shown != d.name
+		shown = d.name
 		return core.Func(func(cx *core.Scope) core.Node {
 			style := pageStyle(cx)
 			if isApp(d.name) {
 				style = underHeader(cx)
 			}
-			return core.View{TestID: "demo-" + d.name, Style: fillPage, StyleFunc: style, Children: []core.Node{d.screen(cx)}}
+			body := fillPage
+			if enter {
+				spec := core.FadeIn.Spec()
+				body.Animated = core.NewMotion(cx, &spec).Style()
+			}
+			return core.View{TestID: "demo-" + d.name, Style: fillPage, StyleFunc: style, Children: []core.Node{
+				core.View{TestID: "demo-body", Style: body, Children: []core.Node{d.screen(cx)}},
+			}}
 		})
 	})
 }
