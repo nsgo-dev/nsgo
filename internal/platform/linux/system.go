@@ -345,6 +345,12 @@ func (w *window) trashFile(f driver.SharedFile, id uint32) {
 // pickImages shows GtkFileDialog for the images r asks for, then reads
 // and prepares the ones chosen off the main thread.
 func (w *window) pickImages(r driver.PickRequest, id uint32) {
+	if t := w.opts.test; t != nil && t.options.PickImages != nil {
+		t.options.PickImages(r, func(files []driver.PickedFile) {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventPick, Count: id, Data: driver.FinishPick(r, files, nil)})
+		})
+		return
+	}
 	dialog := gtkFileDialogNew()
 	if dialog == 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventPick, Count: id})

@@ -110,6 +110,13 @@ jobs:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
         run: xvfb-run -a go tool nsgo test -target linux ./internal/testhost/testdata/websource
+      - name: Test headless photo pick answers
+        run: go tool nsgo test ./internal/testhost/testdata/pick
+      - name: Test native photo pick answers
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: xvfb-run -a go tool nsgo test -target linux ./internal/testhost/testdata/pick
       - name: Test browser empty web sources
         run: go tool nsgo test -target web -run '^TestEmptyWebSourceIsOpaque$' ./internal/platform/web
       - name: Test
@@ -222,6 +229,8 @@ jobs:
         run: go tool nsgo test -target macos ./internal/testhost/testdata/keys
       - name: Test native empty web sources
         run: go tool nsgo test -target macos ./internal/testhost/testdata/websource
+      - name: Test native photo pick answers
+        run: go tool nsgo test -target macos ./internal/testhost/testdata/pick
       - name: Test native radio and tab focus
         run: go tool nsgo test -target macos -run '^(TestRadioGroupIsOneStopItsArrowsMoveThrough|TestTabsTakeHomeEndAndSwapLeftAndRightRightToLeft)$' ./base
       - name: Test composited captures
@@ -275,6 +284,8 @@ jobs:
         run: go tool nsgo test -target windows ./internal/testhost/testdata/keys
       - name: Test native empty web sources
         run: go tool nsgo test -target windows ./internal/testhost/testdata/websource
+      - name: Test native photo pick answers
+        run: go tool nsgo test -target windows ./internal/testhost/testdata/pick
       - name: Test native focus, styles, activation and label relationships
         run: go tool nsgo test -run '^(TestRefFocusUsesNativeKeyboardStops|TestNativeLabeledByProvider)$' ./internal/platform/windows
       - name: Test UI Automation property-changed events

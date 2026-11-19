@@ -500,6 +500,12 @@ type openFileName struct {
 // pickImages queues a pick: the open dialog's modal loop must not run in
 // the batch's. The images chosen are read as they are on a goroutine.
 func (w *window) pickImages(r driver.PickRequest, id uint32) {
+	if t := w.opts.test; t != nil && t.options.PickImages != nil {
+		t.options.PickImages(r, func(files []driver.PickedFile) {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventPick, Count: id, Data: driver.FinishPick(r, files, nil)})
+		})
+		return
+	}
 	w.queueDialog(func() {
 		paths, _ := w.openDialog(syscall.StringToUTF16("Images"), r.DialogExtensions(), r.Limit)
 		go func() {

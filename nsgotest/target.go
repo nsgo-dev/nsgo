@@ -280,11 +280,15 @@ func (a *App) targetOptions(t *target) testhost.Options {
 		// The main window opens at the desktop's default size, as the app's does.
 		size = driver.Size{}
 	}
-	var pickImages func(driver.PickRequest, func([]driver.PickedFile))
-	if a.PickImages != nil {
-		pickImages = func(r driver.PickRequest, done func([]driver.PickedFile)) {
-			testhost.PostToTest(a, func() { done(a.PickImages(r)) })
-		}
+	// The test sets PickImages after Start, so the answer reads it as each pick comes, on the test's goroutine; without one the user cancels, as headless.
+	pickImages := func(r driver.PickRequest, done func([]driver.PickedFile)) {
+		a.postTest(func() {
+			var files []driver.PickedFile
+			if a.PickImages != nil {
+				files = a.PickImages(r)
+			}
+			done(files)
+		})
 	}
 	return testhost.Options{
 		CheckCommits: !automationBuild && !a.measure,

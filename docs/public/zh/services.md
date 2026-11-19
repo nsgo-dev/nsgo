@@ -70,7 +70,7 @@ if desktop.CanLookUp(cx) {
 
 `cx.PickImages` 显示系统照片选择器，返回 `core.PickedFile`，其中包含字节、名称、类型和像素尺寸。`cx.TakePhoto` 在平台有相机时打开相机；`cx.Env().CanTakePhoto` 说明是否有。
 
-`nsgotest.App.PickImages` 可在无头测试和目标测试中提供模拟结果，包括 macOS 目标测试。
+测试中，`nsgotest.App.PickImages` 代替系统选择器回答选取，在无头测试以及 `nsgo test -target` 的 macos、windows 和 linux 上都有效。
 
 ```go
 cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.PickedFile) {

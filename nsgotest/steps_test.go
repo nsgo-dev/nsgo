@@ -860,26 +860,3 @@ func TestPicksRecordTheirHints(t *testing.T) {
 		t.Errorf("folder pick %+v lost its hints", d)
 	}
 }
-
-// TestPickImagesAnswersOnTargets checks that the target host delivers the
-// fake picker result back through the app's engine, as the headless model does.
-func TestPickImagesAnswersOnTargets(t *testing.T) {
-	called, got := 0, -1
-	app := Start(t, func(cx *core.Scope) core.Node {
-		return core.View{TestID: "root", Style: core.Style{Height: core.Pt(40)}, Children: []core.Node{core.View{
-			Role: core.RoleButton, Label: "Pick", TestID: "pick", Style: core.Style{Width: core.Pt(80), Height: core.Pt(30)},
-			OnPress: func(core.PressEvent) {
-				cx.PickImages(core.PickOptions{Limit: 1}, func(files []core.PickedFile) { got = len(files) })
-			},
-		}}}
-	})
-	app.PickImages = func(core.PickRequest) []driver.PickedFile {
-		called++
-		return []driver.PickedFile{{Name: "a.png", MIME: "image/png", Data: []byte("png")}}
-	}
-	app.Press("id:pick")
-	app.WaitUntil(3*time.Second, func() bool { return got >= 0 })
-	if called != 1 || got != 1 {
-		t.Fatalf("picker called %d times and delivered %d files, want one and one", called, got)
-	}
-}

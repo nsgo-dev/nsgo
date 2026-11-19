@@ -252,9 +252,7 @@ type App struct {
 	// with none the app is the newest.
 	UpdateChecks []bool
 	Update       func(background bool) core.UpdateCheck
-	// Picks are the photo picks the app asked for, oldest first.
-	// PickImages answers each with the files the user picks; with none
-	// the user cancels.
+	// Picks are the photo picks the app asked for, oldest first. PickImages answers each with the files the user picks; with none the user cancels. It answers headless and under `nsgo test -target` macos, windows and linux, in place of the system's picker; on the other targets the system's picker shows and PickImages is not asked.
 	Picks      []driver.PickRequest
 	PickImages func(r driver.PickRequest) []driver.PickedFile
 	// Photos are the photos the app asked to take, oldest first, where
