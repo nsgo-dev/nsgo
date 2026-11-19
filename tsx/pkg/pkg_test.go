@@ -113,6 +113,30 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+func TestVerifyReturnsSignedExtra(t *testing.T) {
+	k := newKeys(t)
+	extra := []byte{0, 1, 2, 3, 4}
+	data, err := Build(Contents{App: App{ID: "com.example.app", Build: 1}, Source: "mount(1)", Extra: extra}, k.release, k.cert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := k.trust().Verify(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(p.Extra, extra) {
+		t.Fatalf("extra = %v, want %v", p.Extra, extra)
+	}
+	if at := bytes.Index(data, extra); at < 0 {
+		t.Fatal("extra is not in the package")
+	} else {
+		data[at]++
+		if _, err := k.trust().Verify(data); !errors.Is(err, ErrSignature) {
+			t.Fatalf("tampered extra error = %v, want signature error", err)
+		}
+	}
+}
+
 func TestRefuses(t *testing.T) {
 	k := newKeys(t)
 	other := newKeys(t)

@@ -34,6 +34,8 @@ type Contents struct {
 	MinRuntime string
 	// Capabilities are what its code may reach.
 	Capabilities Capabilities
+	// Extra is opaque metadata the app signs for itself.
+	Extra []byte
 }
 
 // Info is what a package says of itself.
@@ -43,6 +45,8 @@ type Info struct {
 	// Capabilities are what its code may reach, as this runtime reads
 	// them: what it does not know is in Ignored and not granted.
 	Capabilities Capabilities
+	// Extra is opaque metadata the app signed for itself.
+	Extra []byte
 	// CreatedAt is when it was signed, by the release key KeyID, which
 	// Certificate certifies.
 	CreatedAt   time.Time
@@ -73,6 +77,8 @@ const (
 	sourceKey = "source"
 	// sourcePath names the bundle in the file table.
 	sourcePath = "bundle.js"
+	extraKey   = "extra"
+	extraPath  = "metadata"
 )
 
 type header struct {
@@ -136,7 +142,7 @@ func Build(contents Contents, key ed25519.PrivateKey, cert *Certificate) ([]byte
 	if _, _, err := ParseCapabilities(caps, true); err != nil {
 		return nil, err
 	}
-	return assemble(contents.App, min, caps, []byte(contents.Source), key, cert, createdAt)
+	return assemble(contents.App, min, caps, []byte(contents.Source), contents.Extra, key, cert, createdAt)
 }
 
 func checkApp(a App) error {
@@ -158,13 +164,22 @@ func checkSigner(key ed25519.PrivateKey, cert *Certificate, app string, at time.
 	return info.covers(app, at)
 }
 
-func assemble(app App, min string, caps json.RawMessage, source []byte, key ed25519.PrivateKey, cert *Certificate, at time.Time) ([]byte, error) {
+func assemble(app App, min string, caps json.RawMessage, source, extra []byte, key ed25519.PrivateKey, cert *Certificate, at time.Time) ([]byte, error) {
 	sum := sha256.Sum256(source)
 	file, err := json.Marshal(fileEntry{Path: sourcePath, Kind: sourceKey, Size: uint64(len(source)), SHA256: hex.EncodeToString(sum[:])})
 	if err != nil {
 		return nil, err
 	}
-	h, err := json.Marshal(header{App: app, MinRuntime: min, CreatedAt: at.Unix(), Certificate: cert, Files: []json.RawMessage{file},
+	files := []json.RawMessage{file}
+	if extra != nil {
+		sum := sha256.Sum256(extra)
+		entry, err := json.Marshal(fileEntry{Path: extraPath, Kind: extraKey, Offset: uint64(len(source)), Size: uint64(len(extra)), SHA256: hex.EncodeToString(sum[:])})
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, entry)
+	}
+	h, err := json.Marshal(header{App: app, MinRuntime: min, CreatedAt: at.Unix(), Certificate: cert, Files: files,
 		Capabilities: caps, Critical: []string{capabilitiesKey}})
 	if err != nil {
 		return nil, err
@@ -176,6 +191,9 @@ func assemble(app App, min string, caps json.RawMessage, source []byte, key ed25
 	out.Write(binary.LittleEndian.AppendUint32(nil, uint32(len(h))))
 	out.Write(h)
 	out.Write(source)
+	if extra != nil {
+		out.Write(extra)
+	}
 	out.Write(sign(key, contextPackage, out.Bytes()))
 	return out.Bytes(), nil
 }
@@ -348,7 +366,7 @@ func (p *parsed) files(data []byte) ([]file, error) {
 		if hex.EncodeToString(sum[:]) != strings.ToLower(e.SHA256) {
 			return nil, fmt.Errorf("%w: %s", ErrIntegrity, e.Path)
 		}
-		out = append(out, file{entry: e, known: len(unknown) == 0 && e.Kind == sourceKey, data: b})
+		out = append(out, file{entry: e, known: len(unknown) == 0 && (e.Kind == sourceKey || e.Kind == extraKey), data: b})
 	}
 	if at != uint64(len(body)) {
 		return nil, fmt.Errorf("%w: the file table does not tile the data", ErrFormat)
@@ -379,19 +397,28 @@ func (p *parsed) contents(data []byte) (*Package, error) {
 		pkg.Ignored = append(pkg.Ignored, ignored...)
 	}
 	sources := 0
+	extra := 0
 	for _, f := range files {
 		if !f.known {
 			pkg.Ignored = append(pkg.Ignored, "file "+f.entry.Path)
 			continue
 		}
-		sources++
-		if !utf8.Valid(f.data) {
-			return nil, fmt.Errorf("%w: the source is not UTF-8", ErrFormat)
+		if f.entry.Kind == sourceKey {
+			sources++
+			if !utf8.Valid(f.data) {
+				return nil, fmt.Errorf("%w: the source is not UTF-8", ErrFormat)
+			}
+			pkg.source = string(f.data)
+		} else {
+			extra++
+			pkg.Extra = slices.Clone(f.data)
 		}
-		pkg.source = string(f.data)
 	}
 	if sources != 1 {
 		return nil, fmt.Errorf("%w: %d sources, where a package holds one", ErrFormat, sources)
+	}
+	if extra > 1 {
+		return nil, fmt.Errorf("%w: %d extra metadata entries, where a package holds one", ErrFormat, extra)
 	}
 	return pkg, nil
 }

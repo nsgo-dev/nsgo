@@ -54,7 +54,8 @@
 //     "critical" list, and a runtime that does not know a field listed
 //     there refuses the package.
 //
-// What was ignored is in Info.Ignored. An incompatible change bumps the
+// Build may add opaque signed metadata through Contents.Extra, which Verify
+// returns as Info.Extra. The runtime does not parse it. What was ignored is in Info.Ignored. An incompatible change bumps the
 // format version, which runtimes require to match. Certificates and
 // revocation lists refuse fields they do not know.
 package pkg
