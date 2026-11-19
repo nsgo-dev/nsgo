@@ -71,23 +71,17 @@ const (
 	contextRevocations = "nsgo-revocations-v1"
 )
 
-// Signed is a JSON document signed by an Ed25519 key. Its Body is the
-// base64-encoded JSON body, Signer is the signing public key's KeyID and
-// Signature is the base64-encoded signature. Use SignDocument and Open to
-// create and verify documents.
+// Signed is a JSON document signed by an Ed25519 key, the envelope of certificates and revocation lists too: Body is the base64 of the JSON body, the exact bytes signed, so it needs no canonical form; Signer is the signing key's KeyID, which only picks the key to verify with; and Signature is the base64 of the signature over the context, a zero byte and the body's SHA-256. Use SignDocument and Open to create and verify an app's own documents.
 type Signed struct {
 	Body      string `json:"body"`
 	Signer    string `json:"signer"`
 	Signature string `json:"signature"`
 }
 
-// signed is the internal name used by packages, certificates and revocation
-// lists. It is an alias so their envelope remains the same JSON shape.
+// signed is Signed, as certificates and revocation lists name it.
 type signed = Signed
 
-// validDocumentContext accepts contexts reserved for application documents.
-// The app: prefix keeps them apart from NSGo's package, certificate and
-// revocation signatures.
+// validDocumentContext refuses a context that is not an app document's: one starting with app:, which none of NSGo's own does, with more after it and no zero byte, which ends the context in what is signed.
 func validDocumentContext(context string) error {
 	if !strings.HasPrefix(context, "app:") || len(context) == len("app:") || strings.ContainsRune(context, '\x00') {
 		return fmt.Errorf("%w: contexts must start with app: and contain no NUL", ErrContext)
@@ -95,8 +89,7 @@ func validDocumentContext(context string) error {
 	return nil
 }
 
-// SignDocument signs body for an application-chosen context. Contexts must
-// start with app:, and each document type should use its own context.
+// SignDocument signs body, as JSON, with key in context, which must start with app: and hold no zero byte, so it never passes for a package, certificate or revocation list, nor they for it. Give each kind of document a context of its own, with a version to change when its fields change, as "app:catalog-v1".
 func SignDocument(key ed25519.PrivateKey, context string, body any) (Signed, error) {
 	if err := validDocumentContext(context); err != nil {
 		return Signed{}, err
@@ -107,9 +100,7 @@ func SignDocument(key ed25519.PrivateKey, context string, body any) (Signed, err
 	return signBody(key, context, body)
 }
 
-// Open verifies the document with one of roots and decodes its body into v.
-// A document context must start with app: and must match the context used to
-// sign it.
+// Open verifies the document with the one of roots its Signer names, in context, which must start with app: and be the one it was signed in, and decodes its body into v, refusing fields v lacks. It trusts exactly roots: no certificate or revocation list applies, and as the envelope holds no time or sequence, an older document of the same context and key verifies as well as a newer one; put a version or expiry in the body and check it to refuse a replayed one.
 func (s Signed) Open(context string, roots []ed25519.PublicKey, v any) error {
 	if err := validDocumentContext(context); err != nil {
 		return err
@@ -127,8 +118,9 @@ func sign(key ed25519.PrivateKey, context string, message []byte) []byte {
 	return ed25519.Sign(key, framed(context, message))
 }
 
+// verify reports whether key signed message in context. A key of the wrong length verifies nothing, where ed25519.Verify would panic: roots come from the app, and a document names the one it was signed by.
 func verify(key ed25519.PublicKey, context string, message, signature []byte) bool {
-	return len(signature) == ed25519.SignatureSize && ed25519.Verify(key, framed(context, message), signature)
+	return len(key) == ed25519.PublicKeySize && len(signature) == ed25519.SignatureSize && ed25519.Verify(key, framed(context, message), signature)
 }
 
 func signBody(key ed25519.PrivateKey, context string, body any) (signed, error) {

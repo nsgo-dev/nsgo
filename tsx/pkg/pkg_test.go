@@ -706,6 +706,36 @@ func TestSignedDocuments(t *testing.T) {
 	if err := doc.Open("nsgo-package-v1", []ed25519.PublicKey{key.Public().(ed25519.PublicKey)}, &got); !errors.Is(err, ErrContext) {
 		t.Fatalf("reserved context: got %v, want context error", err)
 	}
+	// A root of the wrong length, which a document can name as its signer, verifies nothing rather than panicking.
+	short := ed25519.PublicKey{1, 2, 3}
+	forged := doc
+	forged.Signer = KeyID(short)
+	if err := forged.Open("app:catalog-v1", []ed25519.PublicKey{short}, &got); !errors.Is(err, ErrSignature) {
+		t.Fatalf("short root: got %v, want signature error", err)
+	}
+}
+
+// TestSignedDocumentsStaySeparate holds a document signed in an app context to verifying as no certificate or revocation list, and those to verifying as no document.
+func TestSignedDocumentsStaySeparate(t *testing.T) {
+	root, _ := GenerateKey()
+	roots := []ed25519.PublicKey{root.Public().(ed25519.PublicKey)}
+	var body any
+	for _, context := range []string{contextCertificate, contextRevocations} {
+		doc, err := SignDocument(root, "app:"+context, map[string]any{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := doc.open(context, roots, &body); !errors.Is(err, ErrSignature) {
+			t.Fatalf("an app document opened as %s: %v", context, err)
+		}
+		builtIn, err := signBody(root, context, map[string]any{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := builtIn.Open("app:"+context, roots, &body); !errors.Is(err, ErrSignature) {
+			t.Fatalf("a %s opened as an app document: %v", context, err)
+		}
+	}
 }
 
 func TestAppMatches(t *testing.T) {
