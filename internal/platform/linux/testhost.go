@@ -144,7 +144,12 @@ func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Mod
 		if settings := gtkSettingsGetDefault(); settings != 0 {
 			interval = time.Duration(settingInt(settings, "gtk-double-click-time")) * time.Millisecond
 		}
-		t.w.pointerDown(at, 1, 0, state, t.clicks.Press(at, time.Now(), interval))
+		// The view under the press: a press of another one starts a new click sequence.
+		var target *view
+		if root := t.w.view(t.w.root); root != nil {
+			target = hit(root, at, func(*view) bool { return true })
+		}
+		t.w.pointerDown(at, 1, 0, state, t.clicks.Press(at, target, time.Now(), interval))
 	})
 	if hold > 0 {
 		time.Sleep(hold + 50*time.Millisecond)
