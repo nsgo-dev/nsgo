@@ -128,6 +128,13 @@ func (t *testSurface) mouseWith(kind uint, p driver.Point, clicks int, mods driv
 
 func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
 	t.follow()
+	// A navigation commit can leave AppKit's view hierarchy waiting for its
+	// next run-loop layout pass even though the engine has settled. Flush that
+	// layout before AppKit picks the native view for the synthetic click.
+	onMainSync(func() {
+		t.s.commitPending()
+		t.s.native.Send(sel("layoutSubtreeIfNeeded"))
+	})
 	interval := time.Duration(objc.Send[float64](objc.ID(apple.Class("NSEvent")), sel("doubleClickInterval")) * float64(time.Second))
 	clicks := t.clicks.Press(at, time.Now(), interval)
 	t.mouseWith(evMoved, at, 0, mods)

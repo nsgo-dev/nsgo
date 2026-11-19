@@ -16,7 +16,38 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/desktop"
 	"github.com/nsgo-dev/nsgo/internal/driver"
+	"github.com/nsgo-dev/nsgo/ui"
 )
+
+// TestPressAfterNavigationPush reaches a newly pushed page through the
+// platform's native input path before any extra delay.
+func TestPressAfterNavigationPush(t *testing.T) {
+	pressed := 0
+	app := Start(t, func(cx *core.Scope) core.Node {
+		nav := base.NewNav(cx, "home")
+		return nav.Stack(core.Style{FlexGrow: 1}, func(cx *core.Scope, route string, _ func() int) base.NavPage {
+			if route == "home" {
+				return ui.NavPage(cx, base.NavPage{Title: "Home", Children: []core.Node{
+					ui.Button{Text: "Open", TestID: "open", OnPress: func() { nav.Push("next") }},
+				}}, ui.NavHeader{})
+			}
+			return ui.NavPage(cx, base.NavPage{Title: "Next", Children: []core.Node{
+				ui.Button{Text: "Target", TestID: "target", OnPress: func() { pressed++ }},
+			}}, ui.NavHeader{OnBack: func() { nav.Pop(1) }})
+		})
+	})
+	for i := 0; i < 20; i++ {
+		app.Press("id:open")
+		app.WaitFor("id:target", time.Second)
+		app.Settle()
+		app.Press("id:target")
+		if pressed != i+1 {
+			t.Fatalf("iteration %d: presses = %d, want %d", i, pressed, i+1)
+		}
+		app.Back()
+		app.WaitFor("id:open", time.Second)
+	}
+}
 
 // closingDialog is a dialog with an exit transition and a button outside it that closes it.
 func closingDialog(cx *core.Scope) core.Node {
