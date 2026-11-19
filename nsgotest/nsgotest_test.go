@@ -1238,6 +1238,24 @@ func TestTransparentWindowCapabilities(t *testing.T) {
 	app.Find("text:off the taskbar")
 }
 
+func TestMenuShortcutSpellingMatchesDesktop(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var got string
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "View", Items: []desktop.MenuItem{
+			{Label: "Ctrl", Shortcut: "ctrl+r", OnSelect: func() { got = "ctrl" }},
+			{Label: "Mod", Shortcut: "mod+r", OnSelect: func() { got = "mod" }},
+		}}})
+		cx.SetMainView(func(*core.Scope) core.Node { return core.Text{Content: "main"} })
+	}, Environment(core.Environment{OS: core.OSWindows, Idiom: core.IdiomDesktop}))
+	app.Key("ctrl+r")
+	if got != "mod" {
+		t.Fatalf("ctrl+r chose %q, want mod spelling", got)
+	}
+}
+
 // Another window's shortcuts and menu bar leave the main window's, which Key and ChooseMenu reach, and a context menu any window shows chooses on that window.
 func TestOtherWindowsKeepTheirShortcutsAndMenus(t *testing.T) {
 	if Target() != "" {

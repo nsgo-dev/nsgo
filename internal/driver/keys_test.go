@@ -20,6 +20,8 @@ func TestMenuShortcutEditing(t *testing.T) {
 		{"linux NotInText ends the search", OSLinux, []MenuEntry{{Label: "Refresh", Shortcut: "mod+r", NotInText: true}, {Label: "Run", Shortcut: "mod+r"}}, ctrlR, true, ""},
 		{"linux NotInText in a submenu ends the search", OSLinux, []MenuEntry{{Label: "View", Items: []MenuEntry{{Label: "Refresh", Shortcut: "mod+r", NotInText: true}}}, {Label: "Run", Shortcut: "mod+r"}}, ctrlR, true, ""},
 		// Windows and Linux look an item up by its shortcut's spelling, each name of the press in turn.
+		{"windows names beat menu order", OSWindows, []MenuEntry{{Label: "Ctrl", Shortcut: "ctrl+r"}, {Label: "Mod", Shortcut: "mod+r"}}, ctrlR, false, "Mod"},
+		{"linux names beat menu order", OSLinux, []MenuEntry{{Label: "Ctrl", Shortcut: "ctrl+r"}, {Label: "Mod", Shortcut: "mod+r"}}, ctrlR, false, "Mod"},
 		{"windows NotInText keeps only its spelling", OSWindows, []MenuEntry{{Label: "Refresh", Shortcut: "mod+r", NotInText: true}, {Label: "Run", Shortcut: "ctrl+r"}}, ctrlR, true, "Run"},
 		{"linux NotInText keeps only its spelling", OSLinux, []MenuEntry{{Label: "Refresh", Shortcut: "mod+r", NotInText: true}, {Label: "Run", Shortcut: "ctrl+r"}}, ctrlR, true, "Run"},
 		// Windows and Linux never register an editing role's key, so a NotInText one keeps nothing from later items.

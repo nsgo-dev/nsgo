@@ -1139,6 +1139,8 @@ func (a *App) keyNames(k string) []string {
 	switch {
 	case slices.Contains(mods, "mod"):
 		return []string{k, swap("mod", cmd)}
+	case cmd == "ctrl" && slices.Contains(mods, "ctrl"):
+		return []string{swap("ctrl", "mod"), k}
 	case slices.Contains(mods, cmd):
 		return []string{k, swap(cmd, "mod")}
 	}
