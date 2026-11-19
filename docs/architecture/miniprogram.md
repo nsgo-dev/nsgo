@@ -42,6 +42,8 @@ One module and one logic layer serve every platform; `config.js` names the platf
 | Douyin and ByteDance's other apps | `tt` | `TTWebAssembly`, then `WebAssembly` | `wechat/` as `.ttml`, `.ttss`, `sjs` and `tt:` | `project.config.json` | its app on macOS |
 | Alipay | `my` | `WebAssembly` | `alipay/` | `mini.project.json` | its app on macOS |
 
+WeChat DevTools is refreshed with `cli close --project <dir>` followed by `cli auto --project <dir>` for every `-run` and `dev` build. This sequence was checked against DevTools 2.01.2510290 and removes the manual compile and reopen step reported by older `cli open` flows.
+
 - Go calls the platform only through `nsgoMP.api`, which `api.js` makes from its object: WeChat's as it is, QQ and Douyin's with `chooseImage` standing in for `chooseMedia` where it is missing, and Alipay's translated call by call (`confirm` and `alert` for `showModal`, `{ key }` storage, `setNavigationBar`). An API a platform lacks stays undefined, and Go answers its request as failed.
 - The runtime tries the platform's loaders in order, each with the module's path in the package; a platform that loads none fails to start, with the loaders it tried.
 - Alipay names handlers statically and has no `mut-bind`, page container or component `animate`: every view binds every handler and `nsgo-node` keeps an event for the innermost view that takes it, by its time; a capturing view is a branch of its own with `catchTouchMove`; its scroll views' touches stand for their drags; back leaves the page and keyframes do not run. Events reach the page through the `onNsgo` prop each parent hands its children, as Alipay's components trigger no events their pages hear.

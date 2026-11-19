@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/fs"
@@ -14,6 +15,29 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/dop251/goja"
 )
+
+func TestOpenMiniProgramRefreshesWeChatProject(t *testing.T) {
+	wechat, _ := miniProgramPlatformOf("miniprogram_wechat")
+	var commands [][]string
+	runMiniProgramCommand = func(_ context.Context, name string, args ...string) error {
+		commands = append(commands, append([]string{name}, args...))
+		if len(commands) == 1 {
+			return os.ErrNotExist
+		}
+		return nil
+	}
+	t.Cleanup(func() { runMiniProgramCommand = run })
+	if err := openMiniProgramAt(t.Context(), wechat, "/tmp/project", "/tmp/wechat-cli"); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{
+		{"/tmp/wechat-cli", "close", "--project", "/tmp/project"},
+		{"/tmp/wechat-cli", "auto", "--project", "/tmp/project"},
+	}
+	if !slices.EqualFunc(commands, want, func(a, b []string) bool { return slices.Equal(a, b) }) {
+		t.Fatalf("commands = %#v, want %#v", commands, want)
+	}
+}
 
 // runTree runs the runtime's tree.js on goja and returns a function that
 // applies a batch of operations (JSON) and returns the page's setData

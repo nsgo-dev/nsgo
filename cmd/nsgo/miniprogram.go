@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 
 	"github.com/andybalholm/brotli"
 )
@@ -377,22 +376,16 @@ func writeFile(path string, data []byte) error {
 }
 
 // miniprogramSession writes the project into the dev cache and opens it in
-// mp's developer tool once, which compiles it again as each build changes
-// it.
+// mp's developer tool after each successful build.
 func miniprogramSession(mp miniProgramPlatform) session {
-	var once sync.Once
 	dir := func(p *project) string { return p.cache("dev", "miniprogram_"+mp.name) }
 	return session{
 		build: func(ctx context.Context, p *project) error {
 			return buildMiniProgram(ctx, p, mp, dir(p))
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
-			var err error
-			once.Do(func() {
-				note("%s", rel(dir(p)))
-				err = openMiniProgram(ctx, mp, dir(p))
-			})
-			return app{stop: func() {}}, err
+			note("%s", rel(dir(p)))
+			return app{stop: func() {}}, openMiniProgram(ctx, mp, dir(p))
 		},
 	}
 }
@@ -439,8 +432,21 @@ func openMiniProgram(ctx context.Context, mp miniProgramPlatform, dir string) er
 	if !canOpenMiniProgram(mp) {
 		return fmt.Errorf("%s's developer tool is not installed here: get it at %s, then open %s", mp.title, mp.download, rel(dir))
 	}
+	return openMiniProgramAt(ctx, mp, abs, devToolsCLI())
+}
+
+var runMiniProgramCommand = run
+
+func openMiniProgramAt(ctx context.Context, mp miniProgramPlatform, abs, cli string) error {
 	if mp.name == "wechat" {
-		return run(ctx, devToolsCLI(), "open", "--project", abs)
+		// WeChat DevTools' open command only opens an existing project. Closing
+		// it first makes the following auto command compile and load the fresh
+		// files on every -run and dev rebuild. Closing an unopened project
+		// returns an error, which is safe to ignore.
+		if err := runMiniProgramCommand(ctx, cli, "close", "--project", abs); err != nil && ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return runMiniProgramCommand(ctx, cli, "auto", "--project", abs)
 	}
-	return run(ctx, "open", "-a", mp.tool, abs)
+	return runMiniProgramCommand(ctx, "open", "-a", mp.tool, abs)
 }
