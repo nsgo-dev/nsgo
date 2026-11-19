@@ -29,6 +29,7 @@
 - Fix a `YieldsToMenu` binding losing its key on Windows and Linux to an application-menu item those menus leave out, one of macOS's own roles or a Speech item where nothing speaks (#770 by @houko).
 - Keep the gallery's pages, page headers, sidebar and content pane clear of the left and right safe area, such as the vertical status bar beside a foldable's outer display and an iPhone's camera in landscape (#825 by @houko).
 - Glide Android scroll views with OverScroller's spline fling, as Android's own scroll views do (#833 by @owocc).
+- Keep the code and message of what a TSX plugin's synchronous export throws in `Plugin.Call`'s error, as a rejected promise's, instead of the raw exception (#847 by @houko).
 
 ## [0.2.0] - 2026-11-19
 

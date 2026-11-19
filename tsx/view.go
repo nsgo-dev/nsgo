@@ -110,11 +110,7 @@ func (p *Plugin) Exports() []string {
 	return out
 }
 
-// Call calls the plugin's export name with args, values JSON encodes,
-// and has done hear what it returns, or what its promise resolves with,
-// as JSON decodes it, on the engine's goroutine; err is what it threw or
-// rejected with, ErrNoExport, or why the plugin stopped. Call it on the
-// engine's goroutine.
+// Call calls the plugin's export name with args, values JSON encodes, and has done hear what it returns, or what its promise resolves with, as JSON decodes it, on the engine's goroutine; err is what it threw or rejected with, a *core.Error when that carries a code, ErrNoExport, or why the plugin stopped. Call it on the engine's goroutine.
 func (p *Plugin) Call(name string, args []any, done func(result any, err error)) {
 	r := p.r
 	if err := r.stoppedErr(); err != nil || p.cx.Disposed() {
