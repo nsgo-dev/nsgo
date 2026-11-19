@@ -24,7 +24,7 @@ func majorVersion(ua string) string {
 	if m := chromeVersion.FindStringSubmatch(ua); m != nil {
 		return m[1]
 	}
-	return "130"
+	return driver.WebMobileChromeVersion
 }
 
 type cdpBrand struct {

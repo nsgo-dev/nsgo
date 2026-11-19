@@ -329,8 +329,8 @@ func (dl *webDownload) report() {
 	dl.window.report(dl.view, driver.Event{Kind: driver.EventDownload, ID: dl.view.id, Data: &item})
 }
 
-// What a Mobile web view presents without a user agent of its own: Android Chrome's, of a version as recent as this code, and the platform such a phone reports. Sites take iPhone Safari's for WebKit on iOS, which WebKitGTK is not: given it, x.com showed "Something went wrong" where it loads with Android Chrome's (2026-11).
-var mobileUserAgent = fmt.Sprintf(driver.WebMobileUserAgentAndroid, "157")
+// What a Mobile web view presents without a user agent of its own: Android Chrome's, naming driver.WebMobileChromeVersion, and the platform such a phone reports. Sites take iPhone Safari's for WebKit on iOS, which WebKitGTK is not: given it, x.com showed "Something went wrong" where it loads with Android Chrome's (2026-11).
+var mobileUserAgent = fmt.Sprintf(driver.WebMobileUserAgentAndroid, driver.WebMobileChromeVersion)
 
 const mobilePlatform = "Linux armv8l"
 

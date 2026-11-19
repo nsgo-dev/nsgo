@@ -1,6 +1,10 @@
 // WebView.Mobile's script, run in every frame before the page's own. It is an expression called with what navigator.platform reports and whether to emulate a touch screen, as WebKit's desktop backends (macOS, Linux) have it do: the page then sees one without hover, and the mouse's drags reach it as a finger's touches. Either way a wheel or trackpad scroll that nothing under it would scroll reaches the page as a finger's swipe, which WebView2's own emulation (Windows) leaves a wheel.
 (function (platform, emulate) {
   'use strict';
+  // Once per frame: run twice, it would double every touch.
+  var mark = Symbol.for('nsgo.webMobile');
+  if (window[mark]) return;
+  Object.defineProperty(window, mark, { value: true });
   var slop = 6; // CSS pixels a press moves before it is a drag
   var drag = null, swallow = false, wheel = null, glide = null, ids = 0;
 
@@ -217,16 +221,17 @@
     addEventListener('pointercancel', function (e) { if (drag && e.pointerId === drag.pointer) end(e, 'touchcancel'); }, true);
     addEventListener('blur', function () { if (drag) end(null, 'touchcancel'); });
 
-    // A phone sends no mouse events while a finger moves, none for a touch the page prevented, and no click after a drag. A drag selects no text and drags no image.
+    // A phone sends no mouse events while a finger moves, none for a touch the page prevented, and no click after a drag. A mouseup follows a mousedown the page saw, so its own mouse handling does not stay pressed. A drag selects no text and drags no image, as hiding its moves keeps the engine from extending a selection, while a press still places the caret, which the engine does through selectstart.
     var hide = function (e) {
       e.stopImmediatePropagation();
       e.preventDefault();
     };
-    addEventListener('mousedown', function (e) { if (drag && drag.prevented) hide(e); }, true);
+    var hideUp = false;
+    addEventListener('mousedown', function (e) { hideUp = !!(drag && drag.prevented); if (hideUp) hide(e); }, true);
     addEventListener('mousemove', function (e) { if (drag) hide(e); }, true);
-    addEventListener('mouseup', function (e) { if (swallow) hide(e); }, true);
+    addEventListener('mouseup', function (e) { if (hideUp) { hideUp = false; hide(e); } }, true);
     addEventListener('click', function (e) { if (swallow) { swallow = false; hide(e); } }, true);
-    addEventListener('selectstart', function (e) { if (drag) e.preventDefault(); }, true);
+    addEventListener('selectstart', function (e) { if (drag && drag.moved) e.preventDefault(); }, true);
     addEventListener('dragstart', function (e) { if (drag) e.preventDefault(); }, true);
   }
 
