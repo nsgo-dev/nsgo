@@ -54,7 +54,7 @@ tsx.RegisterFunctions("app/native", map[string]any{
 
 An optional prop forwarded as `undefined` uses its default. When registering a Go component with a getter whose default differs from its type's zero, add an option such as `tsx.Default("Max", float64(100))`; the same default applies while a reactive prop returns undefined, without replacing the component.
 
-Registering Go components and classes uses reflection to discover their exported fields and methods at runtime. This keeps one generic registration path, and it also keeps those methods in a linked binary. Linking `tsx` typically adds about 20 MB to a stripped desktop binary, depending on the target and the app's other dependencies.
+Registering Go components and classes finds their exported fields and methods by reflection as the app runs. That lookup keeps the Go linker from dropping exported methods nothing calls, in the whole app and not only in what TSX registers, so linking `tsx` adds about 20 MB to a stripped desktop binary, more the more packages the app links.
 
 ## Signed packages
 
