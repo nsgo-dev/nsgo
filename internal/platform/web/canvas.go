@@ -165,8 +165,6 @@ type canvasImage struct {
 	density float64
 	loaded  bool
 	waiting map[*view]bool
-	// src keeps the source's inline Data alive for as long as the image is cached: ImageSource.Key names it by its address, which a later buffer could otherwise reuse and be handed this image (#738).
-	src driver.ImageSource
 }
 
 // loadImage returns src's image, loading it the first time, and has v
@@ -182,7 +180,7 @@ func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
 			s.canvasImages = map[string]*canvasImage{}
 		}
 		im = &canvasImage{img: js.Global().Get("Image").New(), density: float64(src.Density()),
-			waiting: map[*view]bool{}, src: src}
+			waiting: map[*view]bool{}}
 		s.canvasImages[key] = im
 		var onload js.Func
 		onload = js.FuncOf(func(js.Value, []js.Value) any {

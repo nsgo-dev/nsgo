@@ -789,8 +789,6 @@ type loadedImage struct {
 	waiting       map[any]func()
 	used          uint64
 	cancel        context.CancelFunc
-	// src keeps the source's inline Data alive while the image is cached: ImageSource.Key names it by its address, which a later buffer could otherwise reuse and be handed this image (#738).
-	src driver.ImageSource
 }
 
 // canvasImageUse counts the images drawn; canvasPass is its value when the last pass of drawing ended, so images used since are the current pass's, which eviction keeps; canvasPassPosted says an endCanvasPass is posted.
@@ -847,7 +845,7 @@ func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
 		delete(canvasImages, oldest)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	im := &loadedImage{used: canvasImageUse, waiting: map[any]func(){}, cancel: cancel, src: src}
+	im := &loadedImage{used: canvasImageUse, waiting: map[any]func(){}, cancel: cancel}
 	if host.Redraw != nil {
 		im.waiting[host.Owner] = host.Redraw
 	}

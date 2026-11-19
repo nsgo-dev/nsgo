@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"image"
 	"strconv"
@@ -1197,13 +1198,13 @@ func (s ImageSource) Density() float32 {
 	return float32(d)
 }
 
-// Key returns a string naming the image s loads, for caches: its URI, or where its bytes or pixels are.
+// Key returns a string naming the image s loads, for caches: its URI, a digest of its bytes, or where its pixels are and their version. Bytes are named by what they hold, not where: a collected buffer's address can come back in a new buffer of the same length, which must not be handed the image cached for the old one (#738).
 func (s ImageSource) Key() string {
 	if s.Pixels != nil {
 		return fmt.Sprintf("pixels:%p:%d", s.Pixels, s.Version)
 	}
 	if len(s.Data) > 0 {
-		return fmt.Sprintf("data:%p:%d", &s.Data[0], len(s.Data))
+		return fmt.Sprintf("data:%x", sha256.Sum256(s.Data))
 	}
 	return s.URI
 }
