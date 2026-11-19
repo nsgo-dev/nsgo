@@ -10,13 +10,18 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// View runs the app of a package a pkg.Trust verified where it is placed in a Go app, sandboxed: the app's own screens delivered anew, or a plugin. The package's capabilities hold it, narrowed by Grant; it keeps a partition of the app's storage of its app ID's, and its host module reaches Host alone. A package that throws as it loads, or stops at a quota, panics, as any component does; place it under a core.Catch to show something else. The web cannot isolate a package from the page, so there it panics with ErrUnisolated unless Sandbox.WebUnisolated.
+// View runs the app of a package a pkg.Trust verified where it is placed in a Go app, sandboxed: the app's own screens delivered anew, or a plugin. The package's capabilities hold it, narrowed by Grant; it keeps a partition of the app's storage of its app ID's, and its host module reaches Host alone. A package that throws as it loads, or stops at a quota, panics, as any component does; place it under a core.Catch to show something else. Export names a component exported by the package's entry module; when set, Props are passed to it and the entry-mounted root is not selected. The web cannot isolate a package from the page, so there it panics with ErrUnisolated unless Sandbox.WebUnisolated.
 //
 //	p, err := trust.Verify(data) // off the engine's goroutine
 //	...
 //	core.Catch{Try: tsx.View{Package: p}.Render, Fallback: failed}
 type View struct {
 	Package *pkg.Package
+	// Export selects a named component exported by the package's entry module.
+	// An empty name keeps the entry-mounted root.
+	Export string
+	// Props are passed to Export as its props object.
+	Props map[string]any
 	// Sandbox's Capabilities are the package's and its Storage its app
 	// ID when unset.
 	Sandbox
@@ -27,7 +32,7 @@ func (v View) Render(cx *core.Scope) core.Node {
 	if v.Package == nil {
 		panic("tsx: a View needs a package")
 	}
-	return Sandboxed(v.Package.App.ID, v.Package.Source(), v.Sandbox.of(v.Package))(cx)
+	return Sandboxed(v.Package.App.ID, v.Package.Source(), v.Sandbox.of(v.Package), ViewOptions{Export: v.Export, Props: v.Props})(cx)
 }
 
 // of is s for package p.
@@ -60,6 +65,14 @@ type Plugin struct {
 // ErrNoExport is the failure of a call of a name the plugin does not
 // export as a function.
 var ErrNoExport = errors.New("tsx: the plugin exports no such function")
+
+// ErrNoViewExport is the failure of a View.Export name the package does not
+// export.
+var ErrNoViewExport = errors.New("tsx: the view exports no such component")
+
+// ErrViewExportNotComponent is the failure of a View.Export value that is not
+// callable as a component.
+var ErrViewExportNotComponent = errors.New("tsx: the view export is not a component")
 
 // Load runs package p as a plugin under cx, within s as View runs it, and returns it once its entry module ran, or a nil Plugin and what that threw, which goes to no Catch above cx and not to the app's report, or ErrUnisolated on the web as View panics with it. Call it on the engine's goroutine.
 func Load(cx *core.Scope, p *pkg.Package, s Sandbox) (plugin *Plugin, err error) {

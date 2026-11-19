@@ -161,14 +161,57 @@ func (s Sandbox) isolation(browser bool) error {
 // SandboxModules are the modules a sandboxed bundle imports without Sandbox.Modules naming them: NSGo's own, with what is registered into them SandboxSafe, none of the Go functions registered with RegisterFunctions, and none of their exports that act on the whole app (setColorScheme, BackHandler.exitApp).
 var SandboxModules = []string{"nsgo", "nsgo:rt", "nsgo/base", "nsgo/base/plot", "nsgo/ui", "nsgo/ui/chat", "nsgo/mobile"}
 
-// Sandboxed returns the app of a bundle, as App does, run within s, in a view of its own: its frame, which fills the room its parent gives it, no more, so the bundle cannot grow over the host's views, and clips what the bundle shows, overlays included (core.Scope.Confine). In a scroll view that room is the scroll view's height: a host that wants the bundle as tall as its content puts it in a view of its own. On the web it panics with ErrUnisolated when s has Capabilities or Grant, unless s.WebUnisolated.
-func Sandboxed(name, src string, s Sandbox) func(cx *core.Scope) core.Node {
+// ViewOptions selects an exported component to render from a bundle. An empty
+// Export keeps the bundle's entry-mounted root. Props are passed as the
+// component's props object.
+type ViewOptions struct {
+	Export string
+	Props  map[string]any
+}
+
+// Sandboxed returns the app of a bundle, as App does, run within s, in a view of its own: its frame, which fills the room its parent gives it, no more, so the bundle cannot grow over the host's views, and clips what the bundle shows, overlays included (core.Scope.Confine). In a scroll view that room is the scroll view's height: a host that wants the bundle as tall as its content puts it in a view of its own. On the web it panics with ErrUnisolated when s has Capabilities or Grant, unless s.WebUnisolated. When options has an Export, that named component is rendered instead of the entry-mounted root.
+func Sandboxed(name, src string, s Sandbox, options ...ViewOptions) func(cx *core.Scope) core.Node {
+	var optionsForView ViewOptions
+	if len(options) > 0 {
+		optionsForView = options[0]
+	}
 	return func(cx *core.Scope) core.Node {
 		inner := cx.Child()
 		var root core.Node
-		inner.Run(func() { root = s.start(inner, name, src).root.elem })
+		inner.Run(func() {
+			r := s.start(inner, name, src)
+			if optionsForView.Export != "" {
+				r.renderExport(optionsForView.Export, optionsForView.Props)
+			}
+			root = r.root.elem
+		})
 		return core.View{Style: sandboxFrame, Children: []core.Node{root}}
 	}
+}
+
+// renderExport mounts a named entry export as a component in the runtime's
+// root. It runs under a child owner, so the component has its own state and
+// is disposed with the sandboxed view.
+func (r *runtime) renderExport(name string, props map[string]any) {
+	exports, _ := r.vm.Get(exportsGlobal).(*js.Object)
+	if exports == nil || !defined(exports.Get(name)) {
+		panic(fmt.Errorf("%w: %q", ErrNoViewExport, name))
+	}
+	component := exports.Get(name)
+	if !isFunction(component) {
+		panic(fmt.Errorf("%w: %q", ErrViewExportNotComponent, name))
+	}
+	input := r.vm.NewObject()
+	if props != nil {
+		input = r.vm.ToValue(props).ToObject(r.vm)
+	}
+	// A package may still mount its normal entry root while defining exports.
+	// An explicitly selected export replaces that root.
+	for _, child := range slices.Clone(r.root.children) {
+		r.removeChild(r.root, child)
+	}
+	owner := r.cx.Child()
+	owner.Run(func() { r.insertValue(r.root, r.call(component, input), nil) })
 }
 
 // sandboxFrame is the style of the view a sandboxed bundle shows in, which the host's scope owns and the bundle cannot restyle.
