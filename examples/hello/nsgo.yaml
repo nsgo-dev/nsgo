@@ -13,7 +13,7 @@ dev:
 
 build:
   output: dist
-  targets: [all, miniprogram]
+  targets: [all]
 
 # The installers' pictures and icons, the built-in ones and the app's
 # icon unless these name others.
