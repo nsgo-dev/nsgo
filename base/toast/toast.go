@@ -91,7 +91,7 @@ type Toast struct {
 	SwipingClass   string
 	SwipingStyle   core.Style
 	Label          string
-	// LabelFunc follows a label that changes while the toast remains in the stack.
+	// LabelFunc is a label that changes while the toast shows, as when a toast replaces it; it wins over Label, and the screen reader reads each new one.
 	LabelFunc func() string
 	// OnDismissRequest: the user swiped it away; dismiss it. It stays
 	// where the swipe took it.
@@ -120,6 +120,17 @@ func (t Toast) Render(cx *core.Scope) core.Node {
 	}
 	if label != "" {
 		cx.Announce(label)
+	}
+	if t.LabelFunc != nil {
+		said := label
+		cx.Effect(func() {
+			if l := t.LabelFunc(); l != said {
+				said = l
+				if l != "" {
+					cx.Announce(l)
+				}
+			}
+		})
 	}
 	threshold := t.SwipeThreshold
 	if threshold == 0 {

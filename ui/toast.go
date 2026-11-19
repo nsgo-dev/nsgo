@@ -38,6 +38,7 @@ type ToastContent struct {
 	OnAction    func()
 	OnClose     func()
 	Duration    time.Duration
+	shown       uint64 // which Show it is, by which a replacement is told from the toast it replaces
 }
 
 type toastEntry = toast.Entry[string, ToastContent]
@@ -61,6 +62,7 @@ type Toaster struct {
 	expanded *core.Signal[bool]
 	ticking  bool
 	count    int
+	shows    uint64
 }
 
 // NewToaster makes a Toaster where cx is.
@@ -78,6 +80,8 @@ func (t *Toaster) Show(c ToastContent) string {
 	if c.Duration == 0 {
 		c.Duration = 5 * time.Second
 	}
+	t.shows++
+	c.shown = t.shows
 	if old, ok := t.manager.Push(c.ID, c, max(c.Duration, 0), t.cx.Now()); ok && old.OnClose != nil {
 		old.OnClose()
 	}
@@ -269,20 +273,21 @@ func (ts Toasts) Render(cx *core.Scope) core.Node {
 func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 	t := ts.Toaster
 	colors := ColorsOf(cx)
-	first := core.Untracked(cx, e)
-	id := first.ID
+	id := core.Untracked(cx, e).ID
+	// The content, which changes only when a toast of the same ID replaces it: the entry changes whenever any toast's status does, and building the content again then would restart a leading spinner and drop a focused action.
+	content := core.NewMemoFunc(cx, func() ToastContent { return e().Value }, func(a, b ToastContent) bool { return a.shown == b.shown })
 	label := func() string {
-		c := e().Value
+		c := content.Get()
 		return strings.Join(slices.DeleteFunc([]string{c.Title, c.Description}, func(s string) bool { return s == "" }), ". ")
 	}
 	leading := core.Dynamic(func(*core.Scope) core.Node {
-		if lead := toastLeading(e().Value); lead != nil {
+		if lead := toastLeading(content.Get()); lead != nil {
 			return core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{lead}}
 		}
-		return core.View{}
+		return nil
 	})
 	textBody := core.Dynamic(func(*core.Scope) core.Node {
-		c := e().Value
+		c := content.Get()
 		texts := []core.Node{core.Text{Content: c.Title, Style: TypeLabel, StyleFunc: Colored(colors.Text)}}
 		if c.Description != "" {
 			texts = append(texts, core.Text{Content: c.Description, Style: TypeCaption, StyleFunc: Colored(colors.Muted)})
@@ -290,13 +295,13 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 		return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 2}, Children: texts}
 	})
 	action := core.Dynamic(func(*core.Scope) core.Node {
-		c := e().Value
+		c := content.Get()
 		if c.Action == "" {
-			return core.View{}
+			return nil
 		}
 		return Button{Text: c.Action, Variant: ButtonSecondary, TestID: id + "-action", OnPress: func() {
-			if latest := e().Value.OnAction; latest != nil {
-				latest()
+			if c.OnAction != nil {
+				c.OnAction()
 			}
 			t.Dismiss(id)
 		}}
@@ -323,7 +328,7 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 		SwipingStyle:     core.Style{Transition: core.Transition{}},
 		StyleFunc: func() core.Style {
 			align := core.AlignCenter
-			if e().Value.Description != "" {
+			if content.Get().Description != "" {
 				align = core.AlignStart
 			}
 			glass := FinOf(cx).Glass()

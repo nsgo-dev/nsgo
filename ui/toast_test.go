@@ -74,11 +74,48 @@ func TestToastReplacementFollowsNewContent(t *testing.T) {
 		if got := toastY(app, "same"); got != oldY {
 			t.Fatalf("replacement moved toast from %v to %v", oldY, got)
 		}
+		if !slices.Contains(app.Announced, "Second. new") {
+			t.Fatalf("the replacement was not read out: %q", app.Announced)
+		}
 		app.Press("same-action")
 		if !nextAction || firstAction {
 			t.Fatalf("replacement action states are first=%v next=%v", firstAction, nextAction)
 		}
 	})
+}
+
+// TestToastKeepsContentAcrossOtherToasts builds a toast's content once while other toasts come and go, so a leading spinner or a focused action button is not built again, and lays out a toast without a leading view or an action with no room for them.
+func TestToastKeepsContentAcrossOtherToasts(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var toaster *Toaster
+		builds := 0
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			toaster = NewToaster(cx)
+			return Toasts{Toaster: toaster, TestID: "toasts", CloseLabel: "Close"}
+		})
+		toaster.Show(ToastContent{ID: "kept", Title: "Kept", Leading: countedBuild{&builds}, Action: "Undo", Duration: -1})
+		toaster.Show(ToastContent{ID: "bare", Title: "Bare", Duration: -1})
+		app.Advance(time.Second)
+		before := builds
+		toaster.Show(ToastContent{ID: "other", Title: "Other", Duration: -1})
+		app.Advance(time.Second)
+		toaster.Dismiss("other")
+		app.Advance(time.Second)
+		if builds != before {
+			t.Fatalf("other toasts built a toast's leading view %d more times", builds-before)
+		}
+		if row := app.Find("text:Bare").Parent.Parent; len(row.Children) != 2 {
+			t.Fatalf("a toast without a leading view or an action lays out %d views beside its text, want only its close button", len(row.Children)-1)
+		}
+	})
+}
+
+// countedBuild counts its builds.
+type countedBuild struct{ n *int }
+
+func (c countedBuild) Render(*core.Scope) core.Node {
+	*c.n++
+	return core.Text{Content: "counted"}
 }
 
 // TestToastFromClosingScope shows a toast from a scope that then goes,
