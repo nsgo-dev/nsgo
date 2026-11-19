@@ -60,6 +60,7 @@ var (
 	gtkWidgetSetName               func(uintptr, *byte)
 	gtkLabelSetText                func(uintptr, *byte)
 	gtkLabelSetXalign              func(uintptr, float32)
+	gtkLabelSetYalign              func(uintptr, float32)
 	gSignalStopEmissionByName      func(uintptr, *byte)
 	gtkStyleContextAddForDisplay   func(uintptr, uintptr, uint32)
 	gtkStyleContextRemoveDisplay   func(uintptr, uintptr)
@@ -103,6 +104,7 @@ func bindEditing() {
 		{&gtkWidgetSetName, "gtk_widget_set_name"},
 		{&gtkLabelSetText, "gtk_label_set_text"},
 		{&gtkLabelSetXalign, "gtk_label_set_xalign"},
+		{&gtkLabelSetYalign, "gtk_label_set_yalign"},
 		{&gtkStyleContextAddForDisplay, "gtk_style_context_add_provider_for_display"},
 		{&gtkStyleContextRemoveDisplay, "gtk_style_context_remove_provider_for_display"},
 	} {
@@ -308,6 +310,8 @@ func (w *window) makeEditor(v *view, multiline bool) {
 		v.hint = gtkLabelNew(cstr(""))
 		gObjectRefSink(v.hint)
 		gtkLabelSetWrap(v.hint, 1)
+		// At the top of the content box, where the text view's first line is: a label centers its lines in its box.
+		gtkLabelSetYalign(v.hint, 0)
 		gtkWidgetSetName(v.hint, cstr(editorName(v)+"-hint"))
 		gtkWidgetSetParent(v.hint, v.widget)
 		v.entry = gtkScrolledWindowNew()

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ebitengine/purego"
 
@@ -99,27 +100,45 @@ func TestTextViewTakesTheLineHeight(t *testing.T) {
 	w := startTestWindow(t, app, Options{Title: title, Width: 320, Height: 240})
 	waitForTitle(t, w, title)
 	var (
-		lineYrange func(tv uintptr, iter *textIter, y, h *int32)
-		measure    func(widget uintptr, orientation, forSize int32, min, nat, minBaseline, natBaseline *int32)
+		lineYrange        func(tv uintptr, iter *textIter, y, h *int32)
+		measure           func(widget uintptr, orientation, forSize int32, min, nat, minBaseline, natBaseline *int32)
+		gtkLabelGetYalign func(uintptr) float32
 	)
 	purego.RegisterLibFunc(&lineYrange, gtkLib, "gtk_text_view_get_line_yrange")
 	purego.RegisterLibFunc(&measure, gtkLib, "gtk_widget_measure")
+	purego.RegisterLibFunc(&gtkLabelGetYalign, gtkLib, "gtk_label_get_yalign")
+	var views []*view
 	w.onLoop(t, func() {
-		var views []*view
 		for _, v := range w.entries {
 			if v.textView != 0 && !slices.Contains(views, v) {
 				views = append(views, v)
 			}
 		}
-		if len(views) != 2 {
-			t.Fatalf("%d text views, want 2", len(views))
+	})
+	if len(views) != 2 {
+		t.Fatalf("%d text views, want 2", len(views))
+	}
+	// GTK lays a text view's lines out at its width once it has one, wrapping them until then.
+	deadline := time.Now().Add(10 * time.Second)
+	for laidOut := false; !laidOut; {
+		w.onLoop(t, func() {
+			laidOut = gtkWidgetGetWidth(views[0].textView) >= 290 && gtkWidgetGetWidth(views[1].textView) >= 290
+		})
+		if !laidOut && time.Now().After(deadline) {
+			t.Fatal("the text views were not laid out at their width")
 		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	w.onLoop(t, func() {
 		for _, v := range views {
 			if v.input.Placeholder != "" {
 				var lo, nat, b1, b2 int32
 				measure(v.hint, 1, 300, &lo, &nat, &b1, &b2)
 				if nat != 26 {
 					t.Errorf("the placeholder is %d px tall, want one line of 26", nat)
+				}
+				if a := gtkLabelGetYalign(v.hint); a != 0 {
+					t.Errorf("the placeholder is aligned %v down its box, want at its top as the text view's first line", a)
 				}
 				continue
 			}
