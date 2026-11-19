@@ -189,7 +189,21 @@ jobs:
       - name: Vet
         run: go tool nsgo check ./internal/platform/apple
       - name: Test
-        run: go tool nsgo test ./internal/platform/apple
+        run: |
+          set +e
+          ulimit -c unlimited
+          go tool nsgo test ./internal/platform/apple
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo 'Recent macOS crash reports:'
+            find "$HOME/Library/Logs/DiagnosticReports" -type f -mmin -10 -print -exec cat {} \; 2>/dev/null || true
+          fi
+          exit "$status"
+      - name: Stress overlapping sound playback
+        run: |
+          for i in $(seq 1 200); do
+            go tool nsgo test -run '^TestASoundDecodesOnceAndPlaysOverlapping$' ./internal/platform/apple || exit
+          done
       - name: Test main-thread failure propagation
         run: go tool nsgo test -run '^TestOnMainExitPropagation$' ./internal/platform/macos -- -race
       - name: Test macOS backend
