@@ -325,6 +325,8 @@ type surface struct {
 	repickAt  time.Duration
 	// testPointer is the isolated test host's pointer in window coordinates. Posted NSEvents do not move the physical mouse queried by AppKit.
 	testPointer *apple.CGPoint
+	// test is what a test host opened the app with, set on its own surface and the windows and panels it opens; nil outside a test.
+	test *testWindow
 
 	// The gestures in progress.
 	pan             *panTrack
@@ -715,7 +717,7 @@ func surfaceMoved(self objc.ID, cmd objc.SEL) {
 		return
 	}
 	if s.engine == nil {
-		s.start(s.app, s.opts, nil)
+		s.start(s.app, s.opts)
 	}
 	s.refresh()
 }
@@ -845,11 +847,11 @@ func startApp(opts Options, ready func(login bool)) objc.ID {
 	return nsApp
 }
 
-// testWindow is what a test host opens a window with: the test's options
-// and the environment it pins.
+// testWindow is what a test host opens an app with: the test's options, the environment it pins, and the main window the app opened (core.Scope.SetMainView), which the test acts on, nil before it opened and once it closed.
 type testWindow struct {
 	options testhost.Options
 	pin     engine.TestPin
+	main    atomic.Pointer[surface]
 }
 
 // shownAlert is an alert on screen and the action of each of its buttons.
@@ -864,38 +866,6 @@ var defaultMenu objc.ID
 
 // defaultLanguage is the language defaultMenu says.
 var defaultLanguage string
-
-// openWindow shows app in a new window at opts' size and starts its
-// engine; test, when set, is what a test host opens it with.
-func openWindow(app engine.App, opts Options, test *testWindow) *surface {
-	if opts.Width == 0 {
-		opts.Width, opts.Height = 480, 640
-	}
-	if test != nil && test.options.Size.Width > 0 {
-		opts.Width, opts.Height = test.options.Size.Width, test.options.Size.Height
-	}
-	const titled, closable, miniaturizable, resizable = 1, 2, 4, 8
-	window := objc.ID(classWindow).Send(selAlloc).Send(
-		sel("initWithContentRect:styleMask:backing:defer:"),
-		apple.Rect(0, 0, float64(opts.Width), float64(opts.Height)),
-		uint(titled|closable|miniaturizable|resizable), uint(2), false)
-	window.Send(sel("setTitle:"), apple.NSString(opts.Title))
-	window.Send(sel("setReleasedWhenClosed:"), false)
-	// Tab goes through the fields and the views that take presses.
-	window.Send(sel("setAutorecalculatesKeyViewLoop:"), true)
-
-	s := newSurface(opts, false)
-	s.window = window
-	s.setWindowDelegate()
-	window.Send(sel("setContentView:"), s.native)
-	s.setMaterial(opts.Material)
-	s.start(app, opts, test)
-	window.Send(sel("center"))
-	if test == nil {
-		window.Send(sel("makeKeyAndOrderFront:"), objc.ID(0))
-	}
-	return s
-}
 
 // newSurface makes a surface's view at opts' size; embedded is set for a
 // host's view.
@@ -929,9 +899,8 @@ func newSurface(opts Options, embedded bool) *surface {
 	return s
 }
 
-// start starts the surface's engine at its view's size; test, when set,
-// is what a test host opens it with.
-func (s *surface) start(app engine.App, opts Options, test *testWindow) {
+// start starts an embedded surface's engine at its view's size.
+func (s *surface) start(app engine.App, opts Options) {
 	s.env = s.environment()
 	var monitor *engine.PerfMonitor
 	if opts.Perf {
@@ -943,10 +912,6 @@ func (s *surface) start(app engine.App, opts Options, test *testWindow) {
 		Environment: s.env, Perf: monitor, Thread: apple.RaiseThread, Appearance: opts.Appearance, Host: opts.Host,
 		Secrets: apple.Keychain{}}
 	eopts.SetDirs(engine.AppDirs(opts.ID))
-	if test != nil {
-		eopts.UseTest(test.options, &test.pin)
-		s.alerts = map[uint32]shownAlert{}
-	}
 	imageload.UseDiskCache(eopts.CacheDir)
 	s.engine = engine.Start(s, app, eopts)
 	s.observe()
@@ -997,6 +962,9 @@ func (s *surface) close() {
 		}
 	}
 	delete(menuTargets, s.menuTarget)
+	if s.test != nil {
+		s.test.main.CompareAndSwap(s, nil)
+	}
 }
 
 // finished is set once the app ends.
@@ -1802,12 +1770,13 @@ func (s *surface) apply(b *driver.MountBatch) {
 			s.directMenu(s.menu)
 			continue
 		case driver.ItemQuit:
-			if !s.embedded {
+			// A test's app leaves its quit to the test's model (App.Quits): the test host's loop runs the test's other apps and the test itself.
+			if !s.embedded && s.test == nil {
 				apple.OnMain(finish)
 			}
 			continue
 		case driver.ItemQuitResponse:
-			if !s.embedded && it.Count == quitRequestID && quitPending {
+			if !s.embedded && s.test == nil && it.Count == quitRequestID && quitPending {
 				quitPending = false
 				if it.On {
 					apple.OnMain(finish)

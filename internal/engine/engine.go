@@ -44,7 +44,8 @@ type Platform interface {
 // reads are answered there, and the platform never sees them.
 type observed struct {
 	Platform
-	observe   func(*driver.MountBatch)
+	surface   uint32
+	observe   func(uint32, *driver.MountBatch)
 	clipboard *driver.MemoryClipboard
 	dispatch  func(driver.Event)
 }
@@ -67,7 +68,7 @@ func (o observedFonts) RegisterFont(data []byte) error {
 }
 
 func (o observed) Mount(b *driver.MountBatch) {
-	o.observe(b)
+	o.observe(o.surface, b)
 	if o.clipboard != nil {
 		var kept []driver.MountItem
 		for i := range b.Items {
@@ -134,12 +135,9 @@ type Options struct {
 	// main thread: a platform whose scheduler would put it on slower
 	// cores raises its priority here.
 	Thread func()
-	// Observe sees each batch before the platform does, and Event each
-	// event the platform reports, as a test host follows the app; Pin
-	// turns each environment the platform reports into the app's. None
-	// may block.
-	Observe func(*driver.MountBatch)
-	Event   func(driver.Event)
+	// Observe sees each batch of every surface before the platform does, and Event each event the platform reports, with the surface's number (0 for the first), as a test host follows the app; Pin turns each environment the platform reports into the app's. None may block.
+	Observe func(surface uint32, b *driver.MountBatch)
+	Event   func(surface uint32, ev driver.Event)
 	Pin     func(driver.Environment) driver.Environment
 	// Clipboard, with Observe, is the clipboard of a test's own, which
 	// the app's clipboard commands use instead of the platform's.
@@ -244,7 +242,7 @@ type Engine struct {
 // runner is what an app's surfaces share.
 type runner struct {
 	mu      sync.Mutex
-	event   func(driver.Event)
+	event   func(uint32, driver.Event)
 	pin     func(driver.Environment) driver.Environment
 	raw     driver.Environment // the first surface's last, before pinning
 	host    HostEnvironment
@@ -321,7 +319,7 @@ func Start(p Platform, app App, opts Options) *Engine {
 	e.raw = opts.Environment
 	opts.Environment = e.effective(opts.Environment)
 	if observe := opts.Observe; observe != nil {
-		p = observed{p, observe, opts.Clipboard, e.Dispatch}.platform()
+		p = observed{p, 0, observe, opts.Clipboard, e.Dispatch}.platform()
 	}
 	go e.run(p, app, opts, tokens)
 	if opts.LogPerf && opts.Perf != nil {
@@ -597,7 +595,12 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 					taken[i].attach = nil
 					continue
 				}
-				attach(tree.Surfaces()[surfaceIndex], m.attach)
+				opened := m.attach
+				if opts.Observe != nil {
+					// A test host follows the windows the app opens too, and their clipboard commands use the test's clipboard.
+					opened = observed{opened, m.surface, opts.Observe, opts.Clipboard, (&Engine{runner: e.runner, surface: m.surface}).Dispatch}.platform()
+				}
+				attach(tree.Surfaces()[surfaceIndex], opened)
 				taken[i].attach = nil
 				if frameAsked {
 					m.attach.RequestFrame()
@@ -761,8 +764,8 @@ func (e *Engine) take() []message {
 
 // Dispatch reports a platform event.
 func (e *Engine) Dispatch(ev driver.Event) {
-	if e.event != nil && e.surface == 0 {
-		e.event(ev)
+	if e.event != nil {
+		e.event(e.surface, ev)
 	}
 	e.push(message{surface: e.surface, event: ev})
 }
@@ -772,16 +775,16 @@ func (e *Engine) Dispatch(ev driver.Event) {
 // event waits for that call to wake the engine, which then handles it and
 // runs the frame in one pass, with one commit, instead of two.
 func (e *Engine) DispatchBeforeFrame(ev driver.Event) {
-	if e.event != nil && e.surface == 0 {
-		e.event(ev)
+	if e.event != nil {
+		e.event(e.surface, ev)
 	}
 	e.enqueue(message{surface: e.surface, event: ev})
 }
 
 // DispatchKeyDown reports EventKeyDown ev and waits for the engine to run the view's OnKeyDown, after what is queued before it, returning whether it consumed the key: the platform calls it on its main thread before matching the keymap, which a consumed key skips. It returns false once the engine has ended. It must not be called from the engine goroutine.
 func (e *Engine) DispatchKeyDown(ev driver.Event) bool {
-	if e.event != nil && e.surface == 0 {
-		e.event(ev)
+	if e.event != nil {
+		e.event(e.surface, ev)
 	}
 	request := &keyDownRequest{event: ev, done: make(chan bool, 1)}
 	e.push(message{surface: e.surface, keyDown: request})

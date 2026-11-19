@@ -150,7 +150,8 @@ func (f *followed) Batch(b *driver.MountBatch) {
 	}
 	g.mu.Unlock()
 	if f.app.target != nil {
-		f.app.target.observe(b)
+		// Each model follows its one surface, as a target's first.
+		f.app.target.observe(0, b)
 	}
 }
 

@@ -129,6 +129,11 @@ func (c *WindowClosing) Canceled() bool { return c != nil && c.canceled }
 // closes when that owner goes. It returns nil where the platform opens no
 // windows.
 func (cx *Scope) OpenWindow(opts WindowOptions, content func(cx *Scope) Node) *Window {
+	return cx.openWindow(opts, content, false)
+}
+
+// openWindow is OpenWindow, opening the main window when main is set.
+func (cx *Scope) openWindow(opts WindowOptions, content func(cx *Scope) Node, main bool) *Window {
 	rt := cx.rt
 	if rt.windows == nil {
 		return nil
@@ -152,7 +157,7 @@ func (cx *Scope) OpenWindow(opts WindowOptions, content func(cx *Scope) Node) *W
 	w := rt.openSurface(cx.current(), driver.SurfaceConfig{Kind: driver.SurfaceWindow, Title: opts.Title,
 		Width: size.Width, Height: size.Height, Frame: opts.Frame, Hidden: opts.Hidden, Material: opts.Material, Constraints: limits,
 		Workspaces: opts.Workspaces, PointerEvents: cx.windowPointer(opts.PointerEvents),
-		Transparent: opts.Transparent, NoShadow: opts.NoShadow, SkipTaskbar: opts.SkipTaskbar}, content)
+		Transparent: opts.Transparent, NoShadow: opts.NoShadow, SkipTaskbar: opts.SkipTaskbar, Main: main}, content)
 	if opts.Key != "" {
 		w.key = opts.Key
 		if rt.keyed == nil {
@@ -433,7 +438,7 @@ func (cx *Scope) SetMainView(view func(cx *Scope) Node) {
 	if rt.windows == nil || view == nil || rt.ownMain != nil && !rt.ownMain.closed {
 		return
 	}
-	rt.ownMain = rt.root.OpenWindow(*rt.windows, rt.showMainView)
+	rt.ownMain = rt.root.openWindow(*rt.windows, rt.showMainView, true)
 	rt.main = rt.ownMain
 }
 

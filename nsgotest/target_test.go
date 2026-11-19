@@ -25,13 +25,13 @@ func TestTargetModelKeepsEventsAndCommitsInOrder(t *testing.T) {
 	v := a.Find("id:field")
 	tg := &target{a: a}
 	tg.event(driver.Event{Kind: driver.EventChangeText, ID: v.ID, Text: "loud", Count: 1})
-	tg.observe(&driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "LOUD", Count: 1}}})
+	tg.observe(0, &driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "LOUD", Count: 1}}})
 	tg.drain()
 	if v.Text != "LOUD" {
 		t.Fatalf("controlled text = %q, want LOUD", v.Text)
 	}
 	// A subsequent native edit wins over a preceding commit.
-	tg.observe(&driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "OTHER", Count: 1}}})
+	tg.observe(0, &driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "OTHER", Count: 1}}})
 	tg.event(driver.Event{Kind: driver.EventChangeText, ID: v.ID, Text: "OTHER!", Count: 2})
 	tg.drain()
 	if v.Text != "OTHER!" {
@@ -39,14 +39,14 @@ func TestTargetModelKeepsEventsAndCommitsInOrder(t *testing.T) {
 	}
 	// A slow response to an earlier edit must be rejected just as the native field rejects an ItemInputValue with an old edit count.
 	tg.event(driver.Event{Kind: driver.EventChangeText, ID: v.ID, Text: "OTHER!!", Count: 3})
-	tg.observe(&driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "STALE", Count: 2}}})
+	tg.observe(0, &driver.MountBatch{Items: []driver.MountItem{{Kind: driver.ItemInputValue, ID: v.ID, Value: "STALE", Count: 2}}})
 	tg.drain()
 	if v.Text != "OTHER!!" {
 		t.Fatalf("a stale controlled value replaced the latest edit with %q", v.Text)
 	}
 	// An old view's focus must not reach a new view reusing its ID.
 	tg.event(driver.Event{Kind: driver.EventFocus, ID: v.ID})
-	tg.observe(&driver.MountBatch{Items: []driver.MountItem{
+	tg.observe(0, &driver.MountBatch{Items: []driver.MountItem{
 		{Kind: driver.ItemDelete, ID: v.ID},
 		{Kind: driver.ItemCreate, ID: v.ID, View: driver.KindInput},
 	}})
@@ -80,7 +80,7 @@ func TestTargetSettleWaitsForThePendingCommit(t *testing.T) {
 		if calls == 1 {
 			close(entered)
 			<-release
-			tg.observe(batch)
+			tg.observe(0, batch)
 		}
 	}}
 	go func() { tg.settle(); close(done) }()
@@ -111,7 +111,7 @@ func TestTargetSettleChecksTheEngineBeforeReturningQuiet(t *testing.T) {
 		calls++
 		if calls == 2 {
 			// A commit started after the first barrier but did not send its batch until the second barrier completed.
-			tg.observe(batch)
+			tg.observe(0, batch)
 		}
 	}}
 	tg.settle()
@@ -144,7 +144,7 @@ func TestTargetSettleBoundsChangingAppsAndPreservesMeasure(t *testing.T) {
 			tg, _, batch := settleFixture(t)
 			tg.a.measure = measure
 			tg.surface = settlingSurface{sync: func() {}, animating: func() bool {
-				tg.observe(batch) // The app keeps committing between polls.
+				tg.observe(0, batch) // The app keeps committing between polls.
 				return false
 			}}
 			start := time.Now()

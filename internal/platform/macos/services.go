@@ -632,6 +632,12 @@ func (s *surface) orderFront() {
 	if objc.Send[bool](w, sel("isMiniaturized")) {
 		w.Send(sel("deminiaturize:"), objc.ID(0))
 	}
+	if s.test != nil {
+		// In front, as a user sees it, but without taking the keyboard from the app the user works in.
+		w.Send(sel("orderFrontRegardless"))
+		w.Send(sel("makeKeyWindow"))
+		return
+	}
 	nsApp().Send(sel("unhide:"), objc.ID(0))
 	activateApp()
 	w.Send(sel("makeKeyAndOrderFront:"), objc.ID(0))

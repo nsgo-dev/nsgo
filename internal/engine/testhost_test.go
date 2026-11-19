@@ -9,7 +9,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
 
-func testhostOptions(observe func(*driver.MountBatch)) testhost.Options {
+func testhostOptions(observe func(uint32, *driver.MountBatch)) testhost.Options {
 	return testhost.Options{Observe: observe}
 }
 

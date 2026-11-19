@@ -24,6 +24,12 @@ type Host interface {
 	Several() bool
 }
 
+// WindowHost is a Host whose apps open their windows themselves, as the backend's Run has them do (core.RootOptions.Windows), macOS's: Open's surface is then the app's own, which shows no view, and the main window, which SetMainView opens (driver.SurfaceConfig.Main), is the one a test acts on. Open's Surface acts on the main window once it opened, and opens it at the platform's default size when Options.Size is zero.
+type WindowHost interface {
+	Host
+	OpensWindows() bool
+}
+
 // Options are what a test opens an app with.
 type Options struct {
 	// CheckCommits enables full-layout diagnostics for this app only.
@@ -36,12 +42,9 @@ type Options struct {
 	Storage *core.Store
 	// Secrets is the app's secure store, in place of the machine's; one in memory when nil.
 	Secrets driver.SecretStore
-	// Observe sees every batch the engine sends, on the engine's
-	// goroutine, before the platform applies it; Event every event the
-	// platform reports to the engine, on the goroutine it reports from.
-	// Neither may block.
-	Observe func(*driver.MountBatch)
-	Event   func(driver.Event)
+	// Observe sees every batch the engine sends, on the engine's goroutine, before the platform applies it; Event every event the platform reports to the engine, on the goroutine it reports from. Each comes with the number of its surface: 0 for the first, the one Open opens, else the window or panel the app opened (driver.SurfaceConfig.ID). Neither may block.
+	Observe func(surface uint32, b *driver.MountBatch)
+	Event   func(surface uint32, ev driver.Event)
 	// Host is the channel of the test's embedding host, nil without one.
 	Host *core.Host
 	// Clock is the test's, which the app's timers run on in place of the

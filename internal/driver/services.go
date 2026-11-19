@@ -238,6 +238,8 @@ type SurfaceConfig struct {
 	Tray uint32
 	// Workspaces are the workspaces a window shows on (WindowSetWorkspaces).
 	Workspaces WindowWorkspaces
+	// Main is set for the main window, which SetMainView opens: the window a test host's model follows.
+	Main bool
 }
 
 // TrayConfig is a tray icon (ItemTray).

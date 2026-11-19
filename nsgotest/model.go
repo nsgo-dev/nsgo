@@ -318,6 +318,9 @@ func (a *App) showMenu() {
 	if a.Menu == nil && a.appTree != nil {
 		a.Menu, a.menuTree = a.menus[a.appTree], a.appTree
 	}
+	if a.Menu == nil && a.target != nil {
+		a.Menu = a.target.ownMenu
+	}
 }
 
 // closed forgets what a surface that closed left in the model: a context menu it showed, its menu, and for the main window its views and keyboard shortcuts, as nothing is left there for steps to reach.

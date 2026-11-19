@@ -315,7 +315,7 @@ func TestATestsClipboardIsItsOwn(t *testing.T) {
 	p := &recorder{mounted: make(chan struct{}, 1)}
 	read := make(chan string, 1)
 	var opts Options
-	opts.UseTest(testhostOptions(func(*driver.MountBatch) {}), &TestPin{})
+	opts.UseTest(testhostOptions(func(uint32, *driver.MountBatch) {}), &TestPin{})
 	opts.Size = driver.Size{Width: 100, Height: 100}
 	e := Start(p, func(cx *core.Scope) core.Node {
 		cx.SetClipboard("secret")
@@ -359,7 +359,7 @@ func TestATestsAppRegistersFonts(t *testing.T) {
 	p := &fontRecorder{recorder: recorder{mounted: make(chan struct{}, 1)}, fonts: make(chan []byte, 1), err: errors.New("the platform's answer")}
 	answered := make(chan error, 1)
 	var opts Options
-	opts.UseTest(testhostOptions(func(*driver.MountBatch) {}), &TestPin{})
+	opts.UseTest(testhostOptions(func(uint32, *driver.MountBatch) {}), &TestPin{})
 	opts.Size = driver.Size{Width: 100, Height: 100}
 	e := Start(p, func(cx *core.Scope) core.Node {
 		answered <- cx.RegisterFont([]byte("font"))
@@ -690,7 +690,7 @@ func TestATestsSecretsAreItsOwn(t *testing.T) {
 	read := make(chan string, 1)
 	mem := &driver.MemorySecrets{}
 	opts := Options{Secrets: machineKeychain{t}}
-	o := testhostOptions(func(*driver.MountBatch) {})
+	o := testhostOptions(func(uint32, *driver.MountBatch) {})
 	o.Secrets = mem
 	opts.UseTest(o, &TestPin{})
 	opts.Size = driver.Size{Width: 100, Height: 100}
@@ -714,7 +714,7 @@ func TestATestsSecretsAreItsOwn(t *testing.T) {
 	}
 	// Without a store of the test's, one in memory still takes the platform's place.
 	opts = Options{Secrets: machineKeychain{t}}
-	opts.UseTest(testhostOptions(func(*driver.MountBatch) {}), &TestPin{})
+	opts.UseTest(testhostOptions(func(uint32, *driver.MountBatch) {}), &TestPin{})
 	if _, ok := opts.Secrets.(*driver.MemorySecrets); !ok {
 		t.Errorf("a test keeps its secrets in %T", opts.Secrets)
 	}

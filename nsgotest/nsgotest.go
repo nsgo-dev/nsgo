@@ -51,9 +51,9 @@ import (
 // Option configures Start.
 type Option func(*App)
 
-// Size sets the surface size; 390 by 844 points by default.
+// Size sets the surface size; 390 by 844 points by default, and under `nsgo test -target macos` the main window's default size, 480 by 640.
 func Size(width, height driver.Points) Option {
-	return func(a *App) { a.size = driver.Size{Width: width, Height: height} }
+	return func(a *App) { a.size, a.sized = driver.Size{Width: width, Height: height}, true }
 }
 
 // Storage starts the app with entries in its storage, as if kept from an
@@ -209,6 +209,8 @@ type App struct {
 
 	t    testing.TB
 	size driver.Size
+	// sized is set by the Size option: without it a target that opens the app's windows opens the main window at its default size.
+	sized bool
 	// modality is the input modality last reported, as a platform reports
 	// a key or a press before what it causes (inputBy).
 	modality                  uint32
@@ -481,13 +483,13 @@ type App struct {
 	clicks      uint32
 }
 
-// Start runs app, a root view, and settles it; the test's cleanup disposes it. Under `nsgo test -target` it opens the app on that platform instead. With a macOS Environment app shows in the main window, as nsgo.Run shows a root view there, which steps act on; with any other, Windows and Linux included, it fills the app's one surface, as nsgo.Run's does. An app run with its function is tested with StartApp.
+// Start runs app, a root view, and settles it; the test's cleanup disposes it. Under `nsgo test -target` it opens the app on that platform instead, in the main window on macOS, as there nsgo.Run shows a root view. With a macOS Environment app shows in the main window, as nsgo.Run shows a root view there, which steps act on; with any other, Windows and Linux included, it fills the app's one surface, as nsgo.Run's does. An app run with its function is tested with StartApp.
 func Start(t testing.TB, app func(cx *core.Scope) core.Node, opts ...Option) *App {
 	t.Helper()
 	return start(t, app, nil, opts)
 }
 
-// StartApp runs the app's function app, as nsgo.Run(app) does, and settles it; the test's cleanup disposes it. app runs once in the app's own scope, where what it registers, such as its application menu, quit handlers and global shortcuts, lives. With a desktop Environment (macOS, Windows or Linux) it opens windows as on a desktop, and the view SetMainView sets shows in the main window, which steps act on; with any other that view fills the app's one surface. Under `nsgo test -target` it opens core.AppRoot(app) on that platform instead.
+// StartApp runs the app's function app, as nsgo.Run(app) does, and settles it; the test's cleanup disposes it. app runs once in the app's own scope, where what it registers, such as its application menu, quit handlers and global shortcuts, lives. With a desktop Environment (macOS, Windows or Linux) it opens windows as on a desktop, and the view SetMainView sets shows in the main window, which steps act on; with any other that view fills the app's one surface. Under `nsgo test -target` it opens core.AppRoot(app) on that platform instead, which on macOS opens its windows as there nsgo.Run(app) does, steps acting on the main window.
 func StartApp(t testing.TB, app func(app *core.Scope), opts ...Option) *App {
 	t.Helper()
 	return start(t, nil, app, opts)
@@ -530,10 +532,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		t.Skip("nsgotest: ManualFrames steps the clock, which runs headless only")
 	}
 	if onTarget() {
-		if view == nil {
-			view = core.AppRoot(fn)
-		}
-		a.startTarget(view)
+		a.startTarget(view, fn)
 		return a
 	}
 	if a.idiom != nil {

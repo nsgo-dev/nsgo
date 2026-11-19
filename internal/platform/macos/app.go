@@ -111,6 +111,10 @@ func (o *surface) openSurface(cfg driver.SurfaceConfig) {
 	window.Send(sel("setReleasedWhenClosed:"), false)
 	s := newSurface(opts, false)
 	s.id, s.kind, s.hideOnBlur, s.noActivate = cfg.ID, cfg.Kind, cfg.HideOnBlur, cfg.NoActivate
+	if o.test != nil {
+		// A test's app: its windows take the test's input without activating it, with a pointer of their own, and keep their alerts for the test to answer.
+		s.test, s.alerts, s.testPointer = o.test, map[uint32]shownAlert{}, &apple.CGPoint{X: -1e6, Y: -1e6}
+	}
 	// A window or a panel opened transparent (look.go, newPanel).
 	s.transparent = cfg.Transparent
 	s.window = window
@@ -134,6 +138,9 @@ func (o *surface) openSurface(cfg driver.SurfaceConfig) {
 		s.setSkipTaskbar(cfg.SkipTaskbar)
 	}
 	s.attach(o.engine)
+	if cfg.Main && s.test != nil {
+		s.test.main.Store(s)
+	}
 	if cfg.Kind == driver.SurfaceWindow {
 		s.setConstraints(cfg.Constraints)
 		if cfg.Frame.Move {

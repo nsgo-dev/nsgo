@@ -272,7 +272,7 @@ func TestEditableSpinButton(t *testing.T) { onMain(func() { editableSpinButton(t
 func editableSpinButton(t *testing.T) {
 	loadAppKit()
 	var reported []driver.Event
-	eng := engine.Start(actionEngine{}, func(*core.Scope) core.Node { return core.View{} }, engine.Options{Event: func(e driver.Event) {
+	eng := engine.Start(actionEngine{}, func(*core.Scope) core.Node { return core.View{} }, engine.Options{Event: func(_ uint32, e driver.Event) {
 		if e.Kind == driver.EventAccessibilityAction {
 			reported = append(reported, e)
 		}

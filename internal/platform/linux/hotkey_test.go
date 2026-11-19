@@ -41,7 +41,7 @@ func TestPortalBindingResponse(t *testing.T) {
 			var events []driver.Event
 			e := engine.Start(portalTestPlatform{}, func(*core.Scope) core.Node { return core.View{} }, engine.Options{
 				CheckCommits: true,
-				Event:        func(ev driver.Event) { events = append(events, ev) },
+				Event:        func(_ uint32, ev driver.Event) { events = append(events, ev) },
 			})
 			t.Cleanup(e.Close)
 			state := &globalHotKeys{

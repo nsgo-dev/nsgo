@@ -63,11 +63,25 @@ var (
 	calls      []func()
 )
 
+// testSurface acts on s: for a test, the main window its app opened, else its own surface, own, which shows no view; for nsgo dev's automation, the running app's surface it was made for.
 type testSurface struct {
 	s       *surface
+	own     *surface
 	test    *testWindow
 	hovered []objc.ID
 	clicks  testhost.Clicks
+}
+
+// follow has a test's surface act on the main window its app opened, while one is open, as the test's model follows it (testhost.WindowHost), else on its own surface.
+func (t *testSurface) follow() {
+	if t.test == nil {
+		return
+	}
+	if main := t.test.main.Load(); main != nil {
+		t.s = main
+	} else {
+		t.s = t.own
+	}
 }
 
 // windowPoint is p, in the surface's points from its top left, in the
@@ -96,6 +110,10 @@ func (t *testSurface) mouseWith(kind uint, p driver.Point, clicks int, mods driv
 		flags |= flagCommand
 	}
 	onMainSync(func() {
+		if t.s.closed {
+			// What it did closed the window, as a key or a press on Close does: its next event has nowhere to go.
+			return
+		}
 		w := t.s.window
 		if t.s.testPointer != nil {
 			*t.s.testPointer = t.windowPoint(p)
@@ -109,6 +127,7 @@ func (t *testSurface) mouseWith(kind uint, p driver.Point, clicks int, mods driv
 }
 
 func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Modifiers) error {
+	t.follow()
 	interval := time.Duration(objc.Send[float64](objc.ID(apple.Class("NSEvent")), sel("doubleClickInterval")) * float64(time.Second))
 	clicks := t.clicks.Press(at, time.Now(), interval)
 	t.mouseWith(evMoved, at, 0, mods)
@@ -121,6 +140,7 @@ func (t *testSurface) Press(at driver.Point, hold time.Duration, mods driver.Mod
 }
 
 func (t *testSurface) RightClick(at driver.Point) error {
+	t.follow()
 	t.mouse(evRightDown, at, 1)
 	t.mouse(evRightUp, at, 1)
 	return nil
@@ -128,6 +148,7 @@ func (t *testSurface) RightClick(at driver.Point) error {
 
 // Drag rests where it lands, then moves 10 points a frame, as a hand.
 func (t *testSurface) Drag(path []driver.Point) error {
+	t.follow()
 	if len(path) == 0 {
 		return errors.New("an empty drag")
 	}
@@ -186,6 +207,7 @@ func loadCG() {
 // Scroll is a trackpad gesture: it begins, moves 20 points at most every
 // 16 ms, and ends without momentum.
 func (t *testSurface) Scroll(at driver.Point, delta driver.Point) error {
+	t.follow()
 	loadCG()
 	const pixel, scrollPhase, phaseBegan, phaseChanged, phaseEnded = 0, 99, 1, 2, 4
 	// A trackpad's deltas are continuous, in points.
@@ -248,6 +270,7 @@ func (t *testSurface) hit(at driver.Point) objc.ID {
 // responder, so the views under it hear what their tracking areas would
 // report.
 func (t *testSurface) Hover(at driver.Point) error {
+	t.follow()
 	onMainSync(func() {
 		if t.s.testPointer != nil {
 			*t.s.testPointer = t.windowPoint(at)
@@ -314,6 +337,10 @@ func (t *testSurface) modifier(code uint16, held, flags uint) {
 	const evFlagsChanged = 12
 	for _, f := range []uint{held | flags, held} {
 		onMainSync(func() {
+			if t.s.closed {
+				// What it did closed the window, as a key or a press on Close does: its next event has nowhere to go.
+				return
+			}
 			ev := apple.KeyEvent(evFlagsChanged, f, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), "", "", false, code)
 			rememberTestInput(ev)
 			if objc.Send[bool](t.s.window, sel("isKeyWindow")) {
@@ -332,6 +359,10 @@ func (t *testSurface) modifier(code uint16, held, flags uint) {
 func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 	for _, kind := range []uint{evKeyDown, evKeyUp} {
 		onMainSync(func() {
+			if t.s.closed {
+				// What it did closed the window, as a key or a press on Close does: its next event has nowhere to go.
+				return
+			}
 			ev := apple.KeyEvent(kind, flags, uptime(), objc.Send[int](t.s.window, sel("windowNumber")), chars, ignoring, false, code)
 			rememberTestInput(ev)
 			if objc.Send[bool](t.s.window, sel("isKeyWindow")) {
@@ -357,8 +388,49 @@ func (t *testSurface) key(code uint16, flags uint, chars, ignoring string) {
 
 // keyEquivalent offers a background window's key down to its views and then the menu bar, as AppKit's own dispatch does before the responder sees the key, and reports whether one took it.
 func (t *testSurface) keyEquivalent(ev objc.ID) bool {
-	return objc.Send[bool](t.s.window, sel("performKeyEquivalent:"), ev) ||
-		objc.Send[bool](nsApp().Send(sel("mainMenu")), sel("performKeyEquivalent:"), ev)
+	if objc.Send[bool](t.s.window, sel("performKeyEquivalent:"), ev) {
+		return true
+	}
+	// An item whose action has no target, as a role's Close, goes to the key window, which a background app has none of: the menu bar would take the key and send the action nowhere.
+	menu := nsApp().Send(sel("mainMenu"))
+	if item := keyItem(menu, apple.GoString(ev.Send(sel("charactersIgnoringModifiers"))), objc.Send[uint](ev, sel("modifierFlags"))); item != 0 && t.performUntargeted(item) {
+		return true
+	}
+	return objc.Send[bool](menu, sel("performKeyEquivalent:"), ev)
+}
+
+// keyItem returns the item of menu or its submenus whose key equivalent is key with the modifiers in flags, 0 for none.
+func keyItem(menu objc.ID, key string, flags uint) objc.ID {
+	if menu == 0 || key == "" {
+		return 0
+	}
+	const modifiers = flagCommand | flagControl | flagOption | flagShift
+	for i := range objc.Send[int](menu, sel("numberOfItems")) {
+		it := menu.Send(sel("itemAtIndex:"), i)
+		if sub := it.Send(sel("submenu")); sub != 0 {
+			if found := keyItem(sub, key, flags); found != 0 {
+				return found
+			}
+			continue
+		}
+		if strings.EqualFold(apple.GoString(it.Send(sel("keyEquivalent"))), key) && objc.Send[uint](it, sel("keyEquivalentModifierMask"))&modifiers == flags&modifiers {
+			return it
+		}
+	}
+	return 0
+}
+
+// performUntargeted sends item's action, which has no target, down the window's responder chain, as AppKit sends it down the key window's, and reports whether a responder took it: a background app has no key window for AppKit to send it to.
+func (t *testSurface) performUntargeted(item objc.ID) bool {
+	action := objc.Send[objc.SEL](item, sel("action"))
+	if action == 0 || item.Send(sel("target")) != 0 || t.s.window == 0 {
+		return false
+	}
+	r := t.s.window.Send(sel("firstResponder"))
+	if r == 0 {
+		r = t.s.window
+	}
+	return objc.Send[bool](r, sel("tryToPerform:with:"), action, item)
 }
 
 // activates reports whether the run opted in to activating the test app for the keyboard (nsgo test -target macos -activate). Live surfaces never activate here.
@@ -381,6 +453,7 @@ func (t *testSurface) keyboard() error {
 
 // PrepareKeyboard implements testhost.KeyboardSurface. With the run's opt-in it activates the app and waits up to 2 seconds for it to be active with its window key: AppKit activates asynchronously, so the wait polls from the test goroutine rather than blocking the main thread. Without the opt-in it leaves the user's active app alone and does nothing.
 func (t *testSurface) PrepareKeyboard() error {
+	t.follow()
 	if !t.activates() {
 		return nil
 	}
@@ -410,6 +483,7 @@ func (t *testSurface) PrepareKeyboard() error {
 
 // FocusRefusal implements testhost.KeyboardSurface: after a click left a field without the focus, it names an inactive app as the cause when the run did not opt in to activating it.
 func (t *testSurface) FocusRefusal() error {
+	t.follow()
 	if t.test == nil || t.activates() {
 		return nil
 	}
@@ -422,6 +496,7 @@ func (t *testSurface) FocusRefusal() error {
 }
 
 func (t *testSurface) Type(text string) error {
+	t.follow()
 	if err := t.keyboard(); err != nil {
 		return err
 	}
@@ -443,6 +518,7 @@ func (t *testSurface) Type(text string) error {
 // through NSTextInputClient: the field's editor shows it marked and
 // reports it, as it does a keyboard's composition.
 func (t *testSurface) Compose(text string) error {
+	t.follow()
 	if err := t.keyboard(); err != nil {
 		return err
 	}
@@ -466,6 +542,7 @@ func (t *testSurface) Compose(text string) error {
 // Commit inserts text over what is marked, which ends the composition, as
 // an input method commits.
 func (t *testSurface) Commit(text string) error {
+	t.follow()
 	if err := t.keyboard(); err != nil {
 		return err
 	}
@@ -486,6 +563,7 @@ func (t *testSurface) Commit(text string) error {
 const nsNotFound = uint(1<<63 - 1)
 
 func (t *testSurface) Key(key string) error {
+	t.follow()
 	if err := t.keyboard(); err != nil {
 		return err
 	}
@@ -540,6 +618,7 @@ func (t *testSurface) Key(key string) error {
 
 // Back is Escape, twice in a field, whose first only leaves it.
 func (t *testSurface) Back() error {
+	t.follow()
 	var editing bool
 	onMainSync(func() {
 		r := t.s.window.Send(sel("firstResponder"))
@@ -552,21 +631,28 @@ func (t *testSurface) Back() error {
 }
 
 func (t *testSurface) Answer(id uint32, index int) error {
+	t.follow()
 	var err error
 	onMainSync(func() {
-		shown, ok := t.s.alerts[id]
+		s := t.s
+		shown, ok := s.alerts[id]
+		if !ok && t.own != nil && s != t.own {
+			// One the app's own surface shows, as from the app's function: each surface numbers its alerts itself, and the main window's come first.
+			s = t.own
+			shown, ok = s.alerts[id]
+		}
 		if !ok {
 			err = fmt.Errorf("no alert %d shows", id)
 			return
 		}
 		window := shown.alert.Send(sel("window"))
-		if index < 0 && (t.s.window == 0 || t.s.kind == driver.SurfaceTrayIcon) {
+		if index < 0 && (s.window == 0 || s.kind == driver.SurfaceTrayIcon) {
 			// The app's own alert runs modal, with no window to end a sheet of.
 			nsApp().Send(sel("abortModal"))
 			return
 		}
 		if index < 0 {
-			t.s.window.Send(sel("endSheet:returnCode:"), window, 0)
+			s.window.Send(sel("endSheet:returnCode:"), window, 0)
 			return
 		}
 		for i, action := range shown.order {
@@ -618,6 +704,7 @@ func (t *testSurface) composited(bounds apple.CGRect) []byte {
 }
 
 func (t *testSurface) Screenshot() ([]byte, error) {
+	t.follow()
 	var png []byte
 	onMainSync(func() {
 		v := t.s.native
@@ -653,6 +740,7 @@ func (t *testSurface) Screenshot() ([]byte, error) {
 func (t *testSurface) Sync() { t.s.engine.Sync() }
 
 func (t *testSurface) Animating() bool {
+	t.follow()
 	var busy bool
 	onMainSync(func() {
 		// Batches waiting for a frame have not shown yet, nor scrolls
@@ -663,6 +751,7 @@ func (t *testSurface) Animating() bool {
 }
 
 func (t *testSurface) Resize(size driver.Size) error {
+	t.follow()
 	onMainSync(func() {
 		t.s.window.Send(sel("setContentSize:"), apple.CGSize{Width: float64(size.Width), Height: float64(size.Height)})
 	})
@@ -670,11 +759,20 @@ func (t *testSurface) Resize(size driver.Size) error {
 }
 
 func (t *testSurface) SetEnvironment(env driver.Environment) error {
+	t.follow()
 	if t.test == nil {
 		return errors.New("a running app's window follows the system's settings")
 	}
 	t.test.pin.Set(&env)
-	t.s.engine.Repin()
+	t.own.engine.Repin()
+	// The windows the app opened report their last environment again, which the new pin applies over, as Repin does for the own surface.
+	onMainSync(func() {
+		for s := range surfaces {
+			if s.test == t.test && s != t.own && s.engine != nil && !s.closed {
+				s.engine.SetEnvironment(s.env)
+			}
+		}
+	})
 	return nil
 }
 
@@ -701,6 +799,7 @@ func menuItem(menu objc.ID, id uint32) (item, in objc.ID) {
 
 // ChooseMenu implements testhost.Surface: the item of the surface's menu sends its action, as a click on it does. Each surface numbers its menu's items itself, so the menu bar must show the surface's menu, or the default one where the surface set none.
 func (t *testSurface) ChooseMenu(id uint32) error {
+	t.follow()
 	var err error
 	onMainSync(func() {
 		main := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication")).Send(sel("mainMenu"))
@@ -720,6 +819,7 @@ func (t *testSurface) ChooseMenu(id uint32) error {
 
 // ChooseDockMenu implements testhost.Surface: the item of the Dock menu, as the app delegate hands it to AppKit where it is the app's, sends its action, as a click on it does.
 func (t *testSurface) ChooseDockMenu(id uint32) error {
+	t.follow()
 	var err error
 	onMainSync(func() {
 		menu := dockMenu.menu
@@ -739,6 +839,7 @@ func (t *testSurface) ChooseDockMenu(id uint32) error {
 
 // ChoosePopup implements testhost.Surface: the tracking context menu's item sends its action and the menu closes, as a click on it does. For 0 the menu showing or about to show is cancelled, and it returns once AppKit's tracking loop has ended, so the next input reaches a window; with none showing it does nothing.
 func (t *testSurface) ChoosePopup(id uint32) error {
+	t.follow()
 	if id == 0 {
 		tracking := true
 		onMainSync(func() {

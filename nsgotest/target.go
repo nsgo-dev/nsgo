@@ -84,20 +84,64 @@ type target struct {
 	lost string
 	// appScope is the scope the platform renders the app under, on the engine's graph, which App.Post posts to; a.root is the test's own graph, for storage and the model's callbacks. The engine's goroutine sets it, which may be after Open returns, as on Windows and Android.
 	appScope *core.Scope
+	// windowed is set where the host has the app open its windows itself (testhost.WindowHost): the app's own surface, 0, then shows no view, and the model follows the main window, numbered main once its opening came, 0 before and once it closed. The own surface's batches apply aside, for what they ask of the platform and the application menu, which ownMenu keeps. mu guards main.
+	windowed bool
+	main     uint32
+	ownMenu  []driver.MenuEntry
 }
 
+// targetUpdate is a batch or an event that came: a batch of the app's own surface while the model follows the main window is aside, and closed is set on the main window's last.
 type targetUpdate struct {
-	batch *driver.MountBatch
-	event driver.Event
+	batch  *driver.MountBatch
+	aside  bool
+	closed bool
+	event  driver.Event
 }
 
-// observe queues a batch the app's engine sent, which the next drain applies.
-func (t *target) observe(b *driver.MountBatch) {
+// observe queues a batch the app's engine sent for surface, which the next drain applies: the followed surface's, and with windows the app's own, aside. Other windows' are not modeled.
+func (t *target) observe(surface uint32, b *driver.MountBatch) {
 	t.mu.Lock()
-	if t.lost == "" {
-		t.updates = append(t.updates, targetUpdate{batch: b})
+	defer t.mu.Unlock()
+	if t.lost != "" {
+		return
 	}
+	switch {
+	case !t.windowed:
+		if surface == 0 {
+			t.updates = append(t.updates, targetUpdate{batch: b})
+		}
+	case surface == 0:
+		for _, it := range b.Items {
+			if it.Kind == driver.ItemOpenSurface && it.Surface != nil && it.Surface.Main {
+				t.main = it.Surface.ID
+			}
+		}
+		t.updates = append(t.updates, targetUpdate{batch: b, aside: true})
+	case surface == t.main:
+		u := targetUpdate{batch: b}
+		if destroys(b) {
+			// Its views go with it; a later SetMainView opens another, which the model follows from its first batch.
+			u.closed, t.main = true, 0
+		}
+		t.updates = append(t.updates, u)
+	}
+}
+
+// destroys reports whether b is the last batch of an opened surface, which the engine sends as its tree goes.
+func destroys(b *driver.MountBatch) bool {
+	return slices.ContainsFunc(b.Items, func(it driver.MountItem) bool {
+		return it.Kind == driver.ItemWindow && it.Window != nil && it.Window.Action == driver.WindowDestroy
+	})
+}
+
+// surfaceEvent queues an event the platform reported for surface when the model follows it.
+func (t *target) surfaceEvent(surface uint32, ev driver.Event) {
+	t.mu.Lock()
+	followed := surface == 0 && !t.windowed || t.windowed && surface != 0 && surface == t.main
 	t.mu.Unlock()
+	if followed {
+		t.event(ev)
+	}
 }
 
 // event queues what the next drain takes of an event the platform reported: scrolls, the focus and texts, and for a live app alerts answered.
@@ -153,7 +197,8 @@ const (
 	settleWait = 5 * time.Second
 )
 
-func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
+// startTarget opens the app on the platform: a root view, view, or an app's function, fn.
+func (a *App) startTarget(view func(cx *core.Scope) core.Node, fn func(app *core.Scope)) {
 	a.t.Helper()
 	h := testhost.Current()
 	switch {
@@ -169,6 +214,18 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 		a.store = core.NewStore(nil)
 	}
 	t := &target{a: a}
+	if w, ok := h.(testhost.WindowHost); ok && w.OpensWindows() {
+		t.windowed = true
+		if view != nil {
+			// A root view is the main view of a function of its own, as the backend's Run shows it.
+			main := view
+			fn = func(cx *core.Scope) { cx.SetMainView(main) }
+		}
+	}
+	app := view
+	if fn != nil {
+		app = core.AppRoot(fn)
+	}
 	a.target = t
 	// The test's own graph shares the app's store, as another window
 	// would, for Storage.
@@ -200,10 +257,10 @@ func (a *App) startTarget(app func(cx *core.Scope) core.Node) {
 	}
 	t.surface = s
 	// The first batch can take longer than a step's quiet time to come,
-	// as on Windows, where the window opens first.
+	// as on Windows, where the window opens first; with windows, the main window's first, which comes once the platform opened it, unless the app's own surface opened none.
 	for deadline := time.Now().Add(settleWait); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		t.mu.Lock()
-		came := slices.ContainsFunc(t.updates, func(u targetUpdate) bool { return u.batch != nil })
+		came := slices.ContainsFunc(t.updates, func(u targetUpdate) bool { return u.batch != nil && (!u.aside || t.main == 0) })
 		t.mu.Unlock()
 		if came {
 			break
@@ -218,12 +275,17 @@ func (a *App) targetOptions(t *target) testhost.Options {
 	if a.measure {
 		clock = nil
 	}
+	size := a.size
+	if t.windowed && !a.sized {
+		// The main window opens at the desktop's default size, as the app's does.
+		size = driver.Size{}
+	}
 	return testhost.Options{
 		CheckCommits: !automationBuild && !a.measure,
-		Size:         a.size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
+		Size:         size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
 		FPS:     os.Getenv("NSGO_TEST_FPS") != "",
 		Observe: t.observe,
-		Event:   t.event,
+		Event:   t.surfaceEvent,
 	}
 }
 
@@ -246,10 +308,16 @@ func (t *target) drain() bool {
 	for _, u := range updates {
 		if b := u.batch; b != nil {
 			t.a.traceBatch(b, 0)
-			if t.live {
+			switch {
+			case u.aside:
+				t.applyOwn(b)
+			case t.live:
 				t.applyLive(b)
-			} else {
+			default:
 				t.a.apply(b)
+			}
+			if u.closed {
+				t.mainClosed()
 			}
 			continue
 		}
@@ -277,6 +345,28 @@ func (t *target) drain() bool {
 		}
 	}
 	return len(updates) > 0
+}
+
+// applyOwn applies a batch of the app's own surface aside: its application menu, which shows while the main window sets none, goes to ownMenu.
+func (t *target) applyOwn(b *driver.MountBatch) {
+	aside := *b
+	aside.Items = slices.DeleteFunc(slices.Clone(b.Items), func(it driver.MountItem) bool {
+		if it.Kind == driver.ItemMenu {
+			t.ownMenu = it.Menu
+			return true
+		}
+		return false
+	})
+	t.a.applyAside(&aside)
+	t.a.showMenu()
+}
+
+// mainClosed forgets what the main window that closed left in the model: its views, keyboard shortcuts and menu, as nothing is left there for steps to reach.
+func (t *target) mainClosed() {
+	a := t.a
+	a.views, a.rootID, a.Keymap, a.keyBindings = map[driver.NodeID]*View{}, 0, nil, nil
+	delete(a.menus, nil)
+	a.showMenu()
 }
 
 // sync waits for the engine's pending commit within the step's deadline.

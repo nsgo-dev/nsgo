@@ -15,7 +15,7 @@ func TestHotKeyRegistrationAnswers(t *testing.T) { onMain(func() { hotKeyRegistr
 
 func hotKeyRegistrationAnswers(t *testing.T) {
 	answers := map[uint32]driver.HotKeyState{}
-	eng := engine.Start(actionEngine{}, func(*core.Scope) core.Node { return core.View{} }, engine.Options{Event: func(e driver.Event) {
+	eng := engine.Start(actionEngine{}, func(*core.Scope) core.Node { return core.View{} }, engine.Options{Event: func(_ uint32, e driver.Event) {
 		if e.Kind == driver.EventHotKeyState {
 			answers[e.Count] = driver.HotKeyState(e.Index)
 		}
