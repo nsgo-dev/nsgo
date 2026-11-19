@@ -121,7 +121,7 @@ func cookieApp(t *testing.T, phase string) {
 	onMain(func() { Run(app, Options{Title: "Web cookies", Width: 400, Height: 150}) })
 }
 
-// TestWebCookiesListsAndClearWebsiteDataClears has a local server's page set an HttpOnly cookie, store a value in localStorage and make an IndexedDB database, with SetWebCookies writing cookies of example.test and other.test beside it. Once the web view is gone, WebCookies must list the page's cookie by its URL and the example.test ones by their domain, every field filled in. A second run, with no web view, must list them again, then ClearWebsiteData must leave the store empty and a page loaded after it must send no cookie and find neither the value nor the database. ClearWebsiteData empties the test binary's whole store, which WebKit keeps whatever HOME says, so the values are random and no other test's cookie is counted on after it.
+// TestWebCookiesListsAndClearWebsiteDataClears has a local server's page set an HttpOnly cookie, store a value in localStorage and make an IndexedDB database, with SetWebCookies writing cookies of example.test and other.test beside it. Once the web view is gone, WebCookies must list the page's cookie by its URL and the example.test ones by their domain, every field filled in. A second run must list the example.test ones again before any web view shows, then have the page set its cookie and storage again, as WebKit may end a process before it writes the cookies a page set last (macOS 15 on CI does), list the page's cookie, and ClearWebsiteData must leave the store empty and a page loaded after it must send no cookie and find neither the value nor the database. ClearWebsiteData empties the test binary's whole store, which WebKit keeps whatever HOME says, so the values are random and no other test's cookie is counted on after it.
 func TestWebCookiesListsAndClearWebsiteDataClears(t *testing.T) {
 	if phase := os.Getenv("NSGO_TEST_WEB_LIST_PROCESS"); phase != "" {
 		cookieListApp(t, phase)
@@ -172,7 +172,7 @@ open.onsuccess = () => { open.result.close(); `
 	}
 }
 
-// cookieListApp is a run of TestWebCookiesListsAndClearWebsiteDataClears's app: "set" loads /set, sets the example.test cookies, unmounts the web view and lists; "clear" lists, clears, lists and loads /check.
+// cookieListApp is a run of TestWebCookiesListsAndClearWebsiteDataClears's app: "set" sets the example.test cookies, loads /set, unmounts the web view and lists; "clear" lists example.test, loads /set, unmounts it, lists the page's URL, clears, lists and loads /check.
 func cookieListApp(t *testing.T, phase string) {
 	server, value := os.Getenv("NSGO_TEST_SERVER"), os.Getenv("NSGO_TEST_VALUE")
 	host := strings.TrimPrefix(server, "http://")
@@ -184,8 +184,8 @@ func cookieListApp(t *testing.T, phase string) {
 		{Name: "w", Value: value, Domain: "www.example.test", Path: "/watch", Expires: expires},
 		{Name: "o", Value: value, Domain: "other.test", Path: "/", Expires: expires},
 	}
-	// checkListed holds the store's listings to what the page and SetWebCookies wrote, and calls next once both answered.
-	checkListed := func(cx *core.Scope, next func()) {
+	// checkPage holds the store's listing of the page's URL to the cookie the page set, and calls next once it answered.
+	checkPage := func(cx *core.Scope, next func()) {
 		cx.WebCookies(core.WebCookieFilter{URL: server + "/any"}, func(cookies []core.WebCookie, err error) {
 			// Cookies go to a host whatever its port, so another test's for 127.0.0.1 may be listed too.
 			i := slices.IndexFunc(cookies, func(c core.WebCookie) bool { return c.Name == "page" })
@@ -198,12 +198,16 @@ func cookieListApp(t *testing.T, phase string) {
 			if c.Value != value || c.Domain != host || c.Path != "/" || !c.HTTPOnly || c.Secure || time.Until(c.Expires) < time.Minute || time.Until(c.Expires) > 3*time.Minute {
 				t.Errorf("the page's cookie listed as %+v", c)
 			}
-			cx.WebCookies(core.WebCookieFilter{Domain: "example.test"}, func(cookies []core.WebCookie, err error) {
-				if err != nil || len(cookies) != 2 || cookies[0] != set[0] || cookies[1] != set[1] {
-					t.Errorf("example.test listed %+v, %v; want %+v", cookies, err, set[:2])
-				}
-				next()
-			})
+			next()
+		})
+	}
+	// checkDomain holds the store's listing of example.test to what SetWebCookies wrote, and calls next once it answered.
+	checkDomain := func(cx *core.Scope, next func()) {
+		cx.WebCookies(core.WebCookieFilter{Domain: "example.test"}, func(cookies []core.WebCookie, err error) {
+			if err != nil || len(cookies) != 2 || cookies[0] != set[0] || cookies[1] != set[1] {
+				t.Errorf("example.test listed %+v, %v; want %+v", cookies, err, set[:2])
+			}
+			next()
 		})
 	}
 	app := func(cx *core.Scope) core.Node {
@@ -219,17 +223,18 @@ func cookieListApp(t *testing.T, phase string) {
 				page.Set("/set")
 			})
 		case "clear":
-			checkListed(cx, func() {
-				cx.ClearWebsiteData(func(err error) {
-					if err != nil {
-						t.Errorf("ClearWebsiteData: %v", err)
+			checkDomain(cx, func() { page.Set("/set") })
+		}
+		clearStore := func() {
+			cx.ClearWebsiteData(func(err error) {
+				if err != nil {
+					t.Errorf("ClearWebsiteData: %v", err)
+				}
+				cx.WebCookies(core.WebCookieFilter{}, func(cookies []core.WebCookie, err error) {
+					if err != nil || len(cookies) != 0 {
+						t.Errorf("after ClearWebsiteData the store listed %+v, %v", cookies, err)
 					}
-					cx.WebCookies(core.WebCookieFilter{}, func(cookies []core.WebCookie, err error) {
-						if err != nil || len(cookies) != 0 {
-							t.Errorf("after ClearWebsiteData the store listed %+v, %v", cookies, err)
-						}
-						page.Set("/check")
-					})
+					page.Set("/check")
 				})
 			})
 		}
@@ -241,7 +246,11 @@ func cookieListApp(t *testing.T, phase string) {
 			}
 			// The page that set the cookie goes before the store is listed.
 			page.Set("")
-			checkListed(cx, cx.Quit)
+			if phase == "clear" {
+				checkPage(cx, clearStore)
+				return
+			}
+			checkPage(cx, func() { checkDomain(cx, cx.Quit) })
 		}
 		return core.View{Children: []core.Node{
 			core.Show{When: func() bool { return page.Get() != "" }, Then: func(*core.Scope) core.Node {
