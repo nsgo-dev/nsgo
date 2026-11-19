@@ -646,6 +646,65 @@ func TestFileURLImagesDraw(t *testing.T) {
 	waitForColor(t, hwnd, px(150), px(50), 0x0080ff, time.Second)
 }
 
+// TestPixelFramesShowEachFrame shows ImageSource.Pixels frames one after another, a tinted copy beside them, each frame opaque in one half and clear in the other: a frame of the same size updates the bitmap in place and one of another size makes a new bitmap, and neither leaves the previous frame's pixels where the new one is clear (#863).
+func TestPixelFramesShowEachFrame(t *testing.T) {
+	title := "nsgo-pixel-frames"
+	frame := func(width int, left bool, c color.RGBA) *image.RGBA {
+		m := image.NewRGBA(image.Rect(0, 0, width, 4))
+		for y := range 4 {
+			for x := range width {
+				if x < width/2 == left {
+					m.SetRGBA(x, y, c)
+				}
+			}
+		}
+		return m
+	}
+	frames := []struct {
+		m    *image.RGBA
+		left bool
+		rgb  uint32
+	}{
+		{frame(4, true, color.RGBA{0xff, 0, 0, 0xff}), true, 0xff0000},
+		{frame(4, false, color.RGBA{0, 0, 0xff, 0xff}), false, 0x0000ff},
+		{frame(8, true, color.RGBA{0, 0xff, 0, 0xff}), true, 0x00ff00},
+		{frame(8, false, color.RGBA{0xff, 0, 0, 0xff}), false, 0xff0000},
+	}
+	steps := make(chan func(int), 1)
+	app := func(cx *core.Scope) core.Node {
+		n := core.NewSignal(cx, 0)
+		steps <- func(i int) { cx.Post(func() { n.Set(i) }) }
+		source := func() driver.ImageSource {
+			i := n.Get()
+			return driver.ImageSource{Pixels: frames[i].m, Version: uint64(i + 1)}
+		}
+		return core.View{Style: core.Style{Width: driver.Pt(200), Height: driver.Pt(100), Background: driver.RGB(0xffffff),
+			Direction: core.Row}, Children: []core.Node{
+			core.Image{SourceFunc: source, ResizeMode: driver.Stretch, Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100)}},
+			core.Image{SourceFunc: source, ResizeMode: driver.Stretch,
+				Style: core.Style{Width: driver.Pt(100), Height: driver.Pt(100), TintColor: driver.RGB(0xff00ff)}},
+		}}
+	}
+	hwnd := startWith(t, app, Options{Title: title + "|", Width: 200, Height: 100})
+	var show func(int)
+	select {
+	case show = <-steps:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the app did not start")
+	}
+	for i, f := range frames {
+		show(i)
+		shown, clear := px(25), px(75)
+		if !f.left {
+			shown, clear = clear, shown
+		}
+		waitForColor(t, hwnd, shown, px(50), f.rgb, 2*time.Second)
+		waitForColor(t, hwnd, clear, px(50), 0xffffff, time.Second)
+		waitForColor(t, hwnd, px(100)+shown, px(50), 0xff00ff, time.Second)
+		waitForColor(t, hwnd, px(100)+clear, px(50), 0xffffff, time.Second)
+	}
+}
+
 // TestImagesFitAtTheirPositionBlurAndFade checks the core fit with a
 // position, NSH's Center at the natural size, a blur that blends the
 // halves but keeps the edges opaque, a fade-in and ImageSize.
