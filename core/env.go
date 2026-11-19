@@ -487,7 +487,7 @@ func rightToLeft(lang string) bool {
 // OS returns the operating system.
 func (e *Env) OS() OS { return e.os.Get() }
 
-// Simulated reports whether the app runs as another OS than the platform's, as a web build does for --nsgo-os: OS is that one's, but none of its native parts are there, so the app's own views stand in for its system header, tab bar, menus and window.
+// Simulated reports whether the app runs as another OS than the platform's, as a web build does for --nsgo-os, or on an OS whose native parts it cannot reach, as a mini program does: OS is that one's, but none of its native parts are there, so the app's own views stand in for its system header, tab bar, menus and window.
 func (e *Env) Simulated() bool { return e.simulated }
 
 // host is the OS whose native parts the platform has, tracked as OS is: the web's while it simulates another. hostUntracked reads it without tracking.
