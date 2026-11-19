@@ -91,6 +91,35 @@ func TestStepsRunOnTransitionEnd(t *testing.T) {
 	}
 }
 
+// Answering an alert is a step: what the answer starts, as a sheet's exit, runs its frames before Answer returns, and so do the answers OnAlert gives at the end of a step.
+func TestAnswerRunsOnTransitionEnd(t *testing.T) {
+	ends := 0
+	app := Start(t, func(cx *core.Scope) core.Node {
+		on := core.NewSignal(cx, false)
+		return core.View{Children: []core.Node{
+			core.View{TestID: "faded", OnTransitionEnd: func() { ends++ }, StyleFunc: fading(on, 0, 250*time.Millisecond)},
+			core.View{Role: core.RoleButton, Label: "ask", TestID: "ask", Style: core.Style{Width: core.Pt(40), Height: core.Pt(40)}, OnPress: func(core.PressEvent) {
+				cx.ShowAlert(core.AlertConfig{Title: "Fade?", Actions: []core.AlertAction{{Label: "No", Role: core.AlertCancel}, {Label: "Yes"}}}, func(i int) {
+					if i == 1 {
+						on.Set(!on.Get())
+					}
+				})
+			}},
+		}}
+	}, PendingAlerts())
+	ends = 0
+	app.Press("id:ask")
+	app.Answer(1)
+	if ends != 1 {
+		t.Fatalf("OnTransitionEnd ran %d times by the time Answer returned, want once", ends)
+	}
+	app.OnAlert = func(driver.AlertConfig) int { return 1 }
+	app.Press("id:ask")
+	if ends != 2 {
+		t.Fatalf("OnTransitionEnd ran %d times after OnAlert answered, want twice", ends)
+	}
+}
+
 // A view whose OnTransitionEnd restyles it again holds a step for settleLimit at most.
 func TestEndlessTransitionsHoldAStepForTheLimit(t *testing.T) {
 	app := Start(t, func(cx *core.Scope) core.Node {

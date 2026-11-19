@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Take the frames of what an alert's answer starts in `nsgotest`'s `Answer` and `App.OnAlert`, as every other step does, so a sheet closed from an alert's callback is gone once `Answer` returns instead of staying until the test advances the clock (#782 by @houko).
+
 ## [0.2.0] - 2026-11-19
 
 - Add HarmonyOS as a preview target, whose ArkTS host runs the engine in ArkWeb and draws it with ArkUI views, in `nsgo build`, `nsgo run` and `nsgo test -target harmonyos` (#79 by @togotop).

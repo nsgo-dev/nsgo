@@ -762,18 +762,28 @@ func (a *App) step(format string, args ...any) {
 		if err != nil {
 			a.t.Fatalf("nsgotest: %v", err)
 		}
-		a.Answer(index)
+		a.answerAt(0, index)
 	}
 }
 
-// done ends a step: it settles, then takes display frames while an animation that ends runs, a style transition waits for its OnTransitionEnd or lists bind the rows they pace, for at most settleLimit of the clock's time, and has OnAlert answer the alerts shown. Frames the app asks for itself do not hold a step, since its own loops may never end: Advance runs them.
+// done ends a step: it settles, then takes display frames while an animation that ends runs, a style transition waits for its OnTransitionEnd or lists bind the rows they pace, for at most settleLimit of the clock's time, and has OnAlert answer the alerts shown, taking the frames of what those answers start in turn. Frames the app asks for itself do not hold a step, since its own loops may never end: Advance runs them.
 func (a *App) done() {
 	a.t.Helper()
-	if a.target != nil {
-		a.target.settle()
-		a.answerAlerts()
-		return
+	for {
+		if a.target != nil {
+			a.target.settle()
+		} else {
+			a.takeFrames()
+		}
+		if !a.answerAlerts() {
+			return
+		}
 	}
+}
+
+// takeFrames settles, then takes display frames while an animation that ends runs, a style transition waits for its OnTransitionEnd or lists bind the rows they pace, for at most settleLimit of the clock's time.
+func (a *App) takeFrames() {
+	a.t.Helper()
 	a.Settle()
 	limit := a.Clock.Now().Add(settleLimit)
 	for !a.manualFrames && (a.anim.Ending() || a.tree.Pacing() || a.tree.PendingTransitionEnds()) && a.Clock.Now().Before(limit) {
@@ -781,14 +791,17 @@ func (a *App) done() {
 		a.runFrame()
 		a.Settle()
 	}
-	a.answerAlerts()
 }
 
-func (a *App) answerAlerts() {
+// answerAlerts has OnAlert answer the alerts shown, and reports whether it answered any.
+func (a *App) answerAlerts() bool {
 	a.t.Helper()
+	answered := false
 	for a.OnAlert != nil && len(a.alerts) > 0 {
-		a.Answer(a.OnAlert(a.alerts[0]))
+		a.answerAt(0, a.OnAlert(a.alerts[0]))
+		answered = true
 	}
+	return answered
 }
 
 // defaultAnswer is how a user backing out answers alert: its cancel
@@ -1114,13 +1127,16 @@ func (a *App) checkForUpdates(it *driver.MountItem) {
 func (a *App) Alerts() []driver.AlertConfig { return a.alerts }
 
 // Answer chooses the button at index (-1: dismiss) of the oldest alert
-// shown.
+// shown. It is a step as Press is: it returns once what the answer starts,
+// as a sheet's exit, has run its frames.
 func (a *App) Answer(index int) {
 	a.t.Helper()
 	if len(a.alerts) == 0 {
 		a.t.Fatal("nsgotest: no alert to answer")
 	}
+	a.stepName = fmt.Sprintf("answer(%d)", index)
 	a.answerAt(0, index)
+	a.done()
 }
 
 // answerAt chooses the button at index of the alert at i in Alerts, headless on the surface that showed it, as each numbers its alerts itself.
