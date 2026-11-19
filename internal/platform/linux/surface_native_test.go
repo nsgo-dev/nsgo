@@ -66,7 +66,13 @@ func TestOpenedWindowCloseIsTheApps(t *testing.T) {
 			t.Error("the app's surface is in the background while its window shows")
 		}
 	})
-	w.onLoop(t, func() { opened.menuChosen(menuRef{role: driver.MenuClose}) })
+	// The Close role's own shortcut, as Ctrl+W reaches it.
+	wait("the window's menu has no Close shortcut", func() bool { _, ok := opened.chrome.keys["mod+w"]; return ok })
+	w.onLoop(t, func() {
+		if !opened.menuShortcut("mod+w") {
+			t.Error("mod+w did not reach the menu's Close")
+		}
+	})
 	for deadline := time.Now().Add(10 * time.Second); asked.Load() == 0; time.Sleep(10 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("menu Close did not run OnClosing")
