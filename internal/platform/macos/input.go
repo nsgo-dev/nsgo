@@ -839,7 +839,7 @@ var textAttrs = sync.OnceValue(func() (a struct{ font, color, background, paragr
 	return a
 })
 
-// newParagraph returns a paragraph style aligned as align whose lines are lineHeight tall when that is set, as a core.Text's are (apple/text.go): the extra height goes above each line's glyphs. The caller releases it.
+// newParagraph returns a paragraph style aligned as align whose lines are lineHeight tall when that is set, as a core.Text's are (apple/text.go). The caller releases it.
 func newParagraph(lineHeight driver.Points, align int) objc.ID {
 	para := objc.ID(apple.Class("NSMutableParagraphStyle")).Send(selAlloc).Send(sel("init"))
 	para.Send(selSetAlignment, align)
