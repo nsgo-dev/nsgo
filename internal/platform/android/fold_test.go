@@ -23,31 +23,38 @@ func TestFoldGeometry(t *testing.T) {
 		{"an open fold", open, []fold{{bounds(420.5, 0, 0, 701), foldTypeFold, foldStateFlat}}, driver.Geometry{
 			Regions:      []driver.Region{{Frame: bounds(0, 0, 841, 701)}},
 			Obstructions: []driver.Obstruction{{Frame: bounds(420.5, 0, 0, 701), State: driver.HingeOpen}},
+			State:        driver.HingeOpen,
 		}},
 		{"a half-open fold", open, []fold{{bounds(420.5, 0, 0, 701), foldTypeFold, foldStateHalfOpened}}, driver.Geometry{
 			Regions:      []driver.Region{{Frame: bounds(0, 0, 420.5, 701)}, {Frame: bounds(420.5, 0, 420.5, 701)}},
 			Obstructions: []driver.Obstruction{{Frame: bounds(420.5, 0, 0, 701), Separating: true, State: driver.HingeHalfOpen}},
+			State:        driver.HingeHalfOpen,
 		}},
 		{"an open hinge between two panels", driver.Size{Width: 1114, Height: 705}, []fold{{bounds(540, 0, 34, 705), foldTypeHinge, foldStateFlat}}, driver.Geometry{
 			Regions:      []driver.Region{{Frame: bounds(0, 0, 540, 705)}, {Frame: bounds(574, 0, 540, 705)}},
 			Obstructions: []driver.Obstruction{{Frame: bounds(540, 0, 34, 705), Occluding: true, Separating: true, State: driver.HingeOpen}},
+			State:        driver.HingeOpen,
 		}},
 		{"rotated, half open on a table", driver.Size{Width: 701, Height: 841}, []fold{{bounds(0, 420.5, 701, 0), foldTypeFold, foldStateHalfOpened}}, driver.Geometry{
 			Regions:      []driver.Region{{Frame: bounds(0, 0, 701, 420.5)}, {Frame: bounds(0, 420.5, 701, 420.5)}},
 			Obstructions: []driver.Obstruction{{Frame: bounds(0, 420.5, 701, 0), Horizontal: true, Separating: true, State: driver.HingeHalfOpen}},
+			State:        driver.HingeHalfOpen,
 		}},
 		{"in a split screen beside the fold", driver.Size{Width: 420, Height: 701}, nil, driver.Geometry{
 			Regions: []driver.Region{{Frame: bounds(0, 0, 420, 701)}},
 		}},
 		{"a window on the other side of the fold, which lies past its left", driver.Size{Width: 420, Height: 701}, []fold{{bounds(-0.5, 0, 0, 701), foldTypeFold, foldStateHalfOpened}}, driver.Geometry{
 			Regions: []driver.Region{{Frame: bounds(0, 0, 420, 701)}},
+			State:   driver.HingeHalfOpen,
 		}},
 		{"a view embedded in part of the window, which the fold crosses past its edges", driver.Size{Width: 600, Height: 400}, []fold{{bounds(300, -100, 0, 701), foldTypeFold, foldStateHalfOpened}}, driver.Geometry{
 			Regions:      []driver.Region{{Frame: bounds(0, 0, 300, 400)}, {Frame: bounds(300, 0, 300, 400)}},
 			Obstructions: []driver.Obstruction{{Frame: bounds(300, 0, 0, 400), Separating: true, State: driver.HingeHalfOpen}},
+			State:        driver.HingeHalfOpen,
 		}},
 		{"a feature that crosses the view neither way", open, []fold{{bounds(420.5, 100, 0, 300), foldTypeFold, foldStateHalfOpened}}, driver.Geometry{
 			Regions: []driver.Region{{Frame: bounds(0, 0, 841, 701)}},
+			State:   driver.HingeHalfOpen,
 		}},
 		{"a feature of an unknown type or state", open, []fold{{bounds(420.5, 0, 0, 701), 3, foldStateFlat}, {bounds(420.5, 0, 0, 701), foldTypeFold, 3}}, driver.Geometry{
 			Regions: []driver.Region{{Frame: bounds(0, 0, 841, 701)}},

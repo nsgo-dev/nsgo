@@ -85,6 +85,16 @@ func TestGeometryStates(t *testing.T) {
 	if !half.Equal(half.Clone()) {
 		t.Error("a geometry differs from its clone")
 	}
+	// The device's hinge, apart from any obstruction.
+	flat, shut := Divide(Size{Width: 800, Height: 600}, nil), Divide(Size{Width: 800, Height: 600}, nil)
+	flat.State, flat.Angle, flat.HasAngle = HingeOpen, 3.14, true
+	shut.State, shut.HasAngle = HingeClosed, true
+	if flat.Equal(shut) || flat.Equal(Divide(Size{Width: 800, Height: 600}, nil)) {
+		t.Error("geometries of different hinge states are equal")
+	}
+	if c := flat.Clone(); !c.Equal(flat) || c.State != HingeOpen || c.Angle != 3.14 || !c.HasAngle {
+		t.Errorf("clone %+v, want the hinge state of %+v", c, flat)
+	}
 	if !(Geometry{}).Equal(Geometry{Regions: []Region{}, Obstructions: []Obstruction{}}) {
 		t.Error("empty lists differ from none")
 	}
@@ -94,7 +104,9 @@ func TestGeometryStates(t *testing.T) {
 }
 
 func TestGeometrySerializes(t *testing.T) {
-	for _, g := range []Geometry{{}, Divide(Size{Width: 800, Height: 600}, []Obstruction{{Frame: rect(390, 0, 20, 600), Occluding: true, Separating: true, State: HingeHalfOpen, Angle: 1.5, HasAngle: true}})} {
+	hinged := Divide(Size{Width: 800, Height: 600}, []Obstruction{{Frame: rect(390, 0, 20, 600), Occluding: true, Separating: true, State: HingeHalfOpen, Angle: 1.5, HasAngle: true}})
+	hinged.State, hinged.Angle, hinged.HasAngle = HingeHalfOpen, 1.5, true
+	for _, g := range []Geometry{{}, hinged, {Regions: []Region{{Frame: rect(0, 0, 800, 600)}}, State: HingeOpen, Angle: 3.14, HasAngle: true}} {
 		data, err := json.Marshal(g)
 		if err != nil {
 			t.Fatal(err)

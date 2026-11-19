@@ -25,7 +25,7 @@ const (
 	hingeStatusFullyOpen     = 3
 )
 
-// foldGeometry is the geometry of a surface view of size with safe area safe, regions and the hinge's latest reading: an occlusion region becomes an occluding obstruction and a division region a separating one, one of each at the same frame a single obstruction both occluding and separating; and the hinge's status and angle are every obstruction's. An occlusion region that divides nothing is left to the safe area, as the system's bars and cutouts are, when it lies along an edge of the view, so the vertical bar the system may place on either edge never becomes an obstruction, or wholly within the safe area's insets, as a camera beside the vertical bar does.
+// foldGeometry is the geometry of a surface view of size with safe area safe, regions and the hinge's latest reading: an occlusion region becomes an occluding obstruction and a division region a separating one, one of each at the same frame a single obstruction both occluding and separating; and the hinge's status and angle are the geometry's and every obstruction's, with or without obstructions. An occlusion region that divides nothing is left to the safe area, as the system's bars and cutouts are, when it lies along an edge of the view, so the vertical bar the system may place on either edge never becomes an obstruction, or wholly within the safe area's insets, as a camera beside the vertical bar does.
 func foldGeometry(size driver.Size, safe driver.Edges, regions []reservedRegion, h hingeReading) driver.Geometry {
 	inside := driver.Bounds{Origin: driver.Point{X: safe.Left, Y: safe.Top}, Size: driver.Size{Width: size.Width - safe.Left - safe.Right, Height: size.Height - safe.Top - safe.Bottom}}
 	var obstructions []driver.Obstruction
@@ -46,6 +46,20 @@ func foldGeometry(size driver.Size, safe driver.Edges, regions []reservedRegion,
 			obstructions[i].Occluding = true
 		}
 	}
+	var state driver.HingeState
+	switch {
+	case !h.known:
+	case h.status == hingeStatusClosed:
+		state = driver.HingeClosed
+	case h.status == hingeStatusPartiallyOpen:
+		state = driver.HingeHalfOpen
+	case h.status == hingeStatusFullyOpen:
+		state = driver.HingeOpen
+	}
+	var angle float32
+	if h.known {
+		angle = float32(h.angle)
+	}
 	kept := obstructions[:0]
 	for _, o := range obstructions {
 		f := o.Frame
@@ -54,20 +68,12 @@ func foldGeometry(size driver.Size, safe driver.Edges, regions []reservedRegion,
 		if !o.Separating && (edge || !overlaps(f, inside)) {
 			continue
 		}
-		if h.known {
-			o.Angle, o.HasAngle = float32(h.angle), true
-			switch h.status {
-			case hingeStatusClosed:
-				o.State = driver.HingeClosed
-			case hingeStatusPartiallyOpen:
-				o.State = driver.HingeHalfOpen
-			case hingeStatusFullyOpen:
-				o.State = driver.HingeOpen
-			}
-		}
+		o.State, o.Angle, o.HasAngle = state, angle, h.known
 		kept = append(kept, o)
 	}
-	return driver.Divide(size, kept)
+	g := driver.Divide(size, kept)
+	g.State, g.Angle, g.HasAngle = state, angle, h.known
+	return g
 }
 
 // overlaps reports whether a and b share an area.

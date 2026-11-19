@@ -31,9 +31,10 @@ func readSize(r *reader) (driver.Size, []fold) {
 	return size, folds
 }
 
-// foldGeometry is the geometry folds give a view of size. It derives the properties as Jetpack's HardwareFoldingFeature does: occluding when the bounds have area, separating for a hinge or a half-open fold, horizontal when wider than tall; and keeps only what Jetpack keeps of the library's report, a feature of a known type and state that crosses the view from edge to edge without covering it, so one measured at another size of the window is dropped.
+// foldGeometry is the geometry folds give a view of size. It derives the properties as Jetpack's HardwareFoldingFeature does: occluding when the bounds have area, separating for a hinge or a half-open fold, horizontal when wider than tall; and keeps only what Jetpack keeps of the library's report, a feature of a known type and state that crosses the view from edge to edge without covering it, so one measured at another size of the window is dropped. The device's state is the first known feature's, whether or not the view keeps it, as the fold's state does not depend on where the view lies; the library reports no angle, and no state without a feature.
 func foldGeometry(size driver.Size, folds []fold) driver.Geometry {
 	var obstructions []driver.Obstruction
+	var device driver.HingeState
 	for _, f := range folds {
 		var state driver.HingeState
 		switch f.state {
@@ -46,6 +47,9 @@ func foldGeometry(size driver.Size, folds []fold) driver.Geometry {
 		}
 		if f.kind != foldTypeFold && f.kind != foldTypeHinge {
 			continue
+		}
+		if device == driver.HingeUnknown {
+			device = state
 		}
 		b := f.frame
 		x0, y0 := max(b.Origin.X, 0), max(b.Origin.Y, 0)
@@ -62,5 +66,7 @@ func foldGeometry(size driver.Size, folds []fold) driver.Geometry {
 			State:      state,
 		})
 	}
-	return driver.Divide(size, obstructions)
+	g := driver.Divide(size, obstructions)
+	g.State = device
+	return g
 }

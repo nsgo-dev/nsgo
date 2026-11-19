@@ -770,7 +770,7 @@ func (t *Tree) Resize(size Size, g Geometry) {
 		return
 	}
 	if len(g.Regions) == 0 {
-		g = driver.Divide(size, g.Obstructions)
+		g = divide(size, g)
 	}
 	if size != t.size {
 		t.size = size
@@ -784,6 +784,13 @@ func (t *Tree) Resize(size Size, g Geometry) {
 			e.geometry.Set(g.Clone())
 		}
 	})
+}
+
+// divide returns g's obstructions divided at size, with its hinge's state.
+func divide(size Size, g Geometry) Geometry {
+	d := driver.Divide(size, g.Obstructions)
+	d.State, d.Angle, d.HasAngle = g.State, g.Angle, g.HasAngle
+	return d
 }
 
 // fitContent has the surface take its content's size, up to largest, from the next commit on.
@@ -828,7 +835,7 @@ func (t *Tree) reportFit() {
 	}
 	t.refit = false
 	e := t.root.Env()
-	g := driver.Divide(t.size, e.geometry.GetUntracked().Obstructions)
+	g := divide(t.size, e.geometry.GetUntracked())
 	t.root.Batch(func() {
 		e.window.Set(t.size)
 		if !e.geometry.GetUntracked().Equal(g) {

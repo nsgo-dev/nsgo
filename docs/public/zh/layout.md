@@ -85,6 +85,8 @@ core.View{Style: core.Style{
 
 `core.EnvAll(core.EnvSafeArea)` 表示每一条边，`cx.Env().SafeArea()` 和 `cx.Env().KeyboardHeight()` 在代码中读取这些值。
 
+在可折叠或双屏手机上，`cx.Env().Geometry()` 列出折痕或铰链把窗口分成的区域（每个区域带有落在其中的安全区域）以及区域之间的折痕；它的 `State` 和 `Angle` 表示设备打开的程度（`core.HingeClosed`、`HingeHalfOpen` 或 `HingeOpen`），即使没有折痕穿过窗口也会报告，例如在外屏上或完全展开时。其他设备报告一个区域和 `HingeUnknown`。框架不会据此布局，由应用自己选择分栏。
+
 ## 响应式类名
 
 `Class` 接受 Tailwind CSS 类名：`flex`、`flex-col`、`flex-wrap`、`items-center`、`justify-between`、`gap-3`、`p-4`、`w-full`、`grid`、`grid-cols-3`、`col-span-2` 等。断点跟随窗口，外观、方向和减少动态效果跟随环境：

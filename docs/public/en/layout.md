@@ -85,6 +85,8 @@ core.View{Style: core.Style{
 
 `core.EnvAll(core.EnvSafeArea)` names every edge, and `cx.Env().SafeArea()` and `cx.Env().KeyboardHeight()` read the values in code.
 
+On a foldable or dual-screen phone, `cx.Env().Geometry()` lists the regions a fold or hinge divides the window into, each with the safe area that falls in it, and the folds between them; its `State` and `Angle` say how far the device is open (`core.HingeClosed`, `HingeHalfOpen` or `HingeOpen`) even when no fold crosses the window, as on a cover display or a screen opened flat. Other devices report one region and `HingeUnknown`. Nothing is laid out by it: the app chooses its own panes.
+
 ## Responsive classes
 
 `Class` takes Tailwind CSS classes: `flex`, `flex-col`, `flex-wrap`, `items-center`, `justify-between`, `gap-3`, `p-4`, `w-full`, `grid`, `grid-cols-3`, `col-span-2` and the rest. Breakpoints follow the window, and the display's appearance, the direction and reduced motion follow the environment:

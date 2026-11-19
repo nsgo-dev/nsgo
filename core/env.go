@@ -262,7 +262,7 @@ func (e *Env) DeviceModel() string { return e.deviceModel.Get() }
 // Window returns the surface's size.
 func (e *Env) Window() Size { return e.window.Get() }
 
-// Geometry returns how a fold or hinge divides the surface: its usable regions, each with the safe area that falls in it, and the obstructions between them, in the surface's coordinates and measured at Window's size, which it changes with. A surface without a fold, as on every target but Android and iOS 27.1, has one region and no obstructions. Core lays nothing out by it: an app or component reads it and chooses its own panes.
+// Geometry returns how a fold or hinge divides the surface: its usable regions, each with the safe area that falls in it, and the obstructions between them, in the surface's coordinates and measured at Window's size, which it changes with; and how far the device's hinge is open (State, Angle), whether or not an obstruction lies on the surface, as on a cover display or a screen opened flat. A surface without a fold, as on every target but Android and iOS 27.1, has one region, no obstructions and HingeUnknown. Core lays nothing out by it: an app or component reads it and chooses its own panes.
 func (e *Env) Geometry() Geometry { return e.shown.Get().Clone() }
 
 // VerticalBarEdge returns the edge the system chose for a vertical bar, such as a tab bar drawn down a side, where it may place one, as iOS 27.1 does; VerticalBarUnspecified elsewhere.

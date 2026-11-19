@@ -84,6 +84,33 @@ func TestGeometryChangesOnlyWithItself(t *testing.T) {
 	}
 }
 
+func TestGeometryCarriesTheHingeWithoutObstructions(t *testing.T) {
+	// A display without a fold still says how far the device is open, and a change of that alone reaches the app.
+	var runs []Geometry
+	h := newHost(t, Size{Width: 669, Height: 951}, func(cx *Scope) Node {
+		cx.Effect(func() { runs = append(runs, cx.Env().Geometry()) })
+		return View{}
+	})
+	h.commit()
+	h.tree.Resize(Size{Width: 669, Height: 951}, Geometry{State: HingeOpen, Angle: 3.14, HasAngle: true})
+	h.commit()
+	h.tree.Resize(Size{Width: 669, Height: 951}, Geometry{State: HingeOpen, Angle: 3.14, HasAngle: true})
+	h.commit()
+	h.tree.Resize(Size{Width: 466, Height: 678}, Geometry{State: HingeClosed, HasAngle: true})
+	h.commit()
+	if len(runs) != 3 {
+		t.Fatalf("%d runs, want 3: %+v", len(runs), runs)
+	}
+	open := Geometry{Regions: []Region{{Frame: frame(0, 0, 669, 951)}}, State: HingeOpen, Angle: 3.14, HasAngle: true}
+	if !reflect.DeepEqual(runs[1], open) {
+		t.Errorf("open flat: %+v, want %+v", runs[1], open)
+	}
+	closed := Geometry{Regions: []Region{{Frame: frame(0, 0, 466, 678)}}, State: HingeClosed, HasAngle: true}
+	if !reflect.DeepEqual(runs[2], closed) {
+		t.Errorf("closed: %+v, want %+v", runs[2], closed)
+	}
+}
+
 func TestGeometryRegionsTakeTheSafeArea(t *testing.T) {
 	var got Geometry
 	h := newHost(t, Size{Width: 800, Height: 600}, func(cx *Scope) Node {

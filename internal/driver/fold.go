@@ -11,6 +11,11 @@ type Geometry struct {
 	Regions []Region
 	// Obstructions are the folds and hinges on the surface, in the same order.
 	Obstructions []Obstruction
+	// State is how far the device's hinge is open, whether or not an obstruction lies on the surface, as on a display that shows no fold open flat or an outer display while the device is closed; HingeUnknown on a device without a hinge, or before the platform reports one.
+	State HingeState
+	// Angle is the hinge's angle in radians, where the platform reports one, as HasAngle says.
+	Angle    float32
+	HasAngle bool
 }
 
 // Region is a part of the surface an app can lay out in.
@@ -31,7 +36,8 @@ type Obstruction struct {
 	Occluding bool
 	// Separating says the regions on either side read as logically apart.
 	Separating bool
-	State      HingeState
+	// State is how far this fold or hinge is open, as the platform reports it for each; Geometry.State is the device's.
+	State HingeState
 	// Angle is the hinge's angle in radians, where the platform reports one, as HasAngle says.
 	Angle    float32
 	HasAngle bool
@@ -48,7 +54,7 @@ const (
 	HingeOpen
 )
 
-// Divide returns the geometry of a surface of size that obstructions lie on, in surface points: the obstructions within the surface, clipped to it, and the regions those that separate it and cross it from edge to edge leave on either side of their frames. An obstruction that does not divide the surface, such as one that occludes without separating, reserves its frame in the regions it lies in. Frames outside the surface, and those without length, are left out.
+// Divide returns the geometry of a surface of size that obstructions lie on, in surface points: the obstructions within the surface, clipped to it, and the regions those that separate it and cross it from edge to edge leave on either side of their frames. An obstruction that does not divide the surface, such as one that occludes without separating, reserves its frame in the regions it lies in. Frames outside the surface, and those without length, are left out. The hinge's state is left unknown, for the caller to set.
 func Divide(size Size, obstructions []Obstruction) Geometry {
 	var g Geometry
 	for _, o := range obstructions {
@@ -95,14 +101,16 @@ func Divide(size Size, obstructions []Obstruction) Geometry {
 	return g
 }
 
-// Equal reports whether two geometries have the same regions and obstructions, an empty list the same as none.
+// Equal reports whether two geometries have the same regions, obstructions and hinge state, an empty list the same as none.
 func (g Geometry) Equal(o Geometry) bool {
-	return slices.Equal(g.Regions, o.Regions) && slices.Equal(g.Obstructions, o.Obstructions)
+	return slices.Equal(g.Regions, o.Regions) && slices.Equal(g.Obstructions, o.Obstructions) &&
+		g.State == o.State && g.Angle == o.Angle && g.HasAngle == o.HasAngle
 }
 
 // Clone returns g with lists of its own.
 func (g Geometry) Clone() Geometry {
-	return Geometry{Regions: slices.Clone(g.Regions), Obstructions: slices.Clone(g.Obstructions)}
+	g.Regions, g.Obstructions = slices.Clone(g.Regions), slices.Clone(g.Obstructions)
+	return g
 }
 
 // cut removes [from, to] from the spans, splitting the one it falls in; a span left without length goes.
