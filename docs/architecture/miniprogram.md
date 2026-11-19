@@ -29,7 +29,7 @@ render layer (miniprogram/wechat, miniprogram/alipay)
 - Canvases are played into one offscreen canvas with `canvas2d`, the web's player, and shown as pictures, which move and scroll as views do.
 - Animated values run on the engine's `Animator`, frames timed by the runtime, and go to the render layer as an inline style over the view's. Keyframes and modal presentations run in the render layer through the component's `animate`, with no work per frame.
 - Styles are the web's CSS, written by `webstyle`.
-- The environment reports the device's OS as `Simulated`, as a mini program has none of its native parts: a stack's pages show their `Header`, as no system header stands in for it, and `mobile.IsAvailable` is false.
+- The environment reports the device's OS as `Simulated`, as a mini program has none of its native parts: a stack's pages show their `Header`, as no system header stands in for it, `mobile.IsAvailable` is false, and "mod" is Command on iOS and macOS, as `AppleKeyboard` says.
 
 ## Platforms
 

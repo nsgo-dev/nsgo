@@ -130,9 +130,7 @@ func (s *surface) environment() driver.Environment {
 	env.PixelRatio = float32(d.Get("pixelRatio").Float())
 	env.FontScale = float32(d.Get("fontScale").Float())
 	env.Locale = strings.ReplaceAll(d.Get("language").String(), "_", "-")
-	env.OS = driver.OS(d.Get("os").String())
-	// The device's OS, whose native parts a mini program has none of: the app's own views stand in for the system header and tab bar, as a stack's pages show their Header.
-	env.Simulated = true
+	deviceOS(&env, d.Get("os").String())
 	env.OSVersion = osVersion(d.Get("osVersion").String())
 	env.Idiom = driver.IdiomPhone
 	if d.Get("tablet").Truthy() {

@@ -97,8 +97,7 @@ type Environment struct {
 	Idiom     Idiom
 	// Simulated is whether OS and Idiom are ones the platform imitates rather than runs on, as a web build does for --nsgo-os, or whose native parts it lacks, as a mini program on its device's OS: the app's own views take that OS's paths, while its native components, system header, menus and window functions are absent.
 	Simulated bool
-	// AppleKeyboard says a browser runs on an Apple platform, where "mod"
-	// is Command as on macOS and iOS.
+	// AppleKeyboard says a browser or a mini program runs on an Apple platform, where "mod" is Command as on macOS and iOS.
 	AppleKeyboard bool
 	// HeaderHeight and LargeHeaderHeight are the heights of the system
 	// header a platform draws over screens, without the status bar, and
