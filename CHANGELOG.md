@@ -18,6 +18,7 @@
 - Have an app under `nsgo test -target macos` open its windows as `nsgo.Run` does without an `Environment` option, so a window it opens with `desktop.OpenWindow` hears the main window's keys through `KeyOptions.AllSurfaces`, and have steps act on its main window, which opens at the desktop's default 480 by 640 points without `nsgotest.Size` and shows a root view too, so `desktop.CurrentWindow` and `OnClosing` work there; closing it asks `OnClosing`, and a quit the app asks for counts in `App.Quits` instead of ending the test's process (#763, #771 by @houko).
 - Lay the gallery out for Apple Watch, as a list of the demos a watch can show, and for Apple TV, as a sidebar the remote's focus moves through, each leaving out the demos the device cannot use (#803 by @houko).
 - Leave a camera cutout inside the safe area's insets to the safe area on iOS 27.1, instead of reporting it in `Env.Geometry` as an occluding obstruction with a reserved rectangle, as the iPhone Duo's outer display did (#821 by @houko).
+- Wait for the gallery's web page to report its button before its trusted-input test clicks it, so macOS tests do not race page loading (#753).
 
 ## [0.2.0] - 2026-11-19
 
@@ -54,7 +55,6 @@
 - Let macOS editing role items with `OnSelect` follow the focused editor's enabled state (#724).
 - Target Android runtime manifests at API 36 by default and warn when release builds override it below Google Play's requirement (#748).
 - Share Go compile workers across concurrent `nsgo build` targets instead of oversubscribing the CPU (#725).
-- Wait for the gallery's web page to report its button before its trusted-input test clicks it, so macOS tests do not race page loading (#753).
 - Stop canvases and shaders on Apple platforms and the web from drawing an earlier image for an image's inline `Data` once the earlier buffer was freed and its address reused, by keeping a cached image's bytes alive (#715, #737, #751).
 - Localize the separator between Android TalkBack's state parts with the app's language, including Chinese punctuation (#704).
 - Keep a toast's title, description, leading view and action current when showing a replacement with the same ID, and have the screen reader read the replacement (#749).
