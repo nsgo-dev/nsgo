@@ -794,7 +794,7 @@ func (a *App) Commit(selector, text string) {
 	a.Compose(selector, "")
 }
 
-// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a", or a modifier alone, "shift"): the focused view's OnKeyDown hears it first, and a key it consumes goes no further; else a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, or mod+a selects all its text; else, in a macOS, Windows or Linux environment, the enabled application-menu item with the key as its shortcut is chosen, unless it is NotInText and a field or web view has the focus; else Escape goes back. A key nothing takes does nothing, as on a device.
+// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a", or a modifier alone, "shift"): the focused view's OnKeyDown hears it first, and a key it consumes goes no further; else a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, mod+a selects all its text, and mod+c, mod+x and mod+v copy, cut and paste with Clipboard; else, in a macOS, Windows or Linux environment, the enabled application-menu item with the key as its shortcut is chosen, unless it is NotInText and a field or web view has the focus; else Escape goes back. A key nothing takes does nothing, as on a device.
 func (a *App) Key(key string) {
 	a.t.Helper()
 	a.step("key(%s)", key)
@@ -855,6 +855,21 @@ func (a *App) Key(key string) {
 			a.done()
 			return
 		}
+		// The field's own clipboard keys, which the platforms' fields take before the application menu's editing roles.
+		role := driver.MenuRoleNone
+		switch {
+		case slices.Contains(names, "mod+c"):
+			role = driver.MenuCopy
+		case slices.Contains(names, "mod+x"):
+			role = driver.MenuCut
+		case slices.Contains(names, "mod+v"):
+			role = driver.MenuPaste
+		}
+		if role != driver.MenuRoleNone {
+			a.editField(v, role)
+			a.done()
+			return
+		}
 		if strings.Contains(name, "+") {
 			continue
 		}
@@ -876,11 +891,7 @@ func (a *App) Key(key string) {
 		return
 	}
 	if entry, consumed := a.menuShortcut(names); consumed {
-		if entry.ID != 0 {
-			a.dispatchOn(a.menuTree, driver.Event{Kind: driver.EventMenu, Count: entry.ID})
-		} else {
-			a.menuRole(entry)
-		}
+		a.chooseMenuEntry(entry)
 		a.done()
 		return
 	}
@@ -890,7 +901,7 @@ func (a *App) Key(key string) {
 	a.done()
 }
 
-// menuShortcut finds the item of the application menu a key that the keymap, the keyboard focus and the focused field left goes to, as macOS's key equivalents and Windows' and Linux's menu shortcuts take it (driver.MenuShortcut): its ID, 0 for one with none, and whether an item takes the key. Only macOS, Windows and Linux show the menu.
+// menuShortcut finds the item of the application menu a key that the keymap, the keyboard focus and the focused field left goes to, as macOS's key equivalents and Windows' and Linux's menu shortcuts take it (driver.MenuShortcut): the item, and whether one takes the key. Only macOS, Windows and Linux show the menu.
 func (a *App) menuShortcut(names []string) (driver.MenuEntry, bool) {
 	if a.env == nil || a.env.OS != driver.OSMacOS && a.env.OS != driver.OSWindows && a.env.OS != driver.OSLinux {
 		return driver.MenuEntry{}, false
@@ -903,110 +914,114 @@ func (a *App) menuShortcut(names []string) (driver.MenuEntry, bool) {
 		}
 	}
 	e, ok := driver.MenuShortcut(a.Menu, names, a.env.OS == driver.OSMacOS, editing)
-	if !ok && editing && a.env.OS != driver.OSMacOS {
-		e, ok = headlessEditingMenuShortcut(a.Menu, names, a.env.OS == driver.OSMacOS)
-	}
 	return e, ok
 }
 
-func headlessEditingMenuShortcut(entries []driver.MenuEntry, names []string, mac bool) (driver.MenuEntry, bool) {
-	for _, entry := range entries {
-		if entry.Disabled {
-			continue
-		}
-		if len(entry.Items) > 0 {
-			if found, ok := headlessEditingMenuShortcut(entry.Items, names, mac); ok {
-				return found, true
-			}
-			continue
-		}
-		if entry.ID == 0 && entry.Role.EditsText() && !entry.NotInText {
-			shortcut := entry.Shortcut
-			if shortcut == "" {
-				shortcut = driver.NormalizeKey(entry.Role.Shortcut(mac))
-			}
-			if shortcut != "" && slices.Contains(names, shortcut) {
-				return entry, true
-			}
-		}
+// chooseMenuEntry carries out the application-menu item e, chosen by its shortcut or by ChooseMenu, as the desktop platforms do: an editing role goes to the focused field first, and the item's OnSelect runs when the field does not take it; another item with OnSelect runs it; one without carries out its role (menuRole).
+func (a *App) chooseMenuEntry(e driver.MenuEntry) {
+	if (e.Role.EditsText() || e.Role == driver.MenuPasteAndMatchStyle) && a.menuEdit(e.Role) {
+		return
 	}
-	return driver.MenuEntry{}, false
+	if e.ID != 0 {
+		a.dispatchOn(a.menuTree, driver.Event{Kind: driver.EventMenu, Count: e.ID})
+		return
+	}
+	a.menuRole(e.Role)
 }
 
-// menuRole carries out a standard menu role that a headless model can perform. It returns after reporting an unsupported role as a test failure, so a role item cannot silently swallow a shortcut.
-func (a *App) menuRole(entry driver.MenuEntry) {
-	switch entry.Role {
+// menuRole carries out a standard role of an item without OnSelect: Close closes the main window as its close button does, running its OnClosing handlers; Quit asks the app's OnQuitRequest handlers on macOS, where an approved request counts in Quits, and quits at once on Windows and Linux, which do not ask; Minimize, Zoom and Toggle Full Screen change the window state the environment reports; an editing role with no focused field to take it does nothing, as on the platforms. A role the model cannot carry out fails the step, so that its key is not swallowed unnoticed.
+func (a *App) menuRole(role driver.MenuRole) {
+	a.t.Helper()
+	switch role {
 	case driver.MenuClose:
-		if a.appTree == nil || a.tree == a.appTree {
-			a.t.Fatalf("nsgotest: menu role %q needs an open window", entry.Role.Label())
-		}
 		a.CloseWindow()
 	case driver.MenuQuit:
-		a.dispatch(driver.Event{Kind: driver.EventQuitRequest, Count: 1})
+		if a.env != nil && a.env.OS == driver.OSMacOS {
+			a.quitRequests++
+			a.dispatchOn(a.appTree, driver.Event{Kind: driver.EventQuitRequest, Count: a.quitRequests})
+		} else {
+			a.Quits++
+		}
 	case driver.MenuMinimize:
-		a.changeWindowEnvironment(func(env *driver.Environment) { env.Minimized = true })
+		a.changeWindowState(role, func(env *driver.Environment) { env.Minimized = true })
 	case driver.MenuZoom:
-		a.changeWindowEnvironment(func(env *driver.Environment) { env.Maximized = !env.Maximized })
+		a.changeWindowState(role, func(env *driver.Environment) { env.Maximized = !env.Maximized })
 	case driver.MenuToggleFullScreen:
-		a.changeWindowEnvironment(func(env *driver.Environment) { env.FullScreen = !env.FullScreen })
-	case driver.MenuSelectAll, driver.MenuCopy, driver.MenuCut, driver.MenuPaste, driver.MenuPasteAndMatchStyle, driver.MenuDelete:
-		a.editingMenuRole(entry.Role)
+		a.changeWindowState(role, func(env *driver.Environment) { env.FullScreen = !env.FullScreen })
+	case driver.MenuUndo, driver.MenuRedo, driver.MenuCut, driver.MenuCopy, driver.MenuPaste, driver.MenuPasteAndMatchStyle, driver.MenuDelete, driver.MenuSelectAll:
 	default:
-		a.t.Fatalf("nsgotest: menu role %q is not supported headlessly", entry.Role.Label())
+		a.t.Fatalf("nsgotest: the menu role %q is not modelled headless; give the item an OnSelect or run the test on a target", role.Label())
 	}
 }
 
-func (a *App) changeWindowEnvironment(change func(*driver.Environment)) {
+// changeWindowState changes the main window's state that the environment reports, as the window's own Minimize, Zoom and Toggle Full Screen do.
+func (a *App) changeWindowState(role driver.MenuRole, change func(*driver.Environment)) {
+	a.t.Helper()
 	if a.env == nil || a.appTree == nil || a.tree == a.appTree {
-		a.t.Fatalf("nsgotest: menu role needs an open window")
+		a.t.Fatalf("nsgotest: the menu role %q needs a main window open: a macOS environment, or StartApp with a Windows or Linux one", role.Label())
 	}
 	env := *a.env
 	change(&env)
 	a.SetEnvironment(env)
 }
 
-func (a *App) editingMenuRole(role driver.MenuRole) {
-	var field *View
+// menuEdit carries out editing role in the focused field, as its own keys do, and reports whether a field took it. A focused web view's page is not modelled, so a role it would take fails the step.
+func (a *App) menuEdit(role driver.MenuRole) bool {
+	a.t.Helper()
 	for _, v := range a.views {
-		if v.Focused && v.Kind == driver.KindInput && !v.Input.Readonly && !v.Input.Disabled {
-			field = v
-			break
+		if !v.Focused {
+			continue
+		}
+		switch {
+		case v.Kind == driver.KindWeb:
+			a.t.Fatalf("nsgotest: the menu role %q in a web view's page is not modelled headless", role.Label())
+		case v.Kind == driver.KindInput && !v.Input.Readonly && !v.Input.Disabled:
+			a.editField(v, role)
+			return true
 		}
 	}
-	if field == nil {
-		a.t.Fatalf("nsgotest: menu role %q needs a focused editable field", role.Label())
-	}
-	selection := field.Selection
-	start := max(selection.Start, 0)
-	end := min(max(selection.End, start), driver.UTF16Len(field.Text))
-	left, right := driver.UTF16Offset(field.Text, start), driver.UTF16Offset(field.Text, end)
-	selected := field.Text[left:right]
+	return false
+}
+
+// editField carries out editing role in field v as the platforms' fields do with the clipboard (Clipboard): Copy and Cut take a non-empty selection, which a masked field keeps to itself; Paste replaces the selection with the clipboard's text, a single-line field's line breaks as spaces, within MaxLength, and a field that reports pastes (PasteReport) only reports it; Delete removes the selection. Undo and Redo are not modelled and fail the step.
+func (a *App) editField(v *View, role driver.MenuRole) {
+	a.t.Helper()
+	start := max(v.Selection.Start, 0)
+	end := min(max(v.Selection.End, start), driver.UTF16Len(v.Text))
+	start = min(start, end)
+	left, right := driver.UTF16Offset(v.Text, start), driver.UTF16Offset(v.Text, end)
 	switch role {
 	case driver.MenuSelectAll:
-		a.moveSelection(field, driver.TextRange{Start: 0, End: driver.UTF16Len(field.Text)})
-	case driver.MenuCopy:
-		a.Clipboard = selected
-	case driver.MenuCut:
-		a.Clipboard = selected
-		if left != right {
-			a.edit(field, field.Text[:left]+field.Text[right:])
+		a.moveSelection(v, driver.TextRange{Start: 0, End: driver.UTF16Len(v.Text)})
+	case driver.MenuCopy, driver.MenuCut:
+		if left == right || v.Input.Masked {
+			return
+		}
+		a.Clipboard = v.Text[left:right]
+		if role == driver.MenuCut {
+			a.edit(v, v.Text[:left]+v.Text[right:])
 		}
 	case driver.MenuPaste, driver.MenuPasteAndMatchStyle:
-		if field.Input.PasteBehavior == driver.PasteReport {
-			a.send(field, driver.Event{Kind: driver.EventPaste, Data: &driver.PasteEvent{Text: a.Clipboard}})
+		if a.Clipboard == "" {
+			return
+		}
+		a.send(v, driver.Event{Kind: driver.EventPaste, Data: &driver.PasteEvent{Text: a.Clipboard}})
+		if v.Input.PasteBehavior != driver.PasteInsert {
 			return
 		}
 		text := a.Clipboard
-		if !field.Input.Multiline {
+		if !v.Input.Multiline {
 			text = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(text)
 		}
-		insert, _ := driver.LimitEdit(field.Text, end-start, text, field.Input.MaxLength)
-		a.send(field, driver.Event{Kind: driver.EventPaste, Data: &driver.PasteEvent{Text: text}})
-		a.edit(field, field.Text[:left]+insert+field.Text[right:])
+		if insert, ok := driver.LimitEdit(v.Text, end-start, text, v.Input.MaxLength); ok && insert != "" {
+			a.edit(v, v.Text[:left]+insert+v.Text[right:])
+		}
 	case driver.MenuDelete:
 		if left != right {
-			a.edit(field, field.Text[:left]+field.Text[right:])
+			a.edit(v, v.Text[:left]+v.Text[right:])
 		}
+	default:
+		a.t.Fatalf("nsgotest: the menu role %q is not modelled headless in a field", role.Label())
 	}
 }
 

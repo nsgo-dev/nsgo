@@ -726,6 +726,11 @@ func (a *App) apply(b *driver.MountBatch) {
 			if it.On {
 				a.Restarts++
 			}
+		case driver.ItemQuitResponse:
+			// The app lets the quit the user asked for proceed (OnQuitRequest), and the platform quits.
+			if it.On {
+				a.Quits++
+			}
 		case driver.ItemPopupMenu:
 			// One context menu shows at a time, whichever surface asks.
 			if a.popupID != 0 {

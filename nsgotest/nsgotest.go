@@ -360,10 +360,7 @@ type App struct {
 	// default answer: its cancel button, else dismissed when cancelable,
 	// else the step fails.
 	OnAlert func(driver.AlertConfig) int
-	// Appearance is the appearance the app last forced; Quits how often
-	// it asked to quit, Restarts how many of those restart it;
-	// BackUnhandled how many backs nothing took, which leave an Android
-	// app.
+	// Appearance is the appearance the app last forced; Quits how often it asked to quit, or quit as the user asked: by a Quit menu role on Windows and Linux, or with a quit request it let proceed; Restarts how many of those restart it; BackUnhandled how many backs nothing took, which leave an Android app.
 	Appearance    driver.Appearance
 	Quits         int
 	Restarts      int
@@ -416,6 +413,8 @@ type App struct {
 	menuTree  *core.Tree
 	dockTree  *core.Tree
 	popupTree *core.Tree
+	// quitRequests numbers the quit requests a Quit menu role sent, as macOS numbers the requests it sends.
+	quitRequests uint32
 
 	// StatusBar is the status bar the app last set.
 	StatusBar driver.StatusBarConfig

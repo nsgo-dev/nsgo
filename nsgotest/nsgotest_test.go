@@ -583,63 +583,188 @@ func TestCloseWindowRunsTheMainWindowsHandlers(t *testing.T) {
 	}
 }
 
-// Application-menu role items without OnSelect are carried out by the headless model as the desktop performs them.
+// Application-menu items with a standard role and no OnSelect do headless what the desktop platforms do with them, by their shortcut and by ChooseMenu, and a role the model does not carry out fails the step rather than swallow its key (#711).
 func TestApplicationMenuRolesHeadless(t *testing.T) {
 	if Target() != "" {
 		t.Skip("checks the headless menu role path")
 	}
-	var closed, quit int
-	app := StartApp(t, func(cx *core.Scope) {
-		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{{Role: core.MenuClose}}}})
-		desktop.OnQuitRequest(cx, func(*desktop.QuitRequest) { quit++ })
-		cx.SetMainView(func(cx *core.Scope) core.Node {
-			w := desktop.CurrentWindow(cx)
-			w.OnClosing(cx, func(*desktop.WindowClosing) { closed++ })
-			return core.Text{Content: "main"}
+	mac := Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop})
+	start := func(tb testing.TB, menu []desktop.MenuItem, view func(cx *core.Scope) core.Node, opts ...Option) *App {
+		return StartApp(tb, func(cx *core.Scope) {
+			desktop.SetApplicationMenu(cx, menu)
+			cx.SetMainView(view)
+		}, opts...)
+	}
+	text := func(cx *core.Scope) core.Node { return core.Text{Content: "main"} }
+
+	// Close closes the main window as its close button does, its OnClosing handlers deciding.
+	cancel, closings := true, 0
+	app := start(t, []desktop.MenuItem{{Label: "File", Items: []desktop.MenuItem{{Role: core.MenuClose}}}}, func(cx *core.Scope) core.Node {
+		desktop.CurrentWindow(cx).OnClosing(cx, func(c *desktop.WindowClosing) {
+			closings++
+			if cancel {
+				c.Cancel()
+			}
 		})
-	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+		return core.Text{Content: "main"}
+	}, mac)
 	app.Key("mod+w")
-	if closed != 1 || app.root.MainWindow() != nil {
-		t.Fatalf("close role ran %d handlers and left window %v", closed, app.root.MainWindow() != nil)
+	if closings != 1 || app.root.MainWindow() == nil {
+		t.Fatalf("a canceled close role ran %d handlers and closed the window: %v", closings, app.root.MainWindow() == nil)
+	}
+	cancel = false
+	app.ChooseMenu("File", "Close")
+	if closings != 2 || app.root.MainWindow() != nil {
+		t.Fatalf("the close role ran %d handlers and left the window open: %v", closings, app.root.MainWindow() != nil)
 	}
 
-	quitRequests := 0
-	app = StartApp(t, func(cx *core.Scope) {
-		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{{Role: core.MenuQuit}}}})
-		desktop.OnQuitRequest(cx, func(*desktop.QuitRequest) { quitRequests++ })
-		cx.SetMainView(func(cx *core.Scope) core.Node { return core.Text{Content: "main"} })
-	}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
-	app.ChooseMenu("App", "Quit")
-	if quitRequests != 1 {
-		t.Fatalf("quit role ran %d quit handlers", quitRequests)
+	// On macOS Quit asks the app, which may cancel; elsewhere it quits without asking, as the platforms do.
+	quitMenu := []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{{Role: core.MenuQuit}}}}
+	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux} {
+		requests, keep := 0, true
+		app = StartApp(t, func(cx *core.Scope) {
+			desktop.SetApplicationMenu(cx, quitMenu)
+			desktop.OnQuitRequest(cx, func(q *desktop.QuitRequest) {
+				requests++
+				if keep {
+					q.Cancel()
+				}
+			})
+			cx.SetMainView(text)
+		}, Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
+		app.ChooseMenu("App", "Quit")
+		keep = false
+		if os == core.OSMacOS {
+			if requests != 1 || app.Quits != 0 {
+				t.Fatalf("macOS: a canceled quit role asked %d times and quit %d times", requests, app.Quits)
+			}
+			app.Key("meta+q")
+			if requests != 2 || app.Quits != 1 {
+				t.Fatalf("macOS: an approved quit role asked %d times and quit %d times", requests, app.Quits)
+			}
+			continue
+		}
+		app.Key("alt+f4")
+		if requests != 0 || app.Quits != 2 {
+			t.Fatalf("%v: the quit role asked %d times and quit %d times", os, requests, app.Quits)
+		}
 	}
 
-	app = StartApp(t, func(cx *core.Scope) {
-		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "Edit", Items: []desktop.MenuItem{{Role: core.MenuCopy}, {Role: core.MenuPaste}}}})
-		cx.SetMainView(func(cx *core.Scope) core.Node {
-			return core.Input{TestID: "field", DefaultValue: "abc"}
-		})
-	}, Environment(core.Environment{OS: core.OSWindows, Idiom: core.IdiomDesktop}))
+	// Minimize, Zoom and Toggle Full Screen change the window state the environment reports.
+	var env *core.Env
+	app = start(t, []desktop.MenuItem{{Label: "Window", Items: []desktop.MenuItem{{Role: core.MenuMinimize}, {Role: core.MenuZoom}, {Role: core.MenuToggleFullScreen}}}}, func(cx *core.Scope) core.Node {
+		env = cx.Env()
+		return core.Text{Content: "main"}
+	}, mac)
+	app.ChooseMenu("Window", "Zoom")
+	app.Key("ctrl+meta+f")
+	if !env.Maximized() || !env.FullScreen() || env.Minimized() {
+		t.Fatalf("zoom and full screen reported maximized %v, full screen %v, minimized %v", env.Maximized(), env.FullScreen(), env.Minimized())
+	}
+	app.Key("meta+m")
+	app.ChooseMenu("Window", "Zoom")
+	if env.Maximized() || !env.FullScreen() || !env.Minimized() {
+		t.Fatalf("minimize and a second zoom reported maximized %v, full screen %v, minimized %v", env.Maximized(), env.FullScreen(), env.Minimized())
+	}
+
+	// The editing roles act on the focused field; one with OnSelect runs it only when no field takes it.
+	var pastes []string
+	selected := 0
+	app = start(t, []desktop.MenuItem{{Label: "Edit", Items: []desktop.MenuItem{
+		{Role: core.MenuCopy}, {Role: core.MenuPaste}, {Role: core.MenuPasteAndMatchStyle}, {Role: core.MenuDelete},
+		{Role: core.MenuSelectAll, OnSelect: func() { selected++ }}, {Role: core.MenuUndo},
+	}}}, func(cx *core.Scope) core.Node {
+		return core.View{Children: []core.Node{
+			core.Input{TestID: "field", DefaultValue: "hello world", MaxLength: 14},
+			core.Input{TestID: "report", PasteBehavior: core.PasteReport, OnPaste: func(p core.PasteEvent) { pastes = append(pastes, p.Text) }},
+		}}
+	}, mac)
+	app.ChooseMenu("Edit", "Select All")
+	if selected != 1 {
+		t.Fatalf("select all with no field focused ran OnSelect %d times", selected)
+	}
 	app.Focus("id:field")
-	app.Select("id:field", 0, 3)
-	app.Key("ctrl+c")
-	if app.Clipboard != "abc" {
-		t.Fatalf("copy role put %q in the clipboard", app.Clipboard)
+	app.Select("id:field", 0, 5)
+	app.ChooseMenu("Edit", "Copy")
+	app.Select("id:field", 6, 11)
+	app.ChooseMenu("Edit", "Delete")
+	if got := app.Find("id:field").Text; app.Clipboard != "hello" || got != "hello " {
+		t.Fatalf("copy and delete left %q in the clipboard and %q in the field", app.Clipboard, got)
 	}
-	app.Select("id:field", 3, 3)
-	app.Key("ctrl+v")
-	if got := app.Find("id:field").Text; got != "abcabc" {
-		t.Fatalf("paste role produced %q", got)
+	app.Clipboard = "big\nworld"
+	app.Key("alt+shift+meta+v")
+	if got := app.Find("id:field").Text; got != "hello big worl" {
+		t.Fatalf("paste and match style produced %q", got)
+	}
+	app.Key("meta+a")
+	app.ChooseMenu("Edit", "Select All")
+	if s := app.Find("id:field").Selection; selected != 1 || s.Start != 0 || s.End != 14 {
+		t.Fatalf("select all in the field ran OnSelect %d times and selected %+v", selected, s)
+	}
+	app.Focus("id:report")
+	app.ChooseMenu("Edit", "Paste")
+	if got := app.Find("id:report").Text; len(pastes) != 1 || pastes[0] != "big\nworld" || got != "" {
+		t.Fatalf("a reporting field heard %q and holds %q", pastes, got)
 	}
 
-	if msg := fails(t, func(tb testing.TB) {
-		app := StartApp(tb, func(cx *core.Scope) {
-			desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{{Role: core.MenuAbout}}}})
-			cx.SetMainView(func(cx *core.Scope) core.Node { return core.Text{Content: "main"} })
-		}, Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
-		app.ChooseMenu("App", "About")
-	}); !strings.Contains(msg, `menu role "About" is not supported headlessly`) {
-		t.Fatalf("unsupported role failed with %q", msg)
+	// Roles the model does not carry out fail the step, naming the role.
+	for _, c := range []struct {
+		name string
+		run  func(*App)
+		want string
+	}{
+		{"about", func(app *App) { app.ChooseMenu("App", "About") }, `menu role "About" is not modelled headless`},
+		{"hide", func(app *App) { app.Key("meta+h") }, `menu role "Hide" is not modelled headless`},
+		{"undo", func(app *App) { app.Focus("id:field"); app.Key("meta+z") }, `menu role "Undo" is not modelled headless in a field`},
+		{"holder", func(app *App) { app.ChooseMenu("App", "Window") }, `does nothing`},
+	} {
+		msg := fails(t, func(tb testing.TB) {
+			app := start(tb, []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{
+				{Role: core.MenuAbout}, {Role: core.MenuHide}, {Role: core.MenuUndo}, {Role: core.MenuWindowMenu},
+			}}}, func(cx *core.Scope) core.Node { return core.Input{TestID: "field"} }, mac)
+			c.run(app)
+		})
+		if !strings.Contains(msg, c.want) {
+			t.Errorf("%s failed with %q, want %q", c.name, msg, c.want)
+		}
+	}
+}
+
+// A focused field takes its own clipboard keys, with or without an Edit menu, as the platforms' fields do: copy and cut take a selection a masked field keeps to itself, and paste replaces the selection.
+func TestFieldClipboardKeys(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless field model")
+	}
+	for _, os := range []core.OS{core.OSWindows, core.OSAndroid} {
+		app := Start(t, func(cx *core.Scope) core.Node {
+			return core.View{Children: []core.Node{
+				core.Input{TestID: "field", DefaultValue: "abc"},
+				core.Input{TestID: "secret", DefaultValue: "pw", Masked: true},
+			}}
+		}, Environment(core.Environment{OS: os}))
+		app.Focus("id:field")
+		app.Key("ctrl+c")
+		if app.Clipboard != "" {
+			t.Fatalf("%v: copy with no selection put %q in the clipboard", os, app.Clipboard)
+		}
+		app.Select("id:field", 0, 3)
+		app.Key("ctrl+c")
+		app.Select("id:field", 1, 2)
+		app.Key("ctrl+v")
+		if got := app.Find("id:field").Text; app.Clipboard != "abc" || got != "aabcc" {
+			t.Fatalf("%v: copy and paste left %q in the clipboard and %q in the field", os, app.Clipboard, got)
+		}
+		app.Select("id:field", 0, 2)
+		app.Key("ctrl+x")
+		if got := app.Find("id:field").Text; app.Clipboard != "aa" || got != "bcc" {
+			t.Fatalf("%v: cut left %q in the clipboard and %q in the field", os, app.Clipboard, got)
+		}
+		app.Focus("id:secret")
+		app.Select("id:secret", 0, 2)
+		app.Key("ctrl+x")
+		if got := app.Find("id:secret").Text; app.Clipboard != "aa" || got != "pw" {
+			t.Fatalf("%v: cutting a masked field left %q in the clipboard and %q in the field", os, app.Clipboard, got)
+		}
 	}
 }
 

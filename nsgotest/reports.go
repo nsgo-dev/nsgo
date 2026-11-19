@@ -152,7 +152,7 @@ func (a *App) gesture(v *View, kind driver.EventKind, n int, step func(*driver.E
 	send(driver.GestureEnded, n-1)
 }
 
-// ChooseMenu chooses the application menu item at path, its labels from the menu bar down, such as "File", "New": of Menu, which with a desktop environment is the main window's, else the one the app's function set.
+// ChooseMenu chooses the application menu item at path, its labels from the menu bar down, such as "File", "New": of Menu, which with a desktop environment is the main window's, else the one the app's function set. Headless, an item without OnSelect carries out its standard role as the desktop platforms do (Close, Quit, Minimize, Zoom, Toggle Full Screen and the editing roles in the focused field), and a role the model does not carry out fails the step; under nsgo test -target such an item skips the test.
 func (a *App) ChooseMenu(path ...string) {
 	a.t.Helper()
 	items := a.Menu
@@ -170,17 +170,20 @@ func (a *App) ChooseMenu(path ...string) {
 			a.t.Fatalf("nsgotest: the menu item %q is disabled", path[:i+1])
 		}
 		if i == len(path)-1 {
+			if found.ID == 0 && (found.Role == driver.MenuRoleNone || found.Role.HoldsMenu()) {
+				a.t.Fatalf("nsgotest: menu item %q does nothing", path)
+			}
 			if a.target != nil {
+				if found.ID == 0 {
+					// The surfaces choose items by the IDs their OnSelect gets; a role alone the platform carries out.
+					a.t.Skipf("nsgotest: chooseMenu(%q): the item has a role and no OnSelect, which a target cannot choose yet: it runs headless only", path)
+				}
 				a.step("chooseMenu(%q)", path)
 				a.target.menu(func(s testhost.Surface) error { return s.ChooseMenu(found.ID) })
 				a.done()
 				return
 			}
-			if found.ID != 0 {
-				a.dispatchOn(a.menuTree, driver.Event{Kind: driver.EventMenu, Count: found.ID})
-			} else {
-				a.menuRole(*found)
-			}
+			a.chooseMenuEntry(*found)
 			return
 		}
 		items = found.Items
