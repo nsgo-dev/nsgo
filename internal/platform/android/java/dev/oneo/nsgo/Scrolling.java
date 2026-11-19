@@ -229,6 +229,7 @@ final class Scrolling {
         final ViewGroup frame;
         Config config = new Config();
         private final int slop;
+        private final OverScroller flinger;
         // The touch: where it went down, and whether it dragged.
         private float downX, downY, lastY;
         private boolean touching, dragging, flung;
@@ -250,6 +251,7 @@ final class Scrolling {
             this.content = content;
             this.frame = frame;
             slop = ViewConfiguration.get(view.getContext()).getScaledTouchSlop();
+            flinger = new OverScroller(view.getContext());
         }
 
         int pos() {
@@ -348,6 +350,7 @@ final class Scrolling {
 
         /** Stops a glide or an eased move, which ends its momentum. */
         void stop() {
+            flinger.forceFinished(true);
             if (motion != null) {
                 view.removeCallbacks(motion);
                 motion = null;
@@ -501,25 +504,32 @@ final class Scrolling {
         private void glide(float velocity) {
             momentum = true;
             event(Protocol.EVENT_MOMENTUM_START);
-            final float rate = config.rate;
             carry = 0;
-            final float[] state = {pos(), velocity * density, SystemClock.uptimeMillis()};
+            float baseFriction = ViewConfiguration.getScrollFriction();
+            float friction = baseFriction;
+            if (config.rate > 0f && config.rate < 0.9979f) {
+                friction = baseFriction * (1f - config.rate) / (1f - 0.998f);
+            }
+            flinger.setFriction(friction);
+            flinger.forceFinished(true);
+            final int start = pos();
+            final int vpx = Math.round(velocity * density * 1000f);
+            flinger.fling(0, start, 0, vpx, 0, 0, 0, range());
             motion = new Runnable() {
                 @Override
                 public void run() {
                     if (motion != this) return;
-                    long now = SystemClock.uptimeMillis();
-                    float dt = Math.max(now - state[2], 0);
-                    double k = Math.pow(rate, dt);
-                    state[0] += (float) (state[1] * (k - 1) / Math.log(rate));
-                    state[1] *= (float) k;
-                    state[2] = now;
+                    boolean active = flinger.computeScrollOffset();
                     int max = range();
-                    float at = state[0] + carry;
-                    boolean done = Math.abs(state[1]) < STOP * density || at <= 0 || at >= max;
-                    move(Math.round(Math.min(Math.max(at, 0), max)));
-                    if (done) finish();
-                    else view.postOnAnimation(this);
+                    int at = Math.min(Math.max(flinger.getCurrY() + carry, 0), max);
+                    move(at);
+                    boolean done = !active || flinger.isFinished() || (vpx > 0 ? at >= max : at <= 0);
+                    if (done) {
+                        flinger.forceFinished(true);
+                        finish();
+                    } else {
+                        view.postOnAnimation(this);
+                    }
                 }
             };
             view.postOnAnimation(motion);
