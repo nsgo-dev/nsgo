@@ -14,6 +14,7 @@ import (
 	"log"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
@@ -105,8 +106,12 @@ type runtime struct {
 	// limits are the sandbox's; depth counts the calls into JS under way,
 	// the outermost of which has the time budget.
 	limits Limits
-	stopMu sync.Mutex
 	depth  int
+	// stopMu guards sandbox.stopped, which Plugin.Interrupt and CallTotal set from other goroutines; calls are the plugin calls waiting for a result, by their own key, failed as the runtime stops.
+	stopMu sync.Mutex
+	calls  map[*int]func(error)
+	// interrupted says the host stopped the runtime (interrupt), and hears so through the calls that fail: the JS it cut ends without a panic into the app's Catch.
+	interrupted atomic.Bool
 	// regexTimeout is the shortest sandbox budget, applied to regexp2
 	// patterns because its matcher does not observe goja's interrupt flag.
 	regexTimeout time.Duration
@@ -260,6 +265,9 @@ func (r *runtime) call(fn js.Value, args ...js.Value) js.Value {
 	var err error
 	r.within(r.limits.Call, func() { v, err = f(js.Undefined(), args...) })
 	if err != nil {
+		if r.interrupted.Load() {
+			return js.Undefined()
+		}
 		panic(r.failure(err))
 	}
 	return v

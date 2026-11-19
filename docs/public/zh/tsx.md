@@ -95,7 +95,7 @@ trust.Accept(p) // 运行之后，更旧的构建会被拒绝
 
 应用可以用 `pkg.SignDocument` 为自己的 JSON 文档（例如插件目录）签名，再用 `Signed.Open` 验证，密钥使用 `nsgo keygen` 生成的即可。每种文档使用一个带版本的独立 `app:` 上下文，例如 `app:catalog-v1`：一种文档不会被当作另一种文档，也不会被当作包、证书或吊销列表。`Open` 只信任传给它的公钥，不使用证书和吊销列表，并拒绝解码目标类型中没有的字段。信封中没有时间和序号，旧文档与新文档同样能通过验证：请在正文中放入版本或过期时间并加以检查。
 
-原生沙箱中的回溯正则表达式使用加载和调用预算中较短的值作为匹配超时。未处理的超时会变成 `tsx.ErrBudget`，因此有问题的表达式不会无限期占用引擎。插件可以设置 `Limits.CallTotal` 限制跨异步 Promise continuation 的完整调用，或由 watchdog 调用 `Plugin.Interrupt`；两者都会停止插件并丢弃待处理的定时器。
+原生沙箱中的回溯正则表达式使用加载和调用预算中较短的值作为匹配超时。未处理的超时会变成 `tsx.ErrBudget`，因此有问题的表达式不会无限期占用引擎。插件可以设置 `Limits.CallTotal` 限制跨异步 Promise continuation 的完整调用，或由任意 goroutine 上的 watchdog 调用 `Plugin.Interrupt`；两者都会停止插件、丢弃待处理的定时器，并让进行中和之后的调用失败。`CallTotal` 只在调用完成之前起作用：调用完成后仍在运行的定时器，以及入口模块加载时设置的定时器，不受它限制。
 
 Web 上暂时无法把包与页面隔离：包的代码能绕过它的权限，直接访问页面自己的网络、剪贴板和存储，信任库所在的存储也包括在内。因此在 Web 上 `tsx.View` 和 `tsx.Load` 会以 `tsx.ErrUnisolated` 拒绝运行包，除非设置 `Sandbox.WebUnisolated`，让它以页面的权限运行；这只适合你愿意像对待应用自身代码一样信任的包。
 

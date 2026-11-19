@@ -3,7 +3,7 @@ package tsx
 import (
 	"errors"
 	"fmt"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
@@ -146,24 +146,41 @@ func (p *Plugin) Call(name string, args []any, done func(result any, err error))
 		done(nil, fmt.Errorf("%w: %q", ErrNoExport, name))
 		return
 	}
-	var once bool
-	var finishMu sync.Mutex
+	// state is callRunning until the call settles (callSettled), or until CallTotal runs out first (callExpired), as the total's timer fires on a goroutine of its own: a call that settled before stops the plugin no more, and one past it reports ErrBudget whatever it settles with after.
+	const (
+		callRunning = iota
+		callExpired
+		callSettled
+	)
+	var state atomic.Int32
 	var total *time.Timer
-	finish := func(v any, err error) {
-		finishMu.Lock()
-		defer finishMu.Unlock()
-		if !once {
-			once = true
-			if total != nil {
-				total.Stop()
-			}
-			done(v, err)
+	key := new(int)
+	settle := func(from int32, v any, err error) bool {
+		if !state.CompareAndSwap(from, callSettled) {
+			return false
+		}
+		if total != nil {
+			total.Stop()
+		}
+		delete(r.calls, key)
+		done(v, err)
+		return true
+	}
+	finish := func(v any, err error) { settle(callRunning, v, err) }
+	if r.calls == nil {
+		r.calls = map[*int]func(error){}
+	}
+	r.calls[key] = func(err error) {
+		if !settle(callRunning, nil, err) {
+			settle(callExpired, nil, ErrBudget)
 		}
 	}
 	if d := r.limits.CallTotal; d > 0 {
 		total = time.AfterFunc(d, func() {
-			r.interrupt(ErrBudget)
-			p.cx.Post(func() { finish(nil, ErrBudget) })
+			if state.CompareAndSwap(callRunning, callExpired) {
+				r.interrupt(ErrBudget)
+				p.cx.Post(func() { settle(callExpired, nil, ErrBudget) })
+			}
 		})
 	}
 	p.cx.Run(func() {
@@ -185,6 +202,9 @@ func (p *Plugin) Call(name string, args []any, done func(result any, err error))
 			in[i] = r.vm.ToValue(a)
 		}
 		v := r.call(fn, in...)
+		if err := r.stoppedErr(); err != nil {
+			panic(err)
+		}
 		if _, ok := v.Export().(*js.Promise); !ok {
 			finish(exportJSON(v), nil)
 			return
@@ -206,10 +226,9 @@ func (p *Plugin) Call(name string, args []any, done func(result any, err error))
 	})
 }
 
-// Interrupt stops the plugin from any goroutine. Pending timers and promise
-// continuations are dropped, and the current or next Call reports err.
+// Interrupt stops the plugin for err, ErrInterrupted when nil, from any goroutine: the JS running is cut and none runs after, its waiting timers and promise continuations are dropped, and the calls under way and every Call after fail with err.
 func (p *Plugin) Interrupt(err error) {
-	if p == nil || p.r == nil || p.cx.Disposed() {
+	if p == nil || p.r == nil {
 		return
 	}
 	if err == nil {

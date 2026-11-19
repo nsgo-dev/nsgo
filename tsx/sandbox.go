@@ -363,9 +363,7 @@ func quota(what string, limit int) error {
 		Message: fmt.Sprintf("tsx: the sandbox's quota of %d %s is used up", limit, what)}
 }
 
-// stop stops the runtime for err: the JS running is cut and none runs
-// after, while the views stay as they are. What runs it panics with err
-// into the nearest core.Catch.
+// markStopped records err, ErrInterrupted when nil, as why the runtime stopped, and reports whether it was the first. Safe from any goroutine.
 func (r *runtime) markStopped(err error) bool {
 	if err == nil {
 		err = ErrInterrupted
@@ -379,6 +377,7 @@ func (r *runtime) markStopped(err error) bool {
 	return true
 }
 
+// stopTimers stops the runtime's waiting timers, on the engine's goroutine.
 func (r *runtime) stopTimers() {
 	for _, stop := range r.timers.stop {
 		stop()
@@ -386,8 +385,15 @@ func (r *runtime) stopTimers() {
 	clear(r.timers.stop)
 }
 
-// stop stops the runtime from its graph goroutine, clearing its pending
-// timers before interrupting the currently running call.
+// failCalls fails the plugin calls still waiting for a result with err, on the engine's goroutine: once the runtime stopped, no JS settles them.
+func (r *runtime) failCalls(err error) {
+	for _, fail := range r.calls {
+		fail(err)
+	}
+	clear(r.calls)
+}
+
+// stop stops the runtime for err: the JS running is cut and none runs after, while the views stay as they are, its timers are dropped and the plugin calls waiting fail with err. What runs it panics with err into the nearest core.Catch. Call it on the engine's goroutine.
 func (r *runtime) stop(err error) {
 	if !r.markStopped(err) {
 		if js.Browser {
@@ -396,6 +402,9 @@ func (r *runtime) stop(err error) {
 		return
 	}
 	r.stopTimers()
+	if len(r.calls) > 0 {
+		r.cx.Post(func() { r.failCalls(err) })
+	}
 	r.vm.Interrupt(err)
 	if js.Browser {
 		// The page's engine cannot be interrupted: a throw unwinds it.
@@ -403,15 +412,17 @@ func (r *runtime) stop(err error) {
 	}
 }
 
-// interrupt stops a runtime from another goroutine. Goja's interrupt is
-// safe to call concurrently, while timer ownership remains on the graph
-// goroutine.
+// interrupt stops the runtime for err as stop does, from any goroutine: goja's interrupt is safe to call concurrently, while the timers and the waiting calls belong to the engine's goroutine, which a post stops and fails.
 func (r *runtime) interrupt(err error) {
 	if !r.markStopped(err) {
 		return
 	}
+	r.interrupted.Store(true)
 	r.vm.Interrupt(err)
-	r.cx.Post(r.stopTimers)
+	r.cx.Post(func() {
+		r.stopTimers()
+		r.failCalls(r.stoppedErr())
+	})
 }
 
 // stoppedErr is why the runtime stopped, nil while it runs.
@@ -428,7 +439,7 @@ func (r *runtime) stoppedErr() error {
 // quota.
 func (r *runtime) newCoreElement(cx *core.Scope, props core.Node) *core.Element {
 	if s := r.sandbox; s != nil && r.limits.Nodes > 0 {
-		if s.nodes >= r.limits.Nodes || s.stopped != nil {
+		if s.nodes >= r.limits.Nodes || r.stoppedErr() != nil {
 			r.stop(quota("nodes", r.limits.Nodes))
 		}
 		s.nodes++

@@ -682,15 +682,27 @@ export const notAFunction = 1;`, pkg.Capabilities{Network: &pkg.Network{Hosts: [
 	}
 }
 
+// advanceUntil advances app's clock a millisecond at a time, so the plugin's timers fire, until cond holds, failing t after timeout of real time.
+func advanceUntil(t *testing.T, app *nsgotest.App, timeout time.Duration, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("the condition did not hold after %v", timeout)
+		}
+		app.Advance(time.Millisecond)
+	}
+}
+
+// TestPluginCallTotalStopsYieldingWork holds CallTotal to failing a call whose every slice stays within Call, as it yields to a timer between them, and to dropping its timers, so the app runs on.
 func TestPluginCallTotalStopsYieldingWork(t *testing.T) {
 	p := verified(t, `export async function loop() {
 	for (;;) {
-		const start = Date.now();
-		while (Date.now() - start < 10) {}
+		for (let i = 0; i < 100000; i++) {}
 		await new Promise(resolve => setTimeout(resolve, 0));
 	}
 }`, pkg.Capabilities{})
-	limits := tsx.Limits{Load: time.Second, Call: 100 * time.Millisecond, CallTotal: 150 * time.Millisecond}
+	limits := tsx.Limits{Load: time.Second, Call: 10 * time.Second, CallTotal: 150 * time.Millisecond}
 	var plugin *tsx.Plugin
 	var loadErr error
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
@@ -701,10 +713,75 @@ func TestPluginCallTotalStopsYieldingWork(t *testing.T) {
 		t.Fatal(loadErr)
 	}
 	var callErr error
+	start := time.Now()
 	app.Post(func() { plugin.Call("loop", nil, func(_ any, err error) { callErr = err }) })
-	app.WaitUntil(2*time.Second, func() bool { return callErr != nil })
+	advanceUntil(t, app, 5*time.Second, func() bool { return callErr != nil })
 	if !errors.Is(callErr, tsx.ErrBudget) {
 		t.Fatalf("call error = %v, want ErrBudget", callErr)
+	}
+	if took := time.Since(start); took < limits.CallTotal {
+		t.Fatalf("call failed after %v, before its total of %v", took, limits.CallTotal)
+	}
+	app.Post(plugin.Close)
+}
+
+// TestPluginCallTotalCutsATimerQuietly holds CallTotal, cutting JS a timer runs for the call, to failing the call alone, not the app as a panic past the call.
+func TestPluginCallTotalCutsATimerQuietly(t *testing.T) {
+	p := verified(t, `export function spin() {
+	return new Promise(() => setTimeout(() => { for (;;) {} }, 0));
+}`, pkg.Capabilities{})
+	limits := tsx.Limits{Load: time.Second, Call: 10 * time.Second, CallTotal: 150 * time.Millisecond}
+	var plugin *tsx.Plugin
+	var loadErr error
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		plugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{Limits: &limits, WebUnisolated: true})
+		return core.View{}
+	})
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	var callErr error
+	app.Post(func() { plugin.Call("spin", nil, func(_ any, err error) { callErr = err }) })
+	advanceUntil(t, app, 5*time.Second, func() bool { return callErr != nil })
+	if !errors.Is(callErr, tsx.ErrBudget) {
+		t.Fatalf("call error = %v, want ErrBudget", callErr)
+	}
+	app.Post(plugin.Close)
+}
+
+// TestPluginInterruptFailsAWaitingCall holds Plugin.Interrupt to failing a call that waits on a timer, which no JS settles once the plugin stopped.
+func TestPluginInterruptFailsAWaitingCall(t *testing.T) {
+	p := verified(t, `export async function wait() {
+	await new Promise(resolve => setTimeout(resolve, 60000));
+	return 1;
+}`, pkg.Capabilities{})
+	var plugin *tsx.Plugin
+	var loadErr error
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		plugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{WebUnisolated: true})
+		return core.View{}
+	})
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	called := false
+	var callErr error
+	app.Post(func() {
+		plugin.Call("wait", nil, func(_ any, err error) { called, callErr = true, err })
+	})
+	app.Settle()
+	stop := errors.New("watchdog")
+	plugin.Interrupt(stop)
+	app.WaitUntil(time.Second, func() bool { return called })
+	if callErr != stop {
+		t.Fatalf("call error = %v, want the interrupt's", callErr)
+	}
+	app.Post(func() {
+		plugin.Call("wait", nil, func(_ any, err error) { callErr = err })
+	})
+	app.Settle()
+	if callErr != stop {
+		t.Fatalf("a call after the interrupt failed with %v, want the interrupt's", callErr)
 	}
 	app.Post(plugin.Close)
 }
