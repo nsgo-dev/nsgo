@@ -102,6 +102,7 @@ func TestCapabilitiesAllow(t *testing.T) {
 		{"webview", "microphone", "media", true},
 		{"webview", "camera", "media", false},
 		{"webview", "https://docs.com/", "cookies", false},
+		{"webview", "", "cookies", false},
 		{"openUrl", "https://a.com", "", true},
 		{"openUrl", "tel:123", "", false},
 		{"host", "player.play", "", true},

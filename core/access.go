@@ -42,7 +42,7 @@ const (
 	// AccessNetwork is fetch and the images and videos loaded from the
 	// network, by URL.
 	AccessNetwork = "network"
-	// AccessWebView is the pages a web view shows, by URL, with AccessInput the trusted input Ref.SendInput gives them, with AccessMedia the devices WebView.Media lets them capture, and with AccessCookies the cookies SetWebCookies writes, by a URL each goes to.
+	// AccessWebView is the pages a web view shows, by URL, with AccessInput the trusted input Ref.SendInput gives them, with AccessMedia the devices WebView.Media lets them capture, and with AccessCookies the cookies SetWebCookies writes and WebCookies lists, by a URL each goes to, "" standing for the whole store WebCookies lists and ClearWebsiteData clears.
 	AccessWebView = "webview"
 	// AccessOpenURL is OpenURL, by URL.
 	AccessOpenURL = "openUrl"
@@ -84,7 +84,7 @@ const (
 	AccessFrontmostApp = "frontmostApp"
 )
 
-// AccessInput is AccessRequest.Method for a web view's trusted input, AccessMedia for the devices its pages capture, and AccessCookies for a cookie written to the store every web view of the app shares, which no TSX capability grants.
+// AccessInput is AccessRequest.Method for a web view's trusted input, AccessMedia for the devices its pages capture, and AccessCookies for writing, listing or clearing the store every web view of the app shares, which no TSX capability grants.
 const (
 	AccessInput   = "input"
 	AccessMedia   = "media"

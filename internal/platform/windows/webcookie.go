@@ -64,6 +64,9 @@ const (
 // webCookieSettle is how long a request waits for GetCookies to list its cookies, and for WebView2 to answer at all.
 const webCookieSettle = 5 * time.Second
 
+// webDataClearWait is how long a ClearWebsiteData request waits for ClearBrowsingDataAll to answer.
+const webDataClearWait = time.Minute
+
 // cookieView is a window's hidden web view for its cookie requests.
 type cookieView struct {
 	comp, controller, web *comObject
@@ -96,8 +99,12 @@ func (w *window) webCookies(id uint32, r driver.WebCookiesRequest) {
 		}
 	}
 	fail := func(text string) { finish(driver.Event{Text: text}) }
-	// A web view that closes in the middle of the request may never call its handlers.
-	time.AfterFunc(webCookieSettle+time.Second, func() {
+	// A web view that closes in the middle of the request may never call its handlers. Clearing deletes the profile's caches from disk, which can take longer than a cookie call, so it waits longer before calling the request lost.
+	wait := webCookieSettle + time.Second
+	if r.Op == driver.WebCookiesClear {
+		wait = webDataClearWait
+	}
+	time.AfterFunc(wait, func() {
 		w.post(func() { fail("nsgo: WebView2 did not answer the cookie request") })
 	})
 	start := func(web *comObject) {
