@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -343,6 +344,12 @@ func TestSuppliedHours(t *testing.T) {
 		t.Errorf("check after writing: %v", err)
 	}
 	code, _ := os.ReadFile(filepath.Join(dir, "locales", genFile))
+	if err := os.WriteFile(filepath.Join(dir, "locales", genFile), bytes.ReplaceAll(code, []byte("\n"), []byte("\r\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.prepareCatalogs(ctx, "./...", true); err != nil {
+		t.Errorf("check after a CRLF checkout: %v", err)
+	}
 	for _, want := range []string{
 		"i18n.SetApp(Catalog)", `baselocales.Supply("de"`, "func Type(cx *core.Scope, type_ string, string_ string) string",
 		// Messages with dates take the hour cycle; others keep their parameters alone, and one that writes no date makes no Messages.

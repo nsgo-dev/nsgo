@@ -244,7 +244,7 @@ func (cs *catalogSet) write(check bool) (wrote bool, err error) {
 			return wrote, err
 		}
 		path := filepath.Join(c.dir, genFile)
-		if old, err := os.ReadFile(path); err == nil && bytes.Equal(old, code) {
+		if old, err := os.ReadFile(path); err == nil && bytes.Equal(bytes.ReplaceAll(old, []byte("\r\n"), []byte("\n")), code) {
 			continue
 		}
 		if check {
