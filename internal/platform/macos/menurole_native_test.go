@@ -41,7 +41,7 @@ func menuRoleFallbackApp(title string) func(*core.Scope) core.Node {
 	}
 }
 
-// TestMenuRoleFallback chooses Edit menu role items that carry an OnSelect: with a field focused the field takes Select All and Undo, and with only a view focused, where the surface and the window still answer selectAll: and undo:, the items' OnSelect runs. Run owns AppKit's process lifetime, so the test gets a process of its own.
+// TestMenuRoleFallback chooses Edit menu role items that carry an OnSelect: with a field focused the field takes Select All and Undo, and with only a view focused, where the surface and the window still answer selectAll: and undo:, the items' OnSelect runs. The items are enabled while no field has the focus, and a focused field enables Undo and Cut only once it has something to undo and a selection. Run owns AppKit's process lifetime, so the test gets a process of its own.
 func TestMenuRoleFallback(t *testing.T) {
 	if os.Getenv("NSGO_TEST_MENU_ROLE_PROCESS") != t.Name() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -131,6 +131,11 @@ func TestMenuRoleFallback(t *testing.T) {
 		check := func() error {
 			if err := wait(title + "|ready|0|0"); err != nil {
 				return err
+			}
+			for _, role := range []driver.MenuRole{driver.MenuUndo, driver.MenuCut} {
+				if enabled, err := menuEnabled(role); err != nil || !enabled {
+					return fmt.Errorf("with nothing focused, %s enabled = %v: %v", role.Label(), enabled, err)
+				}
 			}
 			key("mod+b")
 			if err := wait(title + "|button|0|0"); err != nil {
