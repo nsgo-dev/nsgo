@@ -77,6 +77,9 @@ func buildWatchApp(ctx context.Context, p *project, dir string, simulator bool) 
 	if err := writePlist(filepath.Join(app, "Info.plist"), p, sys.plist, extra); err != nil {
 		return "", err
 	}
+	if err := p.writePrivacyManifest(app); err != nil {
+		return "", err
+	}
 	if !simulator {
 		return app, nil
 	}

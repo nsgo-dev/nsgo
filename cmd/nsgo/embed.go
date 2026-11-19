@@ -288,6 +288,14 @@ func buildIOSFramework(ctx context.Context, p *project, dir string) error {
 		if err != nil {
 			return err
 		}
+		// A dynamic framework is a bundle of its own, which declares what its code uses; a static library's code is the host app's, whose manifest declares it.
+		resources := fw
+		if sl.catalyst {
+			resources = filepath.Join(fw, "Versions/A/Resources")
+		}
+		if err := p.writePrivacyManifest(resources); err != nil {
+			return err
+		}
 		binary := filepath.Join(fw, module)
 		if sl.catalyst {
 			binary = filepath.Join(fw, "Versions/A", module)

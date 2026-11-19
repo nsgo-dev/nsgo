@@ -1,57 +1,168 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
+	"sort"
+	"strings"
 )
 
+// privacyManifestName is the privacy manifest Apple reads at a bundle's resource root.
 const privacyManifestName = "PrivacyInfo.xcprivacy"
 
+// nsgoPrivacyReasons are the required-reason APIs every NSGo app uses on Apple platforms, with their reasons: NSUserDefaults for the app's own settings (internal/platform/apple's language and notification keys, CA92.1), Go's os package's stat, fstat, fstatat and lstat on files in the app's containers (C617.1), and mach_absolute_time, Go's monotonic clock, and NSProcessInfo.systemUptime for elapsed time within the app (35F9.1). No Go runtime or NSGo code calls statfs or reads the active keyboards, so disk space and active keyboards are left to apple.privacy.
 var nsgoPrivacyReasons = map[string][]string{
 	"NSPrivacyAccessedAPICategoryUserDefaults":   {"CA92.1"},
 	"NSPrivacyAccessedAPICategoryFileTimestamp":  {"C617.1"},
 	"NSPrivacyAccessedAPICategorySystemBootTime": {"35F9.1"},
 }
 
-func (p *project) privacyManifest() []byte {
-	apis := map[string][]string{}
-	for name, reasons := range nsgoPrivacyReasons {
-		apis[name] = append([]string(nil), reasons...)
-	}
+// validatePrivacy checks apple.privacy's accessed APIs, which Apple refuses without a category or a reason.
+func (p *project) validatePrivacy() error {
 	for name, reasons := range p.Apple.Privacy.AccessedAPIs {
-		apis[name] = append(apis[name], reasons...)
+		if !strings.HasPrefix(name, "NSPrivacyAccessedAPICategory") {
+			return fmt.Errorf("apple.privacy.accessed_apis: %q is not an NSPrivacyAccessedAPICategory", name)
+		}
+		if len(reasons) == 0 || slices.Contains(reasons, "") {
+			return fmt.Errorf("apple.privacy.accessed_apis: %s needs its reasons, such as E174.1", name)
+		}
 	}
-	accessed := make([]any, 0, len(apis))
-	for name, reasons := range apis {
-		values := make([]any, len(reasons))
-		for i, reason := range reasons {
-			values[i] = reason
+	for i, item := range p.Apple.Privacy.CollectedData {
+		if s, _ := item["NSPrivacyCollectedDataType"].(string); s == "" {
+			return fmt.Errorf("apple.privacy.collected_data[%d] has no NSPrivacyCollectedDataType", i)
+		}
+	}
+	return nil
+}
+
+// privacyManifest returns a bundle's PrivacyInfo.xcprivacy: existing, the manifest the app's resources put there or nil, with NSGo's declarations and apple.privacy's merged in. Categories and their reasons are sorted, so a build writes the same file each time.
+func (p *project) privacyManifest(existing map[string]any) []byte {
+	out := map[string]any{}
+	for k, v := range existing {
+		out[k] = v
+	}
+	reasons := map[string][]string{}
+	add := func(name string, rs ...string) {
+		for _, r := range rs {
+			if !slices.Contains(reasons[name], r) {
+				reasons[name] = append(reasons[name], r)
+			}
+		}
+	}
+	others := []any{}
+	for _, e := range plistArray(existing["NSPrivacyAccessedAPITypes"]) {
+		d, _ := e.(map[string]any)
+		name, _ := d["NSPrivacyAccessedAPIType"].(string)
+		if name == "" {
+			others = append(others, e)
+			continue
+		}
+		for _, r := range plistArray(d["NSPrivacyAccessedAPITypeReasons"]) {
+			if s, ok := r.(string); ok {
+				add(name, s)
+			}
+		}
+	}
+	for name, rs := range nsgoPrivacyReasons {
+		add(name, rs...)
+	}
+	for name, rs := range p.Apple.Privacy.AccessedAPIs {
+		add(name, rs...)
+	}
+	names := make([]string, 0, len(reasons))
+	for name := range reasons {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	accessed := others
+	for _, name := range names {
+		rs := reasons[name]
+		sort.Strings(rs)
+		values := make([]any, len(rs))
+		for i, r := range rs {
+			values[i] = r
 		}
 		accessed = append(accessed, map[string]any{
 			"NSPrivacyAccessedAPIType":        name,
 			"NSPrivacyAccessedAPITypeReasons": values,
 		})
 	}
-	tracking := false
-	if p.Apple.Privacy.Tracking != nil {
-		tracking = *p.Apple.Privacy.Tracking
+	out["NSPrivacyAccessedAPITypes"] = accessed
+
+	tracking, _ := existing["NSPrivacyTracking"].(bool)
+	if t := p.Apple.Privacy.Tracking; t != nil && *t {
+		tracking = true
 	}
-	domains := make([]any, len(p.Apple.Privacy.TrackingDomains))
-	for i, domain := range p.Apple.Privacy.TrackingDomains {
-		domains[i] = domain
+	out["NSPrivacyTracking"] = tracking
+
+	domains := plistArray(existing["NSPrivacyTrackingDomains"])
+	for _, d := range p.Apple.Privacy.TrackingDomains {
+		if !slices.Contains(domains, any(d)) {
+			domains = append(domains, d)
+		}
 	}
-	data := make([]any, len(p.Apple.Privacy.CollectedData))
-	for i, item := range p.Apple.Privacy.CollectedData {
-		data[i] = item
+	out["NSPrivacyTrackingDomains"] = domains
+
+	data := plistArray(existing["NSPrivacyCollectedDataTypes"])
+	for _, item := range p.Apple.Privacy.CollectedData {
+		v := plistValue(item)
+		if !slices.ContainsFunc(data, func(e any) bool { return reflect.DeepEqual(e, v) }) {
+			data = append(data, v)
+		}
 	}
-	return encodePlist(map[string]any{
-		"NSPrivacyAccessedAPITypes":   accessed,
-		"NSPrivacyCollectedDataTypes": data,
-		"NSPrivacyTracking":           tracking,
-		"NSPrivacyTrackingDomains":    domains,
-	})
+	out["NSPrivacyCollectedDataTypes"] = data
+	return encodePlist(out)
 }
 
-func (p *project) writePrivacyManifest(bundle string) error {
-	return os.WriteFile(filepath.Join(bundle, privacyManifestName), p.privacyManifest(), 0o644)
+// plistArray is v as a property list's array, empty but not nil when it is none, so encodePlist writes an empty array.
+func plistArray(v any) []any {
+	a, _ := v.([]any)
+	return append([]any{}, a...)
+}
+
+// plistValue converts what nsgo.yaml decodes into the values encodePlist writes, as int64 for YAML's ints.
+func plistValue(v any) any {
+	switch v := v.(type) {
+	case map[string]any:
+		m := make(map[string]any, len(v))
+		for k, e := range v {
+			m[k] = plistValue(e)
+		}
+		return m
+	case []any:
+		a := make([]any, len(v))
+		for i, e := range v {
+			a[i] = plistValue(e)
+		}
+		return a
+	case int:
+		return int64(v)
+	}
+	return v
+}
+
+// writePrivacyManifest writes dir's PrivacyInfo.xcprivacy, merging NSGo's and apple.privacy's declarations into one the app's resources already put there.
+func (p *project) writePrivacyManifest(dir string) error {
+	path := filepath.Join(dir, privacyManifestName)
+	var existing map[string]any
+	if data, err := os.ReadFile(path); err == nil {
+		v, err := decodePlist(data)
+		if err != nil {
+			return fmt.Errorf("%s: %w", privacyManifestName, err)
+		}
+		var ok bool
+		if existing, ok = v.(map[string]any); !ok {
+			return fmt.Errorf("%s: not a dictionary", privacyManifestName)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, p.privacyManifest(existing), 0o644)
 }

@@ -19,7 +19,7 @@ The iOS build writes `<Name>.xcframework` and `<Name>Resources`; the Android bui
 
 ## iOS
 
-Add the framework to the app target as a static library (do not embed it) and the resources folder as a folder reference, then `import <Name>`. Call `NSGoStart()` once as the app launches, before the first view.
+Add the framework to the app target as a static library (do not embed it) and the resources folder as a folder reference, then `import <Name>`. Call `NSGoStart()` once as the app launches, before the first view. The static library's code is the host app's, so the host's privacy manifest declares the required-reason APIs NSGo uses: user defaults (`CA92.1`), file timestamps (`C617.1`) and system boot time (`35F9.1`); a `-dynamic` framework carries them in its own `PrivacyInfo.xcprivacy`.
 
 ```swift
 import Embedded

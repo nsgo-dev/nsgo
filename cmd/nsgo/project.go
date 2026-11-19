@@ -431,6 +431,9 @@ func load(dir string) (*project, error) {
 	if err := p.validateAppClip(); err != nil {
 		return nil, fmt.Errorf("nsgo.yaml: %w", err)
 	}
+	if err := p.validatePrivacy(); err != nil {
+		return nil, fmt.Errorf("nsgo.yaml: %w", err)
+	}
 	if err := p.validateUpdates(); err != nil {
 		return nil, fmt.Errorf("nsgo.yaml: %w", err)
 	}

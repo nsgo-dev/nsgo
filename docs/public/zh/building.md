@@ -154,6 +154,8 @@ sign:
 
 在 macOS 上，滚动视图的边缘效果（`Scroll.EdgeEffects`）和没有指定 `IOS.BackdropMaterial` 的背景模糊 `Blur` 像 AppKit 自己的边缘效果和材质一样，通过 Core Animation 的私有 `CABackdropLayer` 和 `CAFilter` 实现模糊，因为没有公开 API 能按半径模糊，或让模糊程度在视图上渐变。App Store 审核可能拒绝使用私有 API 的应用：NSGo 只在带边缘栏的滚动视图和这类模糊中调用它们，但每个 macOS 构建都包含它们的名称。
 
+`build` 写出的每个 Apple 包，即应用、它的小组件扩展、App Clip 和 Apple Watch 应用，以及 `-dynamic` 的 `-embed` 框架，都带有隐私清单 `PrivacyInfo.xcprivacy`，声明 NSGo 和 Go 运行时用到的需要理由的 API：用户默认设置（`CA92.1`）、文件时间戳（`C617.1`）和系统启动时间（`35F9.1`）。`apple.privacy` 添加应用自己的声明：`accessed_apis` 给出每个类别的理由，另有 `tracking`、`tracking_domains` 和 `collected_data`，后者的条目按 Apple 的命名写成 `NSPrivacyCollectedDataTypes` 的条目；`resources/` 中的 `PrivacyInfo.xcprivacy` 会与这些声明合并，而不是被替换。
+
 ## 发布到 GitHub
 
 构建包含 macOS、Windows 或 Linux 目标时，`dist/releases` 还会包含 `install.sh` 和 `install.ps1`，它们从 `release.github` 指定的 GitHub 仓库的 Releases 安装应用；未指定时取应用 Git 远程 `origin` 所在的仓库，两者都没有时 `build` 不写脚本并给出提示。把其中顶层的文件（不含 `miniprogram/`）上传到标签为 `v<version>` 的 Release：

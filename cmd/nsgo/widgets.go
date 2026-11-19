@@ -552,6 +552,9 @@ func addMacWidgets(ctx context.Context, p *project, app, arch string) error {
 	if err := os.WriteFile(filepath.Join(contents, "Info.plist"), info, 0o644); err != nil {
 		return err
 	}
+	if err := p.writePrivacyManifest(filepath.Join(contents, "Resources")); err != nil {
+		return err
+	}
 	dylib := filepath.Join(app, "Contents", "Frameworks", widgetKitDylib)
 	if err := copyLibrary(w.lib, dylib); err != nil {
 		return err

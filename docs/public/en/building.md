@@ -154,6 +154,8 @@ Without `sign.macos_profile` the Mac package is unsigned: it runs sandboxed on y
 
 On macOS, a scroll view's edge effects (`Scroll.EdgeEffects`) and a backdrop `Blur` with no `IOS.BackdropMaterial` blur through Core Animation's private `CABackdropLayer` and `CAFilter`, as AppKit's own edge effects and materials do, since no public API blurs by a radius or varies a blur across a view. App Store review may reject apps that use private APIs: NSGo calls them only for scroll views with edge bars and those blurs, but every macOS build contains their names.
 
+Every Apple bundle `build` writes, the app, its widget extension, App Clip and Apple Watch app, and a `-dynamic` `-embed` framework, carries a privacy manifest, `PrivacyInfo.xcprivacy`, declaring the required-reason APIs NSGo and Go's runtime use: user defaults (`CA92.1`), file timestamps (`C617.1`) and system boot time (`35F9.1`). `apple.privacy` adds the app's own: `accessed_apis`, each category's reasons, `tracking`, `tracking_domains` and `collected_data`, entries of `NSPrivacyCollectedDataTypes` as Apple names them; a `PrivacyInfo.xcprivacy` in `resources/` is merged with them rather than replaced.
+
 ## Publish on GitHub
 
 When the build has a macOS, Windows or Linux target, `dist/releases` also holds `install.sh` and `install.ps1`, which install the app from the releases of the GitHub repository `release.github` names, else the one the app's Git remote `origin` is on; without either `build` writes none and says so. Upload its files, the top level without `miniprogram/`, to the release tagged `v<version>`:

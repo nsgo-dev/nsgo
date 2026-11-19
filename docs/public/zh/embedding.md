@@ -19,7 +19,7 @@ iOS 构建写出 `<Name>.xcframework` 和 `<Name>Resources`；Android 构建写�
 
 ## iOS
 
-把框架作为静态库加入应用目标（不要嵌入），把资源目录作为文件夹引用加入，然后 `import <Name>`。在应用启动时、第一个视图之前调用一次 `NSGoStart()`。
+把框架作为静态库加入应用目标（不要嵌入），把资源目录作为文件夹引用加入，然后 `import <Name>`。在应用启动时、第一个视图之前调用一次 `NSGoStart()`。静态库的代码属于宿主应用，因此由宿主应用的隐私清单声明 NSGo 用到的需要理由的 API：用户默认设置（`CA92.1`）、文件时间戳（`C617.1`）和系统启动时间（`35F9.1`）；`-dynamic` 框架则在自己的 `PrivacyInfo.xcprivacy` 中声明它们。
 
 ```swift
 import Embedded
