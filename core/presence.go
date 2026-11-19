@@ -20,10 +20,7 @@ type Presence struct {
 // Render implements Node.
 func (p Presence) Render(*Scope) Node { return p }
 
-// PresenceOf is Presence keyed by a comparable value: changing Key sends the
-// old Content away through its exits and builds the new Content. With Wait,
-// the new content waits until every leaving branch is gone. MaxLeaving bounds
-// the branches leaving at once; the oldest leaves immediately past the bound.
+// PresenceOf is Presence keyed by a comparable value: a change of Key's value sends the branch Content built for the old value away through its exits and builds one for the new value. With Wait, the new branch waits until every leaving branch is gone. MaxLeaving bounds the branches leaving at once, the oldest going at once past it; 0 sets no bound.
 type PresenceOf[K comparable] struct {
 	Key        func() K
 	Content    func(cx *Scope, key K) Node
@@ -73,27 +70,26 @@ func (cx *Scope) Present() bool {
 // When's value and sends the one it replaces away through its exits.
 // Branches belong to owner, not to the effect, so they outlive its runs.
 func (p Presence) mount(t *Tree, region *node, owner *Scope) {
-	mountPresence(t, region, owner, func() any { return p.When() }, func(cx *Scope, value any) Node {
+	mountPresence(t, region, owner, func() any { return p.When() }, func(value any) func(*Scope) Node {
 		if value.(bool) {
-			if p.Then == nil {
-				return nil
-			}
-			return p.Then(cx)
+			return p.Then
 		}
-		if p.Else == nil {
-			return nil
-		}
-		return p.Else(cx)
+		return p.Else
 	}, p.Wait, 0)
 }
 
+// mount implements regionMounter as Presence's does, with a branch for each value of Key.
 func (p PresenceOf[K]) mount(t *Tree, region *node, owner *Scope) {
-	mountPresence(t, region, owner, func() any { return p.Key() }, func(cx *Scope, value any) Node {
-		return p.Content(cx, value.(K))
+	mountPresence(t, region, owner, func() any { return p.Key() }, func(value any) func(*Scope) Node {
+		if p.Content == nil {
+			return nil
+		}
+		return func(cx *Scope) Node { return p.Content(cx, value.(K)) }
 	}, p.Wait, p.MaxLeaving)
 }
 
-func mountPresence(t *Tree, region *node, owner *Scope, key func() any, content func(*Scope, any) Node, wait bool, maxLeaving int) {
+// mountPresence is the branches of a Presence or PresenceOf: content gives the function that builds the branch of a value of key, nil for none; past maxLeaving branches leaving, the oldest goes at once (0: no bound).
+func mountPresence(t *Tree, region *node, owner *Scope, key func() any, content func(value any) func(*Scope) Node, wait bool, maxLeaving int) {
 	when := NewMemoFunc[any](owner, key, func(a, b any) bool { return a == b })
 	var cur *presenceBranch
 	var leaving []*presenceBranch
@@ -110,7 +106,8 @@ func mountPresence(t *Tree, region *node, owner *Scope, key func() any, content 
 	}
 	build := func(value any) {
 		cur = nil
-		if content == nil {
+		fn := content(value)
+		if fn == nil {
 			return
 		}
 		b := &presenceBranch{scope: &Scope{}}
@@ -119,7 +116,7 @@ func mountPresence(t *Tree, region *node, owner *Scope, key func() any, content 
 		b.node = t.newRegion(region, b.scope)
 		t.within(b.scope, func() {
 			presenceKey.Provide(b.scope, b)
-			t.mount(b.scope, b.node, content(b.scope, value))
+			t.mount(b.scope, b.node, fn(b.scope))
 		})
 		cur = b
 	}
