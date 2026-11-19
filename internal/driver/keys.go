@@ -139,50 +139,56 @@ func FindKey(keymap []KeyBinding, names []string, focus KeyUse, repeat bool) (id
 	return 0, false
 }
 
-// MenuShortcut finds the enabled item of entries or of their enabled submenus that takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac every item's, elsewhere all but the editing roles', whose keys the focused field handles itself. Linux does not offer an unmodified shortcut to a focused editor. While editing, a NotInText item ends the search for its key, because each desktop menu stops at its first matching item. The first such item in menu order takes the key, as the platforms' menus find it; a disabled item takes nothing, and on a Mac it keeps the key from the items after it too, as AppKit stops at the first key equivalent that matches.
+// MenuShortcut finds the enabled item of entries or of their enabled submenus that takes a shortcut of names where the focus is, a role's own where it has none, as the platforms read them: on a Mac every item's, elsewhere all but the editing roles', whose keys the focused field handles itself. The first such item in menu order takes the key, as the platforms' menus find it; a disabled item takes nothing, and on a Mac it keeps the key from the items after it too, as AppKit stops at the first key equivalent that matches. While editing (a text input or web view has the focus), a NotInText item takes nothing and keeps its key from the items after it, since each desktop stops at it: macOS disables it during the key press, and Windows and Linux keep the first item of each shortcut. Linux offers no key pressed without Control, Alt or a logo key to the menu while editing.
 func MenuShortcut(entries []MenuEntry, names []string, os OS, editing bool) (MenuEntry, bool) {
-	e, ok, _ := menuShortcut(entries, names, os, editing)
+	if os == OSLinux && editing && !slices.ContainsFunc(names, commandKey) {
+		return MenuEntry{}, false
+	}
+	e, ok, _ := menuShortcut(entries, names, os == OSMacOS, editing, map[string]bool{})
 	return e, ok
 }
 
-// menuShortcut is MenuShortcut, also reporting whether a disabled item on a Mac ended the search.
-func menuShortcut(entries []MenuEntry, names []string, os OS, editing bool) (found MenuEntry, ok, stopped bool) {
-	mac := os == OSMacOS
+// commandKey reports whether the normalized key is pressed with Control, Alt or a logo key, Shift not counting.
+func commandKey(key string) bool {
+	parts := strings.Split(key, "+")
+	return slices.ContainsFunc(parts[:len(parts)-1], func(m string) bool { return m == "mod" || m == "ctrl" || m == "alt" || m == "meta" })
+}
+
+// menuShortcut is MenuShortcut, also reporting whether an item on a Mac ended the search. Off a Mac, kept holds the shortcuts a NotInText item keeps while editing: Windows and Linux look an item up by the shortcut's own spelling, so another spelling of the press ("ctrl+r" for "mod+r") may still reach a later item.
+func menuShortcut(entries []MenuEntry, names []string, mac, editing bool, kept map[string]bool) (found MenuEntry, ok, stopped bool) {
 	shortcutOf := func(e MenuEntry) string {
 		if e.Shortcut != "" {
 			return e.Shortcut
 		}
 		return NormalizeKey(e.Role.Shortcut(mac))
 	}
-	has := func(e MenuEntry) bool {
-		shortcut := shortcutOf(e)
-		return shortcut != "" && slices.Contains(names, shortcut)
-	}
 	for _, e := range entries {
 		shortcut := shortcutOf(e)
+		has := shortcut != "" && slices.Contains(names, shortcut) && !kept[shortcut]
 		switch {
 		case e.Separator:
 		case len(e.Items) > 0:
 			if e.Disabled {
 				continue
 			}
-			if found, ok, stopped := menuShortcut(e.Items, names, os, editing); ok || stopped {
+			if found, ok, stopped := menuShortcut(e.Items, names, mac, editing, kept); ok || stopped {
 				return found, ok, stopped
 			}
 		case e.Disabled:
-			if mac && has(e) {
+			if mac && has {
 				return MenuEntry{}, false, true
 			}
+		case !mac && e.Role.EditsText():
+			// Windows and Linux leave an editing role's key to the focused field and give the menu none of it.
 		case e.NotInText && editing:
-			if has(e) {
+			if has && mac {
 				return MenuEntry{}, false, true
 			}
-		case os == OSLinux && editing && !strings.Contains(shortcut, "+"):
-			// Linux never offers an unmodified key equivalent to a focused editor.
-		case mac || !e.Role.EditsText():
-			if has(e) {
-				return e, true, false
+			if has {
+				kept[shortcut] = true
 			}
+		case has:
+			return e, true, false
 		}
 	}
 	return MenuEntry{}, false, false

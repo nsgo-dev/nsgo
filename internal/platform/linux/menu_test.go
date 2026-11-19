@@ -105,6 +105,58 @@ func TestMenuYieldFollowsNativeTextFocus(t *testing.T) {
 	waitForTitle(t, w, title+"|2|1|false")
 }
 
+// TestMenuYieldReachesTheBindingTheMenuLeaves presses keys the GTK menu never takes from a focused field, a MenuNotEditing item's Control+R with a later item of the same shortcut, and an item's unmodified F5, against bindings that yield to the menu: with the field focused each binding runs, as the core keeps it in the keymap, and with no field focused the first item runs (#710).
+func TestMenuYieldReachesTheBindingTheMenuLeaves(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	const title = "nsgo-menu-left"
+	app := func(cx *core.Scope) core.Node {
+		refresh, run, reload, bindingR, bindingF5, focus := core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, false)
+		bump := func(s *core.Signal[int]) func() { return func() { s.Update(func(n int) int { return n + 1 }) } }
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Actions", Items: []core.MenuItem{
+			{Label: "Refresh", Shortcut: "mod+r", When: core.MenuNotEditing, OnSelect: bump(refresh)},
+			{Label: "Run", Shortcut: "mod+r", OnSelect: bump(run)},
+			{Label: "Reload", Shortcut: "f5", OnSelect: bump(reload)},
+		}}})
+		cx.OnKeyWith("mod+r", core.KeyOptions{YieldsToMenu: true}, bump(bindingR))
+		cx.OnKeyWith("f5", core.KeyOptions{YieldsToMenu: true}, bump(bindingF5))
+		cx.Effect(func() {
+			cx.SetTitle(fmt.Sprintf("%s|%d%d%d|%d%d|%v", title, refresh.Get(), run.Get(), reload.Get(), bindingR.Get(), bindingF5.Get(), focus.Get()))
+		})
+		return core.Input{OnFocus: func() { focus.Set(true) }, OnBlur: func() { focus.Set(false) },
+			Style: core.Style{Width: driver.Pt(180), Height: driver.Pt(30)}}
+	}
+	w := startTestWindow(t, app, Options{Title: title, Width: 240, Height: 120})
+	waitForTitle(t, w, title+"|000|00|false")
+	press := func(keyval, keycode, state uint32) {
+		w.onLoop(t, func() {
+			keyPressedCallback(0, keyval, keycode, state, w.handle)
+			keyReleasedCallback(0, keyval, keycode, state, w.handle)
+		})
+	}
+	const f5 = gdkF1 + 4
+	w.onLoop(t, func() {
+		for _, v := range w.entries {
+			if v.kind == driver.KindInput {
+				w.focusEntry(v)
+				break
+			}
+		}
+	})
+	waitForTitle(t, w, title+"|000|00|true")
+	press('r', 27, gdkControl)
+	waitForTitle(t, w, title+"|000|10|true")
+	press(f5, 71, 0)
+	waitForTitle(t, w, title+"|000|11|true")
+	w.onLoop(t, func() { gtkWindowSetFocus(w.win, 0) })
+	waitForTitle(t, w, title+"|000|11|false")
+	press('r', 27, gdkControl)
+	waitForTitle(t, w, title+"|100|11|false")
+	press(f5, 71, 0)
+	waitForTitle(t, w, title+"|101|11|false")
+}
+
 func TestMenuYieldFollowsNativeWebFocus(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")

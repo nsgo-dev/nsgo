@@ -859,15 +859,22 @@ func TestMenuYieldFollowsTextFocus(t *testing.T) {
 				name, key        string
 				menu             []MenuItem
 				outside, editing bool
+				// keptOn is an OS that keeps the binding while editing although the others do not.
+				keptOn OS
 			}{
-				{"not editing", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}, false, true},
-				{"always", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAlways}}, false, false},
-				{"auto non-editing key", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAuto}}, false, false},
-				{"auto editing key", "mod+a", []MenuItem{{Label: "Action", Shortcut: "mod+a", When: MenuAuto}}, false, true},
-				{"submenu", "mod+r", []MenuItem{{Label: "Actions", Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}}}, false, true},
-				{"disabled submenu", "mod+r", []MenuItem{{Label: "Actions", Disabled: true, Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAlways}}}}, true, true},
-				{"a NotInText item stops the search", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}, {Label: "Run", Shortcut: "mod+r", When: MenuAlways}}, false, true},
+				{"not editing", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}, false, true, ""},
+				{"always", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAlways}}, false, false, ""},
+				{"auto non-editing key", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAuto}}, false, false, ""},
+				{"auto editing key", "mod+a", []MenuItem{{Label: "Action", Shortcut: "mod+a", When: MenuAuto}}, false, true, ""},
+				{"submenu", "mod+r", []MenuItem{{Label: "Actions", Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}}}, false, true, ""},
+				{"disabled submenu", "mod+r", []MenuItem{{Label: "Actions", Disabled: true, Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuAlways}}}}, true, true, ""},
+				{"a NotInText item stops the search", "mod+r", []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}, {Label: "Run", Shortcut: "mod+r", When: MenuAlways}}, false, true, ""},
+				{"a NotInText item in a submenu stops the search", "mod+r", []MenuItem{{Label: "View", Items: []MenuItem{{Label: "Refresh", Shortcut: "mod+r", When: MenuNotEditing}}}, {Label: "Run", Shortcut: "mod+r", When: MenuAlways}}, false, true, ""},
+				// Linux offers an editor's unmodified keys, Shift included, to no menu item (#710).
+				{"unmodified key", "f5", []MenuItem{{Label: "Reload", Shortcut: "f5", When: MenuAlways}}, false, false, OSLinux},
+				{"shifted key", "shift+f5", []MenuItem{{Label: "Reload", Shortcut: "shift+f5", When: MenuAlways}}, false, false, OSLinux},
 			} {
+				editing := c.editing || c.keptOn == os
 				t.Run(string(os)+"/"+map[bool]string{false: "input", true: "web"}[web]+"/"+c.name, func(t *testing.T) {
 					var shown *Signal[bool]
 					ran := 0
@@ -912,18 +919,18 @@ func TestMenuYieldFollowsTextFocus(t *testing.T) {
 						}
 					}
 					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: first.id})
-					check("focused", c.editing, driver.KeyUseText)
+					check("focused", editing, driver.KeyUseText)
 					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: second.id})
 					h.tree.Dispatch(driver.Event{Kind: driver.EventBlur, ID: first.id})
-					check("new focus before old blur", c.editing, driver.KeyUseText)
+					check("new focus before old blur", editing, driver.KeyUseText)
 					h.tree.Dispatch(driver.Event{Kind: driver.EventBlur, ID: second.id})
 					check("blurred", c.outside, 0)
 					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: first.id})
-					check("refocused", c.editing, driver.KeyUseText)
+					check("refocused", editing, driver.KeyUseText)
 					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: h.tree.view.id})
 					check("root focused", c.outside, 0)
 					h.tree.Dispatch(driver.Event{Kind: driver.EventFocus, ID: first.id})
-					check("focused before removal", c.editing, driver.KeyUseText)
+					check("focused before removal", editing, driver.KeyUseText)
 					shown.Set(false)
 					check("focused view removed", c.outside, 0)
 				})

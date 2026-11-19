@@ -313,6 +313,84 @@ func TestMenuYieldFollowsNativeFocus(t *testing.T) {
 	press("3|2")
 }
 
+// TestMenuYieldReachesTheBindingTheMenuLeaves presses Control+R with a MenuNotEditing item followed by another item of the same shortcut, and F5 with an item of its own, against bindings that yield to the menu: with a field focused the menu keeps only the first item of a shortcut and leaves Control+R, which the binding takes, while it takes F5 itself; with no field focused the first item of each takes the key (#710).
+func TestMenuYieldReachesTheBindingTheMenuLeaves(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	const title = "nsgo-menu-left"
+	app := func(cx *core.Scope) core.Node {
+		refresh, run, reload, bindingR, bindingF5 := core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0)
+		bump := func(s *core.Signal[int]) func() { return func() { s.Update(func(n int) int { return n + 1 }) } }
+		cx.SetApplicationMenu([]core.MenuItem{{Label: "Actions", Items: []core.MenuItem{
+			{Label: "Refresh", Shortcut: "mod+r", When: core.MenuNotEditing, OnSelect: bump(refresh)},
+			{Label: "Run", Shortcut: "mod+r", OnSelect: bump(run)},
+			{Label: "Reload", Shortcut: "f5", OnSelect: bump(reload)},
+		}}})
+		cx.OnKeyWith("mod+r", core.KeyOptions{YieldsToMenu: true}, bump(bindingR))
+		cx.OnKeyWith("f5", core.KeyOptions{YieldsToMenu: true}, bump(bindingF5))
+		cx.Effect(func() {
+			cx.SetTitle(fmt.Sprintf("%s|%d%d%d|%d%d|", title, refresh.Get(), run.Get(), reload.Get(), bindingR.Get(), bindingF5.Get()))
+		})
+		return core.Input{Style: core.Style{Width: driver.Pt(240), Height: driver.Pt(30)}}
+	}
+	hwnd := startApp(t, title, app, 300, 120)
+	waitForTitle(t, hwnd, title+"|000|00|", 10*time.Second)
+	getState, setState := user32.NewProc("GetKeyboardState"), user32.NewProc("SetKeyboardState")
+	const vkF5 = 0x74
+	press := func(vk uintptr, control bool, want string) {
+		t.Helper()
+		onMain(t, hwnd, func(w *window) {
+			var saved [256]byte
+			getState.Call(uintptr(unsafe.Pointer(&saved)))
+			held := saved
+			if control {
+				held[vkControl] |= 0x80
+			} else {
+				held[vkControl] &^= 0x80
+			}
+			setState.Call(uintptr(unsafe.Pointer(&held)))
+			defer setState.Call(uintptr(unsafe.Pointer(&saved)))
+			if !w.shortcut(vk, 1) {
+				t.Errorf("nothing took key %#x", vk)
+			}
+		})
+		waitForTitle(t, hwnd, title+"|"+want+"|", 5*time.Second)
+	}
+	// bound waits until the keymap holds the Control+R binding as want says.
+	bound := func(want bool) {
+		t.Helper()
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			ok := false
+			onMain(t, hwnd, func(w *window) {
+				ok = slices.ContainsFunc(w.keys, func(k driver.KeyBinding) bool { return k.Key == "mod+r" }) == want
+			})
+			if ok {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("the keymap does not hold the binding %v", want)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	onMain(t, hwnd, func(w *window) {
+		for _, v := range w.views {
+			if v != nil && v.field != nil {
+				w.setFocus(v.field)
+			}
+		}
+	})
+	bound(true)
+	press('R', true, "000|10")
+	press(vkF5, false, "001|10")
+	onMain(t, hwnd, func(w *window) { w.blurAll() })
+	bound(false)
+	press('R', true, "101|10")
+	press(vkF5, false, "102|10")
+}
+
 // TestFocusedPageKeysReachShortcutsFirst types into a focused WebView2 page through the system's input queue, as the user's keyboard does. Control+J, which a KeyAlways binding takes, and Control+K, which a MenuAlways item takes, run the app's handlers and never reach the page; Control+A, whose KeyAuto binding yields to text, Control+L, whose MenuNotEditing item yields too, Control+B, which nothing binds, and a plain letter all reach the page.
 func TestFocusedPageKeysReachShortcutsFirst(t *testing.T) {
 	if testing.Short() {

@@ -863,7 +863,7 @@ func TestStartAppKeepsTheAppsScope(t *testing.T) {
 	app.Find("id:main")
 }
 
-// A key nothing else takes chooses the enabled application-menu item it is the shortcut of, in a submenu too and a role's own on a Mac; a disabled item takes nothing, and on a Mac, as AppKit stops at the first item with the key, leaves nothing to a later item with it, which Windows chooses; a NotInText one leaves the key to a focused field.
+// A key nothing else takes chooses the enabled application-menu item it is the shortcut of, in a submenu too and a role's own on a Mac; a disabled item takes nothing, and on a Mac, as AppKit stops at the first item with the key, leaves nothing to a later item with it, which Windows chooses; a NotInText one leaves the key to a focused field and keeps it from a later item with it on every desktop, and Linux offers the menu no key pressed without Control, Alt or the logo key while a field has the focus (#710).
 func TestApplicationMenuShortcuts(t *testing.T) {
 	if Target() != "" {
 		t.Skip("checks the headless menu shortcut path")
@@ -874,6 +874,8 @@ func TestApplicationMenuShortcuts(t *testing.T) {
 		{Label: "Reload", Shortcut: "mod+r", OnSelect: choose("reload")},
 		{Label: "Disabled", Shortcut: "mod+d", Disabled: true, OnSelect: choose("disabled")},
 		{Label: "Refresh", Shortcut: "mod+i", When: core.MenuNotEditing, OnSelect: choose("refresh")},
+		{Label: "Shadow", Shortcut: "mod+i", OnSelect: choose("shadow")},
+		{Label: "Stop", Shortcut: "f5", OnSelect: choose("stop")},
 		{Label: "Off", Shortcut: "mod+e", Disabled: true, OnSelect: choose("off")},
 		{Label: "Export", Items: []desktop.MenuItem{
 			{Label: "Again", Shortcut: "mod+e", OnSelect: choose("again")},
@@ -901,7 +903,8 @@ func TestApplicationMenuShortcuts(t *testing.T) {
 	app.Focus("id:field")
 	app.Key("mod+i")
 	app.Key("mod+r")
-	if want := []string{"reload"}; !slices.Equal(chosen, want) {
+	app.Key("f5")
+	if want := []string{"reload", "stop"}; !slices.Equal(chosen, want) {
 		t.Errorf("with the field focused: chose %q, want %q", chosen, want)
 	}
 
@@ -912,6 +915,21 @@ func TestApplicationMenuShortcuts(t *testing.T) {
 	app.Key("ctrl+e")
 	if want := []string{"reload", "again"}; !slices.Equal(chosen, want) {
 		t.Errorf("on Windows: chose %q, want %q", chosen, want)
+	}
+	for _, os := range []core.OS{core.OSWindows, core.OSLinux} {
+		app = start(os)
+		app.Key("ctrl+i")
+		app.Key("f5")
+		app.Focus("id:field")
+		app.Key("ctrl+i")
+		app.Key("f5")
+		want := []string{"refresh", "stop", "stop"}
+		if os == core.OSLinux {
+			want = []string{"refresh", "stop"}
+		}
+		if !slices.Equal(chosen, want) {
+			t.Errorf("on %s: chose %q, want %q", os, chosen, want)
+		}
 	}
 
 	// Phones show no application menu.
