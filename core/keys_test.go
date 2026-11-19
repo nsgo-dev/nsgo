@@ -152,6 +152,123 @@ func TestAllSurfaceBindingsRestUnderAnotherWindowsModal(t *testing.T) {
 	}
 }
 
+// An app-wide binding whose owner is hidden in the surface it was bound in rests in every surface, the keymaps the other surfaces send included, and comes back in all of them as its owner shows again; a modal over its owner at home leaves it to the other surfaces' own modals, while one bound at the app's root fires everywhere (#712).
+func TestAllSurfaceBindingsFollowTheirHomeVisibility(t *testing.T) {
+	var hidden, dialog *Signal[bool]
+	var other *Window
+	ran, rootRan := 0, 0
+	w := newWindows(t, func(cx *Scope) {
+		cx.OnKeyWith("mod+e", KeyOptions{AllSurfaces: true}, func() { rootRan++ })
+		cx.SetMainView(func(cx *Scope) Node {
+			hidden, dialog = NewSignal(cx, true), NewSignal(cx, false)
+			return View{Children: []Node{
+				View{StyleFunc: func() Style {
+					if hidden.Get() {
+						return Style{Display: DisplayNone}
+					}
+					return Style{}
+				}, Children: []Node{Func(func(cx *Scope) Node {
+					cx.OnKeyWith("mod+r", KeyOptions{AllSurfaces: true}, func() { ran++ })
+					return Text{Content: "shortcut"}
+				})}},
+				Show{When: dialog.Get, Then: func(*Scope) Node { return Modal{Children: []Node{Text{Content: "dialog"}}} }},
+			}}
+		})
+		other = cx.OpenWindow(WindowOptions{Title: "Other"}, func(*Scope) Node { return View{} })
+	})
+	w.commit()
+	var home, away *Tree
+	for _, s := range w.app.Surfaces() {
+		switch s.Window() {
+		case w.root.MainWindow():
+			home = s
+		case other:
+			away = s
+		}
+	}
+	if home == nil || away == nil {
+		t.Fatal("the windows did not open")
+	}
+	// The app's own surface commits before the main window, the other window after it.
+	surfaces := []*Tree{w.app, home, away}
+	// sent is the binding of key in the keymap surface s sent last, 0 for none.
+	sent := func(s *Tree, key string) uint32 {
+		t.Helper()
+		items := w.take(s.ID(), driver.ItemKeymap)
+		if len(items) == 0 {
+			t.Fatalf("surface %d was sent no keymap", s.ID())
+		}
+		id, _ := driver.FindKey(items[len(items)-1].Keys, []string{key}, 0, false)
+		w.items[s.ID()] = append(w.items[s.ID()], items[len(items)-1])
+		return id
+	}
+	for _, s := range surfaces {
+		if id := sent(s, "mod+r"); id != 0 {
+			t.Fatalf("surface %d sent a keymap matching mod+r while its owner is hidden in the main window", s.ID())
+		}
+		if id := sent(s, "mod+e"); id == 0 {
+			t.Fatalf("surface %d sent a keymap without the app root's mod+e", s.ID())
+		}
+		// A press matched by a keymap sent before runs nothing either.
+		for _, b := range s.keys {
+			if b.Key == "mod+r" {
+				s.Dispatch(driver.Event{Kind: driver.EventKey, Count: b.ID})
+			}
+		}
+	}
+	if ran != 0 {
+		t.Fatalf("the binding ran %d times while its owner is hidden in the main window", ran)
+	}
+	hidden.Set(false)
+	// The app's surface, committed before the main window, sends its keymap in the pass after.
+	w.commit()
+	w.commit()
+	for i, s := range surfaces {
+		id := sent(s, "mod+r")
+		if id == 0 {
+			t.Fatalf("surface %d sent no mod+r once its owner shows in the main window", s.ID())
+		}
+		s.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+		if ran != i+1 {
+			t.Fatalf("a press in surface %d: the binding ran %d times, want %d", s.ID(), ran, i+1)
+		}
+	}
+	dialog.Set(true)
+	w.commit()
+	w.commit()
+	if sent(home, "mod+r") != 0 {
+		t.Fatal("the main window's dialog leaves the binding in its keymap")
+	}
+	for _, s := range []*Tree{w.app, away} {
+		id := sent(s, "mod+r")
+		if id == 0 {
+			t.Fatalf("the main window's dialog takes the binding from surface %d, which shows no modal", s.ID())
+		}
+		before := ran
+		s.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+		if ran != before+1 {
+			t.Fatalf("a press in surface %d under the main window's dialog ran nothing", s.ID())
+		}
+	}
+	dialog.Set(false)
+	hidden.Set(true)
+	w.commit()
+	w.commit()
+	for _, s := range surfaces {
+		if sent(s, "mod+r") != 0 {
+			t.Fatalf("surface %d keeps mod+r after its owner is hidden again", s.ID())
+		}
+		if id := sent(s, "mod+e"); id == 0 {
+			t.Fatalf("surface %d lost the app root's mod+e", s.ID())
+		} else {
+			s.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+		}
+	}
+	if ran != 5 || rootRan != 3 {
+		t.Fatalf("the hidden owner's binding ran %d times, want 5, and the app root's %d, want 3", ran, rootRan)
+	}
+}
+
 // On macOS one menu bar shows the menu a surface sent last, the app's own surface's while a window sets none, so a YieldsToMenu binding in any window leaves its key to an enabled item of that menu, and takes it back as the item is disabled. On Windows and Linux each window shows its own menu bar, and the app surface's menu takes no window's key (#446).
 func TestYieldingBindingsFollowTheMenuBarShown(t *testing.T) {
 	for _, os := range []OS{OSMacOS, OSWindows, OSLinux} {

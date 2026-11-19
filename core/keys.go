@@ -47,25 +47,32 @@ type keyBinding struct {
 	overModals bool
 	// yieldsToMenu is KeyOptions.YieldsToMenu.
 	yieldsToMenu bool
-	// foreign is an app-wide binding (KeyOptions.AllSurfaces) given to a surface other than the one it was bound in, where its owner shows no views: it rests while a modal shows there, unless overModals.
-	foreign bool
-	fn      func()
+	// home is, for an app-wide binding (KeyOptions.AllSurfaces) given to a surface other than the one it was bound in, that surface, and nil for a binding of this surface's own. Such a foreign binding comes before this surface's own bindings, follows whether its owner shows in its home surface, and rests while a modal shows in this one unless overModals (keyActive).
+	home *Tree
+	fn   func()
 }
 
 // globalKey is a binding made with KeyOptions.AllSurfaces: the binding it gives each surface's tree, the trees opened since included (newTree).
 type globalKey struct {
 	owner    *Scope
+	home     *Tree
 	key      string
 	inText   bool
 	yields   driver.KeyUse
 	opts     KeyOptions
 	fn       func()
 	bindings map[*Tree]*keyBinding
+	// shown is whether its owner showed in its home surface when that surface last sent its keymap, which the other surfaces' copies follow (followHome); known is whether it was looked at yet.
+	shown, known bool
 }
 
 // bind gives tree t the binding: as OnKey's in the tree it was bound in, else before the tree's own bindings, which win over it whenever they were made.
 func (g *globalKey) bind(t *Tree, own bool) {
-	g.bindings[t] = t.addKeyBinding(g.owner, g.key, g.inText, g.yields, g.opts, g.fn, !own)
+	var home *Tree
+	if !own {
+		home = g.home
+	}
+	g.bindings[t] = t.addKeyBinding(g.owner, g.key, g.inText, g.yields, g.opts, g.fn, home)
 }
 
 // KeyWhen says when a binding fires.
@@ -89,7 +96,7 @@ type KeyOptions struct {
 	OverModals bool
 	// YieldsToMenu leaves the key to the application menu while an enabled item takes the same shortcut where the focus is on macOS, Windows and Linux, which show the menu, for a default shortcut an app's menu may take over. An item that leaves its shortcut to a focused text input or web view does not suppress the binding. Else a binding takes its key before the menu does.
 	YieldsToMenu bool
-	// AllSurfaces binds the key in every surface of the app rather than only the one it is bound in: the app's own and each window, panel and tray view it opens, those it opens later too, for an app-wide shortcut. In the surface it is bound in it is as OnKey says; in each other one it comes before that surface's own bindings, so one of the same key there wins over it, whenever it was made, and rests while a modal shows there unless OverModals keeps it. It ends in all of them as its owner goes. Where the platform opens no windows it is OnKey's.
+	// AllSurfaces binds the key in every surface of the app rather than only the one it is bound in: the app's own and each window, panel and tray view it opens, those it opens later too, for an app-wide shortcut. In the surface it is bound in it is as OnKey says; in each other one it comes before that surface's own bindings, so one of the same key there wins over it, whenever it was made, and rests while a modal shows there unless OverModals keeps it. It rests in all of them while what its owner shows is hidden in the surface it is bound in, a modal covering it there aside, so a component's shortcut does not run while the user cannot see the component; one bound at the app's root, which shows nothing, fires everywhere. It ends in all of them as its owner goes. Where the platform opens no windows it is OnKey's.
 	AllSurfaces bool
 }
 
@@ -113,7 +120,7 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 	owner := cx.current()
 	if opts.AllSurfaces {
 		rt := cx.rt
-		g := &globalKey{owner: owner, key: k, inText: inText, yields: yields, opts: opts, fn: fn, bindings: map[*Tree]*keyBinding{}}
+		g := &globalKey{owner: owner, key: k, inText: inText, yields: yields, opts: opts, fn: fn, home: t, bindings: map[*Tree]*keyBinding{}}
 		rt.globalKeys = append(rt.globalKeys, g)
 		g.bind(rt.tree, rt.tree == t)
 		for _, s := range rt.surfaces {
@@ -129,19 +136,19 @@ func (cx *Scope) OnKeyWith(key string, opts KeyOptions, fn func()) {
 		})
 		return
 	}
-	b := t.addKeyBinding(owner, k, inText, yields, opts, fn, false)
+	b := t.addKeyBinding(owner, k, inText, yields, opts, fn, nil)
 	owner.addCleanup(func() { t.removeKeyBinding(b) })
 }
 
-// addKeyBinding adds a binding of the normalized key to the tree's table, as its newest, or as its oldest if foreign, an app-wide binding made in another surface.
-func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields driver.KeyUse, opts KeyOptions, fn func(), foreign bool) *keyBinding {
+// addKeyBinding adds a binding of the normalized key to the tree's table, as its newest, or as its oldest if home, the surface of an app-wide binding made in another one, is set.
+func (t *Tree) addKeyBinding(owner *Scope, key string, inText bool, yields driver.KeyUse, opts KeyOptions, fn func(), home *Tree) *keyBinding {
 	// IDs are never reused, so a press the platform matched to a binding since removed runs nothing (pressKey).
 	t.keyID++
 	if t.keyID == 0 {
 		t.keyID++
 	}
-	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: key, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, yieldsToMenu: opts.YieldsToMenu, foreign: foreign, fn: fn}
-	if foreign {
+	b := &keyBinding{KeyBinding: driver.KeyBinding{Key: key, InText: inText, Repeat: opts.Repeat, Yields: yields, ID: t.keyID}, owner: owner, within: confinement(owner), overModals: opts.OverModals, yieldsToMenu: opts.YieldsToMenu, home: home, fn: fn}
+	if home != nil {
 		t.keys = slices.Insert(t.keys, 0, b)
 	} else {
 		t.keys = append(t.keys, b)
@@ -278,10 +285,47 @@ func (t *Tree) keymap() []driver.KeyBinding {
 	return out
 }
 
-// keyActive reports whether binding b may fire: its owner lives and shows (keyPlaces.shows), above any modal unless it is OverModals, a foreign one while no modal shows in the tree unless it is OverModals, the focus is within what it is confined to, and if it is YieldsToMenu, no enabled item of the application menu takes its key where the focus is (menuHasKey).
+// keyActive reports whether binding b may fire: its owner lives and shows (keyPlaces.shows), above any modal unless it is OverModals, the focus is within what it is confined to, and if it is YieldsToMenu, no enabled item of the application menu takes its key where the focus is (menuHasKey). A foreign binding's owner shows in its home surface, not in this one: it rests while its owner is hidden there, whatever modal covers it there, and while a modal shows in this surface unless it is OverModals (#712).
 func (t *Tree) keyActive(b *keyBinding, places *keyPlaces) bool {
-	return !b.owner.disposed && places.shows(b.owner, b.overModals) && !(b.foreign && !b.overModals && places.modal) && t.focusWithin(b.within) &&
-		!(b.yieldsToMenu && t.menuHasKey(b.Key))
+	if b.owner.disposed {
+		return false
+	}
+	if b.home != nil {
+		if !b.home.keyPlaces().shows(b.owner, true) || !b.overModals && places.modal {
+			return false
+		}
+	} else if !places.shows(b.owner, b.overModals) {
+		return false
+	}
+	return t.focusWithin(b.within) && !(b.yieldsToMenu && t.menuHasKey(b.Key))
+}
+
+// followHome has the other surfaces send their keymaps again as the owner of an app-wide binding made in t comes to show in t or stops showing there, which their copies of the binding follow (keyActive). t sends its own keymap then, as what shows in it changed. A surface the platform commits before t takes it in the next pass, which a post asks for.
+func (t *Tree) followHome() {
+	var places *keyPlaces
+	moved := false
+	for _, g := range t.rt.globalKeys {
+		if g.home != t || g.owner.disposed {
+			continue
+		}
+		if places == nil {
+			places = t.keyPlaces()
+		}
+		shown := places.shows(g.owner, true)
+		if g.known && shown == g.shown {
+			continue
+		}
+		g.known, g.shown = true, shown
+		for o := range g.bindings {
+			if o != t && !o.closed {
+				o.keysChanged, o.changed = true, true
+				moved = true
+			}
+		}
+	}
+	if moved && t.rt.post != nil {
+		t.rt.post(func() {})
+	}
 }
 
 // menuHasKey reports whether an enabled item of the application menu takes the normalized key as its shortcut where the focus is (driver.MenuShortcut), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.

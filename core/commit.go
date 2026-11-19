@@ -297,6 +297,7 @@ func (t *Tree) commitRound() {
 	if t.keysChanged {
 		t.keysChanged = false
 		t.items = append(t.items, driver.MountItem{Kind: driver.ItemKeymap, Keys: t.keymap()})
+		t.followHome()
 	}
 	t.emitStatusBar()
 	t.emitHistory()
