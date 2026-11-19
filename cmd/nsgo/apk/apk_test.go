@@ -119,6 +119,46 @@ func TestWrite(t *testing.T) {
 	}
 }
 
+func TestAdaptiveIconResources(t *testing.T) {
+	key, err := NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := Write(&buf, androidruntime.Manifest, Manifest{
+		Package: "dev.oneo.nsgo.test", Label: "Test", VersionName: "1", VersionCode: 1,
+		Icon: []byte("legacy"), Adaptive: &AdaptiveIcon{Foreground: []byte("fg"), Background: []byte("bg"), Monochrome: []byte("mono")},
+	}, nil, key); err != nil {
+		t.Fatal(err)
+	}
+	aapt2, err := tool("aapt2")
+	if err != nil {
+		t.Skip("aapt2 is not installed")
+	}
+	path := filepath.Join(t.TempDir(), "adaptive.apk")
+	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resources, err := exec.Command(aapt2, "dump", "resources", path).CombinedOutput()
+	if err != nil {
+		t.Fatalf("aapt2 dump resources: %v\n%s", err, resources)
+	}
+	for _, want := range []string{"mipmap/ic_launcher_foreground", "mipmap/ic_launcher_background", "mipmap/ic_launcher_monochrome", "res/mipmap-anydpi-v26/ic_launcher.xml"} {
+		if !strings.Contains(string(resources), want) {
+			t.Errorf("resource dump lacks %q:\n%s", want, resources)
+		}
+	}
+	xml, err := exec.Command(aapt2, "dump", "xmltree", path, "--file", adaptiveIconFile).CombinedOutput()
+	if err != nil {
+		t.Fatalf("aapt2 dump adaptive XML: %v\n%s", err, xml)
+	}
+	for _, want := range []string{"adaptive-icon", "foreground", "background", "monochrome"} {
+		if !strings.Contains(string(xml), want) {
+			t.Errorf("adaptive XML lacks %q:\n%s", want, xml)
+		}
+	}
+}
+
 // jdkHome returns the JDK to run apksigner with: the one JAVA_HOME names, else on macOS the one /usr/libexec/java_home finds, else the one this machine may keep beside the SDK in ~/Android/jdk. It returns "" when there is none, leaving the java on PATH to apksigner.
 func jdkHome() string {
 	hasJava := func(home string) bool {

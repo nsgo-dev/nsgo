@@ -42,8 +42,18 @@ func WriteBundle(w io.Writer, template []byte, m Manifest, files []File, key *Ke
 	if m.Icon != nil {
 		all = append(all, File{Name: "base/" + iconFile, Data: m.Icon, Stored: true})
 	}
+	if m.Adaptive != nil {
+		adaptive, err := adaptiveFiles(m.Adaptive)
+		if err != nil {
+			return err
+		}
+		for _, file := range adaptive {
+			file.Name = "base/" + file.Name
+			all = append(all, file)
+		}
+	}
 	all = append(all,
-		File{Name: "base/resources.pb", Data: resourcesProto(m.Package, m.Icon != nil, m.Names)},
+		File{Name: "base/resources.pb", Data: resourcesProto(m.Package, m.Icon != nil, m.Names, m.Adaptive)},
 		File{Name: "BundleConfig.pb", Data: bundleConfig()})
 	signed, err := signJar(all, key)
 	if err != nil {
@@ -165,7 +175,7 @@ func protoItem(name, value string, spec attrSpec, icon bool) ([]byte, error) {
 
 // resourcesProto is the module's resource table, resources.pb, holding
 // what resources' binary table does.
-func resourcesProto(pkg string, icon bool, names map[string]string) []byte {
+func resourcesProto(pkg string, icon bool, names map[string]string, adaptive *AdaptiveIcon) []byte {
 	var types [][]byte
 	id := uint64(1)
 	if icon {
@@ -173,7 +183,25 @@ func resourcesProto(pkg string, icon bool, names map[string]string) []byte {
 		config = pbVarint(config, 24, 4)
 		file := pbString(nil, 1, iconFile)
 		file = pbVarint(file, 2, 1) // PNG
-		types = append(types, protoType(id, "mipmap", "ic_launcher", [][2][]byte{{config, pbBytes(nil, 5, file)}}))
+		values := [][2][]byte{{config, pbBytes(nil, 5, file)}}
+		entries := []protoEntry{{"ic_launcher", values}}
+		if adaptive != nil {
+			anydpi := pbVarint(nil, 18, 0xfffe)
+			anydpi = pbVarint(anydpi, 24, 26)
+			xml := pbString(nil, 1, adaptiveIconFile)
+			xml = pbVarint(xml, 2, 2) // XML
+			entries[0].values = append(entries[0].values, [2][]byte{anydpi, pbBytes(nil, 5, xml)})
+			for i, name := range []string{"ic_launcher_foreground", "ic_launcher_background", "ic_launcher_monochrome"} {
+				if i == 2 && len(adaptive.Monochrome) == 0 {
+					break
+				}
+				path := []string{foregroundFile, backgroundFile, monochromeFile}[i]
+				png := pbString(nil, 1, path)
+				png = pbVarint(png, 2, 1)
+				entries = append(entries, protoEntry{name, [][2][]byte{{config, pbBytes(nil, 5, png)}}})
+			}
+		}
+		types = append(types, protoTypeEntries(id, "mipmap", entries))
 		id++
 	}
 	if len(names) > 0 {
@@ -200,6 +228,29 @@ func resourcesProto(pkg string, icon bool, names map[string]string) []byte {
 		p = pbBytes(p, 3, t)
 	}
 	return pbBytes(nil, 2, p)
+}
+
+type protoEntry struct {
+	key    string
+	values [][2][]byte
+}
+
+func protoTypeEntries(id uint64, name string, entries []protoEntry) []byte {
+	var out []byte
+	out = pbVarint(out, 1, id)
+	out = pbString(out, 2, name)
+	for _, entry := range entries {
+		var e []byte
+		e = pbBytes(e, 1, nil)
+		e = pbString(e, 2, entry.key)
+		for _, value := range entry.values {
+			cv := pbBytes(nil, 1, value[0])
+			cv = pbBytes(cv, 2, pbBytes(nil, 4, value[1]))
+			e = pbBytes(e, 6, cv)
+		}
+		out = pbBytes(out, 3, e)
+	}
+	return out
 }
 
 // protoType is a Type of one entry, key, with an item in each of its

@@ -282,6 +282,15 @@ type icons struct {
 	// WatchOS is the Apple Watch's: an Icon Composer .icon drawn in
 	// circles, or a square image. Without it Apple is used, then PNG.
 	WatchOS string `yaml:"watchos"`
+	// Android is the adaptive launcher icon's foreground, background and
+	// optional themed monochrome layer.
+	Android *androidIcon `yaml:"android"`
+}
+
+type androidIcon struct {
+	Foreground string `yaml:"foreground"`
+	Background string `yaml:"background"`
+	Monochrome string `yaml:"monochrome"`
 }
 
 // openOutput reports whether nsgo build opens its output directory.

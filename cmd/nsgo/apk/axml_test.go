@@ -387,6 +387,7 @@ func TestFrameworkAttributeIDs(t *testing.T) {
 		"configChanges":               0x0101001f,
 		"windowSoftInputMode":         0x0101022b,
 		"value":                       0x01010024,
+		"drawable":                    0x01010199,
 	}
 	for name, spec := range androidAttrs {
 		id, ok := want[name]

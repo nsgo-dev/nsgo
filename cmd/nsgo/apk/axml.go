@@ -25,6 +25,8 @@ type Manifest struct {
 	VersionCode int
 	// Icon is the launcher icon, an IconSize PNG; nil keeps the system's.
 	Icon []byte
+	// Adaptive is the optional Android adaptive icon layers.
+	Adaptive *AdaptiveIcon
 	// Theme replaces the application's theme, a framework style; empty
 	// keeps the runtime's.
 	Theme string
@@ -106,6 +108,7 @@ var androidAttrs = map[string]attrSpec{
 	"windowSoftInputMode":         {0x0101022b, typeHex, parseSoftInputMode},
 	"foregroundServiceType":       {0x01010599, typeHex, parseForegroundServiceType},
 	"value":                       {0x01010024, typeString, nil},
+	"drawable":                    {0x01010199, typeReference, nil},
 }
 
 // foregroundServiceTypes are the ServiceInfo.FOREGROUND_SERVICE_TYPE_* names a service lists, as attrs_manifest.xml has them.
@@ -421,6 +424,7 @@ var (
 // encoder builds the element chunks and the string pool they index.
 type encoder struct {
 	icon    bool // the table has the icon, before the names
+	refs    map[string]uint32
 	strings []string
 	index   map[string]int
 	ids     []uint32 // the framework ID of each leading attribute name
@@ -487,7 +491,19 @@ func (e *encoder) element(n *node) error {
 				attr.raw = int32(attr.data)
 				break
 			}
-			v, err := spec.parse(a.Value)
+			var v uint32
+			var err error
+			if spec.kind == typeReference && e.refs != nil {
+				var ok bool
+				v, ok = e.refs[a.Value]
+				if !ok {
+					err = fmt.Errorf("unknown resource %q", a.Value)
+				}
+			} else if spec.parse != nil {
+				v, err = spec.parse(a.Value)
+			} else {
+				err = fmt.Errorf("cannot parse %q", a.Value)
+			}
 			if err != nil {
 				return fmt.Errorf("manifest: android:%s: %w", a.Name.Local, err)
 			}
@@ -548,6 +564,68 @@ func (e *encoder) element(n *node) error {
 	w(int32(-1))
 	w(name)
 	return nil
+}
+
+// EncodeAdaptiveIcon writes the binary XML resource for an Android adaptive
+// icon. refs maps the drawable references used by its layers to resource IDs.
+func EncodeAdaptiveIcon(refs map[string]uint32, monochrome bool) ([]byte, error) {
+	root := &node{name: xml.Name{Local: "adaptive-icon"}}
+	background := &node{name: xml.Name{Local: "background"}}
+	setAttr(background, androidNS, "drawable", "@mipmap/ic_launcher_background")
+	foreground := &node{name: xml.Name{Local: "foreground"}}
+	setAttr(foreground, androidNS, "drawable", "@mipmap/ic_launcher_foreground")
+	root.kids = append(root.kids, background, foreground)
+	if monochrome {
+		mono := &node{name: xml.Name{Local: "monochrome"}}
+		setAttr(mono, androidNS, "drawable", "@mipmap/ic_launcher_monochrome")
+		root.kids = append(root.kids, mono)
+	}
+	e := &encoder{index: map[string]int{}, refs: refs}
+	for _, name := range attrNames(root) {
+		e.str(name)
+		e.ids = append(e.ids, androidAttrs[name].id)
+	}
+	e.namespace(xmlStartNS, e.str("android"), e.str(androidNS))
+	if err := e.element(root); err != nil {
+		return nil, err
+	}
+	e.namespace(xmlEndNS, e.str("android"), e.str(androidNS))
+	pool := e.pool()
+	var out bytes.Buffer
+	put := func(v any) { binary.Write(&out, binary.LittleEndian, v) }
+	put(uint16(xmlHeader))
+	put(uint16(8))
+	put(uint32(8 + pool.Len() + 8 + 4*len(e.ids) + e.chunks.Len()))
+	out.Write(pool.Bytes())
+	put(uint16(resourceMap))
+	put(uint16(8))
+	put(uint32(8 + 4*len(e.ids)))
+	for _, id := range e.ids {
+		put(id)
+	}
+	out.Write(e.chunks.Bytes())
+	return out.Bytes(), nil
+}
+
+func adaptiveFiles(adaptive *AdaptiveIcon) ([]File, error) {
+	refs := map[string]uint32{
+		"@mipmap/ic_launcher_foreground": foregroundResourceID,
+		"@mipmap/ic_launcher_background": backgroundResourceID,
+		"@mipmap/ic_launcher_monochrome": monochromeResourceID,
+	}
+	xml, err := EncodeAdaptiveIcon(refs, len(adaptive.Monochrome) > 0)
+	if err != nil {
+		return nil, err
+	}
+	files := []File{
+		{Name: adaptiveIconFile, Data: xml, Stored: true},
+		{Name: foregroundFile, Data: adaptive.Foreground, Stored: true},
+		{Name: backgroundFile, Data: adaptive.Background, Stored: true},
+	}
+	if len(adaptive.Monochrome) > 0 {
+		files = append(files, File{Name: monochromeFile, Data: adaptive.Monochrome, Stored: true})
+	}
+	return files, nil
 }
 
 // pool encodes the strings as a UTF-16 string pool, as aapt2 does.

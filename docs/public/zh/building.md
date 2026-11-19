@@ -43,6 +43,10 @@ icon:
   png: assets/Icon.png        # 其他所有目标
   tvos: assets/AppIconTV.brandassets  # Apple TV 的分层图标和顶部横幅，或一张宽图
   watchos: assets/AppIconWatch.icon   # Apple Watch 自己的图标，按圆形绘制，或一张方图
+  android:
+    foreground: assets/IconForeground.png  # 自适应图标前景，432 像素方形
+    background: "#1F1F1F"                 # 颜色或方形 PNG
+    monochrome: assets/IconMonochrome.png  # 可选的主题图标图层
 dev:
   target: native        # native、web、ios、ios_simulator、tvos、tvos_simulator、watchos、watchos_simulator、android、harmonyos 或 miniprogram_<平台>
   hot_reload: true      # false 时只构建一次，不监听文件
@@ -81,6 +85,8 @@ build:
 工具为应用运行的每个 go 命令都使用 `build.tags`：`dev` 及其每次重新加载、`build`（包括 `-embed`）、`test`（包括 `-target`）和 `check`，覆盖所有目标。NSGo 自己的标签（例如 `dev` 中的 `nsgodev`、目标测试中的 `nsgotest`）会加在它们之后，`GOFLAGS` 中 `-tags` 的标签也会合并进来，而不是被替换；`GOFLAGS` 的其余选项照常生效。
 
 Apple TV 的图标不是方形，而是一张分层卡片：`tvos` 取 Xcode 的 `.brandassets`（其中的 `App Icon` 堆栈和顶部横幅），或一张如 1280×768 的宽图，工具用它的边缘色铺底、让图铺满卡片，并居中生成顶部横幅；两者都没有时，`png` 按卡片高度的四分之三居中。Apple Watch 会把图标裁成圆形，所以 `watchos` 取按 watchOS 圆形绘制的 `.icon` 或一张方图；没有它时依次用 `apple` 和 `png`。两者与 `apple`、`png` 一样默认取 `assets/AppIconTV.*` 和 `assets/AppIconWatch.*`。
+
+在 Android 上，`icon.android` 会增加自适应启动图标。`foreground` 和 `background` 必须同时提供，`monochrome` 会增加 Android 13 的主题图标图层。旧版 PNG 仍作为较旧启动器的后备图标。
 
 每个构建在启动时还接受 NSGo 自己的参数，例如 `--nsgo-fps`（[运行与调试](debugging.md#所有构建都接受的参数)）。
 

@@ -212,6 +212,39 @@ func TestReadIconShapes(t *testing.T) {
 	}
 }
 
+func TestAndroidAdaptiveIcon(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string) string {
+		path := filepath.Join(dir, name)
+		file, err := os.Create(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := png.Encode(file, testIcon(64)); err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	p := &project{Icon: icons{Android: &androidIcon{Foreground: write("foreground.png"), Background: "#123456", Monochrome: write("mono.png")}}}
+	icon, err := p.androidAdaptiveIcon()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(icon.Foreground) == 0 || len(icon.Background) == 0 || len(icon.Monochrome) == 0 {
+		t.Fatalf("adaptive icon layers = %+v", icon)
+	}
+	img, err := png.Decode(bytes.NewReader(icon.Background))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := img.Bounds().Dx(); got != 432 || img.Bounds().Dy() != 432 {
+		t.Fatalf("background size = %v", img.Bounds())
+	}
+}
+
 func TestEdgeColor(t *testing.T) {
 	img := image.NewNRGBA(image.Rect(0, 0, 8, 8))
 	for y := range 8 {

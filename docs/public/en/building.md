@@ -43,6 +43,10 @@ icon:
   png: assets/Icon.png        # every other target
   tvos: assets/AppIconTV.brandassets  # the Apple TV's layered icon and top shelf art, or a wide PNG
   watchos: assets/AppIconWatch.icon   # the Apple Watch's own, drawn in circles, or a square PNG
+  android:
+    foreground: assets/IconForeground.png  # adaptive icon foreground, 432 px square
+    background: "#1F1F1F"                 # a color or a square PNG
+    monochrome: assets/IconMonochrome.png  # optional themed icon layer
 dev:
   target: native        # native, web, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android, harmonyos or miniprogram_<platform>
   hot_reload: true      # false builds once, watching no files
@@ -81,6 +85,8 @@ Flags replace the values they name, such as `-target`, `-version` or `-output`; 
 Every go command the tool runs for the app takes `build.tags`, in `dev` and its reloads, `build` with `-embed` too, `test` with `-target` too and `check`, on every target. NSGo's own tags, such as `nsgodev` in `dev` or `nsgotest` in target tests, are added to them, as are the tags of `-tags` in `GOFLAGS`, which would otherwise be replaced; the rest of `GOFLAGS` applies as it is.
 
 An Apple TV's icon is a layered card, not a square: `tvos` takes Xcode's `.brandassets`, its `App Icon` stacks and top shelf images, or a wide image such as 1280×768, which the tool draws to fit the card over its edge color and centers on the top shelf images. Without either, the PNG sits at three quarters of the card's height. An Apple Watch masks its icon to a circle, so `watchos` takes an `.icon` drawn for watchOS's circles or a square PNG; without it the app uses `apple`, then `png`. Both fall back to `assets/AppIconTV.*` and `assets/AppIconWatch.*`, as `apple` and `png` do.
+
+On Android, `icon.android` adds an adaptive launcher icon. `foreground` and `background` are required, and `monochrome` adds the Android 13 themed layer. The legacy PNG remains the fallback for older launchers.
 
 Every build also takes NSGo's own flags as it starts, such as `--nsgo-fps` ([Running and debugging](debugging.md#flags-of-every-build)).
 

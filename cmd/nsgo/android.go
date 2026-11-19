@@ -10,6 +10,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"image/png"
 	"io"
 	"os"
 	"os/exec"
@@ -127,6 +128,17 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 	if img != nil {
 		icon = scaledPNG(img, apk.IconSize)
 	}
+	adaptive, err := p.androidAdaptiveIcon()
+	if err != nil {
+		return "", err
+	}
+	if icon == nil && adaptive != nil {
+		background, err := png.Decode(bytes.NewReader(adaptive.Background))
+		if err != nil {
+			return "", err
+		}
+		icon = scaledPNG(background, apk.IconSize)
+	}
 	path := filepath.Join(dir, p.Name+ext)
 	f, err := os.Create(path)
 	if err != nil {
@@ -148,6 +160,7 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 		VersionName: p.Version,
 		VersionCode: p.versionCode(),
 		Icon:        icon,
+		Adaptive:    adaptive,
 		Theme:       androidThemes[p.Appearance],
 		Debuggable:  p.testBinary,
 		Permissions: p.androidPermissions(),

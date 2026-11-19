@@ -120,6 +120,44 @@ func TestWriteBundle(t *testing.T) {
 	}
 }
 
+func TestWriteBundleAdaptiveIcon(t *testing.T) {
+	key, err := NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	err = WriteBundle(&buf, androidruntime.Manifest, Manifest{
+		Package: "dev.oneo.nsgo.test", Label: "Test", VersionName: "1.0.0", VersionCode: 1,
+		Icon: []byte("legacy"), Adaptive: &AdaptiveIcon{Foreground: []byte("fg"), Background: []byte("bg"), Monochrome: []byte("mono")},
+	}, []File{{Name: "classes.dex", Data: []byte("dex")}}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{}
+	for _, f := range r.File {
+		read, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[f.Name], err = io.ReadAll(read)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"base/" + adaptiveIconFile, "base/" + foregroundFile, "base/" + backgroundFile, "base/" + monochromeFile} {
+		if _, ok := files[name]; !ok {
+			t.Errorf("bundle lacks %s", name)
+		}
+	}
+	if root := decodeXML(t, files["base/"+adaptiveIconFile]).root; root.name != "adaptive-icon" {
+		t.Errorf("adaptive icon root = %q", root.name)
+	}
+}
+
 func TestManifestLinesWrap(t *testing.T) {
 	line := manifestLine("Name: " + strings.Repeat("a", 100))
 	for i, l := range strings.Split(strings.TrimSuffix(line, "\r\n"), "\r\n") {

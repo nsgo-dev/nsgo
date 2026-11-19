@@ -23,7 +23,14 @@ func Write(w io.Writer, template []byte, m Manifest, files []File, key *Key) err
 	if m.Icon != nil {
 		all = append(all, File{Name: iconFile, Data: m.Icon, Stored: true})
 	}
-	all = append(all, File{Name: "resources.arsc", Data: resources(m.Package, m.Icon != nil, m.Names), Stored: true})
+	if m.Adaptive != nil {
+		adaptive, err := adaptiveFiles(m.Adaptive)
+		if err != nil {
+			return err
+		}
+		all = append(all, adaptive...)
+	}
+	all = append(all, File{Name: "resources.arsc", Data: resources(m.Package, m.Icon != nil, m.Names, m.Adaptive), Stored: true})
 	zip, err := archive(all)
 	if err != nil {
 		return err

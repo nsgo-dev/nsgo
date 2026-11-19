@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"slices"
+	"sort"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -11,19 +12,23 @@ import (
 
 // The resource table chunk types, from Android's ResourceTypes.h.
 const (
-	tableHeader     = 0x0002
-	tablePackage    = 0x0200
-	tableType       = 0x0201
-	tableTypeSpec   = 0x0202
-	appPackageID    = 0x7f
-	configSize      = 64
-	densityXXXHigh  = 640
-	iconFile        = "res/mipmap-xxxhdpi-v4/ic_launcher.png"
-	iconResource    = "@mipmap/ic_launcher"
-	iconResourceID  = appPackageID<<24 | 1<<16 // package 0x7f, type 1, entry 0
-	nameResource    = "@string/app_name"
-	utf8PoolFlag    = 1 << 8
-	resStringHeader = 28
+	tableHeader      = 0x0002
+	tablePackage     = 0x0200
+	tableType        = 0x0201
+	tableTypeSpec    = 0x0202
+	appPackageID     = 0x7f
+	configSize       = 64
+	densityXXXHigh   = 640
+	iconFile         = "res/mipmap-xxxhdpi-v4/ic_launcher.png"
+	adaptiveIconFile = "res/mipmap-anydpi-v26/ic_launcher.xml"
+	foregroundFile   = "res/mipmap-xxxhdpi-v4/ic_launcher_foreground.png"
+	backgroundFile   = "res/mipmap-xxxhdpi-v4/ic_launcher_background.png"
+	monochromeFile   = "res/mipmap-xxxhdpi-v4/ic_launcher_monochrome.png"
+	iconResource     = "@mipmap/ic_launcher"
+	iconResourceID   = appPackageID<<24 | 1<<16 // package 0x7f, type 1, entry 0
+	nameResource     = "@string/app_name"
+	utf8PoolFlag     = 1 << 8
+	resStringHeader  = 28
 
 	// What a type's entry varies by (ResTable_config's CONFIG_*).
 	configLocale  = 0x0004
@@ -33,6 +38,19 @@ const (
 // IconSize is the launcher icon's size in pixels: 48dp at xxxhdpi, the
 // density the table declares it for. The system scales it for others.
 const IconSize = 192
+
+// AdaptiveIcon holds the PNG layers of an Android adaptive launcher icon.
+type AdaptiveIcon struct {
+	Foreground []byte
+	Background []byte
+	Monochrome []byte
+}
+
+const (
+	foregroundResourceID = appPackageID<<24 | 1<<16 | 1
+	backgroundResourceID = appPackageID<<24 | 1<<16 | 2
+	monochromeResourceID = appPackageID<<24 | 1<<16 | 3
+)
 
 // nameResourceID is @string/app_name's ID: the type after the icon's,
 // when the table has one.
@@ -46,9 +64,14 @@ func nameResourceID(icon bool) uint32 {
 // resType is a type of the table with one entry, key, and its value in
 // each configuration.
 type resType struct {
-	name, key string
-	varies    uint32 // configLocale, configDensity
-	values    []resValue
+	name    string
+	varies  uint32 // configLocale, configDensity
+	entries []resEntry
+}
+
+type resEntry struct {
+	key    string
+	values []resValue
 }
 
 // resValue is a string value of an entry in a configuration.
@@ -57,21 +80,59 @@ type resValue struct {
 	str    string
 }
 
+func sortedConfigs(configs map[string][]byte) [][]byte {
+	keys := make([]string, 0, len(configs))
+	for key := range configs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([][]byte, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, configs[key])
+	}
+	return out
+}
+
+func valueForConfig(values []resValue, config []byte) (resValue, bool) {
+	for _, value := range values {
+		if string(value.config) == string(config) {
+			return value, true
+		}
+	}
+	return resValue{}, false
+}
+
 // resources is the resource table an APK carries: the launcher icon
 // @mipmap/ic_launcher when icon, at xxxhdpi in iconFile, and the app's
 // name @string/app_name in each language of names, by BCP 47 tag, ""
 // for the default, when names has any. The manifest refers to them by
 // iconResourceID and nameResourceID.
-func resources(pkg string, icon bool, names map[string]string) []byte {
+func resources(pkg string, icon bool, names map[string]string, adaptive *AdaptiveIcon) []byte {
 	var types []resType
 	if icon {
 		config := newConfig()
 		binary.LittleEndian.PutUint16(config[14:], densityXXXHigh)
 		binary.LittleEndian.PutUint16(config[24:], 4) // sdkVersion, as aapt2 adds for a density
-		types = append(types, resType{"mipmap", "ic_launcher", configDensity, []resValue{{config, iconFile}}})
+		entry := resEntry{key: "ic_launcher", values: []resValue{{config, iconFile}}}
+		if adaptive != nil {
+			anydpi := newConfig()
+			binary.LittleEndian.PutUint16(anydpi[14:], 0xfffe)
+			binary.LittleEndian.PutUint16(anydpi[24:], 26)
+			entry.values = append(entry.values, resValue{anydpi, adaptiveIconFile})
+		}
+		entries := []resEntry{entry}
+		if adaptive != nil {
+			entries = append(entries,
+				resEntry{key: "ic_launcher_foreground", values: []resValue{{config, foregroundFile}}},
+				resEntry{key: "ic_launcher_background", values: []resValue{{config, backgroundFile}}})
+			if len(adaptive.Monochrome) > 0 {
+				entries = append(entries, resEntry{key: "ic_launcher_monochrome", values: []resValue{{config, monochromeFile}}})
+			}
+		}
+		types = append(types, resType{name: "mipmap", varies: configDensity, entries: entries})
 	}
 	if len(names) > 0 {
-		t := resType{name: "string", key: "app_name", varies: configLocale}
+		t := resType{name: "string", varies: configLocale, entries: []resEntry{{key: "app_name"}}}
 		langs := make([]string, 0, len(names))
 		for lang := range names {
 			if lang == "" || localeConfig(lang) != nil {
@@ -84,7 +145,7 @@ func resources(pkg string, icon bool, names map[string]string) []byte {
 			if lang != "" {
 				config = localeConfig(lang)
 			}
-			t.values = append(t.values, resValue{config, names[lang]})
+			t.entries[0].values = append(t.entries[0].values, resValue{config, names[lang]})
 		}
 		types = append(types, t)
 	}
@@ -151,27 +212,57 @@ func table(pkg string, types []resType) []byte {
 	for i, t := range types {
 		id := uint8(i + 1)
 		typeNames = append(typeNames, t.name)
-		keys = append(keys, t.key)
+		for _, entry := range t.entries {
+			keys = append(keys, entry.key)
+		}
 		put(&chunks, [2]uint16{tableTypeSpec, 16})
-		put(&chunks, uint32(16+4))
+		put(&chunks, uint32(16+4*len(t.entries)))
 		put(&chunks, [4]uint8{id, 0, 0, 0})
-		put(&chunks, uint32(1)) // one entry
-		put(&chunks, t.varies)
-		for _, v := range t.values {
+		put(&chunks, uint32(len(t.entries)))
+		for range t.entries {
+			put(&chunks, t.varies)
+		}
+		configs := map[string][]byte{}
+		for _, entry := range t.entries {
+			for _, value := range entry.values {
+				configs[string(value.config)] = value.config
+			}
+		}
+		for _, config := range sortedConfigs(configs) {
 			const typeHeader = 20 + configSize
+			present := make([]int, 0, len(t.entries))
+			for entryID, entry := range t.entries {
+				if _, ok := valueForConfig(entry.values, config); ok {
+					present = append(present, entryID)
+				}
+			}
 			put(&chunks, [2]uint16{tableType, typeHeader})
-			put(&chunks, uint32(typeHeader+4+16))
+			put(&chunks, uint32(typeHeader+4*len(t.entries)+16*len(present)))
 			put(&chunks, [4]uint8{id, 0, 0, 0})
-			put(&chunks, uint32(1))            // entries
-			put(&chunks, uint32(typeHeader+4)) // where they start
-			chunks.Write(v.config)
-			put(&chunks, uint32(0))               // the entry's offset
-			put(&chunks, [2]uint16{8, 0})         // entry header, no flags
-			put(&chunks, uint32(i))               // its key
-			put(&chunks, uint16(8))               // value size
-			put(&chunks, [2]uint8{0, typeString}) // a string,
-			put(&chunks, uint32(len(values)))     // in the global pool
-			values = append(values, v.str)
+			put(&chunks, uint32(len(t.entries)))
+			put(&chunks, uint32(typeHeader+4*len(t.entries)))
+			chunks.Write(config)
+			for _, entry := range t.entries {
+				value, ok := valueForConfig(entry.values, config)
+				if !ok {
+					put(&chunks, uint32(0xffffffff))
+					continue
+				}
+				put(&chunks, uint32(slices.IndexFunc(present, func(id int) bool { return t.entries[id].key == entry.key })*16))
+				_ = value
+			}
+			for entryID, entry := range t.entries {
+				value, ok := valueForConfig(entry.values, config)
+				if !ok {
+					continue
+				}
+				put(&chunks, [2]uint16{8, 0})
+				put(&chunks, uint32(entryID))
+				put(&chunks, uint16(8))
+				put(&chunks, [2]uint8{0, typeString})
+				put(&chunks, uint32(len(values)))
+				values = append(values, value.str)
+			}
 		}
 	}
 

@@ -7,6 +7,7 @@ import (
 	"debug/pe"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"go/build"
 	"image"
@@ -16,8 +17,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/nsgo-dev/nsgo/cmd/nsgo/apk"
 )
 
 // assetsDir is the directory beside nsgo.yaml for project files that
@@ -65,6 +69,25 @@ func (p *project) resolveIconSet(set *icons, key, suffix string) error {
 	if ext := filepath.Ext(set.WatchOS); set.WatchOS != "" && ext != ".icon" && ext != ".png" {
 		return fmt.Errorf("%s.watchos: %s is neither an .icon nor a .png", key, rel(set.WatchOS))
 	}
+	if set.Android != nil {
+		if set.Android.Background != "" && !strings.HasPrefix(set.Android.Background, "#") {
+			resolved := p.resolve(set.Android.Background)
+			if _, err := os.Stat(resolved); err != nil {
+				return fmt.Errorf("%s.android.background: %w", key, err)
+			}
+			set.Android.Background = resolved
+		}
+		for name, path := range map[string]*string{"foreground": &set.Android.Foreground, "monochrome": &set.Android.Monochrome} {
+			if *path == "" {
+				continue
+			}
+			resolved := p.resolve(*path)
+			if _, err := os.Stat(resolved); err != nil {
+				return fmt.Errorf("%s.android.%s: %w", key, name, err)
+			}
+			*path = resolved
+		}
+	}
 	return nil
 }
 
@@ -100,11 +123,64 @@ func (p *project) useDevIcons() {
 	if p.Dev.Icon.WatchOS != "" {
 		p.Icon.WatchOS = p.Dev.Icon.WatchOS
 	}
+	if p.Dev.Icon.Android != nil {
+		p.Icon.Android = p.Dev.Icon.Android
+	}
 }
 
 // iconImage decodes the project's PNG icon, nil when it has none.
 func (p *project) iconImage() (image.Image, error) {
 	return readOptionalIcon(p.Icon.PNG)
+}
+
+func (p *project) androidAdaptiveIcon() (*apk.AdaptiveIcon, error) {
+	if p.Icon.Android == nil {
+		return nil, nil
+	}
+	a := p.Icon.Android
+	if a.Foreground == "" || a.Background == "" {
+		return nil, errors.New("icon.android needs foreground and background")
+	}
+	foreground, err := readSquareIcon(a.Foreground)
+	if err != nil {
+		return nil, err
+	}
+	background, err := androidIconLayer(a.Background)
+	if err != nil {
+		return nil, err
+	}
+	adaptive := &apk.AdaptiveIcon{Foreground: scaledPNG(foreground, 432), Background: scaledPNG(background, 432)}
+	if a.Monochrome != "" {
+		mono, err := readSquareIcon(a.Monochrome)
+		if err != nil {
+			return nil, err
+		}
+		adaptive.Monochrome = scaledPNG(mono, 432)
+	}
+	return adaptive, nil
+}
+
+func androidIconLayer(value string) (image.Image, error) {
+	if !strings.HasPrefix(value, "#") {
+		return readSquareIcon(value)
+	}
+	hex := strings.TrimPrefix(value, "#")
+	if len(hex) != 6 && len(hex) != 8 {
+		return nil, fmt.Errorf("icon.android.background: %q is not a #RRGGBB or #RRGGBBAA color", value)
+	}
+	b, err := strconv.ParseUint(hex, 16, 32)
+	if err != nil {
+		return nil, fmt.Errorf("icon.android.background: %q is not a color", value)
+	}
+	a := uint8(255)
+	if len(hex) == 8 {
+		a = uint8(b)
+		b >>= 8
+	}
+	c := color.NRGBA{R: uint8(b >> 16), G: uint8(b >> 8), B: uint8(b), A: a}
+	img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
+	img.SetNRGBA(0, 0, c)
+	return img, nil
 }
 
 // readOptionalIcon decodes path as a square PNG icon, nil when it is

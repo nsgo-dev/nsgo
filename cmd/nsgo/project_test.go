@@ -318,4 +318,13 @@ func TestIcons(t *testing.T) {
 	if _, err := load("dev:\n  icon:\n    apple: art/app.png\n"); err == nil {
 		t.Error("a PNG loaded as dev.icon.apple")
 	}
+	write("art/foreground.png")
+	write("art/mono.png")
+	p, err = load("icon:\n  android:\n    foreground: art/foreground.png\n    background: '#123456'\n    monochrome: art/mono.png\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Icon.Android == nil || p.Icon.Android.Foreground != filepath.Join(dir, "art", "foreground.png") || p.Icon.Android.Background != "#123456" || p.Icon.Android.Monochrome != filepath.Join(dir, "art", "mono.png") {
+		t.Fatalf("android icon = %+v", p.Icon.Android)
+	}
 }
