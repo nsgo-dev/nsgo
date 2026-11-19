@@ -231,7 +231,22 @@ func TestMenuYieldFollowsNativeFocus(t *testing.T) {
 	// apartment out of the process that runs the other native tests.
 	if os.Getenv("NSGO_TEST_WEBVIEW2_MENU_PROCESS") != t.Name() {
 		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
-		dir := t.TempDir()
+		dir, err := os.MkdirTemp("", "nsgo-menu-webview2-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				if err := os.RemoveAll(dir); err == nil {
+					return
+				} else if time.Now().After(deadline) {
+					t.Logf("WebView2 profile cleanup: %v", err)
+					return
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
 		cmd.Env = append(os.Environ(), "NSGO_TEST_WEBVIEW2_MENU_PROCESS="+t.Name(), "APPDATA="+dir, "LOCALAPPDATA="+dir)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
