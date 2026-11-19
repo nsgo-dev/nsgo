@@ -23,7 +23,7 @@ type WebView struct {
 	// InjectedJavaScriptBeforeContent before each page's own scripts.
 	InjectedJavaScript              string
 	InjectedJavaScriptBeforeContent string
-	// The page loads again when InjectedJavaScriptBeforeContentFunc's script changes.
+	// InjectedJavaScriptBeforeContentFunc, when set, gives the script before each page's own scripts in place of InjectedJavaScriptBeforeContent. When its script changes, the view loads its source again with the new script, as when SourceFunc's source changes, replacing the page it shows, one the user or Ref.Load navigated to included.
 	InjectedJavaScriptBeforeContentFunc func() string
 	// UserAgent replaces the platform's.
 	UserAgent string

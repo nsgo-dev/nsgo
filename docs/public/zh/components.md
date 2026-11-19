@@ -18,7 +18,7 @@ core.View{
 }
 ```
 
-`core.WebView` 显示网页内容；空的 `WebSource` 会加载 `about:blank`，并报告通常的加载和导航事件。让 `SourceFunc` 返回空来源，或调用 `Ref.Load(core.WebSource{})`，即可清空之前的页面。若页面自身脚本之前的注入脚本跟随 signal，请设置 `InjectedJavaScriptBeforeContentFunc`。给它绑定一个 `core.Ref` 即可调用 `Reload`、`GoBack` 和 `GoForward`。在原生目标上，这些命令让应用自己的 HTML 和 data 来源继续不受 `core.AccessWebSchemes` 限制；页面自己发起的新导航仍遵循访问策略。
+`core.WebView` 显示网页内容；空的 `WebSource` 会加载 `about:blank`，并报告通常的加载和导航事件。让 `SourceFunc` 返回空来源，或调用 `Ref.Load(core.WebSource{})`，即可清空之前的页面。若页面自身脚本之前的注入脚本跟随 signal，请设置 `InjectedJavaScriptBeforeContentFunc`：脚本变化时，web view 会带着新脚本重新加载它的来源，替换当前显示的页面，即使那是用户或 `Ref.Load` 导航到的页面。给它绑定一个 `core.Ref` 即可调用 `Reload`、`GoBack` 和 `GoForward`。在原生目标上，这些命令让应用自己的 HTML 和 data 来源继续不受 `core.AccessWebSchemes` 限制；页面自己发起的新导航仍遵循访问策略。
 
 设置 `Mobile`（TSX 中为 `mobile`）后，Windows、macOS 和 Linux 上的页面按手机所见的样子显示，适合 YouTube Shorts 这类只在手机上用上下滑动切换视频的网站：页面得到手机的 user agent（设置了 `UserAgent` 时以它为准）和没有悬停的触摸屏，鼠标拖动、以及在不可滚动处的滚轮或触控板滚动，都会作为手指滑动送达页面。Windows 像 Chrome 的设备模式那样模拟手机。macOS 和 Linux 用脚本实现，因此页面的样式表仍看到鼠标，触摸事件也不是可信事件，页面可能忽略它们。iOS、Android、HarmonyOS、Web 和小程序按原样显示页面。
 
