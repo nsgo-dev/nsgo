@@ -109,9 +109,7 @@ func iosEnv(ctx context.Context, sys *appleOS, simulator bool) ([]string, error)
 		"CC=" + clang + " " + flags, "CGO_CFLAGS=" + flags, "CGO_LDFLAGS=" + flags}, nil
 }
 
-// appleBuildInfo returns the toolchain metadata Xcode writes into device
-// bundles. Simulator bundles intentionally omit it: those are development
-// artifacts and App Store validation applies only to device packages.
+// appleBuildInfo returns the toolchain metadata Xcode writes into a device bundle's Info.plist, which App Store Connect reads to tell the SDK and Xcode an upload was built with (#889), and the arm64 requirement it asks of an app. Simulator bundles go to no store and leave it out.
 func appleBuildInfo(ctx context.Context, sys *appleOS, simulator bool) (map[string]any, error) {
 	if simulator {
 		return nil, nil
@@ -134,18 +132,14 @@ func appleBuildInfo(ctx context.Context, sys *appleOS, simulator bool) (map[stri
 		return nil, fmt.Errorf("xcodebuild -version returned no build version")
 	}
 	xcodeVersion = strings.TrimSpace(strings.TrimPrefix(xcodeVersion, "Xcode "))
-	majorText, minorText, _ := strings.Cut(xcodeVersion, ".")
-	major, err := strconv.Atoi(majorText)
-	if err != nil {
-		return nil, fmt.Errorf("xcodebuild -version returned invalid version %q", xcodeVersion)
-	}
-	minor := 0
-	if minorText != "" {
-		minorText, _, _ = strings.Cut(minorText, ".")
-		minor, err = strconv.Atoi(minorText)
-		if err != nil {
+	// DTXcode is the version's major number, two digits, then its minor and patch numbers, a digit each: 1640 for 16.4, 2601 for 26.0.1.
+	var parts [3]int
+	for i, part := range strings.SplitN(xcodeVersion, ".", 3) {
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 || i > 0 && n > 9 {
 			return nil, fmt.Errorf("xcodebuild -version returned invalid version %q", xcodeVersion)
 		}
+		parts[i] = n
 	}
 	xcodeBuild = strings.TrimSpace(strings.TrimPrefix(xcodeBuild, "Build version "))
 	return map[string]any{
@@ -154,16 +148,14 @@ func appleBuildInfo(ctx context.Context, sys *appleOS, simulator bool) (map[stri
 		"DTPlatformBuild":              build,
 		"DTSDKName":                    sdk + version,
 		"DTSDKBuild":                   build,
-		"DTXcode":                      fmt.Sprintf("%d%02d", major, minor*10),
+		"DTXcode":                      fmt.Sprintf("%02d%d%d", parts[0], parts[1], parts[2]),
 		"DTXcodeBuild":                 xcodeBuild,
 		"DTCompiler":                   "com.apple.compilers.llvm.clang.1_0",
 		"UIRequiredDeviceCapabilities": []any{"arm64"},
 	}, nil
 }
 
-// appleBuildPlist returns toolchain metadata as top-level plist entries. An
-// explicit apple.info value wins by leaving its key out of the generated
-// entries; writePlist has already emitted the project's value.
+// appleBuildPlist returns appleBuildInfo's entries for an app's Info.plist, less the keys apple.info sets, whose values writePlist writes.
 func appleBuildPlist(ctx context.Context, p *project, sys *appleOS, simulator bool) (string, error) {
 	info, err := appleBuildInfo(ctx, sys, simulator)
 	if err != nil {

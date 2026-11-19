@@ -3,11 +3,16 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
+// TestAppleBuildInfoDeviceAndSimulator writes the SDK and Xcode an iOS device bundle is built with into its Info.plist, as App Store Connect requires (#889), leaves them out of a simulator's, and leaves a key apple.info sets to it.
 func TestAppleBuildInfoDeviceAndSimulator(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the Xcode fixtures are shell scripts")
+	}
 	bin := t.TempDir()
 	if err := os.WriteFile(filepath.Join(bin, "xcrun"), []byte(`#!/bin/sh
 case "$3" in
@@ -18,7 +23,7 @@ esac
 `), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(bin, "xcodebuild"), []byte("#!/bin/sh\nprintf 'Xcode 16.4\\nBuild version 16F6\\n'\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "xcodebuild"), []byte("#!/bin/sh\nprintf 'Xcode 26.0.1\\nBuild version 17A400\\n'\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -28,7 +33,7 @@ esac
 	}
 	for key, want := range map[string]any{
 		"DTPlatformName": "iphoneos", "DTPlatformVersion": "18.5", "DTPlatformBuild": "22F76",
-		"DTSDKName": "iphoneos18.5", "DTSDKBuild": "22F76", "DTXcode": "1640", "DTXcodeBuild": "16F6",
+		"DTSDKName": "iphoneos18.5", "DTSDKBuild": "22F76", "DTXcode": "2601", "DTXcodeBuild": "17A400",
 		"DTCompiler": "com.apple.compilers.llvm.clang.1_0",
 	} {
 		if got[key] != want {

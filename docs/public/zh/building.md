@@ -11,8 +11,6 @@ order: 22
 go tool nsgo build
 ```
 
-iOS、tvOS 和 watchOS 的设备构建会在应用及其扩展中写入 App Store Connect 检查的 SDK 与 Xcode 元数据，并加入 `UIRequiredDeviceCapabilities: [arm64]`。模拟器构建不会写入这些仅设备条目；`apple.info` 中显式设置的值优先。
-
 `build` 为 `nsgo.yaml` 列出的每个目标写出精简的发布包，放在 `dist/<name>-<version>-<target>`：`.app`、`.ipa`、`.apk`、Windows 和 Linux 的目录，或一个网站，网站页面会在 `import()` 执行时才获取它指定的 TSX 模块。`-target` 替换目标列表，`all` 表示所有只需 Go 和 Xcode 的目标；安装 Android NDK 后可再加上 `android_x64`；`miniprogram` 构建全部[小程序](#小程序)，也可单独指定 `miniprogram_wechat`、`miniprogram_qq`、`miniprogram_alipay` 或 `miniprogram_douyin`；`harmonyos` 构建[鸿蒙](#鸿蒙)预览版。`-run` 启动为本机构建的包，或把它安装到 `-device` 选中的 iPhone、模拟器或 Android 设备上。
 
 所有要交付出去的东西都在 `dist/releases`，只需看这一个目录：
@@ -157,6 +155,8 @@ sign:
 在 macOS 上，滚动视图的边缘效果（`Scroll.EdgeEffects`）和没有指定 `IOS.BackdropMaterial` 的背景模糊 `Blur` 像 AppKit 自己的边缘效果和材质一样，通过 Core Animation 的私有 `CABackdropLayer` 和 `CAFilter` 实现模糊，因为没有公开 API 能按半径模糊，或让模糊程度在视图上渐变。App Store 审核可能拒绝使用私有 API 的应用：NSGo 只在带边缘栏的滚动视图和这类模糊中调用它们，但每个 macOS 构建都包含它们的名称。
 
 `build` 写出的每个 Apple 包，即应用、它的小组件扩展、App Clip 和 Apple Watch 应用，以及 `-dynamic` 的 `-embed` 框架，都带有隐私清单 `PrivacyInfo.xcprivacy`，声明 NSGo 和 Go 运行时用到的需要理由的 API：用户默认设置（`CA92.1`）、文件时间戳（`C617.1`）和系统启动时间（`35F9.1`）。`apple.privacy` 添加应用自己的声明：`accessed_apis` 给出每个类别的理由，另有 `tracking`、`tracking_domains` 和 `collected_data`，后者的条目按 Apple 的命名写成 `NSPrivacyCollectedDataTypes` 的条目；`resources/` 中的 `PrivacyInfo.xcprivacy` 会与这些声明合并，而不是被替换。
+
+iOS、tvOS 和 watchOS 的设备构建会在应用及其扩展中写入 App Store Connect 检查的 SDK 与 Xcode 元数据，并加入 `UIRequiredDeviceCapabilities: [arm64]`。模拟器构建不会写入这些仅设备条目；`apple.info` 中显式设置的值优先。
 
 ## 发布到 GitHub
 

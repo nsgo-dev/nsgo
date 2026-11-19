@@ -628,8 +628,7 @@ func addIOSWidgets(ctx context.Context, p *project, app string, simulator bool) 
 		"UIDeviceFamily":             []any{int64(1), int64(2)},
 	}
 	if simulator {
-		// Keep the platform marker for simulator extensions, but do not add
-		// device-only toolchain metadata.
+		// The simulator's extension names its platform alone: the toolchain metadata is for the store's.
 		platformInfo["DTPlatformName"] = sdk
 	} else {
 		buildInfo, err := appleBuildInfo(ctx, iOS, false)

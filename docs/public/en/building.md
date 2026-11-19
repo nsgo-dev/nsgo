@@ -11,8 +11,6 @@ order: 22
 go tool nsgo build
 ```
 
-Device builds for iOS, tvOS and watchOS include the SDK and Xcode metadata App Store Connect checks, plus `UIRequiredDeviceCapabilities: [arm64]`, in the app and its extensions. Simulator builds leave these device-only entries out, and an explicit `apple.info` value keeps precedence.
-
 `build` writes a stripped release package for each target `nsgo.yaml` lists, into `dist/<name>-<version>-<target>`: an `.app`, an `.ipa`, an `.apk`, Windows' and Linux's directories, or a web site, whose page fetches each TSX module an `import()` names when the import runs. `-target` replaces the list, and `all` means every target that needs only Go and Xcode; add `android_x64` when an Android NDK is installed, and `miniprogram`, or `miniprogram_wechat`, `miniprogram_qq`, `miniprogram_alipay` or `miniprogram_douyin` alone, for [mini programs](#mini-programs), and `harmonyos` for a [HarmonyOS](#harmonyos) preview. `-run` starts the package built for this machine, or installs it on the iPhone, simulator or Android device `-device` picks.
 
 Everything to hand out lands in `dist/releases`, the only directory to look in:
@@ -157,6 +155,8 @@ Without `sign.macos_profile` the Mac package is unsigned: it runs sandboxed on y
 On macOS, a scroll view's edge effects (`Scroll.EdgeEffects`) and a backdrop `Blur` with no `IOS.BackdropMaterial` blur through Core Animation's private `CABackdropLayer` and `CAFilter`, as AppKit's own edge effects and materials do, since no public API blurs by a radius or varies a blur across a view. App Store review may reject apps that use private APIs: NSGo calls them only for scroll views with edge bars and those blurs, but every macOS build contains their names.
 
 Every Apple bundle `build` writes, the app, its widget extension, App Clip and Apple Watch app, and a `-dynamic` `-embed` framework, carries a privacy manifest, `PrivacyInfo.xcprivacy`, declaring the required-reason APIs NSGo and Go's runtime use: user defaults (`CA92.1`), file timestamps (`C617.1`) and system boot time (`35F9.1`). `apple.privacy` adds the app's own: `accessed_apis`, each category's reasons, `tracking`, `tracking_domains` and `collected_data`, entries of `NSPrivacyCollectedDataTypes` as Apple names them; a `PrivacyInfo.xcprivacy` in `resources/` is merged with them rather than replaced.
+
+The Info.plist of each iOS, tvOS and watchOS bundle `build` writes for devices, the app's, its widget extension's and App Clip's, carries the SDK and Xcode `DT` keys App Store Connect checks, read from the Xcode that builds it, and `UIRequiredDeviceCapabilities: [arm64]`; simulator bundles leave them out, and a key `apple.info` sets keeps its value.
 
 ## Publish on GitHub
 
