@@ -120,6 +120,9 @@ func TestWatchGallery(t *testing.T) {
 
 // TestWatchLayout lays the gallery out as a watch does, headless: the index lists only the watch's demos, and a demo goes back to it.
 func TestWatchLayout(t *testing.T) {
+	if nsgotest.Target() != "" {
+		t.Skip("headless: a target keeps its own idiom")
+	}
 	app := nsgotest.Start(t, Root, nsgotest.Size(162, 197), nsgotest.Environment(core.Environment{OS: core.OSIOS, Idiom: core.IdiomWatch, Locale: "en-US"}))
 	for _, d := range allDemos() {
 		if got, want := app.Exists("id:nav-"+d.name), watchPages[d.name] != nil; got != want {

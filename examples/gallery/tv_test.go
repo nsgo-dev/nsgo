@@ -158,6 +158,9 @@ func TestTVGallery(t *testing.T) {
 
 // TestTVLayout lays the gallery out as a TV does, headless: the sidebar leaves out the demos a TV cannot use, and opens the others beside it.
 func TestTVLayout(t *testing.T) {
+	if nsgotest.Target() != "" {
+		t.Skip("headless: a target keeps its own idiom")
+	}
 	app := nsgotest.Start(t, Root, nsgotest.Size(1920, 1080), nsgotest.Environment(core.Environment{OS: core.OSIOS, Idiom: core.IdiomTV, Locale: "en-US"}))
 	for _, d := range allDemos() {
 		if got := app.Exists("id:nav-" + d.name); got == tvLeftOut[d.name] {
