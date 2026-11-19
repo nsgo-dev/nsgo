@@ -517,7 +517,7 @@ func (g *gallery) phone(cx *core.Scope) core.Node {
 		if cx.Env().OS() == core.OSAndroid {
 			system = android
 		}
-		// HarmonyOS reads as Android, whose system bar TabShell picks for tabs with an icon, but its render layer draws no system tab bar yet: tabs with neither icon get TabShell's drawn bar.
+		// HarmonyOS reads as Android, whose system bar TabShell picks for tabs with an icon, but its render layer draws no system tab bar yet (https://github.com/nsgo-dev/nsgo/issues/807): tabs with neither icon get TabShell's drawn bar.
 		if harmonyOS {
 			icon, system = nil, ""
 		}
