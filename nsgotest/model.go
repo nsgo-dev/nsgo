@@ -815,7 +815,7 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 			a.post(driver.Event{Kind: driver.EventOverlayPermission, Count: it.Count, Index: int(a.OverlayPermission)})
 		case driver.ItemWebCookies:
-			a.setWebCookies(it.Count, it.Cookies.Cookies)
+			a.webCookies(it.Count, it.Cookies)
 		case driver.ItemAnnounce:
 			a.Announced = append(a.Announced, it.Value)
 		case driver.ItemInputSource:
@@ -965,6 +965,20 @@ func (a *App) signInWithApple(it *driver.MountItem) {
 	a.post(ev)
 }
 
+// webCookies answers an ItemWebCookies as a platform with a web view cookie store does: it sets cookies in WebCookies, lists those of them the filter picks and that have not expired at the clock's wall time, or clears the store.
+func (a *App) webCookies(id uint32, r *driver.WebCookiesRequest) {
+	switch r.Op {
+	case driver.WebCookiesList:
+		a.post(driver.Event{Kind: driver.EventWebCookies, Count: id, Data: driver.FilterWebCookies(a.WebCookies, r.Filter, a.Clock.WallTime())})
+	case driver.WebCookiesClear:
+		a.WebCookies = nil
+		a.WebsiteDataClears++
+		a.post(driver.Event{Kind: driver.EventWebCookies, Count: id})
+	default:
+		a.setWebCookies(id, r.Cookies)
+	}
+}
+
 // setWebCookies answers an ItemWebCookies as a platform with a web view cookie store does, keeping the cookies in WebCookies unless SetWebCookies refuses them.
 func (a *App) setWebCookies(id uint32, cookies []core.WebCookie) {
 	ev := driver.Event{Kind: driver.EventWebCookies, Count: id}
@@ -976,6 +990,8 @@ func (a *App) setWebCookies(id uint32, cookies []core.WebCookie) {
 		}
 	}
 	for _, c := range cookies {
+		// The store keeps a cookie without a path at "/", as the platforms list it.
+		c.Path = c.CookiePath()
 		a.WebCookies = slices.DeleteFunc(a.WebCookies, func(o core.WebCookie) bool {
 			return o.Name == c.Name && strings.EqualFold(o.Domain, c.Domain) && o.CookiePath() == c.CookiePath()
 		})

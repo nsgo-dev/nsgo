@@ -81,7 +81,7 @@ const (
 	msgRecording = 18
 	// msgSecret reads, writes or deletes a secret in the runtime's keystore (secrets.go).
 	msgSecret = 19
-	// msgCookies sets cookies in the web views' CookieManager (webcookie.go).
+	// msgCookies sets, lists or clears the web views' CookieManager and storage (webcookie.go).
 	msgCookies = 20
 
 	// Java to Go.

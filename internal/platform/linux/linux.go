@@ -903,7 +903,7 @@ func (w *window) apply(b *driver.MountBatch) {
 			speechd.Handle(it.Count, *it.Speak, w.engine.Dispatch)
 			continue
 		case driver.ItemWebCookies:
-			w.setWebCookies(it.Count, *it.Cookies)
+			w.webCookies(it.Count, *it.Cookies)
 			continue
 		case driver.ItemNotificationPermission, driver.ItemShowNotification, driver.ItemCloseNotification, driver.ItemBadge, driver.ItemTaskProgress:
 			w.notify(it)

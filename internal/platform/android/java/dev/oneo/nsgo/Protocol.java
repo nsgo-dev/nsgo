@@ -76,7 +76,7 @@ final class Protocol {
     static final int RECORDING = 18;
     /** Reads, writes or deletes a secret: its number, a SECRET_* op, the service, the account and the value (Secrets). */
     static final int SECRET = 19;
-    /** Sets cookies in CookieManager: the surface and the request's count, then each cookie's URL and Set-Cookie value (webcookie.go). */
+    /** Sets, lists or clears the web views' cookies and storage: the surface, the request's count and a COOKIES_* op, then for COOKIES_ADD each cookie's URL and Set-Cookie value, for COOKIES_LIST the URL (webcookie.go). */
     static final int COOKIES = 20;
 
     // Java to Go.
@@ -106,10 +106,15 @@ final class Protocol {
     static final int SECRET_REPLY = 19;
     /** A sensor session's report or coalesced sample: JSON (sensors.go). */
     static final int SENSOR_REPORT = 20;
-    /** Answers COOKIES: its surface and count, then an error, "" for none. */
+    /** Answers COOKIES: its surface and count, an error, "" for none, and its op, then for COOKIES_LIST the URL and the Cookie header CookieManager gave for it. */
     static final int COOKIES_SET = 21;
     /** Requests or cancels a canvas image: surface, key, generation, cancel. */
     static final int CANVAS_REQUEST = 22;
+
+    // What a COOKIES message asks, as driver.WebCookiesOp has them.
+    static final int COOKIES_ADD = 0;
+    static final int COOKIES_LIST = 1;
+    static final int COOKIES_CLEAR = 2;
 
     // What a SECRET message asks, as secrets.go has them.
     static final int SECRET_READ = 0;

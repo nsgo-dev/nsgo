@@ -1665,7 +1665,7 @@ func (s *surface) apply(b *driver.MountBatch) {
 			apple.HandleSpeak(it.Count, *it.Speak, s.engine.Dispatch)
 			continue
 		case driver.ItemWebCookies:
-			apple.SetWebCookies(it.Count, *it.Cookies, s.engine.Dispatch)
+			apple.WebCookies(it.Count, *it.Cookies, s.engine.Dispatch)
 			continue
 		case driver.ItemAudio:
 			if s.audio == nil {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -54,17 +55,99 @@ func (cx *Scope) SetWebCookies(cookies []WebCookie, done func(err error)) {
 		answer(nil)
 		return
 	}
+	cx.webCookies(t, r, func(_ driver.Event, err error) { answer(err) })
+}
+
+// WebCookieFilter picks cookies of the store the app's web views share: those a request to URL, an http or https URL, would send, by their domain, path and Secure, or those of Domain, a host, and every host under it. The zero filter picks all; a filter takes one or the other.
+type WebCookieFilter = driver.WebCookieFilter
+
+// WebCookies lists the cookies of the store every web view of the app shares that f picks, HttpOnly ones included, which page scripts cannot read, and calls done with them on the engine's goroutine, in the order of their host, path and name; an app reads the cookies of a sign-in made in its web views this way, to call the site from Go or to show where the user is signed in. It works whether or not a web view is shown, and reads the persistent store alone, so an Incognito web view's cookies are never among them. Apple platforms, Windows and Linux list each cookie with every field, filtering in Go; Android's CookieManager answers only the names and values a URL would send, so there a URL filter fills Domain with the URL's host and leaves the other fields empty, and a Domain filter or the zero one gets an Unavailable error. Where the platform has no store, as on the web and where Env.HasWebView is false, done gets an Unavailable error too. Code an Access holds needs the webview capability's cookies (AccessCookies) for the filter's URL, for "https://" and the domain, or for "" to list the whole store.
+func (cx *Scope) WebCookies(f WebCookieFilter, done func(cookies []WebCookie, err error)) {
+	answer := func(cookies []WebCookie, err error) {
+		if done != nil {
+			done(cookies, err)
+		}
+	}
+	t := cx.tree()
+	if t == nil {
+		return
+	}
+	f, resource, err := checkWebCookieFilter(f)
+	if err != nil {
+		answer(nil, err)
+		return
+	}
+	if cx.denied(serviceWebCookies, resource) {
+		answer(nil, AccessDenied(AccessWebView, resource))
+		return
+	}
+	cx.webCookies(t, driver.WebCookiesRequest{Op: driver.WebCookiesList, Filter: f}, func(ev driver.Event, err error) {
+		cookies, _ := ev.Data.([]WebCookie)
+		if err != nil {
+			cookies = nil
+		} else if cookies == nil {
+			cookies = []WebCookie{}
+		}
+		answer(cookies, err)
+	})
+}
+
+// ClearWebsiteData removes everything the store every web view of the app shares holds, cookies, local and session storage, IndexedDB, service workers and caches, and calls done on the engine's goroutine once it is gone, so that a page loaded after it starts signed out and with empty storage: an app's "sign out of every site" or "clear browsing data". A page a web view shows keeps what it already read until it loads again. It works whether or not a web view is shown, and leaves Incognito web views alone, which keep their data in memory. Apple platforms remove all of WKWebsiteDataStore's default store's website data types, Windows clears the WebView2 profile's browsing data (ClearBrowsingDataAll), through a hidden web view while none shows, Linux clears the app's WebKitGTK network session's website data manager, and Android removes CookieManager's cookies and WebStorage's data, which leaves the HTTP cache of web views. Where the platform has no store, as on the web and where Env.HasWebView is false, done gets an Unavailable error. Code an Access holds needs the webview capability's cookies (AccessCookies) for "".
+func (cx *Scope) ClearWebsiteData(done func(err error)) {
+	answer := func(err error) {
+		if done != nil {
+			done(err)
+		}
+	}
+	t := cx.tree()
+	if t == nil {
+		return
+	}
+	if cx.denied(serviceWebCookies, "") {
+		answer(AccessDenied(AccessWebView, ""))
+		return
+	}
+	cx.webCookies(t, driver.WebCookiesRequest{Op: driver.WebCookiesClear}, func(_ driver.Event, err error) { answer(err) })
+}
+
+// webCookies sends r, with the schemes the current scope serves, and calls answer with the platform's event and its error: Unavailable where the platform has no store or no listing by domain.
+func (cx *Scope) webCookies(t *Tree, r driver.WebCookiesRequest, answer func(driver.Event, error)) {
 	r.Schemes = slices.Sorted(maps.Keys(webSchemesOf(cx.current())))
 	t.request(cx, driver.MountItem{Kind: driver.ItemWebCookies, Cookies: &r}, func(ev driver.Event) {
 		switch ev.Text {
 		case "":
-			answer(nil)
-		case driver.NoWebCookieStore:
-			answer(Unavailable(ev.Text))
+			answer(ev, nil)
+		case driver.NoWebCookieStore, driver.NoWebCookieDomains:
+			answer(ev, Unavailable(ev.Text))
 		default:
-			answer(errors.New(ev.Text))
+			answer(ev, errors.New(ev.Text))
 		}
 	})
+}
+
+// checkWebCookieFilter returns f as platforms take it, a URL's scheme and host and a domain in lower case, and the resource Access is asked for, or why it picks nothing.
+func checkWebCookieFilter(f WebCookieFilter) (WebCookieFilter, string, error) {
+	switch {
+	case f.URL != "" && f.Domain != "":
+		return f, "", errors.New("core: a web cookie filter takes a URL or a domain, not both")
+	case f.URL != "":
+		u, err := url.Parse(f.URL)
+		// Parse writes the scheme in lower case.
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+			return f, "", fmt.Errorf("core: a web cookie filter's URL is an http or https URL with a host, not %q", f.URL)
+		}
+		u.Host = strings.ToLower(u.Host)
+		f.URL = u.String()
+		return f, f.URL, nil
+	case f.Domain != "":
+		d := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(f.Domain), "."))
+		if d == "" || strings.ContainsAny(d, "/;, []") || strings.HasSuffix(d, ".") {
+			return f, "", fmt.Errorf("core: a web cookie filter's domain is a host, not %q", f.Domain)
+		}
+		f.Domain = d
+		return f, WebCookie{Domain: d, Secure: true}.URL(), nil
+	}
+	return f, "", nil
 }
 
 // checkWebCookie returns c as the platforms take it, its domain in lower case, or why none would.

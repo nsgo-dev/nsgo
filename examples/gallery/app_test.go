@@ -788,6 +788,25 @@ func TestGesturesAndFileDrop(t *testing.T) {
 	}
 }
 
+func TestCookieStore(t *testing.T) {
+	headless(t)
+	app := startDesktop(t)
+	app.WebCookies = []core.WebCookie{{Name: "other", Value: "1", Domain: "example.com"}}
+	open(app, "WebView")
+	app.Press("role:button Set a cookie")
+	app.Find("text:1 cookie")
+	app.Find("id:cookies >> text:nsgo.dev/")
+	app.Find("id:cookies >> text:HttpOnly")
+	if len(app.WebCookies) != 2 {
+		t.Fatalf("store %+v, want the gallery's cookie beside the other", app.WebCookies)
+	}
+	app.Press("role:button Clear website data")
+	app.Find("text:0 cookies")
+	if len(app.WebCookies) != 0 || app.WebsiteDataClears != 1 {
+		t.Fatalf("store %+v after %d clears", app.WebCookies, app.WebsiteDataClears)
+	}
+}
+
 func TestMedia(t *testing.T) {
 	app := startDesktop(t)
 	open(app, "WebView")

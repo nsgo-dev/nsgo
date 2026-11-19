@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"net/url"
+	"strings"
 
 	"github.com/nsgo-dev/nsgo/desktop/locales"
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -418,4 +420,56 @@ func readEnvironment(r *reader) driver.Environment {
 	env.HeaderHeight, env.LargeHeaderHeight = r.points(), r.points()
 	env.OSVersion.Major = int(r.u32()) // the API level
 	return env
+}
+
+// writeWebCookies writes a msgCookies as NsgoView.cookies reads it: the surface, the request's count and its op, then what the op takes: each cookie to set as a URL it goes to and its Set-Cookie value, which CookieManager.setCookie takes, the URL whose cookies to list, or nothing to clear.
+func writeWebCookies(w *writer, surface, count uint32, r *driver.WebCookiesRequest) {
+	w.u32(surface)
+	w.u32(count)
+	w.byte(byte(r.Op))
+	switch r.Op {
+	case driver.WebCookiesList:
+		w.str(r.Filter.URL)
+	case driver.WebCookiesSet:
+		w.u32(uint32(len(r.Cookies)))
+		for _, c := range r.Cookies {
+			w.str(c.URL())
+			w.str(c.SetCookie())
+		}
+	}
+}
+
+// readWebCookiesSet reads a msgCookiesSet: the surface and the count of the request it answers, an error, "" for none, and the request's op, which for a list is followed by its URL and the Cookie header CookieManager.getCookie gave for it.
+func readWebCookiesSet(r *reader) (uint32, driver.Event) {
+	surface, count := r.u32(), r.u32()
+	ev := driver.Event{Kind: driver.EventWebCookies, Count: count, Text: r.str()}
+	if driver.WebCookiesOp(r.byte()) == driver.WebCookiesList {
+		u, header := r.str(), r.str()
+		if ev.Text == "" {
+			ev.Data = cookiesOfHeader(u, header)
+		}
+	}
+	return surface, ev
+}
+
+// cookiesOfHeader returns the cookies of a Cookie header CookieManager gave for rawURL: names and values alone, for the URL's host, as CookieManager tells nothing else.
+func cookiesOfHeader(rawURL, header string) []driver.WebCookie {
+	host := ""
+	if u, err := url.Parse(rawURL); err == nil {
+		host = strings.ToLower(u.Hostname())
+	}
+	cookies := []driver.WebCookie{}
+	for pair := range strings.SplitSeq(header, ";") {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
+		}
+		// Chromium writes a cookie without a name as its value alone.
+		name, value, ok := strings.Cut(pair, "=")
+		if !ok {
+			name, value = "", pair
+		}
+		cookies = append(cookies, driver.WebCookie{Name: name, Value: value, Domain: host})
+	}
+	return cookies
 }

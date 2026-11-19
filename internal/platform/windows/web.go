@@ -78,6 +78,8 @@ type webView struct {
 	web        *comObject // ICoreWebView2
 	settings   *comObject // ICoreWebView2Settings
 	executed   *comHandler
+	// cookieRequests are the cookie requests running through this view (webcookie.go), by count, each restarting elsewhere if the view closes first, as WebView2 then calls none of their handlers.
+	cookieRequests map[uint32]func()
 
 	ready, closed bool
 	// failed is set when no web view can be made: a placeholder shows.
@@ -1247,6 +1249,11 @@ func (wv *webView) close() {
 	delete(wv.w.webs, wv)
 	wv.w.forget(wv)
 	wv.w.redrawAll()
+	requests := wv.cookieRequests
+	wv.cookieRequests = nil
+	for _, restart := range requests {
+		restart()
+	}
 }
 
 // The mouse event kinds of SendMouseInput.

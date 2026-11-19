@@ -116,6 +116,7 @@ var Parameters = map[string][]string{
 	"ChatWorking":                  {"status", "minutes", "seconds"},
 	"ChatRanTools":                 {"count"},
 	"ChatQuotaLeft":                {"percent"},
+	"MediaCookieCount":             {"n"},
 	"DockEdits":                    {"panel", "count"},
 	"ScrollPageOf":                 {"title", "n", "total"},
 	"DockRegionNone":               {"name"},
@@ -316,6 +317,7 @@ type Translation struct {
 	ChatWorking                  func(status string, minutes int, seconds int) string
 	ChatRanTools                 func(count int) string
 	ChatQuotaLeft                func(percent int) string
+	MediaCookieCount             func(n int) string
 	DockEdits                    func(panel string, count int) string
 	ScrollPageOf                 func(title string, n int, total int) string
 	DockRegionNone               func(name string) string
@@ -2017,6 +2019,11 @@ const (
 	textMediaForward
 	textMediaHome
 	textMediaReload
+	textMediaCookies
+	textMediaTheStoreEveryWebView
+	textMediaSetACookie
+	textMediaList
+	textMediaClearWebsiteData
 	textMediaVideo
 	textMediaThePlatformSPlayer
 	textMediaError
@@ -4339,6 +4346,11 @@ var keyOfText = [numTexts]string{
 	"mediaForward",
 	"mediaHome",
 	"mediaReload",
+	"mediaCookies",
+	"mediaTheStoreEveryWebView",
+	"mediaSetACookie",
+	"mediaList",
+	"mediaClearWebsiteData",
 	"mediaVideo",
 	"mediaThePlatformSPlayer",
 	"mediaError",
@@ -6659,6 +6671,11 @@ var textsEn = i18n.NewTexts(""+
 	"Forward"+
 	"Home"+
 	"Reload"+
+	"Cookies"+
+	"The store every web view shares, HttpOnly cookies included"+
+	"Set a cookie"+
+	"List"+
+	"Clear website data"+
 	"Video"+
 	"The platform's player"+
 	"Error"+
@@ -8976,6 +8993,11 @@ var textsEn = i18n.NewTexts(""+
 		7,
 		4,
 		6,
+		7,
+		58,
+		12,
+		4,
+		18,
 		5,
 		21,
 		5,
@@ -11296,6 +11318,11 @@ var textsZhHans = i18n.NewTexts(""+
 	"前进"+
 	"主页"+
 	"重新加载"+
+	"Cookie"+
+	"所有 web view 共用的存储，包括 HttpOnly Cookie"+
+	"写入 Cookie"+
+	"列出"+
+	"清除网站数据"+
 	"视频"+
 	"平台的播放器"+
 	"错误"+
@@ -13614,6 +13641,11 @@ var textsZhHans = i18n.NewTexts(""+
 		6,
 		12,
 		6,
+		56,
+		13,
+		6,
+		18,
+		6,
 		18,
 		6,
 		9,
@@ -14625,6 +14657,9 @@ func Supply(lang string, t Translation) {
 	}
 	if t.ChatQuotaLeft != nil {
 		s.ChatQuotaLeft = t.ChatQuotaLeft
+	}
+	if t.MediaCookieCount != nil {
+		s.MediaCookieCount = t.MediaCookieCount
 	}
 	if t.DockEdits != nil {
 		s.DockEdits = t.DockEdits
@@ -28610,6 +28645,80 @@ func MediaReload(cx *core.Scope) string { return For(cx).MediaReload() }
 
 // MediaReload is the package's MediaReload in the language of msgs.
 func (msgs Messages) MediaReload() string { return msgs.text(textMediaReload) }
+
+// MediaCookies says "Cookies"
+// in the language the app shows under cx.
+func MediaCookies(cx *core.Scope) string { return For(cx).MediaCookies() }
+
+// MediaCookies is the package's MediaCookies in the language of msgs.
+func (msgs Messages) MediaCookies() string { return msgs.text(textMediaCookies) }
+
+// MediaTheStoreEveryWebView says "The store every web view shares, HttpOnly cookies included"
+// in the language the app shows under cx.
+func MediaTheStoreEveryWebView(cx *core.Scope) string { return For(cx).MediaTheStoreEveryWebView() }
+
+// MediaTheStoreEveryWebView is the package's MediaTheStoreEveryWebView in the language of msgs.
+func (msgs Messages) MediaTheStoreEveryWebView() string {
+	return msgs.text(textMediaTheStoreEveryWebView)
+}
+
+// MediaCookieCount says "{n, plural, one {# cookie} other {# cookies}}"
+// in the language the app shows under cx.
+func MediaCookieCount(cx *core.Scope, n int) string { return For(cx).MediaCookieCount(n) }
+
+// MediaCookieCount is the package's MediaCookieCount in the language of msgs.
+func (msgs Messages) MediaCookieCount(n int) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.MediaCookieCount(n))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].MediaCookieCount; f != nil {
+			return f(n)
+		}
+		switch lang {
+		case "", "en":
+			var b strings.Builder
+			switch i18n.Cardinal("en", float64(n)) {
+			case i18n.One:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(n))))
+				b.WriteString(" cookie")
+			default:
+				b.WriteString(msgs.arg(i18n.FormatNumber("en", float64(n))))
+				b.WriteString(" cookies")
+			}
+			return b.String()
+		case "zh-Hans":
+			var b strings.Builder
+			switch i18n.Cardinal("zh-Hans", float64(n)) {
+			default:
+				b.WriteString(i18n.FormatNumber("zh-Hans", float64(n)))
+				b.WriteString(" 个 Cookie")
+			}
+			return b.String()
+		}
+	}
+}
+
+// MediaSetACookie says "Set a cookie"
+// in the language the app shows under cx.
+func MediaSetACookie(cx *core.Scope) string { return For(cx).MediaSetACookie() }
+
+// MediaSetACookie is the package's MediaSetACookie in the language of msgs.
+func (msgs Messages) MediaSetACookie() string { return msgs.text(textMediaSetACookie) }
+
+// MediaList says "List"
+// in the language the app shows under cx.
+func MediaList(cx *core.Scope) string { return For(cx).MediaList() }
+
+// MediaList is the package's MediaList in the language of msgs.
+func (msgs Messages) MediaList() string { return msgs.text(textMediaList) }
+
+// MediaClearWebsiteData says "Clear website data"
+// in the language the app shows under cx.
+func MediaClearWebsiteData(cx *core.Scope) string { return For(cx).MediaClearWebsiteData() }
+
+// MediaClearWebsiteData is the package's MediaClearWebsiteData in the language of msgs.
+func (msgs Messages) MediaClearWebsiteData() string { return msgs.text(textMediaClearWebsiteData) }
 
 // MediaVideo says "Video"
 // in the language the app shows under cx.

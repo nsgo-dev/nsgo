@@ -358,7 +358,7 @@ const (
 	ItemSensor
 	// ItemPurchase asks the platform's store what Purchase says; the platform answers with EventPurchase carrying Count and Data a *PurchaseAnswer. The core sends none where the environment says no Purchases.
 	ItemPurchase
-	// ItemWebCookies adds or replaces Cookies in the persistent store the app's web views share; the platform answers with EventWebCookies carrying Count, Text why it failed.
+	// ItemWebCookies sets, lists or clears what Cookies asks of the persistent store the app's web views share; the platform answers with EventWebCookies carrying Count, Text why it failed and, for a list, Data.
 	ItemWebCookies
 	// ItemLookUp shows the platform's dictionary panel for Value, drawn over Frame, a box in the surface.
 	ItemLookUp

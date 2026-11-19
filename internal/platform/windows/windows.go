@@ -1280,7 +1280,7 @@ func (w *window) apply(b *driver.MountBatch) {
 			w.speak(it.Count, *it.Speak)
 			continue
 		case driver.ItemWebCookies:
-			w.setWebCookies(it.Count, *it.Cookies)
+			w.webCookies(it.Count, *it.Cookies)
 			continue
 		case driver.ItemOpenSurface:
 			if it.Surface != nil {

@@ -4,6 +4,7 @@ package apple
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
@@ -12,21 +13,33 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
-// SetWebCookies carries out an ItemWebCookies: it sets each cookie in WKWebsiteDataStore's default store, whose WKHTTPCookieStore every web view but an Incognito one reads, and answers once WebKit has taken them all. The store exists without a web view, and WebKit writes it to disk, so a cookie with an expiry outlives the app. A target without WebKit, tvOS, has no store.
-func SetWebCookies(id uint32, r driver.WebCookiesRequest, dispatch func(driver.Event)) {
+// WebCookies carries out an ItemWebCookies in WKWebsiteDataStore's default store, whose WKHTTPCookieStore every web view but an Incognito one reads: it sets the cookies, lists them or removes every type of website data, and answers once WebKit has. The store exists without a web view, and WebKit writes it to disk, so a cookie with an expiry outlives the app. A target without WebKit, tvOS, has no store.
+func WebCookies(id uint32, r driver.WebCookiesRequest, dispatch func(driver.Event)) {
 	if _, err := purego.Dlopen("/System/Library/Frameworks/WebKit.framework/WebKit", purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
 		dispatch(driver.NoWebCookies(&driver.MountItem{Count: id}))
 		return
 	}
 	loadWebKit()
-	store := objc.ID(Class("WKWebsiteDataStore")).Send(sel("defaultDataStore")).Send(sel("httpCookieStore"))
-	pending, failure := len(r.Cookies), ""
+	store := objc.ID(Class("WKWebsiteDataStore")).Send(sel("defaultDataStore"))
+	switch r.Op {
+	case driver.WebCookiesList:
+		listWebCookies(id, store.Send(sel("httpCookieStore")), r.Filter, dispatch)
+	case driver.WebCookiesClear:
+		clearWebsiteData(id, store, dispatch)
+	default:
+		setWebCookies(id, store.Send(sel("httpCookieStore")), r.Cookies, dispatch)
+	}
+}
+
+// setWebCookies sets each of cookies in store and answers once WebKit has taken them all.
+func setWebCookies(id uint32, store objc.ID, cookies []driver.WebCookie, dispatch func(driver.Event)) {
+	pending, failure := len(cookies), ""
 	finish := func() {
 		if pending--; pending == 0 {
 			dispatch(driver.Event{Kind: driver.EventWebCookies, Count: id, Text: failure})
 		}
 	}
-	for _, c := range r.Cookies {
+	for _, c := range cookies {
 		cookie := httpCookie(c)
 		if cookie == 0 {
 			if failure == "" {
@@ -40,6 +53,52 @@ func SetWebCookies(id uint32, r driver.WebCookiesRequest, dispatch func(driver.E
 		store.Send(sel("setCookie:completionHandler:"), cookie, set)
 		set.Release()
 	}
+}
+
+// listWebCookies answers with the cookies of store that f picks, which getAllCookies: lists whole for FilterWebCookies to filter.
+func listWebCookies(id uint32, store objc.ID, f driver.WebCookieFilter, dispatch func(driver.Event)) {
+	list := objcblock.New(func(_ objc.Block, all objc.ID) {
+		// The array is WebKit's for the block's run alone, so its cookies are read here.
+		n := objc.Send[uint](all, sel("count"))
+		cookies := make([]driver.WebCookie, 0, n)
+		for i := range n {
+			cookies = append(cookies, webCookie(all.Send(sel("objectAtIndex:"), i)))
+		}
+		dispatch(driver.Event{Kind: driver.EventWebCookies, Count: id, Data: driver.FilterWebCookies(cookies, f, time.Now())})
+	})
+	store.Send(sel("getAllCookies:"), list)
+	list.Release()
+}
+
+// clearWebsiteData removes every type of website data store holds, over all time, and answers once WebKit has.
+func clearWebsiteData(id uint32, store objc.ID, dispatch func(driver.Event)) {
+	types := objc.ID(Class("WKWebsiteDataStore")).Send(sel("allWebsiteDataTypes"))
+	since := objc.ID(Class("NSDate")).Send(sel("distantPast"))
+	done := objcblock.New(func(objc.Block) {
+		dispatch(driver.Event{Kind: driver.EventWebCookies, Count: id})
+	})
+	store.Send(sel("removeDataOfTypes:modifiedSince:completionHandler:"), types, since, done)
+	done.Release()
+}
+
+// webCookie reads an NSHTTPCookie. Foundation has a policy for SameSite Lax and Strict alone, so a cookie set with None, like one without the attribute, reads as WebSameSiteDefault.
+func webCookie(cookie objc.ID) driver.WebCookie {
+	str := func(name string) string { return GoString(cookie.Send(sel(name))) }
+	flag := func(name string) bool { return objc.Send[bool](cookie, sel(name)) }
+	c := driver.WebCookie{Name: str("name"), Value: str("value"), Domain: str("domain"), Path: str("path"), Secure: flag("isSecure"), HTTPOnly: flag("isHTTPOnly")}
+	if !flag("isSessionOnly") {
+		if at := cookie.Send(sel("expiresDate")); at != 0 {
+			seconds := objc.Send[float64](at, sel("timeIntervalSince1970"))
+			c.Expires = time.Unix(0, int64(seconds*1e9)).UTC()
+		}
+	}
+	switch str("sameSitePolicy") {
+	case "lax":
+		c.SameSite = driver.WebSameSiteLax
+	case "strict":
+		c.SameSite = driver.WebSameSiteStrict
+	}
+	return c
 }
 
 // httpCookie returns c as an autoreleased NSHTTPCookie, 0 when Foundation refuses it. A session cookie is one to discard, and SameSite None leaves the policy out, as Foundation has none for it and WebKit restricts no cookie without one.

@@ -2,7 +2,7 @@
 
 package windows
 
-// The web views' cookie store (core.Scope.SetWebCookies). WebView2 reaches a profile's cookies only through a web view of it (ICoreWebView2_2::get_CookieManager), so a request uses one of the window's that shows pages of the app's profile, and while there is none, a hidden web view of the window's own, made for it in the profile's environment (starting it, with the schemes the request names, as a web view's first batch would). The hidden view stays until a web view of the profile shows pages or the window closes: WebView2's processes, and the session cookies they hold, end with the profile's last web view. Its calls apply after they return, so a request answers once GetCookies lists its cookies, failing after webCookieSettle. The vtable indexes follow WebView2.idl, as webview2.go's do.
+// The web views' cookie store (core.Scope.SetWebCookies, WebCookies and ClearWebsiteData). WebView2 reaches a profile's cookies and browsing data only through a web view of it (ICoreWebView2_2::get_CookieManager, ICoreWebView2_13::get_Profile), so a request uses one of the window's that shows pages of the app's profile, and while there is none, a hidden web view of the window's own, made for it in the profile's environment (starting it, with the schemes the request names, as a web view's first batch would). The hidden view stays until a web view of the profile shows pages or the window closes: WebView2's processes, and the session cookies they hold, end with the profile's last web view. Its cookie calls apply after they return, so a request setting cookies answers once GetCookies lists them, failing after webCookieSettle. The vtable indexes follow WebView2.idl, as webview2.go's do.
 
 import (
 	"time"
@@ -11,7 +11,12 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-var iidGetCookiesCompleted = parseGUID("5a4f5069-5c15-47c3-8646-f4de1c116670")
+var (
+	iidGetCookiesCompleted       = parseGUID("5a4f5069-5c15-47c3-8646-f4de1c116670")
+	iidWeb13                     = parseGUID("f75f09a8-667e-4983-88d6-c8773f315e84")
+	iidProfile2                  = parseGUID("fa740d4b-5eae-4344-a8ad-74be31925397")
+	iidClearBrowsingDataComplete = parseGUID("e9710a06-1d1d-49b2-8234-226f35846ae5")
+)
 
 // Vtable indexes.
 const (
@@ -23,15 +28,26 @@ const (
 	cookieManagerGetCookies        = 5
 	cookieManagerAddOrUpdateCookie = 6
 
+	// ICoreWebView2_13, after ICoreWebView2_12's.
+	web13GetProfile = 105
+
+	// ICoreWebView2Profile2, after ICoreWebView2Profile's.
+	profileClearBrowsingDataAll = 12
+
 	// ICoreWebView2Cookie
 	cookieGetName       = 3
 	cookieGetValue      = 4
 	cookieGetDomain     = 6
 	cookieGetPath       = 7
+	cookieGetExpires    = 8
 	cookiePutExpires    = 9
+	cookieGetIsHttpOnly = 10
 	cookiePutIsHttpOnly = 11
+	cookieGetSameSite   = 12
 	cookiePutSameSite   = 13
+	cookieGetIsSecure   = 14
 	cookiePutIsSecure   = 15
+	cookieGetIsSession  = 16
 
 	// ICoreWebView2CookieList
 	cookieListGetCount        = 3
@@ -57,37 +73,64 @@ type cookieView struct {
 	requests int
 }
 
-// setWebCookies carries out an ItemWebCookies.
-func (w *window) setWebCookies(id uint32, r driver.WebCookiesRequest) {
+// webCookies carries out an ItemWebCookies.
+func (w *window) webCookies(id uint32, r driver.WebCookiesRequest) {
 	finished := false
 	var view *cookieView
-	finish := func(text string) {
+	var page *webView
+	finish := func(ev driver.Event) {
 		if finished {
 			return
 		}
 		finished = true
+		if page != nil {
+			delete(page.cookieRequests, id)
+		}
 		if view != nil {
 			view.requests--
 			w.closeCookieViewWhenUnneeded()
 		}
 		if w.engine != nil && w.hwnd != 0 {
-			w.engine.Dispatch(driver.Event{Kind: driver.EventWebCookies, Count: id, Text: text})
+			ev.Kind, ev.Count = driver.EventWebCookies, id
+			w.engine.Dispatch(ev)
 		}
 	}
+	fail := func(text string) { finish(driver.Event{Text: text}) }
 	// A web view that closes in the middle of the request may never call its handlers.
 	time.AfterFunc(webCookieSettle+time.Second, func() {
-		w.post(func() { finish("nsgo: WebView2 did not answer the cookie request") })
+		w.post(func() { fail("nsgo: WebView2 did not answer the cookie request") })
 	})
 	start := func(web *comObject) {
+		if r.Op == driver.WebCookiesClear {
+			clearBrowsingData(web, func(err error) {
+				if err != nil {
+					fail("nsgo: " + err.Error())
+					return
+				}
+				finish(driver.Event{})
+			})
+			return
+		}
 		manager := cookieManagerOf(web)
 		if manager == nil {
-			finish("nsgo: WebView2 has no cookie manager (ICoreWebView2_2)")
+			fail("nsgo: WebView2 has no cookie manager (ICoreWebView2_2)")
+			return
+		}
+		if r.Op == driver.WebCookiesList {
+			listWebCookies(manager, func(stored []driver.WebCookie, err error) {
+				manager.release()
+				if err != nil {
+					fail("nsgo: " + err.Error())
+					return
+				}
+				finish(driver.Event{Data: driver.FilterWebCookies(stored, r.Filter, time.Now())})
+			})
 			return
 		}
 		for _, c := range r.Cookies {
 			if err := addWebCookie(manager, c); err != nil {
 				manager.release()
-				finish("nsgo: " + err.Error())
+				fail("nsgo: " + err.Error())
 				return
 			}
 		}
@@ -100,13 +143,13 @@ func (w *window) setWebCookies(id uint32, r driver.WebCookiesRequest) {
 					manager.release()
 				case err != nil:
 					manager.release()
-					finish("nsgo: " + err.Error())
+					fail("nsgo: " + err.Error())
 				case holdsWebCookies(stored, r.Cookies):
 					manager.release()
-					finish("")
+					finish(driver.Event{})
 				case time.Now().After(deadline):
 					manager.release()
-					finish("nsgo: WebView2 did not keep the cookies")
+					fail("nsgo: WebView2 did not keep the cookies")
 				default:
 					settle()
 				}
@@ -114,26 +157,38 @@ func (w *window) setWebCookies(id uint32, r driver.WebCookiesRequest) {
 		}
 		settle()
 	}
-	if wv := w.pageWebView(); wv != nil {
-		start(wv.web)
-		return
-	}
-	// Counted before it may answer, which an error made at once does.
-	if w.cookies == nil {
-		w.cookies = &cookieView{}
-	}
-	view = w.cookies
-	view.requests++
-	w.ensureCookieView(r.Schemes, func(web *comObject, err error) {
+	var run func()
+	run = func() {
 		if finished {
 			return
 		}
-		if err != nil {
-			finish("nsgo: " + err.Error())
+		// A view the batch that asked deletes closes after this, so the request starts again on another, or the hidden one, as it does.
+		if page = w.pageWebView(); page != nil {
+			if page.cookieRequests == nil {
+				page.cookieRequests = map[uint32]func(){}
+			}
+			page.cookieRequests[id] = run
+			start(page.web)
 			return
 		}
-		start(web)
-	})
+		// Counted before it may answer, which an error made at once does.
+		if w.cookies == nil {
+			w.cookies = &cookieView{}
+		}
+		view = w.cookies
+		view.requests++
+		w.ensureCookieView(r.Schemes, func(web *comObject, err error) {
+			if finished {
+				return
+			}
+			if err != nil {
+				fail("nsgo: " + err.Error())
+				return
+			}
+			start(web)
+		})
+	}
+	run()
 }
 
 // pageWebView returns a web view of w that shows pages of the app's profile, nil for none.
@@ -290,7 +345,43 @@ func addWebCookie(manager *comObject, c driver.WebCookie) error {
 	return nil
 }
 
-// listWebCookies calls done with every cookie of manager's store, their names, values, domains and paths.
+// clearBrowsingData clears every kind of browsing data of web's profile, over all time, and calls done once WebView2 has.
+func clearBrowsingData(web *comObject, done func(error)) {
+	web13 := web.query(&iidWeb13)
+	if web13 == nil {
+		done(hresultError("ICoreWebView2_13", eNoInterface))
+		return
+	}
+	defer web13.release()
+	var profile *comObject
+	if hr := web13.call(web13GetProfile, uintptr(unsafe.Pointer(&profile))); failed(hr) || profile == nil {
+		done(hresultError("get_Profile", hr))
+		return
+	}
+	defer profile.release()
+	profile2 := profile.query(&iidProfile2)
+	if profile2 == nil {
+		done(hresultError("ICoreWebView2Profile2", eNoInterface))
+		return
+	}
+	defer profile2.release()
+	var h *comHandler
+	// Its Invoke takes the HRESULT alone; the handler's second word goes unread.
+	h = newHandler(&iidClearBrowsingDataComplete, func(hr uintptr, _ unsafe.Pointer) {
+		defer h.release()
+		if failed(hr) {
+			done(hresultError("ClearBrowsingDataAll", hr))
+			return
+		}
+		done(nil)
+	})
+	if hr := profile2.call(profileClearBrowsingDataAll, h.ptr()); failed(hr) {
+		h.release()
+		done(hresultError("ClearBrowsingDataAll", hr))
+	}
+}
+
+// listWebCookies calls done with every cookie of manager's store, with every field.
 func listWebCookies(manager *comObject, done func([]driver.WebCookie, error)) {
 	var h *comHandler
 	h = newHandler(&iidGetCookiesCompleted, func(hr uintptr, result unsafe.Pointer) {
@@ -311,8 +402,7 @@ func listWebCookies(manager *comObject, done func([]driver.WebCookie, error)) {
 			if failed(list.call(cookieListGetValueAtIndex, uintptr(i), uintptr(unsafe.Pointer(&c)))) || c == nil {
 				continue
 			}
-			cookies = append(cookies, driver.WebCookie{Name: c.getString(cookieGetName), Value: c.getString(cookieGetValue),
-				Domain: c.getString(cookieGetDomain), Path: c.getString(cookieGetPath)})
+			cookies = append(cookies, webCookie(c))
 			c.release()
 		}
 		done(cookies, nil)
@@ -350,4 +440,30 @@ func holdsWebCookies(stored, want []driver.WebCookie) bool {
 		}
 	}
 	return true
+}
+
+// webCookie reads an ICoreWebView2Cookie, whose domain has the leading dot of a cookie every host under it shares, as Chromium keeps it. WebView2's SameSite has no kind for a cookie set without the attribute, and reads such a one as one of the three, Lax by its documentation.
+func webCookie(cookie *comObject) driver.WebCookie {
+	flag := func(method int) bool {
+		var v int32
+		return !failed(cookie.call(method, uintptr(unsafe.Pointer(&v)))) && v != 0
+	}
+	c := driver.WebCookie{Name: cookie.getString(cookieGetName), Value: cookie.getString(cookieGetValue), Domain: cookie.getString(cookieGetDomain),
+		Path: cookie.getString(cookieGetPath), Secure: flag(cookieGetIsSecure), HTTPOnly: flag(cookieGetIsHttpOnly)}
+	var expires float64
+	if !flag(cookieGetIsSession) && !failed(cookie.call(cookieGetExpires, uintptr(unsafe.Pointer(&expires)))) && expires > 0 {
+		c.Expires = time.Unix(0, int64(expires*1e9)).UTC()
+	}
+	var policy int32 = -1
+	if !failed(cookie.call(cookieGetSameSite, uintptr(unsafe.Pointer(&policy)))) {
+		switch policy {
+		case cookieSameSiteLax:
+			c.SameSite = driver.WebSameSiteLax
+		case cookieSameSiteStrict:
+			c.SameSite = driver.WebSameSiteStrict
+		case cookieSameSiteNone:
+			c.SameSite = driver.WebSameSiteNone
+		}
+	}
+	return c
 }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -175,6 +176,77 @@ func TestWebCommandsMatchJava(t *testing.T) {
 		if got, ok := values[name]; !ok || got != int(want) {
 			t.Errorf("Protocol.java's %s is %d (found %v), the driver's %d", name, got, ok, want)
 		}
+	}
+}
+
+// TestWebCookieOpsMatchJava holds Protocol.java's COOKIES_* ops to the driver's WebCookiesOp, which writeWebCookies sends and NsgoView.cookies switches on.
+func TestWebCookieOpsMatchJava(t *testing.T) {
+	testhost.RequireSource(t)
+	java, err := os.ReadFile(filepath.Join("java", "dev", "oneo", "nsgo", "Protocol.java"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := map[string]int{}
+	for _, m := range regexp.MustCompile(`static final int (COOKIES_(?:ADD|LIST|CLEAR)) = (\d+);`).FindAllStringSubmatch(string(java), -1) {
+		values[m[1]], _ = strconv.Atoi(m[2])
+	}
+	for name, want := range map[string]driver.WebCookiesOp{"COOKIES_ADD": driver.WebCookiesSet, "COOKIES_LIST": driver.WebCookiesList, "COOKIES_CLEAR": driver.WebCookiesClear} {
+		if got, ok := values[name]; !ok || got != int(want) {
+			t.Errorf("Protocol.java's %s is %d (found %v), the driver's %d", name, got, ok, want)
+		}
+	}
+}
+
+// TestWebCookiesMessages writes a msgCookies of each op as Java reads it, and reads msgCookiesSet answers as Java writes them: a list's Cookie header becomes the cookies of the URL's host, names and values alone.
+func TestWebCookiesMessages(t *testing.T) {
+	var w writer
+	writeWebCookies(&w, 3, 9, &driver.WebCookiesRequest{Op: driver.WebCookiesList, Filter: driver.WebCookieFilter{URL: "https://www.example.com/watch"}})
+	r := reader{w.buf}
+	if surface, count, op, u := r.u32(), r.u32(), r.byte(), r.str(); surface != 3 || count != 9 || op != byte(driver.WebCookiesList) || u != "https://www.example.com/watch" || len(r.buf) != 0 {
+		t.Errorf("list: surface %d, count %d, op %d, URL %q, %d bytes left", surface, count, op, u, len(r.buf))
+	}
+	w = writer{}
+	writeWebCookies(&w, 3, 10, &driver.WebCookiesRequest{Op: driver.WebCookiesClear})
+	r = reader{w.buf}
+	if surface, count, op := r.u32(), r.u32(), r.byte(); surface != 3 || count != 10 || op != byte(driver.WebCookiesClear) || len(r.buf) != 0 {
+		t.Errorf("clear: surface %d, count %d, op %d, %d bytes left", surface, count, op, len(r.buf))
+	}
+	w = writer{}
+	c := driver.WebCookie{Name: "SID", Value: "a", Domain: ".example.com", Secure: true}
+	writeWebCookies(&w, 3, 11, &driver.WebCookiesRequest{Cookies: []driver.WebCookie{c}})
+	r = reader{w.buf}
+	if surface, count, op, n, u, value := r.u32(), r.u32(), r.byte(), r.u32(), r.str(), r.str(); surface != 3 || count != 11 || op != byte(driver.WebCookiesSet) || n != 1 || u != c.URL() || value != c.SetCookie() {
+		t.Errorf("set: surface %d, count %d, op %d, %d cookies, %q %q", surface, count, op, n, u, value)
+	}
+
+	answer := func(text string, op driver.WebCookiesOp, list ...string) driver.Event {
+		var w writer
+		w.u32(3)
+		w.u32(9)
+		w.str(text)
+		w.byte(byte(op))
+		for _, s := range list {
+			w.str(s)
+		}
+		surface, ev := readWebCookiesSet(&reader{w.buf})
+		if surface != 3 || ev.Kind != driver.EventWebCookies || ev.Count != 9 || ev.Text != text {
+			t.Errorf("answer to surface %d: %+v", surface, ev)
+		}
+		return ev
+	}
+	ev := answer("", driver.WebCookiesList, "https://WWW.example.com/watch", "SID=a=b; pref=1;  bare")
+	want := []driver.WebCookie{{Name: "SID", Value: "a=b", Domain: "www.example.com"}, {Name: "pref", Value: "1", Domain: "www.example.com"}, {Value: "bare", Domain: "www.example.com"}}
+	if got, _ := ev.Data.([]driver.WebCookie); !slices.Equal(got, want) {
+		t.Errorf("list answered %+v, want %+v", ev.Data, want)
+	}
+	if got, ok := answer("", driver.WebCookiesList, "https://example.com/", "").Data.([]driver.WebCookie); !ok || len(got) != 0 {
+		t.Errorf("an empty header answered %#v, want no cookies", got)
+	}
+	if ev := answer("Android has no WebView", driver.WebCookiesList, "https://example.com/", ""); ev.Data != nil {
+		t.Errorf("a failed list answered %+v", ev.Data)
+	}
+	if ev := answer("", driver.WebCookiesClear); ev.Data != nil {
+		t.Errorf("a clear answered %+v", ev.Data)
 	}
 }
 

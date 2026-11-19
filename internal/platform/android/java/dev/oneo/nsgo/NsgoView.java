@@ -69,6 +69,7 @@ import android.view.animation.PathInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.CookieManager;
+import android.webkit.WebStorage;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -86,6 +87,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -3653,49 +3655,73 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private String recordingSent;
 
     /**
-     * Takes a COOKIES message on the engine's reader thread and sets its cookies in CookieManager on the UI thread, whose looper its callbacks need, then flushes them to disk and answers with COOKIES_SET: the request's surface and count, then an error, "" for none. CookieManager is the store every WebView of the app reads, so it needs no web view.
+     * Takes a COOKIES message on the engine's reader thread and carries it out in CookieManager on the UI thread, whose looper its callbacks need: sets its cookies and flushes them to disk, reads the Cookie header of its URL, or removes every cookie and WebStorage's data, and answers with COOKIES_SET: the request's surface, count, an error, "" for none, and op, with the URL and the header for a list. CookieManager is the store every WebView of the app reads, so it needs no web view.
      */
     private void cookies(DataInputStream in) throws IOException {
-        int surface = in.readInt(), count = in.readInt();
-        String[] urls = new String[in.readInt()], values = new String[urls.length];
-        for (int i = 0; i < urls.length; i++) {
-            urls[i] = Protocol.readString(in);
-            values[i] = Protocol.readString(in);
+        int surface = in.readInt(), count = in.readInt(), op = in.readByte();
+        String[] urls = new String[0], values = new String[0];
+        if (op == Protocol.COOKIES_LIST) {
+            urls = new String[] {Protocol.readString(in)};
+        } else if (op == Protocol.COOKIES_ADD) {
+            urls = new String[in.readInt()];
+            values = new String[urls.length];
+            for (int i = 0; i < urls.length; i++) {
+                urls[i] = Protocol.readString(in);
+                values[i] = Protocol.readString(in);
+            }
         }
+        String[] u = urls, v = values;
         ui.post(() -> {
             CookieManager manager;
             try {
                 manager = CookieManager.getInstance();
             } catch (RuntimeException e) {
                 // Without a WebView provider, getInstance throws.
-                cookiesSet(surface, count, "Android has no WebView: " + e.getMessage());
+                cookiesSet(surface, count, "Android has no WebView: " + e.getMessage(), op, op == Protocol.COOKIES_LIST ? u[0] : "", "");
                 return;
             }
-            int[] pending = {urls.length};
+            if (op == Protocol.COOKIES_LIST) {
+                cookiesSet(surface, count, "", op, u[0], Objects.toString(manager.getCookie(u[0]), ""));
+                return;
+            }
+            if (op == Protocol.COOKIES_CLEAR) {
+                manager.removeAllCookies(ok -> {
+                    manager.flush();
+                    WebStorage.getInstance().deleteAllData();
+                    cookiesSet(surface, count, "", op, "", "");
+                });
+                return;
+            }
+            int[] pending = {u.length};
             String[] failure = {""};
-            for (int i = 0; i < urls.length; i++) {
-                String value = values[i];
-                manager.setCookie(urls[i], value, ok -> {
+            for (int i = 0; i < u.length; i++) {
+                String value = v[i];
+                manager.setCookie(u[i], value, ok -> {
                     if (!Boolean.TRUE.equals(ok) && failure[0].isEmpty()) {
                         // The name alone: the value may be a credential.
                         failure[0] = "Android's CookieManager refused the cookie " + value.substring(0, value.indexOf('='));
                     }
                     if (--pending[0] == 0) {
                         manager.flush();
-                        cookiesSet(surface, count, failure[0]);
+                        cookiesSet(surface, count, failure[0], op, "", "");
                     }
                 });
             }
         });
     }
 
-    private void cookiesSet(int surface, int count, String error) {
+    private void cookiesSet(int surface, int count, String error, int op, String url, String header) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
         try {
             out.writeInt(surface);
             out.writeInt(count);
             Protocol.writeString(out, error);
+            out.writeByte(op);
+            if (op == Protocol.COOKIES_LIST) {
+                Protocol.writeString(out, url);
+                Protocol.writeString(out, header);
+            }
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
         }

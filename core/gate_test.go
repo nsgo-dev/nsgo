@@ -73,6 +73,8 @@ var gated = map[string]service{
 	"WatchLocation":                 serviceLocation,
 	"WatchMotion":                   serviceMotion,
 	"SetWebCookies":                 serviceWebCookies,
+	"WebCookies":                    serviceWebCookies,
+	"ClearWebsiteData":              serviceWebCookies,
 	"FrontmostApp":                  serviceFrontmostApp,
 	"CanReadFrontmostApp":           serviceFrontmostApp,
 }

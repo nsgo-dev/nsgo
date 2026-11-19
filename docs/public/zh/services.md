@@ -300,6 +300,14 @@ cx.SetWebCookies([]core.WebCookie{
 })
 ```
 
+反过来，`cx.WebCookies` 列出存储里的 Cookie，包括 `document.cookie` 读不到的 HttpOnly Cookie 及其域名、路径、过期时间和各项标志，不管这个站点的页面是否正在显示：`core.WebCookieFilter` 选出向某个 `URL` 发请求时会带上的 Cookie，或某个 `Domain` 及其下所有主机的 Cookie，零值过滤器选出全部。应用要用用户的登录状态从 Go 调用这个站点，或显示用户登录了哪些站点时，就这样读取。`cx.ClearWebsiteData` 让用户退出所有站点：它删除存储里的 Cookie、本地存储和会话存储、IndexedDB、Service Worker 和缓存，全部删除后 done 才会运行。Android 的 `CookieManager` 只回答某个 URL 会带上的名称和值，所以那里只有 `URL` 过滤器能列出，`Domain` 填为它的主机，其他字段留空，`Domain` 过滤器和零值过滤器回答 `Unavailable`；在那里清除不包括 HTTP 缓存。Web、tvOS 和 watchOS 对两者都回答 `Unavailable`。
+
+```go
+cx.WebCookies(core.WebCookieFilter{Domain: "example.com"}, func(cookies []core.WebCookie, err error) {
+	signedIn.Set(err == nil && slices.ContainsFunc(cookies, func(c core.WebCookie) bool { return c.Name == "SID" }))
+})
+```
+
 ## 通过 Apple 登录
 
 `cx.SignInWithApple` 在 macOS、iOS 和 tvOS 上从应用自己的按钮弹出系统的「通过 Apple 登录」面板，这些平台上 `cx.Env().CanSignInWithApple()` 为 true。它只回答一次：给出凭据，或给出错误。用户关闭面板时是 `core.AppleSignInCancelled`，这不算失败；其余是 `AppleSignInFailed`，其他平台上是 `AppleSignInUnavailable`。Apple 只在用户第一次登录这个应用时给出邮箱和姓名，要在那时保存。`Nonce` 以其 SHA-256 的小写十六进制放进请求，身份令牌的 `nonce` 声明里就是这个值：服务器对它交给应用的 nonce 做哈希后比较。`cx.AppleCredentialState` 告诉你用户之后是否撤销了授权。

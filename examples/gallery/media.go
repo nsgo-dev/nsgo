@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -217,6 +218,64 @@ func site(cx *core.Scope) core.Node {
 	}}
 }
 
+// cookieStore sets an HttpOnly cookie for NSGo's docs in the store every web view shares, which the site's next load sends and its scripts cannot read, lists the store's cookies for the site and clears the store, as the platform keeps it whether or not a web view shows.
+func cookieStore(cx *core.Scope) core.Node {
+	tr := locales.For(cx)
+	colors := ui.ColorsOf(cx)
+	cookies := core.NewSignalFunc(cx, []core.WebCookie{}, slices.Equal)
+	failure := core.NewSignal(cx, "")
+	answer := func(err error) bool {
+		if err != nil {
+			failure.Set(err.Error())
+			return false
+		}
+		failure.Set("")
+		return true
+	}
+	list := func() {
+		cx.WebCookies(core.WebCookieFilter{URL: docsHome(cx)}, func(c []core.WebCookie, err error) {
+			if answer(err) {
+				cookies.Set(c)
+			}
+		})
+	}
+	set := func() {
+		cx.SetWebCookies([]core.WebCookie{{Name: "nsgo-gallery", Value: cx.WallTime().Format("150405"), Domain: "nsgo.dev", Expires: cx.WallTime().Add(time.Hour), Secure: true, HTTPOnly: true}},
+			func(err error) {
+				if answer(err) {
+					list()
+				}
+			})
+	}
+	clear := func() {
+		cx.ClearWebsiteData(func(err error) {
+			if answer(err) {
+				list()
+			}
+		})
+	}
+	row := func(cx *core.Scope, c func() core.WebCookie, _ func() int) core.Node {
+		return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{
+			core.Text{ContentFunc: func() string { return c().Name + "=" + c().Value }, MaxLines: 1, EllipsizeMode: core.EllipsizeMiddle, Style: core.Style{FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
+			core.Text{ContentFunc: func() string { return c().Domain + c().CookiePath() }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+			core.Show{When: func() bool { return c().HTTPOnly }, Then: func(*core.Scope) core.Node { return ui.Badge{Text: "HttpOnly"} }},
+		}}
+	}
+	return Card{Title: tr.MediaCookies(), Description: tr.MediaTheStoreEveryWebView(), Actions: []core.Node{
+		ui.Badge{TextFunc: func() string { return tr.MediaCookieCount(len(cookies.Get())) }, Variant: ui.BadgeAccent},
+	}, Children: []core.Node{
+		core.View{TestID: "cookies", Style: core.Style{Gap: 6}, Children: []core.Node{
+			core.Each(cookies.Get, func(c core.WebCookie) string { return c.Name + " " + c.Domain + c.CookiePath() }, row),
+		}},
+		core.Show{When: func() bool { return failure.Get() != "" }, Then: func(*core.Scope) core.Node { return Note{TextFunc: failure.Get} }},
+		core.View{Style: core.Style{Direction: core.Row, Gap: 8, Wrap: core.Wrap}, Children: []core.Node{
+			ui.Button{Text: tr.MediaSetACookie(), Variant: ui.ButtonSecondary, OnPress: set},
+			ui.Button{Text: tr.MediaList(), Variant: ui.ButtonSecondary, OnPress: list},
+			ui.Button{Text: tr.MediaClearWebsiteData(), Variant: ui.ButtonOutline, OnPress: clear},
+		}},
+	}}
+}
+
 // clockText is a duration as minutes and seconds.
 func clockText(d time.Duration) string {
 	s := int(d.Seconds())
@@ -312,10 +371,9 @@ func nativeView(cx *core.Scope) core.Node {
 	}}
 }
 
-// webViewDemo is the platform's hosted views: a web view with messages
-// both ways, NSGo's docs with their history and the app's own views.
+// webViewDemo is the platform's hosted views: a web view with messages both ways, NSGo's docs with their history, the store every web view shares and the app's own views.
 func webViewDemo(cx *core.Scope) core.Node {
-	return demoPage(cx, pageProps{}, messaging, site, nativeView)
+	return demoPage(cx, pageProps{}, messaging, site, cookieStore, nativeView)
 }
 
 // videoDemo is the platform's video player.

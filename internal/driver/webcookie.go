@@ -1,6 +1,9 @@
 package driver
 
 import (
+	"cmp"
+	"net/url"
+	"slices"
 	"strings"
 	"time"
 )
@@ -30,14 +33,84 @@ const (
 	WebSameSiteNone
 )
 
-// WebCookiesRequest is an ItemWebCookies' request: the cookies to add or replace, those of the same name, domain and path, in the persistent store.
+// WebCookiesRequest is an ItemWebCookies' request of the persistent store: Op says what it does with it.
 type WebCookiesRequest struct {
+	Op WebCookiesOp
+	// Cookies are what WebCookiesSet adds, replacing those of the same name, domain and path.
 	Cookies []WebCookie
+	// Filter picks the cookies WebCookiesList answers with.
+	Filter WebCookieFilter
 	// Schemes are the app schemes the calling scope serves, which Windows registers if the request is what starts WebView2's environment, as a web view's would.
 	Schemes []string
 }
 
-// NoWebCookieStore is EventWebCookies' Text where the platform has no store to write, as on the web and where Env.HasWebView is false.
+// WebCookiesOp is what an ItemWebCookies does with the store.
+type WebCookiesOp uint8
+
+const (
+	// WebCookiesSet adds or replaces the request's Cookies; the answer carries no Data.
+	WebCookiesSet WebCookiesOp = iota
+	// WebCookiesList answers with the cookies Filter picks, HttpOnly ones included, as the event's Data, a []WebCookie.
+	WebCookiesList
+	// WebCookiesClear removes everything the store holds: cookies, local and session storage, IndexedDB, service workers and caches.
+	WebCookiesClear
+)
+
+// WebCookieFilter picks cookies of the store, as core.WebCookieFilter: those a request to URL would send, or those of Domain and every host under it; the zero filter picks all. Core sends at most one of them, URL an http or https URL with a host and Domain a host in lower case without a leading dot.
+type WebCookieFilter struct {
+	URL, Domain string
+}
+
+// NoWebCookieDomains is EventWebCookies' Text where the store lists cookies only by URL, as Android's CookieManager does.
+const NoWebCookieDomains = "nsgo: this platform lists web view cookies only by URL"
+
+// FilterWebCookies returns the cookies of cookies that f picks and that have not expired at now, in the order of their host, path and name: those a platform lists whole, as Apple's, Windows' and Linux's stores do, go through it.
+func FilterWebCookies(cookies []WebCookie, f WebCookieFilter, now time.Time) []WebCookie {
+	picks := func(WebCookie) bool { return true }
+	switch {
+	case f.URL != "":
+		u, err := url.Parse(f.URL)
+		if err != nil {
+			return nil
+		}
+		host, path := strings.ToLower(u.Hostname()), u.EscapedPath()
+		if path == "" {
+			path = "/"
+		}
+		secure := u.Scheme == "https" || u.Scheme == "wss"
+		picks = func(c WebCookie) bool {
+			return (!c.Secure || secure) && c.goesTo(host) && pathMatches(path, c.CookiePath())
+		}
+	case f.Domain != "":
+		picks = func(c WebCookie) bool { return c.Host() == f.Domain || strings.HasSuffix(c.Host(), "."+f.Domain) }
+	}
+	out := []WebCookie{}
+	for _, c := range cookies {
+		if (c.Expires.IsZero() || c.Expires.After(now)) && picks(c) {
+			out = append(out, c)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b WebCookie) int {
+		return cmp.Or(strings.Compare(a.Host(), b.Host()), strings.Compare(a.CookiePath(), b.CookiePath()), strings.Compare(a.Name, b.Name))
+	})
+	return out
+}
+
+// goesTo reports whether c goes with a request to host, as RFC 6265 matches a domain: its host alone, or a host-only one's, and the hosts under it too for one with a leading dot.
+func (c WebCookie) goesTo(host string) bool {
+	h := c.Host()
+	return host == h || !c.HostOnly() && strings.HasSuffix(host, "."+h)
+}
+
+// pathMatches reports whether a request's path takes a cookie's, as RFC 6265 matches paths: the same path, or one under it.
+func pathMatches(path, cookie string) bool {
+	if !strings.HasPrefix(path, cookie) {
+		return false
+	}
+	return len(path) == len(cookie) || strings.HasSuffix(cookie, "/") || path[len(cookie)] == '/'
+}
+
+// NoWebCookieStore is EventWebCookies' Text where the platform has no store, as on the web and where Env.HasWebView is false.
 const NoWebCookieStore = "nsgo: this platform has no web view cookie store"
 
 // NoWebCookies is the answer of a platform without a store to it.

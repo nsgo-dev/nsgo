@@ -330,6 +330,14 @@ cx.SetWebCookies([]core.WebCookie{
 })
 ```
 
+The other way round, `cx.WebCookies` lists the store's cookies, HttpOnly ones and their domain, path, expiry and flags included, which `document.cookie` cannot read, whether or not a page of the site is showing: a `core.WebCookieFilter` picks those a request to a `URL` would send, or those of a `Domain` and every host under it, and the zero filter all of them. An app calling the site from Go with the user's sign-in, or showing where the user is signed in, reads them this way. `cx.ClearWebsiteData` signs the user out of every site: it removes the store's cookies, local and session storage, IndexedDB, service workers and caches, and done runs once they are gone. Android's `CookieManager` answers only the names and values a URL would send, so there only a `URL` filter lists, filling `Domain` with its host and leaving the other fields empty, and a `Domain` filter or the zero one answers `Unavailable`; clearing there leaves the HTTP cache. The web, tvOS and watchOS answer `Unavailable` to both.
+
+```go
+cx.WebCookies(core.WebCookieFilter{Domain: "example.com"}, func(cookies []core.WebCookie, err error) {
+	signedIn.Set(err == nil && slices.ContainsFunc(cookies, func(c core.WebCookie) bool { return c.Name == "SID" }))
+})
+```
+
 ## Sign in with Apple
 
 `cx.SignInWithApple` shows the system's Sign in with Apple sheet from the app's own button on macOS, iOS and tvOS, where `cx.Env().CanSignInWithApple()` is true. It answers once with the credential, or with an error: `core.AppleSignInCancelled` when the user closes the sheet, which is not a failure, else `AppleSignInFailed` or, on other platforms, `AppleSignInUnavailable`. Apple gives the email and the name only on the user's first sign-in to the app, so keep them then. `Nonce` goes into the request as its SHA-256 in lowercase hex, which the identity token's `nonce` claim holds: the server hashes the nonce it gave the app and compares. `cx.AppleCredentialState` tells whether the user has since revoked it.

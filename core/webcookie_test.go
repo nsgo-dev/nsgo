@@ -140,3 +140,105 @@ func TestSetWebCookiesHeldToAccess(t *testing.T) {
 		t.Fatalf("refused: %v, store %+v", got, app.WebCookies)
 	}
 }
+
+func TestWebCookiesListsTheStore(t *testing.T) {
+	app, cx := startCookies(t, nil)
+	app.WebCookies = []core.WebCookie{
+		{Name: "s", Value: "1", Domain: ".example.test", Path: "/", Secure: true, HTTPOnly: true, SameSite: core.WebSameSiteLax, Expires: time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)},
+		{Name: "www", Value: "2", Domain: "www.example.test", Path: "/watch"},
+		{Name: "other", Value: "3", Domain: "other.test"},
+	}
+	list := func(f core.WebCookieFilter) ([]core.WebCookie, error) {
+		var got []core.WebCookie
+		var err error
+		calls := 0
+		cx.WebCookies(f, func(cookies []core.WebCookie, e error) { got, err = cookies, e; calls++ })
+		app.Settle()
+		if calls != 1 {
+			t.Fatalf("%+v: done ran %d times", f, calls)
+		}
+		return got, err
+	}
+	got, err := list(core.WebCookieFilter{Domain: ".Example.TEST"})
+	if err != nil || !slices.Equal(got, app.WebCookies[:2]) {
+		t.Errorf("a domain listed %+v, %v", got, err)
+	}
+	got, err = list(core.WebCookieFilter{URL: "HTTPS://WWW.Example.test/watch/1"})
+	if err != nil || !slices.Equal(got, app.WebCookies[:2]) {
+		t.Errorf("a URL listed %+v, %v", got, err)
+	}
+	got, err = list(core.WebCookieFilter{URL: "http://www.example.test/"})
+	if err != nil || got == nil || len(got) != 0 {
+		t.Errorf("a URL that takes none listed %#v, %v", got, err)
+	}
+	got, err = list(core.WebCookieFilter{})
+	if err != nil || len(got) != 3 {
+		t.Errorf("the zero filter listed %+v, %v", got, err)
+	}
+	for _, f := range []core.WebCookieFilter{
+		{URL: "https://example.test/", Domain: "example.test"},
+		{URL: "ftp://example.test/"},
+		{URL: "example.test"},
+		{URL: "https:///path"},
+		{Domain: "."},
+		{Domain: "example.test/"},
+		{Domain: "example.test."},
+	} {
+		ran := false
+		cx.WebCookies(f, func(cookies []core.WebCookie, err error) {
+			ran = true
+			if err == nil || cookies != nil {
+				t.Errorf("%+v answered %+v, %v, want an error", f, cookies, err)
+			}
+		})
+		if !ran {
+			t.Errorf("%+v did not answer at once", f)
+		}
+	}
+}
+
+func TestClearWebsiteDataEmptiesTheStore(t *testing.T) {
+	app, cx := startCookies(t, nil)
+	app.WebCookies = []core.WebCookie{{Name: "s", Value: "1", Domain: ".example.test"}}
+	var got error
+	calls := 0
+	cx.ClearWebsiteData(func(err error) { got = err; calls++ })
+	app.Settle()
+	if calls != 1 || got != nil || len(app.WebCookies) != 0 || app.WebsiteDataClears != 1 {
+		t.Fatalf("done ran %d times with %v; store %+v after %d clears", calls, got, app.WebCookies, app.WebsiteDataClears)
+	}
+	var cookies []core.WebCookie
+	cx.WebCookies(core.WebCookieFilter{}, func(c []core.WebCookie, err error) { cookies, got = c, err })
+	app.Settle()
+	if got != nil || len(cookies) != 0 {
+		t.Errorf("after clearing the store listed %+v, %v", cookies, got)
+	}
+}
+
+func TestWebCookiesHeldToAccess(t *testing.T) {
+	app, cx := startCookies(t, cookieAccess{hosts: []string{"example.test"}})
+	app.WebCookies = []core.WebCookie{{Name: "s", Value: "1", Domain: ".example.test"}, {Name: "o", Value: "2", Domain: "other.test"}}
+	for _, c := range []struct {
+		filter core.WebCookieFilter
+		denied bool
+	}{
+		{core.WebCookieFilter{Domain: "example.test"}, false},
+		{core.WebCookieFilter{URL: "https://example.test/x"}, false},
+		{core.WebCookieFilter{Domain: "other.test"}, true},
+		{core.WebCookieFilter{URL: "https://other.test/"}, true},
+		{core.WebCookieFilter{}, true},
+	} {
+		var got error
+		cx.WebCookies(c.filter, func(_ []core.WebCookie, err error) { got = err })
+		app.Settle()
+		if denied := core.ErrorCode(got) == core.CodeAccessDenied; denied != c.denied {
+			t.Errorf("%+v answered %v, want denied %v", c.filter, got, c.denied)
+		}
+	}
+	var got error
+	cx.ClearWebsiteData(func(err error) { got = err })
+	app.Settle()
+	if core.ErrorCode(got) != core.CodeAccessDenied || len(app.WebCookies) != 2 {
+		t.Errorf("clearing answered %v, store %+v", got, app.WebCookies)
+	}
+}

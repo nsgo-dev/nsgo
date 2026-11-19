@@ -290,9 +290,11 @@ type App struct {
 	// TrashedFiles records paths moved to the system trash. TrashFile returns the path in the trash, or "" as Linux does, and an error, which may be core.ErrNoTrash; nil trashes each with no path.
 	TrashedFiles []string
 	TrashFile    func(path string) (string, error)
-	// WebCookies are the cookies of the store the app's web views share (core.Scope.SetWebCookies), oldest first, one the app sets again replacing the one of its name, domain and path. A test puts the cookies a run left there, as the store outlives the app. SetWebCookies answers each call before the store takes its cookies, nil to take them and an error to refuse them all; every call succeeds when it is nil.
+	// WebCookies are the cookies of the store the app's web views share (core.Scope.SetWebCookies, which core.Scope.WebCookies lists), oldest first, one the app sets again replacing the one of its name, domain and path. A test puts the cookies a run left there, as the store outlives the app. SetWebCookies answers each call before the store takes its cookies, nil to take them and an error to refuse them all; every call succeeds when it is nil.
 	WebCookies    []core.WebCookie
 	SetWebCookies func(cookies []core.WebCookie) error
+	// WebsiteDataClears counts the app's core.Scope.ClearWebsiteData, each of which empties WebCookies.
+	WebsiteDataClears int
 	// Shares are the shares the app asked for, oldest first; each sheet
 	// shows.
 	Shares []driver.ShareRequest

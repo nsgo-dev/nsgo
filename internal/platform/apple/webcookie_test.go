@@ -52,3 +52,23 @@ func testHTTPCookieCarriesEveryAttribute(t *testing.T) {
 		}
 	}
 }
+
+// TestWebCookieReadsWhatHTTPCookieWrites reads back the NSHTTPCookie SetWebCookies hands WebKit as WebCookies lists it: every field, but SameSite None, which Foundation has no policy for, reads as the default.
+func TestWebCookieReadsWhatHTTPCookieWrites(t *testing.T) {
+	withPool(func() {
+		expires := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second).UTC()
+		for _, c := range []driver.WebCookie{
+			{Name: "SID", Value: "v", Domain: ".example.com", Path: "/watch", Expires: expires, Secure: true, HTTPOnly: true, SameSite: driver.WebSameSiteStrict},
+			{Name: "pref", Value: "1", Domain: "www.example.com", Path: "/", SameSite: driver.WebSameSiteLax},
+			{Name: "x", Value: "2", Domain: "example.com", Path: "/", Secure: true, SameSite: driver.WebSameSiteNone},
+		} {
+			want := c
+			if want.SameSite == driver.WebSameSiteNone {
+				want.SameSite = driver.WebSameSiteDefault
+			}
+			if got := webCookie(httpCookie(c)); got != want {
+				t.Errorf("%+v read back as %+v", c, got)
+			}
+		}
+	})
+}
