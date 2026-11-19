@@ -21,11 +21,12 @@ func menuRoleFallbackApp(title string) func(*core.Scope) core.Node {
 	return func(cx *core.Scope) core.Node {
 		var button, field core.Ref
 		focused := core.NewSignal(cx, "ready")
-		selected, undone := core.NewSignal(cx, 0), core.NewSignal(cx, 0)
+		selected, undone, cut := core.NewSignal(cx, 0), core.NewSignal(cx, 0), core.NewSignal(cx, 0)
 		cx.Effect(func() { cx.SetTitle(fmt.Sprintf("%s|%s|%d|%d", title, focused.Get(), selected.Get(), undone.Get())) })
 		cx.SetApplicationMenu([]core.MenuItem{{Label: "Edit", Items: []core.MenuItem{
 			{Role: core.MenuUndo, OnSelect: func() { undone.Update(func(n int) int { return n + 1 }) }},
 			{Role: core.MenuSelectAll, OnSelect: func() { selected.Update(func(n int) int { return n + 1 }) }},
+			{Role: core.MenuCut, OnSelect: func() { cut.Update(func(n int) int { return n + 1 }) }},
 		}}})
 		cx.OnKeyWith("mod+f", core.KeyOptions{When: core.KeyAlways}, field.Focus)
 		cx.OnKeyWith("mod+b", core.KeyOptions{When: core.KeyAlways}, button.Focus)
@@ -114,6 +115,19 @@ func TestMenuRoleFallback(t *testing.T) {
 			})
 			return err
 		}
+		menuEnabled := func(role driver.MenuRole) (enabled bool, err error) {
+			main(func() {
+				edit := nsApp().Send(sel("mainMenu")).Send(selItemAtIndex, 0).Send(sel("submenu"))
+				for i := range objc.Send[int](edit, sel("numberOfItems")) {
+					if it := edit.Send(selItemAtIndex, i); live.roleFallback[uint32(objc.Send[int](it, sel("tag")))] == role {
+						enabled = validateMenu(live.menuTarget, objc.SEL(0), it)
+						return
+					}
+				}
+				err = fmt.Errorf("the Edit menu has no %s item", role.Label())
+			})
+			return enabled, err
+		}
 		check := func() error {
 			if err := wait(title + "|ready|0|0"); err != nil {
 				return err
@@ -121,6 +135,9 @@ func TestMenuRoleFallback(t *testing.T) {
 			key("mod+b")
 			if err := wait(title + "|button|0|0"); err != nil {
 				return err
+			}
+			if enabled, err := menuEnabled(driver.MenuUndo); err != nil || !enabled {
+				return fmt.Errorf("with no field focused, Undo enabled = %v: %v", enabled, err)
 			}
 			for _, role := range []driver.MenuRole{driver.MenuSelectAll, driver.MenuUndo} {
 				if err := choose(role); err != nil {
@@ -133,6 +150,26 @@ func TestMenuRoleFallback(t *testing.T) {
 			key("mod+f")
 			if err := wait(title + "|field|1|1"); err != nil {
 				return err
+			}
+			if enabled, err := menuEnabled(driver.MenuUndo); err != nil || enabled {
+				return fmt.Errorf("with an empty undo stack, Undo enabled = %v: %v", enabled, err)
+			}
+			if enabled, err := menuEnabled(driver.MenuCut); err != nil || enabled {
+				return fmt.Errorf("with no selection, Cut enabled = %v: %v", enabled, err)
+			}
+			main(func() {
+				first := live.window.Send(sel("firstResponder"))
+				first.Send(sel("insertText:"), apple.NSString("x"))
+			})
+			if enabled, err := menuEnabled(driver.MenuUndo); err != nil || !enabled {
+				return fmt.Errorf("after typing, Undo enabled = %v: %v", enabled, err)
+			}
+			main(func() {
+				first := live.window.Send(sel("firstResponder"))
+				first.Send(sel("selectAll:"), objc.ID(0))
+			})
+			if enabled, err := menuEnabled(driver.MenuCut); err != nil || !enabled {
+				return fmt.Errorf("after selecting text, Cut enabled = %v: %v", enabled, err)
 			}
 			for _, role := range []driver.MenuRole{driver.MenuUndo, driver.MenuSelectAll} {
 				if err := choose(role); err != nil {

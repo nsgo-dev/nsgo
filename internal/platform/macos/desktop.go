@@ -1020,10 +1020,65 @@ func validateMenu(self objc.ID, _ objc.SEL, item objc.ID) bool {
 		return s.validateFullScreen(item)
 	}
 	id := uint32(objc.Send[int](item, sel("tag")))
+	if s != nil {
+		if role, ok := s.roleFallback[id]; ok {
+			return validateRoleMenuItem(item, role)
+		}
+	}
 	if s == nil || !s.notInText[id] || s.editingKeys[id] != 0 {
 		return true
 	}
 	return s.keyField() == 0
+}
+
+// validateRoleMenuItem asks the responder AppKit would use for an editing
+// role whether it can carry out the action. No responder leaves the item to
+// the app's OnSelect fallback.
+func validateRoleMenuItem(item objc.ID, role driver.MenuRole) bool {
+	action := sel(roleActions[role])
+	if action == 0 {
+		return true
+	}
+	target := nsApp().Send(sel("targetForAction:to:from:"), action, objc.ID(0), objc.ID(0))
+	if target == 0 {
+		return true
+	}
+	if objc.Send[bool](target, sel("respondsToSelector:"), sel("firstResponder")) && windowEditing(target) {
+		first := target.Send(sel("firstResponder"))
+		switch role {
+		case driver.MenuUndo, driver.MenuRedo:
+			if objc.Send[bool](first, sel("respondsToSelector:"), sel("undoManager")) {
+				manager := first.Send(sel("undoManager"))
+				if manager == 0 {
+					break
+				}
+				if role == driver.MenuUndo {
+					return objc.Send[bool](manager, sel("canUndo"))
+				}
+				return objc.Send[bool](manager, sel("canRedo"))
+			}
+		case driver.MenuCut, driver.MenuCopy, driver.MenuDelete:
+			if objc.Send[bool](first, sel("respondsToSelector:"), selSelectedRange) {
+				selected := objc.Send[apple.NSRange](first, selSelectedRange)
+				return selected.Length != 0
+			}
+		}
+	}
+	if objc.Send[bool](target, sel("respondsToSelector:"), sel("firstResponder")) {
+		if first := target.Send(sel("firstResponder")); first != 0 {
+			target = first
+		}
+	}
+	oldAction := objc.Send[objc.SEL](item, sel("action"))
+	item.Send(sel("setAction:"), action)
+	defer item.Send(sel("setAction:"), oldAction)
+	if objc.Send[bool](target, sel("respondsToSelector:"), sel("validateUserInterfaceItem:")) {
+		return objc.Send[bool](target, sel("validateUserInterfaceItem:"), item)
+	}
+	if objc.Send[bool](target, sel("respondsToSelector:"), sel("validateMenuItem:")) {
+		return objc.Send[bool](target, sel("validateMenuItem:"), item)
+	}
+	return true
 }
 
 // keyField returns the window a key press looking for a menu item's key equivalent went to when a field or a web view in it has the keyboard focus, and 0 otherwise. The menu bar is the app's whichever surface set it, so the window is the key's own, any of the app's or AppKit's: the event's, else the key window, the main window, and the menu's own window while no window has the keyboard.
