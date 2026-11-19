@@ -160,6 +160,7 @@ func (s *surface) environment() driver.Environment {
 	if w.desktop.Get("matches").Bool() {
 		env.Idiom = driver.IdiomDesktop
 	}
+	simulate(&env, s.simulate)
 	switch {
 	case s.doc.Get("visibilityState").String() == "hidden":
 		env.Lifecycle = driver.LifecycleBackground
@@ -179,6 +180,17 @@ func (s *surface) environment() driver.Environment {
 		env.KeyboardHeight = driver.Points(math.Max(0, math.Round(h)))
 	}
 	return env
+}
+
+// simulate has env report os (Options.OS) as the platform it runs on, its idiom a phone for iOS and Android and a desktop otherwise. The web, or none, leaves env the browser's.
+func simulate(env *driver.Environment, os driver.OS) {
+	if os == "" || os == driver.OSWeb {
+		return
+	}
+	env.OS, env.Simulated, env.Idiom = os, true, driver.IdiomDesktop
+	if os == driver.OSIOS || os == driver.OSAndroid {
+		env.Idiom = driver.IdiomPhone
+	}
 }
 
 // localeSettings is what the browser's Intl says of locale's hours and

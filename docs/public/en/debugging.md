@@ -135,6 +135,7 @@ Every build of an app, packages included, takes NSGo's own flags as it starts, w
 | `--nsgo-fps` | Shows the performance monitor on macOS, iOS, Windows and Linux |
 | `--nsgo-lang=zh-Hans` | Starts the app in a locale, a pseudo locale too |
 | `--nsgo-appearance=dark` | Starts the app `light`, `dark` or following the `system` |
+| `--nsgo-os=ios` | Runs a web build as `macos`, `windows`, `linux`, `ios` or `android`, `web` being itself |
 
 ```sh
 ./Hello --nsgo-fps                                   # Windows and Linux
@@ -144,3 +145,5 @@ adb shell am start -n dev.example.hello/dev.oneo.nsgo.NsgoActivity --ez nsgo-fps
 ```
 
 On the web they go in the page's query: `?nsgo-fps&nsgo-lang=de`.
+
+`--nsgo-os` previews another platform's layout in a browser: the app reads that OS and its idiom, a phone for iOS and Android and a desktop otherwise, and `Env.Simulated` reports true. The browser has none of that platform's native parts: `NavHeader` and the drawn tab bar take the place of the system's, there is no application menu, no native popup menu (`desktop.PopupMenu`) and no window functions, and `mobile.IsAvailable` and `desktop.IsAvailable` are false. Drawn menus such as `ui.ContextMenu` and `ui.Menu` still work. Shortcuts follow the visitor's keyboard. Other builds ignore the flag and log a warning.

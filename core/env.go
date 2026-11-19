@@ -69,6 +69,8 @@ type Env struct {
 	clear *Signal[bool]
 	// headers are the system header's heights, which only the tree reads.
 	headers [2]Points
+	// simulated is whether the OS is one the platform imitates (driver.Environment.Simulated), settled as the app starts.
+	simulated bool
 }
 
 type displayList struct{ values []DisplayInfo }
@@ -236,7 +238,7 @@ func (e *Env) set(v Environment) {
 	}
 	e.os.Set(v.OS)
 	e.version.Set(v.OSVersion)
-	e.appleKeys.Set(v.OS == OSMacOS || v.OS == OSIOS || v.AppleKeyboard)
+	e.appleKeys.Set(!v.Simulated && (v.OS == OSMacOS || v.OS == OSIOS) || v.AppleKeyboard)
 	e.idiom.Set(v.Idiom)
 	e.lifecycle.Set(v.Lifecycle)
 	e.appClip.Set(v.AppClip)
@@ -248,6 +250,7 @@ func (e *Env) set(v Environment) {
 	e.clear.Set(v.WindowTransparent)
 	e.verticalBar.Set(v.VerticalBarEdge)
 	e.headers = [2]Points{v.HeaderHeight, max(v.LargeHeaderHeight, v.HeaderHeight)}
+	e.simulated = v.Simulated
 }
 
 // DeviceName returns the name the user gave the device, such as "Ada's MacBook Pro", as the system's settings show it; it is empty on the web and where the platform keeps it private, as iOS does from apps without Apple's user-assigned device name entitlement.
@@ -483,6 +486,25 @@ func rightToLeft(lang string) bool {
 
 // OS returns the operating system.
 func (e *Env) OS() OS { return e.os.Get() }
+
+// Simulated reports whether the app runs as another OS than the platform's, as a web build does for --nsgo-os: OS is that one's, but none of its native parts are there, so the app's own views stand in for its system header, tab bar, menus and window.
+func (e *Env) Simulated() bool { return e.simulated }
+
+// host is the OS whose native parts the platform has, tracked as OS is: the web's while it simulates another. hostUntracked reads it without tracking.
+func (e *Env) host() OS {
+	os := e.os.Get()
+	if e.simulated {
+		return OSWeb
+	}
+	return os
+}
+
+func (e *Env) hostUntracked() OS {
+	if e.simulated {
+		return OSWeb
+	}
+	return e.os.GetUntracked()
+}
 
 // OSVersion returns the system's version: Android's API level as its
 // major, zero on the web.

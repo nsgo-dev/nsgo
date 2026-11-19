@@ -36,4 +36,7 @@ func TestHapticsPlayOnPhonesAlone(t *testing.T) {
 	if got := played(Environment{OS: OSMacOS}, HapticMedium); len(got) != 0 {
 		t.Errorf("a Mac played %v", got)
 	}
+	if got := played(Environment{OS: OSIOS, Idiom: IdiomPhone, Simulated: true}, HapticSelection); len(got) != 0 {
+		t.Errorf("a web build that runs as iOS played %v", got)
+	}
 }

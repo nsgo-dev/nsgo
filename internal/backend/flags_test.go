@@ -1,7 +1,10 @@
 package backend
 
 import (
+	"bytes"
+	"log"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/core"
@@ -101,5 +104,50 @@ func TestRestartDropsTheLoginMarker(t *testing.T) {
 	}
 	if got := restartArgs(nil); got != nil {
 		t.Errorf("no args = %q", got)
+	}
+}
+
+// --nsgo-os names the OS a web build runs as; other builds say they ignore it.
+func TestOSLaunchFlag(t *testing.T) {
+	for value, want := range map[string]core.OS{"macos": core.OSMacOS, "windows": core.OSWindows, "linux": core.OSLinux, "ios": core.OSIOS, "android": core.OSAndroid, "web": core.OSWeb} {
+		var f launchFlags
+		if got := f.parse([]string{"app", "--nsgo-os=" + value, "-v"}); !slices.Equal(got, []string{"app", "-v"}) || f.os != want {
+			t.Errorf("--nsgo-os=%s: args = %q, os = %q", value, got, f.os)
+		}
+	}
+	var f launchFlags
+	if err := f.set("os=beos"); err == nil || f.os != "" {
+		t.Errorf("--nsgo-os=beos: err = %v, os = %q", err, f.os)
+	}
+	if err := f.set("os"); err == nil || f.os != "" {
+		t.Errorf("--nsgo-os: err = %v, os = %q", err, f.os)
+	}
+	if err := f.set("nope"); err == nil || !strings.Contains(err.Error(), "--nsgo-appearance or --nsgo-os") {
+		t.Errorf("an unknown flag's error = %v", err)
+	}
+
+	var out bytes.Buffer
+	defer log.SetOutput(log.Writer())
+	log.SetOutput(&out)
+	defer func(was bool) { simulates = was }(simulates)
+	for _, web := range []bool{false, true} {
+		out.Reset()
+		simulates = web
+		var o Options
+		(&launchFlags{os: core.OSIOS}).apply(&o)
+		if o.Simulate != core.OSIOS {
+			t.Errorf("web %v: Simulate = %q", web, o.Simulate)
+		}
+		if warned := strings.Contains(out.String(), "only a web build"); warned == web {
+			t.Errorf("web %v: logged %q", web, out.String())
+		}
+	}
+	simulates = false
+	for _, os := range []core.OS{"", core.OSWeb} {
+		out.Reset()
+		(&launchFlags{os: os}).apply(&Options{})
+		if out.Len() != 0 {
+			t.Errorf("--nsgo-os=%q, logged %q", os, out.String())
+		}
 	}
 }

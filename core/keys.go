@@ -328,11 +328,12 @@ func (t *Tree) followHome() {
 	}
 }
 
-// menuHasKey reports whether an enabled item of the application menu takes the normalized key as its shortcut where the focus is (driver.MenuShortcut), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu; elsewhere it takes no key.
+// menuHasKey reports whether an enabled item of the application menu takes the normalized key as its shortcut where the focus is (driver.MenuShortcut), "mod" and the platform's own Command or Control being the same press. Only macOS, Windows and Linux show the menu, not a web build that runs as them; elsewhere it takes no key.
 func (t *Tree) menuHasKey(key string) bool {
 	env := t.root.Env()
 	menu := t.menu
-	switch env.os.GetUntracked() {
+	os := env.hostUntracked()
+	switch os {
 	case OSMacOS:
 		// One menu bar shows the menu the surface that sent one last sent, the app's own surface's while the window the focus is in sets none.
 		menu = nil
@@ -361,7 +362,7 @@ func (t *Tree) menuHasKey(key string) bool {
 		}
 	}
 	editing := t.focus != nil && (t.focus.kind == driver.KindInput || t.focus.kind == driver.KindWeb)
-	_, ok := driver.MenuShortcut(menu, names, env.os.GetUntracked(), editing)
+	_, ok := driver.MenuShortcut(menu, names, os, editing)
 	return ok
 }
 

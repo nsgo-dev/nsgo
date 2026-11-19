@@ -10,17 +10,9 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
-// The browser's history follows the app's navigation when the app is the
-// page, as NSH's does: each screen above a stack's first and each modal
-// shown is an entry (ItemHistory), so the back button, the mouse's back
-// button and the back key go back in the app.
+// The browser's history follows the app's navigation when the app is the page, as NSH's does: each screen above a stack's first and each modal shown is an entry (ItemHistory), so the back button, the mouse's back button and the back key go back in the app.
 //
-// Entries carry the depth and the page load they belong to. Entries the
-// app takes away itself are gone back over with history.go, whose
-// popstate is not a back; a back the app refuses gets its entry again.
-// After a reload the earlier load's entries are passed over. An app in an
-// element of a page, or in a frame, pushes nothing: its entries would be
-// the page's; it takes the mouse's back button and the back key itself.
+// Entries carry the depth and the page load they belong to. Entries the app takes away itself are gone back over with history.go, whose popstate is not a back; a back the app refuses gets its entry again. After a reload the earlier load's entries are passed over. An app in an element of a page, or in a frame, pushes nothing: its entries would be the page's; it takes the mouse's back button and the back key itself. A same-origin frame whose iframe element has data-nsgo-history follows the page's history as if it were the page, as the gallery's previews do.
 type history struct {
 	owned   bool
 	session string
@@ -28,12 +20,11 @@ type history struct {
 	skip    int // popstates of the app's own history.go to ignore
 }
 
-// listenHistory starts following the history, owned when the app is the
-// whole page of the top window.
+// listenHistory starts following the history, owned when the app is the whole page of the top window or of a frame that opts in.
 func (s *surface) listenHistory(ls *listeners, whole bool) {
 	win := js.Global().Get("window")
 	h := &s.history
-	h.owned = whole && win.Get("top").Equal(win)
+	h.owned = whole && ownsHistory(win)
 	if !h.owned {
 		ls.on(s.host, "mouseup", func(e js.Value) {
 			if e.Get("button").Int() == 3 {
@@ -53,6 +44,15 @@ func (s *surface) listenHistory(ls *listeners, whole bool) {
 	hist := win.Get("history")
 	hist.Call("replaceState", h.state(0), "")
 	ls.on(win, "popstate", func(e js.Value) { s.popState(e.Get("state")) })
+}
+
+// ownsHistory is whether the page in win has the history: it is the top window's, or its frame's element has data-nsgo-history. A cross-origin frame's element is null.
+func ownsHistory(win js.Value) bool {
+	if win.Get("top").Equal(win) {
+		return true
+	}
+	frame := win.Get("frameElement")
+	return frame.Truthy() && frame.Call("hasAttribute", "data-nsgo-history").Bool()
 }
 
 func (h *history) state(depth int) map[string]any {

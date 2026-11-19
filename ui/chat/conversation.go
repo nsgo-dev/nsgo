@@ -157,12 +157,13 @@ func chatGlass(tint core.Color) core.Style {
 	return core.Style{Background: tint, BackdropFilters: []core.Filter{core.Blur(24)}, GlassEffect: core.GlassRegular}
 }
 
-// chatGlassEdge is the border of a glass surface: none where the system's
-// glass draws its own rim, keeping the surface's size, else rim.
+// chatGlassEdge is the border of a glass surface: none where the system's glass draws its own rim, keeping the surface's size, else rim, as in a web build that runs as such a system.
 func chatGlassEdge(cx *core.Scope, rim core.Color) core.Color {
 	switch cx.Env().OS() {
 	case core.OSMacOS, core.OSIOS, core.OSWindows:
-		return core.Transparent
+		if !cx.Env().Simulated() {
+			return core.Transparent
+		}
 	}
 	return rim
 }

@@ -51,7 +51,7 @@ func DownloadUpdate(ctx context.Context, update UpdateCheck, dir string, progres
 
 // InstallUpdate hands a verified package to the platform's installer.
 func InstallUpdate(cx *Scope, path string, done func(error)) {
-	if cx.Env().OS() == OSAndroid {
+	if cx.Env().host() == OSAndroid {
 		cx.InstallPackage(path, func(started bool, err error) {
 			if err == nil && !started {
 				err = errors.New("core: Android installer did not start")

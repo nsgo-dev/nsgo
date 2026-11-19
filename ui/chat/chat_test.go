@@ -561,3 +561,25 @@ func quotaViews(v *nsgotest.View) []*nsgotest.View {
 	}
 	return out
 }
+
+// The system's glass draws its own rim on macOS, iOS and Windows, but not in a web build that runs as them.
+func TestChatGlassEdge(t *testing.T) {
+	rim := core.RGB(0x123456)
+	for _, tc := range []struct {
+		env  core.Environment
+		want core.Color
+	}{
+		{desktopEnv, core.Transparent},
+		{core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop, Simulated: true}, rim},
+		{core.Environment{OS: core.OSLinux, Idiom: core.IdiomDesktop}, rim},
+	} {
+		var got core.Color
+		nsgotest.Start(t, func(cx *core.Scope) core.Node {
+			got = chatGlassEdge(cx, rim)
+			return core.View{}
+		}, nsgotest.Environment(tc.env))
+		if got != tc.want {
+			t.Errorf("%s, simulated %v: edge %v", tc.env.OS, tc.env.Simulated, got)
+		}
+	}
+}

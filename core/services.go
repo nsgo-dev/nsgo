@@ -673,7 +673,7 @@ func (cx *Scope) OpenFile(f SharedFile, done func(opened bool, err error)) {
 	if t == nil {
 		return
 	}
-	os := cx.Env().os.GetUntracked()
+	os := cx.Env().hostUntracked()
 	r, err := resolveOpened(f, os == OSMacOS || os == OSWindows || os == OSLinux)
 	if err != nil {
 		answer(false, err)
@@ -849,7 +849,7 @@ func (cx *Scope) InstallPackage(path string, done func(started bool, err error))
 	if t == nil {
 		return
 	}
-	if cx.Env().os.GetUntracked() != OSAndroid {
+	if cx.Env().hostUntracked() != OSAndroid {
 		answer(false, errNoInstaller)
 		return
 	}
@@ -893,7 +893,7 @@ func (cx *Scope) androidAsk(kind driver.ItemKind, done func(bool)) {
 	if t == nil {
 		return
 	}
-	if cx.Env().os.GetUntracked() != OSAndroid {
+	if cx.Env().hostUntracked() != OSAndroid {
 		answer(false)
 		return
 	}

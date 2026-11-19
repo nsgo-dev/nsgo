@@ -128,7 +128,7 @@ func check(cx *core.Scope, background bool, answered func(core.UpdateCheck)) {
 				Cancelable: true,
 			}, func(index int) {
 				if index == 0 {
-					if c.Download != "" && (cx.Env().OS() == core.OSLinux || cx.Env().OS() == core.OSAndroid) {
+					if c.Download != "" && installs(cx) {
 						downloadAndInstall(cx, c)
 					} else {
 						cx.OpenURL(c.URL, nil)
@@ -153,12 +153,18 @@ func staging(cx *core.Scope) string {
 
 // discardStaged removes the packages downloadAndInstall staged on Linux and Android. Android's installer reads one through a content URI after it starts, so a package stays until the next download or a check that finds the app up to date.
 func discardStaged(cx *core.Scope) {
-	if sys := cx.Env().OS(); sys != core.OSLinux && sys != core.OSAndroid {
+	if !installs(cx) {
 		return
 	}
 	if err := os.RemoveAll(staging(cx)); err != nil {
 		log.Printf("updater: %v", err)
 	}
+}
+
+// installs reports whether the app downloads and installs packages itself: on Linux and Android, not a web build that runs as them (core.Env.Simulated).
+func installs(cx *core.Scope) bool {
+	sys := cx.Env().OS()
+	return (sys == core.OSLinux || sys == core.OSAndroid) && !cx.Env().Simulated()
 }
 
 // installing is set while downloadAndInstall's download and install run, from the user choosing Update until Linux's package manager finished or Android's installer started. The alert shows nothing meanwhile, so a user may choose Update again, and a second run would discard the first's staged package and stage its own under the same name.

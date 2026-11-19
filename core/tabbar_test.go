@@ -21,6 +21,18 @@ func TestTabBarTakesTheAccent(t *testing.T) {
 	}
 }
 
+// A web build that runs as iOS or Android has no system tab bar to show.
+func TestTabBarShowsNothingSimulated(t *testing.T) {
+	for _, os := range []core.OS{core.OSIOS, core.OSAndroid} {
+		app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+			return core.TabBar{Items: []core.TabBarItem{{Title: "Home", Icon: "house"}}, TestID: "bar"}
+		}, nsgotest.Environment(driver.Environment{OS: os, Idiom: driver.IdiomPhone, Simulated: true}))
+		if v := app.FindMounted("id:bar"); v.Component != "" {
+			t.Fatalf("%v: mounted the component %q", os, v.Component)
+		}
+	}
+}
+
 func TestTabBarSVGIsAndroidOnlyAndReactive(t *testing.T) {
 	for _, os := range []core.OS{core.OSAndroid, core.OSIOS} {
 		t.Run(string(os), func(t *testing.T) {

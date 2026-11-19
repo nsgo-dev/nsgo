@@ -95,6 +95,8 @@ type Environment struct {
 	// as Major, and zero on the web.
 	OSVersion OSVersion
 	Idiom     Idiom
+	// Simulated is whether OS and Idiom are ones the platform imitates rather than runs on, as a web build does for --nsgo-os: the app's own views take that OS's paths, while its native components, system header, menus and window functions are absent.
+	Simulated bool
 	// AppleKeyboard says a browser runs on an Apple platform, where "mod"
 	// is Command as on macOS and iOS.
 	AppleKeyboard bool

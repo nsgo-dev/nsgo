@@ -36,6 +36,8 @@ type Options struct {
 	Constraints core.WindowConstraints
 	// Appearance is the appearance the app starts in.
 	Appearance core.Appearance
+	// Simulate is the OS a web build runs as: --nsgo-os. Other platforms ignore it.
+	Simulate core.OS
 	// InstanceKey scopes the Windows and Linux instance lock; empty keeps one per app ID.
 	InstanceKey string
 	// HideDock starts the app out of the Dock (macOS).

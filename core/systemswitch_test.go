@@ -33,3 +33,17 @@ func TestSystemSwitchShowsNothingElsewhere(t *testing.T) {
 		t.Fatalf("Android mounted the component %q", v.Component)
 	}
 }
+
+// A web build that runs as macOS or iOS has no UISwitch or NSSwitch to show.
+func TestSystemSwitchShowsNothingSimulated(t *testing.T) {
+	for _, os := range []driver.OS{driver.OSMacOS, driver.OSIOS} {
+		available := true
+		app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+			available = core.SystemSwitchAvailable(cx)
+			return core.SystemSwitch{TestID: "switch"}
+		}, nsgotest.Environment(driver.Environment{OS: os, Simulated: true}))
+		if v := app.FindMounted("id:switch"); available || v.Component != "" {
+			t.Fatalf("%v: available %v, mounted the component %q", os, available, v.Component)
+		}
+	}
+}

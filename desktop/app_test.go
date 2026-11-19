@@ -137,3 +137,17 @@ func TestFrontmostAppIsHeldToAccess(t *testing.T) {
 		})
 	}
 }
+
+// A web build that runs as a desktop OS has none of its window functions.
+func TestIsAvailableSimulated(t *testing.T) {
+	for _, simulated := range []bool{false, true} {
+		var available bool
+		nsgotest.Start(t, func(cx *core.Scope) core.Node {
+			available = desktop.IsAvailable(cx)
+			return core.View{}
+		}, nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop, Simulated: simulated}))
+		if available == simulated {
+			t.Errorf("simulated %v: IsAvailable = %v", simulated, available)
+		}
+	}
+}

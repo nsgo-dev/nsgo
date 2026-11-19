@@ -105,7 +105,7 @@ func (cx *Scope) overlayPermission(ask bool, done func(OverlayPermission)) {
 
 // overlays reports whether code using cx may show overlays: on Android, where its Access grants AccessOverlay.
 func (cx *Scope) overlays() bool {
-	return cx.Env().os.GetUntracked() == OSAndroid && !cx.denied(serviceOverlay, "")
+	return cx.Env().hostUntracked() == OSAndroid && !cx.denied(serviceOverlay, "")
 }
 
 // OpenOverlay is the core's part of mobile.OpenOverlay, which apps use: it opens an overlay over other apps showing content, a tree of its own that belongs to the current owner and closes as that owner goes. The app has one overlay at a time: it returns nil while another is open, off Android and where Access does not grant AccessOverlay. Without the permission the platform ends it at once (OverlayEndDenied).

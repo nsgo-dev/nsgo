@@ -135,6 +135,7 @@ claude mcp add nsgo -- go tool nsgo mcp
 | `--nsgo-fps` | 在 macOS、iOS、Windows 和 Linux 上显示性能监视器 |
 | `--nsgo-lang=zh-Hans` | 以某个语言区域启动应用，也可以是伪语言区域 |
 | `--nsgo-appearance=dark` | 以 `light`、`dark` 或跟随系统（`system`）的外观启动应用 |
+| `--nsgo-os=ios` | 让 Web 构建以 `macos`、`windows`、`linux`、`ios` 或 `android` 运行，`web` 表示按本身运行 |
 
 ```sh
 ./Hello --nsgo-fps                                   # Windows 和 Linux
@@ -144,3 +145,5 @@ adb shell am start -n dev.example.hello/dev.oneo.nsgo.NsgoActivity --ez nsgo-fps
 ```
 
 在 Web 上，这些参数写在页面的查询字符串中：`?nsgo-fps&nsgo-lang=de`。
+
+`--nsgo-os` 用来在浏览器里预览别的平台的布局：应用读到的是那个系统和对应的设备类型（iOS 和 Android 是手机，其余是桌面），`Env.Simulated` 返回 true。浏览器里没有那个平台的原生部件：`NavHeader` 和自绘的标签栏代替系统的，没有应用菜单、原生弹出菜单（`desktop.PopupMenu`）和窗口功能，`mobile.IsAvailable` 和 `desktop.IsAvailable` 都是 false。`ui.ContextMenu`、`ui.Menu` 这类自绘菜单照常可用。快捷键跟随访问者自己的键盘。其他构建忽略这个参数，并打印一条警告。

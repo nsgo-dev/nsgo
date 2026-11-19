@@ -8,11 +8,13 @@ import (
 	"github.com/nsgo-dev/nsgo/icons/lucide"
 )
 
-// TestNavPage gives a page without a header of its own a themed one with a back button, below the status bar where the system has a header. On iOS and Android the system's header stands in for it, and on Android it is opaque in the surface's color, the page below it.
+// TestNavPage gives a page without a header of its own a themed one with a back button, below the status bar where the system has a header. On iOS and Android the system's header stands in for it, and on Android it is opaque in the surface's color, the page below it. A web build that runs as iOS has no system header, so it draws NavHeader.
 func TestNavPage(t *testing.T) {
 	android := phoneEnv
 	android.OS, android.HeaderHeight, android.SafeArea = core.OSAndroid, 56, core.Edges{Top: 47, Bottom: 34}
-	for _, e := range []core.Environment{desktopEnv, android} {
+	simulated := phoneEnv
+	simulated.Simulated = true
+	for _, e := range []core.Environment{desktopEnv, android, simulated} {
 		popped := false
 		var nav *base.Nav[string]
 		app, p := start(t, e, func(cx *core.Scope) core.Node {

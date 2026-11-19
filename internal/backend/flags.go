@@ -11,21 +11,20 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/engine"
 )
 
-// launchFlags are the engine's command-line flags, which any build of an
-// app takes, with one dash or two:
+// launchFlags are the engine's command-line flags, which any build of an app takes, with one dash or two:
 //
 //	--nsgo-fps               show the performance monitor
 //	--nsgo-lang=zh-Hans      run in a locale, as core.Scope.SetLocale does
 //	--nsgo-appearance=dark   start light, dark or following the system
+//	--nsgo-os=ios            run a web build as macos, windows, linux, ios or android (web: as itself)
 //
-// They override nsgo.yaml and Run's options. Phones and the web take them
-// as the platform launches apps with values: the simulator's and
-// devicectl's arguments, an Android intent's extras (--ez nsgo-fps true,
-// --es nsgo-lang de) and the page's query (?nsgo-fps&nsgo-lang=de).
+// They override nsgo.yaml and Run's options. Phones and the web take them as the platform launches apps with values: the simulator's and devicectl's arguments, an Android intent's extras (--ez nsgo-fps true, --es nsgo-lang de) and the page's query (?nsgo-fps&nsgo-lang=de).
 type launchFlags struct {
 	fps        bool
 	lang       string
 	appearance core.Appearance
+	// os is the OS a web build runs as, --nsgo-os.
+	os core.OS
 	// appearanceSet is whether --nsgo-appearance was given, as its
 	// "system" is the zero Appearance.
 	appearanceSet bool
@@ -42,14 +41,16 @@ type launchFlags struct {
 // launch holds the flags the app was started with.
 var launch launchFlags
 
+// simulates is whether the build runs as the OS --nsgo-os names, which only the web's does (run_web.go).
+var simulates bool
+
 // launchArgs are the program's arguments as it started, its launch flags among them but the Jump List task it chose and the login marker, which a restart passes again.
 var launchArgs []string
 
 // loginMarker is the flag the macOS 11/12 LaunchAgent, the Windows Run value and the Linux autostart entry start the app with, so it reports the launch as a login one (desktop.LaunchedAtLogin).
 const loginMarker = "--nsgo-launched-at-login"
 
-// The flags leave os.Args before main runs, so the app's own flag
-// parsing never sees them.
+// The flags leave os.Args before main runs, so the app's own flag parsing never sees them.
 func init() {
 	launchArgs = restartArgs(os.Args)
 	os.Args = launch.parse(os.Args)
@@ -73,9 +74,7 @@ func restartArgs(args []string) []string {
 	return out
 }
 
-// parse takes the engine's flags out of args, a program's arguments, and
-// returns the rest. A malformed or unknown one is logged and dropped.
-// Arguments after "--" are the app's.
+// parse takes the engine's flags out of args, a program's arguments, and returns the rest. A malformed or unknown one is logged and dropped. Arguments after "--" are the app's.
 func (f *launchFlags) parse(args []string) []string {
 	if len(args) == 0 {
 		return args
@@ -140,23 +139,31 @@ func (f *launchFlags) set(flag string) error {
 		f.dockTask = value
 	case "launched-at-login":
 		f.launchedAtLogin = true
+	case "os":
+		o, ok := map[string]core.OS{"macos": core.OSMacOS, "windows": core.OSWindows, "linux": core.OSLinux, "ios": core.OSIOS, "android": core.OSAndroid, "web": core.OSWeb}[value]
+		if !ok {
+			return errors.New("needs macos, windows, linux, ios, android or web")
+		}
+		f.os = o
 	default:
-		return errors.New("no such flag: --nsgo-fps, --nsgo-lang or --nsgo-appearance")
+		return errors.New("no such flag: --nsgo-fps, --nsgo-lang, --nsgo-appearance or --nsgo-os")
 	}
 	return nil
 }
 
-// apply puts the flags over Run's options.
+// apply puts the flags over Run's options. It runs once every init has, so simulates is settled.
 func (f *launchFlags) apply(o *Options) {
 	o.Monitor = f.fps
 	if f.appearanceSet {
 		o.Appearance = f.appearance
 	}
+	o.Simulate = f.os
+	if f.os != "" && f.os != core.OSWeb && !simulates {
+		log.Print("nsgo: --nsgo-os: only a web build runs as another OS")
+	}
 }
 
-// localized returns root, run in the locale --nsgo-lang names. The flag
-// has the last word as the app starts, over a choice the app restores,
-// and the user's later choices have theirs.
+// localized returns root, run in the locale --nsgo-lang names. The flag has the last word as the app starts, over a choice the app restores, and the user's later choices have theirs.
 func (f *launchFlags) localized(root engine.App) engine.App {
 	if f.lang == "" {
 		return root

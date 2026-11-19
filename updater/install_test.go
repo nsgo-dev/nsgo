@@ -57,12 +57,29 @@ func fakeInstaller(t *testing.T) *installer {
 // startOn runs an app on os whose Check button checks for updates, with the platform's updater answering found.
 func startOn(t *testing.T, os driver.OS, found core.UpdateCheck) *nsgotest.App {
 	t.Helper()
+	return startIn(t, driver.Environment{OS: os}, found)
+}
+
+// startIn is startOn in the environment env.
+func startIn(t *testing.T, env driver.Environment, found core.UpdateCheck) *nsgotest.App {
+	t.Helper()
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		return base.Button{OnPress: func(core.PressEvent) { updater.Check(cx) },
 			Style: core.Style{Width: core.Pt(80), Height: core.Pt(30)}, Children: []core.Node{core.Text{Content: "Check"}}}
-	}, nsgotest.Size(300, 120), nsgotest.Environment(driver.Environment{OS: os}))
+	}, nsgotest.Size(300, 120), nsgotest.Environment(env))
 	app.Update = func(bool) core.UpdateCheck { return found }
 	return app
+}
+
+// A web build that runs as Linux installs nothing: Update opens the release's page.
+func TestUpdateOpensThePageInASimulatedLinux(t *testing.T) {
+	in := fakeInstaller(t)
+	app := startIn(t, driver.Environment{OS: driver.OSLinux, Simulated: true}, signedNewer)
+	app.Press("text:Check")
+	app.Answer(0)
+	if !slices.Equal(app.OpenedURLs, []string{signedNewer.URL}) || len(in.downloaded) != 0 || app.Restarts != 0 {
+		t.Fatalf("opened %v, downloaded %v, restarts %d", app.OpenedURLs, in.downloaded, app.Restarts)
+	}
 }
 
 func TestUpdateInstallsAndRestartsOnLinux(t *testing.T) {

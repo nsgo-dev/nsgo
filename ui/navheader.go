@@ -8,14 +8,16 @@ import (
 // navEdgeTail is how far a soft edge's blur runs past its bars.
 const navEdgeTail core.Points = 24
 
-// systemHeader reports whether a page shows the platform's header, iOS's navigation bar or Android's toolbar, rather than NavHeader.
+// systemHeader reports whether a page shows the platform's header, iOS's navigation bar or Android's toolbar, rather than NavHeader, which a web build that runs as them shows.
 func systemHeader(cx *core.Scope) bool {
 	os := cx.Env().OS()
-	return os == core.OSIOS || os == core.OSAndroid
+	return (os == core.OSIOS || os == core.OSAndroid) && !cx.Env().Simulated()
 }
 
 // transparentHeader reports whether the system's header lies over the page's content without a background, which scrolls under it with a progressive blur: iOS's. Android's stays opaque until it draws scroll edge effects.
-func transparentHeader(cx *core.Scope) bool { return cx.Env().OS() == core.OSIOS }
+func transparentHeader(cx *core.Scope) bool {
+	return cx.Env().OS() == core.OSIOS && !cx.Env().Simulated()
+}
 
 // NavInset is the room to leave at the top of a page's content that does not scroll for a NavPage's system header, and 0 where the header takes room of its own. Scroll views under the header are inset already. It is tracked as the safe area changes.
 func NavInset(cx *core.Scope) core.Points {

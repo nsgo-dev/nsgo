@@ -29,7 +29,7 @@ type TabBarItem struct {
 
 // Render implements Node.
 func (b TabBar) Render(cx *Scope) Node {
-	mobile := func() bool { os := cx.Env().OS(); return os == OSIOS || os == OSAndroid }
+	mobile := func() bool { os := cx.Env().host(); return os == OSIOS || os == OSAndroid }
 	return Show{When: mobile, Then: b.native,
 		Else: func(*Scope) Node { return View{Style: Style{Display: DisplayNone}, TestID: b.TestID} }}
 }

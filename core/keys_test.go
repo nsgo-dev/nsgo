@@ -852,6 +852,39 @@ func TestBindingsYieldToTheMenuAsAsked(t *testing.T) {
 	}
 }
 
+// A web build that runs as a desktop OS shows no application menu, so a YieldsToMenu binding keeps its key, and "mod" is Command only on an Apple keyboard, which the browser reports.
+func TestSimulatedDesktopKeepsTheMenusKeys(t *testing.T) {
+	for _, os := range []OS{OSMacOS, OSWindows, OSLinux} {
+		for _, apple := range []bool{false, true} {
+			var cx *Scope
+			var shown *Signal[bool]
+			ran := false
+			h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node {
+				cx = c
+				shown = NewSignal(c, false)
+				c.OnKeyWith("mod+r", KeyOptions{YieldsToMenu: true}, func() { ran = true })
+				return Show{When: shown.Get, Then: func(cx *Scope) Node {
+					cx.SetApplicationMenu([]MenuItem{{Label: "File", Items: []MenuItem{{Label: "Run", Shortcut: "mod+r"}}}})
+					return View{}
+				}}
+			})
+			h.tree.SetEnvironment(Environment{OS: os, Idiom: IdiomDesktop, Simulated: true, AppleKeyboard: apple})
+			h.commit()
+			shown.Set(true)
+			if keys, _ := sentKeys(h.commit()); !slices.Equal(keys, []string{"mod+r"}) {
+				t.Errorf("%s: keymap = %q, want the binding's key", os, keys)
+			}
+			h.pressKey("mod+r", 0)
+			if !ran {
+				t.Errorf("%s: mod+r did not fire", os)
+			}
+			if env := cx.Env(); !env.Simulated() || Untracked(cx, env.AppleKeys) != apple {
+				t.Errorf("%s, Apple keyboard %v: Simulated %v, AppleKeys %v", os, apple, env.Simulated(), Untracked(cx, env.AppleKeys))
+			}
+		}
+	}
+}
+
 func TestMenuYieldFollowsTextFocus(t *testing.T) {
 	for _, os := range []OS{OSMacOS, OSWindows, OSLinux} {
 		for _, web := range []bool{false, true} {

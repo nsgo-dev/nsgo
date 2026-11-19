@@ -324,8 +324,7 @@ func TestShellPhone(t *testing.T) {
 	}
 }
 
-// TestTabShellSystemBar takes the system's bar on a phone where every tab
-// names its icon, and the drawn bar elsewhere.
+// TestTabShellSystemBar takes the system's bar on a phone where every tab names its icon, and the drawn bar elsewhere, a web build that runs as iOS included.
 func TestTabShellSystemBar(t *testing.T) {
 	selected := 0
 	tabs := func(cx *core.Scope) core.Node {
@@ -346,6 +345,17 @@ func TestTabShellSystemBar(t *testing.T) {
 	}
 	wide, _ := shell(t, desktopEnv, tabs)
 	wide.Find("role:tablist Sections")
+	phone.Simulated = true
+	simulated, _ := shell(t, phone, tabs)
+	simulated.Find("role:tablist Sections")
+	if v := simulated.FindMounted("id:tab-bar"); v.Component != "" {
+		t.Fatalf("simulated iOS mounted the component %q", v.Component)
+	}
+	selected = 0
+	simulated.Press("role:tab Search")
+	if selected != 1 || !simulated.Exists("Search page") {
+		t.Fatal("the drawn bar did not switch sections")
+	}
 }
 
 // TestTabShellSafeArea leaves no bottom safe area to the sections above a drawn bar, a nav page's included, following the safe area and giving it back while the keyboard hides the bar; under iOS's floating bar the sections keep it.

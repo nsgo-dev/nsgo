@@ -531,6 +531,17 @@ func TestInstallPackage(t *testing.T) {
 		t.Fatalf("off Android: %v, %v, %v", installErr, allowed, opened)
 	}
 
+	// A web build that runs as Android has no installer.
+	h.tree.SetEnvironment(Environment{OS: OSAndroid, Simulated: true})
+	h.commit()
+	installErr, allowed, opened = nil, true, true
+	cx.InstallPackage(apk, func(ok bool, err error) { started, installErr = ok, err })
+	cx.CanInstallPackages(func(ok bool) { allowed = ok })
+	cx.OpenInstallSettings(func(ok bool) { opened = ok })
+	if installErr == nil || allowed || opened || len(h.commit().Items) != 0 {
+		t.Fatalf("simulated Android: %v, %v, %v", installErr, allowed, opened)
+	}
+
 	h.tree.SetEnvironment(Environment{OS: OSAndroid})
 	h.commit()
 	cx.InstallPackage(apk, func(ok bool, err error) { started, installErr = ok, err })
@@ -710,6 +721,14 @@ func TestPopupMenu(t *testing.T) {
 	h.commit()
 	cx.PopupMenu([]MenuItem{{Label: "A"}}, Point{}, func() { log = append(log, "phone") })
 	if command(h.commit(), driver.ItemPopupMenu) != nil || log[len(log)-1] != "phone" {
+		t.Fatalf("log = %q", log)
+	}
+
+	// Nor has a web build that runs as macOS.
+	h.tree.SetEnvironment(Environment{OS: OSMacOS, Idiom: IdiomDesktop, Simulated: true})
+	h.commit()
+	cx.PopupMenu([]MenuItem{{Label: "A"}}, Point{}, func() { log = append(log, "simulated") })
+	if command(h.commit(), driver.ItemPopupMenu) != nil || log[len(log)-1] != "simulated" {
 		t.Fatalf("log = %q", log)
 	}
 }

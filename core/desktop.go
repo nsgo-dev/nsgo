@@ -198,7 +198,7 @@ func (t *Tree) menuSent() {
 	t.rt.menuBar = t
 	t.keysChanged = true
 	t.changed = true
-	if t.root.Env().os.GetUntracked() != OSMacOS {
+	if t.root.Env().hostUntracked() != OSMacOS {
 		return
 	}
 	for _, o := range append([]*Tree{t.rt.tree}, t.rt.surfaces...) {
@@ -295,7 +295,7 @@ func (cx *Scope) PopupMenu(items []MenuItem, at Point, closed func()) {
 		return
 	}
 	owner := cx.current()
-	if os := cx.Env().os.GetUntracked(); os != OSMacOS && os != OSWindows && os != OSLinux ||
+	if os := cx.Env().hostUntracked(); os != OSMacOS && os != OSWindows && os != OSLinux ||
 		!t.confinedMay(owner, refusedPresent, askedToPresent) {
 		if closed != nil {
 			t.within(owner, closed)

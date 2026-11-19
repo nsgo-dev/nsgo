@@ -31,7 +31,7 @@ func (cx *Scope) PlayHaptic(h Haptic) {
 	if h < HapticSelection || h > HapticError {
 		return
 	}
-	if os := cx.Env().os.GetUntracked(); os != OSIOS && os != OSAndroid {
+	if os := cx.Env().hostUntracked(); os != OSIOS && os != OSAndroid {
 		return
 	}
 	if t := cx.tree(); t != nil {

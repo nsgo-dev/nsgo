@@ -95,12 +95,11 @@ const (
 	WindowMaterialTabbed  = core.WindowMaterialTabbed
 )
 
-// IsAvailable reports whether the app runs on macOS, Windows or Linux,
-// where this package's functions act.
+// IsAvailable reports whether the app runs on macOS, Windows or Linux, where this package's functions act; a web build that runs as one (core.Env.Simulated) does not.
 func IsAvailable(cx *core.Scope) bool {
 	switch cx.Env().OS() {
 	case core.OSMacOS, core.OSWindows, core.OSLinux:
-		return true
+		return !cx.Env().Simulated()
 	}
 	return false
 }

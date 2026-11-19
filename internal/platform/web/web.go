@@ -41,9 +41,10 @@ type Options struct {
 	Fonts []string
 	// Appearance is the appearance the app starts in.
 	Appearance driver.Appearance
-	// Host names the global the loader keeps the page's host bridge in
-	// (host.go); without one the app has no host.
+	// Host names the global the loader keeps the page's host bridge in (host.go); without one the app has no host.
 	Host string
+	// OS, when set and not OSWeb, is the platform the page runs as (--nsgo-os): the environment reports it, Simulated, with its idiom, phone for iOS and Android, desktop otherwise, rather than the one the desktop media query gives.
+	OS driver.OS
 }
 
 const fontFamily = `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`
@@ -106,6 +107,8 @@ func (c *clicks) down(p driver.Point) int {
 type surface struct {
 	doc  js.Value
 	host js.Value
+	// simulate is the OS the page runs as (Options.OS).
+	simulate driver.OS
 	// rtl is the app's direction (driver.ItemDirection), which alerts lay
 	// their buttons out in.
 	rtl  bool
@@ -371,6 +374,7 @@ func open(app engine.App, opts Options, test *testOpen) *surface {
 	host.Call("appendChild", s.parked)
 	s.listen()
 	s.whole = opts.Mount == ""
+	s.simulate = opts.OS
 	var ls listeners // for the page's life, as listen's
 	s.listenHistory(&ls, opts.Mount == "" && test == nil)
 	s.watchStart(opts.Mount == "")
