@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"hash/crc32"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -926,7 +927,17 @@ func TestListTestsUsesTargetBuildTags(t *testing.T) {
 func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 	dir := t.TempDir()
 	encode := func(name string) string { return "~" + base64.RawURLEncoding.EncodeToString([]byte(name)) }
-	line := func(name string) string { return "nsgo-screenshot " + encode(name) + " 1/1 iVBORw0KGgo=" }
+	line := func(name string) string { return "nsgo-screenshot " + encode(name) + " 1/1 8:7a0709a4 iVBORw0KGgo=" }
+	// chunks is a PNG's lines as nsgotest prints them, size base64 characters to a chunk.
+	chunks := func(name string, png []byte, size int) []string {
+		data := base64.StdEncoding.EncodeToString(png)
+		n := (len(data) + size - 1) / size
+		var out []string
+		for i := range n {
+			out = append(out, fmt.Sprintf("nsgo-screenshot %s %d/%d %d:%08x %s", encode(name), i+1, n, len(png), crc32.ChecksumIEEE(png), data[i*size:min((i+1)*size, len(data))]))
+		}
+		return out
+	}
 	seen := map[string]bool{}
 	if _, saved, err := saveScreenshots(line("en/my library")+"\n"+line("ja/my library")+"\n", dir, seen); err != nil {
 		t.Fatal(err)
@@ -944,7 +955,7 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 		t.Fatalf("saved %v beside a duplicate, want after.png", saved)
 	}
 	// Two shots of one name in one process, the second larger, fail without corrupting the first.
-	two := "nsgo-screenshot " + encode("twice") + " 1/2 AAAA\nnsgo-screenshot " + encode("twice") + " 2/2 BBBB\n"
+	two := strings.Join(chunks("twice", []byte("a larger second shot"), 8), "\n") + "\n"
 	if _, saved, err := saveScreenshots(line("twice")+"\n"+two, dir, map[string]bool{}); err == nil {
 		t.Fatal("a name shot twice in one process succeeded")
 	} else if len(saved) != 1 {
@@ -970,6 +981,32 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 	} else if len(saved) != 1 {
 		t.Fatalf("saved %v, want only shot.png/a.png", saved)
 	}
+	// What a device's log loses or cuts fails the shot by name before a file is written: a dropped middle chunk, a chunk cut short (one that still decodes, as a cut at a multiple of four characters does), an empty chunk, chunks that disagree and data that is not base64.
+	png := []byte("\x89PNG\r\n\x1a\n twelve chunks of a PNG's bytes, base64 in eight characters each")
+	parts := fmt.Sprintf("/%d ", len(chunks("x", png, 8)))
+	cut := func(name string, edit func([]string) []string) string {
+		lines := edit(chunks(name, png, 8))
+		return strings.Join(lines, "\n") + "\n"
+	}
+	for _, c := range []struct{ name, out, want string }{
+		{"dropped", cut("dropped", func(l []string) []string { return append(l[:3:3], l[4:]...) }), `screenshot "dropped": missing chunks 4 of`},
+		{"short", cut("short", func(l []string) []string { l[4] = l[4][:len(l[4])-4]; return l }), `screenshot "short": its chunks hold`},
+		{"empty", cut("empty", func(l []string) []string { l[4] = l[4][:len(l[4])-8]; return l }), `screenshot "empty": its chunks hold`},
+		{"total", cut("total", func(l []string) []string { l[2] = strings.Replace(l[2], parts, "/99 ", 1); return l }), `screenshot "total": chunk 3 declares 99 parts`},
+		{"base64", cut("base64", func(l []string) []string { l[1] = l[1][:len(l[1])-8] + "!!!!!!!!"; return l }), `screenshot "base64": illegal base64`},
+	} {
+		if _, saved, err := saveScreenshots(c.out, dir, map[string]bool{}); err == nil || !strings.Contains(err.Error(), c.want) || len(saved) != 0 {
+			t.Errorf("%s: saved %v, error %v; want %q", c.name, saved, err, c.want)
+		}
+		if _, err := os.Stat(filepath.Join(dir, c.name+".png")); err == nil {
+			t.Errorf("%s: wrote a file", c.name)
+		}
+	}
+	if _, saved, err := saveScreenshots(strings.Join(chunks("complete", png, 8), "\n")+"\n", dir, map[string]bool{}); err != nil || len(saved) != 1 {
+		t.Fatalf("complete chunks: saved %v, error %v", saved, err)
+	} else if b, _ := os.ReadFile(saved[0]); string(b) != string(png) {
+		t.Fatalf("complete chunks saved %q, want %q", b, png)
+	}
 	// Names that differ only in case are one file where the volume ignores case.
 	seen = map[string]bool{}
 	if _, _, err := saveScreenshots(line("en/Home")+"\n", dir, seen); err != nil {
@@ -987,7 +1024,7 @@ func TestSaveScreenshotsKeepsNamesAndRejectsDuplicates(t *testing.T) {
 // A passing test the tool fails, for a screenshot it cannot save or a process that exits badly, reports the tool's reason as its JUnit message and prints none of go test's closing lines.
 func TestToolFailureIsTheMessage(t *testing.T) {
 	dir := t.TempDir()
-	shot := "nsgo-screenshot ~" + base64.RawURLEncoding.EncodeToString([]byte("home")) + " 1/1 iVBORw0KGgo=\n"
+	shot := "nsgo-screenshot ~" + base64.RawURLEncoding.EncodeToString([]byte("home")) + " 1/1 8:7a0709a4 iVBORw0KGgo=\n"
 	passed := "=== RUN   TestShot\n    shot_test.go:9: took it\n" + shot + shot + "--- PASS: TestShot (0.01s)\nPASS\n"
 	dup, _ := targetResult("TestShot", 0, passed, 0, nil, dir, map[string]bool{})
 	exited, _ := targetResult("TestExit", 0, "=== RUN   TestExit\n--- PASS: TestExit (0.01s)\nPASS\n", 1, nil, dir, map[string]bool{})

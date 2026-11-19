@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/png"
 	"log"
@@ -702,13 +703,13 @@ func (a *App) Screenshot(name string) {
 	}
 	png := a.CapturePNG()
 	encoded := base64.RawURLEncoding.EncodeToString([]byte(name))
-	// The tool saves it: the app may run on a phone, or in a browser. A
-	// device's log keeps lines of a few kilobytes, so it goes in chunks.
+	// The tool saves it: the app may run on a phone, or in a browser. A device's log keeps lines of a few kilobytes, so it goes in chunks, each with the PNG's length and CRC-32, which the tool checks the joined chunks against: a log that drops or cuts lines, as HarmonyOS's hilog does when it throttles an app, fails the test instead of saving a corrupt image.
 	data := base64.StdEncoding.EncodeToString(png)
+	sum := fmt.Sprintf("%d:%08x", len(png), crc32.ChecksumIEEE(png))
 	const chunk = 3000
 	n := (len(data) + chunk - 1) / chunk
 	for i := range n {
-		fmt.Printf("nsgo-screenshot ~%s %d/%d %s\n", encoded, i+1, n, data[i*chunk:min((i+1)*chunk, len(data))])
+		fmt.Printf("nsgo-screenshot ~%s %d/%d %s %s\n", encoded, i+1, n, sum, data[i*chunk:min((i+1)*chunk, len(data))])
 	}
 }
 

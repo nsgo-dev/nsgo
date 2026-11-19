@@ -26,7 +26,7 @@ func TestIsolated(t *testing.T) {
 	}
 	defer f.Close()
 	// Exercise screenshot transport without starting a native UI.
-	fmt.Println("nsgo-screenshot repeated 1/1 c2hvdA==")
+	fmt.Println("nsgo-screenshot repeated 1/1 4:ab0788bb c2hvdA==")
 	if _, err := f.WriteString(strconv.Itoa(runtime.GOMAXPROCS(0)) + "\n"); err != nil {
 		t.Fatal(err)
 	}

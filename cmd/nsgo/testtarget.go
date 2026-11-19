@@ -11,6 +11,7 @@ import (
 	"go/doc"
 	"go/parser"
 	"go/token"
+	"hash/crc32"
 	"io"
 	"os"
 	"os/exec"
@@ -532,17 +533,21 @@ func parseTestOutput(name string, depth int, out string, code int, runErr error)
 	return t
 }
 
-// screenshotLine is how nsgotest hands the tool a screenshot: its encoded
-// name, then the PNG in base64, in chunks a device's log keeps whole.
-var screenshotLine = regexp.MustCompile(`nsgo-screenshot (\S+) (\d+)/(\d+) (\S*)`)
+// screenshotLine is how nsgotest hands the tool a screenshot: its encoded name, the chunk's number and count, the PNG's length and CRC-32, then the PNG in base64, in chunks a device's log keeps whole.
+var screenshotLine = regexp.MustCompile(`nsgo-screenshot (\S+) (\d+)/(\d+) (\d+):([0-9a-f]{8}) (\S*)`)
 
-// saveScreenshots saves the screenshots out carries in dir and returns out without them, the files written and an error for each shot whose path is invalid, taken before or cannot be written, which it skips.
+// saveScreenshots saves the screenshots out carries in dir and returns out without them, the files written and an error for each shot whose chunks are missing, repeated, inconsistent or do not add up to the PNG they declare, or whose path is invalid, taken before or cannot be written, which it skips.
 func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, error) {
 	var kept strings.Builder
 	// Each Screenshot call is a shot of its own, so a name taken twice in one process is a duplicate rather than one image's chunks overwritten.
 	type shot struct {
 		name  string
+		total int
+		// sum is the PNG's length and CRC-32 as its first chunk declares them.
+		sum   string
 		parts []string
+		got   []bool
+		errs  []error
 	}
 	var shots []*shot
 	current := map[string]*shot{}
@@ -564,26 +569,64 @@ func saveScreenshots(out, dir string, seen map[string]bool) (string, []string, e
 			}
 			name = string(decoded)
 		}
-		i, _ := strconv.Atoi(m[2])
-		n, _ := strconv.Atoi(m[3])
+		i, iErr := strconv.Atoi(m[2])
+		n, nErr := strconv.Atoi(m[3])
 		// A first chunk starts a new shot of the name.
 		s := current[name]
 		if s == nil || i == 1 {
-			s = &shot{name: name, parts: make([]string, n)}
+			s = &shot{name: name, total: n, sum: m[4] + ":" + m[5]}
+			if n > 0 {
+				s.parts = make([]string, n)
+				s.got = make([]bool, n)
+			}
 			current[name] = s
 			shots = append(shots, s)
 		}
+		if iErr != nil || nErr != nil || n <= 0 || i <= 0 {
+			s.errs = append(s.errs, fmt.Errorf("screenshot %q: invalid chunk %q/%q", name, m[2], m[3]))
+			continue
+		}
+		if n != s.total || m[4]+":"+m[5] != s.sum {
+			s.errs = append(s.errs, fmt.Errorf("screenshot %q: chunk %d declares %d parts of %s, want %d of %s", name, i, n, m[4]+":"+m[5], s.total, s.sum))
+			continue
+		}
 		if i >= 1 && i <= len(s.parts) {
-			s.parts[i-1] = m[4]
+			if s.got[i-1] {
+				s.errs = append(s.errs, fmt.Errorf("screenshot %q: chunk %d was repeated", name, i))
+				continue
+			}
+			s.parts[i-1] = m[6]
+			s.got[i-1] = true
+		} else {
+			s.errs = append(s.errs, fmt.Errorf("screenshot %q: chunk %d is outside 1/%d", name, i, s.total))
 		}
 	}
 	var saved []string
 	var errs []error
 	for _, s := range shots {
 		name := s.name
+		errs = append(errs, s.errs...)
+		if len(s.parts) == 0 {
+			continue
+		}
+		var missing []string
+		for i, ok := range s.got {
+			if !ok {
+				missing = append(missing, strconv.Itoa(i+1))
+			}
+		}
+		if len(missing) > 0 {
+			errs = append(errs, fmt.Errorf("screenshot %q: missing chunks %s of %d", name, strings.Join(missing, ", "), s.total))
+			continue
+		}
 		data, err := base64.StdEncoding.DecodeString(strings.Join(s.parts, ""))
 		if err != nil {
-			kept.WriteString("screenshot " + name + ": " + err.Error() + "\n")
+			errs = append(errs, fmt.Errorf("screenshot %q: %w", name, err))
+			continue
+		}
+		// A chunk the device's log cut short can still decode.
+		if got := fmt.Sprintf("%d:%08x", len(data), crc32.ChecksumIEEE(data)); got != s.sum {
+			errs = append(errs, fmt.Errorf("screenshot %q: its chunks hold %s (length:CRC-32), not the %s it declares: the device's log cut a chunk short", name, got, s.sum))
 			continue
 		}
 		// A name that cleans to "." names dir itself, which .png would turn into a file beside it.
