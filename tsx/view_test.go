@@ -136,3 +136,30 @@ func TestViewNamedExportErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestViewHoldsANamedExportToThePackage renders a named export of a package declaring the clipboard and the host call "greet" under a Grant of the host call alone: the export is held to the same capabilities, narrowed by Grant, as the entry is, and its props are a copy of the host's.
+func TestViewHoldsANamedExportToThePackage(t *testing.T) {
+	p := verified(t, `import { signal, Text, Clipboard, host } from "nsgo";
+export function Panel(props) {
+	const log = signal([]);
+	const say = (v) => log.set([...log(), v]);
+	props.title = "changed";
+	(async () => {
+		try { await Clipboard.readText(); say("clipboard ok"); } catch (e) { say("clipboard " + e.code); }
+		try { await host.call("greet", "Ada"); say("host ok"); } catch (e) { say("host " + e.code); }
+		say("done");
+	})();
+	return <Text testID="log">{() => props.title + ": " + log().join(", ")}</Text>;
+}`, pkg.Capabilities{Clipboard: true, Host: []string{"greet"}})
+	props := map[string]any{"title": "panel"}
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return tsx.View{Package: p, Export: "Panel", Props: props, Sandbox: tsx.Sandbox{WebUnisolated: true, Host: greeter(), Grant: &pkg.Capabilities{Host: []string{"greet"}}}}
+	})
+	app.WaitUntil(10*time.Second, func() bool { return strings.Contains(app.Find("id:log").Text, "done") })
+	if got := app.Find("id:log").Text; got != "changed: clipboard ERR_ACCESS_DENIED, host ok, done" {
+		t.Fatalf("the export shows %q", got)
+	}
+	if props["title"] != "panel" {
+		t.Fatalf("the export wrote the host's props: %v", props)
+	}
+}

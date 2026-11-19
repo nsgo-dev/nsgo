@@ -10,17 +10,16 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 )
 
-// View runs the app of a package a pkg.Trust verified where it is placed in a Go app, sandboxed: the app's own screens delivered anew, or a plugin. The package's capabilities hold it, narrowed by Grant; it keeps a partition of the app's storage of its app ID's, and its host module reaches Host alone. A package that throws as it loads, or stops at a quota, panics, as any component does; place it under a core.Catch to show something else. Export names a component exported by the package's entry module; when set, Props are passed to it and the entry-mounted root is not selected. The web cannot isolate a package from the page, so there it panics with ErrUnisolated unless Sandbox.WebUnisolated.
+// View runs the app of a package a pkg.Trust verified where it is placed in a Go app, sandboxed: the app's own screens delivered anew, or a plugin. The package's capabilities hold it, narrowed by Grant; it keeps a partition of the app's storage of its app ID's, and its host module reaches Host alone. A package that throws as it loads, or stops at a quota, panics, as any component does; place it under a core.Catch to show something else. Export names a component the package's entry module exports, which it shows in place of the root the entry mounts, with Props, so one package provides several views, each with state of its own; it runs within the same sandbox, capabilities and limits. The web cannot isolate a package from the page, so there it panics with ErrUnisolated unless Sandbox.WebUnisolated.
 //
 //	p, err := trust.Verify(data) // off the engine's goroutine
 //	...
 //	core.Catch{Try: tsx.View{Package: p}.Render, Fallback: failed}
 type View struct {
 	Package *pkg.Package
-	// Export selects a named component exported by the package's entry module.
-	// An empty name keeps the entry-mounted root.
+	// Export names a component the package's entry module exports, which the view renders in place of the root the entry mounts; empty keeps that root.
 	Export string
-	// Props are passed to Export as its props object.
+	// Props are Export's props object, as JSON encodes them.
 	Props map[string]any
 	// Sandbox's Capabilities are the package's and its Storage its app
 	// ID when unset.
@@ -66,12 +65,10 @@ type Plugin struct {
 // export as a function.
 var ErrNoExport = errors.New("tsx: the plugin exports no such function")
 
-// ErrNoViewExport is the failure of a View.Export name the package does not
-// export.
+// ErrNoViewExport is the failure of a View.Export name the package does not export.
 var ErrNoViewExport = errors.New("tsx: the view exports no such component")
 
-// ErrViewExportNotComponent is the failure of a View.Export value that is not
-// callable as a component.
+// ErrViewExportNotComponent is the failure of a View.Export the package exports as something other than a function.
 var ErrViewExportNotComponent = errors.New("tsx: the view export is not a component")
 
 // Load runs package p as a plugin under cx, within s as View runs it, and returns it once its entry module ran, or a nil Plugin and what that threw, which goes to no Catch above cx and not to the app's report, or ErrUnisolated on the web as View panics with it. Call it on the engine's goroutine.

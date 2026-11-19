@@ -1,6 +1,7 @@
 package tsx
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -161,27 +162,25 @@ func (s Sandbox) isolation(browser bool) error {
 // SandboxModules are the modules a sandboxed bundle imports without Sandbox.Modules naming them: NSGo's own, with what is registered into them SandboxSafe, none of the Go functions registered with RegisterFunctions, and none of their exports that act on the whole app (setColorScheme, BackHandler.exitApp).
 var SandboxModules = []string{"nsgo", "nsgo:rt", "nsgo/base", "nsgo/base/plot", "nsgo/ui", "nsgo/ui/chat", "nsgo/mobile"}
 
-// ViewOptions selects an exported component to render from a bundle. An empty
-// Export keeps the bundle's entry-mounted root. Props are passed as the
-// component's props object.
+// ViewOptions selects an exported component to render from a bundle. An empty Export keeps the bundle's entry-mounted root. Props are the component's props object, as JSON encodes and decodes them, so each view gets a copy of its own and the bundle reaches no Go value through them.
 type ViewOptions struct {
 	Export string
 	Props  map[string]any
 }
 
-// Sandboxed returns the app of a bundle, as App does, run within s, in a view of its own: its frame, which fills the room its parent gives it, no more, so the bundle cannot grow over the host's views, and clips what the bundle shows, overlays included (core.Scope.Confine). In a scroll view that room is the scroll view's height: a host that wants the bundle as tall as its content puts it in a view of its own. On the web it panics with ErrUnisolated when s has Capabilities or Grant, unless s.WebUnisolated. When options has an Export, that named component is rendered instead of the entry-mounted root.
+// Sandboxed returns the app of a bundle, as App does, run within s, in a view of its own: its frame, which fills the room its parent gives it, no more, so the bundle cannot grow over the host's views, and clips what the bundle shows, overlays included (core.Scope.Confine). In a scroll view that room is the scroll view's height: a host that wants the bundle as tall as its content puts it in a view of its own. On the web it panics with ErrUnisolated when s has Capabilities or Grant, unless s.WebUnisolated. When options has an Export, that named component, which runs within s as the rest of the bundle does, is rendered instead of the entry-mounted root; a missing one panics with ErrNoViewExport and one that is not a function with ErrViewExportNotComponent.
 func Sandboxed(name, src string, s Sandbox, options ...ViewOptions) func(cx *core.Scope) core.Node {
-	var optionsForView ViewOptions
+	var view ViewOptions
 	if len(options) > 0 {
-		optionsForView = options[0]
+		view = options[0]
 	}
 	return func(cx *core.Scope) core.Node {
 		inner := cx.Child()
 		var root core.Node
 		inner.Run(func() {
 			r := s.start(inner, name, src)
-			if optionsForView.Export != "" {
-				r.renderExport(optionsForView.Export, optionsForView.Props)
+			if view.Export != "" {
+				r.renderExport(view.Export, view.Props)
 			}
 			root = r.root.elem
 		})
@@ -189,9 +188,7 @@ func Sandboxed(name, src string, s Sandbox, options ...ViewOptions) func(cx *cor
 	}
 }
 
-// renderExport mounts a named entry export as a component in the runtime's
-// root. It runs under a child owner, so the component has its own state and
-// is disposed with the sandboxed view.
+// renderExport mounts the entry module's export name as a component in the runtime's root, in place of what the entry mounted, with props, under a child owner so it has state of its own.
 func (r *runtime) renderExport(name string, props map[string]any) {
 	exports, _ := r.vm.Get(exportsGlobal).(*js.Object)
 	if exports == nil || !defined(exports.Get(name)) {
@@ -203,10 +200,17 @@ func (r *runtime) renderExport(name string, props map[string]any) {
 	}
 	input := r.vm.NewObject()
 	if props != nil {
-		input = r.vm.ToValue(props).ToObject(r.vm)
+		// A copy, so that the bundle neither writes to the host's map, nor shares it with another view given the same one, nor reaches a Go value in it.
+		b, err := json.Marshal(props)
+		if err != nil {
+			panic(fmt.Errorf("tsx: a view's props: %w", err))
+		}
+		var copied map[string]any
+		if err := json.Unmarshal(b, &copied); err != nil {
+			panic(fmt.Errorf("tsx: a view's props: %w", err))
+		}
+		input = r.vm.ToValue(copied).ToObject(r.vm)
 	}
-	// A package may still mount its normal entry root while defining exports.
-	// An explicitly selected export replaces that root.
 	for _, child := range slices.Clone(r.root.children) {
 		r.removeChild(r.root, child)
 	}
