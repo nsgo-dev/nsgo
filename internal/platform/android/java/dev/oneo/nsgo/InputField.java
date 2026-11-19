@@ -6,6 +6,8 @@ import android.os.Build;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.View;
@@ -65,6 +67,8 @@ final class InputField extends EditText {
     /** core.PasteReport: a paste is only reported. */
     private boolean pasteReport;
     private boolean caretPosted;
+    /** A multiline field's lines' height, the glyphs centered in each as in a Text; null for the font's own. */
+    private Text.LineHeight lineHeight;
 
     InputField(Context context, Listener listener) {
         super(context);
@@ -82,6 +86,7 @@ final class InputField extends EditText {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
             @Override public void afterTextChanged(Editable s) {
+                spanLines(s);
                 if (applying) return;
                 // Reconfiguring sets the same text again: only real edits count.
                 String text = s.toString();
@@ -392,6 +397,33 @@ final class InputField extends EditText {
         setText(text);
         setSelection(atEnd ? text.length() : Math.min(Math.max(selection, 0), text.length()));
         applying = false;
+    }
+
+    /**
+     * Gives the lines, and the hint's, the height px, 0 for the font's own,
+     * centering the glyphs in each as Text lays out a text's lines.
+     */
+    void setLineHeights(int px, String hint) {
+        if (px != (lineHeight == null ? 0 : lineHeight.height)) {
+            Editable text = getText();
+            if (lineHeight != null) text.removeSpan(lineHeight);
+            lineHeight = px > 0 ? new Text.LineHeight(px) : null;
+            spanLines(text);
+        }
+        if (lineHeight == null || hint.isEmpty()) {
+            setHint(hint);
+            return;
+        }
+        SpannableString spanned = new SpannableString(hint);
+        spanned.setSpan(new Text.LineHeight(px), 0, hint.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+        setHint(spanned);
+    }
+
+    /** Keeps the line height over the whole text, which a new text or an edit at its ends leaves without it. */
+    private void spanLines(Editable text) {
+        if (lineHeight != null && (text.getSpanStart(lineHeight) != 0 || text.getSpanEnd(lineHeight) != text.length())) {
+            text.setSpan(lineHeight, 0, text.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
+        }
     }
 
     /** ItemSelection: selects start to end, clamped to the text. */

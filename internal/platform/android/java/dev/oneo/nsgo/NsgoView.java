@@ -4523,13 +4523,14 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         LayoutParams content = frame(in);
         n.accessory = in.readInt();
         field.configure(in, keyboard, masked, readonly, disabled, density);
-        field.setHint(placeholder);
         field.setTypeface(style.typeface());
         field.setTextSize(TypedValue.COMPLEX_UNIT_PX, style.size);
         field.setTextColor(style.color);
         field.setLetterSpacing(style.letterSpacingEm());
         field.setFontFeatureSettings(style.features);
         field.setPaintFlags(style.paintFlags(field.getPaintFlags()));
+        // A field's one line stays centered in its box.
+        field.setLineHeights(field.multiline() ? Math.round(style.lineHeight) : 0, placeholder);
         field.setGravity(style.gravity() | (field.multiline() ? Gravity.TOP : Gravity.CENTER_VERTICAL));
         field.setLayoutParams(content);
     }

@@ -715,8 +715,8 @@ final class Text {
     }
 
     /** Gives every line the same height, the glyphs centered in it as in CSS. */
-    private static final class LineHeight implements LineHeightSpan {
-        private final int height;
+    static final class LineHeight implements LineHeightSpan {
+        final int height;
 
         LineHeight(int height) {
             this.height = height;
