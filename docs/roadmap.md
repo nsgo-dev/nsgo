@@ -279,7 +279,7 @@ tvOS runs on iOS's backend, its remote moving a focus ([keyboard focus](architec
 | Sizes for a room | — | Apps can read across a room: `ui`'s 28-point controls and 13-point text at 1920×1080 points read small from a couch, so `ui` or the app takes larger sizes there, never `core` or `base`, an [open question](../ARCHITECTURE.md#open-questions) until the user decides |
 | The focus's look | — | A focused view lifts as tvOS's do, scaled with a shadow, or keeps `ui.FocusRing` by decision; the ring shows today |
 | Scrolling with the remote's surface | — | A scroll view with nothing focusable in it, such as a long text, scrolls as the remote's touch surface swipes, which only the focus moving scrolls now |
-| What tvOS has not | — | Web views (no WebKit), the camera, the photo picker, speech, recording and the clipboard report `ErrUnsupported` or their platform's refusal on tvOS, each checked from the gallery, rather than failing as they reach a missing class |
+| What tvOS has not | — | Web views (no WebKit), the camera, the photo picker, speech, recording and the clipboard report `ErrUnsupported` or their platform's refusal on tvOS, each checked by a test on the simulator, as the gallery leaves their demos out there, rather than failing as they reach a missing class |
 | The terminal and embedding on tvOS | — | `tools/libghostty` builds libghostty-vt for tvOS and its simulator, and `-embed` builds a tvOS framework |
 | tvOS tests' settling | — | A test step on the tvOS simulator settles once a dialog's transition ends, rather than after `settleWait`'s 5 seconds: an `nsgo.opacity` animation stays on its layer there |
 
@@ -296,7 +296,7 @@ watchOS runs in a SwiftUI host, its views nodes Go draws into ([platforms](../AR
 | The Digital Crown and native touches | — | A view that pans or turns a value takes the crown's rotation, and the test host posts touches SwiftUI sees, so tests reach its scrolls and text fields as a finger does |
 | Leaving views animated | `animation.md` | A commit's layout animation takes views out with its Delete, which leave at once on a watch now |
 | Sticky views and list headers on watchOS | `scrolling-and-lists.md` | The SwiftUI host consumes `ItemStickyCells` and pins views at the start or end of its scroll viewport within their travel; it ignores these ranges now |
-| What watchOS has not | — | Web views, video, native components and shaders (no WebKit, AVKit views or Metal), the clipboard, pickers, files, sharing and speech report `ErrUnsupported`, each checked from the gallery; the views show empty boxes and the services answer unsupported now |
+| What watchOS has not | — | Web views, video, native components and shaders (no WebKit, AVKit views or Metal), the clipboard, pickers, files, sharing and speech report `ErrUnsupported`, each checked by a test on the simulator, as the gallery leaves their demos out there; the views show empty boxes and the services answer unsupported now |
 | Speaking on Apple Watch | — | `Speak` speaks with `AVSpeechSynthesizer` on watchOS, its audio session set for playback, where `Env.CanSpeak` is false now |
 | Permissions on Apple Watch | `services.md` (Permissions) | The SwiftUI host tells and asks for the microphone (`AVAudioSession`'s record permission), calendars, reminders and Bluetooth, which answer unknown now, and shows notifications through `UNUserNotificationCenter` with its permission, which answers unavailable now |
 

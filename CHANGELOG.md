@@ -13,7 +13,7 @@
 - Add keyed `core.PresenceOf` with bounded leaving branches for animated value changes (#786 by @houko).
 - Let TSX packages carry opaque signed metadata in `pkg.Contents.Extra` (#761 by @houko).
 - Have an app under `nsgo test -target macos` open its windows as `nsgo.Run` does without an `Environment` option, so a window it opens with `desktop.OpenWindow` hears the main window's keys through `KeyOptions.AllSurfaces`, and have steps act on its main window, which opens at the desktop's default 480 by 640 points without `nsgotest.Size` and shows a root view too, so `desktop.CurrentWindow` and `OnClosing` work there; closing it asks `OnClosing`, and a quit the app asks for counts in `App.Quits` instead of ending the test's process (#763, #771 by @houko).
-- Give the gallery a layout of its own on Apple Watch, a list of the demos a watch can show that pushes pages laid out for its screen, and on Apple TV, a sidebar the remote's focus moves through in type read from across a room, leaving out the demos that need touch, a pointer or what tvOS lacks.
+- Lay the gallery out for Apple Watch, as a list of the demos a watch can show, and for Apple TV, as a sidebar the remote's focus moves through, each leaving out the demos the device cannot use (#803 by @houko).
 
 ## [0.2.0] - 2026-11-19
 

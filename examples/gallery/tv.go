@@ -32,6 +32,7 @@ func (g *gallery) tv(cx *core.Scope) core.Node {
 	if tvLeftOut[g.selected.GetUntracked()] {
 		g.selectDemo(tvDemos()[0].name)
 	}
+	// The demos lay themselves out in paneWidth, the window's width less the sidebar's.
 	g.sidebarOpen.Set(true)
 	g.sidebarWidth.Set(tvSidebarWidth)
 	colors := ui.ColorsOf(cx)

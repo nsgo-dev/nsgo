@@ -32,8 +32,7 @@ func watchDemos() []demo {
 func (g *gallery) watch(cx *core.Scope) core.Node {
 	return g.nav.Stack(fillPage, func(cx *core.Scope, r route, _ func() int) base.NavPage {
 		tr := locales.For(cx)
-		switch {
-		case r.demo != "":
+		if r.demo != "" {
 			d, _ := findDemo(r.demo)
 			return watchScreen(cx, d.title(tr), "screen-"+d.name, true, watchPages[d.name](cx))
 		}
@@ -131,6 +130,7 @@ func watchButtons(cx *core.Scope) core.Node {
 
 func watchToggles(cx *core.Scope) core.Node {
 	tr := locales.For(cx)
+	// The switch starts off, as one that starts on is drawn off on a watch: the watch backend applies animated values only in its frames (hostFrame), where iOS and macOS also apply them after each batch.
 	starred, on, picked := core.NewSignal(cx, true), core.NewSignal(cx, false), core.NewSignal(cx, 0)
 	var radios []core.Node
 	for i, name := range []string{tr.LibApple(), tr.LibBanana(), tr.LibCherry()} {
