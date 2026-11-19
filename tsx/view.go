@@ -3,6 +3,8 @@ package tsx
 import (
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 	"github.com/nsgo-dev/nsgo/tsx/pkg"
@@ -145,11 +147,24 @@ func (p *Plugin) Call(name string, args []any, done func(result any, err error))
 		return
 	}
 	var once bool
+	var finishMu sync.Mutex
+	var total *time.Timer
 	finish := func(v any, err error) {
+		finishMu.Lock()
+		defer finishMu.Unlock()
 		if !once {
 			once = true
+			if total != nil {
+				total.Stop()
+			}
 			done(v, err)
 		}
+	}
+	if d := r.limits.CallTotal; d > 0 {
+		total = time.AfterFunc(d, func() {
+			r.interrupt(ErrBudget)
+			p.cx.Post(func() { finish(nil, ErrBudget) })
+		})
 	}
 	p.cx.Run(func() {
 		defer func() {
@@ -189,6 +204,18 @@ func (p *Plugin) Call(name string, args []any, done func(result any, err error))
 			}
 		})
 	})
+}
+
+// Interrupt stops the plugin from any goroutine. Pending timers and promise
+// continuations are dropped, and the current or next Call reports err.
+func (p *Plugin) Interrupt(err error) {
+	if p == nil || p.r == nil || p.cx.Disposed() {
+		return
+	}
+	if err == nil {
+		err = ErrInterrupted
+	}
+	p.r.interrupt(err)
 }
 
 // Close stops the plugin and frees what it holds.

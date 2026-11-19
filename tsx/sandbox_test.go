@@ -682,6 +682,67 @@ export const notAFunction = 1;`, pkg.Capabilities{Network: &pkg.Network{Hosts: [
 	}
 }
 
+func TestPluginCallTotalStopsYieldingWork(t *testing.T) {
+	p := verified(t, `export async function loop() {
+	for (;;) {
+		const start = Date.now();
+		while (Date.now() - start < 10) {}
+		await new Promise(resolve => setTimeout(resolve, 0));
+	}
+}`, pkg.Capabilities{})
+	limits := tsx.Limits{Load: time.Second, Call: 100 * time.Millisecond, CallTotal: 150 * time.Millisecond}
+	var plugin *tsx.Plugin
+	var loadErr error
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		plugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{Limits: &limits, WebUnisolated: true})
+		return core.View{}
+	})
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	var callErr error
+	app.Post(func() { plugin.Call("loop", nil, func(_ any, err error) { callErr = err }) })
+	app.WaitUntil(2*time.Second, func() bool { return callErr != nil })
+	if !errors.Is(callErr, tsx.ErrBudget) {
+		t.Fatalf("call error = %v, want ErrBudget", callErr)
+	}
+	app.Post(plugin.Close)
+}
+
+func TestPluginInterruptStopsCall(t *testing.T) {
+	p := verified(t, `export async function loop() {
+	for (;;) await new Promise(resolve => setTimeout(resolve, 0));
+}`, pkg.Capabilities{})
+	var plugin *tsx.Plugin
+	var loadErr error
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		plugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{WebUnisolated: true})
+		return core.View{}
+	})
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	var callErr error
+	app.Post(func() { plugin.Call("loop", nil, func(_ any, err error) { callErr = err }) })
+	time.Sleep(20 * time.Millisecond)
+	plugin.Interrupt(nil)
+	app.WaitUntil(time.Second, func() bool { return callErr != nil })
+	if !errors.Is(callErr, tsx.ErrInterrupted) {
+		t.Fatalf("call error = %v, want ErrInterrupted", callErr)
+	}
+	app.Post(plugin.Close)
+}
+
+func TestParseLimitsCallTotal(t *testing.T) {
+	got, err := tsx.ParseLimits("call-total=3s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CallTotal != 3*time.Second {
+		t.Fatalf("call total = %v, want 3s", got.CallTotal)
+	}
+}
+
 // TestLoadReturnsEntryModuleError holds Load to returning what a package's entry module throws as it loads, to its caller alone: no Catch above the scope and no app report sees it, and nothing the module set up before it threw runs after.
 func TestLoadReturnsEntryModuleError(t *testing.T) {
 	for _, c := range []struct{ name, source, want string }{

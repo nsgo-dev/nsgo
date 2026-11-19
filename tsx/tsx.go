@@ -105,6 +105,7 @@ type runtime struct {
 	// limits are the sandbox's; depth counts the calls into JS under way,
 	// the outermost of which has the time budget.
 	limits Limits
+	stopMu sync.Mutex
 	depth  int
 	// regexTimeout is the shortest sandbox budget, applied to regexp2
 	// patterns because its matcher does not observe goja's interrupt flag.

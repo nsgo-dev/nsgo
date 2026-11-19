@@ -28,8 +28,10 @@ import (
 type Limits struct {
 	// Load is how long the bundle's script may run as it loads, and Call
 	// how long each call into JS may run (a handler, an effect, a
-	// render): past it, the call is cut with ErrBudget.
-	Load, Call time.Duration
+	// render): past it, the call is cut with ErrBudget. CallTotal bounds a
+	// plugin call from its entry until its result or rejection, including
+	// asynchronous promise continuations. Zero leaves it unlimited.
+	Load, Call, CallTotal time.Duration
 	// Stack is how deep JS calls may nest.
 	Stack int
 	// Harden deletes eval, has the Function constructors throw and
@@ -60,6 +62,10 @@ var DefaultLimits = Limits{Load: 10 * time.Second, Call: 2 * time.Second, Stack:
 // ErrBudget is what a call cut at its time budget fails with.
 var ErrBudget = errors.New("tsx: the script ran past its time budget")
 
+// ErrInterrupted is used when a host interrupts a plugin without supplying
+// its own error.
+var ErrInterrupted = errors.New("tsx: the plugin was interrupted")
+
 // regexpTimeouts are the match timeouts of the sandboxed calls running, whose shortest is regexp2's process-wide default while any runs, as a regular expression takes it when it compiles, and the default before them once none runs. The lock is held only while the default changes, never across a call: a sandboxed call can run another sandbox's on the same goroutine, as a host function calling a plugin does.
 var regexpTimeouts struct {
 	sync.Mutex
@@ -89,7 +95,7 @@ func limitRegexps(d time.Duration) (restore func()) {
 	}
 }
 
-// ParseLimits reads limits as nsgo dev -limits writes them: DefaultLimits with the fields spec names set, as "nodes=1000,call=500ms". Its keys are load, call, stack, nodes, timers, requests, body, storage and memory; "default" or "" is DefaultLimits.
+// ParseLimits reads limits as nsgo dev -limits writes them: DefaultLimits with the fields spec names set, as "nodes=1000,call=500ms". Its keys are load, call, call-total, stack, nodes, timers, requests, body, storage and memory; "default" or "" is DefaultLimits.
 func ParseLimits(spec string) (Limits, error) {
 	l := DefaultLimits
 	if spec == "" || spec == "default" {
@@ -102,13 +108,16 @@ func ParseLimits(spec string) (Limits, error) {
 		}
 		var err error
 		switch k {
-		case "load", "call":
+		case "load", "call", "call-total":
 			var d time.Duration
 			if d, err = time.ParseDuration(v); err == nil {
-				if k == "load" {
+				switch k {
+				case "load":
 					l.Load = d
-				} else {
+				case "call":
 					l.Call = d
+				default:
+					l.CallTotal = d
 				}
 			}
 		case "stack", "nodes", "timers", "requests", "body", "storage", "memory":
@@ -119,7 +128,7 @@ func ParseLimits(spec string) (Limits, error) {
 			*map[string]*int{"stack": &l.Stack, "nodes": &l.Nodes, "timers": &l.Timers, "requests": &l.Requests,
 				"body": &l.Body, "storage": &l.Storage, "memory": &l.Memory}[k] = n
 		default:
-			return l, fmt.Errorf("tsx: no limit %q: load, call, stack, nodes, timers, requests, body, storage or memory", k)
+			return l, fmt.Errorf("tsx: no limit %q: load, call, call-total, stack, nodes, timers, requests, body, storage or memory", k)
 		}
 		if err != nil {
 			return l, fmt.Errorf("tsx: limit %s: %v", k, err)
@@ -357,18 +366,36 @@ func quota(what string, limit int) error {
 // stop stops the runtime for err: the JS running is cut and none runs
 // after, while the views stay as they are. What runs it panics with err
 // into the nearest core.Catch.
-func (r *runtime) stop(err error) {
-	if stopped := r.sandbox.stopped; stopped != nil {
-		if js.Browser {
-			panic(r.goError(stopped))
-		}
-		return
+func (r *runtime) markStopped(err error) bool {
+	if err == nil {
+		err = ErrInterrupted
+	}
+	r.stopMu.Lock()
+	defer r.stopMu.Unlock()
+	if r.sandbox.stopped != nil {
+		return false
 	}
 	r.sandbox.stopped = err
+	return true
+}
+
+func (r *runtime) stopTimers() {
 	for _, stop := range r.timers.stop {
 		stop()
 	}
 	clear(r.timers.stop)
+}
+
+// stop stops the runtime from its graph goroutine, clearing its pending
+// timers before interrupting the currently running call.
+func (r *runtime) stop(err error) {
+	if !r.markStopped(err) {
+		if js.Browser {
+			panic(r.goError(r.stoppedErr()))
+		}
+		return
+	}
+	r.stopTimers()
 	r.vm.Interrupt(err)
 	if js.Browser {
 		// The page's engine cannot be interrupted: a throw unwinds it.
@@ -376,11 +403,24 @@ func (r *runtime) stop(err error) {
 	}
 }
 
+// interrupt stops a runtime from another goroutine. Goja's interrupt is
+// safe to call concurrently, while timer ownership remains on the graph
+// goroutine.
+func (r *runtime) interrupt(err error) {
+	if !r.markStopped(err) {
+		return
+	}
+	r.vm.Interrupt(err)
+	r.cx.Post(r.stopTimers)
+}
+
 // stoppedErr is why the runtime stopped, nil while it runs.
 func (r *runtime) stoppedErr() error {
 	if r.sandbox == nil {
 		return nil
 	}
+	r.stopMu.Lock()
+	defer r.stopMu.Unlock()
 	return r.sandbox.stopped
 }
 

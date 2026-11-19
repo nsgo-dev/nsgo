@@ -95,7 +95,7 @@ trust.Accept(p) // once it ran, older builds are refused
 
 An app can sign its own JSON documents, such as a catalog of its plugins, with `pkg.SignDocument` and verify them with `Signed.Open`, with the keys `nsgo keygen` prints. Give each kind of document an `app:` context of its own with a version, as `app:catalog-v1`: a document never passes for another kind, nor for a package, certificate or revocation list. `Open` trusts exactly the public keys it is given, with no certificate or revocation list, and refuses body fields the type it decodes into lacks. The envelope holds no time or sequence, so an older document verifies as well as a newer one: put a version or expiry in the body and check it.
 
-Backtracking regular expressions in a native sandbox use the shortest load or call budget as their match timeout. An unhandled timeout becomes `tsx.ErrBudget`, so a pathological expression does not occupy the engine indefinitely.
+Backtracking regular expressions in a native sandbox use the shortest load or call budget as their match timeout. An unhandled timeout becomes `tsx.ErrBudget`, so a pathological expression does not occupy the engine indefinitely. A plugin can set `Limits.CallTotal` to bound a call across asynchronous promise continuations, or call `Plugin.Interrupt` from a watchdog; either stops the plugin and drops its pending timers.
 
 The web cannot isolate a package from the page yet: its code would reach the page's own network, clipboard and storage, the trust store's included, past its capabilities. There `tsx.View` and `tsx.Load` refuse a package with `tsx.ErrUnisolated`, unless you set `Sandbox.WebUnisolated` to run it with the page's authority, which suits only packages you would trust with the app's own.
 
