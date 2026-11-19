@@ -19,12 +19,12 @@ import java.io.IOException;
 
 /**
  * Scroll views, as NSH's ScrollBox scrolls: Android's ScrollView and
- * HorizontalScrollView, whose flings glide by core.ScrollBehavior's
- * deceleration or end at the snap point snapTarget (a port of
- * core.ScrollBehavior.SnapTarget) picks; drag and momentum events; the
- * content inset as padding; keyboard dismissal on drags and taps; pull to
- * refresh with a spinner, or the app's own indicator, above the content;
- * and ZoomScroll, which a
+ * HorizontalScrollView, whose flings glide with OverScroller's spline
+ * (its friction scaled by core.ScrollBehavior's deceleration) or end at
+ * the snap point snapTarget (a port of core.ScrollBehavior.SnapTarget)
+ * picks; drag and momentum events; the content inset as padding;
+ * keyboard dismissal on drags and taps; pull to refresh with a spinner,
+ * or the app's own indicator, above the content; and ZoomScroll, which a
  * zoomable view switches to: it scales the content around its top left and
  * scrolls both ways itself.
  */
@@ -35,8 +35,10 @@ final class Scrolling {
     static final float REFRESH_PULL = 64, REFRESH_SPACE = 56;
     /** Releases slower than this (points per millisecond) settle at the nearest snap point. */
     private static final float SLOW = 0.3f;
-    /** A glide stops below this speed, in points per millisecond. */
+    /** Speed threshold (5x this, in points per millisecond) below which a release does not glide. */
     private static final float STOP = 0.01f;
+    /** Default DecelerationRate (core.DecelerationNormal), velocity kept per millisecond. */
+    private static final float NORMAL = 0.998f;
     /** Duration of animated scrolls, in milliseconds. */
     private static final long ANIMATION = 300;
 
@@ -44,7 +46,7 @@ final class Scrolling {
     static final class Config {
         boolean horizontal, hideIndicator, paging, oneStep, noScroll, noBounces, refreshable, refreshing;
         boolean noBouncesZoom, noPinchZoom, centerContent;
-        float interval, rate = 0.998f;
+        float interval, rate = NORMAL;
         int alignment, dismiss, taps;
         float[] offsets = new float[0];
         float insetTop, insetRight, insetBottom, insetLeft;
@@ -505,23 +507,22 @@ final class Scrolling {
             momentum = true;
             event(Protocol.EVENT_MOMENTUM_START);
             carry = 0;
-            float baseFriction = ViewConfiguration.getScrollFriction();
-            float friction = baseFriction;
-            if (config.rate > 0f && config.rate < 0.9979f) {
-                friction = baseFriction * (1f - config.rate) / (1f - 0.998f);
+            float friction = ViewConfiguration.getScrollFriction();
+            if (config.rate > 0f && config.rate < 1f && config.rate != NORMAL) {
+                friction *= (float) Math.pow(Math.log(config.rate) / Math.log(NORMAL), 1.358);
             }
             flinger.setFriction(friction);
             flinger.forceFinished(true);
             final int start = pos();
             final int vpx = Math.round(velocity * density * 1000f);
-            flinger.fling(0, start, 0, vpx, 0, 0, 0, range());
+            flinger.fling(0, 0, 0, vpx, 0, 0, Integer.MIN_VALUE, Integer.MAX_VALUE);
             motion = new Runnable() {
                 @Override
                 public void run() {
                     if (motion != this) return;
                     boolean active = flinger.computeScrollOffset();
                     int max = range();
-                    int at = Math.min(Math.max(flinger.getCurrY() + carry, 0), max);
+                    int at = Math.min(Math.max(start + flinger.getCurrY() + carry, 0), max);
                     move(at);
                     boolean done = !active || flinger.isFinished() || (vpx > 0 ? at >= max : at <= 0);
                     if (done) {

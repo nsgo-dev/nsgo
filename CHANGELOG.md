@@ -11,6 +11,7 @@
 - Match headless menu shortcut spelling precedence with Windows and Linux (#769 by @houko).
 - Add keyed `core.PresenceOf` with bounded leaving branches for animated value changes (#786 by @houko).
 - Let TSX packages carry opaque signed metadata in `pkg.Contents.Extra` (#761 by @houko).
+- Glide Android scroll views with OverScroller's spline fling, as Android's own scroll views do (#833 by @owocc).
 
 ## [0.2.0] - 2026-11-19
 
