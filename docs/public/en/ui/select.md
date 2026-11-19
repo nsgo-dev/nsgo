@@ -19,7 +19,7 @@ ui.Select[string]{
 
 ## Options and search
 
-`Options` are `ui.Option[T]`s, each with a `Value`, a `Label`, and an optional `Icon`, `Disabled` function or `Content` of the app's own. `Placeholder` shows while no option is chosen. `Searchable` filters the list by typing, `OnClear` shows a clear button, and `Disabled` stops it.
+`Options` are `ui.Option[T]`s, each with a `Value`, a `Label`, and an optional `Icon`, `Disabled` function or `Content` of the app's own. Use `OptionsFunc` when the options follow a signal, so the open list updates in place and keeps the field's value and focus. `Placeholder` shows while no option is chosen. `Searchable` filters the list by typing, `OnClear` shows a clear button, and `Disabled` stops it.
 
 ```go preview=select/searchable height=400
 ui.Select[string]{

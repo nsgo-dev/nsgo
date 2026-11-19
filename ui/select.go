@@ -17,10 +17,13 @@ import (
 // they scroll in, so a list may be long. Options' Icon and Content go unused.
 type Select[T comparable] struct {
 	// Ref is the field's; LabelledBy and Invalid are a core.View's.
-	Ref         *core.Ref
-	LabelledBy  []*core.Ref
-	Invalid     func() bool
-	Options     []Option[T]
+	Ref        *core.Ref
+	LabelledBy []*core.Ref
+	Invalid    func() bool
+	Options    []Option[T]
+	// OptionsFunc returns the options and updates the open list in place when
+	// the values it reads change, keeping the field's value and focus.
+	OptionsFunc func() []Option[T]
 	Value       func() T
 	OnChange    func(value T)
 	Placeholder string
@@ -48,7 +51,12 @@ type Select[T comparable] struct {
 
 // optionItems are options as a list's, valued by their index.
 func optionItems[T comparable](options []Option[T]) func() []base.SelectItem {
+	return optionItemsFunc(func() []Option[T] { return options })
+}
+
+func optionItemsFunc[T comparable](options func() []Option[T]) func() []base.SelectItem {
 	return func() []base.SelectItem {
+		options := options()
 		items := make([]base.SelectItem, len(options))
 		for i, o := range options {
 			items[i] = base.SelectItem{Value: strconv.Itoa(i), Title: o.Label, Disabled: o.Disabled != nil && o.Disabled()}
@@ -73,11 +81,18 @@ func optionRow[T comparable](cx *core.Scope, o Option[T], id string) core.Node {
 
 // Render implements core.Node.
 func (s Select[T]) Render(cx *core.Scope) core.Node {
+	options := func() []Option[T] {
+		if s.OptionsFunc != nil {
+			return s.OptionsFunc()
+		}
+		return s.Options
+	}
 	open := core.NewSignal(cx, false)
 	chosen := core.NewMemo(cx, func() int {
+		options := options()
 		if s.Value != nil {
 			v := s.Value()
-			for i, o := range s.Options {
+			for i, o := range options {
 				if o.Value == v {
 					return i
 				}
@@ -86,14 +101,16 @@ func (s Select[T]) Render(cx *core.Scope) core.Node {
 		return -1
 	})
 	leading := core.Dynamic(func(*core.Scope) core.Node {
-		if i := chosen.Get(); i >= 0 && s.Options[i].Leading != nil {
-			return s.Options[i].Leading
+		options := options()
+		if i := chosen.Get(); i >= 0 && i < len(options) && options[i].Leading != nil {
+			return options[i].Leading
 		}
 		return core.Group(nil)
 	})
 	title := func() string {
-		if i := chosen.Get(); i >= 0 {
-			return s.Options[i].Label
+		options := options()
+		if i := chosen.Get(); i >= 0 && i < len(options) {
+			return options[i].Label
 		}
 		return ""
 	}
@@ -106,7 +123,7 @@ func (s Select[T]) Render(cx *core.Scope) core.Node {
 	if label == "" {
 		label = s.Placeholder
 	}
-	b := base.Select{Items: optionItems(s.Options), Disabled: s.Disabled, Presentation: s.Presentation, Open: open.Get, OnOpenChange: func(v bool, _ base.Reason) { open.Set(v) },
+	b := base.Select{Items: optionItemsFunc(options), Disabled: s.Disabled, Presentation: s.Presentation, Open: open.Get, OnOpenChange: func(v bool, _ base.Reason) { open.Set(v) },
 		Value: func() *string {
 			if i := chosen.Get(); i >= 0 {
 				v := strconv.Itoa(i)
@@ -122,7 +139,11 @@ func (s Select[T]) Render(cx *core.Scope) core.Node {
 				return
 			}
 			if i, err := strconv.Atoi(*v); err == nil && s.OnChange != nil {
-				s.OnChange(s.Options[i].Value)
+				options := options()
+				if i < 0 || i >= len(options) {
+					return
+				}
+				s.OnChange(options[i].Value)
 			}
 		},
 		Offset: 4, Margin: 8, RootStyle: root,
@@ -135,7 +156,11 @@ func (s Select[T]) Render(cx *core.Scope) core.Node {
 			if s.TestID != "" {
 				id = s.TestID + "-" + strconv.Itoa(e.Index)
 			}
-			return optionRow(cx, s.Options[e.Index], id)
+			options := options()
+			if e.Index < 0 || e.Index >= len(options) {
+				return nil
+			}
+			return optionRow(cx, options[e.Index], id)
 		}}
 	if s.Searchable {
 		b.Searchable = func() bool { return true }

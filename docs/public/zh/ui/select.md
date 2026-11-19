@@ -19,7 +19,7 @@ ui.Select[string]{
 
 ## 选项与搜索
 
-`Options` 由 `ui.Option[T]` 组成，每项有 `Value`、`Label`，以及可选的 `Icon`、`Disabled` 函数或应用自己的 `Content`。未选择时显示 `Placeholder`。`Searchable` 允许输入过滤列表，`OnClear` 显示清除按钮，`Disabled` 停用它。
+`Options` 由 `ui.Option[T]` 组成，每项有 `Value`、`Label`，以及可选的 `Icon`、`Disabled` 函数或应用自己的 `Content`。选项跟随 signal 时使用 `OptionsFunc`，打开的列表会原地更新并保留字段的值和焦点。未选择时显示 `Placeholder`。`Searchable` 允许输入过滤列表，`OnClear` 显示清除按钮，`Disabled` 停用它。
 
 ```go preview=select/searchable height=400
 ui.Select[string]{

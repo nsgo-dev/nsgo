@@ -46,6 +46,44 @@ func TestSelectSearchesAndClears(t *testing.T) {
 	})
 }
 
+func TestSelectOptionsFuncUpdatesInPlace(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var options *core.Signal[[]Option[string]]
+		var value *core.Signal[string]
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			options = core.NewSignalFunc(cx, fruitOptions(), nil)
+			value = core.NewSignal(cx, "pear")
+			return Select[string]{TestID: "fruit", Label: "Fruit", OptionsFunc: options.Get, Value: value.Get, OnChange: value.Set}
+		})
+		if e.Idiom == core.IdiomDesktop {
+			app.Focus("id:fruit")
+			if !app.Find("role:combobox").Focused {
+				t.Fatal("the select did not take focus")
+			}
+			options.Set([]Option[string]{{Value: "apple", Label: "Apple"}, {Value: "pear", Label: "Pear (new)"}, {Value: "orange", Label: "Orange"}})
+			app.Settle()
+			if !app.Find("role:combobox").Focused {
+				t.Fatal("updating options moved focus from the select")
+			}
+			app.Press("id:fruit")
+		} else {
+			app.Press("id:fruit")
+			if !app.Exists("role:option Pear") {
+				t.Fatal("the initial options did not open")
+			}
+			options.Set([]Option[string]{{Value: "apple", Label: "Apple"}, {Value: "pear", Label: "Pear (new)"}, {Value: "orange", Label: "Orange"}})
+			app.Settle()
+		}
+		if !app.Exists("role:option Orange") || app.Exists("role:option Plum") || !app.Exists("role:option Pear (new)") {
+			t.Fatal("the options function did not update the open list")
+		}
+		app.Press("role:option Pear (new)")
+		if value.Get() != "pear" {
+			t.Fatalf("selected value = %q, want pear", value.Get())
+		}
+	})
+}
+
 // A combobox of several values toggles them, selecting their rows, and
 // stays open.
 func TestComboboxToggles(t *testing.T) {
