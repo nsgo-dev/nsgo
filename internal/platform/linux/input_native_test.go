@@ -4,6 +4,7 @@ package linux
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -79,6 +80,60 @@ func TestEditorsTakeLinesLimitsAndSubmit(t *testing.T) {
 		gSignalEmitByName(line.entry, cstr("activate"))
 	})
 	waitForTitle(t, w, title+"|one/twothree|true|12-12|1|1")
+}
+
+// TestTextViewTakesTheLineHeight checks that a multiline input's lines, and its placeholder's, are as tall as its style's line height, as a text's are (#310).
+func TestTextViewTakesTheLineHeight(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	title := "nsgo-line-height"
+	style := core.Style{Width: driver.Pt(300), Height: driver.Pt(100), FontSize: 16, LineHeight: 26}
+	app := func(cx *core.Scope) core.Node {
+		cx.SetTitle(title)
+		return core.View{Style: core.Style{Width: driver.Pt(320), Height: driver.Pt(240), Background: driver.RGB(0xffffff)}, Children: []core.Node{
+			core.Input{Multiline: true, DefaultValue: "HHHH\nHHHH\nHHHH", Style: style},
+			core.Input{Multiline: true, Placeholder: "HHHH", Style: style},
+		}}
+	}
+	w := startTestWindow(t, app, Options{Title: title, Width: 320, Height: 240})
+	waitForTitle(t, w, title)
+	var (
+		lineYrange func(tv uintptr, iter *textIter, y, h *int32)
+		measure    func(widget uintptr, orientation, forSize int32, min, nat, minBaseline, natBaseline *int32)
+	)
+	purego.RegisterLibFunc(&lineYrange, gtkLib, "gtk_text_view_get_line_yrange")
+	purego.RegisterLibFunc(&measure, gtkLib, "gtk_widget_measure")
+	w.onLoop(t, func() {
+		var views []*view
+		for _, v := range w.entries {
+			if v.textView != 0 && !slices.Contains(views, v) {
+				views = append(views, v)
+			}
+		}
+		if len(views) != 2 {
+			t.Fatalf("%d text views, want 2", len(views))
+		}
+		for _, v := range views {
+			if v.input.Placeholder != "" {
+				var lo, nat, b1, b2 int32
+				measure(v.hint, 1, 300, &lo, &nat, &b1, &b2)
+				if nat != 26 {
+					t.Errorf("the placeholder is %d px tall, want one line of 26", nat)
+				}
+				continue
+			}
+			for k, at := range []int32{0, 5, 10} {
+				var iter textIter
+				var y, h int32
+				gtkTextBufferGetIterAtOffset(v.buffer, &iter, at)
+				lineYrange(v.textView, &iter, &y, &h)
+				if y != int32(k)*26 || h != 26 {
+					t.Errorf("line %d at %d, %d px tall; want at %d, 26 tall", k, y, h, k*26)
+				}
+			}
+		}
+	})
 }
 
 // TestKeysCaretAndPasteInAField focuses a field that reports its caret

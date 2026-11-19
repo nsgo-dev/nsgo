@@ -437,6 +437,21 @@ func TestEntryStyleCarriesTheTextStyle(t *testing.T) {
 	}
 }
 
+// TestEntryStyleCarriesTheLineHeight checks that a text view and its placeholder take the line height and the font, and that a field's one line does not (#310).
+func TestEntryStyleCarriesTheLineHeight(t *testing.T) {
+	v := &view{id: 4, input: driver.InputConfig{Multiline: true, Style: driver.TextStyle{Font: driver.Font{Size: 15}, LineHeight: 25.5}}}
+	css := entryStyle(v)
+	for _, want := range []string{"#nsgo-input-4-hint { padding", "#nsgo-input-4-hint { font-size: 15.000px", "#nsgo-input-4-hint { line-height: 25.500px; }"} {
+		if !strings.Contains(css, want) {
+			t.Errorf("CSS lacks %q:\n%s", want, css)
+		}
+	}
+	v.input.Multiline = false
+	if css := entryStyle(v); strings.Contains(css, "line-height") {
+		t.Errorf("a field's CSS sets a line height:\n%s", css)
+	}
+}
+
 func TestHistoryKeysStepThroughAPage(t *testing.T) {
 	for _, c := range []struct {
 		keyval, state uint32

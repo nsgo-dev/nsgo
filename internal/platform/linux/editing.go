@@ -137,12 +137,12 @@ func editorName(v *view) string { return fmt.Sprintf("nsgo-input-%d", v.editorNu
 
 // entryStyle is the CSS an editor takes: no look of GTK's own, the view
 // draws its box, and the input's text style, caret, selection and
-// placeholder colors.
+// placeholder colors. A text view's placeholder label takes the text style too.
 func entryStyle(v *view) string {
 	in := &v.input
 	f := in.Style.Font
 	name := "#" + editorName(v)
-	all := name + ", " + name + " *"
+	all := name + ", " + name + " *, " + name + "-hint"
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s { padding: 0; margin: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; background: none; background-color: transparent; outline: none; }\n", all)
 	caret := in.Style.Color
@@ -166,6 +166,10 @@ func entryStyle(v *view) string {
 	}
 	if f.Italic {
 		fmt.Fprintf(&b, "%s { font-style: italic; }\n", all)
+	}
+	// A text view's lines, as a text's (text.go): Pango centers the font in each. A field's one line stays centered in its box.
+	if in.Multiline && in.Style.LineHeight > 0 {
+		fmt.Fprintf(&b, "%s { line-height: %.3fpx; }\n", all, float64(in.Style.LineHeight))
 	}
 	if tags := f.Variant.Tags(); len(tags) > 0 {
 		fmt.Fprintf(&b, "%s { font-feature-settings: \"%s\" 1; }\n", all, strings.Join(tags, "\" 1, \""))
