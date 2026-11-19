@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Document that a page on Windows takes no press, tap or drag until its first contentful paint, or for up to 500 ms when it paints none, as Chromium drops them while it holds the previous page's paint, and have the Windows `WebView.Mobile` test drag once after that paint instead of dragging again until one got through (#851 by @houko).
 - Add `core.Input.InputSource` and `KeepInputSource`, which select a keyboard input source, such as `com.apple.keylayout.ABC` for English, while a text field has the focus, and select `base.Command`'s each time its field takes the focus, so a palette kept mounted can be opened again.
 - Document what linking `tsx` costs in binary size, about 20 MB on the desktops, and why: its reflective method lookups and goja's turn off the linker's dead method elimination (#839 by @houko).
 - Add `Scope.Store`, the graph's `core.Store`, which a host passes to another root's `RootOptions.Storage` so a plugin run on a root of its own keeps its `Storage` on the device with the app's (#837 by @houko).

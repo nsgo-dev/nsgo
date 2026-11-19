@@ -18,7 +18,7 @@ import (
 )
 
 // mobilePage reports what it sees of the device, and then the touches a drag made or the mouse's release after one that made none.
-const mobilePage = `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body style="margin:0;height:100vh"><script>
+const mobilePage = `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body style="margin:0;height:100vh"><p>phone</p><script>
 var seen = { moves: 0, mouseMoves: 0, ids: [] };
 var at = function (e) { var t = e.changedTouches[0]; seen.ids.push(t.identifier); return [Math.round(t.clientX), Math.round(t.clientY), e.touches.length]; };
 addEventListener('touchstart', function (e) { seen.start = at(e); }, { passive: false });
@@ -26,14 +26,10 @@ addEventListener('touchmove', function (e) { seen.moves++; seen.last = at(e); },
 addEventListener('touchend', function (e) { seen.end = at(e); window.nsgo.postMessage('touches:' + JSON.stringify(seen)); });
 addEventListener('mousemove', function (e) { if (seen.start && !seen.end) seen.mouseMoves++; });
 addEventListener('mouseup', function () { window.nsgo.postMessage('mouseup:' + JSON.stringify(seen)); });
-// Two frames once the page shows: WebView2 takes input once the page draws.
-var shown = function () {
-  if (document.visibilityState !== 'visible') return;
-  document.removeEventListener('visibilitychange', shown);
-  requestAnimationFrame(function () { requestAnimationFrame(function () { window.nsgo.postMessage('painted'); }); });
-};
-document.addEventListener('visibilitychange', shown);
-shown();
+// Chromium drops a page's presses until its first contentful paint, or for 500 ms when none comes (paint holding): the text paints, and the page says when.
+new PerformanceObserver(function (list) {
+  if (list.getEntriesByName('first-contentful-paint').length) window.nsgo.postMessage('painted');
+}).observe({ type: 'paint', buffered: true });
 window.nsgo.postMessage('ready:' + JSON.stringify({ ua: navigator.userAgent, points: navigator.maxTouchPoints,
   coarse: matchMedia('(pointer: coarse)').matches, noHover: matchMedia('(hover: none)').matches, touch: 'ontouchstart' in window,
   mobile: !!(navigator.userAgentData && navigator.userAgentData.mobile), platform: navigator.userAgentData ? navigator.userAgentData.platform : '' }));
@@ -155,7 +151,7 @@ func TestWebMobilePresentsAPhone(t *testing.T) {
 		}
 	}
 	wait("the pages did not load", func() bool { return has("mobile", "ready:") && has("agent", "ready:") && has("desktop", "ready:") })
-	wait("the pages did not draw", func() bool { return has("mobile", "painted") && has("desktop", "painted") })
+	wait("the pages did not paint", func() bool { return has("mobile", "painted") && has("desktop", "painted") })
 	// A drag up from (100, 150) to (100, 40) in a view x points from the window's left, as the mouse's messages, with the window in front and the cursor where they say: posted to a window behind others, away from the cursor, they reached the page only some of the time.
 	drag := func(x driver.Points) {
 		var at [12]uintptr
@@ -182,27 +178,11 @@ func TestWebMobilePresentsAPhone(t *testing.T) {
 		}
 		send(11, wmLButtonUp, 0)
 	}
-	// WebView2 at times drops the input a page gets soon after it shows: drag again until one reaches the page.
-	dragUntil := func(x driver.Points, what string, ok func() bool) {
-		t.Helper()
-		for try := 1; ; try++ {
-			drag(x)
-			for deadline := time.Now().Add(2 * time.Second); !ok() && time.Now().Before(deadline); {
-				time.Sleep(20 * time.Millisecond)
-			}
-			if ok() {
-				t.Logf("%s on try %d", what, try)
-				return
-			}
-			if try == 10 {
-				mu.Lock()
-				defer mu.Unlock()
-				t.Fatalf("no %s: heard %q", what, heard)
-			}
-		}
-	}
-	dragUntil(100, "touches from the drag over the Mobile view", func() bool { return has("mobile", "touches:") })
-	dragUntil(500, "mouse release from the drag over the desktop view", func() bool { return has("desktop", "mouseup:") })
+	// The first drag after the pages' first contentful paint reaches them (#851).
+	drag(100)
+	wait("touches from the drag over the Mobile view", func() bool { return has("mobile", "touches:") })
+	drag(500)
+	wait("mouse release from the drag over the desktop view", func() bool { return has("desktop", "mouseup:") })
 	wait("the next page did not load", func() bool {
 		mu.Lock()
 		defer mu.Unlock()
