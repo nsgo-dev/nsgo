@@ -4,6 +4,7 @@ package harmonyos
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/textruns"
@@ -55,7 +56,7 @@ func textRunsJSON(t *driver.TextContent) string {
 		if c == 0 {
 			c = t.Style.Color
 		}
-		out = append(out, textRun{T: r.Text, C: webstyle.Color(c), S: float32(f.Size),
+		out = append(out, textRun{T: strings.ReplaceAll(r.Text, string(driver.AttachmentRune), ""), C: webstyle.Color(c), S: float32(f.Size),
 			W: int(f.Weight), I: f.Italic, F: f.Family})
 	}
 	b, err := json.Marshal(out)

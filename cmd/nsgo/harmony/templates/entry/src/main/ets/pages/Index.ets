@@ -275,6 +275,7 @@ class VNode {
   italic: boolean = false;
   family: string = '';
   color: string = '#000000';
+  phColor: string = '';
   lh: number = 0;
   align: number = 0;
   maxLines: number = 0;
@@ -658,6 +659,7 @@ class Tree {
           v.fs = o[3] as number;
           v.fw = o[4] as number;
           v.color = o[5] as string;
+          v.phColor = o[6] as string;
           v.masked = o[7] as boolean;
           v.multiline = o[8] as boolean;
         } else if (code === 'iv') {
@@ -3201,7 +3203,9 @@ class Renderer {
     a.fontSize(v.fs).fontColor(v.color)
       .type(v.masked ? InputType.Password : InputType.Normal)
       .lineHeight(v.multiline ? Math.max(v.fs * 1.4, 1) : v.h)
-      .padding({ top: 0, bottom: 0 })
+      .padding({ top: 0, right: 0, bottom: 0, left: 0 })
+      .placeholderColor(v.phColor)
+      .placeholderFont({ size: v.fs, weight: v.fw })
       .onFocus(() => {
         const host = this.host;
         if (host !== undefined) {
