@@ -384,7 +384,7 @@ type App struct {
 	// which Apple platforms keep for the system's words in later launches.
 	Language       string
 	LanguageForced bool
-	// Menu is the application menu the app set, with a desktop environment the main window's or else the app's own surface's; DockMenu the app icon's menu, the one any surface set last; Window the window commands it sent, oldest first.
+	// Menu is the application menu the app set: on macOS the one the main window or the app's own surface sent last, none once that surface closed, and on other desktops the main window's or else the app's own surface's; DockMenu the app icon's menu, the one any surface set last; Window the window commands it sent, oldest first.
 	Menu     []driver.MenuEntry
 	DockMenu []driver.MenuEntry
 	Window   []driver.WindowCommand
@@ -413,8 +413,9 @@ type App struct {
 	// responseTree is the surface whose batch is being applied, which the platform's answers to what it asked go back to; guideTree the one that asked for the permission guide shown.
 	responseTree *core.Tree
 	guideTree    *core.Tree
-	// menus are the application menus the surfaces set, by tree, nil under a target; menuTree is the one Menu came from, dockTree the one that set DockMenu and popupTree the one that shows PopupMenu, where choosing their items goes.
+	// menus are the application menus the surfaces set, by tree, nil under a target; menuBar is the surface that sent one last, menuTree the one Menu came from, dockTree the one that set DockMenu and popupTree the one that shows PopupMenu, where choosing their items goes.
 	menus     map[*core.Tree][]driver.MenuEntry
+	menuBar   *core.Tree
 	menuTree  *core.Tree
 	dockTree  *core.Tree
 	popupTree *core.Tree

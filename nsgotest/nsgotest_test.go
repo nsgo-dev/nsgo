@@ -1286,6 +1286,60 @@ func TestOtherWindowsKeepTheirShortcutsAndMenus(t *testing.T) {
 	}
 }
 
+// On macOS the application menu is the one the main window or the app's own surface sent last, in either order, as the core reads it for YieldsToMenu bindings: Key gives the binding a key only an earlier menu has, and once the last surface restores the platform's menu, none of the earlier one's items take a key.
+func TestMacOSApplicationMenuFollowsTheLastSurface(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless macOS menu model")
+	}
+	var got []string
+	choose := func(label, key string) []desktop.MenuItem {
+		return []desktop.MenuItem{{Label: label, Shortcut: key, OnSelect: func() { got = append(got, label) }}}
+	}
+	mac := Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop})
+	app := StartApp(t, func(cx *core.Scope) {
+		desktop.SetApplicationMenu(cx, choose("app", "mod+r"))
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			desktop.SetApplicationMenu(cx, choose("main", "mod+m"))
+			cx.OnKeyWith("mod+r", core.KeyOptions{YieldsToMenu: true}, func() { got = append(got, "binding") })
+			return core.Text{Content: "main"}
+		})
+	}, mac)
+	app.ChooseMenu("main")
+	app.Key("mod+r")
+	if want := "main binding"; strings.Join(got, " ") != want {
+		t.Fatalf("main window last: got %q, want %q", strings.Join(got, " "), want)
+	}
+
+	got = nil
+	var appScope *core.Scope
+	app = StartApp(t, func(cx *core.Scope) {
+		appScope = cx
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			desktop.SetApplicationMenu(cx, choose("main", "mod+r"))
+			cx.OnKeyWith("mod+r", core.KeyOptions{YieldsToMenu: true}, func() { got = append(got, "binding") })
+			return core.Text{Content: "main"}
+		})
+	}, mac)
+	app.Post(func() { desktop.SetApplicationMenu(appScope, choose("app", "mod+a")) })
+	app.Settle()
+	app.ChooseMenu("app")
+	app.Key("mod+r")
+	if want := "app binding"; strings.Join(got, " ") != want {
+		t.Fatalf("app surface last: got %q, want %q", strings.Join(got, " "), want)
+	}
+
+	got = nil
+	app.Post(func() { desktop.SetApplicationMenu(appScope, nil) })
+	app.Settle()
+	if app.Menu != nil {
+		t.Fatalf("after the app surface restored the platform's menu, Menu is %v", app.Menu)
+	}
+	app.Key("mod+r")
+	if want := "binding"; strings.Join(got, " ") != want {
+		t.Fatalf("platform's menu last: got %q, want %q", strings.Join(got, " "), want)
+	}
+}
+
 // The app icon's menu is the app's, the one a surface set last: ChooseDockMenu chooses on that surface, though the surfaces number their items alike, and the menu goes with the window that set it.
 func TestDockMenuIsTheApps(t *testing.T) {
 	if Target() != "" {

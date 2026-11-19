@@ -152,7 +152,7 @@ func (a *App) gesture(v *View, kind driver.EventKind, n int, step func(*driver.E
 	send(driver.GestureEnded, n-1)
 }
 
-// ChooseMenu chooses the application menu item at path, its labels from the menu bar down, such as "File", "New": of Menu, which with a desktop environment is the main window's, else the one the app's function set. Headless, as the desktop platforms do, an editing role goes to the focused field first, its OnSelect running when no field takes it, and an item without OnSelect carries out its standard role: Close, Quit, Minimize, Zoom, Toggle Full Screen and the editing roles; a role the model does not carry out fails the step. Under nsgo test -target an item without OnSelect skips the test.
+// ChooseMenu chooses the application menu item at path, its labels from the menu bar down, such as "File", "New": of Menu, which on macOS is the one the main window or the app's function sent last, and on other desktops the main window's or else the one the app's function set. Headless, as the desktop platforms do, an editing role goes to the focused field first, its OnSelect running when no field takes it, and an item without OnSelect carries out its standard role: Close, Quit, Minimize, Zoom, Toggle Full Screen and the editing roles; a role the model does not carry out fails the step. Under nsgo test -target an item without OnSelect skips the test.
 func (a *App) ChooseMenu(path ...string) {
 	a.t.Helper()
 	items := a.Menu

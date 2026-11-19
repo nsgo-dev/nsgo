@@ -309,11 +309,16 @@ func (a *App) setMenu(tree *core.Tree, menu []driver.MenuEntry) {
 		a.menus = map[*core.Tree][]driver.MenuEntry{}
 	}
 	a.menus[tree] = menu
+	a.menuBar = tree
 	a.showMenu()
 }
 
-// showMenu shows the main window's menu, else the one the app's own surface set, as a macOS app's application menu.
+// showMenu shows, on macOS, the menu of the surface that sent one last, as its one menu bar and the core (menuHasKey) do: none once that surface restored the platform's or closed. Other desktops show the main window's menu, else the app's own surface's.
 func (a *App) showMenu() {
+	if a.env != nil && a.env.OS == core.OSMacOS && a.menuBar != nil {
+		a.Menu, a.menuTree = a.menus[a.menuBar], a.menuBar
+		return
+	}
 	a.Menu, a.menuTree = a.menus[a.tree], a.tree
 	if a.Menu == nil && a.appTree != nil {
 		a.Menu, a.menuTree = a.menus[a.appTree], a.appTree
