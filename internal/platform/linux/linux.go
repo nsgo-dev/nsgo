@@ -552,9 +552,7 @@ func (w *window) closeNatives() {
 	}
 }
 
-// closeEditors removes display-wide CSS providers before the stopped window
-// leaves the GTK main loop. The primary window's views stay registered for
-// callbacks, so releaseSurface cannot perform this cleanup on its path.
+// closeEditors releases the editors of a stopped app window and the CSS providers they added to the whole display. The app's own window keeps its views for the callbacks GTK may still make, so releaseSurface, which an opened window goes through, does not run for it.
 func (w *window) closeEditors() {
 	for _, v := range w.views {
 		if v != nil {

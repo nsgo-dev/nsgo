@@ -210,27 +210,78 @@ func TestWindowRunsAnAppAndTakesNativeInput(t *testing.T) {
 	})
 }
 
-// TestWindowCloseReleasesEditorProviders keeps a primary window's display CSS
-// providers from outliving the window that created its inputs.
+// TestWindowCloseReleasesEditorProviders opens and closes windows with a field and a multiline input, the app's own window and one it opens beside a window that stays, and checks that the display-wide CSS providers their editors add go with them while the window left open keeps its own (#859).
 func TestWindowCloseReleasesEditorProviders(t *testing.T) {
 	if testing.Short() {
 		t.Skip("opens a window")
 	}
+	inputs := func() core.Node {
+		return core.View{Style: core.Style{Width: driver.Pt(200), Height: driver.Pt(120)}, Children: []core.Node{
+			core.Input{DefaultValue: "field", Style: core.Style{Width: driver.Pt(160), Height: driver.Pt(30)}},
+			core.Input{DefaultValue: "lines", Multiline: true, Style: core.Style{Width: driver.Pt(160), Height: driver.Pt(60)}},
+		}}
+	}
 	before := editorProviders.Load()
-	title := "nsgo-editor-provider-cleanup"
-	w := startTestWindow(t, nativeApp(title), Options{Title: title, Width: 360, Height: 240})
-	waitForTitle(t, w, title+"|0||0|0")
-	if got := editorProviders.Load(); got <= before {
-		t.Fatalf("editor providers = %d, want more than %d while the window is open", got, before)
+	waitFor := func(what string, want int64) {
+		t.Helper()
+		for deadline := time.Now().Add(10 * time.Second); editorProviders.Load() != want; time.Sleep(10 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatalf("%s: editor providers = %d, want %d", what, editorProviders.Load(), want)
+			}
+		}
 	}
+	// The app's own window, opened and closed again and again.
+	for i := range 3 {
+		w := startTestWindow(t, func(*core.Scope) core.Node { return inputs() }, Options{Title: "nsgo-editor-providers", Width: 200, Height: 120})
+		waitFor(fmt.Sprintf("window %d open", i), before+2)
+		w.onLoop(t, w.close)
+		waitFor(fmt.Sprintf("window %d closed", i), before)
+	}
+	// Windows the app opens: the one that closes takes its providers, the one that stays keeps its.
+	app := core.AppRoot(func(cx *core.Scope) {
+		cx.SetShutdownMode(core.ShutdownOnExplicit)
+		cx.OpenWindow(core.WindowOptions{Title: "nsgo-editors-stay", Width: 200, Height: 120}, func(*core.Scope) core.Node { return inputs() })
+		cx.OpenWindow(core.WindowOptions{Title: "nsgo-editors-go", Width: 200, Height: 120}, func(*core.Scope) core.Node { return inputs() })
+	})
+	w := startTestWindow(t, app, Options{Title: "nsgo-app", Width: 120, Height: 80, Hidden: true})
+	waitFor("both opened windows open", before+4)
+	var stays, goes *window
+	w.onLoop(t, func() {
+		windowHandles.Range(func(_, v any) bool {
+			if o := v.(*window); !o.primary && o.win != 0 {
+				switch goString(gtkWindowGetTitle(o.win)) {
+				case "nsgo-editors-stay":
+					stays = o
+				case "nsgo-editors-go":
+					goes = o
+				}
+			}
+			return true
+		})
+	})
+	if stays == nil || goes == nil {
+		t.Fatal("the opened windows were not found")
+	}
+	w.onLoop(t, func() { gtkWindowClose(goes.win) })
+	waitFor("one opened window closed", before+2)
+	w.onLoop(t, func() {
+		n := 0
+		for _, v := range stays.views {
+			if v != nil && v.provider != 0 {
+				n++
+				if v.entry == 0 {
+					t.Error("the window left open lost an editor")
+				}
+			}
+		}
+		if n != 2 {
+			t.Errorf("the window left open has %d editor providers, want 2", n)
+		}
+	})
+	w.onLoop(t, func() { gtkWindowClose(stays.win) })
+	waitFor("both opened windows closed", before)
 	w.onLoop(t, w.close)
-	deadline := time.Now().Add(10 * time.Second)
-	for editorProviders.Load() != before && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if got := editorProviders.Load(); got != before {
-		t.Fatalf("editor providers = %d after close, want %d", got, before)
-	}
+	waitFor("the app closed", before)
 }
 
 // pixels is the surface as GTK draws it, premultiplied ARGB32.
