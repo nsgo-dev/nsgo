@@ -187,6 +187,8 @@ Without a heap limit a module can still exhaust memory: the quotas bound what Go
 - **Running.** `tsx.View{Package: p}` runs a verified package where it is placed in a Go tree, in its [sandbox](#sandbox), so a host shows plugins beside its own views; a package that throws as it loads, or stops, panics into the nearest `core.Catch`. Verifying hashes the whole package, so hosts call it off the engine's goroutine. `examples/plugins` does all of this, with tests on every target; on the web it shows the refusal.
 - **Tooling.** `nsgo keygen`, `certify`, `publish`, `verify` and `revoke` ([tool](tool.md#signed-packages)).
 
+Applications can sign their own JSON documents with `pkg.SignDocument` and verify them with `Signed.Open`. Application contexts must begin with `app:` and are kept separate from NSGo's package, certificate and revocation signatures. The same encoded keys and Ed25519 envelope rules apply, while each application chooses a distinct context for each document type.
+
 ## Store policies
 
 - Apple's guideline 2.5.2 forbids downloaded code that changes an app's features, while its developer agreement allows interpreted code that keeps the app's purpose.

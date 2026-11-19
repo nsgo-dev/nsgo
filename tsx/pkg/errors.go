@@ -25,6 +25,7 @@ var (
 	ErrStale       = errors.New("pkg: the revocation list is not newer than the one held")
 	ErrExpired     = errors.New("pkg: a trusted root's revocation list has expired or is missing")
 	ErrState       = errors.New("pkg: the trust state")
+	ErrContext     = errors.New("pkg: invalid signing context")
 )
 
 // appMatches reports whether pattern, "*", "prefix.*" or an ID, covers

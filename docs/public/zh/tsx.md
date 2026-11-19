@@ -91,6 +91,8 @@ trust.Accept(p) // 运行之后，更旧的构建会被拒绝
 
 `Sandbox.Grant` 让它得到比声明更少的权限，`Sandbox.Limits` 设置其他时间预算和配额，`Sandbox.Modules` 给它 NSGo 自带之外的 Go 函数和组件。它的快捷键、返回处理器和导航栈只在键盘焦点位于它的视图内时生效；它自己移动焦点（`focus()`、`autoFocus`、`Keyboard.dismiss`、`setAccessibilityFocus`）也只在焦点已在其中、或响应用户在其中的按压时才生效。它显示在自己的视图中，这个视图占满且不超出父视图给它的空间，并裁剪它的内容，菜单、弹出框和提示也在其中；放在滚动视图中时，用一个视图包住它，它才会按内容的高度显示。它的对话框、警告框、上下文菜单和读屏播报也只按同样的规则显示；即使它不移除自己的对话框，返回也会关闭它。入口导出函数的包是函数型插件：`tsx.Load(cx, p, tsx.Sandbox{})` 在后台运行它，入口模块加载时抛出错误则返回这个错误，`Plugin.Call` 调用这些函数。`go tool nsgo dev -limits` 像这样的视图一样运行应用，`go tool nsgo revoke` 签署吊销发布密钥和包的列表，供 `Trust.UpdateRevocations` 使用。`examples/plugins` 会请用户授予包声明的权限，再安装并运行它。`Limits.Memory` 默认关闭，在 `-limits` 中写作 `memory=<bytes>`，它在原生目标上限制按大小分配的内置函数为包占用的内存：`ArrayBuffer` 和各种类型化数组、`repeat`、`padStart`、`padEnd`、`Array.from`、`join`、`fill`、`toSorted` 等数组副本、`apply` 的参数列表，以及 `JSON.stringify`。它们在分配前检查，超出时包以 `ERR_NSH_QUOTA_EXCEEDED` 停止，而不会让应用退出；分配出的内存一直计入，直到被回收。对象、拼接出的字符串、逐个元素增长的数组、`concat`、`flat` 和展开语法产生的副本，以及 `replace` 生成的字符串都不计入，Web 上也不限制，所以它防的是失控的分配，而不是有意耗尽内存的包。自己用 `pkg.Build` 签名包的应用，可以把自己的元数据放进 `pkg.Contents.Extra`，例如插件要加到菜单里的项：它和包一起签名，`Verify` 原样以 `p.Extra` 返回，由应用自己解析，因此应用无需运行包的代码就能读到它。
 
+应用可以用 `pkg.SignDocument` 为自己的 JSON 文档签名，再用 `Signed.Open` 验证。每种文档都使用 `app:` 开头的独立上下文。这些上下文与 NSGo 的包、证书和吊销列表签名相互隔离，也可以使用 `nsgo keygen` 生成的相同密钥。
+
 原生沙箱中的回溯正则表达式使用加载和调用预算中较短的值作为匹配超时。未处理的超时会变成 `tsx.ErrBudget`，因此有问题的表达式不会无限期占用引擎。
 
 Web 上暂时无法把包与页面隔离：包的代码能绕过它的权限，直接访问页面自己的网络、剪贴板和存储，信任库所在的存储也包括在内。因此在 Web 上 `tsx.View` 和 `tsx.Load` 会以 `tsx.ErrUnisolated` 拒绝运行包，除非设置 `Sandbox.WebUnisolated`，让它以页面的权限运行；这只适合你愿意像对待应用自身代码一样信任的包。

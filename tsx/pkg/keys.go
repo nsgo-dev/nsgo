@@ -71,6 +71,52 @@ const (
 	contextRevocations = "nsgo-revocations-v1"
 )
 
+// Signed is a JSON document signed by an Ed25519 key. Its Body is the
+// base64-encoded JSON body, Signer is the signing public key's KeyID and
+// Signature is the base64-encoded signature. Use SignDocument and Open to
+// create and verify documents.
+type Signed struct {
+	Body      string `json:"body"`
+	Signer    string `json:"signer"`
+	Signature string `json:"signature"`
+}
+
+// signed is the internal name used by packages, certificates and revocation
+// lists. It is an alias so their envelope remains the same JSON shape.
+type signed = Signed
+
+// validDocumentContext accepts contexts reserved for application documents.
+// The app: prefix keeps them apart from NSGo's package, certificate and
+// revocation signatures.
+func validDocumentContext(context string) error {
+	if !strings.HasPrefix(context, "app:") || len(context) == len("app:") || strings.ContainsRune(context, '\x00') {
+		return fmt.Errorf("%w: contexts must start with app: and contain no NUL", ErrContext)
+	}
+	return nil
+}
+
+// SignDocument signs body for an application-chosen context. Contexts must
+// start with app:, and each document type should use its own context.
+func SignDocument(key ed25519.PrivateKey, context string, body any) (Signed, error) {
+	if err := validDocumentContext(context); err != nil {
+		return Signed{}, err
+	}
+	if len(key) != ed25519.PrivateKeySize {
+		return Signed{}, fmt.Errorf("%w: secret key is %d bytes, not %d", ErrKey, len(key), ed25519.PrivateKeySize)
+	}
+	return signBody(key, context, body)
+}
+
+// Open verifies the document with one of roots and decodes its body into v.
+// A document context must start with app: and must match the context used to
+// sign it.
+func (s Signed) Open(context string, roots []ed25519.PublicKey, v any) error {
+	if err := validDocumentContext(context); err != nil {
+		return err
+	}
+	return s.open(context, roots, v)
+}
+
 // framed is what a signature in context signs of message.
 func framed(context string, message []byte) []byte {
 	sum := sha256.Sum256(message)
@@ -83,14 +129,6 @@ func sign(key ed25519.PrivateKey, context string, message []byte) []byte {
 
 func verify(key ed25519.PublicKey, context string, message, signature []byte) bool {
 	return len(signature) == ed25519.SignatureSize && ed25519.Verify(key, framed(context, message), signature)
-}
-
-// signed is a JSON body a root signed: a certificate or a revocation
-// list.
-type signed struct {
-	Body      string `json:"body"`
-	Signer    string `json:"signer"`
-	Signature string `json:"signature"`
 }
 
 func signBody(key ed25519.PrivateKey, context string, body any) (signed, error) {

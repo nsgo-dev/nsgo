@@ -658,6 +658,56 @@ func TestKeys(t *testing.T) {
 	}
 }
 
+func TestSignedDocuments(t *testing.T) {
+	key, err := GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}{"catalog", 2}
+	doc, err := SignDocument(key, "app:catalog-v1", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+	if err := doc.Open("app:catalog-v1", []ed25519.PublicKey{key.Public().(ed25519.PublicKey)}, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got != body {
+		t.Fatalf("body = %+v, want %+v", got, body)
+	}
+	data, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTrip Signed
+	if err := json.Unmarshal(data, &roundTrip); err != nil {
+		t.Fatal(err)
+	}
+	if err := roundTrip.Open("app:catalog-v1", []ed25519.PublicKey{key.Public().(ed25519.PublicKey)}, &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.Open("app:other-v1", []ed25519.PublicKey{key.Public().(ed25519.PublicKey)}, &got); !errors.Is(err, ErrSignature) {
+		t.Fatalf("wrong context = %v, want signature error", err)
+	}
+	for _, context := range []string{"", "nsgo-package-v1", "app:", "app:bad\x00context"} {
+		if _, err := SignDocument(key, context, body); !errors.Is(err, ErrContext) {
+			t.Fatalf("context %q: got %v, want context error", context, err)
+		}
+	}
+	if _, err := SignDocument(ed25519.PrivateKey{1}, "app:catalog-v1", body); !errors.Is(err, ErrKey) {
+		t.Fatalf("short key: got %v, want key error", err)
+	}
+	if err := doc.Open("nsgo-package-v1", []ed25519.PublicKey{key.Public().(ed25519.PublicKey)}, &got); !errors.Is(err, ErrContext) {
+		t.Fatalf("reserved context: got %v, want context error", err)
+	}
+}
+
 func TestAppMatches(t *testing.T) {
 	for _, c := range []struct {
 		pattern, id string
