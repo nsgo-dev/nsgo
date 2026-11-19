@@ -95,9 +95,6 @@ func TestWatchGallery(t *testing.T) {
 	for i, d := range watchDemos() {
 		app.Press("id:nav-" + d.name)
 		app.WaitFor("id:screen-"+d.name, 5*time.Second)
-		if d.name == "Checkbox" {
-			app.Press("id:switch")
-		}
 		app.FastForward(time.Second)
 		app.Screenshot("watch/" + strings.ToLower(d.name))
 		if i%2 == 0 {

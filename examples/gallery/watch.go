@@ -130,8 +130,7 @@ func watchButtons(cx *core.Scope) core.Node {
 
 func watchToggles(cx *core.Scope) core.Node {
 	tr := locales.For(cx)
-	// The switch starts off, as one that starts on is drawn off on a watch: the watch backend applies animated values only in its frames (hostFrame), where iOS and macOS also apply them after each batch.
-	starred, on, picked := core.NewSignal(cx, true), core.NewSignal(cx, false), core.NewSignal(cx, 0)
+	starred, on, picked := core.NewSignal(cx, true), core.NewSignal(cx, true), core.NewSignal(cx, 0)
 	var radios []core.Node
 	for i, name := range []string{tr.LibApple(), tr.LibBanana(), tr.LibCherry()} {
 		radios = append(radios, ui.Radio{Text: name, Checked: func() bool { return picked.Get() == i }, OnChange: func(bool) { picked.Set(i) }})
