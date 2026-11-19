@@ -142,7 +142,8 @@ func checkDrag(t *testing.T, got mobileTouches) {
 	for _, id := range got.IDs {
 		same = same && id == got.IDs[0]
 	}
-	if !near(got.Start, 100, 150, 1) || !near(got.Last, 100, 40, 1) || !near(got.End, 100, 40, 0) || got.Moves < 3 || !same || got.MouseMoves != 0 {
+	// WebKit coalesces mouse moves that come faster than it handles them, as on a busy runner, so the drag may make as few as one touchmove; Last shows it reached its end while the finger was down (#891).
+	if !near(got.Start, 100, 150, 1) || !near(got.Last, 100, 40, 1) || !near(got.End, 100, 40, 0) || got.Moves < 1 || !same || got.MouseMoves != 0 {
 		t.Errorf("the drag made %+v", got)
 	}
 }

@@ -244,7 +244,8 @@ func TestWebMobilePresentsAPhone(t *testing.T) {
 	}
 	// Chromium may fold the last moves into the end.
 	movedUp := len(got.Last) == 3 && got.Last[1] < 100 && got.Last[2] == 1
-	if !near(got.Start, 100, 150, 1) || !movedUp || !near(got.End, 100, 40, 0) || got.Moves < 3 || !same || got.MouseMoves != 0 {
+	// WebView2 may coalesce the moves into as few as one touchmove; movedUp shows the drag moved up while the finger was down (#891).
+	if !near(got.Start, 100, 150, 1) || !movedUp || !near(got.End, 100, 40, 0) || got.Moves < 1 || !same || got.MouseMoves != 0 {
 		t.Errorf("the drag made %+v", got)
 	}
 	if got := touches("desktop", "mouseup:"); got.Start != nil || got.Moves != 0 {
