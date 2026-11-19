@@ -636,7 +636,9 @@ func (m *mounter) input(id driver.NodeID, c *driver.InputConfig) {
 	}
 	m.o.op("in", id).str(c.Placeholder).num(float64(f.Size)).num(float64(f.Weight)).
 		str(webstyle.Color(c.Style.Color)).str(webstyle.Fill(c.PlaceholderColor)).
-		boolean(c.Masked).boolean(c.Multiline)
+		boolean(c.Masked).boolean(c.Multiline).
+		num(float64(c.Content.Origin.X)).num(float64(c.Content.Origin.Y)).
+		num(float64(c.Content.Size.Width)).num(float64(c.Content.Size.Height))
 }
 
 // scrollTo scrolls a scroll view to offset, as the app asked.

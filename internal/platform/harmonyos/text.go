@@ -40,10 +40,9 @@ type prepared struct {
 	text   *driver.AttributedText
 }
 
-// Measure returns the text's size wrapped at maxWidth, which Auto leaves
-// unwrapped.
+// Measure returns the text's size wrapped at maxWidth, which Auto leaves unwrapped: the size of the text drawn, without its attachments' characters.
 func (p *prepared) Measure(maxWidth driver.Points) driver.Size {
-	return p.engine.measure(p.text.Text, p.text.Style, maxWidth)
+	return p.engine.measure(drawnText(p.text.Text), p.text.Style, maxWidth)
 }
 
 // Layout returns the text as it will be drawn: the render layer lays it out

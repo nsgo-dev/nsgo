@@ -283,6 +283,11 @@ class VNode {
   value: string = '';
   masked: boolean = false;
   multiline: boolean = false;
+  // A text field's content box in its frame: where its text goes, inside its padding and border.
+  inX: number = 0;
+  inY: number = 0;
+  inW: number = -1;
+  inH: number = -1;
   // An image's URI, its fit, and the bytes it embeds, base64.
   src: string = '';
   fit: string = 'cover';
@@ -662,6 +667,10 @@ class Tree {
           v.phColor = o[6] as string;
           v.masked = o[7] as boolean;
           v.multiline = o[8] as boolean;
+          v.inX = o[9] as number;
+          v.inY = o[10] as number;
+          v.inW = o[11] as number;
+          v.inH = o[12] as number;
         } else if (code === 'iv') {
           v.value = o[2] as string;
         } else if (code === 'im') {
@@ -3195,15 +3204,25 @@ class Renderer {
     if (a === undefined) {
       return;
     }
+    // The text goes in the content box the engine laid out, as on the other targets: ArkUI's padding, inside the border, is what lies around it in the frame. ArkUI's default padding would otherwise shift the text, and leave only the top half of each glyph visible in a short field.
+    const cw = v.inW >= 0 ? v.inW : v.w;
+    const ch = v.inH >= 0 ? v.inH : v.h;
+    const pad: Padding = {
+      top: Math.max(v.inY - v.bw, 0), left: Math.max(v.inX - v.bw, 0),
+      right: Math.max(v.w - v.inX - cw - v.bw, 0), bottom: Math.max(v.h - v.inY - ch - v.bw, 0)
+    };
+    // ArkUI's TextInput draws its theme's grey capsule unless its own background, corners and border are set: the common attributes style() writes do not reach them. The engine's are written here again, transparent where it gives none.
+    a.backgroundColor(v.bg === '' ? Color.Transparent : v.bg)
+      .borderRadius(v.radius)
+      .border({ width: v.bw, color: v.bc === '' ? Color.Transparent : v.bc });
     if (v.multiline) {
-      // A field as tall as a page is not a line as tall as a page: using
-      // its whole height as lineHeight drops the glyphs into the middle.
+      // A field as tall as a page is not a line as tall as a page: using its whole height as lineHeight drops the glyphs into the middle. A single line is centered in the content box.
       node.commonAttribute.align(Alignment.TopStart);
+      a.lineHeight(Math.max(v.fs * 1.4, 1));
     }
     a.fontSize(v.fs).fontColor(v.color)
       .type(v.masked ? InputType.Password : InputType.Normal)
-      .lineHeight(v.multiline ? Math.max(v.fs * 1.4, 1) : v.h)
-      .padding({ top: 0, right: 0, bottom: 0, left: 0 })
+      .padding(pad)
       .placeholderFont({ size: v.fs, weight: v.fw })
       .onFocus(() => {
         const host = this.host;

@@ -66,5 +66,5 @@ func textRunsJSON(t *driver.TextContent) string {
 	return string(b)
 }
 
-// drawnText is a text as ArkUI draws it: without the attachment runes, which ArkUI would draw as boxes. The attachments' views are mounted apart, at the frames the engine gives them.
+// drawnText is a text as ArkUI draws and measures it: without the attachment runes, which ArkUI would draw as boxes. The attachments' views are not drawn yet (#811).
 func drawnText(s string) string { return strings.ReplaceAll(s, string(driver.AttachmentRune), "") }
