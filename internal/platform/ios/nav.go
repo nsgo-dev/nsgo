@@ -154,14 +154,20 @@ func navMethods() []objc.MethodDef {
 	return []objc.MethodDef{{Cmd: selEdgeSwipe, Fn: edgeSwiped}, {Cmd: selHeaderItem, Fn: headerItemPressed}}
 }
 
-// headerHeights measures a navigation bar on this device, as NSH does:
-// its height, and with a large title the 52-point row large titles add.
+// headerHeights measures a navigation bar on this device, as NSH does: its height, and with a large title the 52-point row large titles add. An Apple TV's bar is measured at the screen's width, and as tvOS draws no large titles, a large title's header is as tall as the bar.
 func headerHeights() [2]driver.Points {
+	width := 390.0
+	if onTV() {
+		width = objc.Send[apple.CGRect](objc.ID(apple.Class("UIScreen")).Send(sel("mainScreen")), selBounds).Size.Width
+	}
 	bar := objc.ID(apple.Class("UINavigationBar")).Send(selNew)
-	h := objc.Send[apple.CGSize](bar, sel("sizeThatFits:"), apple.CGSize{Width: 390}).Height
+	h := objc.Send[apple.CGSize](bar, sel("sizeThatFits:"), apple.CGSize{Width: width}).Height
 	bar.Send(selRelease)
 	if h <= 0 {
 		h = 44
+	}
+	if onTV() {
+		return [2]driver.Points{driver.Points(h), driver.Points(h)}
 	}
 	return [2]driver.Points{driver.Points(h), driver.Points(h + 52)}
 }
@@ -235,14 +241,13 @@ func (s *surface) styleBar(b *navBar, c *driver.ScreenConfig) {
 	}
 	b.bar.Send(sel("setTintColor:"), tint)
 	if onTV() {
-		// tvOS refuses UINavigationBarAppearance, but UINavigationBar still
-		// accepts title attributes directly. Set them before returning so a
-		// screen's title does not inherit an invisible default color.
+		// tvOS refuses UINavigationBarAppearance but takes the title's attributes on the bar. Without them the title is in the system appearance's color, which need not show on the app's own background; without a TitleColor it goes back to that default.
+		attrs := objc.ID(0)
 		if c.TitleColor != 0 {
 			key := apple.Global(uikitPath, "NSForegroundColorAttributeName")
-			attrs := objc.ID(apple.Class("NSDictionary")).Send(sel("dictionaryWithObject:forKey:"), uiColor(c.TitleColor), key)
-			b.bar.Send(sel("setTitleTextAttributes:"), attrs)
+			attrs = objc.ID(apple.Class("NSDictionary")).Send(sel("dictionaryWithObject:forKey:"), uiColor(c.TitleColor), key)
 		}
+		b.bar.Send(sel("setTitleTextAttributes:"), attrs)
 		return
 	}
 	a := objc.ID(apple.Class("UINavigationBarAppearance")).Send(selNew)
@@ -350,7 +355,8 @@ func (s *surface) followLargeTitle(sv *view, offset driver.Points) {
 			break
 		}
 	}
-	if screen == nil || !screen.bar.config.LargeTitle {
+	// An Apple TV has no large titles to collapse.
+	if screen == nil || !screen.bar.config.LargeTitle || onTV() {
 		return
 	}
 	scrolled := offset + sv.sc.config.Behavior.ContentInset.Top
