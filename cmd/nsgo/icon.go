@@ -17,7 +17,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -176,24 +175,19 @@ func (p *project) androidAdaptiveIcon() (*apk.AdaptiveIcon, image.Image, error) 
 	return adaptive, legacy, nil
 }
 
+// androidIconLayer decodes an adaptive icon layer: a square PNG, or a #RRGGBB or #RRGGBBAA color as a one-pixel image.
 func androidIconLayer(value string) (image.Image, error) {
 	if !strings.HasPrefix(value, "#") {
 		return readSquareIcon(value)
 	}
-	hex := strings.TrimPrefix(value, "#")
-	if len(hex) != 6 && len(hex) != 8 {
+	rgba, err := hex.DecodeString(value[1:])
+	if err != nil || len(rgba) != 3 && len(rgba) != 4 {
 		return nil, fmt.Errorf("icon.android.background: %q is not a #RRGGBB or #RRGGBBAA color", value)
 	}
-	b, err := strconv.ParseUint(hex, 16, 32)
-	if err != nil {
-		return nil, fmt.Errorf("icon.android.background: %q is not a color", value)
+	c := color.NRGBA{R: rgba[0], G: rgba[1], B: rgba[2], A: 255}
+	if len(rgba) == 4 {
+		c.A = rgba[3]
 	}
-	a := uint8(255)
-	if len(hex) == 8 {
-		a = uint8(b)
-		b >>= 8
-	}
-	c := color.NRGBA{R: uint8(b >> 16), G: uint8(b >> 8), B: uint8(b), A: a}
 	img := image.NewNRGBA(image.Rect(0, 0, 1, 1))
 	img.SetNRGBA(0, 0, c)
 	return img, nil

@@ -336,3 +336,20 @@ func TestLinuxDesktopEntryCategories(t *testing.T) {
 		}
 	}
 }
+
+func TestAndroidIconLayerColors(t *testing.T) {
+	for value, want := range map[string]color.NRGBA{"#123456": {0x12, 0x34, 0x56, 0xff}, "#12345678": {0x12, 0x34, 0x56, 0x78}} {
+		img, err := androidIconLayer(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := img.(*image.NRGBA).NRGBAAt(0, 0); got != want {
+			t.Errorf("%s = %v, want %v", value, got, want)
+		}
+	}
+	for _, value := range []string{"#12345", "#1234567", "#12345g", "#"} {
+		if _, err := androidIconLayer(value); err == nil {
+			t.Errorf("%s is a color", value)
+		}
+	}
+}
