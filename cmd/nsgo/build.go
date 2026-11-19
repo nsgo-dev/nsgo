@@ -36,7 +36,8 @@ func buildAll(ctx context.Context, p *project) error {
 			return err
 		}
 	}
-	if warning := androidTargetWarning(p, buildTargets); warning != "" {
+	// A library for a host app takes the host's target API.
+	if warning := androidTargetWarning(p, buildTargets); warning != "" && !p.Build.embed {
 		warn("%s", warning)
 	}
 	jobs, err := p.buildJobs(len(buildTargets))
