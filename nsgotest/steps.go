@@ -1116,9 +1116,7 @@ func shifted(c string) string {
 	return strings.ToUpper(c)
 }
 
-// keyNames are the names a press of normalized key k matches bindings
-// by, as a platform's: "mod" is Command on Apple platforms and Control
-// elsewhere, whichever of the two the key names.
+// keyNames are the names a press of normalized key k matches bindings by, as a platform's: "mod" is Command on Apple platforms and Control elsewhere, whichever of the two the key names. Off Apple platforms the "mod" spelling comes first, as Windows and Linux try a press's spellings in that order against their menu shortcuts (driver.MenuShortcut).
 func (a *App) keyNames(k string) []string {
 	cmd := "ctrl"
 	if a.env != nil && (a.env.OS == driver.OSMacOS || a.env.OS == driver.OSIOS) {
