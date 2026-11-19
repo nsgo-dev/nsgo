@@ -1,6 +1,10 @@
 package ios
 
-import "github.com/nsgo-dev/nsgo/internal/driver"
+import (
+	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
+)
 
 // This file builds on every system, so tests check the mapping from UIKit's observations on any Mac.
 
@@ -80,4 +84,40 @@ func foldGeometry(size driver.Size, safe driver.Edges, regions []reservedRegion,
 func overlaps(a, b driver.Bounds) bool {
 	return a.Origin.X < b.Origin.X+b.Size.Width && b.Origin.X < a.Origin.X+a.Size.Width &&
 		a.Origin.Y < b.Origin.Y+b.Size.Height && b.Origin.Y < a.Origin.Y+a.Size.Height
+}
+
+// regionHold is how long after the surface view changes size its reserved regions go unread: during a rotation or a move to the other display, reservedRegionsOfKind: can answer for a layout pass or more in the previous coordinate space, and nothing tells when it stops, so the regions are read again once it has passed and later still (regionReads).
+const regionHold = 250 * time.Millisecond
+
+// regionReads are when, after a size change, the surface view is laid out again so its reserved regions are read at the new size, as UIKit tells nothing when they change.
+var regionReads = []time.Duration{regionHold, 3 * regionHold, 8 * regionHold}
+
+// regionClock follows the sizes the surface view's reserved regions are read at.
+type regionClock struct {
+	size  driver.Size
+	since time.Time
+}
+
+// read reports whether regions read at size now can be used: not while regionHold has not passed since the size changed, the size the surface first reads at excepted. changed is true when size is a new one, for the caller to read again later.
+func (c *regionClock) read(size driver.Size, now time.Time) (trusted, changed bool) {
+	switch {
+	case c.since.IsZero():
+		c.size, c.since = size, now.Add(-regionHold)
+	case size != c.size:
+		c.size, c.since = size, now
+		changed = true
+	}
+	return now.Sub(c.since) >= regionHold, changed
+}
+
+// regionsFit reports whether every region lies within a view of size, as one measured at that size does: a frame past its bounds, such as the inner display's division at the outer display's size, was measured in another coordinate space.
+func regionsFit(size driver.Size, regions []reservedRegion) bool {
+	const slack = 0.5
+	for _, r := range regions {
+		f := r.frame
+		if f.Origin.X < -slack || f.Origin.Y < -slack || f.Origin.X+f.Size.Width > size.Width+slack || f.Origin.Y+f.Size.Height > size.Height+slack {
+			return false
+		}
+	}
+	return true
 }

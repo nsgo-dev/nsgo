@@ -18,6 +18,7 @@
 - Take the frames of what an alert's answer starts in `nsgotest`'s `Answer` and `App.OnAlert`, as every other step does, so a sheet closed from an alert's callback is gone once `Answer` returns instead of staying until the test advances the clock (#782 by @houko).
 - Report a malformed SVG string in a TSX `icon` prop once, naming the parse error, instead of silently drawing nothing (#594 by @dhruv1220).
 - Route Linux application-menu Close and Quit roles through the owning window and app teardown (#768 by @houko).
+- Stop committing an iOS 27.1 surface's reserved regions read in the previous display's or orientation's coordinate space just after it changes size, which split the iPhone Duo's outer display or reserved a rectangle on its inner one as it opened and closed, and read them again once the change settles (#823 by @houko).
 - Bound backtracking regular expressions in sandboxed TSX calls by their time budget (#759 by @houko).
 - Match headless menu shortcut spelling precedence with Windows and Linux (#769 by @houko).
 - Show a navigation stack's pages' `Header` in mini programs, which took the phone's OS for one that draws a system header and showed neither a title nor back; `core.Env.Simulated` reports true there.

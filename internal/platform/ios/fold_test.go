@@ -3,6 +3,7 @@ package ios
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -113,6 +114,44 @@ func TestFoldGeometryCutouts(t *testing.T) {
 	for _, c := range cases {
 		if got := foldGeometry(c.size, c.safe, c.regions, closed); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s:\n got %+v\nwant %+v", c.name, got, c.want)
+		}
+	}
+}
+
+// TestStaleRegions leaves out what the iPhone Duo simulator (iOS 27.2) answered in the previous display's coordinate space as it moved between displays: the inner display's division at the outer display's size, and anything read just after a size change.
+func TestStaleRegions(t *testing.T) {
+	outer := driver.Size{Width: 678, Height: 466}
+	if regionsFit(outer, []reservedRegion{{frame: bounds(182.5, 0, 40, 669), division: true}}) {
+		t.Error("the inner display's division fits the outer display")
+	}
+	if !regionsFit(outer, []reservedRegion{{frame: bounds(611.6666666666666, 399.6666666666667, 37, 37)}, {frame: bounds(594, 384, 84, 82)}}) {
+		t.Error("the outer display's own regions do not fit it")
+	}
+	if !regionsFit(driver.Size{Width: 900, Height: 640}, []reservedRegion{{frame: bounds(450, 0, 0, 640.25), division: true}}) {
+		t.Error("a division rounded past the edge does not fit")
+	}
+
+	var c regionClock
+	start := time.Unix(1000, 0)
+	inner := driver.Size{Width: 951, Height: 669}
+	steps := []struct {
+		size             driver.Size
+		at               time.Duration
+		trusted, changed bool
+	}{
+		{outer, 0, true, false},               // the size the surface starts at
+		{outer, time.Second, true, false},     // a hinge update at the same size
+		{inner, 2 * time.Second, false, true}, // opening: the previous display's frames come first
+		{inner, 2*time.Second + 10*time.Millisecond, false, false},
+		{inner, 2*time.Second + regionHold, true, false}, // read again once the hold has passed
+		{outer, 5 * time.Second, false, true},            // closing
+		{outer, 5*time.Second + regionHold - 1, false, false},
+		{outer, 6 * time.Second, true, false},
+	}
+	for i, st := range steps {
+		trusted, changed := c.read(st.size, start.Add(st.at))
+		if trusted != st.trusted || changed != st.changed {
+			t.Errorf("step %d at %v: trusted %v changed %v, want %v %v", i, st.at, trusted, changed, st.trusted, st.changed)
 		}
 	}
 }

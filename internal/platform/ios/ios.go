@@ -147,6 +147,8 @@ type surface struct {
 	batch uint64 // batches applied
 	// hinge is the latest a UIHingeInteraction reported (watchHinge).
 	hinge hingeReading
+	// regionClock follows the sizes the reserved regions are read at (geometry).
+	regionClock regionClock
 	// perf measures the surface while its panel, hud, shows; perfOn says
 	// the app asked for them.
 	perf   *engine.PerfMonitor
@@ -1794,7 +1796,7 @@ func surfaceLayout(self objc.ID, cmd objc.SEL) {
 	apple.Super(self, cmd)
 	if v := views[self]; v != nil && v.surface.engine != nil {
 		b := objc.Send[apple.CGRect](self, selBounds)
-		// The reserved regions are read at the size reported now, so they go with it.
+		// The geometry is read at the size reported now, so it goes with it.
 		size := driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}
 		v.surface.engine.Resize(size, v.surface.geometry(size))
 		if h := v.surface.hud; h != nil {

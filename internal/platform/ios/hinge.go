@@ -3,6 +3,8 @@
 package ios
 
 import (
+	"time"
+
 	"github.com/ebitengine/purego/objc"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -50,11 +52,36 @@ func (s *surface) reservedRegions() []reservedRegion {
 	return out
 }
 
-// geometry is the surface view's fold geometry at size, as layoutSubviews reports it: its active reserved regions, read with its safe area, and the hinge's latest reading.
+// geometry is the surface view's fold geometry at size, as layoutSubviews reports it: its active reserved regions, read with its safe area, and the hinge's latest reading. Regions that may be in another coordinate space, read within regionHold of a size change or reaching past the bounds, are left out, giving the one-region form with the hinge's state, and the view is laid out again to read them later.
 func (s *surface) geometry(size driver.Size) driver.Geometry {
+	trusted, changed := s.regionClock.read(size, time.Now())
+	if changed {
+		s.layOutAfter(regionReads...)
+	}
+	var regions []reservedRegion
+	if trusted {
+		regions = s.reservedRegions()
+		if !regionsFit(size, regions) {
+			regions = nil
+			s.layOutAfter(regionHold)
+		}
+	}
 	in := objc.Send[edgeInsets](s.native, sel("safeAreaInsets"))
 	safe := driver.Edges{Top: driver.Points(in.Top), Right: driver.Points(in.Right), Bottom: driver.Points(in.Bottom), Left: driver.Points(in.Left)}
-	return foldGeometry(size, safe, s.reservedRegions(), s.hinge)
+	return foldGeometry(size, safe, regions, s.hinge)
+}
+
+// layOutAfter lays the surface view out again after each delay, unless it closed.
+func (s *surface) layOutAfter(delays ...time.Duration) {
+	for _, d := range delays {
+		time.AfterFunc(d, func() {
+			apple.OnMain(func() {
+				if !s.closed {
+					s.native.Send(sel("setNeedsLayout"))
+				}
+			})
+		})
+	}
 }
 
 // watchHinge adds a UIHingeInteraction to the surface view on iOS 27.1: each update keeps the hinge's status and angle and lays the view out again, so a change of state alone is a resize to the same size with the new geometry.
