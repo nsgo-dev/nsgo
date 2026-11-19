@@ -184,6 +184,30 @@ mount(App);`)
 	}
 }
 
+func TestWebViewMobileFollowsItsProp(t *testing.T) {
+	app := run(t, `import { mount, signal, Text, View, WebView } from "nsgo";
+function App() {
+	const mobile = signal(true);
+	return <View style={{ flex: 1 }}>
+		<WebView testID="web" src="https://m.example/" mobile={mobile()} style={{ height: 50 }} />
+		<WebView testID="desktop" src="https://example.com/" style={{ height: 50 }} />
+		<Text testID="off" onPress={() => mobile.set(false)}>Off</Text>
+	</View>;
+}
+mount(App);`)
+	if v := app.Find("id:web"); !v.Web.Mobile || v.Web.UserAgent != "" {
+		t.Fatalf("mounted with %+v, want Mobile", v.Web)
+	}
+	if v := app.Find("id:desktop"); v.Web.Mobile {
+		t.Errorf("a web view without mobile is Mobile: %+v", v.Web)
+	}
+	app.Press("id:off")
+	app.Settle()
+	if v := app.Find("id:web"); v.Web.Mobile || v.Web.Source.Src != "https://m.example/" {
+		t.Errorf("after the change: %+v", v.Web)
+	}
+}
+
 func TestWebViewMessagesCarryTheirOrigin(t *testing.T) {
 	app := run(t, `import { mount, signal, Text, View, WebView } from "nsgo";
 function App() {

@@ -86,6 +86,7 @@ func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 			Headers:            map[string]string{"X-Test": "one"},
 			Incognito:          true,
 			PinchZoom:          true,
+			Mobile:             true,
 			Ref:                &ref,
 			TestID:             "web",
 			Style:              Style{Width: Pt(300), Height: Pt(200)},
@@ -109,7 +110,7 @@ func TestWebViewConfiguresLoadsAndReports(t *testing.T) {
 	if n := h.find("web"); n.kind != driver.KindWeb {
 		t.Fatalf("kind %v, want KindWeb", n.kind)
 	}
-	if cfg == nil || cfg.Source.Src != "https://example.com" || cfg.InjectedJavaScript != "1" || cfg.Headers["X-Test"] != "one" || !cfg.Incognito || !cfg.PinchZoom {
+	if cfg == nil || cfg.Source.Src != "https://example.com" || cfg.InjectedJavaScript != "1" || cfg.Headers["X-Test"] != "one" || !cfg.Incognito || !cfg.PinchZoom || !cfg.Mobile {
 		t.Fatalf("config %+v", cfg)
 	}
 	if !mask.Has(driver.EventLoad) || !mask.Has(driver.EventMessage) || mask.Has(driver.EventLoadStart) {
