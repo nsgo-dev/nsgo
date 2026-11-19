@@ -3,8 +3,6 @@ package tsx
 import (
 	"errors"
 	"fmt"
-	"sync/atomic"
-	"time"
 
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 	"github.com/nsgo-dev/nsgo/tsx/pkg"
@@ -82,6 +80,7 @@ func Load(cx *core.Scope, p *pkg.Package, s Sandbox) (plugin *Plugin, err error)
 		return nil, ErrNoTree
 	}
 	s = s.of(p)
+	s.plugin = true
 	// Refused before the scope runs it, which would send the panic to a Catch rather than to the caller.
 	if err := s.isolation(js.Browser); err != nil {
 		return nil, err
@@ -146,83 +145,72 @@ func (p *Plugin) Call(name string, args []any, done func(result any, err error))
 		done(nil, fmt.Errorf("%w: %q", ErrNoExport, name))
 		return
 	}
-	// state is callRunning until the call settles (callSettled), or until CallTotal runs out first (callExpired), as the total's timer fires on a goroutine of its own: a call that settled before stops the plugin no more, and one past it reports ErrBudget whatever it settles with after.
-	const (
-		callRunning = iota
-		callExpired
-		callSettled
-	)
-	var state atomic.Int32
-	var total *time.Timer
+	settled := false
 	key := new(int)
-	settle := func(from int32, v any, err error) bool {
-		if !state.CompareAndSwap(from, callSettled) {
-			return false
+	finish := func(v any, err error) {
+		if settled {
+			return
 		}
-		if total != nil {
-			total.Stop()
-		}
+		settled = true
 		delete(r.calls, key)
 		done(v, err)
-		return true
 	}
-	finish := func(v any, err error) { settle(callRunning, v, err) }
 	if r.calls == nil {
 		r.calls = map[*int]func(error){}
 	}
-	r.calls[key] = func(err error) {
-		if !settle(callRunning, nil, err) {
-			settle(callExpired, nil, ErrBudget)
-		}
+	r.calls[key] = func(err error) { finish(nil, err) }
+	// The call and what it sets going run until its deadline (deadline.go): past it, the call fails with ErrBudget if it has not settled, and what is left of its work is dropped.
+	var dl *deadline
+	if r.deadlines {
+		dl = r.newDeadline(r.limits.CallTotal, func() { finish(nil, ErrBudget) }, true)
 	}
-	if d := r.limits.CallTotal; d > 0 {
-		total = time.AfterFunc(d, func() {
-			if state.CompareAndSwap(callRunning, callExpired) {
-				r.interrupt(ErrBudget)
-				p.cx.Post(func() { settle(callExpired, nil, ErrBudget) })
+	p.cx.Run(func() { r.under(dl, func() { p.call(fn, args, dl, finish) }) })
+}
+
+// call runs a Call of fn under dl, its deadline, nil without one, reporting to finish.
+func (p *Plugin) call(fn js.Value, args []any, dl *deadline, finish func(any, error)) {
+	r := p.r
+	defer func() {
+		if x := recover(); x != nil {
+			var callErr error
+			if ex, ok := x.(*js.Exception); ok {
+				callErr = r.rejection(ex.Value())
+			} else if e, ok := x.(error); ok {
+				callErr = e
+			} else {
+				callErr = fmt.Errorf("%v", x)
 			}
-		})
-	}
-	p.cx.Run(func() {
-		defer func() {
-			if x := recover(); x != nil {
-				var callErr error
-				if ex, ok := x.(*js.Exception); ok {
-					callErr = r.rejection(ex.Value())
-				} else if e, ok := x.(error); ok {
-					callErr = e
-				} else {
-					callErr = fmt.Errorf("%v", x)
-				}
-				finish(nil, callErr)
-			}
-		}()
-		in := make([]js.Value, len(args))
-		for i, a := range args {
-			in[i] = r.vm.ToValue(a)
+			finish(nil, callErr)
 		}
-		v := r.call(fn, in...)
-		if err := r.stoppedErr(); err != nil {
+	}()
+	in := make([]js.Value, len(args))
+	for i, a := range args {
+		in[i] = r.vm.ToValue(a)
+	}
+	v := r.call(fn, in...)
+	if err := r.stoppedErr(); err != nil {
+		panic(err)
+	}
+	if dl != nil && dl.expired {
+		return
+	}
+	if _, ok := v.Export().(*js.Promise); !ok {
+		finish(exportJSON(v), nil)
+		return
+	}
+	then, _ := js.AssertFunction(v.(*js.Object).Get("then"))
+	onResolve := r.function(func(call js.FunctionCall) js.Value {
+		finish(exportJSON(arg(call, 0)), nil)
+		return js.Undefined()
+	})
+	onReject := r.function(func(call js.FunctionCall) js.Value {
+		finish(nil, r.rejection(arg(call, 0)))
+		return js.Undefined()
+	})
+	r.within(r.limits.Call, func() {
+		if _, err := then(v, onResolve, onReject); err != nil {
 			panic(err)
 		}
-		if _, ok := v.Export().(*js.Promise); !ok {
-			finish(exportJSON(v), nil)
-			return
-		}
-		then, _ := js.AssertFunction(v.(*js.Object).Get("then"))
-		onResolve := r.function(func(call js.FunctionCall) js.Value {
-			finish(exportJSON(arg(call, 0)), nil)
-			return js.Undefined()
-		})
-		onReject := r.function(func(call js.FunctionCall) js.Value {
-			finish(nil, r.rejection(arg(call, 0)))
-			return js.Undefined()
-		})
-		r.within(r.limits.Call, func() {
-			if _, err := then(v, onResolve, onReject); err != nil {
-				panic(err)
-			}
-		})
 	})
 }
 

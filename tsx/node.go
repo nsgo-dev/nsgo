@@ -107,7 +107,7 @@ func (n *node) ScrollToEnd(options js.Value) {
 // Measure resolves with { bounds, pagePosition } once this turn's changes
 // are laid out, or null when the view is not in the tree.
 func (n *node) Measure() *js.Promise {
-	p, resolve, _ := n.r.vm.NewPromise()
+	p, resolve, _ := n.r.newPromise()
 	answer := func(frame, page core.Bounds, ok bool) {
 		n.r.inJS(func() {
 			if !ok {

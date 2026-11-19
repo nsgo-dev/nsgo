@@ -749,6 +749,200 @@ func TestPluginCallTotalCutsATimerQuietly(t *testing.T) {
 	app.Post(plugin.Close)
 }
 
+// deadlinePlugin loads source as a plugin held to a CallTotal of total and a load of load, with a Call budget no test reaches.
+func deadlinePlugin(t *testing.T, source string, load, total time.Duration) (*nsgotest.App, *tsx.Plugin) {
+	t.Helper()
+	p := verified(t, source, pkg.Capabilities{})
+	limits := tsx.Limits{Load: load, Call: 10 * time.Second, CallTotal: total}
+	var plugin *tsx.Plugin
+	var loadErr error
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		plugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{Limits: &limits, WebUnisolated: true})
+		return core.View{}
+	})
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	t.Cleanup(func() { app.Post(plugin.Close) })
+	return app, plugin
+}
+
+// callPlugin calls name and runs the app's clock until the call settles.
+func callPlugin(t *testing.T, app *nsgotest.App, plugin *tsx.Plugin, name string) (any, error) {
+	t.Helper()
+	var result any
+	var err error
+	settled := false
+	app.Post(func() {
+		plugin.Call(name, nil, func(v any, e error) { result, err, settled = v, e, true })
+	})
+	advanceUntil(t, app, 5*time.Second, func() bool { return settled })
+	return result, err
+}
+
+// counts calls the plugin's counts export, an array of numbers.
+func counts(t *testing.T, app *nsgotest.App, plugin *tsx.Plugin) []float64 {
+	t.Helper()
+	v, err := callPlugin(t, app, plugin, "counts")
+	if err != nil {
+		t.Fatalf("counts: %v", err)
+	}
+	var out []float64
+	for _, n := range v.([]any) {
+		out = append(out, number(n))
+	}
+	return out
+}
+
+// number is a JSON number as Call gives one, an int64 or a float64.
+func number(v any) float64 {
+	switch n := v.(type) {
+	case int64:
+		return float64(n)
+	case float64:
+		return n
+	}
+	return -1
+}
+
+// runUntil runs the app's clock, so the plugin's timers fire, until since is at least d ago in real time.
+func runUntil(app *nsgotest.App, since time.Time, d time.Duration) {
+	for time.Since(since) < d {
+		app.Advance(time.Millisecond)
+	}
+}
+
+// TestPluginCallTotalStopsAnIntervalTheCallLeft holds an interval a call sets going, which runs while the call's deadline lasts, to stopping once it passed, though the call settled long before, and the plugin to answering calls after.
+func TestPluginCallTotalStopsAnIntervalTheCallLeft(t *testing.T) {
+	app, plugin := deadlinePlugin(t, `let n = 0;
+export function start() { setInterval(() => { n++; }, 1); return 1; }
+export function counts() { return [n]; }`, time.Second, 300*time.Millisecond)
+	start := time.Now()
+	if v, err := callPlugin(t, app, plugin, "start"); err != nil || number(v) != 1 {
+		t.Fatalf("start = %v, %v", v, err)
+	}
+	runUntil(app, start, 150*time.Millisecond)
+	if c := counts(t, app, plugin); c[0] == 0 {
+		t.Fatal("the interval did not run within its call's deadline")
+	}
+	runUntil(app, start, 400*time.Millisecond)
+	before := counts(t, app, plugin)
+	runUntil(app, start, 600*time.Millisecond)
+	if after := counts(t, app, plugin); after[0] != before[0] {
+		t.Fatalf("the interval ran %v times after its call's deadline", after[0]-before[0])
+	}
+}
+
+// TestPluginLoadDeadlineStopsAModuleTimer holds an interval the entry module sets as it loads to the load's deadline.
+func TestPluginLoadDeadlineStopsAModuleTimer(t *testing.T) {
+	start := time.Now()
+	app, plugin := deadlinePlugin(t, `let n = 0;
+setInterval(() => { n++; }, 1);
+export function counts() { return [n]; }`, 300*time.Millisecond, time.Second)
+	runUntil(app, start, 150*time.Millisecond)
+	if c := counts(t, app, plugin); c[0] == 0 {
+		t.Fatal("the module's interval did not run within the load's deadline")
+	}
+	runUntil(app, start, 400*time.Millisecond)
+	before := counts(t, app, plugin)
+	runUntil(app, start, 600*time.Millisecond)
+	if after := counts(t, app, plugin); after[0] != before[0] {
+		t.Fatalf("the module's interval ran %v times after the load's deadline", after[0]-before[0])
+	}
+}
+
+// TestPluginCallTotalStopsTimeoutChains holds a setTimeout chain that sets itself again, whether the call starts it or a continuation of the call after an await, to the call's deadline, while a short delay within it still works.
+func TestPluginCallTotalStopsTimeoutChains(t *testing.T) {
+	app, plugin := deadlinePlugin(t, `let a = 0, b = 0, late = 0;
+export function chain() { setTimeout(function tick() { a++; setTimeout(tick, 1); }, 1); return 1; }
+export async function after() {
+	await new Promise(resolve => setTimeout(resolve, 5));
+	setTimeout(function tick() { b++; setTimeout(tick, 1); }, 1);
+	setTimeout(() => { late = 1; }, 20);
+	return 2;
+}
+export function counts() { return [a, b, late]; }`, time.Second, 300*time.Millisecond)
+	start := time.Now()
+	if _, err := callPlugin(t, app, plugin, "chain"); err != nil {
+		t.Fatal(err)
+	}
+	if v, err := callPlugin(t, app, plugin, "after"); err != nil || number(v) != 2 {
+		t.Fatalf("after = %v, %v, want 2 after its short delay", v, err)
+	}
+	runUntil(app, start, 150*time.Millisecond)
+	if c := counts(t, app, plugin); c[0] == 0 || c[1] == 0 || c[2] != 1 {
+		t.Fatalf("counts within the deadline = %v, want both chains running and the late timer run", c)
+	}
+	runUntil(app, start, 450*time.Millisecond)
+	before := counts(t, app, plugin)
+	runUntil(app, start, 650*time.Millisecond)
+	if after := counts(t, app, plugin); after[0] != before[0] || after[1] != before[1] {
+		t.Fatalf("the chains ran on after their calls' deadlines: %v, then %v", before, after)
+	}
+}
+
+// TestPluginCallTotalStopsPromiseChains holds a chain of microtasks, which never yields the call into JS, and a chain of promises a timer settles, both left running by calls that returned, to their calls' deadlines, and the plugin to answering after.
+func TestPluginCallTotalStopsPromiseChains(t *testing.T) {
+	app, plugin := deadlinePlugin(t, `let m = 0, n = 0;
+export function micro() { (async () => { for (;;) { m++; await null; } })(); return 1; }
+export function timed() { (async () => { for (;;) { n++; await new Promise(resolve => setTimeout(resolve, 1)); } })(); return 1; }
+export function counts() { return [m, n]; }`, time.Second, 300*time.Millisecond)
+	start := time.Now()
+	if _, err := callPlugin(t, app, plugin, "micro"); !errors.Is(err, tsx.ErrBudget) {
+		t.Fatalf("micro = %v, want ErrBudget, as its microtasks ran to its deadline", err)
+	}
+	if time.Since(start) < 300*time.Millisecond {
+		t.Fatalf("micro failed after %v, before its deadline", time.Since(start))
+	}
+	timedAt := time.Now()
+	if _, err := callPlugin(t, app, plugin, "timed"); err != nil {
+		t.Fatal(err)
+	}
+	runUntil(app, timedAt, 100*time.Millisecond)
+	before := counts(t, app, plugin)
+	if before[0] == 0 || before[1] == 0 {
+		t.Fatalf("counts = %v, want both chains to have run", before)
+	}
+	runUntil(app, timedAt, 400*time.Millisecond)
+	before = counts(t, app, plugin)
+	runUntil(app, timedAt, 600*time.Millisecond)
+	if after := counts(t, app, plugin); after[0] != before[0] || after[1] != before[1] {
+		t.Fatalf("the promise chains ran on after their calls' deadlines: %v, then %v", before, after)
+	}
+}
+
+// TestPluginCallTotalKeepsCallsApart holds two calls' work, started at different times, each to its own call's deadline: the earlier's stops while the later's runs on, which neither extends nor cuts the earlier's.
+func TestPluginCallTotalKeepsCallsApart(t *testing.T) {
+	app, plugin := deadlinePlugin(t, `let a = 0, b = 0;
+export function first() { setInterval(() => { a++; }, 1); return 1; }
+export function second() { setInterval(() => { b++; }, 1); return 1; }
+export function counts() { return [a, b]; }`, time.Second, 600*time.Millisecond)
+	start := time.Now()
+	if _, err := callPlugin(t, app, plugin, "first"); err != nil {
+		t.Fatal(err)
+	}
+	runUntil(app, start, 300*time.Millisecond)
+	if _, err := callPlugin(t, app, plugin, "second"); err != nil {
+		t.Fatal(err)
+	}
+	runUntil(app, start, 700*time.Millisecond)
+	mid := counts(t, app, plugin)
+	runUntil(app, start, 820*time.Millisecond)
+	late := counts(t, app, plugin)
+	if late[0] != mid[0] {
+		t.Fatalf("the first call's interval ran past its deadline: %v, then %v", mid, late)
+	}
+	if late[1] <= mid[1] {
+		t.Fatalf("the second call's interval stopped before its deadline: %v, then %v", mid, late)
+	}
+	runUntil(app, start, 1050*time.Millisecond)
+	before := counts(t, app, plugin)
+	runUntil(app, start, 1200*time.Millisecond)
+	if after := counts(t, app, plugin); after[1] != before[1] {
+		t.Fatalf("the second call's interval ran past its deadline: %v, then %v", before, after)
+	}
+}
+
 // TestPluginInterruptFailsAWaitingCall holds Plugin.Interrupt to failing a call that waits on a timer, which no JS settles once the plugin stopped.
 func TestPluginInterruptFailsAWaitingCall(t *testing.T) {
 	p := verified(t, `export async function wait() {

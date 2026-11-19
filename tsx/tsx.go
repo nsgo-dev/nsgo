@@ -112,6 +112,12 @@ type runtime struct {
 	calls  map[*int]func(error)
 	// interrupted says the host stopped the runtime (interrupt), and hears so through the calls that fail: the JS it cut ends without a panic into the app's Catch.
 	interrupted atomic.Bool
+	// deadlines says Limits.CallTotal holds the runtime, a plugin's (deadline.go): current is the deadline of what runs now, slice the timer cutting the call into JS running, at sliceEnd, and cut says the last one was cut as its deadline passed.
+	deadlines bool
+	current   *deadline
+	slice     *time.Timer
+	sliceEnd  time.Time
+	cut       bool
 	// regexTimeout is the shortest sandbox budget, applied to regexp2
 	// patterns because its matcher does not observe goja's interrupt flag.
 	regexTimeout time.Duration
@@ -265,7 +271,7 @@ func (r *runtime) call(fn js.Value, args ...js.Value) js.Value {
 	var err error
 	r.within(r.limits.Call, func() { v, err = f(js.Undefined(), args...) })
 	if err != nil {
-		if r.interrupted.Load() {
+		if r.interrupted.Load() || r.cut {
 			return js.Undefined()
 		}
 		panic(r.failure(err))

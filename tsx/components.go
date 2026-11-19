@@ -179,7 +179,7 @@ func (r *runtime) keepContext(call js.FunctionCall) js.Value {
 // settled once the chunk of that key ran, which defines its modules.
 func (r *runtime) loadChunk(call js.FunctionCall) js.Value {
 	key := arg(call, 0).String()
-	p, resolve, reject := r.vm.NewPromise()
+	p, resolve, reject := r.newPromise()
 	if r.chunk == nil {
 		_ = reject(r.vm.NewTypeError("nsgo: the app has no chunk %s", key))
 		return r.vm.ToValue(p)

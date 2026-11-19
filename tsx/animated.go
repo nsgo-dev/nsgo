@@ -126,7 +126,7 @@ func (r *runtime) installAnimated() {
 	_ = a.compProto.Set("start", r.function(func(call js.FunctionCall) js.Value {
 		c := r.compositeOf(call.This)
 		cb := arg(call, 0)
-		p, resolve, _ := vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		if c.run != nil {
 			c.run.Stop()
 		}
@@ -238,14 +238,14 @@ type diffClampKey struct {
 
 // readValue is a promise of v's value on the platform.
 func (r *runtime) readValue(v *core.AnimatedValue) js.Value {
-	p, resolve, _ := r.vm.NewPromise()
+	p, resolve, _ := r.newPromise()
 	v.Read(r.cx, func(x float64) { r.inJS(func() { _ = resolve(x) }) })
 	return r.vm.ToValue(p)
 }
 
 // play runs a on the platform: a promise of whether it finished.
 func (r *runtime) play(a *core.Animation) js.Value {
-	p, resolve, _ := r.vm.NewPromise()
+	p, resolve, _ := r.newPromise()
 	r.cx.StartAnimation(a, func(finished bool) { r.inJS(func() { _ = resolve(finished) }) })
 	return r.vm.ToValue(p)
 }
@@ -960,7 +960,7 @@ func (r *runtime) createMotion(call js.FunctionCall) js.Value {
 		if run != nil {
 			run.Stop()
 		}
-		p, resolve, _ := r.vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		run = r.cx.StartAnimation(m.Animation(s, reduced(options)), func(finished bool) {
 			r.inJS(func() { _ = resolve(finished) })
 		})

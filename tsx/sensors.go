@@ -24,7 +24,7 @@ func (r *runtime) sensors() js.Value {
 			default:
 				panic(r.vm.NewTypeError("Sensors: unknown permission"))
 			}
-			p, resolve, _ := r.vm.NewPromise()
+			p, resolve, _ := r.newPromise()
 			done := func(s core.PermissionStatus) { r.inJS(func() { _ = resolve(s.String()) }) }
 			if ask {
 				r.cx.RequestPermission(key, done)
@@ -37,7 +37,7 @@ func (r *runtime) sensors() js.Value {
 	_ = o.Set("permission", r.function(permission(false)))
 	_ = o.Set("requestPermission", r.function(permission(true)))
 	_ = o.Set("locate", r.function(func(call js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		_, err := r.cx.Locate(sensorLocationOptions(r.options(arg(call, 0))), func(f core.LocationFix, err error) {
 			r.inJS(func() {
 				if err != nil {

@@ -37,7 +37,7 @@ var serviceExports = []export{
 	{"Sensors", (*runtime).sensors},
 	{"Purchases", (*runtime).purchases},
 	fn("openUrl", func(r *runtime, call js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		u := arg(call, 0).String()
 		if err := r.checkAccess(core.AccessRequest{Permission: core.AccessOpenURL, Resource: u}); err != nil {
 			_ = reject(r.goError(err))
@@ -133,7 +133,7 @@ func (r *runtime) refused(permission string) js.Value {
 	if err == nil {
 		return nil
 	}
-	p, _, reject := r.vm.NewPromise()
+	p, _, reject := r.newPromise()
 	_ = reject(r.goError(err))
 	return r.vm.ToValue(p)
 }
@@ -141,7 +141,7 @@ func (r *runtime) refused(permission string) js.Value {
 // promise returns a promise and a function settling it on the engine
 // goroutine with what make gives.
 func (r *runtime) promise() (*js.Promise, func(v func() js.Value)) {
-	p, resolve, _ := r.vm.NewPromise()
+	p, resolve, _ := r.newPromise()
 	return p, func(v func() js.Value) { r.inJS(func() { _ = resolve(v()) }) }
 }
 
@@ -172,7 +172,7 @@ func (r *runtime) clipboard() js.Value {
 		return r.vm.ToValue(p)
 	})
 	set("writeImage", func(call js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		data, err := imageBytes(arg(call, 0).String())
 		if err != nil {
 			_ = reject(r.goError(err))
@@ -183,7 +183,7 @@ func (r *runtime) clipboard() js.Value {
 		return r.vm.ToValue(p)
 	})
 	set("readImage", func(js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.ReadClipboardImage(func(img core.ClipboardImage, ok bool, err error) {
 			r.inJS(func() {
 				if err != nil {
@@ -232,7 +232,7 @@ func (r *runtime) storage() js.Value {
 	s := r.cx.Storage()
 	set := func(name string, f func(call js.FunctionCall) (js.Value, error)) {
 		_ = o.Set(name, r.function(func(call js.FunctionCall) js.Value {
-			p, resolve, reject := r.vm.NewPromise()
+			p, resolve, reject := r.newPromise()
 			v, err := f(call)
 			if err != nil {
 				_ = reject(r.goError(err))
@@ -272,7 +272,7 @@ func (r *runtime) secrets() js.Value {
 			if refused := r.refused(core.AccessSecrets); refused != nil {
 				return refused
 			}
-			p, resolve, reject := r.vm.NewPromise()
+			p, resolve, reject := r.newPromise()
 			run := f(r.cx.Secrets(), call)
 			go func() {
 				v, err := run()
@@ -340,7 +340,7 @@ func (r *runtime) picker() js.Value {
 		return r.vm.ToValue(p)
 	}))
 	_ = o.Set("canTakePhoto", r.function(func(js.FunctionCall) js.Value {
-		p, resolve, _ := r.vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		_ = resolve(core.Untracked(r.cx, r.cx.Env().CanTakePhoto))
 		return r.vm.ToValue(p)
 	}))
@@ -350,7 +350,7 @@ func (r *runtime) picker() js.Value {
 		}
 		op := r.options(arg(call, 0))
 		opts := core.PhotoOptions{MaxDimension: int(op.float("maxDimension", 0)), Quality: float32(op.float("quality", 0))}
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.TakePhoto(opts, func(photo *core.PickedFile, err error) {
 			r.inJS(func() {
 				switch {
@@ -380,7 +380,7 @@ func (r *runtime) pickedImage(f core.PickedFile) *js.Object {
 func (r *runtime) imageModule() js.Value {
 	img := r.hostComponent("image").(*js.Object)
 	_ = img.Set("getSize", r.function(func(call js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.ImageSize(r.imageSource(arg(call, 0)), func(px core.Size, err error) {
 			r.inJS(func() {
 				if err != nil {

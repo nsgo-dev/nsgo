@@ -38,6 +38,15 @@ func (r *runtime) installTimers() {
 			r.timerQuota(len(r.timers.stop))
 			r.timers.next++
 			id := r.timers.next
+			// The timer is work of what set it, and runs under its deadline, which drops it once it passed (deadline.go).
+			dl := r.current
+			if dl != nil {
+				if dl.timers == nil {
+					dl.timers = map[int64]struct{}{}
+				}
+				dl.timers[id] = struct{}{}
+				r.watch(dl)
+			}
 			// An interval keeps its cadence: each run is due an interval
 			// after the last was due, however late that one ran.
 			due := r.cx.Now()
@@ -48,12 +57,19 @@ func (r *runtime) installTimers() {
 				// is set.
 				r.cx.Run(func() {
 					r.timers.stop[id] = r.cx.AfterFunc(max(due.Sub(r.cx.Now()), 0), func() {
+						if dl != nil && r.passed(dl) {
+							delete(r.timers.stop, id)
+							return
+						}
 						if repeat {
 							schedule()
 						} else {
 							delete(r.timers.stop, id)
+							if dl != nil {
+								delete(dl.timers, id)
+							}
 						}
-						r.call(fn, args...)
+						r.under(dl, func() { r.call(fn, args...) })
 					})
 				})
 			}
@@ -76,6 +92,10 @@ func (r *runtime) installTimers() {
 	frames := map[int64]func(){}
 	_ = r.vm.Set("requestAnimationFrame", r.function(func(call js.FunctionCall) js.Value {
 		fn := arg(call, 0)
+		dl := r.current
+		if dl != nil {
+			r.watch(dl)
+		}
 		r.timerQuota(len(frames))
 		r.timers.next++
 		id := r.timers.next
@@ -83,7 +103,7 @@ func (r *runtime) installTimers() {
 			// The frame's time, on performance.now()'s clock.
 			frames[id] = r.cx.RequestAnimationFrame(func(at time.Time) {
 				delete(frames, id)
-				r.call(fn, r.vm.ToValue(r.millis(at)))
+				r.under(dl, func() { r.call(fn, r.vm.ToValue(r.millis(at))) })
 			})
 		})
 		return r.vm.ToValue(id)

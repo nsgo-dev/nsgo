@@ -12,7 +12,7 @@ import (
 func (r *runtime) speech() js.Value {
 	o := r.vm.NewObject()
 	_ = o.Set("available", r.function(func(js.FunctionCall) js.Value {
-		p, resolve, _ := r.vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		_ = resolve(core.Untracked(r.cx, r.cx.Env().CanRecognizeSpeech))
 		return r.vm.ToValue(p)
 	}))

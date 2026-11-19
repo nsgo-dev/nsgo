@@ -137,7 +137,7 @@ func (r *runtime) menuModule() js.Value {
 		return js.Undefined()
 	}))
 	_ = o.Set("popup", r.function(func(call js.FunctionCall) js.Value {
-		p, resolve, _ := r.vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		var at core.Point
 		if a, ok := arg(call, 1).(*js.Object); ok {
 			at = r.pointOf(a)

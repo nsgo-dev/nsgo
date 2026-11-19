@@ -535,10 +535,12 @@ func (r *runtime) fetch(call js.FunctionCall) js.Value {
 		}
 	}
 	finished := false
+	// The answer runs under the deadline of what sent the request, and not at all once that passed (deadline.go).
+	resume := r.resumer()
 	answer := func(fn func()) {
 		r.cx.Post(func() {
 			r.fetchDone(&finished)
-			r.inJS(fn)
+			resume(func() { r.inJS(fn) })
 		})
 	}
 	asset, shipped := r.assets[target]

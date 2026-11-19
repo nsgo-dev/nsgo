@@ -45,7 +45,7 @@ func (r *runtime) notifications() js.Value {
 		opt := r.options(arg(call, 0))
 		n := core.Notification{ID: opt.str("id", ""), Title: opt.str("title", ""), Body: opt.str("body", ""),
 			Silent: opt.bool("silent", false)}
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		if opt.has("at") {
 			// A Date or a number of milliseconds, as Date's own valueOf.
 			ms := opt.get("at").ToFloat()
@@ -80,13 +80,13 @@ func (r *runtime) notifications() js.Value {
 		return r.vm.ToValue(p)
 	})
 	set("canSchedule", func(js.FunctionCall) js.Value {
-		p, resolve, _ := r.vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		_ = resolve(core.Untracked(r.cx, r.cx.Env().CanScheduleNotifications))
 		return r.vm.ToValue(p)
 	})
 	set("setBadge", func(call js.FunctionCall) js.Value {
 		count := arg(call, 0).ToFloat()
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		if !(count >= 0 && count == math.Trunc(count) && count <= math.MaxInt32) {
 			_ = reject(r.goError(&JSError{Name: "RangeError",
 				Message: "Notifications.setBadge: count must be a whole number from 0"}))

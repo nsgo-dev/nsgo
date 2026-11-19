@@ -1,6 +1,7 @@
 package tsx
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,11 +27,7 @@ import (
 
 // Limits are what a bundle may use. Zero fields leave that unlimited.
 type Limits struct {
-	// Load is how long the bundle's script may run as it loads, and Call
-	// how long each call into JS may run (a handler, an effect, a
-	// render): past it, the call is cut with ErrBudget. CallTotal bounds a
-	// plugin call from its entry until its result or rejection, including
-	// asynchronous promise continuations. Zero leaves it unlimited.
+	// Load is how long the bundle's script may run as it loads, and Call how long each call into JS may run (a handler, an effect, a render): past it, the call is cut with ErrBudget. CallTotal is, for a plugin (Load), the deadline of each Plugin.Call and of all the work it sets going, timers, intervals, frames, promise continuations and host requests' answers, however late they run: past it they are dropped and a call still waiting fails with ErrBudget. What the entry module sets going is held to Load the same way, and what the host delivers on its own, as an event, to CallTotal from its delivery. Zero leaves it unlimited.
 	Load, Call, CallTotal time.Duration
 	// Stack is how deep JS calls may nest.
 	Stack int
@@ -140,6 +137,8 @@ func ParseLimits(spec string) (Limits, error) {
 // Sandbox is what a bundle runs within: its limits, what it may reach and
 // import, the host it talks to and the storage it keeps.
 type Sandbox struct {
+	// plugin says Load runs it, whose calls Limits.CallTotal holds.
+	plugin bool
 	// Limits are what it may use, DefaultLimits when nil.
 	Limits *Limits
 	// Capabilities are what its code may reach (a package's own); nil
@@ -267,6 +266,12 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 	}
 	if limits.Harden {
 		r.harden()
+	}
+	if s.plugin && limits.CallTotal > 0 {
+		// What the entry module sets going as it loads runs until the load's deadline.
+		r.deadlines = true
+		r.current = r.newDeadline(cmp.Or(limits.Load, limits.CallTotal), nil, true)
+		defer func() { r.current = nil }()
 	}
 	r.within(limits.Load, func() {
 		if _, err := r.vm.RunScript(name, src); err != nil {
@@ -455,19 +460,45 @@ func (r *runtime) within(budget time.Duration, fn func()) {
 		return
 	}
 	outer := r.depth == 0
+	if outer {
+		r.cut = false
+	}
+	held := outer && r.deadlines
+	if held {
+		// What the host delivers on its own, as an event, has a deadline of its own from now.
+		prev := r.current
+		if r.current == nil {
+			r.current = r.newDeadline(r.limits.CallTotal, nil, false)
+		}
+		defer func() { r.current = prev }()
+		if r.passed(r.current) {
+			r.cut = true
+			return
+		}
+	}
 	r.depth++
 	defer func() { r.depth-- }()
 	if r.sandbox != nil && r.regexTimeout > 0 && outer && !js.Browser {
 		defer limitRegexps(r.regexTimeout)()
 	}
-	if budget <= 0 || !outer {
+	if (budget <= 0 && !held) || !outer {
 		fn()
 		return
 	}
-	timer := time.AfterFunc(budget, func() { r.vm.Interrupt(ErrBudget) })
+	end := time.Now().Add(budget)
+	if held && (budget <= 0 || r.current.at.Before(end)) {
+		end = r.current.at
+	}
+	r.sliceEnd = end
+	r.slice = time.AfterFunc(time.Until(end), func() { r.vm.Interrupt(ErrBudget) })
 	defer func() {
-		timer.Stop()
+		r.slice.Stop()
+		r.slice = nil
 		r.vm.ClearInterrupt()
+		// A call cut as its deadline passed ends quietly: its call, if it is one, fails with ErrBudget, and what it set going is dropped.
+		if held && r.passed(r.current) {
+			r.cut = true
+		}
 	}()
 	fn()
 }

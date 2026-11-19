@@ -1260,7 +1260,7 @@ func (r *runtime) refObject(ref reflect.Value) *js.Object {
 			}
 			// What a method returns comes in a promise, as NSH's queries,
 			// which cross to the engine thread, do.
-			p, resolve, _ := r.vm.NewPromise()
+			p, resolve, _ := r.newPromise()
 			_ = resolve(r.results(out, ft, names))
 			return r.vm.ToValue(p)
 		}))

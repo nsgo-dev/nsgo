@@ -12,7 +12,7 @@ import (
 func (r *runtime) signInWithApple() js.Value {
 	o := r.vm.NewObject()
 	_ = o.Set("available", r.function(func(js.FunctionCall) js.Value {
-		p, resolve, _ := r.vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		_ = resolve(core.Untracked(r.cx, r.cx.Env().CanSignInWithApple))
 		return r.vm.ToValue(p)
 	}))
@@ -22,7 +22,7 @@ func (r *runtime) signInWithApple() js.Value {
 		}
 		op := r.options(arg(call, 0))
 		opts := core.AppleSignInOptions{FullName: op.bool("fullName", false), Email: op.bool("email", false), Nonce: op.str("nonce", "")}
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.SignInWithApple(opts, func(c core.AppleCredential, err error) {
 			r.inJS(func() {
 				switch {
@@ -45,7 +45,7 @@ func (r *runtime) signInWithApple() js.Value {
 		if v := arg(call, 0); defined(v) {
 			user = v.String()
 		}
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.AppleCredentialState(user, func(s core.AppleCredentialState, err error) {
 			r.inJS(func() {
 				if err != nil {

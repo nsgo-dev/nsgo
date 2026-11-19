@@ -21,7 +21,7 @@ func (r *runtime) purchases() js.Value {
 		}))
 	}
 	_ = o.Set("available", r.function(func(js.FunctionCall) js.Value {
-		p, resolve, _ := r.vm.NewPromise()
+		p, resolve, _ := r.newPromise()
 		_ = resolve(core.Untracked(r.cx, r.cx.Env().CanPurchase))
 		return r.vm.ToValue(p)
 	}))
@@ -30,7 +30,7 @@ func (r *runtime) purchases() js.Value {
 		for _, v := range r.arrayItems(arg(call, 0)) {
 			ids = append(ids, v.String())
 		}
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.Products(ids, func(products []core.Product, err error) {
 			r.inJS(func() {
 				if err != nil {
@@ -49,7 +49,7 @@ func (r *runtime) purchases() js.Value {
 	set("purchase", func(call js.FunctionCall) js.Value {
 		op := r.options(arg(call, 1))
 		opts := core.PurchaseOptions{AccountToken: op.str("accountToken", ""), Quantity: int(op.float("quantity", 1))}
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		if v := op.get("offer"); defined(v) {
 			offer := r.options(v)
 			sig, err := base64.StdEncoding.DecodeString(offer.str("signature", ""))
@@ -89,7 +89,7 @@ func (r *runtime) purchases() js.Value {
 		if v := arg(call, 0); defined(v) {
 			id = v.String()
 		}
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.FinishTransaction(id, func(err error) {
 			r.inJS(func() {
 				switch {
@@ -105,7 +105,7 @@ func (r *runtime) purchases() js.Value {
 		return r.vm.ToValue(p)
 	})
 	set("currentEntitlements", func(js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.CurrentEntitlements(func(txs []core.Transaction, err error) {
 			r.inJS(func() {
 				if err != nil {
@@ -122,7 +122,7 @@ func (r *runtime) purchases() js.Value {
 		return r.vm.ToValue(p)
 	})
 	set("sync", func(js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		r.cx.SyncPurchases(func(err error) {
 			r.inJS(func() {
 				switch {

@@ -18,7 +18,7 @@ func (r *runtime) authSession() js.Value {
 			panic(r.vm.NewTypeError("nsgo: AuthSession.start takes a function building the authorization URL"))
 		}
 		op := r.options(arg(call, 1))
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		session := r.vm.NewObject()
 		_ = session.Set("result", p)
 		cancel := func() {}

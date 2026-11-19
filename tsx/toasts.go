@@ -55,7 +55,7 @@ func (r *runtime) alertDialog() js.Value {
 			}
 		}
 		if len(d.Actions) == 0 {
-			p, _, reject := r.vm.NewPromise()
+			p, _, reject := r.newPromise()
 			_ = reject(r.vm.NewTypeError("AlertDialog.show needs at least one of its actions"))
 			return r.vm.ToValue(p)
 		}

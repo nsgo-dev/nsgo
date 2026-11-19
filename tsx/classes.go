@@ -353,7 +353,7 @@ func (r *runtime) callGo(name string, fn reflect.Value, args []js.Value) js.Valu
 	r.posting++
 	in := r.goArgs(ft, 1, args)
 	r.posting--
-	p, resolve, reject := r.vm.NewPromise()
+	p, resolve, reject := r.newPromise()
 	var ctx context.Context
 	r.cx.Run(func() { ctx = r.cx.Context() })
 	in[0] = reflect.ValueOf(ctx)
@@ -457,13 +457,15 @@ func (r *runtime) goResult(ft reflect.Type, out []reflect.Value) js.Value {
 func (r *runtime) callback(fn js.Value, t reflect.Type) reflect.Value {
 	var ctx context.Context
 	r.cx.Run(func() { ctx = r.cx.Context() })
+	// The Go call runs it under the deadline of what made the call, and not at all once that passed (deadline.go).
+	resume := r.resumer()
 	return reflect.MakeFunc(t, func(in []reflect.Value) []reflect.Value {
 		outs := make([]reflect.Value, t.NumOut())
 		for i := range outs {
 			outs[i] = reflect.Zero(t.Out(i))
 		}
 		if t.NumOut() == 0 {
-			r.cx.Post(func() { r.inJS(func() { r.call(fn, r.encodeAll(in)...) }) })
+			r.cx.Post(func() { resume(func() { r.inJS(func() { r.call(fn, r.encodeAll(in)...) }) }) })
 			return outs
 		}
 		done := make(chan []reflect.Value, 1)
@@ -481,27 +483,32 @@ func (r *runtime) callback(fn js.Value, t reflect.Type) reflect.Value {
 			done <- res
 		}
 		r.cx.Post(func() {
-			r.inJS(func() {
-				f, _ := js.AssertFunction(fn)
-				v, err := f(js.Undefined(), r.encodeAll(in)...)
-				if err != nil {
-					v = js.Undefined()
-				} else if _, ok := v.Export().(*js.Promise); ok {
-					then, _ := js.AssertFunction(v.ToObject(r.vm).Get("then"))
-					_, _ = then(v, r.function(func(c js.FunctionCall) js.Value {
-						settle(c.Argument(0), nil)
-						return js.Undefined()
-					}), r.function(func(c js.FunctionCall) js.Value {
-						settle(nil, jsError(c.Argument(0)))
-						return js.Undefined()
-					}))
-					return
-				}
-				if ex, ok := err.(*js.Exception); ok {
-					err = jsError(ex.Value())
-				}
-				settle(v, err)
+			ran := resume(func() {
+				r.inJS(func() {
+					f, _ := js.AssertFunction(fn)
+					v, err := f(js.Undefined(), r.encodeAll(in)...)
+					if err != nil {
+						v = js.Undefined()
+					} else if _, ok := v.Export().(*js.Promise); ok {
+						then, _ := js.AssertFunction(v.ToObject(r.vm).Get("then"))
+						_, _ = then(v, r.function(func(c js.FunctionCall) js.Value {
+							settle(c.Argument(0), nil)
+							return js.Undefined()
+						}), r.function(func(c js.FunctionCall) js.Value {
+							settle(nil, jsError(c.Argument(0)))
+							return js.Undefined()
+						}))
+						return
+					}
+					if ex, ok := err.(*js.Exception); ok {
+						err = jsError(ex.Value())
+					}
+					settle(v, err)
+				})
 			})
+			if !ran {
+				settle(nil, ErrBudget)
+			}
 		})
 		select {
 		case res := <-done:

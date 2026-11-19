@@ -21,7 +21,7 @@ func (r *runtime) host() js.Value {
 		return r.vm.ToValue(r.cx.HostParams())
 	}), nil, js.FLAG_FALSE, js.FLAG_TRUE)
 	set("call", func(call js.FunctionCall) js.Value {
-		p, resolve, reject := r.vm.NewPromise()
+		p, resolve, reject := r.newPromise()
 		name, data := arg(call, 0).String(), exportJSON(arg(call, 1))
 		if !r.cx.HasHost() {
 			_ = reject(r.goError(core.Unavailable("nsgo/host: this platform has no host")))
