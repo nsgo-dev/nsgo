@@ -26,6 +26,7 @@
 - Show the simulator's window in `nsgo run`, `nsgo dev` and `nsgo test` on Xcode 27, which replaced Simulator with DeviceHub: open the app by its bundle ID, DeviceHub's first and Simulator's on older Xcode, and warn when neither opens instead of ignoring it (#826 by @houko).
 - Fix a `YieldsToMenu` binding losing its key on Windows and Linux to an application-menu item those menus leave out, one of macOS's own roles or a Speech item where nothing speaks (#770 by @houko).
 - Keep the gallery's pages, page headers, sidebar and content pane clear of the left and right safe area, such as the vertical status bar beside a foldable's outer display and an iPhone's camera in landscape (#825 by @houko).
+- Glide Android scroll views with OverScroller's spline fling, as Android's own scroll views do (#833 by @owocc).
 
 ## [0.2.0] - 2026-11-19
 
