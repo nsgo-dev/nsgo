@@ -1176,8 +1176,8 @@ func TestOneWindowsEnvironment(t *testing.T) {
 	}
 
 	a.ChooseMenu("Window", "Minimize")
-	if !main.Minimized() || settings.Minimized() {
-		t.Fatalf("Minimize left the main window minimized %v and Settings %v; want the main window alone", main.Minimized(), settings.Minimized())
+	if !main.Minimized() || main.Lifecycle() != core.LifecycleBackground || settings.Minimized() || settings.Lifecycle() != core.LifecycleActive {
+		t.Fatalf("Minimize left the main window minimized %v and %v, Settings minimized %v and %v; want the main window alone in the background", main.Minimized(), main.Lifecycle(), settings.Minimized(), settings.Lifecycle())
 	}
 }
 
