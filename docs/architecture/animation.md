@@ -41,6 +41,7 @@ The graph travels as `ItemAnimation`, after the batch's views. Each backend keep
 | Web | `requestAnimationFrame` | Inline styles |
 | Windows, Linux | The backend's 16 ms frame timer | The next paint |
 | Android | `Choreographer` | A Java port of the animator on the UI thread |
+| watchOS | SwiftUI host frames | The next host update, including values applied after a commit |
 
 A display link runs only in the run loop mode object it is given: Foundation's `NSRunLoopCommonModes` (`apple.CommonModes`), not an equal string. A ProMotion iPhone grants links more than 60 Hz only to apps whose `Info.plist` sets `CADisableMinimumFrameDurationOnPhone`, which `nsgo` writes; iPads ignore it.
 

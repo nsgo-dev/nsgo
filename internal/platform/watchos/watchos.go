@@ -341,6 +341,7 @@ func (s *surface) Mount(b *driver.MountBatch) {
 			for _, b := range s.batches.Drain() {
 				driver.Apply(b, s.apply)
 			}
+			s.applyAnimated()
 			s.flush()
 		})
 	}
@@ -373,18 +374,7 @@ func (s *surface) tick(on bool) {
 func hostFrame(float64) {
 	now := time.Since(s.epoch)
 	s.animator.Step(now)
-	s.animator.Changed(func(id driver.NodeID, v driver.AnimatedValues) {
-		if vw := s.view(id); vw != nil {
-			a := v
-			vw.animated = &a
-			s.touched(vw)
-		}
-	})
-	s.animator.ChangedCanvases(func(id driver.NodeID) {
-		if vw := s.view(id); vw != nil {
-			s.redraw[vw] = true
-		}
-	})
+	s.applyAnimated()
 	s.stepMotions()
 	if s.frameWanted.Swap(false) {
 		s.engine.Frame()
@@ -399,6 +389,24 @@ func hostFrame(float64) {
 			s.tick(true)
 		}
 	}
+}
+
+// applyAnimated applies bound values after a commit and on each host frame.
+// A value that starts without a running animation still needs to reach the
+// host before the first frame, as a checked switch's initial position does.
+func (s *surface) applyAnimated() {
+	s.animator.Changed(func(id driver.NodeID, v driver.AnimatedValues) {
+		if vw := s.view(id); vw != nil {
+			a := v
+			vw.animated = &a
+			s.touched(vw)
+		}
+	})
+	s.animator.ChangedCanvases(func(id driver.NodeID) {
+		if vw := s.view(id); vw != nil {
+			s.redraw[vw] = true
+		}
+	})
 }
 
 func (s *surface) view(id driver.NodeID) *view {
