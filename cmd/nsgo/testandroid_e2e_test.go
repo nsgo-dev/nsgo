@@ -77,6 +77,18 @@ func TestAndroidProcessExitResults(t *testing.T) {
 					t.Fatalf("wrong failure: %s", data)
 				}
 			}
+			// The tests ran under their own package, removed once they ended, so an installed build of the app is never replaced (#812).
+			d, err := adbDevice(t.Context(), opts.device)
+			if err != nil {
+				t.Fatal(err)
+			}
+			left, err := d.output(t.Context(), "shell", "pm", "list", "packages", testBundleID(p.ID))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.TrimSpace(left) != "" {
+				t.Fatalf("the test build stayed installed: %s", left)
+			}
 		})
 	}
 }

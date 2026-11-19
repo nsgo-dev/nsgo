@@ -266,10 +266,7 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 	if err := d.run(ctx, "install", "-r", apk); err != nil {
 		return targetRunner{}, err
 	}
-	stop := func() {
-		d.run(context.Background(), "shell", "am", "force-stop", test.ID)
-		d.run(context.Background(), "uninstall", test.ID)
-	}
+	stop := func() { d.run(context.Background(), "shell", "am", "force-stop", test.ID) }
 	return targetRunner{
 		run: func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
 			if err := d.prepareTestScreen(ctx); err != nil {
@@ -308,6 +305,10 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 				return errors.New("the device's log ended")
 			}, nil)
 		},
-		close: stop,
+		// Each test stops the app before and after it runs; the test build stays installed until the last test ends, then goes so it does not sit beside the app.
+		close: func() {
+			stop()
+			d.run(context.Background(), "uninstall", test.ID)
+		},
 	}, nil
 }
