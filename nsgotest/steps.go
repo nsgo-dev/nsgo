@@ -960,15 +960,13 @@ func (a *App) menuRole(role driver.MenuRole) {
 	}
 }
 
-// changeWindowState changes the main window's state that the environment reports, as the window's own Minimize, Zoom and Toggle Full Screen do.
+// changeWindowState changes the main window's state that its environment reports, as the window's own Minimize, Zoom and Toggle Full Screen do, leaving the app's other windows as they are.
 func (a *App) changeWindowState(role driver.MenuRole, change func(*driver.Environment)) {
 	a.t.Helper()
 	if a.env == nil || a.appTree == nil || a.tree == a.appTree {
 		a.t.Fatalf("nsgotest: the menu role %q needs a main window open: a macOS environment, or StartApp with a Windows or Linux one", role.Label())
 	}
-	env := *a.env
-	change(&env)
-	a.SetEnvironment(env)
+	a.SetWindowEnvironment("", change)
 }
 
 // menuEdit carries out editing role in the focused field, as its own keys do, and reports whether a field took it. A focused web view's page is not modelled, so a role it would take fails the step.

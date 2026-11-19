@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 - Add the `--nsgo-os` launch flag, `?nsgo-os=ios` in a page's query, which runs a web build as macOS, Windows, Linux, iOS or Android: the app reads that OS and its idiom, and `core.Env.Simulated` reports that the platform's native parts are absent, so `NavHeader` and the drawn tab bar stand in for the system's, there is no application menu or native popup menu (`desktop.PopupMenu`) while drawn menus such as `ui.ContextMenu` and `ui.Menu` still work, and `mobile.IsAvailable` and `desktop.IsAvailable` are false.
+- Add `nsgotest.App.SetWindowEnvironment`, which changes one window's environment apart from the app's other windows, so a test can put the main window in the background while another window shows, and have the Minimize, Zoom and Toggle Full Screen roles change only the main window, as the desktops do (#783 by @houko).
+- Take the frames of what an alert's answer starts in `nsgotest`'s `Answer` and `App.OnAlert`, as every other step does, so a sheet closed from an alert's callback is gone once `Answer` returns instead of staying until the test advances the clock (#782 by @houko).
+- Report a malformed SVG string in a TSX `icon` prop once, naming the parse error, instead of silently drawing nothing (#594 by @dhruv1220).
 
 ## [0.2.0] - 2026-11-19
 

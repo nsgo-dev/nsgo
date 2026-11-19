@@ -397,8 +397,10 @@ type App struct {
 	main     *core.Tree
 	surfaces map[uint32]bool
 	clear    map[uint32]bool
-	root     *core.Scope
-	store    *core.Store
+	// own are the changes SetWindowEnvironment made to one window's environment, by surface, which surfaceEnv applies over the app's until SetEnvironment sets every window's again.
+	own   map[uint32][]func(*driver.Environment)
+	root  *core.Scope
+	store *core.Store
 	// Clock is the app's clock, which Advance and FastForward move: a ManualClock starting at 2026-01-01 00:00 UTC, its wall time with it, unless the Clock or WallTime option sets it. Options apply before the first render, so what they set is what it reads. Under Measure the app runs on the system's clock instead.
 	Clock *core.ManualClock
 	// wallTime is what the WallTime option sets.
@@ -925,9 +927,12 @@ func (a *App) WaitUntil(timeout time.Duration, cond func() bool) {
 	}
 }
 
-// surfaceEnv is the app's environment env as the platform reports it to surface: a window or a panel that is transparent reports it, as on a compositing desktop.
+// surfaceEnv is the app's environment env as the platform reports it to surface: a window or a panel that is transparent reports it, as on a compositing desktop, and a window SetWindowEnvironment changed reports its own state.
 func (a *App) surfaceEnv(surface *core.Tree, env driver.Environment) driver.Environment {
 	env.WindowTransparent = a.clear[surface.ID()]
+	for _, change := range a.own[surface.ID()] {
+		change(&env)
+	}
 	return env
 }
 
@@ -964,6 +969,7 @@ func (a *App) SetEnvironment(env driver.Environment) {
 	if a.appTree != nil {
 		// Every window shares the app's environment, and those it opens later start from it.
 		a.env = &env
+		a.own = nil
 		a.appTree.SetEnvironment(env)
 		for _, surface := range a.appTree.Surfaces() {
 			if !surface.Closed() {
@@ -974,6 +980,50 @@ func (a *App) SetEnvironment(env driver.Environment) {
 		a.tree.SetEnvironment(env)
 	}
 	a.Settle()
+}
+
+// SetWindowEnvironment reports one window's environment changed by change, as a platform reports a window minimized, zoomed, full screen or out of sight while the app's other windows stay as they are, and settles: the window the app opened titled title, or the main window for "". The app's own surface, whose Lifecycle is every window's together, and the other windows keep the app's environment. Changes add up until SetEnvironment sets every window's again. It needs a desktop environment, where the app opens windows, and runs headless only.
+func (a *App) SetWindowEnvironment(title string, change func(*driver.Environment)) {
+	a.t.Helper()
+	if a.target != nil {
+		a.t.Skipf("nsgotest: SetWindowEnvironment reports what a platform would: it runs headless only")
+	}
+	if a.env == nil || a.appTree == nil {
+		a.t.Fatalf("nsgotest: SetWindowEnvironment needs a desktop environment, where the app opens windows")
+	}
+	window := a.window(title)
+	if a.own == nil {
+		a.own = map[uint32][]func(*driver.Environment){}
+	}
+	a.own[window.ID()] = append(a.own[window.ID()], change)
+	window.SetEnvironment(a.surfaceEnv(window, *a.env))
+	a.Settle()
+}
+
+// window is the open window titled title, or the main window for "", failing the test when there is none or more than one.
+func (a *App) window(title string) *core.Tree {
+	a.t.Helper()
+	if title == "" {
+		if a.main == nil || a.main.Closed() {
+			a.t.Fatalf("nsgotest: no main window is open")
+		}
+		return a.main
+	}
+	var found []*core.Tree
+	for _, s := range a.Opened {
+		if s.Kind != driver.SurfaceWindow || s.Title != title {
+			continue
+		}
+		for _, surface := range a.appTree.Surfaces() {
+			if surface.ID() == s.ID && !surface.Closed() {
+				found = append(found, surface)
+			}
+		}
+	}
+	if len(found) != 1 {
+		a.t.Fatalf("nsgotest: %d open windows are titled %q", len(found), title)
+	}
+	return found[0]
 }
 
 // Resize sets the surface size and settles.

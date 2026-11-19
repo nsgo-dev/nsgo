@@ -1137,6 +1137,50 @@ func TestStepsFollowTheMainWindow(t *testing.T) {
 	app.Find("id:main")
 }
 
+// SetWindowEnvironment changes one window's environment, the main window's for "" or one the app opened by its title, while the app's own surface and its other windows keep the app's; the main window's Minimize changes only it; SetEnvironment sets every window's again.
+func TestOneWindowsEnvironment(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	var app, main, settings *core.Env
+	a := StartApp(t, func(cx *core.Scope) {
+		app = cx.Env()
+		desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "Window", Items: []desktop.MenuItem{{Role: core.MenuMinimize}}}})
+		desktop.OpenWindow(cx, desktop.WindowOptions{Width: 200, Height: 100, Title: "Settings"}, func(cx *core.Scope) core.Node {
+			settings = cx.Env()
+			return core.Text{Content: "settings"}
+		})
+		cx.SetMainView(func(cx *core.Scope) core.Node {
+			main = cx.Env()
+			return core.Text{Content: "main", TestID: "main"}
+		})
+	}, Environment(core.Environment{OS: core.OSMacOS}))
+	a.Find("id:main")
+
+	a.SetWindowEnvironment("", func(env *core.Environment) { env.Lifecycle, env.Minimized = core.LifecycleBackground, true })
+	if main.Lifecycle() != core.LifecycleBackground || !main.Minimized() {
+		t.Fatalf("the main window is %v, minimized %v; want it in the background", main.Lifecycle(), main.Minimized())
+	}
+	if settings.Lifecycle() != core.LifecycleActive || settings.Minimized() || app.Lifecycle() != core.LifecycleActive {
+		t.Fatalf("settings %v, minimized %v, app %v; want them active while only the main window is away", settings.Lifecycle(), settings.Minimized(), app.Lifecycle())
+	}
+
+	a.SetWindowEnvironment("Settings", func(env *core.Environment) { env.Dark = true })
+	if !settings.Dark() || main.Dark() || main.Lifecycle() != core.LifecycleBackground {
+		t.Fatalf("settings dark %v, main dark %v, main %v; want the change on Settings alone, the main window's kept", settings.Dark(), main.Dark(), main.Lifecycle())
+	}
+
+	a.SetEnvironment(core.Environment{OS: core.OSMacOS})
+	if main.Lifecycle() != core.LifecycleActive || main.Minimized() || settings.Dark() {
+		t.Fatalf("after SetEnvironment main %v, minimized %v, settings dark %v; want every window's the app's", main.Lifecycle(), main.Minimized(), settings.Dark())
+	}
+
+	a.ChooseMenu("Window", "Minimize")
+	if !main.Minimized() || settings.Minimized() {
+		t.Fatalf("Minimize left the main window minimized %v and Settings %v; want the main window alone", main.Minimized(), settings.Minimized())
+	}
+}
+
 // A window the app opens transparent, shadowless and off the taskbar is recorded so, and the main window's changes to them reach Window.
 func TestTransparentWindowsAreRecorded(t *testing.T) {
 	if Target() != "" {
