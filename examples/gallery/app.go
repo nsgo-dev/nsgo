@@ -177,6 +177,11 @@ func init() {
 		}},
 		{"basics", m.TabBasics, lucide.Shapes, "square.on.circle", "android:ic_menu_sort_by_size", basics},
 	}
+	for _, t := range tabs {
+		for i := range t.groups {
+			t.groups[i].demos = slices.DeleteFunc(t.groups[i].demos, func(d demo) bool { return omitted[d.name] })
+		}
+	}
 }
 
 // allGroups is every group, in the tabs' order.
@@ -497,6 +502,10 @@ func (g *gallery) phone(cx *core.Scope) core.Node {
 		system := ios
 		if cx.Env().OS() == core.OSAndroid {
 			system = android
+		}
+		// HarmonyOS reads as Android, whose system bar TabShell picks for tabs with an icon, but its render layer draws no system tab bar yet: tabs with neither icon get TabShell's drawn bar.
+		if harmonyOS {
+			icon, system = nil, ""
 		}
 		return ui.ShellTab{Text: title, Icon: icon, SystemIcon: system, TestID: "tab-" + id, Content: func(cx *core.Scope) core.Node {
 			return core.Stack{Style: fillPage, Children: []core.Node{g.section(cx, i)}}

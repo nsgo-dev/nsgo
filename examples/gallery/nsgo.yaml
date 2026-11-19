@@ -21,7 +21,7 @@ live_activities:
 build:
   output: dist
   open: true
-  targets: [all]
+  targets: [all, harmonyos]
 
 apple:
   purchases: true
