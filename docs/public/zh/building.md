@@ -295,7 +295,7 @@ sign:
   # clip_profile: assets/Clip.mobileprovision        # 为 IPA 中的轻 App 签名
 ```
 
-密钥库的密码来自 `NSGO_KEYSTORE_PASSWORD` 和 `NSGO_KEY_PASSWORD`。`-team` 用于为 iPhone 包签名。
+密钥库的密码来自 `NSGO_KEYSTORE_PASSWORD` 和 `NSGO_KEY_PASSWORD`。`-team` 用于为 iPhone 包签名。命令行可用 `-profile`、`-widgets-profile` 和 `-clip-profile` 替换应用、小组件扩展和轻 App 的描述文件。
 
 ### 为 Windows 包签名
 
@@ -314,7 +314,7 @@ sign:
   sign_command: "signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a %1"
 ```
 
-在安装包里签卸载器需要 NSIS 3.08 或更高版本，且只能由 `.pfx` 完成，`sign.sign_command` 无法签卸载器。命令行可用 `-profile`、`-widgets-profile` 和 `-clip-profile` 替换 iOS 描述文件，用 `-certificate`、`-sign-command` 和 `-timestamp-url` 指定 Windows 签名值。
+在安装包里签卸载器需要 NSIS 3.08 或更高版本，且只能由 `.pfx` 完成，`sign.sign_command` 无法签卸载器。命令行可用 `-certificate`、`-sign-command` 和 `-timestamp-url` 指定这些值。
 
 ### 公证
 

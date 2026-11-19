@@ -295,7 +295,7 @@ sign:
   # clip_profile: assets/Clip.mobileprovision        # signs the IPA's App Clip
 ```
 
-The keystore's passwords come from `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD`. `-team` signs the iPhone's package.
+The keystore's passwords come from `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD`. `-team` signs the iPhone's package. `-profile`, `-widgets-profile` and `-clip-profile` replace the app's, the widget extension's and the App Clip's provisioning profiles from the command line.
 
 ### Sign Windows packages
 
@@ -314,7 +314,7 @@ sign:
   sign_command: "signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a %1"
 ```
 
-Signing the uninstaller inside the installer needs NSIS 3.08 or later, and a certificate that is not a `.pfx` cannot sign it through `sign.certificate`. `-profile`, `-widgets-profile` and `-clip-profile` replace the iOS provisioning profiles from the command line; `-certificate`, `-sign-command` and `-timestamp-url` set the Windows signing values.
+Signing the uninstaller inside the installer needs NSIS 3.08 or later, and a certificate that is not a `.pfx` cannot sign it through `sign.certificate`. `-certificate`, `-sign-command` and `-timestamp-url` set these from the command line.
 
 ### Notarize
 
