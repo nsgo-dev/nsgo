@@ -13,9 +13,11 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 )
 
+const webKitPath = "/System/Library/Frameworks/WebKit.framework/WebKit"
+
 // WebCookies carries out an ItemWebCookies in WKWebsiteDataStore's default store, whose WKHTTPCookieStore every web view but an Incognito one reads: it sets the cookies, lists them or removes every type of website data, and answers once WebKit has. The store exists without a web view, and WebKit writes it to disk, so a cookie with an expiry outlives the app. A target without WebKit, tvOS, has no store.
 func WebCookies(id uint32, r driver.WebCookiesRequest, dispatch func(driver.Event)) {
-	if _, err := purego.Dlopen("/System/Library/Frameworks/WebKit.framework/WebKit", purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
+	if _, err := purego.Dlopen(webKitPath, purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
 		dispatch(driver.NoWebCookies(&driver.MountItem{Count: id}))
 		return
 	}
@@ -23,7 +25,8 @@ func WebCookies(id uint32, r driver.WebCookiesRequest, dispatch func(driver.Even
 	store := objc.ID(Class("WKWebsiteDataStore")).Send(sel("defaultDataStore"))
 	switch r.Op {
 	case driver.WebCookiesList:
-		listWebCookies(id, store.Send(sel("httpCookieStore")), r.Filter, dispatch)
+		cookies := store.Send(sel("httpCookieStore"))
+		launchNetworkProcess(store, func() { listWebCookies(id, cookies, r.Filter, dispatch) })
 	case driver.WebCookiesClear:
 		clearWebsiteData(id, store, dispatch)
 	default:
@@ -53,6 +56,14 @@ func setWebCookies(id uint32, store objc.ID, cookies []driver.WebCookie, dispatc
 		store.Send(sel("setCookie:completionHandler:"), cookie, set)
 		set.Release()
 	}
+}
+
+// launchNetworkProcess calls next once store's network process, which holds the cookies WebKit kept on disk, runs. WebKit before 313745@main (https://webkit.org/b/315310), macOS 15's among it, answers getAllCookies: with no cookies while that process has not started, which it does with the app's first web view or a request that needs it, so a listing before any web view showed missed every cookie of an earlier run; fetching the store's cookie records starts it on a persistent store, and setCookie: and removeDataOfTypes: start it themselves.
+func launchNetworkProcess(store objc.ID, next func()) {
+	types := objc.ID(Class("NSSet")).Send(sel("setWithObject:"), Global(webKitPath, "WKWebsiteDataTypeCookies"))
+	fetched := objcblock.New(func(objc.Block, objc.ID) { next() })
+	store.Send(sel("fetchDataRecordsOfTypes:completionHandler:"), types, fetched)
+	fetched.Release()
 }
 
 // listWebCookies answers with the cookies of store that f picks, which getAllCookies: lists whole for FilterWebCookies to filter.
