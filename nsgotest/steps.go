@@ -794,7 +794,7 @@ func (a *App) Commit(selector, text string) {
 	a.Compose(selector, "")
 }
 
-// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a", or a modifier alone, "shift"): the focused view's OnKeyDown hears it first, and a key it consumes goes no further; else a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, mod+a selects all its text, and mod+c, mod+x and mod+v copy, cut and paste with Clipboard; else, in a macOS, Windows or Linux environment, the enabled application-menu item with the key as its shortcut is chosen, unless it is NotInText and a field or web view has the focus; else Escape goes back. A key nothing takes does nothing, as on a device.
+// Key presses a key on a hardware keyboard, as the app's keymap reads it ("mod+s", "Escape", "a", or a modifier alone, "shift"): the focused view's OnKeyDown hears it first, and a key it consumes goes no further; else a binding of the keymap fires, unless the focused view uses the key itself as on a device (core.KeyAuto), a field its editing keys, a pressable view Return and Space, a slider or a tab bar its arrows; else, in a desktop or web environment, Tab and Shift+Tab move the keyboard focus between fields and pressable views, and Return or Space press the pressable view it is on with the modifiers held, except with Alt on Windows, where they go to the window menu; else the focused field takes a character, Backspace or Enter, mod+a selects all its text, and mod+c, mod+x and mod+v copy, cut and paste with Clipboard unless an application-menu item has the key as its shortcut; else, in a macOS, Windows or Linux environment, the enabled application-menu item with the key as its shortcut is chosen, unless it is NotInText and a field or web view has the focus; else Escape goes back. A key nothing takes does nothing, as on a device.
 func (a *App) Key(key string) {
 	a.t.Helper()
 	a.step("key(%s)", key)
@@ -855,7 +855,7 @@ func (a *App) Key(key string) {
 			a.done()
 			return
 		}
-		// The field's own clipboard keys, which the platforms' fields take before the application menu's editing roles.
+		// The field's own clipboard keys, which the platforms' fields take before the application menu's editing roles; an item the app gave one of them as its shortcut takes it first, as the platforms' menus do (chooseMenuEntry still hands an editing role to the field).
 		role := driver.MenuRoleNone
 		switch {
 		case slices.Contains(names, "mod+c"):
@@ -866,6 +866,9 @@ func (a *App) Key(key string) {
 			role = driver.MenuPaste
 		}
 		if role != driver.MenuRoleNone {
+			if _, taken := a.menuShortcut(names); taken {
+				break
+			}
 			a.editField(v, role)
 			a.done()
 			return

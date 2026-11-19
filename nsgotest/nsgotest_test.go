@@ -766,6 +766,21 @@ func TestFieldClipboardKeys(t *testing.T) {
 			t.Fatalf("%v: cutting a masked field left %q in the clipboard and %q in the field", os, app.Clipboard, got)
 		}
 	}
+
+	// An application-menu item the app gave a clipboard key as its shortcut takes it before the field, as the desktops' menus do.
+	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux} {
+		chosen := 0
+		app := StartApp(t, func(cx *core.Scope) {
+			desktop.SetApplicationMenu(cx, []desktop.MenuItem{{Label: "Edit", Items: []desktop.MenuItem{{Label: "Copy Link", Shortcut: "mod+c", OnSelect: func() { chosen++ }}}}})
+			cx.SetMainView(func(cx *core.Scope) core.Node { return core.Input{TestID: "field", DefaultValue: "abc"} })
+		}, Environment(core.Environment{OS: os, Idiom: core.IdiomDesktop}))
+		app.Focus("id:field")
+		app.Select("id:field", 0, 3)
+		app.Key("mod+c")
+		if chosen != 1 || app.Clipboard != "" {
+			t.Fatalf("%v: the item with mod+c ran %d times and the field copied %q", os, chosen, app.Clipboard)
+		}
+	}
 }
 
 // Another window the app opens runs beside the main one without disturbing the views steps reach, and each window's alerts are answered to the window that showed them, though both number them alike.
