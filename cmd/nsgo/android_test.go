@@ -9,7 +9,15 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	androidruntime "github.com/nsgo-dev/nsgo/internal/platform/android/runtime"
 )
+
+func TestAndroidRuntimeTargetsPlayAPI(t *testing.T) {
+	if !strings.Contains(string(androidruntime.Manifest), `android:targetSdkVersion="36"`) {
+		t.Fatal("the Android runtime does not target API 36")
+	}
+}
 
 // TestFindAdbInTheSDK checks the fallback that finds adb without it being
 // on PATH, so nsgo dev works after installing the SDK in its usual place.

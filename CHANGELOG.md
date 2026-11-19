@@ -37,6 +37,7 @@
 - Keep an engine fault's `CheckCommits` re-panic ahead of its exit notification, so fault-isolation tests cannot mistake the notification for a swallowed panic (#703).
 - Accept CRLF checkouts of generated catalogs without reporting them as out of date (#726).
 - Let macOS editing role items with `OnSelect` follow the focused editor's enabled state (#724).
+- Target Android runtime manifests at API 36 by default and warn when release builds override it below Google Play's requirement (#748).
 - Stop canvases and shaders on Apple platforms and the web from drawing an earlier image for an image's inline `Data` once the earlier buffer was freed and its address reused, by keeping a cached image's bytes alive (#715, #737, #751).
 - Localize the separator between Android TalkBack's state parts with the app's language, including Chinese punctuation (#704).
 

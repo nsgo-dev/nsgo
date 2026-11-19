@@ -32,6 +32,19 @@ const androidComponent = "/dev.oneo.nsgo.NsgoActivity"
 // the same API as the runtime.
 const androidAPI = 28
 
+// androidPlayTargetSDK is the target API Google Play requires for new apps
+// and updates from August 31, 2026.
+const androidPlayTargetSDK = 36
+
+func androidTargetWarning(p *project, targets []string) string {
+	if p.Android.TargetSDK == 0 || p.Android.TargetSDK >= androidPlayTargetSDK || !slices.ContainsFunc(targets, func(target string) bool {
+		return strings.HasPrefix(target, "android")
+	}) {
+		return ""
+	}
+	return fmt.Sprintf("android.target_sdk %d is below Google Play's required targetSdkVersion %d", p.Android.TargetSDK, androidPlayTargetSDK)
+}
+
 // buildAndroidBinary builds the app's executable for goarch in tmp and
 // returns it with its ABI's name.
 func buildAndroidBinary(ctx context.Context, p *project, tmp, goarch string) ([]byte, string, error) {

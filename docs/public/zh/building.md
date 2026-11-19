@@ -135,11 +135,13 @@ linux:
   license: MIT                         # SPDX 表达式；默认为 LicenseRef-proprietary
   # flatpak_runtime: "51"              # GNOME 运行时的版本
 android:
-  target_sdk: 35                       # Google Play 要求的 targetSdkVersion
+  target_sdk: 36                       # Google Play 要求的 targetSdkVersion
 sign:
   macos_profile: assets/MacAppStore.provisionprofile  # Mac App Store 的描述文件
   # installer: "3rd Party Mac Developer Installer: Example (ABCDE12345)"  # 默认取钥匙串中描述文件所属团队的安装器身份
 ```
+
+未设置 `android.target_sdk` 时，运行时以 API 36 为目标。由于 Google Play 自 2026 年 8 月 31 日起要求 API 36，发布构建将对低于 36 的设置发出警告。
 
 没有 `sign.macos_profile` 时，Mac 包不签名：它能在你的 Mac 上以沙盒方式运行，可用来测试沙盒，但无法上传。沙盒中的应用只能访问自己的容器、网络和用户选择的文件；小组件暂时无法在沙盒中共享时间线，所以 store 构建会拒绝带小组件的应用。用 Transporter 上传 `.pkg`，在 Partner Center 上传 `.msix`，在 Play Console 上传 `.aab`；Release 中有了清单引用的归档后，把 `flatpak/<id>.yml` 提交到 Flathub，也可以用 `flatpak-builder` 在本地构建。Windows 只安装已签名的 MSIX，商店之外安装需要签名，上架时由商店签名。
 

@@ -135,11 +135,13 @@ linux:
   license: MIT                         # an SPDX expression; LicenseRef-proprietary by default
   # flatpak_runtime: "51"              # GNOME's runtime version
 android:
-  target_sdk: 35                       # the targetSdkVersion Google Play requires
+  target_sdk: 36                       # the targetSdkVersion Google Play requires
 sign:
   macos_profile: assets/MacAppStore.provisionprofile  # the Mac App Store's profile
   # installer: "3rd Party Mac Developer Installer: Example (ABCDE12345)"  # by default the keychain's of the profile's team
 ```
+
+The runtime targets API 36 when `android.target_sdk` is unset. A release build warns when it is set below 36 because Google Play requires API 36 from August 31, 2026.
 
 Without `sign.macos_profile` the Mac package is unsigned: it runs sandboxed on your Mac, which tests the sandbox, but uploads nowhere. A sandboxed app reaches only its own container, the network and the files the user picks; widgets cannot share timelines from the sandbox yet, so a store build refuses them. Upload the `.pkg` with Transporter, the `.msix` in Partner Center, the `.aab` in Play Console, and submit `flatpak/<id>.yml` to Flathub once the release holds the archives it names; `flatpak-builder` builds it locally too. Windows installs an MSIX outside the Store only when it is signed, which the Store does.
 

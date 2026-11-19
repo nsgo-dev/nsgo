@@ -20,7 +20,7 @@ The Java runtime owns `AudioRecord`, its reader thread, the file writer and the 
 
 `RECORD_AUDIO` is asked for when a recording starts, through the visible activity as the runtime asks for `CAMERA`; an `-embed` host passes its `onRequestPermissionsResult` on as it does today ([embedding](embedding.md)). A refusal is `ErrDenied`, and a later start after the user grants it records without restarting the app. A start with no visible activity fails with `ErrUnavailable` instead of asking, since Android shows its permission dialog only over an activity, as does a start in an app whose manifest declares no recording service. A start waits for the user's answer however long it takes; a process that ends meanwhile leaves nothing to start.
 
-The foreground-service rules span the whole supported range, API 28 to the target (the runtime's manifest has `minSdkVersion` 28 and `targetSdkVersion` 34):
+The foreground-service rules span the whole supported range, API 28 to the target (the runtime's manifest has `minSdkVersion` 28 and `targetSdkVersion` 36):
 
 - From Android 9 (API 28), an app capturing with no foreground UI and no foreground service receives silence, and a foreground service needs the `FOREGROUND_SERVICE` permission.
 - From Android 11 (API 30), an app targeting it must declare the `microphone` foreground-service type to use the microphone in a foreground service, and a foreground service started while the app is in the background cannot use the microphone at all.

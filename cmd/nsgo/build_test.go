@@ -30,6 +30,28 @@ func TestExpandAllTargets(t *testing.T) {
 	}
 }
 
+func TestAndroidTargetWarning(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		target  int
+		targets []string
+		want    string
+	}{
+		{"default", 0, []string{"android_arm64"}, ""},
+		{"current", androidPlayTargetSDK, []string{"android_arm64"}, ""},
+		{"old", 35, []string{"android_arm64"}, "android.target_sdk 35 is below Google Play's required targetSdkVersion 36"},
+		{"other target", 35, []string{"macos_arm64"}, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			p := project{}
+			p.Android.TargetSDK = c.target
+			if got := androidTargetWarning(&p, c.targets); got != c.want {
+				t.Fatalf("androidTargetWarning = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
 func TestExpandTargetsDropsDuplicates(t *testing.T) {
 	got, err := expandTargets([]string{"all", "web", "android_x64"})
 	if err != nil {
