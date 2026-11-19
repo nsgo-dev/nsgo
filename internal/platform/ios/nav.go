@@ -235,7 +235,14 @@ func (s *surface) styleBar(b *navBar, c *driver.ScreenConfig) {
 	}
 	b.bar.Send(sel("setTintColor:"), tint)
 	if onTV() {
-		// tvOS refuses UINavigationBarAppearance.
+		// tvOS refuses UINavigationBarAppearance, but UINavigationBar still
+		// accepts title attributes directly. Set them before returning so a
+		// screen's title does not inherit an invisible default color.
+		if c.TitleColor != 0 {
+			key := apple.Global(uikitPath, "NSForegroundColorAttributeName")
+			attrs := objc.ID(apple.Class("NSDictionary")).Send(sel("dictionaryWithObject:forKey:"), uiColor(c.TitleColor), key)
+			b.bar.Send(sel("setTitleTextAttributes:"), attrs)
+		}
 		return
 	}
 	a := objc.ID(apple.Class("UINavigationBarAppearance")).Send(selNew)
