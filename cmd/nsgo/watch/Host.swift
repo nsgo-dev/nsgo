@@ -176,7 +176,7 @@ enum Kind: UInt8 {
 	var content = CGSize.zero
 	var locked = false
 	var position = ScrollPosition()
-	/// offset is where the scroll view last reported it was.
+	/// offset is where the scroll view last reported it was, from where its content rests.
 	@ObservationIgnored var offset = CGPoint.zero
 
 	// A text field's.
@@ -273,6 +273,7 @@ struct Alert: Identifiable {
 			case .scrollTo:
 				let id = r.u32(), x = r.f64(), y = r.f64(), animated = r.u8() != 0
 				guard let n = nodes[id] else { continue }
+				// ScrollPosition measures a point from where the content rests, as Go does.
 				if animated {
 					withAnimation { n.position.scrollTo(point: CGPoint(x: x, y: y)) }
 				} else {
@@ -441,7 +442,8 @@ struct ScrollNode: View {
 		.scrollPosition($node.position)
 		.scrollDisabled(node.locked)
 		.contentMargins(0, for: .scrollContent)
-		.onScrollGeometryChange(for: CGPoint.self) { $0.contentOffset } action: { _, at in
+		// A scroll view that starts within the top of the screen that is not safe extends up to the screen's edge and insets its content by as much, which leaves the content where Go put it: report where it is from there, as ScrollPosition measures it, so it rests at zero (#814).
+		.onScrollGeometryChange(for: CGPoint.self) { CGPoint(x: $0.contentOffset.x + $0.contentInsets.leading, y: $0.contentOffset.y + $0.contentInsets.top) } action: { _, at in
 			node.offset = at
 			bridge?.scroll(node.id, at.x, at.y, 0)
 		}

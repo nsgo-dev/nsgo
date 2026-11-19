@@ -40,7 +40,7 @@ func (g *gallery) watch(cx *core.Scope) core.Node {
 	})
 }
 
-// watchScreen is a page of the watch's stack under its own header, with a back button above the index: the system draws none on a watch. The content, which watchScroll pads below the header, fills the screen under it, as the host's scroll views start scrolled back by as much as they are below the screen's top.
+// watchScreen is a page of the watch's stack under its own header, with a back button above the index: the system draws none on a watch. The content fills the screen below the header.
 func watchScreen(cx *core.Scope, title, testID string, back bool, content core.Node) base.NavPage {
 	colors := ui.ColorsOf(cx)
 	tr := locales.For(cx)
@@ -54,9 +54,8 @@ func watchScreen(cx *core.Scope, title, testID string, back bool, content core.N
 	}
 	return base.NavPage{Title: title, TestID: testID, HeaderHidden: true, StyleFunc: pageStyle(cx), Children: []core.Node{
 		core.View{Style: fillPage, Children: []core.Node{
+			core.View{Style: core.Style{Height: core.Pt(watchHeader), FlexShrink: 0, Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, Padding: core.Symmetric(0, 8)}, Children: header},
 			content,
-			core.View{Style: core.Style{Position: core.Absolute, Top: core.Pt(0), Left: core.Pt(0), Right: core.Pt(0), Height: core.Pt(watchHeader),
-				Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, Padding: core.Symmetric(0, 8)}, StyleFunc: pageStyle(cx), Children: header},
 		}},
 	}}
 }
@@ -94,7 +93,7 @@ const watchHeader core.Points = 32
 // watchScroll scrolls a watch page's content under its header, a column on narrow gutters.
 func watchScroll(testID string, children ...core.Node) core.Node {
 	return core.Scroll{TestID: testID, Style: fillPage, Children: []core.Node{
-		core.View{Style: core.Style{Gap: 6, Padding: core.Edges{Top: watchHeader + 4, Right: 8, Bottom: 24, Left: 8}}, Children: children},
+		core.View{Style: core.Style{Gap: 6, Padding: core.Edges{Top: 4, Right: 8, Bottom: 24, Left: 8}}, Children: children},
 	}}
 }
 
