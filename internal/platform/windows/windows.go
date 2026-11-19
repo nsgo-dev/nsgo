@@ -30,7 +30,6 @@ import (
 	"math"
 	"runtime"
 	"slices"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -572,23 +571,25 @@ func wide(s string) *uint16 {
 	return p
 }
 
-// launched hands the running app what a second launch asked of it (launchArguments): a Jump List task chooses its item, any other launch reopens the app, and the files it names open.
-func (w *window) launched(args []string) {
-	var files []string
-	label, task := dockTask(args)
-	for _, arg := range args {
-		if !strings.HasPrefix(arg, dockTaskArgument) {
-			files = append(files, arg)
-		}
-	}
-	if task {
+// launched hands the running app what a second launch asked of it (launchArguments): a Jump List task chooses its item, a launch to open links alone brings the app's window to the front, as opening a link does on macOS, any other launch reopens the app, and the files and links it names open.
+func (w *window) launched(args launch) {
+	switch {
+	case args.Task != "":
 		// As choosing a Dock menu item on macOS, it does not reopen the app.
-		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: label})
-	} else {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: args.Task})
+	case len(args.Links) > 0 && len(args.Files) == 0:
+		// A window the app hid stays hidden: the app's handler shows what the link asks for.
+		if visible, _, _ := isWindowVisible.Call(w.hwnd); visible != 0 {
+			w.windowCommand(&driver.WindowCommand{Action: driver.WindowOrderFront})
+		}
+	default:
 		w.engine.Dispatch(driver.Event{Kind: driver.EventReopen})
 	}
-	if len(files) > 0 {
-		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: files})
+	if len(args.Files) > 0 {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: args.Files})
+	}
+	if len(args.Links) > 0 {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: args.Links})
 	}
 }
 
@@ -696,7 +697,7 @@ func Run(app engine.App, opts Options) {
 	size := w.point(client.Right, client.Bottom)
 	w.startEngine(app, opts, driver.Size{Width: size.X, Height: size.Y})
 	if single != nil {
-		single.setDelivery(func(args []string) { w.post(func() { w.launched(args) }) })
+		single.setDelivery(func(args launch) { w.post(func() { w.launched(args) }) })
 	}
 	attachToastActivation(w, w.engine)
 	if !opts.Hidden {
@@ -707,8 +708,14 @@ func Run(app engine.App, opts Options) {
 	} else if opts.DockTask != "" {
 		// The core keeps it until the app sets its menu.
 		w.engine.Dispatch(driver.Event{Kind: driver.EventDockMenu, Text: opts.DockTask})
-	} else if paths := engine.LaunchFiles(); len(paths) > 0 {
-		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
+	} else {
+		// The core keeps them until the app's first handlers register.
+		if paths := engine.LaunchFiles(); len(paths) > 0 {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
+		}
+		if links := engine.LaunchLinks(); len(links) > 0 {
+			w.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
+		}
 	}
 	if opts.test == nil {
 		// Language waits for the app's mount, so WinSparkle starts in the language the app shows.

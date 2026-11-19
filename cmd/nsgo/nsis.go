@@ -187,6 +187,8 @@ type nsisData struct {
 	// installer leaves out.
 	Files, Dirs, Excludes []string
 	FileTypes             []nsisFileType
+	// URLSchemes are the app's URL schemes, which the installer registers under HKCU\Software\Classes, each opening the app with its link after "--", so a link that breaks out of its quotes reaches no flag of the engine's or the app's.
+	URLSchemes []string
 }
 
 // nsisFileType has an app-specific ProgID, independent of a type's position or display name. Install metadata remembers its extensions so an upgrade can remove declarations that the new version dropped.
@@ -245,6 +247,7 @@ func nsisScript(ctx context.Context, p *project, dir, arch string) (*nsisData, e
 		}
 		d.Languages = append(d.Languages, nsisLanguage{Name: l, Shortcut: words[0], Running: fmt.Sprintf(words[1], name)})
 	}
+	d.URLSchemes = p.URLSchemes
 	for _, f := range p.FileTypes {
 		sum := sha256.Sum256([]byte(f.ID))
 		d.FileTypes = append(d.FileTypes, nsisFileType{
@@ -465,6 +468,36 @@ FunctionEnd
 !macroend
 !insertmacro RemoveFileTypes ""
 !insertmacro RemoveFileTypes "un."
+
+; Remove the URL schemes this installation registered, including those an upgrade dropped. A scheme whose command changed belongs to someone else now; keep it.
+!macro RemoveURLSchemes un
+Function ${un}RemoveURLSchemes
+  Push $0
+  Push $1
+  Push $2
+  next_scheme:
+  ClearErrors
+  EnumRegValue $0 HKCU {{q (printf "%s\\URLSchemes" .UninstallKey)}} 0
+  IfErrors done
+  StrCmp $0 "" done
+  ReadRegStr $1 HKCU {{q (printf "%s\\URLSchemes" .UninstallKey)}} $0
+  ReadRegStr $2 HKCU "Software\Classes\$0\shell\open\command" ""
+  StrCmp $1 $2 0 forget_scheme
+  DeleteRegKey HKCU "Software\Classes\$0"
+  forget_scheme:
+  ClearErrors
+  DeleteRegValue HKCU {{q (printf "%s\\URLSchemes" .UninstallKey)}} $0
+  IfErrors done
+  Goto next_scheme
+  done:
+  DeleteRegKey /ifempty HKCU {{q (printf "%s\\URLSchemes" .UninstallKey)}}
+  Pop $2
+  Pop $1
+  Pop $0
+FunctionEnd
+!macroend
+!insertmacro RemoveURLSchemes ""
+!insertmacro RemoveURLSchemes "un."
 {{- if .Command}}
 
 ; Put the command companion's folder on the user's Path and remove it on uninstall.
@@ -515,6 +548,14 @@ Section
 {{- if .FileTypes}}
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 {{- end}}
+  Call RemoveURLSchemes
+{{- range .URLSchemes}}
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\%s" .)}} "" {{q (printf "URL:%s" $.Name)}}
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\%s" .)}} "URL Protocol" ""
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\%s\\DefaultIcon" .)}} "" {{cmd (path "$INSTDIR\\" $.Exe) ",0"}}
+  WriteRegStr HKCU {{q (printf "Software\\Classes\\%s\\shell\\open\\command" .)}} "" {{cmd (path "$INSTDIR\\" $.Exe) " -- \"%1\""}}
+  WriteRegStr HKCU {{q (printf "%s\\URLSchemes" $.UninstallKey)}} {{q .}} {{cmd (path "$INSTDIR\\" $.Exe) " -- \"%1\""}}
+{{- end}}
   CreateShortCut {{path "$SMPROGRAMS\\" .Name ".lnk"}} {{path "$INSTDIR\\" .Exe}}
   ; Give desktop toasts a COM activator CLSID on the Start menu shortcut.
   ExecWait {{cmd (path "$INSTDIR\\" .Exe) " --nsgo-register-toast=" (path "$SMPROGRAMS\\" .Name ".lnk")}}
@@ -551,6 +592,7 @@ Section "Uninstall"
   Call un.UserPath
 {{- end}}
   Call un.RemoveFileTypes
+  Call un.RemoveURLSchemes
   ; Remove the per-user toast COM registration before deleting the EXE.
   ExecWait {{cmd (path "$INSTDIR\\" .Exe) " --nsgo-unregister-toast"}}
   Delete {{path "$SMPROGRAMS\\" .Name ".lnk"}}

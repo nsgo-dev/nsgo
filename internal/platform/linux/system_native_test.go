@@ -32,7 +32,6 @@ func TestSettingsToWatchIncludesColorScheme(t *testing.T) {
 }
 
 var (
-	gtkWidgetGetVisible          func(widget uintptr) int32
 	gtkWindowGetToplevels        func() uintptr
 	gTypeNameFromInstance        func(instance uintptr) uintptr
 	gtkFileChooserSetFile        func(chooser, file, err uintptr) int32
@@ -43,7 +42,6 @@ var (
 
 func init() {
 	if openLibs() == nil {
-		purego.RegisterLibFunc(&gtkWidgetGetVisible, gtkLib, "gtk_widget_get_visible")
 		purego.RegisterLibFunc(&gtkWindowGetToplevels, gtkLib, "gtk_window_get_toplevels")
 		purego.RegisterLibFunc(&gTypeNameFromInstance, gobjectLib, "g_type_name_from_instance")
 		purego.RegisterLibFunc(&gtkFileChooserSetFile, gtkLib, "gtk_file_chooser_set_file")

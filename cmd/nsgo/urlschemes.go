@@ -15,13 +15,16 @@ var systemSchemes = map[string]bool{
 	"data": true, "about": true, "blob": true, "javascript": true, "asset": true, "x-apple-helpviewer": true,
 }
 
-// validateURLSchemes checks url_schemes, the schemes of the app's own links, which its macOS package registers with Launch Services so their links reach desktop.OnOpenLinks; it lowercases them.
+// validateURLSchemes checks url_schemes, the schemes of the app's own links, which the desktop packages register so their links reach desktop.OnOpenLinks: the macOS app with Launch Services, the Windows installer and MSIX package with the shell, and the Linux desktop entry as x-scheme-handler types. It lowercases them.
 func (p *project) validateURLSchemes() error {
 	seen := map[string]bool{}
 	for i, s := range p.URLSchemes {
 		key := fmt.Sprintf("url_schemes[%d]", i)
 		if !schemePattern.MatchString(s) {
 			return fmt.Errorf("%s: %q is not a URL scheme; write myapp, not myapp://", key, s)
+		}
+		if len(s) < 2 {
+			return fmt.Errorf("%s: %q is a Windows drive's letter; choose a longer scheme", key, s)
 		}
 		s = strings.ToLower(s)
 		if systemSchemes[s] {

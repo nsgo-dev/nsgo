@@ -5,7 +5,6 @@ package windows
 import (
 	"log"
 	"os"
-	"strings"
 	"syscall"
 	"unsafe"
 
@@ -67,16 +66,6 @@ func setProcessAppUserModelID(id string) {
 // jumpTask reports whether e is a Jump List task: an enabled top-level action with a label, as tasks have no submenus, separators or check marks.
 func jumpTask(e driver.MenuEntry) bool {
 	return e.ID != 0 && e.Label != "" && !e.Disabled && !e.Separator && len(e.Items) == 0
-}
-
-// dockTask returns the label of the task args name, those a second launch handed over.
-func dockTask(args []string) (string, bool) {
-	for _, arg := range args {
-		if label, ok := strings.CutPrefix(arg, dockTaskArgument); ok && label != "" {
-			return label, true
-		}
-	}
-	return "", false
 }
 
 // setDockMenu writes the app's Jump List: the top-level actions of entries as tasks, each starting the app's exe with dockTaskArgument and its label, and the Recent category of the documents AddRecentFile noted. Without a task it deletes the list, which leaves the one Windows makes itself.

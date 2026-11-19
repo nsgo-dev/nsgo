@@ -223,7 +223,7 @@ func linuxPackageFiles(p *project, dir string) ([]linuxPackageEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID, MIMETypes: types, Categories: p.Linux.Categories}
+	entry := desktopData{Name: p.Name, Exec: "/" + opt + "/" + p.Name, ID: p.ID, MIMETypes: types, URLSchemes: p.URLSchemes, Categories: p.Linux.Categories}
 	if n != nil {
 		entry.Name = n.names[n.source]
 		for _, lang := range n.languages()[1:] {
@@ -320,7 +320,7 @@ func debPackage(p *project, files []linuxPackageEntry, arch string) ([]byte, err
 		{name: "control", data: []byte(control), mode: 0o644},
 		{name: "md5sums", data: md5sums.Bytes(), mode: 0o644},
 	}
-	if len(p.FileTypes) > 0 {
+	if p.linuxRegisters() {
 		for _, script := range []string{"postinst", "postrm"} {
 			controlFiles = append(controlFiles, linuxPackageEntry{name: script, data: []byte(linuxCacheScript), mode: 0o755})
 		}
@@ -370,7 +370,7 @@ func archPackage(p *project, files []linuxPackageEntry, arch string) ([]byte, er
 		fmt.Fprintf(&info, "optdepend = %s\n", dep)
 	}
 	entries := append([]linuxPackageEntry{{name: ".PKGINFO", data: []byte(info.String()), mode: 0o644}}, files...)
-	if len(p.FileTypes) > 0 {
+	if p.linuxRegisters() {
 		entries = append(entries, linuxPackageEntry{name: ".INSTALL", data: []byte(archCacheScript), mode: 0o644})
 	}
 	return tarGz(entries, "")

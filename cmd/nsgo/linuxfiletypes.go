@@ -53,6 +53,9 @@ func (p *project) linuxFileTypes() (types []string, definitions []byte, err erro
 	return types, definitions, nil
 }
 
+// linuxRegisters reports whether the app's desktop entry registers anything with the system, file types or URL schemes, whose caches the package's scripts refresh.
+func (p *project) linuxRegisters() bool { return len(p.FileTypes) > 0 || len(p.URLSchemes) > 0 }
+
 // linuxCacheScript refreshes desktop registration after install and uninstall. A machine without a desktop can install the package too.
 const linuxCacheScript = `#!/bin/sh
 set -e

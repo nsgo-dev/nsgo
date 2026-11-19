@@ -237,19 +237,19 @@ desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
 
 ## 链接
 
-`url_schemes` 让 macOS 应用拥有自己的链接，例如 `myapp://settings`，可以从浏览器、其他应用或 `open` 命令打开它：
+`url_schemes` 让应用拥有自己的链接，例如 `myapp://settings`，可以从浏览器、其他应用或 `open`、`start`、`xdg-open` 命令打开它。macOS 应用、Windows 的安装程序和 MSIX 包、Linux 的桌面项（Debian、Arch、AppImage 和 Flatpak 包都带着它）会注册这些链接，卸载时一并移除：
 
 ```yaml
 url_schemes: [myapp]
 ```
 
-应用用 `desktop.OnOpenLinks` 接收这些链接，运行中也能收到。启动应用时带来的链接会等到第一个处理函数注册。任何人都能构造这样的链接，所以在它改变任何东西之前，先检查内容并征得用户确认：
+应用用 `desktop.OnOpenLinks` 接收这些链接，运行中也能收到：在 Windows 和 Linux 上，第二次启动会把链接交给正在运行的应用后退出。启动应用时带来的链接会等到第一个处理函数注册。任何人都能构造这样的链接，而且在 Windows 和 Linux 上，应用启动时带的任何 URL 都会交给处理函数，所以先检查 scheme，并在链接改变任何东西之前征得用户确认：
 
 ```go
 desktop.OnOpenLinks(cx, func(links []string) { show(links[0]) })
 ```
 
-Windows、Linux 和 iOS 暂不支持。
+测试里用 `app.OpenLinks("myapp://settings")` 送入链接。iOS 暂不支持。
 
 ## 小程序
 

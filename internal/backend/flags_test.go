@@ -107,6 +107,14 @@ func TestRestartDropsTheLoginMarker(t *testing.T) {
 	}
 }
 
+// A link asked for something once, as a Jump List task does: a restart drops it, also after "--", where Windows' registration of a URL scheme passes it.
+func TestRestartDropsLinks(t *testing.T) {
+	got := restartArgs([]string{"app", "umapp://connect?key=1", "notes.txt", "--", "umapp://settings", "--app-flag"})
+	if want := []string{"notes.txt", "--", "--app-flag"}; !slices.Equal(got, want) {
+		t.Errorf("restart args = %q, want %q", got, want)
+	}
+}
+
 // --nsgo-os names the OS a web build runs as; other builds say they ignore it.
 func TestOSLaunchFlag(t *testing.T) {
 	for value, want := range map[string]core.OS{"macos": core.OSMacOS, "windows": core.OSWindows, "linux": core.OSLinux, "ios": core.OSIOS, "android": core.OSAndroid, "web": core.OSWeb} {

@@ -4,6 +4,7 @@ package engine
 
 import (
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -800,13 +801,22 @@ func (e *Engine) InputModality(m uint32) {
 	}
 }
 
-// LaunchFiles returns the files the command line names, as absolute
-// paths: what Windows and Linux launch an app with to open, which their
-// backends send it as EventOpenFiles. Other arguments are left to the
-// app.
+// Launch is what a launch of the app on Windows or Linux asks it to open, which a second launch hands the running copy over the one-instance claim: the files (EventOpenFiles) and the links (EventOpenLinks) its command line names.
+type Launch struct {
+	Files []string `json:"files,omitempty"`
+	Links []string `json:"links,omitempty"`
+}
+
+// Launched returns what this process's command line asks the app to open.
+func Launched() Launch { return Launch{Files: LaunchFiles(), Links: LaunchLinks()} }
+
+// LaunchFiles returns the files the command line names, as absolute paths, also those named by file URLs, as a desktop entry's %U passes them: what Windows and Linux launch an app with to open, which their backends send it as EventOpenFiles. Other arguments are left to the app.
 func LaunchFiles() []string {
 	var paths []string
 	for _, arg := range os.Args[1:] {
+		if path, ok := fileURLPath(arg); ok {
+			arg = path
+		}
 		if fi, err := os.Stat(arg); err != nil || !fi.Mode().IsRegular() {
 			continue
 		}
@@ -815,6 +825,41 @@ func LaunchFiles() []string {
 		}
 	}
 	return paths
+}
+
+// LaunchLinks returns the links the command line names (IsLink): what Windows and Linux launch an app with to open a link of a URL scheme its package registers, which their backends send it as EventOpenLinks. The app filters them by scheme itself, so a build that registers none, as a development one, takes those it is started with too.
+func LaunchLinks() []string {
+	var links []string
+	for _, arg := range os.Args[1:] {
+		if IsLink(arg) {
+			links = append(links, arg)
+		}
+	}
+	return links
+}
+
+// IsLink reports whether arg, an argument the app was launched with, is a link: an absolute URL whose scheme is not file's and is longer than one letter, which on Windows is a drive's, and that names no file.
+func IsLink(arg string) bool {
+	u, err := url.Parse(arg)
+	if err != nil || len(u.Scheme) < 2 || u.Scheme == "file" {
+		return false
+	}
+	_, err = os.Stat(arg)
+	return err != nil
+}
+
+// fileURLPath returns the local path a file URL names.
+func fileURLPath(arg string) (string, bool) {
+	u, err := url.Parse(arg)
+	if err != nil || u.Scheme != "file" || (u.Host != "" && u.Host != "localhost") || u.Path == "" {
+		return "", false
+	}
+	path := u.Path
+	// file:///C:/Users/a.txt names C:/Users/a.txt.
+	if len(path) > 2 && path[0] == '/' && path[2] == ':' {
+		path = path[1:]
+	}
+	return filepath.FromSlash(path), true
 }
 
 // Sync returns once the engine ran what was posted to it before and handed the resulting commits to the platforms, or the engine exited. It must not be called from the engine goroutine.

@@ -44,7 +44,7 @@ var launch launchFlags
 // simulates is whether the build runs as the OS --nsgo-os names, which only the web's does (run_web.go).
 var simulates bool
 
-// launchArgs are the program's arguments as it started, its launch flags among them but the Jump List task it chose and the login marker, which a restart passes again.
+// launchArgs are the program's arguments as it started, its launch flags among them but the Jump List task it chose, the links it opened and the login marker, which a restart passes again.
 var launchArgs []string
 
 // loginMarker is the flag the macOS 11/12 LaunchAgent, the Windows Run value and the Linux autostart entry start the app with, so it reports the launch as a login one (desktop.LaunchedAtLogin).
@@ -56,18 +56,23 @@ func init() {
 	os.Args = launch.parse(os.Args)
 }
 
-// restartArgs are a program's arguments after its name, but a Jump List task's, which chose an item once, and the login marker, as the system does not start a restarted app at login. Arguments after "--" are the app's and stay.
+// restartArgs are a program's arguments after its name, but a Jump List task's, which chose an item once, the links it was launched to open, which asked for something once too, and the login marker, as the system does not start a restarted app at login. Arguments after "--" are the app's and stay, but links, which Windows' registration of the app's URL schemes passes there.
 func restartArgs(args []string) []string {
 	if len(args) < 2 {
 		return nil
 	}
 	var out []string
-	for i, arg := range args[1:] {
-		if arg == "--" {
-			return append(out, args[1+i:]...)
-		}
-		dockTask := strings.HasPrefix(arg, "-") && strings.HasPrefix(strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-"), "nsgo-dock-menu=")
-		if !dockTask && arg != loginMarker && arg != loginMarker[1:] {
+	own := false
+	for _, arg := range args[1:] {
+		switch {
+		case engine.IsLink(arg):
+		case own:
+			out = append(out, arg)
+		case arg == "--":
+			own = true
+			out = append(out, arg)
+		case strings.HasPrefix(arg, "-") && strings.HasPrefix(strings.TrimPrefix(strings.TrimPrefix(arg, "-"), "-"), "nsgo-dock-menu="):
+		case arg != loginMarker && arg != loginMarker[1:]:
 			out = append(out, arg)
 		}
 	}

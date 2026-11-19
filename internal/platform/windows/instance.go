@@ -52,20 +52,22 @@ type instance struct {
 	once  sync.Once
 
 	mu      sync.Mutex
-	deliver func([]string)
-	pending [][]string
+	deliver func(launch)
+	pending []launch
 }
 
-// launchArguments are what a launch hands the running app: the files it names and the label of the Jump List task it chose, if any.
-func launchArguments(task string) []string {
-	args := engine.LaunchFiles()
-	if task != "" {
-		args = append(args, dockTaskArgument+task)
-	}
-	return args
+// launch is what a launch hands the running app: the files and links it names and the label of the Jump List task it chose, if any.
+type launch struct {
+	engine.Launch
+	Task string `json:"task,omitempty"`
 }
 
-func claimInstance(id, key string, args []string) (*instance, bool) {
+// launchArguments is what this launch hands the running app.
+func launchArguments(task string) launch {
+	return launch{Launch: engine.Launched(), Task: task}
+}
+
+func claimInstance(id, key string, args launch) (*instance, bool) {
 	mutexName, pipeName := instanceNames(id, key)
 	h, _, err := createMutexW.Call(0, 1, uintptr(unsafe.Pointer(mutexName)))
 	if h == 0 {
@@ -97,7 +99,7 @@ func instanceNames(id, key string) (*uint16, *uint16) {
 	return wide("Local\\" + name), wide(fmt.Sprintf("\\\\.\\pipe\\%s-%d", name, session))
 }
 
-func sendInstance(name *uint16, args []string) bool {
+func sendInstance(name *uint16, args launch) bool {
 	payload, err := json.Marshal(args)
 	if err != nil {
 		return false
@@ -135,7 +137,7 @@ func (i *instance) serve() {
 			return
 		}
 		connected, _, err := connectNamedPipe.Call(pipe, 0)
-		var args []string
+		var args launch
 		received := false
 		if connected != 0 || err == syscall.Errno(instancePipeConnected) {
 			var data [64 << 10]byte
@@ -157,7 +159,7 @@ func (i *instance) serve() {
 	}
 }
 
-func (i *instance) enqueue(args []string) {
+func (i *instance) enqueue(args launch) {
 	i.mu.Lock()
 	if i.deliver == nil {
 		i.pending = append(i.pending, args)
@@ -169,7 +171,7 @@ func (i *instance) enqueue(args []string) {
 	deliver(args)
 }
 
-func (i *instance) setDelivery(deliver func([]string)) {
+func (i *instance) setDelivery(deliver func(launch)) {
 	i.mu.Lock()
 	i.deliver = deliver
 	pending := i.pending

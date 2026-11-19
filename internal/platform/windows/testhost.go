@@ -510,7 +510,7 @@ func (t *testSurface) ChooseDockMenu(id uint32) error {
 	t.onMain(func() {
 		for _, e := range jumpTasks {
 			if e.ID == id && jumpTask(e) {
-				t.w.launched([]string{dockTaskArgument + e.Label})
+				t.w.launched(launch{Task: e.Label})
 				return
 			}
 		}

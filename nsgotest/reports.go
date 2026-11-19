@@ -224,6 +224,12 @@ func (a *App) ChooseDockMenu(path ...string) {
 	}
 }
 
+// OpenLinks asks the app to open links, as the system does with a link of one of its URL schemes (url_schemes), or one a second launch on Windows and Linux names: desktop.OnOpenLinks hears them, or the first handler registered once one is. Headless only.
+func (a *App) OpenLinks(links ...string) {
+	a.t.Helper()
+	a.dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
+}
+
 // ChoosePopup chooses the item at path in the context menu the app shows
 // with PopupMenu, its labels from the menu down, which closes the menu.
 func (a *App) ChoosePopup(path ...string) {

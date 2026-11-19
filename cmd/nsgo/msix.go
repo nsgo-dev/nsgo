@@ -265,6 +265,7 @@ type msixData struct {
 	Name, Description, Exe                            string
 	Languages                                         []string
 	FileTypes                                         []msixFileType
+	URLSchemes                                        []string
 	DeviceCapabilities                                []string
 }
 
@@ -328,6 +329,13 @@ func msixManifest(p *project, arch string) ([]byte, error) {
 		}
 		d.FileTypes = append(d.FileTypes, ft)
 	}
+	for _, scheme := range p.URLSchemes {
+		// What a package's protocol may be named, beyond what validateURLSchemes checks.
+		if len(scheme) > 39 {
+			return nil, fmt.Errorf("url_schemes: an MSIX package registers schemes of up to 39 characters, not %q", scheme)
+		}
+		d.URLSchemes = append(d.URLSchemes, scheme)
+	}
 	var out bytes.Buffer
 	err = msixManifestTemplate.Execute(&out, d)
 	return out.Bytes(), err
@@ -336,8 +344,9 @@ func msixManifest(p *project, arch string) ([]byte, error) {
 var msixManifestTemplate = template.Must(template.New("msix").Funcs(template.FuncMap{"x": xmlText}).Parse(`<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap uap3 rescap">
   <Identity Name="{{x .Identity}}" Publisher="{{x .Publisher}}" Version="{{.Version}}" ProcessorArchitecture="{{.Arch}}"/>
   <Properties>
     <DisplayName>{{x .Name}}</DisplayName>
@@ -356,7 +365,7 @@ var msixManifestTemplate = template.Must(template.New("msix").Funcs(template.Fun
     <Application Id="App" Executable="{{x .Exe}}" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="{{x .Name}}" Description="{{x .Description}}" BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png"/>
-{{- if .FileTypes}}
+{{- if or .FileTypes .URLSchemes}}
       <Extensions>
 {{- range .FileTypes}}
         <uap:Extension Category="windows.fileTypeAssociation">
@@ -369,6 +378,11 @@ var msixManifestTemplate = template.Must(template.New("msix").Funcs(template.Fun
             </uap:SupportedFileTypes>
           </uap:FileTypeAssociation>
         </uap:Extension>
+{{- end}}
+{{- range .URLSchemes}}
+        <uap3:Extension Category="windows.protocol">
+          <uap3:Protocol Name="{{x .}}" Parameters="-- &quot;%1&quot;"/>
+        </uap3:Extension>
 {{- end}}
       </Extensions>
 {{- end}}

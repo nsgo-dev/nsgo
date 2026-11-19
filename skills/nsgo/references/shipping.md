@@ -54,6 +54,8 @@ Packages land in `dist/<name>-<version>-<target>`, and everything to hand out in
 
 Declare `file_types` in `nsgo.yaml` and handle paths with `desktop.OnOpenFiles`. macOS, Windows (NSIS/MSIX) and Linux packages register them; Windows retains the user's default handler. Linux infers common extensions from a fixed table and defines unknown app-owned types as `application/x-<type id>`; set `mime: [video/mp4]` to reference existing types, especially for unknown imported extensions. AppImage needs desktop integration to install the bundled entry and any custom MIME definitions.
 
+Declare `url_schemes: [myapp]` for the app's own links and handle them with `desktop.OnOpenLinks`. The macOS app, the NSIS installer and MSIX package, and the Linux desktop entry register them; on Windows and Linux a second launch hands its link to the running app. The handler hears any URL the app is started with, so check the scheme, and confirm with the user before a link changes anything.
+
 ## Secrets
 
 Never commit secret keys or passwords. The tool reads them from the environment: `NSGO_UPDATES_KEY` for update feeds, `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD` for Android keystores, `NSGO_CERTIFICATE_PASSWORD` for a Windows code signing certificate, `NSGO_NOTARY_KEY`, `NSGO_NOTARY_KEY_ID` and `NSGO_NOTARY_ISSUER` for notarizing in CI, `NSGO_ROOT_KEY` and `NSGO_RELEASE_KEY` for signed TSX packages. Public keys belong in `nsgo.yaml` and the app's code.

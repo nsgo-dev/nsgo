@@ -59,7 +59,7 @@ NSGo ports NSH's design: the architecture, the backends, the API's names and `ba
 
 Both are UI written in Go without cgo, but MyGo draws its native UI itself on the GPU and rebuilds it from a view function every frame, where NSGo hands native views what changed.
 
-- **Choose MyGo** for desktop apps that look the same on every desktop, web-page windows with typed calls into Go, and its desktop APIs and shipping: tray icons, deep links, file associations, installers, notarization and signed delta updates.
+- **Choose MyGo** for desktop apps that look the same on every desktop, web-page windows with typed calls into Go, and its desktop APIs and shipping: tray icons, file associations, installers, notarization and signed delta updates.
 - **Choose NSGo** to reach phones too, to use each platform's own text, input and accessibility, or for state held in signals rather than redrawn from the app's data.
 
 ## Other Go toolkits

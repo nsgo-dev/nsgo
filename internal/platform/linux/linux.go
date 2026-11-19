@@ -299,7 +299,7 @@ func Run(app engine.App, opts Options) {
 	var instance *instance
 	if opts.ID != "" && opts.test == nil {
 		var alreadyRunning bool
-		if instance, alreadyRunning = claimInstance(opts.ID, opts.InstanceKey, engine.LaunchFiles()); alreadyRunning {
+		if instance, alreadyRunning = claimInstance(opts.ID, opts.InstanceKey, engine.Launched()); alreadyRunning {
 			return
 		}
 		defer instance.close()
@@ -310,20 +310,35 @@ func Run(app engine.App, opts Options) {
 		panic("nsgo: " + err.Error())
 	}
 	if instance != nil {
-		instance.setDelivery(func(paths []string) {
-			w.post(func() {
-				w.engine.Dispatch(driver.Event{Kind: driver.EventReopen})
-				if len(paths) > 0 {
-					w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
-				}
-			})
-		})
+		instance.setDelivery(func(args engine.Launch) { w.post(func() { w.launched(args) }) })
 	}
+	// The core keeps them until the app's first handlers register.
 	if paths := engine.LaunchFiles(); len(paths) > 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: paths})
 	}
+	if links := engine.LaunchLinks(); len(links) > 0 {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
+	}
 	w.run()
 	w.stop()
+}
+
+// launched hands the running app what a second launch asked of it: a launch to open links alone brings the app's window to the front, as opening a link does on macOS, any other launch reopens the app, and the files and links it names open.
+func (w *window) launched(args engine.Launch) {
+	if len(args.Links) > 0 && len(args.Files) == 0 {
+		// A window the app hid stays hidden: the app's handler shows what the link asks for.
+		if gtkWidgetGetVisible(w.win) != 0 {
+			w.windowCommand(&driver.WindowCommand{Action: driver.WindowOrderFront})
+		}
+	} else {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventReopen})
+	}
+	if len(args.Files) > 0 {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenFiles, Data: args.Files})
+	}
+	if len(args.Links) > 0 {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: args.Links})
+	}
 }
 
 // start opens the window and starts the engine, without running the main

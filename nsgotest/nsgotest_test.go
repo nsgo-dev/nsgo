@@ -3,6 +3,7 @@ package nsgotest
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1418,5 +1419,29 @@ func TestWindowPointerEventsReachTheWindow(t *testing.T) {
 	if n := len(app.Window); n == 0 || app.Window[n-1].Action != driver.WindowSetPointerEvents ||
 		app.Window[n-1].PointerEvents != desktop.WindowPointerPainted {
 		t.Fatalf("the window was sent %+v", app.Window)
+	}
+}
+
+// OpenLinks delivers links as the system does: a handler hears them, one that registers later hears those that came before it, and the app routes them where it chooses.
+func TestOpenLinksReachTheApp(t *testing.T) {
+	if Target() != "" {
+		t.Skip("checks the headless model")
+	}
+	app := Start(t, func(cx *core.Scope) core.Node {
+		shown := core.NewSignal(cx, "home")
+		desktop.OnOpenLinks(cx, func(links []string) {
+			if u, err := url.Parse(links[0]); err == nil && u.Scheme == "umapp" {
+				shown.Set(u.Host)
+			}
+		})
+		return core.Text{ContentFunc: shown.Get, TestID: "page"}
+	}, Environment(core.Environment{OS: core.OSWindows}))
+	app.OpenLinks("umapp://settings/desktop")
+	if got := app.Find("id:page").Text; got != "settings" {
+		t.Fatalf("page %q after a link, want settings", got)
+	}
+	app.OpenLinks("https://example.com")
+	if got := app.Find("id:page").Text; got != "settings" {
+		t.Fatalf("page %q after another scheme's link, want settings", got)
 	}
 }

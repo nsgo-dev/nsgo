@@ -707,7 +707,7 @@ func writeLinuxIcon(p *project, dir string) error {
 	if err != nil {
 		return err
 	}
-	entry := desktopData{Name: p.Name, Exec: p.Name, ID: p.ID, MIMETypes: types, Categories: p.Linux.Categories}
+	entry := desktopData{Name: p.Name, Exec: p.Name, ID: p.ID, MIMETypes: types, URLSchemes: p.URLSchemes, Categories: p.Linux.Categories}
 	if n != nil {
 		entry.Name = n.names[n.source]
 		for _, lang := range n.languages()[1:] {
@@ -722,11 +722,12 @@ func writeLinuxIcon(p *project, dir string) error {
 	return desktopEntry.Execute(f, entry)
 }
 
-// desktopData is what a desktop entry says: the app's name, in its other languages by locale too, its executable, and its ID, which names its icon and is the class of its windows that docks match them by, as the Linux backend gives them the ID as the program name.
+// desktopData is what a desktop entry says: the app's name, in its other languages by locale too, its executable, and its ID, which names its icon and is the class of its windows that docks match them by, as the Linux backend gives them the ID as the program name. It registers the media types of the files the app opens, and its URL schemes as x-scheme-handler types, whose links the launcher passes as %U, with files as file URLs.
 type desktopData struct {
 	Name, Exec, ID string
 	Names          [][2]string
 	MIMETypes      []string
+	URLSchemes     []string
 	Categories     []string
 }
 
@@ -753,11 +754,11 @@ Name={{s .Name}}
 {{- range .Names}}
 Name[{{index . 0}}]={{s (index . 1)}}
 {{- end}}
-Exec={{exec .Exec}}{{if .MIMETypes}} %F{{end}}
+Exec={{exec .Exec}}{{if .URLSchemes}} %U{{else if .MIMETypes}} %F{{end}}
 Icon={{.ID}}
 Terminal=false
-{{- if .MIMETypes}}
-MimeType={{range .MIMETypes}}{{.}};{{end}}
+{{- if or .MIMETypes .URLSchemes}}
+MimeType={{range .MIMETypes}}{{.}};{{end}}{{range .URLSchemes}}x-scheme-handler/{{.}};{{end}}
 {{- end}}
 StartupWMClass={{.ID}}
 {{- if .Categories}}

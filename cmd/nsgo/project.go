@@ -153,7 +153,7 @@ type project struct {
 	// FileTypes are the kinds of documents the app opens, which its macOS
 	// package registers (filetypes.go).
 	FileTypes []fileType `yaml:"file_types"`
-	// URLSchemes are the schemes of the app's own links, which its macOS package registers (urlschemes.go).
+	// URLSchemes are the schemes of the app's own links, which its desktop packages register (urlschemes.go).
 	URLSchemes []string `yaml:"url_schemes"`
 	// Widgets are the kinds of the app's widgets, which nsgo build puts
 	// into its macOS and iOS packages as a widget extension (widgets.go).

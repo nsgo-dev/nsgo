@@ -237,19 +237,19 @@ desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
 
 ## Links
 
-`url_schemes` gives a macOS app links of its own, such as `myapp://settings`, which open it from a browser, another app or `open`:
+`url_schemes` gives the app links of its own, such as `myapp://settings`, which open it from a browser, another app, `open`, `start` or `xdg-open`. The macOS app registers them, as do the Windows installer and MSIX package and the Linux desktop entry, which the Debian, Arch, AppImage and Flatpak packages carry; uninstalling removes them:
 
 ```yaml
 url_schemes: [myapp]
 ```
 
-The app hears them with `desktop.OnOpenLinks`, also while it runs. A link that launched the app waits for the first handler. Anyone can write such a link, so check it and ask the user before it changes anything:
+The app hears them with `desktop.OnOpenLinks`, also while it runs: on Windows and Linux a second launch hands its link to the running app and exits. A link that launched the app waits for the first handler. Anyone can write such a link, and on Windows and Linux the handler hears any URL the app is started with, so check the scheme and ask the user before a link changes anything:
 
 ```go
 desktop.OnOpenLinks(cx, func(links []string) { show(links[0]) })
 ```
 
-Windows, Linux and iOS don't take them yet.
+`app.OpenLinks("myapp://settings")` delivers one in a test. iOS doesn't take them yet.
 
 ## Mini programs
 

@@ -135,6 +135,7 @@ var (
 	gdkToplevelGetState                    func(uintptr) uint32
 	gtkWidgetShow                          func(uintptr)
 	gtkWidgetSetVisible                    func(uintptr, int32)
+	gtkWidgetGetVisible                    func(uintptr) int32
 	gtkWidgetAddController                 func(uintptr, uintptr)
 	gtkWidgetQueueDraw                     func(uintptr)
 	gtkWidgetQueueAllocate                 func(uintptr)
@@ -495,6 +496,7 @@ func bind() {
 	purego.RegisterLibFunc(&gdkToplevelGetState, gtkLib, "gdk_toplevel_get_state")
 	purego.RegisterLibFunc(&gtkWidgetShow, gtkLib, "gtk_widget_show")
 	purego.RegisterLibFunc(&gtkWidgetSetVisible, gtkLib, "gtk_widget_set_visible")
+	purego.RegisterLibFunc(&gtkWidgetGetVisible, gtkLib, "gtk_widget_get_visible")
 	purego.RegisterLibFunc(&gtkWidgetAddController, gtkLib, "gtk_widget_add_controller")
 	purego.RegisterLibFunc(&gtkWidgetQueueDraw, gtkLib, "gtk_widget_queue_draw")
 	purego.RegisterLibFunc(&gtkWidgetQueueAllocate, gtkLib, "gtk_widget_queue_allocate")

@@ -14,9 +14,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/nsgo-dev/nsgo/internal/engine"
 )
 
-// instance is what the first copy of an app holds: an exclusive lock on its lock file (instancePath), which ends with the process however it ends, and the Unix socket later launches hand their files to. Messages received before the GTK window exists wait in pending until Run installs the delivery function.
+// instance is what the first copy of an app holds: an exclusive lock on its lock file (instancePath), which ends with the process however it ends, and the Unix socket later launches hand their files and links to. Messages received before the GTK window exists wait in pending until Run installs the delivery function.
 type instance struct {
 	lock     *os.File
 	listener *net.UnixListener
@@ -25,12 +27,12 @@ type instance struct {
 	once     sync.Once
 
 	mu      sync.Mutex
-	deliver func([]string)
-	pending [][]string
+	deliver func(engine.Launch)
+	pending []engine.Launch
 }
 
 // claimInstance makes this process the owner, or hands its launch to the owner and reports that the caller should exit. The lock decides, as Windows' mutex does: whoever holds it owns the app ID and key, so two launches at once never both start an engine, and a socket a dead process left behind is replaced without asking it.
-func claimInstance(id, key string, args []string) (*instance, bool) {
+func claimInstance(id, key string, args engine.Launch) (*instance, bool) {
 	path, err := instancePath(id, key)
 	if err != nil {
 		log.Printf("nsgo: single-instance setup: %v", err)
@@ -117,7 +119,7 @@ func privateDir(dir string) error {
 }
 
 // sendInstance hands args to the owner, retrying while the owner, which already holds the lock, may not be listening yet.
-func sendInstance(path string, args []string) bool {
+func sendInstance(path string, args engine.Launch) bool {
 	for range 20 {
 		conn, err := net.DialTimeout("unix", path, 150*time.Millisecond)
 		if err == nil {
@@ -143,7 +145,7 @@ func (i *instance) serve() {
 			continue
 		}
 		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		var args []string
+		var args engine.Launch
 		if err := json.NewDecoder(conn).Decode(&args); err == nil {
 			i.enqueue(args)
 		}
@@ -151,7 +153,7 @@ func (i *instance) serve() {
 	}
 }
 
-func (i *instance) enqueue(args []string) {
+func (i *instance) enqueue(args engine.Launch) {
 	i.mu.Lock()
 	if i.deliver == nil {
 		i.pending = append(i.pending, args)
@@ -163,7 +165,7 @@ func (i *instance) enqueue(args []string) {
 	deliver(args)
 }
 
-func (i *instance) setDelivery(deliver func([]string)) {
+func (i *instance) setDelivery(deliver func(engine.Launch)) {
 	i.mu.Lock()
 	i.deliver = deliver
 	pending := i.pending
