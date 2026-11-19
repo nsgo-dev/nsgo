@@ -84,6 +84,8 @@ cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.
 
 `cx.Storage()` is the app's key-value storage, kept on the device and shared by every graph of the app. Reads are synchronous and read inside a computation subscribe it to changes; `SetItem` returns a `core.StorageFullError` past the quota (`core.StorageQuota`, 5 MiB by default). It is a plain file any program of the user's can read, so keep tokens and passwords in [secrets](#secrets) instead.
 
+`cx.Store()` returns the underlying store for a host that creates another root with `core.RootOptions.Storage`; both roots then share the app's entries and persistence.
+
 ```go
 store := cx.Storage()
 if tab, ok := store.GetItem("tab"); ok {

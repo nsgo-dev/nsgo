@@ -118,6 +118,8 @@ Style `Transition`s, animated values and layout animations run on the platform, 
 
 `Scope.Storage` follows NSH's `nsh/storage`: strings by key with a 5 MB quota, held in memory by a `Store` and loaded once from the platform's `StorageBackend`.
 
+`Scope.Store` returns the app's `Store` so code that owns more than one root can pass the same store through `RootOptions.Storage`. The roots then share entries, change notifications and the platform's persistence.
+
 - Engines given the same `Store` share its entries and quota. Each graph keeps a signal per key it read and one for the key set; its own changes bump them at once, and other graphs' changes arrive through `Post`.
 - The store hands each change to the backend under its lock, so every graph and the backend see one order.
 - Native targets keep `storage.json` in the data directory: `engine.OpenFileStorage` returns one store per file in the process and rewrites the file on a goroutine of its own.

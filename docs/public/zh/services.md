@@ -84,6 +84,8 @@ cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.
 
 `cx.Storage()` 是应用的键值存储，保存在设备上，应用的每个响应式图共享它。读取是同步的，在计算中读取会让它订阅变化；超过配额时 `SetItem` 返回 `core.StorageFullError`（默认 `core.StorageQuota` 为 5 MiB）。它是一个用户的任何程序都能读取的明文文件，令牌和密码请放进[机密](#机密)。
 
+需要创建另一个 root 的宿主可以用 `cx.Store()` 获取底层 store，并将它传给 `core.RootOptions.Storage`，两个 root 会共享应用的条目和持久化。
+
 ```go
 store := cx.Storage()
 if tab, ok := store.GetItem("tab"); ok {

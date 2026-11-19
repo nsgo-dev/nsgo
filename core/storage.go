@@ -307,6 +307,16 @@ func (cx *Scope) Storage() Storage {
 	return st
 }
 
+// Store returns the app's underlying store, which a host may pass to another
+// root so its graphs share the app's entries and persistence.
+func (cx *Scope) Store() *Store {
+	rt := cx.rt
+	if rt.store == nil {
+		rt.store = NewStore(nil)
+	}
+	return rt.store
+}
+
 // GetItem returns the value of key and whether it has one.
 func (s Storage) GetItem(key string) (string, bool) {
 	key = s.part.prefix + key

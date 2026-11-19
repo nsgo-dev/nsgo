@@ -157,3 +157,18 @@ func TestStorageInMemoryByDefault(t *testing.T) {
 		t.Fatal("graphs without a store shared entries")
 	}
 }
+
+func TestScopeStoreCanBeSharedWithAnotherRoot(t *testing.T) {
+	first := newGraph(nil)
+	store := first.root.Store()
+	second := newGraph(store)
+	if first.root.Store() != store || second.root.Store() != store {
+		t.Fatal("roots did not return their shared store")
+	}
+	if err := first.root.Storage().SetItem("draft", "saved"); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := second.root.Storage().GetItem("draft"); !ok || got != "saved" {
+		t.Fatalf("second root read %q, %v", got, ok)
+	}
+}
