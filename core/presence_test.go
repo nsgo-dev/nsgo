@@ -103,6 +103,92 @@ func TestPresenceWaitsForTheLeavingBranch(t *testing.T) {
 	}
 }
 
+func TestPresenceOfSwitchesKeys(t *testing.T) {
+	var selected *Signal[string]
+	var owner *Scope
+	built := []string{}
+	exits := map[string]func(){}
+	h := newHost(t, Size{Width: 100, Height: 200}, func(cx *Scope) Node {
+		owner = cx
+		selected = NewSignal(cx, "a")
+		return View{TestID: "box", Children: []Node{PresenceOf[string]{Key: selected.Get, Content: func(cx *Scope, key string) Node {
+			built = append(built, key)
+			cx.OnExit(func(done func()) { exits[key] = done })
+			return Text{Content: key}
+		}}}}
+	})
+	h.commit()
+	box := h.find("box")
+	owner.Batch(func() {
+		selected.Set("b")
+		selected.Set("c")
+	})
+	h.commit()
+	if !slices.Equal(built, []string{"a", "c"}) {
+		t.Fatalf("built %v, want a and c", built)
+	}
+	if got := box.sent.children; len(got) != 2 {
+		t.Fatalf("branches = %d, want leaving and current", len(got))
+	}
+	exits["a"]()
+	h.commit()
+	if got := box.sent.children; len(got) != 1 {
+		t.Fatalf("after exit branches = %d, want current alone", len(got))
+	}
+}
+
+func TestPresenceOfWaitsForTheLeavingBranch(t *testing.T) {
+	var selected *Signal[string]
+	var leave func()
+	built := 0
+	h := newHost(t, Size{Width: 100, Height: 200}, func(cx *Scope) Node {
+		selected = NewSignal(cx, "a")
+		return View{TestID: "box", Children: []Node{PresenceOf[string]{Key: selected.Get, Wait: true, Content: func(cx *Scope, key string) Node {
+			built++
+			cx.OnExit(func(done func()) { leave = done })
+			return Text{Content: key}
+		}}}}
+	})
+	h.commit()
+	box := h.find("box")
+	selected.Set("b")
+	h.commit()
+	if built != 1 || len(box.sent.children) != 1 {
+		t.Fatalf("while leaving built %d branches %d, want one branch and one build", built, len(box.sent.children))
+	}
+	leave()
+	h.commit()
+	if built != 2 || len(box.sent.children) != 1 {
+		t.Fatalf("after leaving built %d branches %d, want two builds and one branch", built, len(box.sent.children))
+	}
+}
+
+func TestPresenceOfBoundsLeavingBranches(t *testing.T) {
+	var selected *Signal[string]
+	exits := map[string]func(){}
+	h := newHost(t, Size{Width: 100, Height: 200}, func(cx *Scope) Node {
+		selected = NewSignal(cx, "a")
+		return View{TestID: "box", Children: []Node{PresenceOf[string]{Key: selected.Get, MaxLeaving: 1, Content: func(cx *Scope, key string) Node {
+			cx.OnExit(func(done func()) { exits[key] = done })
+			return Text{Content: key}
+		}}}}
+	})
+	h.commit()
+	box := h.find("box")
+	selected.Set("b")
+	h.commit()
+	selected.Set("c")
+	h.commit()
+	if got := box.sent.children; len(got) != 2 {
+		t.Fatalf("branches = %d, want one leaving and current", len(got))
+	}
+	exits["b"]()
+	h.commit()
+	if got := box.sent.children; len(got) != 1 {
+		t.Fatalf("after current exit branches = %d, want current alone", len(got))
+	}
+}
+
 func TestMotionExitKeepsItsViewUntilItEnds(t *testing.T) {
 	var open *Signal[bool]
 	var m *Motion

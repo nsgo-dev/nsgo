@@ -73,7 +73,7 @@ motion.Exit(core.FadeOut.Spec())
 core.View{Style: core.Style{Animated: motion.Style()}, Children: content}
 ```
 
-`core.Presence{When, Then, Else}` 会保留一个分支，直到它注册的所有退出动画结束，因此 sheet 或 toast 无论被什么移除，都会带着动效离开。`MotionPresets()` 列出所有预设，`Kind()` 说明它是进入、退出、吸引注意还是循环。
+`core.Presence{When, Then, Else}` 会保留一个分支，直到它注册的所有退出动画结束，因此 sheet 或 toast 无论被什么移除，都会带着动效离开。`core.PresenceOf` 将相同机制用于可比较的键和内容函数，`MaxLeaving` 会在值快速变化时限制离开的旧分支数量。`MotionPresets()` 列出所有预设，`Kind()` 说明它是进入、退出、吸引注意还是循环。
 
 ## 关键帧
 

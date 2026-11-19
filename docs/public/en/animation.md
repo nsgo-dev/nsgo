@@ -73,7 +73,7 @@ motion.Exit(core.FadeOut.Spec())
 core.View{Style: core.Style{Animated: motion.Style()}, Children: content}
 ```
 
-`core.Presence{When, Then, Else}` keeps a branch until every exit it registered has finished, so a sheet or a toast leaves with its motion whatever removes it. `MotionPresets()` lists every preset and `Kind()` says whether it enters, exits, draws attention or loops.
+`core.Presence{When, Then, Else}` keeps a branch until every exit it registered has finished, so a sheet or a toast leaves with its motion whatever removes it. `core.PresenceOf` applies the same behavior to a comparable key and content function, and `MaxLeaving` bounds old branches while a value changes quickly. `MotionPresets()` lists every preset and `Kind()` says whether it enters, exits, draws attention or loops.
 
 ## Keyframes
 

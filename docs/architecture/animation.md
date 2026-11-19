@@ -58,7 +58,7 @@ A display link runs only in the run loop mode object it is given: Foundation's `
 
 ## Exits
 
-`Presence` is `Show` whose branches leave with their exits, gpui-base's `Presence` and Motion's `AnimatePresence`, which NSH lacks. A part of a branch registers an exit with `Scope.OnExit`, and `Motion.Exit` registers one that plays a `MotionSpec`; when `When` changes, the branch stays before the new one until every exit has called its `done`, while `Scope.Present` reads false in it. A branch with none goes at once. A leaving branch never comes back: the new value builds a branch beside it, or once it is gone with `Wait`. Exits run in the core, so the backends learn nothing new.
+`Presence` is `Show` whose branches leave with their exits, gpui-base's `Presence` and Motion's `AnimatePresence`, which NSH lacks. A part of a branch registers an exit with `Scope.OnExit`, and `Motion.Exit` registers one that plays a `MotionSpec`; when `When` changes, the branch stays before the new one until every exit has called its `done`, while `Scope.Present` reads false in it. A branch with none goes at once. A leaving branch never comes back: the new value builds a branch beside it, or once it is gone with `Wait`. `PresenceOf` applies the same lifecycle to a comparable key and content function, with `MaxLeaving` bounding old branches. Exits run in the core, so the backends learn nothing new.
 
 ## Where Go departs from NSH
 
