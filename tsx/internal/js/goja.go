@@ -66,7 +66,7 @@ func Caller(r *Runtime) (file string, line int, ok bool) {
 	return "", 0, false
 }
 
-// StringData is the memory goja keeps s, a string it made, in: its first byte and its size in bytes. goja keeps an ASCII string as a Go string, a byte a unit, and others as UTF-16 with a leading BOM; a concatenation it has not read yet, which keeps its parts, and a value that is no string have none (nil).
+// StringData is the memory goja keeps s, a string it made, in: where it starts and its size in bytes. goja keeps an ASCII string as a Go string, a byte a unit, and others as UTF-16 with a leading BOM, or, as JSON.stringify returns them, as a Go string it reads as UTF-16 once it needs to, keeping both, which starts where its record of the two does; a concatenation it has not read yet, which keeps its parts, and a value that is no string have none (nil).
 func StringData(s Value) (*byte, int) {
 	switch v := reflect.ValueOf(s); v.Kind() {
 	case reflect.String:
@@ -76,6 +76,12 @@ func StringData(s Value) (*byte, int) {
 	case reflect.Slice:
 		if v.Len() > 0 {
 			return (*byte)(v.UnsafePointer()), v.Len() * 2
+		}
+	case reflect.Pointer:
+		if e := v.Elem(); e.Kind() == reflect.Struct {
+			if str := e.FieldByName("s"); str.Kind() == reflect.String && str.Len() > 0 {
+				return (*byte)(v.UnsafePointer()), str.Len() + 2*s.(String).Length()
+			}
 		}
 	}
 	return nil, 0

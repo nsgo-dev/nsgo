@@ -10,13 +10,14 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"unicode/utf16"
 	"weak"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 )
 
-// A sandbox's memory budget (Limits.Memory). goja allocates from Go's heap, which the host and every other runtime share, so a sample of that heap cannot tell what one bundle holds, and one allocation can take more than the system has before any sample sees it. Instead the built-ins that allocate by a size the bundle gives them, a length, a count or a length's worth of elements, are replaced by ones that check the budget before they call the original, so that what would not fit is never allocated, and charge what the original made until the Go collector frees it. The bundle's other allocations, its objects, closures, the arrays it builds or spreads and the strings it concatenates, are not counted: goja gives no hook for them, and they cost the bundle time as they grow, which Limits.Call bounds per call.
+// A sandbox's memory budget (Limits.Memory). goja allocates from Go's heap, which the host and every other runtime share, so a sample of that heap cannot tell what one bundle holds, and one allocation can take more than the system has before any sample sees it. Instead the built-ins that allocate by a size the bundle gives them, a length, a count or a length's worth of elements, are replaced by ones that check the budget before they call the original, so that what would not fit is never allocated, and charge what the original made until the Go collector frees it. What the original reads its size from, a length, an argument list or the parts of a string it joins, is read once, here, and handed to it as read, as a value, a copy or a proxy that answers the length, so that a getter, a proxy or a valueOf cannot have it allocate more than was checked. The bundle's other allocations, its objects, closures, the arrays it builds, copies, concatenates, flattens or spreads, the strings it concatenates or replaces into and the copies the web APIs make, are not counted: goja gives no hook for them. Those made in JS cost the bundle time as they grow, which Limits.Call bounds per call, but the built-ins that copy what the bundle holds do so at the speed of memory, so a bundle that doubles an array or a string a few dozen times, or flattens or concatenates many references to one, still takes as much as it likes: Memory stops runaway allocations of the built-ins it holds, not a bundle written to exhaust memory.
 
 // memory is what the built-ins hold for a sandbox.
 type memory struct {
@@ -27,6 +28,10 @@ type memory struct {
 	held map[any]int64
 	// joining are the arrays Array.prototype.join is joining, outermost first, as goja's own join keeps them, so that an array in itself joins as "".
 	joining []*js.Object
+	// pin, iterate and project are memoryProgram's, which the wrappers hand the originals in place of what the bundle gave them.
+	pin, iterate, project js.Callable
+	// isRawJSON is the original JSON.isRawJSON.
+	isRawJSON js.Callable
 }
 
 const (
@@ -42,8 +47,14 @@ const (
 
 // limitMemory holds the built-ins that allocate by size to limit bytes, before the bundle runs and hardening freezes them.
 func (r *runtime) limitMemory(limit int64) {
-	r.sandbox.memory = &memory{limit: limit, held: map[any]int64{}}
+	m := &memory{limit: limit, held: map[any]int64{}}
+	r.sandbox.memory = m
 	g := r.vm.GlobalObject()
+	helpers := r.run(memoryProgram).(*js.Object)
+	m.pin, _ = js.AssertFunction(helpers.Get("pin"))
+	m.iterate, _ = js.AssertFunction(helpers.Get("iterate"))
+	m.project, _ = js.AssertFunction(helpers.Get("project"))
+	m.isRawJSON, _ = js.AssertFunction(object(g, "JSON").Get("isRawJSON"))
 	r.wrapConstructor("ArrayBuffer", 0)
 	for _, name := range []string{"Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array"} {
 		r.wrapConstructor(name, g.Get(name).(*js.Object).Get("BYTES_PER_ELEMENT").ToInteger())
@@ -127,12 +138,7 @@ func (r *runtime) limitMemory(limit int64) {
 	r.wrap(str, "padStart", pad)
 	r.wrap(str, "padEnd", pad)
 	r.wrap(object(g, "String"), "raw", func(call js.FunctionCall, orig js.Callable) js.Value {
-		if o, ok := call.Argument(0).(*js.Object); ok {
-			if raw, ok := o.Get("raw").(*js.Object); ok {
-				r.checkMemory(mul(r.lengthOf(raw), valueSize))
-			}
-		}
-		return r.holdString(r.callOrig(orig, call.This, call.Arguments))
+		return r.raw(call, orig)
 	})
 
 	array := object(g, "Array", "prototype")
@@ -149,9 +155,10 @@ func (r *runtime) limitMemory(limit int64) {
 	r.wrap(array, "toLocaleString", func(call js.FunctionCall, _ js.Callable) js.Value {
 		return r.join(call.This.ToObject(r.vm), r.vm.ToValue(","), r.localeString, join)
 	})
+	// fill, sort and the copies read the length of what is not an array once more, so they are given it pinned to what was checked.
 	r.wrap(array, "fill", func(call js.FunctionCall, orig js.Callable) js.Value {
 		o := call.This.ToObject(r.vm)
-		n := r.lengthOf(o)
+		this, n := r.pinned(o, false)
 		start, end := call.Argument(1).ToNumber(), call.Argument(2)
 		if !js.IsUndefined(end) {
 			end = end.ToNumber()
@@ -160,38 +167,47 @@ func (r *runtime) limitMemory(limit int64) {
 		if to > from {
 			r.checkMemory(mul(to-from, valueSize))
 		}
-		v := r.callOrig(orig, o, []js.Value{call.Argument(0), start, end})
+		r.callOrig(orig, this, []js.Value{call.Argument(0), start, end})
 		hold(r, o, mul(to, valueSize))
-		return v
+		return o
 	})
 	// sort copies the elements of what is not an array into a list first.
 	r.wrap(array, "sort", func(call js.FunctionCall, orig js.Callable) js.Value {
 		o := call.This.ToObject(r.vm)
-		r.checkMemory(mul(r.lengthOf(o), valueSize))
-		return r.callOrig(orig, o, call.Arguments)
+		this, n := r.pinned(o, false)
+		r.checkMemory(mul(n, valueSize))
+		r.callOrig(orig, this, call.Arguments)
+		return o
 	})
 	// What makes an array as long as this one, or one longer by its arguments.
 	for _, name := range []string{"toSorted", "toReversed", "toSpliced", "with"} {
 		r.wrap(array, name, func(call js.FunctionCall, orig js.Callable) js.Value {
-			o := call.This.ToObject(r.vm)
-			r.checkMemory(mul(r.lengthOf(o)+int64(len(call.Arguments)), valueSize))
-			return r.holdArray(r.callOrig(orig, o, call.Arguments))
+			this, n := r.pinned(call.This.ToObject(r.vm), false)
+			r.checkMemory(mul(n+int64(len(call.Arguments)), valueSize))
+			return r.holdArray(r.callOrig(orig, this, call.Arguments))
 		})
 	}
 	r.wrap(object(g, "Array"), "from", func(call js.FunctionCall, orig js.Callable) js.Value {
-		if items := call.Argument(0); !js.IsUndefined(items) && !js.IsNull(items) {
-			r.checkMemory(mul(r.lengthOf(items.ToObject(r.vm)), valueSize))
+		args := slices.Clone(call.Arguments)
+		if o, ok := call.Argument(0).(*js.Object); ok {
+			var n int64
+			args[0], n = r.source(o)
+			r.checkMemory(mul(n, valueSize))
+		} else if s, ok := call.Argument(0).(js.String); ok {
+			// A string iterates by code points, no more of them than its units.
+			r.checkMemory(mul(int64(s.Length()), valueSize))
 		}
-		return r.holdArray(r.callOrig(orig, call.This, call.Arguments))
+		return r.holdArray(r.callOrig(orig, call.This, args))
 	})
 
-	// What makes a list of arguments of an array-like's length.
+	// What makes a list of arguments of an array-like's length. The list is copied here, reading its length and elements once as the original would, so that the original makes it of what was checked.
 	arguments := func(i int) func(call js.FunctionCall, orig js.Callable) js.Value {
 		return func(call js.FunctionCall, orig js.Callable) js.Value {
+			args := slices.Clone(call.Arguments)
 			if o, ok := call.Argument(i).(*js.Object); ok {
-				r.checkMemory(mul(r.lengthOf(o), valueSize))
+				args[i] = r.argumentList(o)
 			}
-			return r.callOrig(orig, call.This, call.Arguments)
+			return r.callOrig(orig, call.This, args)
 		}
 	}
 	r.wrap(object(g, "Function", "prototype"), "apply", arguments(1))
@@ -246,12 +262,18 @@ func (r *runtime) wrapConstructor(name string, size int64) {
 				args[0] = args[0].ToNumber()
 				r.checkMemory(lengthOf(args[0]))
 			case ok:
-				if a.ExportType() == arrayBufferType {
+				switch {
+				case a.ExportType() == arrayBufferType:
 					// A view of a buffer allocates nothing.
 					allocates = false
-				} else {
-					// An array-like, an iterable or another typed array, as long as its length.
-					r.checkMemory(mul(r.lengthOf(a), size))
+				case isTyped(a):
+					// Another typed array, as long as it is, whatever its length property says.
+					r.checkMemory(mul(r.elementsOf(a), size))
+				default:
+					// An array-like as long as its length, or an iterable, as many as it yields, charged once made.
+					var n int64
+					args[0], n = r.source(a)
+					r.checkMemory(mul(n, size))
 				}
 			default:
 				args[0] = args[0].ToNumber()
@@ -342,33 +364,286 @@ func (r *runtime) localeString(e js.Value) js.Value {
 	return r.callOrig(f, e, nil).ToString()
 }
 
-// stringify is JSON.stringify, which checks what the strings and keys it writes add up to as it reaches them, through a replacer of its own around the bundle's, before it writes them.
-func (r *runtime) stringify(call js.FunctionCall, orig, isArray js.Callable) js.Value {
-	args := slices.Clone(call.Arguments)
-	if rep, ok := call.Argument(1).(*js.Object); ok && r.callOrig(isArray, js.Undefined(), []js.Value{rep}).ToBoolean() {
-		// A list of the properties to write: only its own length is checked.
-		r.checkMemory(mul(r.lengthOf(rep), valueSize))
-		return r.holdString(r.callOrig(orig, call.This, args))
+// raw is String.raw, which reads the template's parts and the substitutions between them once, as the original would, checking the strings they make as they add up, and hands the original those strings to join.
+func (r *runtime) raw(call js.FunctionCall, orig js.Callable) js.Value {
+	raw := call.Argument(0).ToObject(r.vm).Get("raw")
+	if raw == nil {
+		raw = js.Undefined()
 	}
-	user, replaces := js.AssertFunction(call.Argument(1))
+	o := raw.ToObject(r.vm)
+	n := r.lengthOf(o)
+	r.checkMemory(mul(n, valueSize))
+	var subs []js.Value
+	if len(call.Arguments) > 1 {
+		subs = call.Arguments[1:]
+	}
+	parts := make([]any, 0, n)
+	args := []js.Value{nil}
 	var total int64
-	replacer := r.function(func(c js.FunctionCall) js.Value {
+	for i := int64(0); i < n; i++ {
+		part := o.Get(strconv.FormatInt(i, 10))
+		if part == nil {
+			part = js.Undefined()
+		}
+		s := part.ToString()
+		parts = append(parts, s)
+		total = sum(total, mul(stringLen(s), unitSize))
+		r.checkMemory(total)
+		if i+1 == n || i >= int64(len(subs)) {
+			continue
+		}
+		s = subs[i].ToString()
+		args = append(args, s)
+		total = sum(total, mul(stringLen(s), unitSize))
+		r.checkMemory(total)
+	}
+	template := r.vm.NewObject()
+	_ = template.DefineDataProperty("raw", r.vm.NewArray(parts...), js.FLAG_FALSE, js.FLAG_FALSE, js.FLAG_FALSE)
+	args[0] = template
+	return r.holdString(r.callOrig(orig, call.This, args))
+}
+
+// jsonExtra is the most JSON.stringify writes around a value besides its key, its indentation and itself: a comma and a newline before it and its closing bracket, its brackets, the quotes and colon of its key and a space after, or the null, true or false it may be.
+const jsonExtra = 16
+
+// stringify is JSON.stringify, which checks what it writes as it reaches each value, through a replacer of its own around the bundle's, before it writes it: the value's key, the value itself when it is a string, a number or raw JSON, and the indentation of its line and of its closing bracket, which grows with its depth. A list of the properties to write, which the original would take in place of a replacer, is read here once as the original reads it, and the replacer hands the original each object to write as a proxy with just those properties, in that order, read from the object as the original would read them.
+func (r *runtime) stringify(call js.FunctionCall, orig, isArray js.Callable) js.Value {
+	m := r.sandbox.memory
+	args := slices.Clone(call.Arguments)
+	for len(args) < 3 {
+		args = append(args, js.Undefined())
+	}
+	var user js.Callable
+	var keys js.Value
+	if rep, ok := args[1].(*js.Object); ok {
+		if r.callOrig(isArray, js.Undefined(), []js.Value{rep}).ToBoolean() {
+			keys = r.propertyList(rep)
+		} else {
+			user, _ = js.AssertFunction(rep)
+		}
+	}
+	// The indentation a level, read once as the original would read it and handed to it so: at most 10 bytes.
+	var gap int64
+	if o, ok := args[2].(*js.Object); ok {
+		switch o.ClassName() {
+		case "Number":
+			args[2] = o.ToNumber()
+		case "String":
+			args[2] = o.ToString()
+		}
+	}
+	if s, ok := args[2].(js.String); ok {
+		gap = min(int64(s.Length())*3, 10)
+	} else if isNumber(args[2]) {
+		if f := args[2].ToFloat(); f >= 1 {
+			gap = int64(min(f, 10))
+		}
+	}
+	// How deep each object or array written is, by the objects that hold them, the outermost 1.
+	depths := map[*js.Object]int64{}
+	var total int64
+	args[1] = r.function(func(c js.FunctionCall) js.Value {
 		key, v := c.Argument(0), c.Argument(1)
-		if replaces {
+		if user != nil {
 			v = r.callOrig(user, c.This, []js.Value{key, v})
 		}
-		total = sum(total, valueSize, mul(stringLen(key), unitSize))
-		if _, ok := v.(js.String); ok {
-			total = sum(total, mul(stringLen(v), unitSize))
+		var level int64
+		if holder, ok := c.This.(*js.Object); ok {
+			level = depths[holder]
 		}
+		n := sum(jsonExtra, mul(2, level, gap), jsonLen(key))
+		switch x := v.(type) {
+		case js.String:
+			n = sum(n, jsonLen(x))
+		case *js.Object:
+			if r.callOrig(m.isRawJSON, js.Undefined(), []js.Value{x}).ToBoolean() {
+				// Raw JSON is written as it is, its units in at most 3 bytes each.
+				n = sum(n, mul(stringLen(x.Get("rawJSON")), 3))
+				break
+			}
+			if keys != nil && r.projects(x, isArray) {
+				x = r.callOrig(m.project, js.Undefined(), []js.Value{x, keys}).(*js.Object)
+				v = x
+			}
+			depths[x] = level + 1
+		default:
+			if isNumber(x) {
+				n = sum(n, int64(len(x.String())))
+			}
+		}
+		total = sum(total, n)
 		r.checkMemory(total)
 		return v
 	})
-	for len(args) < 2 {
-		args = append(args, js.Undefined())
-	}
-	args[1] = replacer
 	return r.holdString(r.callOrig(orig, call.This, args))
+}
+
+// propertyList is the list of the properties to write that JSON.stringify makes of rep, an array, as goja's makes it: its strings and numbers, and its String and Number objects as strings, each once.
+func (r *runtime) propertyList(rep *js.Object) js.Value {
+	n := r.lengthOf(rep)
+	r.checkMemory(mul(n, valueSize))
+	seen := map[string]bool{}
+	var names []any
+	for i := int64(0); i < n; i++ {
+		v := rep.Get(strconv.FormatInt(i, 10))
+		var name string
+		switch x := v.(type) {
+		case js.String:
+			name = x.String()
+		case *js.Object:
+			if c := x.ClassName(); c != "Number" && c != "String" {
+				continue
+			}
+			name = x.String()
+		default:
+			if !isNumber(v) {
+				continue
+			}
+			name = v.String()
+		}
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	return r.vm.NewArray(names...)
+}
+
+// projects reports whether JSON.stringify writes o as an object of its properties, which a list of them selects: one that is not a function, an array, raw JSON or a primitive's wrapper.
+func (r *runtime) projects(o *js.Object, isArray js.Callable) bool {
+	if _, ok := js.AssertFunction(o); ok || r.callOrig(isArray, js.Undefined(), []js.Value{o}).ToBoolean() {
+		return false
+	}
+	switch o.ClassName() {
+	case "Number", "String", "Boolean", "Symbol", "BigInt":
+		return false
+	}
+	return true
+}
+
+// isNumber reports whether v is a number.
+func isNumber(v js.Value) bool {
+	if _, ok := v.(*js.Object); ok || v == nil {
+		return false
+	}
+	t := v.ExportType()
+	return t != nil && (t.Kind() == reflect.Int64 || t.Kind() == reflect.Float64)
+}
+
+// jsonLen is the most bytes JSON.stringify writes v, a string, in, its quotes included: goja writes a string as UTF-8, escaping quotes, backslashes, control characters and lone surrogates; 0 for anything else.
+func jsonLen(v js.Value) int64 {
+	s, ok := v.(js.String)
+	if !ok {
+		return 0
+	}
+	n := int64(2)
+	for i, l := 0, s.Length(); i < l; i++ {
+		switch c := s.CharAt(i); {
+		case c == '"' || c == '\\' || c == '\b' || c == '\t' || c == '\n' || c == '\f' || c == '\r':
+			n += 2
+		case c < 0x20:
+			n += 6
+		case c < 0x80:
+			n++
+		case c < 0x800:
+			n += 2
+		case utf16.IsSurrogate(rune(c)):
+			if c < 0xDC00 && i+1 < l {
+				if d := s.CharAt(i + 1); d >= 0xDC00 && d < 0xE000 {
+					// A pair, one code point of 4 bytes.
+					n += 4
+					i++
+					continue
+				}
+			}
+			n += 6
+		default:
+			n += 3
+		}
+	}
+	return n
+}
+
+// pinned is o as a built-in that reads its length and then its elements should see it, with that length, read here once: o itself when it is an array, whose length is a number of its own, or else a proxy of o that answers the length, and with iterator its iterator as nothing, as they were read here, so that a getter, a proxy or a valueOf cannot give the built-in more to allocate than was checked. It reads the rest of o, and sets it, as the built-in would.
+func (r *runtime) pinned(o *js.Object, iterator bool) (js.Value, int64) {
+	if o.ExportType() == arrayType {
+		return o, r.lengthOf(o)
+	}
+	l := o.Get("length")
+	if l == nil {
+		l = js.Undefined()
+	}
+	n := lengthOf(l.ToNumber())
+	if _, ok := l.(*js.Object); ok {
+		l = r.vm.ToValue(n)
+	}
+	return r.callOrig(r.sandbox.memory.pin, js.Undefined(), []js.Value{o, l, r.vm.ToValue(iterator)}), n
+}
+
+// source is o as Array.from and the typed arrays' constructors should see it, with how many elements they make of it when it is an array-like: an array itself, an iterable one that iterates as o does but whose iterator it reads here, once, and an array-like pinned (pinned).
+func (r *runtime) source(o *js.Object) (js.Value, int64) {
+	if o.ExportType() == arrayType {
+		return o, r.lengthOf(o)
+	}
+	if it := r.callOrig(r.sandbox.memory.iterate, js.Undefined(), []js.Value{o}); !js.IsUndefined(it) {
+		return it, 0
+	}
+	return r.pinned(o, true)
+}
+
+// argumentList is o, the arguments of apply or construct, as the original would make them a list: an array itself, or else an array of o's elements read here once, as the original would read them, so that it makes a list of as many as were checked.
+func (r *runtime) argumentList(o *js.Object) js.Value {
+	if o.ExportType() == arrayType {
+		r.checkMemory(mul(r.lengthOf(o), valueSize))
+		return o
+	}
+	l := o.Get("length")
+	if l == nil {
+		l = js.Undefined()
+	}
+	n := lengthOf(l.ToNumber())
+	// The copy and the list the original makes of it.
+	r.checkMemory(mul(n, 2*valueSize))
+	parts := make([]any, n)
+	for i := range parts {
+		e := o.Get(strconv.Itoa(i))
+		if e == nil {
+			e = js.Undefined()
+		}
+		parts[i] = e
+	}
+	return r.vm.NewArray(parts...)
+}
+
+// memoryProgram makes what the wrappers hand the originals in place of what the bundle gave them, of the built-ins as they were before it ran: pin, a proxy of an object o that answers its length, and its iterator when noIterator is set, as given, and reads and sets the rest of o as a built-in would; iterate, an iterable that iterates as o does, its iterator read once, or undefined when o has none; and project, a proxy with o's properties keys, in that order, as JSON.stringify writes an object with a list of them.
+var memoryProgram = js.MustCompile("memory.js", `(function (Proxy, get, set, apply, iterator) {
+	"use strict";
+	const descriptor = () => ({ value: undefined, writable: true, enumerable: true, configurable: true });
+	return {
+		pin: (o, length, noIterator) => new Proxy(o, {
+			__proto__: null,
+			get: (t, k) => k === "length" ? length : noIterator && k === iterator ? undefined : get(t, k),
+			set: (t, k, v) => set(t, k, v),
+		}),
+		iterate: (o) => {
+			const it = o[iterator];
+			return it === undefined || it === null ? undefined : { [iterator]: () => apply(it, o, []) };
+		},
+		project: (o, keys) => new Proxy({}, {
+			__proto__: null,
+			ownKeys: () => keys,
+			getOwnPropertyDescriptor: descriptor,
+			get: (t, k) => get(o, k),
+		}),
+	};
+})(Proxy, Reflect.get, Reflect.set, Reflect.apply, Symbol.iterator)`, true)
+
+var arrayType = reflect.TypeFor[[]any]()
+
+// isTyped reports whether o is a typed array.
+func isTyped(o *js.Object) bool {
+	t := o.ExportType()
+	return t != nil && t != arrayBufferType && t.Kind() == reflect.Slice && t.Elem().Kind() != reflect.Interface
 }
 
 // checkMemory stops the runtime when n more bytes would not fit its budget.
@@ -435,7 +710,7 @@ func (r *runtime) bytesOf(v js.Value) []byte {
 	if !ok {
 		return nil
 	}
-	if t := o.ExportType(); t != arrayBufferType && (t == nil || t.Kind() != reflect.Slice || t.Elem().Kind() == reflect.Interface) {
+	if o.ExportType() != arrayBufferType && !isTyped(o) {
 		return nil
 	}
 	var b []byte

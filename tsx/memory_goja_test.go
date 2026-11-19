@@ -91,6 +91,76 @@ func TestMemoryStopsWhatWouldNotFit(t *testing.T) {
 	}
 }
 
+// TestMemoryReadsSizesOnce holds a built-in to the size it was checked by when what it is given reads differently the second time, through a length getter, a proxy or a valueOf: each of these read 0 first and would then allocate from 16 MiB to over 1 GiB under a 1 MiB budget.
+func TestMemoryReadsSizesOnce(t *testing.T) {
+	const grows = `let c = 0; const o = { get length() { return c++ ? 1 << 24 : 0; } };`
+	for _, src := range []string{
+		grows + `new Uint8Array(o)`,
+		grows + `new Float64Array(o)`,
+		grows + `Array.from(o)`,
+		grows + `Array.prototype.toReversed.call(o)`,
+		grows + `Array.prototype.toSorted.call(o)`,
+		grows + `Array.prototype.with.call(o, 0, 0)`,
+		grows + `Array.prototype.toSpliced.call(o)`,
+		grows + `Array.prototype.sort.call(o)`,
+		`let c = 0; Array.prototype.fill.call({ get length() { return c++ ? 1 << 20 : 0; } }, 0)`,
+		grows + `Math.max.apply(null, o)`,
+		grows + `Reflect.apply(Math.max, null, o)`,
+		grows + `Reflect.construct(Array, o)`,
+		`let c = 0; Math.max.apply(null, { length: { valueOf: () => c++ ? 1 << 22 : 0 } })`,
+		`let c = 0; Math.max.apply(null, new Proxy({}, { get: (t, k) => k === "length" ? (c++ ? 1 << 22 : 0) : 0 }))`,
+		grows + `String.raw({ raw: o })`,
+		`let c = 0; JSON.stringify({}, new Proxy([], { get: (t, k) => k === "length" ? (c++ ? 1 << 22 : 0) : undefined }))`,
+	} {
+		r := limited(1 << 20)
+		if n := allocated(func() { _, _ = r.vm.RunString(src) }); n > 8<<20 {
+			t.Errorf("%s: allocated %d MiB", src, n>>20)
+		}
+	}
+}
+
+// TestMemoryStopsWhatAddsUp stops a built-in before it allocates past the budget in parts that a check of its arguments alone would not see: the strings a template or JSON joins, the indentation of deep JSON, raw JSON, a typed array's own length, a subclass's constructor or species. Each would allocate from 4 MiB to over 400 MiB under a 1 MiB budget.
+func TestMemoryStopsWhatAddsUp(t *testing.T) {
+	for _, src := range []string{
+		`const a = new Uint8Array(1 << 19); Object.defineProperty(a, "length", { value: 0 }); new Float64Array(a)`,
+		`String.raw({ raw: new Array(1000).fill("x".repeat(100_000)) })`,
+		`String.raw({ raw: ["", ""] }, { toString: () => "x".repeat(900_000) }) + String.raw({ raw: new Array(200).fill("") }, ...new Array(199).fill("x".repeat(100_000)))`,
+		`let a = []; for (let i = 0; i < 3000; i++) a = [a]; JSON.stringify(a, null, 10)`,
+		`let a = []; for (let i = 0; i < 3000; i++) a = [a]; JSON.stringify(a, null, new Number(10))`,
+		`JSON.stringify(new Array(1000).fill("x".repeat(100_000)), [])`,
+		`JSON.stringify(new Array(1000).fill({ a: "x".repeat(100_000) }), ["a"])`,
+		`const r = JSON.rawJSON('"' + "x".repeat(100_000) + '"'); JSON.stringify(new Array(1000).fill(r))`,
+		`JSON.stringify("\x01".repeat(300_000))`,
+		`const s = "é".repeat(100_000); for (let i = 0; i < 100; i++) globalThis["k" + i] = JSON.stringify(s)`,
+		`new (class extends ArrayBuffer {})(2 ** 32)`,
+		`Reflect.construct(ArrayBuffer, [2 ** 32], function () {})`,
+		`Reflect.construct(Uint8Array, [2 ** 32], Object)`,
+		`new (class extends Uint8Array { static get [Symbol.species]() { return Float64Array; } })(500_000).map((x) => x)`,
+	} {
+		r := limited(1 << 20)
+		var err error
+		n := allocated(func() {
+			_, err = r.vm.RunString(`let caught = false; try { ` + src + ` } catch (e) { caught = true; }`)
+		})
+		var interrupted *js.InterruptedError
+		if !errors.As(err, &interrupted) || core.ErrorCode(r.stoppedErr()) != core.CodeQuotaExceeded {
+			t.Errorf("%s: ran to %v, stopped with %v", src, err, r.stoppedErr())
+		}
+		if n > 8<<20 {
+			t.Errorf("%s: allocated %d MiB", src, n>>20)
+		}
+	}
+}
+
+// allocated is how many bytes the process allocated while f ran: what a script needs besides what it is held to is far below a few MiB, and one allocation past a budget of 1 MiB here far above.
+func allocated(f func()) uint64 {
+	var before, after goruntime.MemStats
+	goruntime.ReadMemStats(&before)
+	f()
+	goruntime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
+}
+
 // TestMemoryKeepsWhatFits runs what fits the budget as the originals do, holding what it keeps.
 func TestMemoryKeepsWhatFits(t *testing.T) {
 	r := limited(64 << 20)
@@ -125,6 +195,12 @@ func TestMemoryKeepsTheBuiltinsBehavior(t *testing.T) {
 		`[Array.from("abc").join(), Array.from({ length: 3 }, (_, i) => i * 2).join(), Array.from(new Set([1, 1, 2])).join(), Array.from(new Map([[1, 2]])).join(";"), (class extends Array {}).from([1]).constructor.name]`,
 		`function f() { return [this.x, ...arguments].join(); } [f.apply({ x: 1 }, [2, 3]), f.apply({ x: 1 }, { length: 2, 0: "a" }), Reflect.apply(f, { x: 0 }, [1]), Reflect.construct(Array, [3]).length, Reflect.construct(Date, [0], Object).constructor === Date, Math.max.apply(null, [1, 5, 2])]`,
 		`[JSON.stringify({ a: [1, "x", null], b: { toJSON: () => "j" }, c: undefined }), JSON.stringify({ a: 1, b: 2, c: { a: 3 } }, ["a", "c"]), JSON.stringify({ a: 1, b: "s" }, (k, v) => typeof v === "number" ? v * 10 : v, 2), JSON.stringify("é\n"), JSON.stringify(undefined), JSON.stringify([new Date(0)]), JSON.stringify({ k: 1 }, function (k, v) { return k === "" ? v : this === undefined; })]`,
+		`const o = { b: 1, 1: 2, a: { b: [1, { a: 3, b: 4 }], c: 5 }, get g() { return "g"; }, toJSON: undefined }; [JSON.stringify(o, ["b", "1", "a", "g", 1, new String("c"), "b"]), JSON.stringify(o, ["a", "b"], 2), JSON.stringify([o, [o]], ["a"], "--"), JSON.stringify({ a: { toJSON: (k) => k + "!" } }, ["a"]), JSON.stringify(1, []), JSON.stringify([new Number(3), new String("s"), Object(true)], [])]`,
+		`let a = [1]; for (let i = 0; i < 5; i++) a = [a, { k: a }]; [JSON.stringify(a, null, 3), JSON.stringify(a, null, new Number(2)), JSON.stringify(a, null, new String("\t")), JSON.stringify(a, null, "abcdefghijklmn"), JSON.stringify(a, null, 0.5), JSON.stringify(a, null, 20), JSON.stringify({ s: "\u0001\ud800é\ud83d\ude00\"\\" }), JSON.stringify([JSON.rawJSON("12"), JSON.rawJSON("null")]), JSON.stringify({ r: JSON.rawJSON('"x"') }, null, 1)]`,
+		`[String.raw({ raw: { length: 3, 0: "a", 1: "b", 2: "c" } }, 1, { toString: () => "two" }, 3), String.raw({ raw: "xyz" }, "-", "+"), String.raw({ raw: [] }), (() => { try { String.raw({}); } catch (e) { return e.name; } })(), String.raw.name, String.raw.length]`,
+		`const log = []; const o = { get length() { log.push("len"); return 3; }, get 0() { log.push(0); return "c"; }, 1: "a", set 0(v) { log.push(this === o); }, 2: "b" }; const s = Array.prototype.sort.call(o); [s === o, o[1], o[2], log.join(), Array.prototype.fill.call({ length: 2 }, 7)[1], Array.prototype.toSorted.call({ length: 2, 0: 2, 1: 1 }).join(), Array.prototype.toReversed.call("abc").join()]`,
+		`class Bag { #items = [3, 4]; *[Symbol.iterator]() { yield* this.#items; } } [Array.from(new Bag()).join(), new Uint8Array(new Bag()).join(), Uint8Array.from(new Bag()).join(), Array.from({ length: 2, 0: "x" }, (v, i) => v + i).join(), new Int8Array({ length: 2, 0: 5 }).join(), Array.from(new Set([1, 2])).join(), (() => { try { Array.from({ [Symbol.iterator]: 1 }); } catch (e) { return e.name; } })()]`,
+		`function f() { return [this && this.x, arguments.length, ...arguments].join(); } [f.apply({ x: 1 }, { length: 3, 0: "a", 2: "c" }), Reflect.apply(f, null, { length: 1, 0: 9 }), Reflect.construct(Array, { length: 2, 0: 1, 1: 2 }).join(), Math.max.apply(null, new Proxy([1, 7, 3], {})), (() => { try { Reflect.apply(f, null, 1); } catch (e) { return e.name; } })()]`,
 		`[JSON.stringify.name, JSON.stringify.length, (function () {}).apply.name, Object.isFrozen(ArrayBuffer), Object.isFrozen(Uint8Array.prototype), typeof Uint8Array.fromBase64]`,
 	} {
 		want, err := limited(0).vm.RunString(src)
