@@ -614,7 +614,7 @@ func (m *mounter) text(id driver.NodeID, t *driver.TextContent) {
 	case driver.TextAlignEnd:
 		align = 2
 	}
-	m.o.op("t", id).str(strings.ReplaceAll(t.Text, string(driver.AttachmentRune), "")).num(float64(f.Size)).num(float64(f.Weight)).
+	m.o.op("t", id).str(drawnText(t.Text)).num(float64(f.Size)).num(float64(f.Weight)).
 		boolean(f.Italic).str(f.Family).str(webstyle.Color(st.Color)).
 		num(float64(st.LineHeight)).num(float64(align)).num(float64(t.MaxLines))
 	if runs := textRunsJSON(t); runs != "" {
@@ -635,7 +635,7 @@ func (m *mounter) input(id driver.NodeID, c *driver.InputConfig) {
 		f.Weight = 400
 	}
 	m.o.op("in", id).str(c.Placeholder).num(float64(f.Size)).num(float64(f.Weight)).
-		str(webstyle.Color(c.Style.Color)).str(webstyle.Color(c.PlaceholderColor)).
+		str(webstyle.Color(c.Style.Color)).str(webstyle.Fill(c.PlaceholderColor)).
 		boolean(c.Masked).boolean(c.Multiline)
 }
 

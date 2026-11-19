@@ -3204,7 +3204,6 @@ class Renderer {
       .type(v.masked ? InputType.Password : InputType.Normal)
       .lineHeight(v.multiline ? Math.max(v.fs * 1.4, 1) : v.h)
       .padding({ top: 0, right: 0, bottom: 0, left: 0 })
-      .placeholderColor(v.phColor)
       .placeholderFont({ size: v.fs, weight: v.fw })
       .onFocus(() => {
         const host = this.host;
@@ -3241,6 +3240,10 @@ class Renderer {
           host.send('selection', v.id, start, end, '');
         }
       });
+    // An unset placeholder color is the platform's, as on the other targets.
+    if (v.phColor !== '') {
+      a.placeholderColor(v.phColor);
+    }
     if (v.selStart >= 0) {
       const control = this.controllers.get(v.id);
       const start = v.selStart;

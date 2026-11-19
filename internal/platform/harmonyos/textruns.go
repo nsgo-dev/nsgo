@@ -56,7 +56,7 @@ func textRunsJSON(t *driver.TextContent) string {
 		if c == 0 {
 			c = t.Style.Color
 		}
-		out = append(out, textRun{T: strings.ReplaceAll(r.Text, string(driver.AttachmentRune), ""), C: webstyle.Color(c), S: float32(f.Size),
+		out = append(out, textRun{T: drawnText(r.Text), C: webstyle.Color(c), S: float32(f.Size),
 			W: int(f.Weight), I: f.Italic, F: f.Family})
 	}
 	b, err := json.Marshal(out)
@@ -65,3 +65,6 @@ func textRunsJSON(t *driver.TextContent) string {
 	}
 	return string(b)
 }
+
+// drawnText is a text as ArkUI draws it: without the attachment runes, which ArkUI would draw as boxes. The attachments' views are mounted apart, at the frames the engine gives them.
+func drawnText(s string) string { return strings.ReplaceAll(s, string(driver.AttachmentRune), "") }
