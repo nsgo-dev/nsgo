@@ -109,6 +109,75 @@ func iosEnv(ctx context.Context, sys *appleOS, simulator bool) ([]string, error)
 		"CC=" + clang + " " + flags, "CGO_CFLAGS=" + flags, "CGO_LDFLAGS=" + flags}, nil
 }
 
+// appleBuildInfo returns the toolchain metadata Xcode writes into device
+// bundles. Simulator bundles intentionally omit it: those are development
+// artifacts and App Store validation applies only to device packages.
+func appleBuildInfo(ctx context.Context, sys *appleOS, simulator bool) (map[string]any, error) {
+	if simulator {
+		return nil, nil
+	}
+	sdk := sys.sdkName(false)
+	version, err := output(ctx, "xcrun", "--sdk", sdk, "--show-sdk-version")
+	if err != nil {
+		return nil, err
+	}
+	build, err := output(ctx, "xcrun", "--sdk", sdk, "--show-sdk-build-version")
+	if err != nil {
+		return nil, err
+	}
+	xcode, err := output(ctx, "xcodebuild", "-version")
+	if err != nil {
+		return nil, err
+	}
+	xcodeVersion, xcodeBuild, ok := strings.Cut(xcode, "\n")
+	if !ok {
+		return nil, fmt.Errorf("xcodebuild -version returned no build version")
+	}
+	xcodeVersion = strings.TrimSpace(strings.TrimPrefix(xcodeVersion, "Xcode "))
+	majorText, minorText, _ := strings.Cut(xcodeVersion, ".")
+	major, err := strconv.Atoi(majorText)
+	if err != nil {
+		return nil, fmt.Errorf("xcodebuild -version returned invalid version %q", xcodeVersion)
+	}
+	minor := 0
+	if minorText != "" {
+		minorText, _, _ = strings.Cut(minorText, ".")
+		minor, err = strconv.Atoi(minorText)
+		if err != nil {
+			return nil, fmt.Errorf("xcodebuild -version returned invalid version %q", xcodeVersion)
+		}
+	}
+	xcodeBuild = strings.TrimSpace(strings.TrimPrefix(xcodeBuild, "Build version "))
+	return map[string]any{
+		"DTPlatformName":               sdk,
+		"DTPlatformVersion":            version,
+		"DTPlatformBuild":              build,
+		"DTSDKName":                    sdk + version,
+		"DTSDKBuild":                   build,
+		"DTXcode":                      fmt.Sprintf("%d%02d", major, minor*10),
+		"DTXcodeBuild":                 xcodeBuild,
+		"DTCompiler":                   "com.apple.compilers.llvm.clang.1_0",
+		"UIRequiredDeviceCapabilities": []any{"arm64"},
+	}, nil
+}
+
+// appleBuildPlist returns toolchain metadata as top-level plist entries. An
+// explicit apple.info value wins by leaving its key out of the generated
+// entries; writePlist has already emitted the project's value.
+func appleBuildPlist(ctx context.Context, p *project, sys *appleOS, simulator bool) (string, error) {
+	info, err := appleBuildInfo(ctx, sys, simulator)
+	if err != nil {
+		return "", err
+	}
+	for key := range p.Apple.Info {
+		delete(info, key)
+	}
+	if len(info) == 0 {
+		return "", nil
+	}
+	return plistEntries(string(encodePlist(info))), nil
+}
+
 // buildIOSApp writes <dir>/<name>.app for sys's simulator or devices.
 // Device builds are left unsigned for the developer's own identity.
 func buildIOSApp(ctx context.Context, p *project, sys *appleOS, dir string, simulator bool) (string, error) {
@@ -145,6 +214,11 @@ func buildIOSApp(ctx context.Context, p *project, sys *appleOS, dir string, simu
 		detailIn(ctx, "no widgets or Live Activities on %s: they are left out", sys.name)
 	}
 	extra := icon + "\n" + names + "\n\t<key>CFBundleSupportedPlatforms</key><array><string>" + sys.platformName(simulator) + "</string></array>"
+	buildInfo, err := appleBuildPlist(ctx, p, sys, simulator)
+	if err != nil {
+		return "", err
+	}
+	extra += "\n" + buildInfo
 	if widgets {
 		extra += "\n" + p.widgetPlist(true)
 	}

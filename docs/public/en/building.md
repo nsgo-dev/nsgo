@@ -11,6 +11,8 @@ order: 22
 go tool nsgo build
 ```
 
+Device builds for iOS, tvOS and watchOS include the SDK and Xcode metadata App Store Connect checks, plus `UIRequiredDeviceCapabilities: [arm64]`, in the app and its extensions. Simulator builds leave these device-only entries out, and an explicit `apple.info` value keeps precedence.
+
 `build` writes a stripped release package for each target `nsgo.yaml` lists, into `dist/<name>-<version>-<target>`: an `.app`, an `.ipa`, an `.apk`, Windows' and Linux's directories, or a web site, whose page fetches each TSX module an `import()` names when the import runs. `-target` replaces the list, and `all` means every target that needs only Go and Xcode; add `android_x64` when an Android NDK is installed, and `miniprogram`, or `miniprogram_wechat`, `miniprogram_qq`, `miniprogram_alipay` or `miniprogram_douyin` alone, for [mini programs](#mini-programs), and `harmonyos` for a [HarmonyOS](#harmonyos) preview. `-run` starts the package built for this machine, or installs it on the iPhone, simulator or Android device `-device` picks.
 
 Everything to hand out lands in `dist/releases`, the only directory to look in:

@@ -11,6 +11,8 @@ order: 22
 go tool nsgo build
 ```
 
+iOS、tvOS 和 watchOS 的设备构建会在应用及其扩展中写入 App Store Connect 检查的 SDK 与 Xcode 元数据，并加入 `UIRequiredDeviceCapabilities: [arm64]`。模拟器构建不会写入这些仅设备条目；`apple.info` 中显式设置的值优先。
+
 `build` 为 `nsgo.yaml` 列出的每个目标写出精简的发布包，放在 `dist/<name>-<version>-<target>`：`.app`、`.ipa`、`.apk`、Windows 和 Linux 的目录，或一个网站，网站页面会在 `import()` 执行时才获取它指定的 TSX 模块。`-target` 替换目标列表，`all` 表示所有只需 Go 和 Xcode 的目标；安装 Android NDK 后可再加上 `android_x64`；`miniprogram` 构建全部[小程序](#小程序)，也可单独指定 `miniprogram_wechat`、`miniprogram_qq`、`miniprogram_alipay` 或 `miniprogram_douyin`；`harmonyos` 构建[鸿蒙](#鸿蒙)预览版。`-run` 启动为本机构建的包，或把它安装到 `-device` 选中的 iPhone、模拟器或 Android 设备上。
 
 所有要交付出去的东西都在 `dist/releases`，只需看这一个目录：

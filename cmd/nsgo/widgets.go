@@ -621,13 +621,26 @@ func addIOSWidgets(ctx context.Context, p *project, app string, simulator bool) 
 	if err := copyLibrary(exe, filepath.Join(appex, widgetsExec)); err != nil {
 		return err
 	}
-	info := widgetsInfo(p, map[string]any{
+	platformInfo := map[string]any{
 		widgetGroupKey:               p.appGroup(),
 		"CFBundleSupportedPlatforms": []any{platform},
-		"DTPlatformName":             sdk,
 		"MinimumOSVersion":           "15.0",
 		"UIDeviceFamily":             []any{int64(1), int64(2)},
-	})
+	}
+	if simulator {
+		// Keep the platform marker for simulator extensions, but do not add
+		// device-only toolchain metadata.
+		platformInfo["DTPlatformName"] = sdk
+	} else {
+		buildInfo, err := appleBuildInfo(ctx, iOS, false)
+		if err != nil {
+			return err
+		}
+		for key, value := range buildInfo {
+			platformInfo[key] = value
+		}
+	}
+	info := widgetsInfo(p, platformInfo)
 	if err := os.WriteFile(filepath.Join(appex, "Info.plist"), info, 0o644); err != nil {
 		return err
 	}
