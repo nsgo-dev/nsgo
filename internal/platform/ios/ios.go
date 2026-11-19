@@ -663,7 +663,7 @@ func appLifecycle() driver.Lifecycle {
 	return driver.LifecycleActive
 }
 
-// layoutChanged follows a change of the surface view's safe area or traits. UIKit makes them as it rotates the view or moves it to another display, after it set the new bounds and before it lays the view out at them, so for a view in a window the environment goes with the size from the layout that follows (surfaceLayout): reported now, it would reach the app at the previous size.
+// layoutChanged follows a change of the surface view's safe area or traits. UIKit mostly makes them as it rotates the view or moves it to another display, after it set the new bounds and before it lays the view out at them, so for a view in a window the environment goes with the size from the layout that follows (surfaceLayout): reported now, it would reach the app at the previous size. Where UIKit lays the view out between the two, as docs/architecture/foldable.md (Updates) records, the app sees them in two batches.
 func (s *surface) layoutChanged() {
 	if s.engine != nil && s.uiWindow() != 0 {
 		s.native.Send(selSetNeedsLayout)
