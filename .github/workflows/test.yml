@@ -292,6 +292,8 @@ jobs:
         run: go tool nsgo test -run '^(TestRefFocusUsesNativeKeyboardStops|TestNativeLabeledByProvider)$' ./internal/platform/windows
       - name: Test UI Automation property-changed events
         run: go tool nsgo test -run '^TestUIAPropertyChangedEvents$' ./internal/platform/windows
+      - name: Test pixel frames and animated images
+        run: go tool nsgo test -run '^(TestPixelFramesShowEachFrame|TestAnimatedGIFAndSVGImagesDraw)$' ./internal/platform/windows
       - name: Test menu yield with a focused WebView2 page
         run: go tool nsgo test -run '^TestMenuYieldFollowsNativeFocus$' ./internal/platform/windows
       - name: Test menu yield to the shortcuts the menu leaves a focused field
