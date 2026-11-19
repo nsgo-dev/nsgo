@@ -21,7 +21,7 @@ ui.Input{
 }
 ```
 
-`Masked` hides the characters, `Readonly` and `Disabled` stop edits, and `Multiline` wraps the text and grows with it unless its style sizes it. `KeyboardType` picks the software keyboard (`core.KeyboardEmail`, `core.KeyboardNumber`, `core.KeyboardURL` and the rest), `AutoComplete` tells the system what the field holds for autofill, and `MaxLength` caps the UTF-16 units the user enters. `AutoCapitalize` and `NoAutoCorrect` tune the keyboard's behavior.
+`Masked` hides the characters, `Readonly` and `Disabled` stop edits, and `Multiline` wraps the text and grows with it unless its style sizes it. A multiline field's lines, and its placeholder's, are as tall as its style's `LineHeight`, the font centered in each as in a `core.Text`; a single-line field keeps its line centered in its height. `KeyboardType` picks the software keyboard (`core.KeyboardEmail`, `core.KeyboardNumber`, `core.KeyboardURL` and the rest), `AutoComplete` tells the system what the field holds for autofill, and `MaxLength` caps the UTF-16 units the user enters. `AutoCapitalize` and `NoAutoCorrect` tune the keyboard's behavior.
 
 `OnSelectionChange` and `OnCaretMove` report the selection and where the caret is, for a menu that opens at it. `Suggest`, a `core.Suggest`, follows a query after a trigger such as `@`, and a `ui.SuggestList` beside the field offers rows for it at the caret, which Up, Down, Return and a press choose from, as `chat.Composer`'s `Suggest` does for mentions. `OnKeyPress` hears each key, `OnPaste` what the user pastes, and `OnCompositionChange` follows an input method.
 
