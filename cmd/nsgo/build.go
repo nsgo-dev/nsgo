@@ -132,7 +132,7 @@ func buildPackages(ctx context.Context, p *project, targets []string, jobs int) 
 			defer func() { <-slots }()
 			dir := filepath.Join(p.Build.Output, fmt.Sprintf("%s-%s-%s", p.Name, p.Version, target))
 			q := *p
-			q.buildParallel = max(1, runtime.NumCPU()/jobs)
+			q.buildParallel = compileWorkers(jobs)
 			q.released = nil
 			err := os.RemoveAll(dir)
 			if err == nil {
@@ -184,6 +184,11 @@ func (p *project) buildJobs(targets int) (int, error) {
 	}
 	jobs = min(jobs, max(1, runtime.NumCPU()))
 	return max(1, min(jobs, targets)), nil
+}
+
+// compileWorkers is the -p of each go build while jobs targets build at once, so that their compilers together stay within the CPU count; a lone target keeps every CPU.
+func compileWorkers(jobs int) int {
+	return max(1, runtime.NumCPU()/max(1, jobs))
 }
 
 // buildSummary closes a build of several targets with their number, time

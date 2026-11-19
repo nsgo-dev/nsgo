@@ -206,8 +206,10 @@ func TestBuildJobs(t *testing.T) {
 		{1, 4, 1},
 	} {
 		p.Build.Jobs = c.jobs
-		if got, err := p.buildJobs(c.targets); err != nil || got != c.want {
-			t.Errorf("build.jobs %d for %d targets: got %d, %v; want %d", c.jobs, c.targets, got, err, c.want)
+		// No more targets than CPUs build at once.
+		want := min(c.want, runtime.NumCPU())
+		if got, err := p.buildJobs(c.targets); err != nil || got != want {
+			t.Errorf("build.jobs %d for %d targets: got %d, %v; want %d", c.jobs, c.targets, got, err, want)
 		}
 	}
 	p.Build.Jobs = 0
@@ -219,16 +221,18 @@ func TestBuildJobs(t *testing.T) {
 		t.Error("build.jobs -1: got no error")
 	}
 	p.Build.Jobs = runtime.NumCPU() * 2
-	if got, _ := p.buildJobs(100); got > runtime.NumCPU() {
-		t.Errorf("explicit build.jobs oversubscribes: got %d, want at most %d", got, runtime.NumCPU())
+	if got, _ := p.buildJobs(100); got != runtime.NumCPU() {
+		t.Errorf("build.jobs %d: got %d, want the %d CPUs", p.Build.Jobs, got, runtime.NumCPU())
 	}
 }
 
-func TestBuildParallelKeepsCompilersWithinTheCPUCount(t *testing.T) {
-	for _, jobs := range []int{1, 2, max(1, runtime.NumCPU()/2), runtime.NumCPU()} {
-		p := &project{buildParallel: max(1, runtime.NumCPU()/max(1, jobs))}
-		if got := jobs * p.buildParallel; got > runtime.NumCPU() {
-			t.Errorf("%d targets use %d compile workers, want at most %d", jobs, got, runtime.NumCPU())
+func TestCompileWorkersStayWithinTheCPUs(t *testing.T) {
+	if got := compileWorkers(1); got != runtime.NumCPU() {
+		t.Errorf("one target: got -p %d, want every one of %d CPUs", got, runtime.NumCPU())
+	}
+	for _, jobs := range []int{2, 3, max(1, runtime.NumCPU()/2), runtime.NumCPU()} {
+		if got := compileWorkers(jobs); got < 1 || jobs*got > max(jobs, runtime.NumCPU()) {
+			t.Errorf("%d targets at once: got -p %d, want 1 or more and at most %d in all", jobs, got, runtime.NumCPU())
 		}
 	}
 }
