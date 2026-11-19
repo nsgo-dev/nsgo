@@ -25,8 +25,9 @@ const (
 	hingeStatusFullyOpen     = 3
 )
 
-// foldGeometry is the geometry of a surface view of size with regions and the hinge's latest reading: an occlusion region becomes an occluding obstruction and a division region a separating one, one of each at the same frame a single obstruction both occluding and separating; and the hinge's status and angle are every obstruction's. An occlusion region along an edge of the view that divides nothing is left to the safe area, as the system's bars are, so the vertical bar the system may place on either edge never becomes an obstruction.
-func foldGeometry(size driver.Size, regions []reservedRegion, h hingeReading) driver.Geometry {
+// foldGeometry is the geometry of a surface view of size with safe area safe, regions and the hinge's latest reading: an occlusion region becomes an occluding obstruction and a division region a separating one, one of each at the same frame a single obstruction both occluding and separating; and the hinge's status and angle are every obstruction's. An occlusion region that divides nothing is left to the safe area, as the system's bars and cutouts are, when it lies along an edge of the view, so the vertical bar the system may place on either edge never becomes an obstruction, or wholly within the safe area's insets, as a camera beside the vertical bar does.
+func foldGeometry(size driver.Size, safe driver.Edges, regions []reservedRegion, h hingeReading) driver.Geometry {
+	inside := driver.Bounds{Origin: driver.Point{X: safe.Left, Y: safe.Top}, Size: driver.Size{Width: size.Width - safe.Left - safe.Right, Height: size.Height - safe.Top - safe.Bottom}}
 	var obstructions []driver.Obstruction
 	for _, r := range regions {
 		i := -1
@@ -50,7 +51,7 @@ func foldGeometry(size driver.Size, regions []reservedRegion, h hingeReading) dr
 		f := o.Frame
 		edge := !o.Horizontal && (f.Origin.X <= 0 || f.Origin.X+f.Size.Width >= size.Width) ||
 			o.Horizontal && (f.Origin.Y <= 0 || f.Origin.Y+f.Size.Height >= size.Height)
-		if !o.Separating && edge {
+		if !o.Separating && (edge || !overlaps(f, inside)) {
 			continue
 		}
 		if h.known {
@@ -67,4 +68,10 @@ func foldGeometry(size driver.Size, regions []reservedRegion, h hingeReading) dr
 		kept = append(kept, o)
 	}
 	return driver.Divide(size, kept)
+}
+
+// overlaps reports whether a and b share an area.
+func overlaps(a, b driver.Bounds) bool {
+	return a.Origin.X < b.Origin.X+b.Size.Width && b.Origin.X < a.Origin.X+a.Size.Width &&
+		a.Origin.Y < b.Origin.Y+b.Size.Height && b.Origin.Y < a.Origin.Y+a.Size.Height
 }

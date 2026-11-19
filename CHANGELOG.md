@@ -16,6 +16,7 @@
 - Let TSX packages carry opaque signed metadata in `pkg.Contents.Extra` (#761 by @houko).
 - Have an app under `nsgo test -target macos` open its windows as `nsgo.Run` does without an `Environment` option, so a window it opens with `desktop.OpenWindow` hears the main window's keys through `KeyOptions.AllSurfaces`, and have steps act on its main window, which opens at the desktop's default 480 by 640 points without `nsgotest.Size` and shows a root view too, so `desktop.CurrentWindow` and `OnClosing` work there; closing it asks `OnClosing`, and a quit the app asks for counts in `App.Quits` instead of ending the test's process (#763, #771 by @houko).
 - Lay the gallery out for Apple Watch, as a list of the demos a watch can show, and for Apple TV, as a sidebar the remote's focus moves through, each leaving out the demos the device cannot use (#803 by @houko).
+- Leave a camera cutout inside the safe area's insets to the safe area on iOS 27.1, instead of reporting it in `Env.Geometry` as an occluding obstruction with a reserved rectangle, as the iPhone Duo's outer display did (#821 by @houko).
 
 ## [0.2.0] - 2026-11-19
 

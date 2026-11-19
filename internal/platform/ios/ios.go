@@ -538,7 +538,7 @@ func (s *surface) startEngine(test *testOpen) {
 		s.alerts = map[uint32]shownAlert{}
 	}
 	// The first commit is laid out with the regions read at the size it starts at, as layoutSubviews reports them.
-	opts.Geometry = foldGeometry(opts.Size, s.reservedRegions(), s.hinge)
+	opts.Geometry = s.geometry(opts.Size)
 	imageload.UseDiskCache(opts.CacheDir)
 	if s.perfOn && test == nil || test != nil && test.options.FPS {
 		s.perf = engine.NewPerfMonitor()
@@ -1796,7 +1796,7 @@ func surfaceLayout(self objc.ID, cmd objc.SEL) {
 		b := objc.Send[apple.CGRect](self, selBounds)
 		// The reserved regions are read at the size reported now, so they go with it.
 		size := driver.Size{Width: driver.Points(b.Size.Width), Height: driver.Points(b.Size.Height)}
-		v.surface.engine.Resize(size, foldGeometry(size, v.surface.reservedRegions(), v.surface.hinge))
+		v.surface.engine.Resize(size, v.surface.geometry(size))
 		if h := v.surface.hud; h != nil {
 			h.layout()
 		}

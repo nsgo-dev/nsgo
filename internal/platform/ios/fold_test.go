@@ -59,7 +59,40 @@ func TestFoldGeometry(t *testing.T) {
 		}},
 	}
 	for _, c := range cases {
-		if got := foldGeometry(c.size, c.regions, c.hinge); !reflect.DeepEqual(got, c.want) {
+		if got := foldGeometry(c.size, driver.Edges{}, c.regions, c.hinge); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s:\n got %+v\nwant %+v", c.name, got, c.want)
+		}
+	}
+}
+
+// TestFoldGeometryCutouts leaves to the safe area the occlusion regions the iPhone Duo simulator (iOS 27.2) reports for the outer display's camera and the vertical bar around it, which lie within the safe area's insets.
+func TestFoldGeometryCutouts(t *testing.T) {
+	closed := hingeReading{true, hingeStatusClosed, 0}
+	cases := []struct {
+		name    string
+		size    driver.Size
+		safe    driver.Edges
+		regions []reservedRegion
+		want    driver.Geometry
+	}{
+		{"the camera inside the trailing bar", driver.Size{Width: 466, Height: 678}, driver.Edges{Right: 84, Bottom: 34},
+			[]reservedRegion{{frame: bounds(399.6666666666667, 29.333333333333332, 37, 37)}, {frame: bounds(382, 0, 84, 174)}},
+			driver.Geometry{Regions: []driver.Region{{Frame: bounds(0, 0, 466, 678)}}}},
+		{"the camera inside the trailing bar in landscape", driver.Size{Width: 678, Height: 466}, driver.Edges{Right: 84, Bottom: 34},
+			[]reservedRegion{{frame: bounds(611.6666666666666, 399.6666666666667, 37, 37)}, {frame: bounds(594, 384, 84, 82)}},
+			driver.Geometry{Regions: []driver.Region{{Frame: bounds(0, 0, 678, 466)}}}},
+		{"the camera inside the leading bar", driver.Size{Width: 678, Height: 466}, driver.Edges{Bottom: 34, Left: 84},
+			[]reservedRegion{{frame: bounds(29.333333333333332, 29.333333333333314, 37, 37)}, {frame: bounds(0, 0, 84, 82)}},
+			driver.Geometry{Regions: []driver.Region{{Frame: bounds(0, 0, 678, 466)}}}},
+		{"an occlusion reaching into the safe area", driver.Size{Width: 466, Height: 678}, driver.Edges{Right: 84, Bottom: 34},
+			[]reservedRegion{{frame: bounds(360, 300, 37, 37)}},
+			driver.Geometry{
+				Regions:      []driver.Region{{Frame: bounds(0, 0, 466, 678), Reserved: bounds(360, 300, 37, 37)}},
+				Obstructions: []driver.Obstruction{{Frame: bounds(360, 300, 37, 37), Occluding: true, State: driver.HingeClosed, HasAngle: true}},
+			}},
+	}
+	for _, c := range cases {
+		if got := foldGeometry(c.size, c.safe, c.regions, closed); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s:\n got %+v\nwant %+v", c.name, got, c.want)
 		}
 	}
