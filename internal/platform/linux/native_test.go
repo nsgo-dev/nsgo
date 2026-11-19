@@ -1136,6 +1136,9 @@ func aiff() []byte {
 	return chunk("FORM", body)
 }
 
+// gstreamerNeverPrerolled marks a failure in which GStreamer neither prepared the stream nor reported an error, before NSGo had anything to do.
+const gstreamerNeverPrerolled = "gstreamer: the stream was never prepared and reported no error"
+
 // TestVideoReportsLoadProgressAndEnd plays a short sound through a Video and reads its events. At the end, unrelated configuration stays stopped; an explicit replay or seek starts it again.
 func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 	if testing.Short() {
@@ -1143,16 +1146,34 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 	}
 	// GTK and GStreamer keep state beyond a window's lifetime. Exercise this first pipeline independently of the other native tests, as the WebKit regressions do, while retaining every playback assertion.
 	if os.Getenv("NSGO_TEST_GSTREAMER_PROCESS") != t.Name() {
-		cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
-		cmd.Env = append(os.Environ(), "NSGO_TEST_GSTREAMER_PROCESS="+t.Name())
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("%v\n%s", err, out)
+		// Now and then in CI GStreamer never prerolls the file: GstPlay stays in READY with no error, so GTK never prepares the stream and NSGo is never asked anything (#727). A PulseAudio daemon that does not answer, stopped with SIGSTOP, fails the test exactly so, as pulsesink waits for it; CI's daemon stalls now and then. A run that fails that way, and only that way, gets one more process; any other failure, or the same one twice, fails the test.
+		var failures []string
+		for attempt := 1; ; attempt++ {
+			dots := t.TempDir()
+			cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+			// GstPlay writes the pipeline at each of its state changes there, so a failure names the last one it reached.
+			cmd.Env = append(os.Environ(), "NSGO_TEST_GSTREAMER_PROCESS="+t.Name(), "GST_DEBUG_DUMP_DOT_DIR="+dots)
+			out, err := cmd.CombinedOutput()
+			if err == nil {
+				if strings.Contains(string(out), "--- SKIP") {
+					t.Skipf("%s", out)
+				}
+				if len(failures) > 0 {
+					t.Logf("passed on attempt %d after GStreamer never prerolled:\n%s", attempt, strings.Join(failures, "\n"))
+				}
+				return
+			}
+			var states []string
+			if entries, _ := os.ReadDir(dots); len(entries) > 0 {
+				for _, e := range entries {
+					states = append(states, e.Name())
+				}
+			}
+			failures = append(failures, fmt.Sprintf("attempt %d: %v\n%s\nGstPlay state changes: %q", attempt, err, out, states))
+			if attempt == 2 || !strings.Contains(string(out), gstreamerNeverPrerolled) {
+				t.Fatal(strings.Join(failures, "\n"))
+			}
 		}
-		if strings.Contains(string(out), "--- SKIP") {
-			t.Skipf("%s", out)
-		}
-		return
 	}
 	path := filepath.Join(t.TempDir(), "silence.aiff")
 	if err := os.WriteFile(path, aiff(), 0o644); err != nil {
@@ -1191,6 +1212,8 @@ func TestVideoReportsLoadProgressAndEnd(t *testing.T) {
 				msg := "none"
 				if e := gtkMediaStreamGetError(s); e != 0 {
 					msg = goString((*gError)(cPointer(e)).message)
+				} else if gtkMediaStreamIsPrepared(s) == 0 {
+					t.Log(gstreamerNeverPrerolled)
 				}
 				t.Logf("media: audio=%d video=%d duration=%d time=%d error=%s",
 					gtkMediaStreamHasAudio(s), gtkMediaStreamHasVideo(s), gtkMediaStreamGetDuration(s), gtkMediaStreamGetTimestamp(s), msg)
