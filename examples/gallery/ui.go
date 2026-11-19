@@ -216,7 +216,9 @@ func pageHeader(cx *core.Scope, p pageHeaderProps) core.Node {
 	}
 	back := func() bool { return p.left == nil && !p.root && shell.nav.Depth() > 0 }
 	style := func() core.Style {
-		s := core.Style{Height: core.Pt(44), Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, Padding: core.Symmetric(0, 12)}
+		// Like the page under it, the header keeps clear of the left and right safe area.
+		s := core.Style{Height: core.Pt(44), Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, Padding: core.Symmetric(0, 12),
+			PaddingEnv: core.EnvEdges{Right: core.EnvSafeArea, Left: core.EnvSafeArea}}
 		if tb := shell.titleBar(cx); tb != (core.Edges{}) {
 			s.Height, s.Padding = core.Pt(ui.ShellHeaderHeight(cx)), core.Edges{Left: tb.Left + 12, Right: tb.Right + 12}
 		}
@@ -353,6 +355,33 @@ var transparent = core.RGBA(0xffffff, 0)
 // to it: a page whose scroll views scroll within it instead of growing it
 // past the window (React Native's flex items do not shrink by default).
 var fillPage = core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), MinWidth: core.Pt(0)}
+
+// clearSides keeps children clear of the left and right safe area (core.EnvSafeArea), such as the vertical status bar beside a foldable's outer display or an iPhone's camera in landscape, and of the left one only while left says so (nil: always). It takes both insets away from what the children keep clear of (core.Insets), so a page that pads by the safe area itself does not pad twice. Its own padding shows the background of the page around it.
+func clearSides(left func() bool, children ...core.Node) core.Node {
+	clearsLeft := func() bool { return left == nil || left() }
+	return core.View{Style: fillPage, StyleFunc: func() core.Style {
+		env := core.EnvEdges{Right: core.EnvSafeArea}
+		if clearsLeft() {
+			env.Left = core.EnvSafeArea
+		}
+		return core.Style{PaddingEnv: env}
+	}, Children: []core.Node{core.Func(func(cx *core.Scope) core.Node {
+		outer := core.InsetsFunc(cx)
+		// While the left is not cleared, something else covers it, such as the desktop layout's sidebar.
+		core.ProvideInsets(cx, func() core.Edges {
+			in := outer()
+			in.Left, in.Right = 0, 0
+			return in
+		})
+		return core.View{Style: fillPage, Children: children}
+	})}}
+}
+
+// clearPageSides keeps page p's content clear of the left and right safe area (clearSides).
+func clearPageSides(p base.NavPage) base.NavPage {
+	p.Children = []core.Node{clearSides(nil, p.Children...)}
+	return p
+}
 
 // later runs fn after d under cx itself. Scope.AfterFunc belongs to the
 // current owner, which in a press handler is the pressed view's: a timer
