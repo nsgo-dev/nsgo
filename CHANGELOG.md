@@ -4,11 +4,13 @@
 
 - Add the `--nsgo-os` launch flag, `?nsgo-os=ios` in a page's query, which runs a web build as macOS, Windows, Linux, iOS or Android: the app reads that OS and its idiom, and `core.Env.Simulated` reports that the platform's native parts are absent, so `NavHeader` and the drawn tab bar stand in for the system's, there is no application menu or native popup menu (`desktop.PopupMenu`) while drawn menus such as `ui.ContextMenu` and `ui.Menu` still work, and `mobile.IsAvailable` and `desktop.IsAvailable` are false.
 - Add `nsgotest.App.SetWindowEnvironment`, which changes one window's environment apart from the app's other windows, so a test can put the main window in the background while another window shows, and have the Minimize, Zoom and Toggle Full Screen roles change only the main window, as the desktops do (#783 by @houko).
+- Add `examples/gallery-miniprogram`, the gallery for mini programs: buttons, text fields, toggles, a slider, badges, avatars, images, a list, layout, tabs, a navigation stack and the platform's alerts, clipboard and storage, on `base` in `ui`'s look and within the platforms' 2 MB package.
 - Build the gallery for HarmonyOS too, with its own tab bar and without the Shader and DataTable demos the preview cannot draw yet, and send a HarmonyOS test's press to what shows under the point rather than to a row scrolled out of view beneath it (#805 by @houko).
 - Take the frames of what an alert's answer starts in `nsgotest`'s `Answer` and `App.OnAlert`, as every other step does, so a sheet closed from an alert's callback is gone once `Answer` returns instead of staying until the test advances the clock (#782 by @houko).
 - Report a malformed SVG string in a TSX `icon` prop once, naming the parse error, instead of silently drawing nothing (#594 by @dhruv1220).
 - Route Linux application-menu Close and Quit roles through the owning window and app teardown (#768 by @houko).
 - Match headless menu shortcut spelling precedence with Windows and Linux (#769 by @houko).
+- Show a navigation stack's pages' `Header` in mini programs, which took the phone's OS for one that draws a system header and showed neither a title nor back; `core.Env.Simulated` reports true there.
 - Add keyed `core.PresenceOf` with bounded leaving branches for animated value changes (#786 by @houko).
 - Let TSX packages carry opaque signed metadata in `pkg.Contents.Extra` (#761 by @houko).
 

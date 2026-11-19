@@ -29,6 +29,7 @@ render layer (miniprogram/wechat, miniprogram/alipay)
 - Canvases are played into one offscreen canvas with `canvas2d`, the web's player, and shown as pictures, which move and scroll as views do.
 - Animated values run on the engine's `Animator`, frames timed by the runtime, and go to the render layer as an inline style over the view's. Keyframes and modal presentations run in the render layer through the component's `animate`, with no work per frame.
 - Styles are the web's CSS, written by `webstyle`.
+- The environment reports the device's OS as `Simulated`, as a mini program has none of its native parts: a stack's pages show their `Header`, as no system header stands in for it, and `mobile.IsAvailable` is false.
 
 ## Platforms
 
@@ -63,4 +64,4 @@ Alerts are the platform's modal or action sheet, the clipboard holds text, stora
 - The module is built with `GOEXPERIMENT=nojsonv2`, encoding/json's smaller first implementation, as every app's is where it can be ([packages](tool.md#packages)), and again without inlining when it is still too large.
 - TSX does not run: a mini program evaluates no code it did not ship, which the page's engine needs, and goja does not fit. The tool refuses apps that link `tsx`.
 
-`examples/embedded` compresses to 1.9 MB. NSH's gallery in Go does not fit.
+`examples/embedded` compresses to 1.9 MB and `examples/gallery-miniprogram` to 2.0 MB, about 40 KB short of the limit. NSH's gallery in Go does not fit, and neither does an app of `ui`'s controls: a `ui.Button` links the SVG parser and `encoding/xml` for its busy spinner, so the mini program gallery styles `base`'s components as `ui` does.
