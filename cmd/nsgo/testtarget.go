@@ -39,6 +39,13 @@ type targetRunner struct {
 	timesFromStart bool
 }
 
+// targetDeviceLostError stops a target run once when the device disappears;
+// a transient test-level failure remains attached to that test instead.
+type targetDeviceLostError struct{ err error }
+
+func (e *targetDeviceLostError) Error() string { return e.err.Error() }
+func (e *targetDeviceLostError) Unwrap() error { return e.err }
+
 // runTargetTests runs the app's tests on opts.target, each test in a
 // process of its own, as the platform shows one app at a time: the test
 // binary, built with the backend's test host, is the target's package.
@@ -128,6 +135,10 @@ tests:
 			code, err := runner.run(tctx, args, env, w)
 			timedOut := errors.Is(tctx.Err(), context.DeadlineExceeded)
 			cancel()
+			var lost *targetDeviceLostError
+			if errors.As(err, &lost) {
+				return err
+			}
 			if timedOut {
 				code, err = -1, timeoutError(opts.timeout)
 			} else if ctx.Err() != nil {

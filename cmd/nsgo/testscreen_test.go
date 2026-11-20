@@ -73,6 +73,47 @@ func TestPrepareAndroidTestScreen(t *testing.T) {
 	}
 }
 
+func TestPrepareAndroidTestScreenRetriesTransientReads(t *testing.T) {
+	remaining := 2
+	command := func(_ context.Context, args ...string) (string, error) {
+		switch strings.Join(args, " ") {
+		case "shell dumpsys power":
+			if remaining > 0 {
+				remaining--
+				return "", errors.New("adb transport reset")
+			}
+			return "mWakefulness=Awake", nil
+		case "shell dumpsys window policy":
+			return "showing=false\ninputRestricted=false", nil
+		case "shell dumpsys trust":
+			return unlockedTrust, nil
+		default:
+			t.Fatalf("unexpected command %q", strings.Join(args, " "))
+			return "", nil
+		}
+	}
+	if err := prepareAndroidTestScreen(t.Context(), command); err != nil {
+		t.Fatalf("prepare = %v, want transient read to recover", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("transient read failures remaining = %d, want all retried", remaining)
+	}
+}
+
+func TestPrepareAndroidTestScreenReportsPersistentReadFailure(t *testing.T) {
+	command := func(_ context.Context, args ...string) (string, error) {
+		if strings.Join(args, " ") == "shell dumpsys power" {
+			return "", errors.New("adb unavailable")
+		}
+		return "", nil
+	}
+	err := prepareAndroidTestScreen(t.Context(), command)
+	var readErr *androidTestScreenReadError
+	if !errors.As(err, &readErr) || !strings.Contains(err.Error(), "read display state") {
+		t.Fatalf("prepare = %v, want persistent display read error", err)
+	}
+}
+
 func TestAndroidTestRunnerRefusesALockedDeviceBeforeBuilding(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake adb uses a POSIX shell")

@@ -4,12 +4,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 )
 
 // androidTestScreen is a device's display and keyguard state: secure means the trust manager reports the current user's device locked, a keyguard only a credential dismisses.
 type androidTestScreen struct{ awake, locked, secure bool }
+
+// androidTestScreenReadError means adb failed to read one of the three state
+// dumps after the short retry window. Callers use it to stop a target run once
+// with a device-lost error instead of turning every remaining test into the
+// same failure.
+type androidTestScreenReadError struct {
+	what string
+	err  error
+}
+
+func (e *androidTestScreenReadError) Error() string { return fmt.Sprintf("read %s: %v", e.what, e.err) }
+func (e *androidTestScreenReadError) Unwrap() error { return e.err }
+
+const (
+	androidTestScreenReadAttempts = 3
+	androidTestScreenRetryDelay   = 100 * time.Millisecond
+)
+
+func adbDeviceDisconnected(err error) bool {
+	var exit *exec.ExitError
+	return errors.As(err, &exit) && exit.ExitCode() == 255
+}
 
 // readAndroidTestScreen reads AOSP's power, keyguard and trust dumps. Unknown output is an error rather than permission to run behind a lock screen.
 //
@@ -63,14 +86,38 @@ func prepareAndroidTestScreen(ctx context.Context, command func(context.Context,
 	}
 	// A command the deadline or a cancellation killed says the wait ended, not that adb failed.
 	read := func(what string, args ...string) (string, error) {
-		out, err := command(ctx, args...)
-		if err != nil && ctx.Err() != nil {
-			return "", notReady()
+		var err error
+		for attempt := 0; attempt < androidTestScreenReadAttempts; attempt++ {
+			var out string
+			out, err = command(ctx, args...)
+			if err == nil {
+				return out, nil
+			}
+			if ctx.Err() != nil {
+				return "", notReady()
+			}
+			if adbDeviceDisconnected(err) {
+				// A transport loss can leave the serial absent for a moment;
+				// wait-for-device gives adb a chance to reconnect before retrying.
+				if _, waitErr := command(ctx, "wait-for-device"); waitErr != nil {
+					if ctx.Err() != nil {
+						return "", notReady()
+					}
+					err = waitErr
+				}
+			}
+			if attempt+1 == androidTestScreenReadAttempts {
+				return "", &androidTestScreenReadError{what: what, err: err}
+			}
+			timer := time.NewTimer(androidTestScreenRetryDelay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return "", notReady()
+			case <-timer.C:
+			}
 		}
-		if err != nil {
-			return "", fmt.Errorf("read %s: %w", what, err)
-		}
-		return out, nil
+		panic("unreachable")
 	}
 	woke, dismissed := false, false
 	for {
@@ -122,9 +169,14 @@ func prepareAndroidTestScreen(ctx context.Context, command func(context.Context,
 const androidTestScreenWait = 15 * time.Second
 
 func (d device) prepareTestScreen(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, androidTestScreenWait)
+	parent := ctx
+	ctx, cancel := context.WithTimeout(parent, androidTestScreenWait)
 	defer cancel()
 	if err := prepareAndroidTestScreen(ctx, d.output); err != nil {
+		var readErr *androidTestScreenReadError
+		if errors.As(err, &readErr) || errors.Is(err, context.DeadlineExceeded) && parent.Err() == nil {
+			return &targetDeviceLostError{err: fmt.Errorf("Android test device %s lost: %w", d.serial, err)}
+		}
 		return fmt.Errorf("Android test device %s: %w", d.serial, err)
 	}
 	return nil

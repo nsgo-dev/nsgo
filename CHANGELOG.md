@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Retry transient Android screen-state adb failures and stop target runs once with a device-lost error when the device stays unreachable (#718 by @houko).
 - Make non-editing menu roles with `OnSelect` run the callback instead of the standard role on macOS, Windows and Linux, matching headless tests (#723 by @houko).
 - Keep selectable table and tree rows exposed as selection items while unselected, with Windows' SelectionItem pattern and the web's `aria-selected="false"` (#735 by @houko).
 - Add `MultiSelectable` accessibility state for multi-row `DataTable` selection, exposing `aria-multiselectable`, UI Automation Selection and GTK multiselectable state (#734 by @houko).
