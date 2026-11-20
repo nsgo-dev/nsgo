@@ -319,18 +319,18 @@ func patternIID(id uintptr) (guid, bool) {
 
 // uiaSpec is what an element exposes.
 type uiaSpec struct {
-	control                        int32
-	name, help, automationID       string
-	localizedType                  string
-	description                    string
-	invalid                        bool
-	enabled, focusable, focused    bool
-	invoke, ranged, expandable     bool
+	control                                         int32
+	name, help, automationID                        string
+	localizedType                                   string
+	description                                     string
+	invalid                                         bool
+	enabled, focusable, focused                     bool
+	invoke, ranged, expandable                      bool
 	selectable, selected, expanded, multiselectable bool
-	toggle                         int32 // ToggleState, -1 for none
-	min, max, now                  float32
-	live                           driver.LiveRegion
-	heading, dialog, password      bool
+	toggle                                          int32 // ToggleState, -1 for none
+	min, max, now                                   float32
+	live                                            driver.LiveRegion
+	heading, dialog, password                       bool
 }
 
 // uiaControls are the control types of the roles.
@@ -991,11 +991,11 @@ func uiaGetSelection(i *uiaIface, out *uintptr) uintptr {
 	if arr == 0 {
 		return 0x8007000E // E_OUTOFMEMORY
 	}
-	var raw uintptr
-	if ret, _, _ := safeArrayAccessData.Call(arr, uintptr(unsafe.Pointer(&raw))); ret != 0 {
+	var slotsPtr *uintptr
+	if ret, _, _ := safeArrayAccessData.Call(arr, uintptr(unsafe.Pointer(&slotsPtr))); ret != 0 {
 		return 0x80004005 // E_FAIL
 	}
-	slots := unsafe.Slice((*uintptr)(unsafe.Pointer(raw)), len(selected))
+	slots := unsafe.Slice(slotsPtr, len(selected))
 	for n, child := range selected {
 		child.refs.Add(1)
 		slots[n] = uintptr(unsafe.Pointer(&child.simple))
