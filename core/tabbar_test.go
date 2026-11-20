@@ -21,6 +21,22 @@ func TestTabBarTakesTheAccent(t *testing.T) {
 	}
 }
 
+func TestTabBarSendsCustomPaletteRoles(t *testing.T) {
+	theme := core.DefaultTheme()
+	theme.Light.Surface, theme.Light.TextMuted, theme.Light.AccentText = core.RGB(0x102030), core.RGB(0x405060), core.RGB(0xffffff)
+	theme.Light.SetColor("accentContainer", core.RGB(0x708090))
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		cx.SetTheme(theme)
+		return core.TabBar{Items: []core.TabBarItem{{Title: "Home"}}, Style: core.Style{Height: core.Pt(80)}, TestID: "bar"}
+	}, nsgotest.Environment(driver.Environment{OS: driver.OSIOS}))
+	props := app.Find("id:bar").NativeProps
+	for name, want := range map[string]float64{"background": float64(core.RGB(0x102030)), "inactive": float64(core.RGB(0x405060)), "indicator": float64(core.RGB(0x708090)), "activeContent": float64(core.RGB(0xffffff))} {
+		if got := props[name]; got != want {
+			t.Errorf("%s = %v, want %v", name, got, want)
+		}
+	}
+}
+
 // A web build that runs as iOS or Android has no system tab bar to show.
 func TestTabBarShowsNothingSimulated(t *testing.T) {
 	for _, os := range []core.OS{core.OSIOS, core.OSAndroid} {

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Let Android's system tab bar follow the app theme's surface, inactive text, active text and accent-container colors (#936 by @houko).
 - Add touch-sheet options to `ui.Dialog` for bare content, grabber visibility, content/title styles and custom entry/exit motion (#933 by @houko).
 - Pin `Environment.Camera` under `nsgo test -target` and deliver `App.TakePhoto` answers through the target test host instead of opening a system camera (#897, #948 by @houko).
 - Add Android's Material 3 `SystemSwitch` implementation for `ui.SwitchSystem`, with native checked, disabled and accessibility behavior (#937 by @houko).

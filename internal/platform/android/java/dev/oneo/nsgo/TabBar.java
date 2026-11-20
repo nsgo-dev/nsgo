@@ -49,6 +49,10 @@ public final class TabBar extends LinearLayout {
     private int selected;
     /** The theme's accent as ARGB (0: none): the selected tab's icon, label and indicator. */
     private int tint;
+    private int background;
+    private int inactive;
+    private int indicator;
+    private int activeContent;
     private final float density;
     /** The pixels of this bar over the system's navigation bar, kept clear as bottom padding. */
     private int bottomInset;
@@ -123,6 +127,15 @@ public final class TabBar extends LinearLayout {
         restyle();
     }
 
+    public void setBackground(long argb) {
+        background = (int) argb;
+        setBackgroundColor(background != 0 ? background : (night() ? 0xff211f26 : 0xfff3edf7));
+    }
+
+    public void setInactive(long argb) { inactive = (int) argb; restyle(); }
+    public void setIndicator(long argb) { indicator = (int) argb; restyle(); }
+    public void setActiveContent(long argb) { activeContent = (int) argb; restyle(); }
+
     private View tab(int index, String title, Drawable icon) {
         LinearLayout item = new LinearLayout(getContext());
         item.setOrientation(VERTICAL);
@@ -177,11 +190,17 @@ public final class TabBar extends LinearLayout {
         int indicator = night ? 0xff4a4458 : 0xffe8def8;
         int activeIcon = night ? 0xffe8def8 : 0xff1d192b;
         int activeLabel = night ? 0xffe6e0e9 : 0xff1d1b20;
+        if (inactive != 0) idle = inactive;
         if (tint != 0) {
             // The icon and label in the accent, over a faint pill of it.
             indicator = (tint & 0x00ffffff) | (((tint >>> 24) * 0x1f / 0xff) << 24);
             activeIcon = tint;
             activeLabel = tint;
+        }
+        if (this.indicator != 0) indicator = this.indicator;
+        if (activeContent != 0) {
+            activeIcon = activeContent;
+            activeLabel = activeContent;
         }
         for (int i = 0; i < getChildCount(); i++) {
             LinearLayout item = (LinearLayout) getChildAt(i);

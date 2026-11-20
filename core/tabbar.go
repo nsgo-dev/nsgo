@@ -4,7 +4,9 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 
 // TabBar is the core's part of mobile.TabBar, which apps use: the
 // system's tab bar, a native component iOS and Android register. The
-// selected tab takes the theme's accent; the others keep the system's.
+// selected tab takes the theme's accent; Android also follows custom palette
+// surface, muted text, indicator and accent-text roles when they differ from
+// the default Material baseline.
 type TabBar struct {
 	Items     []TabBarItem
 	ItemsFunc func() []TabBarItem
@@ -61,8 +63,27 @@ func (b TabBar) native(cx *Scope) Node {
 			if b.Selected != nil {
 				selected = b.Selected()
 			}
-			// One color, for the appearance shown: sent again when it changes.
-			return map[string]any{"items": list, "selectedIndex": float64(selected), "tint": float64(cx.Palette().Accent)}
+			// The accent is always sent. Extra palette roles are sent only for a
+			// theme that changes the tab bar's roles, preserving the Material
+			// baseline for NSGo's default theme.
+			p := cx.Palette()
+			props := map[string]any{"items": list, "selectedIndex": float64(selected), "tint": float64(p.Accent)}
+			base := DefaultTheme().Light
+			if cx.Dark() {
+				base = DefaultTheme().Dark
+			}
+			container, hasContainer := p.Color("accentContainer")
+			baseContainer, baseHasContainer := base.Color("accentContainer")
+			if p.Surface != base.Surface || p.TextMuted != base.TextMuted || p.AccentText != base.AccentText || hasContainer != baseHasContainer || container != baseContainer {
+				props["background"] = float64(p.Surface)
+				props["inactive"] = float64(p.TextMuted)
+				if !hasContainer || container == 0 {
+					container = p.Accent.Faded(0.12)
+				}
+				props["indicator"] = float64(container)
+				props["activeContent"] = float64(p.AccentText)
+			}
+			return props
 		},
 		OnEvent: func(name string, data any) {
 			if name != "change" || b.OnChange == nil {

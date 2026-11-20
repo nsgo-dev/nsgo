@@ -24,6 +24,11 @@ func (*tabBar) SetProp(string, any) {}
 // ViewProps implements driver.AndroidPropMapper: the items cross as one
 // JSON string.
 func (*tabBar) ViewProps(name string, value any) []driver.AndroidViewProp {
+	color := func(v any) []driver.AndroidViewProp {
+		c, _ := v.(float64)
+		rgba := uint32(c)
+		return []driver.AndroidViewProp{{Name: name, Value: int64(rgba>>8 | rgba<<24)}}
+	}
 	switch name {
 	case "items":
 		data, err := tabBarItems(value)
@@ -39,6 +44,8 @@ func (*tabBar) ViewProps(name string, value any) []driver.AndroidViewProp {
 		c, _ := value.(float64)
 		rgba := uint32(c)
 		return []driver.AndroidViewProp{{Name: "tint", Value: int64(rgba>>8 | rgba<<24)}}
+	case "background", "inactive", "indicator", "activeContent":
+		return color(value)
 	}
 	return nil
 }
