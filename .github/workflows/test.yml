@@ -265,7 +265,7 @@ jobs:
         run: |
           # Booting a simulator on a hosted runner takes from about three to ten minutes, and the three cases run in one package, so go test's default ten-minute limit can end the last case before it starts.
           go tool nsgo test -run '^TestSimulatorProcessResults$' ./cmd/nsgo -- -timeout=25m
-          go tool nsgo test -target ios_simulator -timeout 30s -run '^TestFoldGeometry$' ./internal/platform/ios
+          go tool nsgo test -target ios_simulator -timeout 1m -run '^(TestFoldGeometry|TestSceneReconnectKeepsTheEngine)$' ./internal/platform/ios
           go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
           go tool nsgo test -target watchos_simulator -timeout 1m ./internal/platform/watchos
 

@@ -427,6 +427,7 @@ func loadUIKit() {
 	register("NsgoSceneDelegate", apple.Class("UIResponder"),
 		[]*objc.Protocol{objc.GetProtocol("UIWindowSceneDelegate")},
 		[]objc.MethodDef{{Cmd: sel("scene:willConnectToSession:options:"), Fn: sceneWillConnect},
+			{Cmd: sel("sceneDidDisconnect:"), Fn: sceneDidDisconnect},
 			{Cmd: sel("scene:continueUserActivity:"), Fn: sceneContinueActivity},
 			{Cmd: sel("scene:openURLContexts:"), Fn: sceneOpenURLContexts}})
 }
@@ -485,10 +486,14 @@ var window, controller objc.ID
 func sceneWillConnect(self objc.ID, _ objc.SEL, scene, session, options objc.ID) {
 	takeConnectionActivities(options)
 	takeConnectionLinks(options)
+	s := runner
+	if s.native != 0 {
+		s.reconnect(scene)
+		return
+	}
 	window = objc.ID(apple.Class("UIWindow")).Send(selAlloc).Send(sel("initWithWindowScene:"), scene)
 	bounds := objc.Send[apple.CGRect](window, selBounds)
 	controller = objc.ID(classController).Send(selNew)
-	s := runner
 	s.native = objc.ID(classSurface).Send(selAlloc).Send(selInitWithFrame, bounds)
 	views[s.native] = &view{surface: s}
 	controller.Send(sel("setView:"), s.native)
@@ -503,6 +508,42 @@ func sceneWillConnect(self objc.ID, _ objc.SEL, scene, session, options objc.ID)
 		return
 	}
 	s.startEngine(nil)
+}
+
+// sceneDidDisconnect lets go of the window of the scene UIKit releases, as it may a scene in the background while the process lives, and of the display link, which holds the surface view. The engine, its tree, the surface view and its controller stay for the scene that connects next (reconnect); the engine closes only as the app terminates.
+func sceneDidDisconnect(self objc.ID, _ objc.SEL, scene objc.ID) { runner.detach() }
+
+// detach takes the surface view out of the standalone app's window and lets the window go.
+func (s *surface) detach() {
+	if window == 0 {
+		return
+	}
+	s.dropLink()
+	w := window
+	window = 0
+	w.Send(selSetHidden, true)
+	w.Send(sel("setRootViewController:"), objc.ID(0))
+	w.Send(selRelease)
+}
+
+// reconnect shows the surface the app already runs on in the window of a scene that connects again after its previous one disconnected (sceneDidDisconnect), rather than starting a second engine over the first. The new window lays the view out at its size, which reaches the engine as a resize with the environment read there; the links and the activity the scene connects with go to the running app.
+func (s *surface) reconnect(scene objc.ID) {
+	// A scene that connects while the window still shows in another moves the app to it.
+	s.detach()
+	window = objc.ID(apple.Class("UIWindow")).Send(selAlloc).Send(sel("initWithWindowScene:"), scene)
+	s.native.Send(selSetFrame, objc.Send[apple.CGRect](window, selBounds))
+	window.Send(sel("setRootViewController:"), controller)
+	setAppearance(s.appearance)
+	window.Send(sel("makeKeyAndVisible"))
+	if s.engine == nil {
+		// A test host's before a test opened its app.
+		return
+	}
+	s.refresh()
+	s.sendLaunchLinks()
+	if s.perf != nil || s.frameWanted.Load() || s.animator.Running() || len(s.motions) > 0 {
+		s.startTicking()
+	}
 }
 
 // watch adds what follows the surface's touches: the watcher of presses
