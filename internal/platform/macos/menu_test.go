@@ -194,6 +194,60 @@ func menuRolesRegister(t *testing.T) {
 	}
 }
 
+// TestClosingTheMenuOwnerRestoresTheOtherMenu checks that the bar goes back to the newest surviving surface's menu as the surface that set it closes, its Services, Window and Help menus registered again although the closed surface's bar took the Services menu, and to the default menu when none remains.
+func TestClosingTheMenuOwnerRestoresTheOtherMenu(t *testing.T) {
+	onMain(func() { closingMenuOwnerRestores(t) })
+}
+
+func closingMenuOwnerRestores(t *testing.T) {
+	loadAppKit()
+	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+	menus := []driver.MenuEntry{
+		{Label: "App", Items: []driver.MenuEntry{{Label: "Services", Role: driver.MenuServices}, {Separator: true}, {Label: "Quit", Role: driver.MenuQuit}}},
+		{Label: "Window", Role: driver.MenuWindowMenu, Items: []driver.MenuEntry{{Label: "Tile", ID: 3}}},
+		{Label: "Help", Role: driver.MenuHelpMenu},
+	}
+	a, b := &surface{}, &surface{}
+	surfaces[a], surfaces[b] = true, true
+	defer func() {
+		delete(surfaces, a)
+		delete(surfaces, b)
+		a.closed, b.closed = false, false
+		b.setMenu(nil)
+		a.setMenu(nil)
+		delete(menuTargets, a.menuTarget)
+		delete(menuTargets, b.menuTarget)
+	}()
+	a.setMenu(menus)
+	b.setMenu(menus)
+	if nsApp.Send(sel("mainMenu")) != b.menu || mainMenuSurface != b {
+		t.Fatal("the second surface's menu is not the main menu")
+	}
+	b.closed = true
+	b.restoreMainMenu()
+	bar := nsApp.Send(sel("mainMenu"))
+	if bar != a.menu || mainMenuSurface != a {
+		t.Fatalf("closing the menu's owner left the main menu %v, want the other surface's %v", bar, a.menu)
+	}
+	for _, c := range []struct {
+		get  string
+		path []int
+	}{{"servicesMenu", []int{0, 0}}, {"windowsMenu", []int{1}}, {"helpMenu", []int{2}}} {
+		want := bar
+		for _, i := range c.path {
+			want = want.Send(selItemAtIndex, i).Send(sel("submenu"))
+		}
+		if got := nsApp.Send(sel(c.get)); got == 0 || got != want {
+			t.Errorf("after the owner closed, %s is %v, want the restored bar's %v", c.get, got, want)
+		}
+	}
+	a.closed = true
+	a.restoreMainMenu()
+	if nsApp.Send(sel("mainMenu")) != defaultMenu || mainMenuSurface != nil {
+		t.Error("closing the last menu's owner did not restore the default menu")
+	}
+}
+
 // TestMenuRoleItems checks the actions the new item roles send down the responder chain, Paste and Match Style's key, and a radio's check mark.
 func TestMenuRoleItems(t *testing.T) {
 	onMain(func() {

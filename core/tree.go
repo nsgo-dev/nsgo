@@ -38,8 +38,7 @@ type Tree struct {
 	id     uint32
 	window *Window
 	closed bool
-	// menuOrder is the sequence in which this tree last sent an application
-	// menu, including a nil menu that restores the default.
+	// menuOrder is the sequence in which this tree last sent an application menu, including a nil menu that restores the default.
 	menuOrder uint64
 	rt        *runtime
 	text      driver.TextEngine

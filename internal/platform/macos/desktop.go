@@ -554,10 +554,8 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 	s.menu = bar
 }
 
-// restoreMainMenu puts the newest surviving surface's menu back on AppKit's
-// menu bar after its current owner closes, or restores the default menu when
-// the surviving surface last sent no menu.
-func restoreMainMenu() {
+// restoreMainMenu puts the newest surviving surface's menu back on AppKit's menu bar as s, its current owner, closes, or the default menu when none remains. The surface sets its menu again rather than showing its old bar: the bars shown since took that bar's Services menu, which AppKit fills, and registered their own Window and Help menus.
+func (s *surface) restoreMainMenu() {
 	var next *surface
 	for candidate, alive := range surfaces {
 		if !alive || candidate == nil || candidate.closed || candidate.embedded || candidate.menuOrder == 0 {
@@ -567,13 +565,13 @@ func restoreMainMenu() {
 			next = candidate
 		}
 	}
-	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
-	if next != nil && next.menu != 0 {
-		nsApp.Send(sel("setMainMenu:"), next.menu)
-		mainMenuSurface = next
+	if next != nil {
+		next.setMenu(next.menuEntries)
 		return
 	}
+	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
 	nsApp.Send(sel("setMainMenu:"), defaultMenu)
+	s.registerMenus(0)
 	mainMenuSurface = nil
 }
 

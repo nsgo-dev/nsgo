@@ -211,9 +211,7 @@ func (t *Tree) menuSent() {
 	}
 }
 
-// menuClosed restores the last menu sent by a surface that is still open.
-// Closing the current menu owner must also make every tree recompute keys that
-// yield to the menu, as menuSent does.
+// menuClosed restores the last menu sent by a surface that is still open. Closing the current menu owner must also make every tree recompute keys that yield to the menu, as menuSent does.
 func (t *Tree) menuClosed() {
 	if t.rt.menuBar != t {
 		return
