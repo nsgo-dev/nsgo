@@ -159,6 +159,19 @@ func TestApplicationMenuFollowsItsOwner(t *testing.T) {
 	}
 }
 
+func TestClosingApplicationMenuOwnerRestoresPreviousSurface(t *testing.T) {
+	h := newHost(t, Size{Width: 100, Height: 100}, func(*Scope) Node { return View{} })
+	rt := h.tree.rt
+	previous := &Tree{rt: rt, root: h.tree.root, menuOrder: 1}
+	owner := &Tree{rt: rt, root: h.tree.root, menuOrder: 2, closed: true}
+	rt.surfaces = []*Tree{previous, owner}
+	rt.menuBar = owner
+	owner.menuClosed()
+	if rt.menuBar != previous || !previous.keysChanged || !previous.changed {
+		t.Fatalf("menu bar = %p, previous flags keys=%v changed=%v; want previous and both invalidated", rt.menuBar, previous.keysChanged, previous.changed)
+	}
+}
+
 func TestDockMenuFollowsItsOwner(t *testing.T) {
 	var log []string
 	var open *Signal[bool]

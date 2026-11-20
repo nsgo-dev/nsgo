@@ -864,6 +864,11 @@ type shownAlert struct {
 // the app sets its own.
 var defaultMenu objc.ID
 
+// mainMenuSurface is the surface whose menu is currently on AppKit's menu
+// bar. menuSequence lets close restore the most recently sent surviving one.
+var mainMenuSurface *surface
+var menuSequence uint64
+
 // defaultLanguage is the language defaultMenu says.
 var defaultLanguage string
 
@@ -930,6 +935,9 @@ func (s *surface) close() {
 	s.closed = true
 	if dockMenu.target == s {
 		clearDockMenu()
+	}
+	if mainMenuSurface == s {
+		restoreMainMenu()
 	}
 	s.sensors.Close()
 	delete(surfaces, s)

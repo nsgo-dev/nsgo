@@ -226,7 +226,8 @@ type runtime struct {
 	// globalKeys are the bindings made with KeyOptions.AllSurfaces, which every tree opened takes.
 	globalKeys []*globalKey
 	// menuBar is the tree that set the application menu last, whose menu macOS's menu bar shows (menuHasKey).
-	menuBar *Tree
+	menuBar   *Tree
+	menuOrder uint64
 	// overlay is the overlay over other apps opened last (OpenOverlay).
 	overlay *Window
 	// shutdown says when the app ends; main is its main window, ownMain

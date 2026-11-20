@@ -195,12 +195,36 @@ func (cx *Scope) SetApplicationMenu(items []MenuItem) {
 
 // menuSent follows the application menu the tree sent: bindings that yield to the menu (KeyOptions.YieldsToMenu) come and go with its shortcuts, in every surface on macOS, whose one menu bar shows the menu a surface sent last.
 func (t *Tree) menuSent() {
+	t.rt.menuOrder++
+	t.menuOrder = t.rt.menuOrder
 	t.rt.menuBar = t
 	t.keysChanged = true
 	t.changed = true
 	if t.root.Env().hostUntracked() != OSMacOS {
 		return
 	}
+	for _, o := range append([]*Tree{t.rt.tree}, t.rt.surfaces...) {
+		if o != nil && !o.closed {
+			o.keysChanged = true
+			o.changed = true
+		}
+	}
+}
+
+// menuClosed restores the last menu sent by a surface that is still open.
+// Closing the current menu owner must also make every tree recompute keys that
+// yield to the menu, as menuSent does.
+func (t *Tree) menuClosed() {
+	if t.rt.menuBar != t {
+		return
+	}
+	var bar *Tree
+	for _, o := range append([]*Tree{t.rt.tree}, t.rt.surfaces...) {
+		if o != nil && !o.closed && (bar == nil || o.menuOrder > bar.menuOrder) {
+			bar = o
+		}
+	}
+	t.rt.menuBar = bar
 	for _, o := range append([]*Tree{t.rt.tree}, t.rt.surfaces...) {
 		if o != nil && !o.closed {
 			o.keysChanged = true

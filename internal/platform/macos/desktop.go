@@ -43,6 +43,7 @@ type chrome struct {
 	appName     string
 	menu        objc.ID // the app's menu bar
 	menuEntries []driver.MenuEntry
+	menuOrder   uint64
 	language    string // what the menus say (driver.ItemDirection)
 	menuTarget  objc.ID
 	// roleFallback are the roles of the editing items with an ID, which menuRoleChosen carries out or reports.
@@ -502,6 +503,9 @@ func (v *view) takesPointer() bool {
 
 // setMenu makes entries the menu bar, or restores the default one.
 func (s *surface) setMenu(entries []driver.MenuEntry) {
+	menuSequence++
+	s.menuOrder = menuSequence
+	mainMenuSurface = s
 	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
 	s.menuEntries = entries
 	if entries == nil {
@@ -548,6 +552,29 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 		s.menu.Send(selRelease)
 	}
 	s.menu = bar
+}
+
+// restoreMainMenu puts the newest surviving surface's menu back on AppKit's
+// menu bar after its current owner closes, or restores the default menu when
+// the surviving surface last sent no menu.
+func restoreMainMenu() {
+	var next *surface
+	for candidate, alive := range surfaces {
+		if !alive || candidate == nil || candidate.closed || candidate.embedded || candidate.menuOrder == 0 {
+			continue
+		}
+		if next == nil || candidate.menuOrder > next.menuOrder {
+			next = candidate
+		}
+	}
+	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+	if next != nil && next.menu != 0 {
+		nsApp.Send(sel("setMainMenu:"), next.menu)
+		mainMenuSurface = next
+		return
+	}
+	nsApp.Send(sel("setMainMenu:"), defaultMenu)
+	mainMenuSurface = nil
 }
 
 // dockMenu is the menu applicationDockMenu: hands AppKit, the one a surface set last (core.Scope.SetDockMenu), and that surface, whose engine hears its items.

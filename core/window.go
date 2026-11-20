@@ -227,6 +227,7 @@ func (w *Window) gone() {
 	w.closed = true
 	t := w.t
 	t.closed = true
+	t.menuClosed()
 	rt := t.rt
 	if w.key != "" && rt.keyed[w.key] == w {
 		delete(rt.keyed, w.key)

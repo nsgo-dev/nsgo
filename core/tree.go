@@ -35,26 +35,29 @@ type Tree struct {
 	reported Environment
 	// id numbers an opened surface's tree, 0 the first's; window is its
 	// handle, closed set once it is gone.
-	id       uint32
-	window   *Window
-	closed   bool
-	rt       *runtime
-	text     driver.TextEngine
-	nodes    []*node // index is NodeID; 0 is unused
-	free     []NodeID
-	view     *node // the surface's root view
-	touches  touchState
-	size     Size
-	changed  bool
-	deleted  []NodeID // retired nodes kept for command cancellation, created or not
-	commands []driver.MountItem
-	moves    []move
-	items    []driver.MountItem
-	laidOut  []*node
-	transits []*node // nodes whose next frame their layout transition moves
-	ending   []*node // nodes with OnTransitionEnd restyled since the last commit
-	reports  []report
-	stacks   []*node
+	id     uint32
+	window *Window
+	closed bool
+	// menuOrder is the sequence in which this tree last sent an application
+	// menu, including a nil menu that restores the default.
+	menuOrder uint64
+	rt        *runtime
+	text      driver.TextEngine
+	nodes     []*node // index is NodeID; 0 is unused
+	free      []NodeID
+	view      *node // the surface's root view
+	touches   touchState
+	size      Size
+	changed   bool
+	deleted   []NodeID // retired nodes kept for command cancellation, created or not
+	commands  []driver.MountItem
+	moves     []move
+	items     []driver.MountItem
+	laidOut   []*node
+	transits  []*node // nodes whose next frame their layout transition moves
+	ending    []*node // nodes with OnTransitionEnd restyled since the last commit
+	reports   []report
+	stacks    []*node
 
 	// fit is the largest size of a panel that takes its content's (PanelOptions.FitContent), zero for a surface of the platform's size; reportedSize is the size its platform last reported, which a fitted size differing from is sent (driver.WindowFitSize), and refit says the environment has yet to hear t.size.
 	fit, reportedSize Size

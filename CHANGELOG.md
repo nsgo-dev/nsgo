@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Restore the most recent surviving application menu and its `YieldsToMenu` shortcuts when the menu owner's macOS window closes (#714 by @houko).
 - Keep `nsgo dev`'s Command/Control+R reload binding alive in other windows after an app function's main view closes (#713 by @houko).
 - Keep the Windows overlay scroll indicator for wheel, touch and momentum scrolling, while app-owned `ScrollTo`, `ScrollBy`, reveals, insets and animations leave it hidden (#708 by @houko).
 - Retry transient Android screen-state adb failures and stop target runs once with a device-lost error when the device stays unreachable (#718 by @houko).
