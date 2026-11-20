@@ -4,9 +4,7 @@ import "github.com/nsgo-dev/nsgo/internal/driver"
 
 // TabBar is the core's part of mobile.TabBar, which apps use: the
 // system's tab bar, a native component iOS and Android register. The
-// selected tab takes the theme's accent; Android also follows custom palette
-// surface, muted text, indicator and accent-text roles when they differ from
-// the default Material baseline.
+// selected tab takes the theme's accent; Android also follows custom palette surface, muted text, indicator and accent-text roles when they differ from the default Material baseline.
 type TabBar struct {
 	Items     []TabBarItem
 	ItemsFunc func() []TabBarItem
@@ -63,11 +61,10 @@ func (b TabBar) native(cx *Scope) Node {
 			if b.Selected != nil {
 				selected = b.Selected()
 			}
-			// The accent is always sent. Extra palette roles are sent only for a
-			// theme that changes the tab bar's roles, preserving the Material
-			// baseline for NSGo's default theme.
+			// The accent is always sent. The other palette roles are colors only for a theme that changes the tab bar's roles, and 0, Android's own Material baseline, for NSGo's default theme; they are always sent, so a theme going back to the default takes its overrides off.
 			p := cx.Palette()
-			props := map[string]any{"items": list, "selectedIndex": float64(selected), "tint": float64(p.Accent)}
+			props := map[string]any{"items": list, "selectedIndex": float64(selected), "tint": float64(p.Accent),
+				"background": float64(0), "inactive": float64(0), "indicator": float64(0), "activeContent": float64(0)}
 			base := DefaultTheme().Light
 			if cx.Dark() {
 				base = DefaultTheme().Dark

@@ -25,14 +25,31 @@ func TestTabBarSendsCustomPaletteRoles(t *testing.T) {
 	theme := core.DefaultTheme()
 	theme.Light.Surface, theme.Light.TextMuted, theme.Light.AccentText = core.RGB(0x102030), core.RGB(0x405060), core.RGB(0xffffff)
 	theme.Light.SetColor("accentContainer", core.RGB(0x708090))
+	var custom *core.Signal[bool]
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		custom = core.NewSignal(cx, true)
 		cx.SetTheme(theme)
+		cx.Effect(func() {
+			if !custom.Get() {
+				cx.SetTheme(core.DefaultTheme())
+			}
+		})
 		return core.TabBar{Items: []core.TabBarItem{{Title: "Home"}}, Style: core.Style{Height: core.Pt(80)}, TestID: "bar"}
 	}, nsgotest.Environment(driver.Environment{OS: driver.OSIOS}))
+	app.Settle()
 	props := app.Find("id:bar").NativeProps
 	for name, want := range map[string]float64{"background": float64(core.RGB(0x102030)), "inactive": float64(core.RGB(0x405060)), "indicator": float64(core.RGB(0x708090)), "activeContent": float64(core.RGB(0xffffff))} {
 		if got := props[name]; got != want {
 			t.Errorf("%s = %v, want %v", name, got, want)
+		}
+	}
+	// Back on the default theme, the overrides go: 0 is Android's Material baseline.
+	custom.Set(false)
+	app.Settle()
+	props = app.Find("id:bar").NativeProps
+	for _, name := range []string{"background", "inactive", "indicator", "activeContent"} {
+		if got, ok := props[name]; !ok || got != float64(0) {
+			t.Errorf("after the default theme came back, %s = %v (sent %v), want 0", name, got, ok)
 		}
 	}
 }
