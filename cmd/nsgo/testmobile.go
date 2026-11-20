@@ -289,6 +289,7 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 			if err := cmd.Start(); err != nil {
 				return -1, err
 			}
+			var captured bytes.Buffer
 			defer func() {
 				cmd.Process.Kill()
 				cmd.Wait()
@@ -296,14 +297,25 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 			}()
 			if err := d.run(ctx, "shell", "am", "start", "-S", "-n", test.ID+androidComponent,
 				"--es", "nsgo.test", base64.StdEncoding.EncodeToString(payload)); err != nil {
+				if ctx.Err() != nil {
+					cmd.Process.Kill()
+					cmd.Wait()
+					androidTimeoutReport(out, token, captured.Bytes(), d)
+				}
 				return -1, err
 			}
-			return readMarkedRun(logs, token, out, func() error {
+			code, readErr := readMarkedRun(io.TeeReader(logs, &captured), token, out, func() error {
 				if ctx.Err() != nil {
 					return testContextError(ctx, opts.timeout)
 				}
 				return errors.New("the device's log ended")
 			}, nil)
+			if ctx.Err() != nil {
+				cmd.Process.Kill()
+				cmd.Wait()
+				androidTimeoutReport(out, token, captured.Bytes(), d)
+			}
+			return code, readErr
 		},
 		// Each test stops the app before and after it runs; the test build stays installed until the last test ends, then goes so it does not sit beside the app.
 		close: func() {
@@ -311,4 +323,34 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 			d.run(context.Background(), "uninstall", test.ID)
 		},
 	}, nil
+}
+
+const androidTimeoutLogTail = 128 << 10
+
+// androidTimeoutReport captures the test's log before the runner clears it for
+// the next test. The start mark distinguishes an app that never reached the
+// host from a test that hung after it began.
+func androidTimeoutReport(out io.Writer, token string, captured []byte, d device) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dump, _ := d.output(ctx, "logcat", "-d", "-v", "raw", "-s", "nsgo:I")
+	writeAndroidTimeoutReport(out, token, captured, dump)
+}
+
+func writeAndroidTimeoutReport(out io.Writer, token string, captured []byte, dump string) {
+	started := bytes.Contains(captured, []byte("nsgo-test-start "+token))
+	if dump == "" {
+		dump = string(captured)
+	}
+	lines := []byte(dump)
+	if len(lines) > androidTimeoutLogTail {
+		lines = lines[len(lines)-androidTimeoutLogTail:]
+	}
+	fmt.Fprintf(out, "nsgo: Android test timed out (host started: %t); last log lines:\n", started)
+	if len(lines) > 0 {
+		_, _ = out.Write(lines)
+		if lines[len(lines)-1] != '\n' {
+			_, _ = io.WriteString(out, "\n")
+		}
+	}
 }

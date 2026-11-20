@@ -67,6 +67,19 @@ func TestReadMarkedRunWithoutAnExitMark(t *testing.T) {
 	}
 }
 
+func TestWriteAndroidTimeoutReport(t *testing.T) {
+	var out strings.Builder
+	writeAndroidTimeoutReport(&out, "run-1", []byte("nsgo-test-start run-1\n=== RUN TestIME\n"), "native detail\n")
+	if got := out.String(); !strings.Contains(got, "host started: true") || !strings.Contains(got, "native detail") {
+		t.Fatalf("report = %q", got)
+	}
+	out.Reset()
+	writeAndroidTimeoutReport(&out, "run-2", []byte("launcher detail\n"), "")
+	if got := out.String(); !strings.Contains(got, "host started: false") || !strings.Contains(got, "launcher detail") {
+		t.Fatalf("pre-start report = %q", got)
+	}
+}
+
 // Exercise the launcher process itself: simctl can fail after a fast app has already reported its result, or exit either way after the app has crashed.
 func TestSimulatorTestReadsTheAppsExitCode(t *testing.T) {
 	for _, tc := range []struct {
