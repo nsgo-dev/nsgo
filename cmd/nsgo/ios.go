@@ -217,6 +217,9 @@ func buildIOSApp(ctx context.Context, p *project, sys *appleOS, dir string, simu
 	if clip := p.clipPlist(); clip != "" {
 		extra += "\n" + clip
 	}
+	if schemes := p.iosURLSchemesPlist(sys); schemes != "" {
+		extra += "\n" + schemes
+	}
 	if err := writePlist(filepath.Join(app, "Info.plist"), p, sys.plist, extra); err != nil {
 		return "", err
 	}

@@ -821,7 +821,7 @@ func (q *openQueue) open(rt *runtime, items []string) {
 // OnOpenFiles is the core's part of desktop.OnOpenFiles, which apps use: fn runs, while the current owner lives, with the paths of files the system asks the app to open. Files that came before any handler, as those the app launched to open, go to the first one registered.
 func (cx *Scope) OnOpenFiles(fn func(paths []string)) { cx.rt.opens.add(cx, fn) }
 
-// OnOpenLinks is the core's part of desktop.OnOpenLinks, which apps use: fn runs, while the current owner lives, with the links of the app's own URL schemes the system asks it to open. Links that came before any handler, as one the app launched to open, go to the first one registered.
+// OnOpenLinks is the core's part of desktop.OnOpenLinks and mobile.OnOpenLinks, which apps use: fn runs, while the current owner lives, with the links of the app's own URL schemes the system asks it to open. Links that came before any handler, as one the app launched to open, go to the first one registered.
 func (cx *Scope) OnOpenLinks(fn func(links []string)) { cx.rt.links.add(cx, fn) }
 
 func (t *Tree) surfaceEvent(ev driver.Event) bool {

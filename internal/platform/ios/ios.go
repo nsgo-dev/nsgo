@@ -427,7 +427,8 @@ func loadUIKit() {
 	register("NsgoSceneDelegate", apple.Class("UIResponder"),
 		[]*objc.Protocol{objc.GetProtocol("UIWindowSceneDelegate")},
 		[]objc.MethodDef{{Cmd: sel("scene:willConnectToSession:options:"), Fn: sceneWillConnect},
-			{Cmd: sel("scene:continueUserActivity:"), Fn: sceneContinueActivity}})
+			{Cmd: sel("scene:continueUserActivity:"), Fn: sceneContinueActivity},
+			{Cmd: sel("scene:openURLContexts:"), Fn: sceneOpenURLContexts}})
 }
 
 func register(name string, super objc.Class, protocols []*objc.Protocol, methods []objc.MethodDef) objc.Class {
@@ -483,6 +484,7 @@ var window, controller objc.ID
 
 func sceneWillConnect(self objc.ID, _ objc.SEL, scene, session, options objc.ID) {
 	takeConnectionActivities(options)
+	takeConnectionLinks(options)
 	window = objc.ID(apple.Class("UIWindow")).Send(selAlloc).Send(sel("initWithWindowScene:"), scene)
 	bounds := objc.Send[apple.CGRect](window, selBounds)
 	controller = objc.ID(classController).Send(selNew)
@@ -552,6 +554,7 @@ func (s *surface) startEngine(test *testOpen) {
 	e := s.engine
 	apple.SetNotificationPress(func(id string) { e.Dispatch(driver.Event{Kind: driver.EventNotificationPress, Text: id}) })
 	apple.SetPurchaseUpdates(e.Dispatch)
+	s.sendLaunchLinks()
 	s.observe()
 }
 

@@ -42,6 +42,34 @@ func TestURLSchemesRegisterInThePlist(t *testing.T) {
 	}
 }
 
+// The iOS app registers the schemes too, its App Clip and an Apple TV's app none (#909).
+func TestURLSchemesRegisterInTheIOSPlist(t *testing.T) {
+	p := &project{Name: "Umapp", ID: "me.oneo.umapp", URLSchemes: []string{"umapp"}}
+	if got := p.iosURLSchemesPlist(iOS); got != p.urlSchemesPlist() || got == "" {
+		t.Errorf("the iOS app registers %q", got)
+	}
+	if got := p.iosURLSchemesPlist(tvOS); got != "" {
+		t.Errorf("the Apple TV app registers %q", got)
+	}
+	clip := &project{Name: "Umapp Clip", ID: "me.oneo.umapp.Clip", URLSchemes: []string{"umapp"}, clipParent: "me.oneo.umapp"}
+	if got := clip.iosURLSchemesPlist(iOS); got != "" {
+		t.Errorf("the App Clip registers %q", got)
+	}
+	path := filepath.Join(t.TempDir(), "Info.plist")
+	if err := writePlist(path, p, iosPlist, p.iosURLSchemesPlist(iOS)); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "<key>CFBundleURLSchemes</key><array><string>umapp</string></array>") {
+		t.Errorf("the iOS Info.plist lacks the scheme:\n%s", data)
+	}
+	if lint, err := exec.LookPath("plutil"); err == nil {
+		if out, err := exec.Command(lint, "-lint", path).CombinedOutput(); err != nil {
+			t.Errorf("plutil: %s", out)
+		}
+	}
+}
+
 func TestNoURLSchemesWriteNothing(t *testing.T) {
 	if got := (&project{ID: "me.oneo.umapp"}).urlSchemesPlist(); got != "" {
 		t.Errorf("an app without schemes registers %q", got)

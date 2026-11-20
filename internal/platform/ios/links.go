@@ -7,6 +7,7 @@ import (
 
 	"github.com/ebitengine/purego/objc"
 
+	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
@@ -66,4 +67,51 @@ func appClip() bool {
 		}
 	}
 	return isAppClip == 1
+}
+
+// launchLinks are links of the app's own URL schemes that came before its engine started, as the one a cold launch opens it with, which go to it once it starts (core.Scope.OnOpenLinks keeps them for the first handler).
+var launchLinks []string
+
+// contextLinks are the links of a set of UIOpenURLContexts: those of the app's URL schemes (url_schemes, CFBundleURLTypes), not files another app shares.
+func contextLinks(contexts objc.ID) []string {
+	var links []string
+	if contexts == 0 {
+		return nil
+	}
+	apple.ForEach(contexts, func(c objc.ID) {
+		u := c.Send(sel("URL"))
+		if u == 0 || objc.Send[bool](u, sel("isFileURL")) {
+			return
+		}
+		links = append(links, apple.GoString(u.Send(sel("absoluteString"))))
+	})
+	return links
+}
+
+// takeConnectionLinks keeps the links a scene's connection options open it with, as a link of the app's scheme launches it.
+func takeConnectionLinks(options objc.ID) {
+	if options != 0 {
+		launchLinks = append(launchLinks, contextLinks(options.Send(sel("URLContexts")))...)
+	}
+}
+
+// sceneOpenURLContexts is the scene delegate's scene:openURLContexts:, as a link of the app's scheme opens the running app.
+func sceneOpenURLContexts(_ objc.ID, _ objc.SEL, _, contexts objc.ID) {
+	links := contextLinks(contexts)
+	if len(links) == 0 {
+		return
+	}
+	if runner == nil || runner.engine == nil {
+		launchLinks = append(launchLinks, links...)
+		return
+	}
+	runner.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
+}
+
+// sendLaunchLinks sends the links that came before the engine started to it.
+func (s *surface) sendLaunchLinks() {
+	if len(launchLinks) > 0 {
+		s.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: launchLinks})
+		launchLinks = nil
+	}
 }

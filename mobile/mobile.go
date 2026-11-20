@@ -68,6 +68,9 @@ func IsAppClip(cx *core.Scope) bool { return cx.Env().AppClip() }
 // component follows.
 func OpenedURL(cx *core.Scope) string { return cx.Env().OpenedURL() }
 
+// OnOpenLinks runs fn with links of the app's own URL schemes, which nsgo.yaml's url_schemes declares and the iOS package registers, that the system asks the app to open: tapped in Safari, another app or a widget (Entry.URL, Style.Link), or opened with xcrun simctl openurl. They reach the running app, and the link the app launched to open waits for the first handler. Android does not take them yet. A link carries whatever the page that made it chose, so treat its contents as untrusted input and confirm with the user before acting on it. It is desktop.OnOpenLinks for phones, and either hears the same links.
+func OnOpenLinks(cx *core.Scope, fn func(links []string)) { cx.OnOpenLinks(fn) }
+
 // ExitApp leaves the app on Android as its back button does when nothing
 // in the app takes it: the task's root activity goes to the background,
 // any other finishes. iOS apps never leave themselves, so it does nothing
