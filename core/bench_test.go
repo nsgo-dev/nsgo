@@ -58,6 +58,27 @@ func BenchmarkViewTick(b *testing.B) {
 	commitEach(b, tree, func(i int) { tick.Set(i + 1) })
 }
 
+// BenchmarkWindowMove reports a new window frame before each commit over trees of static rows, as a window drag does: its cost stays the same whatever the tree holds (#178).
+func BenchmarkWindowMove(b *testing.B) {
+	for _, rows := range []int{300, 3000} {
+		b.Run(fmt.Sprint(rows), func(b *testing.B) {
+			tree := benchTree(b, Size{Width: 400, Height: 800}, func(*Scope) Node {
+				kids := make([]Node, rows)
+				for i := range kids {
+					kids[i] = View{Style: Style{Direction: Row, Padding: All(8), Gap: 8}, Children: []Node{
+						View{Style: Style{Width: Pt(20), Height: Pt(20), Background: RGB(0x3366ff)}},
+						Text{Content: fmt.Sprintf("row %d", i), Style: Style{FontSize: 14}},
+					}}
+				}
+				return View{Children: kids}
+			})
+			commitEach(b, tree, func(i int) {
+				tree.SetEnvironment(Environment{WindowFrame: WindowFrame{X: Points(i + 1), Y: 40, Width: 400, Height: 800}})
+			})
+		})
+	}
+}
+
 // BenchmarkMountChildren checks that mounting children stays linear in their count: plain ones whether or not a positional class is in another branch (#584), and striped ones that each follow their place.
 func BenchmarkMountChildren(b *testing.B) {
 	for _, count := range []int{1000, 4000} {

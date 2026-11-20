@@ -846,9 +846,9 @@ func (t *Tree) reportFit() {
 	})
 }
 
-// SetEnvironment records what the platform reports about where the app
-// runs.
+// SetEnvironment records what the platform reports about where the app runs.
 func (t *Tree) SetEnvironment(env Environment) {
+	previous := t.reported
 	t.reported = env
 	e := t.root.Env()
 	safe, headers := e.safe.GetUntracked(), e.headers
@@ -858,8 +858,19 @@ func (t *Tree) SetEnvironment(env Environment) {
 	if e.safe.GetUntracked() != safe || e.headers != headers {
 		t.markLayout(t.view)
 	}
-	// Images pick their scales, screens their headers from it.
-	t.markAll()
+	// Images pick their scales, screens their headers from the rest of it, which resolving and emitting read; the window's frame, maximized state, lifecycle and title bar reach only what reads their signals.
+	if environmentNeedsFullRound(previous, env) {
+		t.markAll()
+	}
+}
+
+// environmentNeedsFullRound reports whether env changes from previous in a field that resolving or emitting the tree reads directly: any but WindowFrame, Maximized, Lifecycle and TitleBar, which only their Env signals carry (#178).
+func environmentNeedsFullRound(previous, env Environment) bool {
+	previous.WindowFrame = env.WindowFrame
+	previous.Maximized = env.Maximized
+	previous.Lifecycle = env.Lifecycle
+	previous.TitleBar = env.TitleBar
+	return !previous.Equal(env)
 }
 
 // Size returns the surface size.
