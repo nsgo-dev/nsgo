@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Keep macOS target test windows at the requested `nsgotest.Size` and `Resize` content size instead of silently constraining them to the screen (#697 by @houko).
 - Add `nsgo publish -extra`, which signs a file's bytes into the package as `pkg.Contents.Extra` (#924 by @houko).
 - Add `ToastContent.NoClose`, `Trailing` and `OnPress`, plus `Toasts.NoClose`, so apps can customize toast dismissal, trailing content and whole-toast presses while preserving child actions (#934 by @houko).
 - Register `url_schemes` in the iOS app and hand their links to `mobile.OnOpenLinks`, at a cold launch and while the app runs, through `scene:openURLContexts:` (#909 by @houko).

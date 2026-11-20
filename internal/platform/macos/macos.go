@@ -442,6 +442,15 @@ func loadAppKit() {
 		// A transparent window is borderless, which AppKit otherwise keeps from the keyboard.
 		Cmd: sel("canBecomeKeyWindow"), Fn: yes,
 	}, {
+		// Test windows are geometry fixtures: AppKit's default screen
+		// constraint would silently shrink a requested nsgotest.Size.
+		Cmd: sel("constrainFrameRect:toScreen:"), Fn: func(self objc.ID, cmd objc.SEL, frame apple.CGRect, screen objc.ID) apple.CGRect {
+			if s := windowSurface(self); s != nil && s.test != nil {
+				return frame
+			}
+			return apple.SendSuper[apple.CGRect](self, cmd, frame, screen)
+		},
+	}, {
 		Cmd: sel("canBecomeMainWindow"), Fn: yes,
 	}, {
 		// AppKit's performClose: only beeps in a window without a close button, as a transparent one is: the app's close and Cmd+W ask the app instead.
