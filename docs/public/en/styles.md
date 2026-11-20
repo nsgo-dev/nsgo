@@ -5,8 +5,6 @@ group: Core concepts
 order: 52
 ---
 
-On Apple, per-side borders stay above backdrop blur, material and glass layers while remaining below the view’s children, so a translucent frosted view keeps its hairline.
-
 ## A style
 
 `core.Style` is one Go value for a box's layout, look and text. Every field's zero value is unset, so styles compose: `Merge` replaces only what the later style sets, and a child inherits the text fields its parents set.

@@ -158,6 +158,19 @@ func blursByRadius(vs *driver.ViewStyle, glass bool) bool {
 	return color
 }
 
+// borderHost is the layer v's per-side borders go in, above its backdrop and below its children: the glass's own layer, else the tint over the material or blur; zero, v's own layer, without a backdrop.
+func (v *view) borderHost() objc.ID {
+	switch {
+	case v.backdrop == 0:
+		return 0
+	case v.glass:
+		return v.backdrop.Send(selLayer)
+	case v.tint != 0:
+		return v.tint.Send(selLayer)
+	}
+	return 0
+}
+
 // setBackdrop gives v the backdrop its style asks for, or takes it away.
 func (v *view) setBackdrop(vs *driver.ViewStyle) {
 	glass := drawsGlass(vs)
@@ -201,7 +214,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		v.surface.keepGlassActive()
 		v.backdrop.Send(sel("setStyle:"), int(vs.Glass)-1)
 		v.backdrop.Send(sel("setCornerRadius:"), float64(max(vs.CornerRadius, vs.Corners.TopLeft)))
-		apple.MoveBorders(v.native.Send(selLayer), v.backdrop.Send(selLayer))
+		apple.MoveBorders(v.native.Send(selLayer), v.borderHost())
 		return
 	}
 	if gaussian {
@@ -220,7 +233,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		v.backdrop.Send(sel("addSubview:"), v.tint)
 		v.tint.Send(selRelease)
 	}
-	apple.MoveBorders(v.native.Send(selLayer), v.tint.Send(selLayer))
+	apple.MoveBorders(v.native.Send(selLayer), v.borderHost())
 }
 
 // styleTint draws the background above the blur, with the same transition and presentation-value retargeting as the view's own layer. Only color changes touch it, so frames moving other properties leave a tint's transition alone. A background binding takes over immediately.

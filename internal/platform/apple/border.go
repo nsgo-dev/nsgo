@@ -83,8 +83,7 @@ func LayoutBorders(layer objc.ID) {
 // ForgetBorders forgets the borders of a layer that is going away.
 func ForgetBorders(layer objc.ID) { delete(rings, layer) }
 
-// MoveBorders rehomes a per-side border above a backdrop's layer while
-// keeping the view's children above it. Passing zero puts it back on layer.
+// MoveBorders rehomes a per-side border above a backdrop's layer while keeping the view's children above it. Passing zero puts it back on layer.
 func MoveBorders(layer, host objc.ID) {
 	r := rings[layer]
 	if r == nil {

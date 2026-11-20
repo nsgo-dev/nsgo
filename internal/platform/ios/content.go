@@ -217,9 +217,16 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 	if !glass {
 		v.backdrop.Send(sel("contentView")).Send(sel("setBackgroundColor:"), uiColor(vs.Background))
 	}
-	host := v.backdrop.Send(selLayer)
-	if !glass {
-		host = v.backdrop.Send(sel("contentView")).Send(selLayer)
+	apple.MoveBorders(v.native.Send(selLayer), v.borderHost())
+}
+
+// borderHost is the layer v's per-side borders go in, above its backdrop and below its children: the glass's own layer, else the blur's content view, which draws the background; zero, v's own layer, without a backdrop.
+func (v *view) borderHost() objc.ID {
+	switch {
+	case v.backdrop == 0:
+		return 0
+	case v.glass:
+		return v.backdrop.Send(selLayer)
 	}
-	apple.MoveBorders(v.native.Send(selLayer), host)
+	return v.backdrop.Send(sel("contentView")).Send(selLayer)
 }
