@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Start Android and iPhone target test deadlines at the test host's start mark and report a separate launch timeout when the host does not start (#729 by @houko).
 - Restart Linux apps launched from an AppImage through the outer image path, remounting it after the old FUSE mount exits (#732 by @houko).
 - Report whether an Android target test reached its host and include its logcat tail when the test times out (#730 by @houko).
 - Show Linux's window manager menu when a drag-region double click follows `gtk-titlebar-double-click=menu` (#731 by @houko).

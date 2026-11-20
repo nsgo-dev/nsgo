@@ -58,7 +58,16 @@ const simulatorLaunchTimeout = 5 * time.Minute
 var (
 	errSimulatorLaunchTimeout = errors.New("the simulator app's launch timed out")
 	errSimulatorTestTimeout   = errors.New("the simulator test timed out")
+	errDeviceLaunchTimeout    = errors.New("the device app's launch timed out")
+	errDeviceTestTimeout      = errors.New("the device test timed out")
 )
+
+func deviceLaunchError(ctx context.Context, what string, err error) error {
+	if errors.Is(context.Cause(ctx), errDeviceLaunchTimeout) {
+		return fmt.Errorf("launch %s: the test host did not start within %v", what, simulatorLaunchTimeout)
+	}
+	return fmt.Errorf("%s: %w", what, err)
+}
 
 type simulatorTest struct {
 	udid, id      string
@@ -186,7 +195,11 @@ func iosDeviceTestRunner(ctx context.Context, p *project, sys *appleOS, dir stri
 	return targetRunner{
 		run: func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
 			token := strconv.FormatInt(time.Now().UnixNano(), 36)
-			cmd := exec.CommandContext(ctx, "xcrun", append([]string{"devicectl", "device", "process", "launch", "--console",
+			runCtx, cancel := context.WithCancelCause(ctx)
+			defer cancel(nil)
+			launchTimer := time.AfterFunc(simulatorLaunchTimeout, func() { cancel(errDeviceLaunchTimeout) })
+			defer launchTimer.Stop()
+			cmd := exec.CommandContext(runCtx, "xcrun", append([]string{"devicectl", "device", "process", "launch", "--console",
 				// After --, devicectl takes the test's flags, as -test.run, for the app's rather than its own.
 				"--terminate-existing", "--device", device.UDID, p.ID, "--"}, args...)...)
 			cmd.Env = append(os.Environ(), "DEVICECTL_CHILD_NSGO_TEST_RUN="+token)
@@ -199,17 +212,51 @@ func iosDeviceTestRunner(ctx context.Context, p *project, sys *appleOS, dir stri
 			}
 			cmd.Stderr = io.Discard
 			if err := cmd.Start(); err != nil {
-				return -1, err
+				return -1, deviceLaunchError(runCtx, "app on "+device.Name, err)
 			}
-			defer cmd.Wait()
-			return readMarkedRun(logs, token, out, func() error {
-				if ctx.Err() != nil {
-					return testContextError(ctx, opts.timeout)
+			started := false
+			var testTimer *time.Timer
+			code, readErr := readMarkedRun(logs, token, out, func() error {
+				if runCtx.Err() != nil {
+					return runCtx.Err()
 				}
 				return fmt.Errorf("the app on %s ended without its exit code", device.Name)
-			}, nil)
+			}, func() {
+				started = true
+				launchTimer.Stop()
+				if opts.timeout > 0 {
+					testTimer = time.AfterFunc(opts.timeout, func() { cancel(errDeviceTestTimeout) })
+				}
+			})
+			if runCtx.Err() != nil {
+				cmd.Process.Kill()
+			}
+			// The timers still bound an app that lingers after its marks, as devicectl returns only once it exits.
+			waitErr := cmd.Wait()
+			launchTimer.Stop()
+			if testTimer != nil {
+				testTimer.Stop()
+			}
+			// A run that read its exit mark passed or failed on its own, even if a deadline fell just after.
+			if readErr == nil {
+				return code, nil
+			}
+			if runCtx.Err() != nil {
+				switch cause := context.Cause(runCtx); {
+				case errors.Is(cause, errDeviceTestTimeout):
+					return -1, timeoutError(opts.timeout)
+				case errors.Is(cause, errDeviceLaunchTimeout):
+					return -1, fmt.Errorf("launch app on %s: the test host did not start within %v", device.Name, simulatorLaunchTimeout)
+				}
+				return -1, testContextError(ctx, opts.timeout)
+			}
+			if !started && waitErr != nil {
+				return -1, fmt.Errorf("launch app on %s: %w", device.Name, waitErr)
+			}
+			return -1, readErr
 		},
-		close: func() {},
+		close:          func() {},
+		timesFromStart: true,
 	}, nil
 }
 
@@ -266,14 +313,20 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 	if err := d.run(ctx, "install", "-r", apk); err != nil {
 		return targetRunner{}, err
 	}
-	stop := func() { d.run(context.Background(), "shell", "am", "force-stop", test.ID) }
+	stop := func(ctx context.Context) { d.run(ctx, "shell", "am", "force-stop", test.ID) }
 	return targetRunner{
 		run: func(ctx context.Context, args, env []string, out io.Writer) (int, error) {
-			if err := d.prepareTestScreen(ctx); err != nil {
-				return -1, err
+			runCtx, cancel := context.WithCancelCause(ctx)
+			defer cancel(nil)
+			launchTimer := time.AfterFunc(simulatorLaunchTimeout, func() { cancel(errDeviceLaunchTimeout) })
+			defer launchTimer.Stop()
+			if err := d.prepareTestScreen(runCtx); err != nil {
+				return -1, deviceLaunchError(runCtx, "Android test app", err)
 			}
-			stop()
-			d.run(ctx, "logcat", "-c")
+			stop(runCtx)
+			if err := d.run(runCtx, "logcat", "-c"); err != nil {
+				return -1, deviceLaunchError(runCtx, "Android test app", err)
+			}
 			token := strconv.FormatInt(time.Now().UnixNano(), 36)
 			envMap := map[string]string{"NSGO_TEST_RUN": token}
 			for _, kv := range env {
@@ -281,46 +334,67 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 				envMap[k] = v
 			}
 			payload, _ := json.Marshal(map[string]any{"args": args, "env": envMap})
-			cmd := exec.CommandContext(ctx, d.adb, "-s", d.serial, "logcat", "-v", "raw", "-s", "nsgo:I")
+			cmd := exec.CommandContext(runCtx, d.adb, "-s", d.serial, "logcat", "-v", "raw", "-s", "nsgo:I")
 			logs, err := cmd.StdoutPipe()
 			if err != nil {
 				return -1, err
 			}
 			if err := cmd.Start(); err != nil {
-				return -1, err
+				return -1, deviceLaunchError(runCtx, "Android test app", err)
 			}
 			var captured bytes.Buffer
 			defer func() {
 				cmd.Process.Kill()
 				cmd.Wait()
-				stop()
+				stop(context.Background())
 			}()
-			if err := d.run(ctx, "shell", "am", "start", "-S", "-n", test.ID+androidComponent,
+			if err := d.run(runCtx, "shell", "am", "start", "-S", "-n", test.ID+androidComponent,
 				"--es", "nsgo.test", base64.StdEncoding.EncodeToString(payload)); err != nil {
-				if ctx.Err() != nil {
+				if runCtx.Err() != nil {
 					cmd.Process.Kill()
 					cmd.Wait()
 					androidTimeoutReport(out, token, captured.Bytes(), d)
 				}
-				return -1, err
+				return -1, deviceLaunchError(runCtx, "Android test app", err)
 			}
+			var testTimer *time.Timer
 			code, readErr := readMarkedRun(io.TeeReader(logs, &captured), token, out, func() error {
-				if ctx.Err() != nil {
-					return testContextError(ctx, opts.timeout)
+				if runCtx.Err() != nil {
+					return runCtx.Err()
 				}
 				return errors.New("the device's log ended")
-			}, nil)
-			// A run that read its exit mark passed or failed on its own, even if the deadline fell just after.
-			if readErr != nil && ctx.Err() != nil {
+			}, func() {
+				launchTimer.Stop()
+				if opts.timeout > 0 {
+					testTimer = time.AfterFunc(opts.timeout, func() { cancel(errDeviceTestTimeout) })
+				}
+			})
+			launchTimer.Stop()
+			if testTimer != nil {
+				testTimer.Stop()
+			}
+			// A run that read its exit mark passed or failed on its own, even if a deadline fell just after.
+			if readErr == nil {
+				return code, nil
+			}
+			if runCtx.Err() != nil {
 				cmd.Process.Kill()
 				cmd.Wait()
 				androidTimeoutReport(out, token, captured.Bytes(), d)
+				switch cause := context.Cause(runCtx); {
+				case errors.Is(cause, errDeviceTestTimeout):
+					return -1, timeoutError(opts.timeout)
+				case errors.Is(cause, errDeviceLaunchTimeout):
+					return -1, fmt.Errorf("launch Android test app: the test host did not start within %v", simulatorLaunchTimeout)
+				}
+				return -1, testContextError(ctx, opts.timeout)
 			}
-			return code, readErr
+			return -1, readErr
 		},
+		timesFromStart: true,
 		// Each test stops the app before and after it runs; the test build stays installed until the last test ends, then goes so it does not sit beside the app.
 		close: func() {
-			stop()
+			stop(context.Background())
 			d.run(context.Background(), "uninstall", test.ID)
 		},
 	}, nil
