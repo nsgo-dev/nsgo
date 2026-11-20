@@ -95,13 +95,27 @@ func MoveBorders(layer, host objc.ID) {
 	if r.host == host {
 		return
 	}
+	r.host = host
 	for _, side := range r.sides {
 		if side != 0 {
 			side.Send(sel("removeFromSuperlayer"))
 			host.Send(sel("addSublayer:"), side)
+			r.orient(side, layer)
 		}
 	}
-	r.host = host
+}
+
+// orient draws side as layer would: a host whose content is not flipped as layer's is, as AppKit's tint view under a flipped view, would draw the ring upside down, a top border at the bottom.
+func (r *ring) orient(side, layer objc.ID) {
+	host := r.host
+	if host == 0 {
+		host = layer
+	}
+	t := affine{A: 1, D: 1}
+	if objc.Send[bool](host, sel("contentsAreFlipped")) != objc.Send[bool](layer, sel("contentsAreFlipped")) {
+		t.D = -1
+	}
+	side.Send(sel("setAffineTransform:"), t)
 }
 
 // remove takes away side i's layer.
@@ -147,6 +161,7 @@ func (r *ring) layout(layer objc.ID, tr *driver.Transition) {
 				}
 				parent.Send(sel("insertSublayer:atIndex:"), side, uint32(0))
 				r.sides[i] = side
+				r.orient(side, layer)
 			}
 			side.Send(selSetFrame, bounds)
 			color := CGColor(colors[i])
