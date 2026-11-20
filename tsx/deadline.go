@@ -6,17 +6,14 @@ import (
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 )
 
-// A deadline owns a plugin call's async work, with or without a total time
-// limit. It also holds the total limits of module loading and host events.
-// Only the engine goroutine uses it; the watchdog posts to that goroutine.
+// A deadline owns a plugin call's async work, with or without a total time limit. It also holds the total limits of module loading and host events. Only the engine goroutine uses it; the watchdog posts to that goroutine.
 type deadline struct {
 	// at is zero when only the budget of each JS slice applies.
 	at      time.Time
 	expired bool
 	// timers are the ids of the timers it set, which expire stops.
 	timers map[int64]struct{}
-	// done is the pending call's callback, nil once it settles or for work
-	// that is not a Plugin.Call.
+	// done is the pending call's callback, nil once it settles or for work that is not a Plugin.Call.
 	done func(any, error)
 	// watch is the timer that expires it on time, set once work waits on it.
 	watch *time.Timer
@@ -84,8 +81,7 @@ func (r *runtime) under(dl *deadline, fn func()) {
 	fn()
 }
 
-// adopt keeps the earliest total deadline for the JS slice, separately
-// from the owner of the particular callback or promise reaction running.
+// adopt keeps the earliest total deadline for the JS slice, separately from the owner of the particular callback or promise reaction running.
 func (r *runtime) adopt(dl *deadline) {
 	if dl.expired || dl.at.IsZero() {
 		return

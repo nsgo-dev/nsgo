@@ -27,13 +27,7 @@ import (
 
 // Limits are what a bundle may use. Zero fields leave that unlimited.
 type Limits struct {
-	// Load limits the entry script and Call limits each slice of JS. On
-	// goja, a Plugin.Call whose slice is cut fails with ErrBudget even
-	// after it has awaited. CallTotal limits the wall time of a plugin
-	// call and the work it starts; at that deadline its pending work is
-	// dropped and a call still waiting fails with ErrBudget. The entry
-	// module's work is held to Load and standalone host events to CallTotal
-	// when CallTotal is set. Zero leaves a budget unlimited.
+	// Load limits the entry script and Call limits each slice of JS. On goja, a Plugin.Call whose slice is cut fails with ErrBudget even after it has awaited. CallTotal limits the wall time of a plugin call and the work it starts; at that deadline its pending work is dropped and a call still waiting fails with ErrBudget. The entry module's work is held to Load and standalone host events to CallTotal when CallTotal is set. Zero leaves a budget unlimited.
 	Load, Call, CallTotal time.Duration
 	// Stack is how deep JS calls may nest.
 	Stack int
@@ -402,8 +396,7 @@ func (r *runtime) stopTimers() {
 	}
 }
 
-// finish delivers a plugin call's result once, even if its promise later
-// settles or the plugin closes. Successful calls leave their work running.
+// finish delivers a plugin call's result once, even if its promise later settles or the plugin closes. Successful calls leave their work running.
 func (r *runtime) finish(dl *deadline, result any, err error) {
 	delete(r.calls, dl)
 	if done := dl.done; done != nil {
@@ -477,8 +470,7 @@ func (r *runtime) newCoreElement(cx *core.Scope, props core.Node) *core.Element 
 	return core.NewElement(cx, props)
 }
 
-// within runs one slice of JS. Only the outermost entry arms the slice
-// watchdog, and cut reports whether a deadline handled the interruption.
+// within runs one slice of JS. Only the outermost entry arms the slice watchdog, and cut reports whether a deadline handled the interruption.
 func (r *runtime) within(budget time.Duration, fn func() error) (err error, cut bool) {
 	if r.stoppedErr() != nil {
 		return nil, false

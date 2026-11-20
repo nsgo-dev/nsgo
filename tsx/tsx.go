@@ -113,8 +113,7 @@ type runtime struct {
 	calls  map[*deadline]struct{}
 	// interrupted says the host stopped the runtime (interrupt), and hears so through the calls that fail: the JS it cut ends without a panic into the app's Catch.
 	interrupted atomic.Bool
-	// deadlines enables CallTotal. current owns the JS work running now,
-	// and sliceDeadline is the earliest total deadline in the current slice.
+	// deadlines enables CallTotal. current owns the JS work running now, and sliceDeadline is the earliest total deadline in the current slice.
 	deadlines     bool
 	current       *deadline
 	slice         *time.Timer
@@ -145,8 +144,7 @@ type runtime struct {
 // maxCallStack is how deep JS calls nest in any app.
 const maxCallStack = 10000
 
-// continuations restores the owner of a promise reaction and runs it
-// untracked, even if a different call settled the promise.
+// continuations restores the owner of a promise reaction and runs it untracked, even if a different call settled the promise.
 type continuations struct {
 	r      *runtime
 	resume []continuation
@@ -303,8 +301,7 @@ func (r *runtime) call(fn js.Value, args ...js.Value) js.Value {
 	return v
 }
 
-// invoke runs a function in a JS slice, reporting errors and whether an
-// expired deadline already dealt with the error.
+// invoke runs a function in a JS slice, reporting errors and whether an expired deadline already dealt with the error.
 func (r *runtime) invoke(fn js.Callable, this js.Value, args ...js.Value) (v js.Value, err error, cut bool) {
 	err, cut = r.within(r.limits.Call, func() error {
 		v, err = fn(this, args...)
