@@ -233,6 +233,7 @@ func (v *view) styleLayer(vs *driver.ViewStyle) {
 		shown = &v.drawn
 	}
 	apple.RestyleLayer(v.native.Send(selLayer), shown, vs, 0)
+	v.setBackdrop(vs)
 	v.drawn, v.styled = *vs, true
 }
 

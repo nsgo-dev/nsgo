@@ -41,6 +41,7 @@ type ring struct {
 	continuous bool
 	// sides are the shape layers: only [0] when every side has one color.
 	sides [4]objc.ID
+	host  objc.ID // layer currently hosting sides; zero means layer itself
 }
 
 // rings are the layers drawing per-side borders.
@@ -82,6 +83,28 @@ func LayoutBorders(layer objc.ID) {
 // ForgetBorders forgets the borders of a layer that is going away.
 func ForgetBorders(layer objc.ID) { delete(rings, layer) }
 
+// MoveBorders rehomes a per-side border above a backdrop's layer while
+// keeping the view's children above it. Passing zero puts it back on layer.
+func MoveBorders(layer, host objc.ID) {
+	r := rings[layer]
+	if r == nil {
+		return
+	}
+	if host == 0 {
+		host = layer
+	}
+	if r.host == host {
+		return
+	}
+	for _, side := range r.sides {
+		if side != 0 {
+			side.Send(sel("removeFromSuperlayer"))
+			host.Send(sel("addSublayer:"), side)
+		}
+	}
+	r.host = host
+}
+
 // remove takes away side i's layer.
 func (r *ring) remove(i int) {
 	if r.sides[i] != 0 {
@@ -119,7 +142,11 @@ func (r *ring) layout(layer objc.ID, tr *driver.Transition) {
 			if fresh {
 				side = objc.ID(Class("CAShapeLayer")).Send(selNew)
 				side.Send(sel("setFillRule:"), NSString("even-odd"))
-				layer.Send(sel("insertSublayer:atIndex:"), side, uint32(0))
+				parent := layer
+				if r.host != 0 {
+					parent = r.host
+				}
+				parent.Send(sel("insertSublayer:atIndex:"), side, uint32(0))
 				r.sides[i] = side
 			}
 			side.Send(selSetFrame, bounds)

@@ -185,6 +185,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 	glass := vs.Glass != driver.GlassNone && apple.Class("UIGlassEffect") != 0
 	want := vs.Effects.BackdropBlur() > 0 || glass
 	if !want || glass != v.glass {
+		apple.MoveBorders(v.native.Send(selLayer), 0)
 		if v.backdrop != 0 {
 			v.backdrop.Send(sel("removeFromSuperview"))
 			v.backdrop = 0
@@ -216,4 +217,9 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 	if !glass {
 		v.backdrop.Send(sel("contentView")).Send(sel("setBackgroundColor:"), uiColor(vs.Background))
 	}
+	host := v.backdrop.Send(selLayer)
+	if !glass {
+		host = v.backdrop.Send(sel("contentView")).Send(selLayer)
+	}
+	apple.MoveBorders(v.native.Send(selLayer), host)
 }

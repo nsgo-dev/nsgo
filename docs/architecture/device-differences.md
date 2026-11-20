@@ -71,3 +71,6 @@ Touch screens have no pointer, so these exist on desktops alone.
 | `ui/chat` glass surfaces | macOS, iOS, Windows | No drawn rim, as the system's glass draws its own |
 | `ui/filepicker` | macOS | Shortcuts use Command instead of Control |
 | `core.Input`'s and `base.Command`'s `InputSource` | macOS, Windows, Linux | Selects the keyboard input source; nothing elsewhere |
+
+
+Apple backdrop and material views keep per-side border rings above their effect layers and below app children, matching CSS and the other backends.

@@ -164,6 +164,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 	gaussian := blursByRadius(vs, glass)
 	want := glass || gaussian || vs.Effects.BackdropBlur() > 0
 	if !want || glass != v.glass || gaussian != v.gaussian {
+		apple.MoveBorders(v.native.Send(selLayer), 0)
 		if v.backdrop != 0 {
 			v.backdrop.Send(sel("removeFromSuperview"))
 			v.backdrop, v.backdropLayer, v.tint = 0, 0, 0
@@ -200,6 +201,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		v.surface.keepGlassActive()
 		v.backdrop.Send(sel("setStyle:"), int(vs.Glass)-1)
 		v.backdrop.Send(sel("setCornerRadius:"), float64(max(vs.CornerRadius, vs.Corners.TopLeft)))
+		apple.MoveBorders(v.native.Send(selLayer), v.backdrop.Send(selLayer))
 		return
 	}
 	if gaussian {
@@ -218,6 +220,7 @@ func (v *view) setBackdrop(vs *driver.ViewStyle) {
 		v.backdrop.Send(sel("addSubview:"), v.tint)
 		v.tint.Send(selRelease)
 	}
+	apple.MoveBorders(v.native.Send(selLayer), v.tint.Send(selLayer))
 }
 
 // styleTint draws the background above the blur, with the same transition and presentation-value retargeting as the view's own layer. Only color changes touch it, so frames moving other properties leave a tint's transition alone. A background binding takes over immediately.

@@ -365,6 +365,9 @@ func (v *view) styleLayer(vs *driver.ViewStyle) {
 		shown = &v.drawn
 	}
 	apple.RestyleLayer(v.native.Send(selLayer), shown, vs, v.native)
+	// RestyleLayer may create per-side rings after setBackdrop ran; move them
+	// above the backdrop now that they exist.
+	v.setBackdrop(vs)
 	v.drawn, v.styled = *vs, true
 	v.transform = vs.Transform
 	if vs.Transform != (driver.Transform{}) || vs.Animation.Keyframes != 0 {
