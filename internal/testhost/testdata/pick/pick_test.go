@@ -36,6 +36,26 @@ func names(files []core.PickedFile) string {
 	return s
 }
 
+func cameraApp(cx *core.Scope) core.Node {
+	got := core.NewSignal(cx, "none")
+	return core.View{Children: []core.Node{
+		core.View{Role: core.RoleButton, Label: "Take", TestID: "take", Style: core.Style{Width: core.Pt(80), Height: core.Pt(30)},
+			OnPress: func(core.PressEvent) {
+				cx.TakePhoto(core.PhotoOptions{}, func(photo *core.PickedFile, err error) {
+					switch {
+					case err != nil:
+						got.Set("error: " + err.Error())
+					case photo == nil:
+						got.Set("cancelled")
+					default:
+						got.Set("photo " + photo.Name)
+					}
+				})
+			}},
+		core.Text{ContentFunc: got.Get},
+	}}
+}
+
 func skipOtherTargets(t *testing.T) {
 	switch nsgotest.Target() {
 	case "", "macos", "windows", "linux":
@@ -66,4 +86,26 @@ func TestPickImagesWithoutAnAnswerCancels(t *testing.T) {
 	app := nsgotest.Start(t, pickApp)
 	app.Press("id:pick")
 	app.WaitFor("text:picked 0", 5*time.Second)
+}
+
+// TestTakePhotoAnswersTheApp checks that App.TakePhoto, set after Start, reaches the app under every target without opening a camera (#897, #948).
+func TestTakePhotoAnswersTheApp(t *testing.T) {
+	app := nsgotest.Start(t, cameraApp, nsgotest.Environment(core.Environment{Camera: true}))
+	called := 0
+	app.TakePhoto = func(core.PickRequest) (*core.PickedFile, error) {
+		called++
+		return &core.PickedFile{Name: "capture.jpg", MIME: "image/jpeg", Data: []byte("jpeg")}, nil
+	}
+	app.Press("id:take")
+	app.WaitFor("text:photo capture.jpg", 5*time.Second)
+	if called != 1 || len(app.Photos) != 1 {
+		t.Fatalf("TakePhoto was asked %d times for %d requests, want once", called, len(app.Photos))
+	}
+}
+
+// TestTakePhotoWithoutAnAnswerCancels checks that a target test without a camera hook does not open a system camera.
+func TestTakePhotoWithoutAnAnswerCancels(t *testing.T) {
+	app := nsgotest.Start(t, cameraApp, nsgotest.Environment(core.Environment{Camera: true}))
+	app.Press("id:take")
+	app.WaitFor("text:cancelled", 5*time.Second)
 }

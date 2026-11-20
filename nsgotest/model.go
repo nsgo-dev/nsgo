@@ -665,6 +665,10 @@ func (a *App) apply(b *driver.MountBatch) {
 				a.post(driver.Event{Kind: driver.EventPick, Count: it.Count, Data: files})
 			}
 		case driver.ItemTakePhoto:
+			if a.target != nil {
+				// The target observer routes this request through testhost.Options.TakePhoto.
+				continue
+			}
 			a.Photos = append(a.Photos, *it.Pick)
 			ev := driver.Event{Kind: driver.EventPick, Count: it.Count}
 			if a.TakePhoto != nil {

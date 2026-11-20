@@ -80,7 +80,7 @@ func Secrets(values map[string]string) Option {
 	return func(a *App) { a.seedSecrets = values }
 }
 
-// Environment starts the app in env from its first frame, as a platform reports it before the app mounts: screens have the system header where env has HeaderHeight. Under `nsgo test -target` it pins only the appearance, reduced motion, increased contrast, the login launch reason, the application in front and whether the platform follows it, and, when set, the locale, text size, device name and device model; the OS, the idiom, the safe area and the header heights stay the platform's, so a test of another OS's layout runs headless or on that OS's target.
+// Environment starts the app in env from its first frame, as a platform reports it before the app mounts: screens have the system header where env has HeaderHeight. Under `nsgo test -target` it pins only the appearance, reduced motion, increased contrast, the login launch reason, the application in front and whether the platform follows it, camera availability, and, when set, the locale, text size, device name and device model; the OS, the idiom, the safe area and the header heights stay the platform's, so a test of another OS's layout runs headless or on that OS's target.
 func Environment(env driver.Environment) Option {
 	return func(a *App) { a.env = &env }
 }
@@ -255,9 +255,7 @@ type App struct {
 	// Picks are the photo picks the app asked for, oldest first. PickImages answers each with the files the user picks; with none the user cancels. It answers headless and under `nsgo test -target` macos, windows and linux, in place of the system's picker; on the other targets the system's picker shows and PickImages is not asked.
 	Picks      []driver.PickRequest
 	PickImages func(r driver.PickRequest) []driver.PickedFile
-	// Photos are the photos the app asked to take, oldest first, where
-	// the environment says Camera. TakePhoto answers each with the photo
-	// the user takes, or with why it failed; with none the user cancels.
+	// Photos are the photos the app asked to take, oldest first, where the environment says Camera. TakePhoto answers each with the photo the user takes, or with why it failed; with none the user cancels. It answers headless and under `nsgo test -target` through the test host, without opening a system camera.
 	Photos    []driver.PickRequest
 	TakePhoto func(r driver.PickRequest) (*driver.PickedFile, error)
 	// PickScreenColor answers Scope.PickScreenColor with the color the user

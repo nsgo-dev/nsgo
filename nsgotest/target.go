@@ -291,6 +291,18 @@ func (a *App) targetOptions(t *target) testhost.Options {
 			done(files)
 		})
 	}
+	// The test sets TakePhoto after Start, so the answer reads it as each request comes, on the test's goroutine; without one the user cancels, as headless.
+	takePhoto := func(r driver.PickRequest, done func(*driver.PickedFile, error)) {
+		a.postTest(func() {
+			a.Photos = append(a.Photos, r)
+			if a.TakePhoto == nil {
+				done(nil, nil)
+				return
+			}
+			photo, err := a.TakePhoto(r)
+			done(photo, err)
+		})
+	}
 	return testhost.Options{
 		CheckCommits: !automationBuild && !a.measure,
 		Size:         size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
@@ -298,6 +310,7 @@ func (a *App) targetOptions(t *target) testhost.Options {
 		Observe:    t.observe,
 		Event:      t.surfaceEvent,
 		PickImages: pickImages,
+		TakePhoto:  takePhoto,
 	}
 }
 
