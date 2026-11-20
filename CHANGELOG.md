@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Restart Linux apps launched from an AppImage through the outer image path, remounting it after the old FUSE mount exits (#732 by @houko).
 - Report whether an Android target test reached its host and include its logcat tail when the test times out (#730 by @houko).
 - Show Linux's window manager menu when a drag-region double click follows `gtk-titlebar-double-click=menu` (#731 by @houko).
 - Make `base.DataTable` expose its named grid as the keyboard and accessibility focus target instead of an unnamed pointer hit layer (#736 by @houko).

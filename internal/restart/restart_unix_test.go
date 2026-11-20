@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -23,6 +24,23 @@ func TestRestartProgram(t *testing.T) {
 	}
 	if got := restartProgram("/usr/local/bin/app", nil); !slices.Equal(got, []string{"/usr/local/bin/app"}) {
 		t.Errorf("an executable restarts with %q", got)
+	}
+	t.Setenv("APPIMAGE", "/tmp/example.AppImage")
+	if got := restartProgram(exe, []string{"--again"}); !slices.Equal(got, []string{"/tmp/example.AppImage", "--again"}) {
+		t.Errorf("an AppImage restarts with %q", got)
+	}
+}
+
+func TestRestartCommandDropsStaleAppImageEnvironment(t *testing.T) {
+	t.Setenv("APPIMAGE", "/tmp/example.AppImage")
+	t.Setenv("APPDIR", "/tmp/.mount_old/AppDir")
+	t.Setenv("ARGV0", "/tmp/.mount_old/AppRun")
+	cmd := restartCommand(1, []string{"/tmp/example.AppImage"})
+	for _, value := range cmd.Env {
+		key, _, _ := strings.Cut(value, "=")
+		if key == "APPDIR" || key == "APPIMAGE" || key == "ARGV0" {
+			t.Errorf("stale AppImage environment %q survived", value)
+		}
 	}
 }
 
