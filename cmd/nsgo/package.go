@@ -214,7 +214,7 @@ func runnable(target string) bool {
 		return err == nil
 	case "ios", "ios_simulator", "tvos", "tvos_simulator", "watchos", "watchos_simulator":
 		return runtime.GOOS == "darwin"
-	case "macos_" + arch:
+	case "macos_" + arch, "macos_universal":
 		return runtime.GOOS == "darwin"
 	case "linux_" + arch:
 		return runtime.GOOS == "linux"

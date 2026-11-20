@@ -270,7 +270,7 @@ func (m *machine) run(target string) verdict {
 	}
 	if desktop, a, ok := strings.Cut(target, "_"); ok && desktopSystems[desktop] != [2]string{} {
 		switch sys := desktopSystems[desktop]; {
-		case m.goos != sys[0] || a != arch:
+		case m.goos != sys[0] || a != arch && target != "macos_universal":
 			return elsewhere("runs on " + sys[1] + " " + a)
 		case desktop == "linux" && len(m.linuxLibs) > 0:
 			return no("needs GTK 4.14 or newer, Pango and Cairo")

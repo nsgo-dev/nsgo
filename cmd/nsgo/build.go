@@ -302,12 +302,7 @@ var targets = []string{
 // miniProgramGroup names every mini program target at once.
 const miniProgramGroup = "miniprogram"
 
-// expandTargets replaces "all" with every target that needs only Go and
-// Xcode, a bare OS name with its architectures, and "miniprogram" with every
-// mini program, checks every name and drops duplicates, so each package is
-// built once. android_x64 stays out of "all" and "android" because it needs
-// an NDK, and the mini programs because they take only Go apps that fit
-// their packages.
+// expandTargets replaces "all" with every target that needs only Go and Xcode, a bare OS name with its architectures, and "miniprogram" with every mini program, checks every name and drops duplicates, so each package is built once. android_x64 stays out of "all" and "android" because it needs an NDK, macos_universal out of "all" and "macos" because it builds both macOS architectures again to join them, and the mini programs because they take only Go apps that fit their packages.
 func expandTargets(names []string) ([]string, error) {
 	var out []string
 	for _, name := range names {
@@ -326,7 +321,7 @@ func expandTargets(names []string) ([]string, error) {
 			// The bare OS, as nsgo test -target spells it (#589).
 			expanded = nil
 			for _, t := range targets {
-				if goos, _, _ := strings.Cut(t, "_"); goos == name && t != "android_x64" {
+				if goos, _, _ := strings.Cut(t, "_"); goos == name && t != "android_x64" && t != "macos_universal" {
 					expanded = append(expanded, t)
 				}
 			}
@@ -342,14 +337,11 @@ func expandTargets(names []string) ([]string, error) {
 	return out, nil
 }
 
-// goAndXcodeTargets are the packages a Mac with Go and Xcode can build.
-// android_x64 is omitted: Go links android/amd64 only with cgo, so it needs
-// an NDK; harmonyos, whose packages are unsigned previews, and the mini
-// programs, which only some apps fit.
+// goAndXcodeTargets are the packages a Mac with Go and Xcode can build. android_x64 is omitted: Go links android/amd64 only with cgo, so it needs an NDK; macos_universal, which joins the two macOS targets' builds; harmonyos, whose packages are unsigned previews, and the mini programs, which only some apps fit.
 func goAndXcodeTargets() []string {
 	var out []string
 	for _, target := range targets {
-		if target != "android_x64" && target != "harmonyos" && !strings.HasPrefix(target, "miniprogram_") {
+		if target != "android_x64" && target != "macos_universal" && target != "harmonyos" && !strings.HasPrefix(target, "miniprogram_") {
 			out = append(out, target)
 		}
 	}
@@ -532,10 +524,7 @@ func buildTarget(ctx context.Context, p *project, target, dir string) error {
 	return fmt.Errorf("unknown target %q; use all or one of %s", target, strings.Join(targets, ", "))
 }
 
-// buildMacUniversal joins the two direct-channel macOS app builds before the
-// bundle is signed and packaged. Each architecture is built through the
-// normal pipeline first, so resources, widgets and optional libraries keep
-// the same inputs as their single-architecture counterparts.
+// buildMacUniversal joins the two direct-channel macOS app builds before the bundle is signed and packaged. Each architecture is built through the normal pipeline first, so resources, widgets and optional libraries keep the same inputs as their single-architecture counterparts.
 func buildMacUniversal(ctx context.Context, p *project, dir string) error {
 	work, err := os.MkdirTemp(dir, ".universal-")
 	if err != nil {
@@ -550,11 +539,12 @@ func buildMacUniversal(ctx context.Context, p *project, dir string) error {
 	if err != nil {
 		return err
 	}
+	// Moving the arm64 bundle keeps its framework links, executable modes and the signatures of what lipo leaves alone, such as Sparkle's.
 	app := filepath.Join(dir, p.Name+".app")
-	if err := copyDir(arm, app); err != nil {
+	if err := os.Rename(arm, app); err != nil {
 		return err
 	}
-	if err := lipoMacBinaries(ctx, p, app, x64); err != nil {
+	if err := lipoMacBinaries(ctx, app, x64); err != nil {
 		return err
 	}
 	if err := rewriteUniversalFeed(p, app); err != nil {
@@ -582,10 +572,8 @@ func buildMacUniversal(ctx context.Context, p *project, dir string) error {
 	return p.releaseInstaller("macos_universal", dmg)
 }
 
-// lipoMacBinaries replaces every known executable or dylib present in both
-// architecture bundles with a universal binary. Resource files remain those
-// from the arm64 bundle, which are identical inputs from buildMacApp.
-func lipoMacBinaries(ctx context.Context, p *project, app, other string) error {
+// lipoMacBinaries replaces every executable or dylib that differs between the two architecture bundles with a universal binary. One that is the same in both, such as Sparkle's helpers or a library already universal, stays as it is, signature included, as lipo refuses to join two files of the same architectures. Resource files remain those from the arm64 bundle, which are identical inputs from buildMacApp.
+func lipoMacBinaries(ctx context.Context, app, other string) error {
 	return filepath.WalkDir(app, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil || entry.IsDir() {
 			return walkErr
@@ -599,13 +587,19 @@ func lipoMacBinaries(ctx context.Context, p *project, app, other string) error {
 			return nil
 		}
 		otherPath := filepath.Join(other, rel)
-		if _, err := os.Stat(otherPath); err != nil {
+		theirs, err := os.ReadFile(otherPath)
+		if err != nil {
 			return nil
+		}
+		ours, err := os.ReadFile(path)
+		if err != nil || bytes.Equal(ours, theirs) {
+			return err
 		}
 		return run(ctx, "lipo", "-create", path, otherPath, "-output", path)
 	})
 }
 
+// rewriteUniversalFeed points the joined bundle's Sparkle feed, the arm64 build's, at macos_universal's appcast.
 func rewriteUniversalFeed(p *project, app string) error {
 	path := filepath.Join(app, "Contents", "Info.plist")
 	data, err := os.ReadFile(path)
@@ -613,11 +607,14 @@ func rewriteUniversalFeed(p *project, app string) error {
 		return err
 	}
 	for _, arch := range []string{"macos_arm64", "macos_x64"} {
-		data = bytes.ReplaceAll(data, []byte(p.appcastURL(arch)), []byte(p.appcastURL("macos_universal")))
+		if feed := p.appcastURL(arch); feed != "" {
+			data = bytes.ReplaceAll(data, []byte(feed), []byte(p.appcastURL("macos_universal")))
+		}
 	}
 	return os.WriteFile(path, data, 0o644)
 }
 
+// signUniversalAdHoc signs the joined bundle ad hoc again without sign.identity, as buildMacApp signed each architecture's, since lipo broke the signatures of what it joined.
 func signUniversalAdHoc(ctx context.Context, p *project, app string) error {
 	if appex := macWidgetsAppex(app); len(p.Widgets) > 0 {
 		if err := signMacWidgets(ctx, p, appex, "-"); err != nil {

@@ -58,7 +58,7 @@ build:
   open: false           # true 时构建后打开输出目录
   installers: true      # false 时不生成磁盘映像、Windows 安装程序和 Linux 软件包
   jobs: 0               # 同时构建的目标数；0 为 CPU 数的一半，1 为逐个构建
-  targets: [macos_arm64, macos_x64, macos_universal, windows_arm64, windows_x64, linux_arm64, linux_x64, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android_arm64, web]
+  targets: [macos_arm64, macos_x64, windows_arm64, windows_x64, linux_arm64, linux_x64, ios, ios_simulator, tvos, tvos_simulator, watchos, watchos_simulator, android_arm64, web]
 # apple: { sign_in_with_apple: true }  # 「通过 Apple 登录」的授权，用于 iOS、tvOS 和 Mac App Store 构建
 # apple: { purchases: true }  # App 内购买所经由的 StoreKit 库，放进 macOS、iOS 和 tvOS 包
 # apple: { privacy: { accessed_apis: { NSPrivacyAccessedAPICategoryDiskSpace: [E174.1] }, tracking: false } }  # 向 PrivacyInfo.xcprivacy 添加应用使用的 API 和跟踪声明
@@ -77,7 +77,7 @@ build:
 # miniprogram: { appid: { wechat: wx0123456789abcdef, alipay: "2021000000000000" }, custom_navigation: false }  # 小程序的设置
 ```
 
-只写操作系统名的目标表示它的全部架构（`windows` 即 `windows_arm64` 和 `windows_x64`；`android` 仅表示 `android_arm64`，因 x86_64 构建需要 NDK），可用于 `targets`、`nsgo build -target` 和 `nsgo check -target`。加入 `macos_universal` 可为直发渠道生成一个包含 arm64、x64 二进制、库和小组件的 DMG 及 Sparkle feed。`nsgo test -target` 也接受测试实际运行的那个架构的名字：桌面系统是本机的架构，Android 是 `arm64`。所以在 x64 的 Windows 机器上 `windows_x64` 即 `windows` 目标；目标不在其上运行的架构会被拒绝，并提示应使用的名字。
+只写操作系统名的目标表示它的全部架构（`windows` 即 `windows_arm64` 和 `windows_x64`；`android` 仅表示 `android_arm64`，因 x86_64 构建需要 NDK），可用于 `targets`、`nsgo build -target` 和 `nsgo check -target`。`macos_universal` 不在 `macos` 和 `all` 之内：它构建 macOS 的两种架构并合成一个应用（库和小组件也一并合成），生成一个磁盘映像和一个 Sparkle feed，只用于直接分发渠道。`nsgo test -target` 也接受测试实际运行的那个架构的名字：桌面系统是本机的架构，Android 是 `arm64`。所以在 x64 的 Windows 机器上 `windows_x64` 即 `windows` 目标；目标不在其上运行的架构会被拒绝，并提示应使用的名字。
 
 命令行参数会替换同名的值，例如 `-target`、`-version` 或 `-output`；`-h` 列出全部参数。
 

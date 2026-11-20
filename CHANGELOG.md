@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add the `macos_universal` build target, which joins the arm64 and x64 apps, libraries and widgets into one direct-channel disk image and Sparkle feed (#265 by @houko).
 - Add `TabStyle` and `IndicatorStyle` to `ui.Tabs` to restyle its tabs, the selected tab and the indicator (#958 by @houko).
 - Keep partial borders above Apple backdrop, material and glass layers while leaving app children above the border (#935 by @houko).
 - Add `nsgo build -macos-profile` and `-installer`, which replace `sign.macos_profile` and `sign.installer` for the Mac App Store package from the command line (#899 by @houko).

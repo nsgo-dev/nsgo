@@ -68,6 +68,8 @@ case "$(uname -s)" in
     arch=x64
     [ "$(sysctl -in hw.optional.arm64 2> /dev/null)" != 1 ] || arch=arm64
     asset="$slug-$version-macos-$arch.dmg"
+    # A release built only for macos_universal has one disk image for both.
+    curl -fsL -r 0-0 -o /dev/null "$base/$asset" 2> /dev/null || asset="$slug-$version-macos-universal.dmg"
     download "$asset"
     mkdir "$work/mnt"
     hdiutil attach -quiet -nobrowse -readonly -noautoopen -mountpoint "$work/mnt" "$work/$asset" ||
