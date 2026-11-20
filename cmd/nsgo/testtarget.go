@@ -39,8 +39,7 @@ type targetRunner struct {
 	timesFromStart bool
 }
 
-// targetDeviceLostError stops a target run once when the device disappears;
-// a transient test-level failure remains attached to that test instead.
+// targetDeviceLostError stops a target run once when the device disappears; a transient test-level failure remains attached to that test instead.
 type targetDeviceLostError struct{ err error }
 
 func (e *targetDeviceLostError) Error() string { return e.err.Error() }
@@ -137,7 +136,8 @@ tests:
 			cancel()
 			var lost *targetDeviceLostError
 			if errors.As(err, &lost) {
-				return err
+				// The tests that ran still get their summary and JUnit report; the rest did not run.
+				return errors.Join(err, r.finish(opts, nil))
 			}
 			if timedOut {
 				code, err = -1, timeoutError(opts.timeout)

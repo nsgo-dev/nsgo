@@ -12,10 +12,7 @@ import (
 // androidTestScreen is a device's display and keyguard state: secure means the trust manager reports the current user's device locked, a keyguard only a credential dismisses.
 type androidTestScreen struct{ awake, locked, secure bool }
 
-// androidTestScreenReadError means adb failed to read one of the three state
-// dumps after the short retry window. Callers use it to stop a target run once
-// with a device-lost error instead of turning every remaining test into the
-// same failure.
+// androidTestScreenReadError means adb failed to read one of the three state dumps after the short retry window. Callers use it to stop a target run once with a device-lost error instead of turning every remaining test into the same failure.
 type androidTestScreenReadError struct {
 	what string
 	err  error
@@ -86,10 +83,8 @@ func prepareAndroidTestScreen(ctx context.Context, command func(context.Context,
 	}
 	// A command the deadline or a cancellation killed says the wait ended, not that adb failed.
 	read := func(what string, args ...string) (string, error) {
-		var err error
-		for attempt := 0; attempt < androidTestScreenReadAttempts; attempt++ {
-			var out string
-			out, err = command(ctx, args...)
+		for attempt := 1; ; attempt++ {
+			out, err := command(ctx, args...)
 			if err == nil {
 				return out, nil
 			}
@@ -97,8 +92,7 @@ func prepareAndroidTestScreen(ctx context.Context, command func(context.Context,
 				return "", notReady()
 			}
 			if adbDeviceDisconnected(err) {
-				// A transport loss can leave the serial absent for a moment;
-				// wait-for-device gives adb a chance to reconnect before retrying.
+				// A transport loss can leave the serial absent for a moment; wait-for-device gives adb a chance to reconnect before retrying.
 				if _, waitErr := command(ctx, "wait-for-device"); waitErr != nil {
 					if ctx.Err() != nil {
 						return "", notReady()
@@ -106,7 +100,7 @@ func prepareAndroidTestScreen(ctx context.Context, command func(context.Context,
 					err = waitErr
 				}
 			}
-			if attempt+1 == androidTestScreenReadAttempts {
+			if attempt == androidTestScreenReadAttempts {
 				return "", &androidTestScreenReadError{what: what, err: err}
 			}
 			timer := time.NewTimer(androidTestScreenRetryDelay)
@@ -117,7 +111,6 @@ func prepareAndroidTestScreen(ctx context.Context, command func(context.Context,
 			case <-timer.C:
 			}
 		}
-		panic("unreachable")
 	}
 	woke, dismissed := false, false
 	for {
@@ -169,12 +162,12 @@ func prepareAndroidTestScreen(ctx context.Context, command func(context.Context,
 const androidTestScreenWait = 15 * time.Second
 
 func (d device) prepareTestScreen(ctx context.Context) error {
-	parent := ctx
-	ctx, cancel := context.WithTimeout(parent, androidTestScreenWait)
+	ctx, cancel := context.WithTimeout(ctx, androidTestScreenWait)
 	defer cancel()
 	if err := prepareAndroidTestScreen(ctx, d.output); err != nil {
+		// Only adb failing to answer after its retries means the device is gone; a screen that does not wake or unlock in time still fails just this test, with the unlock hint.
 		var readErr *androidTestScreenReadError
-		if errors.As(err, &readErr) || errors.Is(err, context.DeadlineExceeded) && parent.Err() == nil {
+		if errors.As(err, &readErr) {
 			return &targetDeviceLostError{err: fmt.Errorf("Android test device %s lost: %w", d.serial, err)}
 		}
 		return fmt.Errorf("Android test device %s: %w", d.serial, err)
