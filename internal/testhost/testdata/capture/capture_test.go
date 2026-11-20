@@ -42,3 +42,29 @@ func TestCaptureShowsCompositedEffects(t *testing.T) {
 		t.Errorf("below the shadowed box shows %d,%d,%d, want its black shadow", r, g, b)
 	}
 }
+
+// TestPartialBorderShowsOverABackdrop checks that a border on only some sides of a frosted view draws over its blur and tint, the right way up, as a uniform border does (#935).
+func TestPartialBorderShowsOverABackdrop(t *testing.T) {
+	if nsgotest.Target() != "macos" {
+		t.Skip("checks the macOS test host's capture")
+	}
+	const width, height = 300, 300
+	app := nsgotest.Start(t, func(*core.Scope) core.Node {
+		return core.View{Style: core.Style{Background: core.RGB(0x2050c0), Padding: core.All(50)}, Children: []core.Node{
+			core.View{Style: core.Style{Width: core.Pt(200), Height: core.Pt(100), Background: core.RGBA(0xffffff, 0.3), BackdropFilters: []core.Filter{core.Blur(10)},
+				Borders: core.Edges{Top: 6}, BorderColors: core.EdgeColors{Top: core.RGB(0xff0000)}}},
+		}}
+	}, nsgotest.Size(width, height))
+	img := app.Capture()
+	at := func(x, y core.Points) (r, g, b uint32) {
+		p := image.Pt(img.Bounds().Min.X+int(float64(x)*float64(img.Bounds().Dx())/width), img.Bounds().Min.Y+int(float64(y)*float64(img.Bounds().Dy())/height))
+		r, g, b, _ = img.At(p.X, p.Y).RGBA()
+		return r >> 8, g >> 8, b >> 8
+	}
+	if r, g, b := at(150, 53); r < 180 || g > 110 || b > 110 {
+		t.Errorf("the top border shows %d,%d,%d, want red over the backdrop", r, g, b)
+	}
+	if r, g, b := at(150, 147); r > 180 && g < 110 && b < 110 {
+		t.Errorf("the bottom edge shows the top border's red %d,%d,%d: the ring is upside down", r, g, b)
+	}
+}
