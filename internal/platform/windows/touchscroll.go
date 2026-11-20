@@ -181,6 +181,10 @@ func (w *window) glide(v *view, m *scrollbar.Motion, momentum bool) {
 		offset := v.offset
 		scrollbar.SetAlong(&v.scroll, &offset, at)
 		w.moveOffset(v, offset)
+		if momentum {
+			// A glide can outlast the indicator's fade; it shows until the glide ends, as the wheel's and a snap's moves keep it.
+			w.showBar(v)
+		}
 		if done {
 			v.glide = nil
 			if momentum {
