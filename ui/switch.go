@@ -28,9 +28,7 @@ type SwitchVariant uint8
 const (
 	// SwitchDefault is ui's own look. It is the default.
 	SwitchDefault SwitchVariant = iota
-	// SwitchSystem is the platform's own switch where it has one: macOS's NSSwitch,
-	// iOS's UISwitch and Android's Material 3 switch (core.SystemSwitch), sized as
-	// the system's; elsewhere, a watch included, it is ui's look.
+	// SwitchSystem is the platform's own switch where it has one: macOS's NSSwitch, iOS's UISwitch and Android's Material 3 switch (core.SystemSwitch), sized as the system's; elsewhere, a watch included, it is ui's look.
 	SwitchSystem
 )
 
