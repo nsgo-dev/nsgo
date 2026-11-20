@@ -137,6 +137,8 @@ func ParseLimits(spec string) (Limits, error) {
 type Sandbox struct {
 	// plugin says Load runs it, whose calls Limits.CallTotal holds.
 	plugin bool
+	// exportView says a view renders one of its exports in place of what its entry module mounts.
+	exportView bool
 	// Limits are what it may use, DefaultLimits when nil.
 	Limits *Limits
 	// Capabilities are what its code may reach (a package's own); nil
@@ -180,6 +182,7 @@ func Sandboxed(name, src string, s Sandbox, options ...ViewOptions) func(cx *cor
 	if len(options) > 0 {
 		view = options[0]
 	}
+	s.exportView = view.Export != ""
 	return func(cx *core.Scope) core.Node {
 		inner := cx.Child()
 		var root core.Node
@@ -256,6 +259,7 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 		r.regexTimeout = limits.Load
 	}
 	r.sandbox = &sandboxed{caps: s.Capabilities != nil || s.Grant != nil, modules: s.Modules}
+	r.exportView = s.exportView
 	if limits.Stack > 0 {
 		r.vm.SetMaxCallStackSize(limits.Stack)
 	}

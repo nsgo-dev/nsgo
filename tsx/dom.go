@@ -717,9 +717,11 @@ func keyOf(v js.Value) any {
 	}
 }
 
-// mount is `mount(App, props)`: App rendered into the surface; it returns
-// a function that removes it.
+// mount is `mount(App, props)`: App rendered into the surface; it returns a function that removes it. In a view of an export it neither renders nor runs App, whose effects, handlers, timers and frames would otherwise run hidden beside the export, and returns a function that does nothing.
 func (r *runtime) mount(call js.FunctionCall) js.Value {
+	if r.exportView {
+		return r.function(func(js.FunctionCall) js.Value { return js.Undefined() })
+	}
 	app, props := arg(call, 0), arg(call, 1)
 	if _, ok := props.(*js.Object); !ok {
 		props = r.vm.NewObject()

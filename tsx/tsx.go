@@ -135,6 +135,8 @@ type runtime struct {
 	// committing is set while a commit is asked for after the page's
 	// engine called Go (engine_browser.go).
 	committing bool
+	// exportView says a view renders one of the entry module's exports, so mount attaches nothing and runs nothing of what it is given.
+	exportView bool
 }
 
 // maxCallStack is how deep JS calls nest in any app.

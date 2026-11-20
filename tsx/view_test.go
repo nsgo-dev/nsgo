@@ -109,6 +109,37 @@ export function Second() { const n = signal(0); return <Text testID="second" onP
 	}
 }
 
+// TestViewExportDisposesEntryMount verifies that what an entry module mounts never runs in a view of an export: neither its nodes nor the timers and animation frames it sets, however late it sets them.
+func TestViewExportDisposesEntryMount(t *testing.T) {
+	data, trust := signedPackage(t, `import { mount, signal, effect, Text } from "nsgo";
+const ticks = signal(0);
+const frames = signal(0);
+const late = signal(0);
+function Mounted() {
+  effect(() => { setInterval(() => ticks.set(ticks() + 1), 10); });
+  const loop = () => { frames.set(frames() + 1); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+  queueMicrotask(() => setInterval(() => late.set(late() + 1), 10));
+  return <Text testID="mounted">mounted</Text>;
+}
+mount(Mounted);
+export function Panel() { return <Text testID="export">{() => "export " + ticks() + " " + frames() + " " + late()}</Text>; }`, 1)
+	p, err := trust.Verify(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return tsx.View{Package: p, Export: "Panel", Sandbox: tsx.Sandbox{WebUnisolated: true}}
+	})
+	if app.Exists("id:mounted") || app.Find("id:export").Text != "export 0 0 0" {
+		t.Fatalf("entry mount was left in the root\n%s", app.Dump())
+	}
+	app.FastForward(100 * time.Millisecond)
+	if got := app.Find("id:export").Text; got != "export 0 0 0" {
+		t.Fatalf("entry mount kept running: %q", got)
+	}
+}
+
 func TestViewNamedExportErrors(t *testing.T) {
 	data, trust := signedPackage(t, `export const NotAComponent = 1;`, 1)
 	p, err := trust.Verify(data)

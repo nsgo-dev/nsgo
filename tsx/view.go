@@ -18,7 +18,7 @@ import (
 //	core.Catch{Try: tsx.View{Package: p}.Render, Fallback: failed}
 type View struct {
 	Package *pkg.Package
-	// Export names a component the package's entry module exports, which the view renders in place of the root the entry mounts; empty keeps that root.
+	// Export names a component the package's entry module exports, which the view renders in place of the root the entry mounts, whose mount then neither renders nor runs its component; empty keeps that root.
 	Export string
 	// Props are Export's props object, as JSON encodes them.
 	Props map[string]any
