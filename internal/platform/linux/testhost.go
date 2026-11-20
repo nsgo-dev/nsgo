@@ -243,6 +243,8 @@ var (
 	textSetPosn func(text uintptr, position int32)
 
 	textBufferDeleteSelection func(buffer uintptr, interactive, defaultEditable bool) bool
+
+	gdkDisplaySync func(display uintptr)
 )
 
 func loadEditing() {
@@ -251,6 +253,7 @@ func loadEditing() {
 		purego.RegisterLibFunc(&textGetPosn, gtkLib, "gtk_editable_get_position")
 		purego.RegisterLibFunc(&textSetPosn, gtkLib, "gtk_editable_set_position")
 		purego.RegisterLibFunc(&textBufferDeleteSelection, gtkLib, "gtk_text_buffer_delete_selection")
+		purego.RegisterLibFunc(&gdkDisplaySync, gtkLib, "gdk_display_sync")
 	}
 }
 
@@ -401,7 +404,11 @@ func (t *testSurface) Key(key string) error {
 	if !ok {
 		return fmt.Errorf("unknown key %q", key)
 	}
+	loadEditing()
+	closing := false
 	t.onLoop(func() {
+		// After the release, wait for the display server to have sent the events the key caused, which the loop's next turn handles before the turn below.
+		defer func() { gdkDisplaySync(gdkDisplayGetDefault()); closing = t.w.closing }()
 		defer keyReleasedCallback(0, keyval, 0, state, t.w.handle)
 		if keyPressedCallback(0, keyval, 0, state, t.w.handle) != 0 {
 			return
@@ -439,6 +446,10 @@ func (t *testSurface) Key(key string) error {
 			return
 		}
 	})
+	// Let those events run before the next step, as they do before a user's next key: under X11 a selection Shift+Right had just extended was sometimes collapsed again by events GTK handled only after the next key was sent, so App.Select's keys lost a character. A closing window's loop may not turn again.
+	if !closing {
+		t.onLoop(func() {})
+	}
 	return nil
 }
 
