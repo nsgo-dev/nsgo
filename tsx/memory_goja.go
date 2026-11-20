@@ -30,8 +30,6 @@ type memory struct {
 	joining []*js.Object
 	// pin, iterate and project are memoryProgram's, which the wrappers hand the originals in place of what the bundle gave them.
 	pin, iterate, project js.Callable
-	// isRawJSON is the original JSON.isRawJSON.
-	isRawJSON js.Callable
 }
 
 const (
@@ -54,7 +52,6 @@ func (r *runtime) limitMemory(limit int64) {
 	m.pin, _ = js.AssertFunction(helpers.Get("pin"))
 	m.iterate, _ = js.AssertFunction(helpers.Get("iterate"))
 	m.project, _ = js.AssertFunction(helpers.Get("project"))
-	m.isRawJSON, _ = js.AssertFunction(object(g, "JSON").Get("isRawJSON"))
 	r.wrapConstructor("ArrayBuffer", 0)
 	for _, name := range []string{"Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array"} {
 		r.wrapConstructor(name, g.Get(name).(*js.Object).Get("BYTES_PER_ELEMENT").ToInteger())
@@ -141,20 +138,8 @@ func (r *runtime) limitMemory(limit int64) {
 		return r.raw(call, orig)
 	})
 
+	// Array.prototype.join and toLocaleString, and JSON.stringify, check what they make as they make it in the wrappers limitNesting puts around them, which hold how deep they go as well.
 	array := object(g, "Array", "prototype")
-	join, _ := js.AssertFunction(array.Get("join"))
-	r.wrap(array, "join", func(call js.FunctionCall, _ js.Callable) js.Value {
-		o, sep := call.This.ToObject(r.vm), call.Argument(0)
-		if js.IsUndefined(sep) {
-			sep = r.vm.ToValue(",")
-		} else {
-			sep = sep.ToString()
-		}
-		return r.join(o, sep, js.Value.ToString, join)
-	})
-	r.wrap(array, "toLocaleString", func(call js.FunctionCall, _ js.Callable) js.Value {
-		return r.join(call.This.ToObject(r.vm), r.vm.ToValue(","), r.localeString, join)
-	})
 	// fill, sort and the copies read the length of what is not an array once more, so they are given it pinned to what was checked.
 	r.wrap(array, "fill", func(call js.FunctionCall, orig js.Callable) js.Value {
 		o := call.This.ToObject(r.vm)
@@ -213,11 +198,6 @@ func (r *runtime) limitMemory(limit int64) {
 	r.wrap(object(g, "Function", "prototype"), "apply", arguments(1))
 	r.wrap(object(g, "Reflect"), "apply", arguments(2))
 	r.wrap(object(g, "Reflect"), "construct", arguments(1))
-
-	isArray, _ := js.AssertFunction(object(g, "Array", "isArray"))
-	r.wrap(object(g, "JSON"), "stringify", func(call js.FunctionCall, orig js.Callable) js.Value {
-		return r.stringify(call, orig, isArray)
-	})
 }
 
 // object is the object at path from o.
@@ -406,9 +386,12 @@ func (r *runtime) raw(call js.FunctionCall, orig js.Callable) js.Value {
 // jsonExtra is the most JSON.stringify writes around a value besides its key, its indentation and itself: a comma and a newline before it and its closing bracket, its brackets, the quotes and colon of its key and a space after, or the null, true or false it may be.
 const jsonExtra = 16
 
-// stringify is JSON.stringify, which checks what it writes as it reaches each value, through a replacer of its own around the bundle's, before it writes it: the value's key, the value itself when it is a string, a number or raw JSON, and the indentation of its line and of its closing bracket, which grows with its depth. A list of the properties to write, which the original would take in place of a replacer, is read here once as the original reads it, and the replacer hands the original each object to write as a proxy with just those properties, in that order, read from the object as the original would read them.
-func (r *runtime) stringify(call js.FunctionCall, orig, isArray js.Callable) js.Value {
+// stringify is JSON.stringify, which checks each value as it reaches it, through a replacer of its own around the bundle's, before it writes it: how deep it lies, which past maxNesting throws a RangeError before the original goes into it, and under Limits.Memory what it writes: the value's key, the value itself when it is a string, a number or raw JSON, and the indentation of its line and of its closing bracket, which grows with its depth. A list of the properties to write, which the original would take in place of a replacer, is read here once as the original reads it, and the replacer hands the original each object to write as a proxy with just those properties, in that order, read from the object as the original would read them, by project. Raw JSON, which isRawJSON tells, is written as it is.
+func (r *runtime) stringify(call js.FunctionCall, orig, isArray, isRawJSON, project js.Callable) js.Value {
 	m := r.sandbox.memory
+	// The levels it goes down count toward the nesting while it runs, as far as the last value it reached, so that what a getter, toJSON or the replacer calls has only the rest.
+	outer := r.sandbox.nesting
+	defer func() { r.sandbox.nesting = outer }()
 	args := slices.Clone(call.Arguments)
 	for len(args) < 3 {
 		args = append(args, js.Undefined())
@@ -444,44 +427,55 @@ func (r *runtime) stringify(call js.FunctionCall, orig, isArray js.Callable) js.
 	var total int64
 	args[1] = r.function(func(c js.FunctionCall) js.Value {
 		key, v := c.Argument(0), c.Argument(1)
-		if user != nil {
-			v = r.callOrig(user, c.This, []js.Value{key, v})
-		}
 		var level int64
 		if holder, ok := c.This.(*js.Object); ok {
 			level = depths[holder]
 		}
-		n := sum(jsonExtra, mul(2, level, gap), jsonLen(key))
-		switch x := v.(type) {
-		case js.String:
-			n = sum(n, jsonLen(x))
-		case *js.Object:
-			if r.callOrig(m.isRawJSON, js.Undefined(), []js.Value{x}).ToBoolean() {
-				// Raw JSON is written as it is, its units in at most 3 bytes each.
-				n = sum(n, mul(stringLen(x.Get("rawJSON")), 3))
-				break
-			}
+		r.sandbox.nesting = outer + int(level)
+		if user != nil {
+			v = r.callOrig(user, c.This, []js.Value{key, v})
+		}
+		x, ok := v.(*js.Object)
+		raw := ok && r.callOrig(isRawJSON, js.Undefined(), []js.Value{x}).ToBoolean()
+		if ok && !raw {
+			// What the original goes into, a level deeper; raw JSON it writes as it is.
+			r.nest()
 			if keys != nil && r.projects(x, isArray) {
-				x = r.callOrig(m.project, js.Undefined(), []js.Value{x, keys}).(*js.Object)
+				x = r.callOrig(project, js.Undefined(), []js.Value{x, keys}).(*js.Object)
 				v = x
 			}
 			depths[x] = level + 1
+		}
+		if m == nil {
+			return v
+		}
+		n := sum(jsonExtra, mul(2, level, gap), jsonLen(key))
+		switch {
+		case raw:
+			// Raw JSON is written as it is, its units in at most 3 bytes each.
+			n = sum(n, mul(stringLen(x.Get("rawJSON")), 3))
+		case isNumber(v):
+			n = sum(n, int64(len(v.String())))
 		default:
-			if isNumber(x) {
-				n = sum(n, int64(len(x.String())))
-			}
+			n = sum(n, jsonLen(v))
 		}
 		total = sum(total, n)
 		r.checkMemory(total)
 		return v
 	})
-	return r.holdString(r.callOrig(orig, call.This, args))
+	v := r.callOrig(orig, call.This, args)
+	if m == nil {
+		return v
+	}
+	return r.holdString(v)
 }
 
 // propertyList is the list of the properties to write that JSON.stringify makes of rep, an array, as goja's makes it: its strings and numbers, and its String and Number objects as strings, each once.
 func (r *runtime) propertyList(rep *js.Object) js.Value {
 	n := r.lengthOf(rep)
-	r.checkMemory(mul(n, valueSize))
+	if r.sandbox.memory != nil {
+		r.checkMemory(mul(n, valueSize))
+	}
 	seen := map[string]bool{}
 	var names []any
 	for i := int64(0); i < n; i++ {

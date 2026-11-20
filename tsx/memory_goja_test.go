@@ -12,12 +12,20 @@ import (
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 )
 
-// limited is a sandboxed runtime with no app whose built-ins hold limit bytes, hardened as a sandbox's are.
+// limited is a sandboxed runtime with no app whose built-ins hold limit bytes and the nesting, hardened as a sandbox's are.
 func limited(limit int64) *runtime {
 	r := &runtime{vm: js.New(), warned: map[string]bool{}, sandbox: &sandboxed{}}
 	if limit > 0 {
 		r.limitMemory(limit)
 	}
+	r.limitNesting()
+	r.harden()
+	return r
+}
+
+// bare is a runtime with no app whose built-ins are goja's own, hardened as a sandbox's are.
+func bare() *runtime {
+	r := &runtime{vm: js.New(), warned: map[string]bool{}, sandbox: &sandboxed{}}
 	r.harden()
 	return r
 }
@@ -173,7 +181,7 @@ func TestMemoryKeepsWhatFits(t *testing.T) {
 	}
 }
 
-// TestMemoryKeepsTheBuiltinsBehavior runs scripts in a runtime whose built-ins are held and one whose are not, which must agree.
+// TestMemoryKeepsTheBuiltinsBehavior runs scripts in runtimes whose built-ins are held, to the nesting alone and to a memory budget as well, and one whose are goja's own, which must agree.
 func TestMemoryKeepsTheBuiltinsBehavior(t *testing.T) {
 	for _, src := range []string{
 		`const b = new ArrayBuffer(16); [b.byteLength, b instanceof ArrayBuffer, b.constructor === ArrayBuffer, ArrayBuffer.isView(new Uint8Array(b)), ArrayBuffer.name, ArrayBuffer.length, Object.getPrototypeOf(b) === ArrayBuffer.prototype]`,
@@ -202,18 +210,25 @@ func TestMemoryKeepsTheBuiltinsBehavior(t *testing.T) {
 		`class Bag { #items = [3, 4]; *[Symbol.iterator]() { yield* this.#items; } } [Array.from(new Bag()).join(), new Uint8Array(new Bag()).join(), Uint8Array.from(new Bag()).join(), Array.from({ length: 2, 0: "x" }, (v, i) => v + i).join(), new Int8Array({ length: 2, 0: 5 }).join(), Array.from(new Set([1, 2])).join(), (() => { try { Array.from({ [Symbol.iterator]: 1 }); } catch (e) { return e.name; } })()]`,
 		`function f() { return [this && this.x, arguments.length, ...arguments].join(); } [f.apply({ x: 1 }, { length: 3, 0: "a", 2: "c" }), Reflect.apply(f, null, { length: 1, 0: 9 }), Reflect.construct(Array, { length: 2, 0: 1, 1: 2 }).join(), Math.max.apply(null, new Proxy([1, 7, 3], {})), (() => { try { Reflect.apply(f, null, 1); } catch (e) { return e.name; } })()]`,
 		`[JSON.stringify.name, JSON.stringify.length, (function () {}).apply.name, Object.isFrozen(ArrayBuffer), Object.isFrozen(Uint8Array.prototype), typeof Uint8Array.fromBase64]`,
+		`const f = [JSON.stringify, JSON.parse, Array.prototype.join, Array.prototype.toString, Array.prototype.toLocaleString, Array.prototype.flat]; [f.map((g) => g.name + g.length + Function.prototype.toString.call(g) + Object.keys(g).length + Object.getOwnPropertyNames(g).join("/") + ("prototype" in g)).join(), Object.getPrototypeOf(Uint8Array.prototype).toString === Array.prototype.toString, Object.getOwnPropertyNames(Object.getPrototypeOf(Uint8Array.prototype)).includes("toString"), JSON.stringify(Object.getOwnPropertyDescriptor(Array.prototype, "flat")), JSON.stringify(Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), "toString"))]`,
+		`[[1, [2, [3, [4]]]].flat().length, [1, [2, [3, [4]]]].flat(2).length, [1, [2, [3, [4]]]].flat(Infinity).join(), [1, [2]].flat(0).length, [1, [2]].flat(-1).length, [1, [2]].flat("1").length, [1, [2]].flat(NaN).length, [1, [2, [3]]].flat({ valueOf: () => 1 }).length, [, 1, [, 2]].flat().join(), Array.prototype.flat.call({ length: 2, 0: [1], 1: 2 }).join(), (class extends Array {}).from([[1]]).flat().constructor.name, (() => { try { Array.prototype.flat.call(null); } catch (e) { return e.name; } })()]`,
+		`const seen = []; const v = JSON.parse('{"a":[1,{"b":2}],"c":"x","d":null}', function (k, v) { seen.push(k + ":" + (this === null) + ":" + typeof v); return k === "c" ? undefined : typeof v === "number" ? v * 10 : v; }); [JSON.stringify(v), seen.join(), JSON.parse("[1,2]", (k, v) => (k === "0" ? undefined : v)).length, 0 in JSON.parse("[1,2]", (k, v) => (k === "0" ? undefined : v)), JSON.parse('"s"', 1), (() => { try { JSON.parse("{", () => 1); } catch (e) { return e.name; } })(), JSON.parse('{"a":{"b":1}}', function (k, v) { if (k === "a") this.z = 1; return v; }).z, JSON.parse('{"a":1,"b":2}', function (k, v) { if (k === "a") this.b = [7]; return v; }).b.join()]`,
+		`[JSON.stringify({ a: JSON.rawJSON("1e3"), b: { a: JSON.rawJSON('"r"') } }, ["a", "b"]), JSON.stringify([JSON.rawJSON("1"), { x: 1 }], ["x"]), JSON.stringify({ a: JSON.rawJSON("2") }, (k, v) => v, 1)]`,
+		`[String([1, [2, [3]]]), [1, [2]].toString(), Array.prototype.toString.call({ join: () => "j" }), Array.prototype.toString.call({}), new Uint8Array([1, 2]).toString(), String(new Int8Array([3])), [[1.5], 2].toLocaleString(), (() => { const a = [1]; a.join = () => "own"; return String(a); })()]`,
 	} {
-		want, err := limited(0).vm.RunString(src)
+		want, err := bare().vm.RunString(src)
 		if err != nil {
 			t.Fatalf("%s: %v", src, err)
 		}
-		got, err := limited(64 << 20).vm.RunString(src)
-		if err != nil {
-			t.Errorf("%s: %v", src, err)
-			continue
-		}
-		if g, w := got.String(), want.String(); g != w {
-			t.Errorf("%s:\n got %s\nwant %s", src, g, w)
+		for _, limit := range []int64{0, 64 << 20} {
+			got, err := limited(limit).vm.RunString(src)
+			if err != nil {
+				t.Errorf("%s: %v", src, err)
+				continue
+			}
+			if g, w := got.String(), want.String(); g != w {
+				t.Errorf("%s, memory %d:\n got %s\nwant %s", src, limit, g, w)
+			}
 		}
 	}
 }

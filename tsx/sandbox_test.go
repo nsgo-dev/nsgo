@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"reflect"
 	"runtime"
 	"slices"
@@ -614,6 +615,41 @@ mount(() => <View>
 	app.WaitFor("id:stopped", 5*time.Second)
 	if core.ErrorCode(failed) != core.CodeQuotaExceeded {
 		t.Fatalf("stopped with %v", failed)
+	}
+}
+
+// TestSandboxGuardsRecursiveBuiltins gives the built-ins that go down data in Go, in a sandbox as a plugin gets one, data a million levels deep, which before #875 hung the call past its budget or overflowed the goroutine's stack and ended the process; each must throw a RangeError the plugin catches. It runs in a process of its own so that a crash fails the test rather than ending its binary.
+func TestSandboxGuardsRecursiveBuiltins(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("the web keeps the browser's built-ins, and starts no process")
+	}
+	if os.Getenv("NSGO_TEST_SANDBOX_NESTING") == "" {
+		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestSandboxGuardsRecursiveBuiltins$", "-test.v")
+		cmd.Env = append(os.Environ(), "NSGO_TEST_SANDBOX_NESTING=1")
+		cmd.WaitDelay = time.Second
+		timer := time.AfterFunc(2*time.Minute, func() { _ = cmd.Process.Kill() })
+		defer timer.Stop()
+		if out, err := cmd.CombinedOutput(); err != nil {
+			text := string(out)
+			if i := strings.Index(text, "\ngoroutine "); i >= 0 {
+				text = text[:i]
+			}
+			t.Fatalf("%v\n%s", err, text)
+		}
+		return
+	}
+	p := verified(t, `import { mount, Text } from "nsgo";
+let value = [];
+for (let i = 0; i < 1000000; i++) value = [value];
+const result = [];
+for (const [name, fn] of [["json", () => JSON.stringify(value)], ["string", () => String(value)], ["locale", () => value.toLocaleString()], ["flat", () => value.flat(Infinity)], ["revive", () => JSON.parse("[1, 2]", function (k, v) { if (k === "0") this[1] = value; return v; })]]) {
+	try { fn(); result.push(name + ":ok"); } catch (e) { result.push(name + ":" + e.name); }
+}
+mount(() => <Text testID="out">{result.join("|")}</Text>);`, pkg.Capabilities{})
+	app := nsgotest.Start(t, tsx.View{Package: p, Sandbox: tsx.Sandbox{WebUnisolated: true}}.Render)
+	app.WaitFor("id:out", 30*time.Second)
+	if got := app.Find("id:out").Text; got != "json:RangeError|string:RangeError|locale:RangeError|flat:RangeError|revive:RangeError" {
+		t.Fatalf("recursive built-ins returned %q", got)
 	}
 }
 

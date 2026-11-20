@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Have a native sandbox's `JSON.stringify`, `JSON.parse` with a reviver, `Array.prototype.join`, `toString`, `toLocaleString` and `flat` throw a catchable `RangeError` past 1,000 levels, counted across nested calls, where data a million levels deep hung the call past its time budget and an array whose `join` is `toString` overflowed the Go stack and ended the host; the wrappers carry `Limits.Memory`'s checks too, so no built-in is wrapped twice (#875 by @houko).
 - Add Xcode SDK metadata and the arm64 device requirement to iOS, tvOS and watchOS device bundles and their extensions (#889 by @houko).
 - Make WebView mobile drag tests tolerate WebKit and WebView2 coalescing intermediate moves while still requiring a touch drag (#891 by @houko).
 - Name inline image data by a SHA-256 digest of its bytes rather than their address in `ImageSource.Key`, so a buffer freed and reused at the same address cannot draw an earlier image in Android's canvas bitmap cache, the Linux and Windows shader textures or the mini program's images, which did not keep the bytes alive as the Apple and web canvas caches did since 0.2.0 (#738 by @houko).

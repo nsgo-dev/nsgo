@@ -264,6 +264,7 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 	if limits.Memory > 0 {
 		r.limitMemory(int64(limits.Memory))
 	}
+	r.limitNesting()
 	if limits.Harden {
 		r.harden()
 	}
@@ -315,6 +316,8 @@ type sandboxed struct {
 	stopped error
 	// memory is what the built-ins hold for it under Limits.Memory, nil without one.
 	memory *memory
+	// nesting is how many levels the built-ins limitNesting holds have gone down in the calls running.
+	nesting int
 }
 
 // importsModule reports whether the bundle may import module: one of
