@@ -12,6 +12,7 @@ package web
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -2430,6 +2431,7 @@ func (s *surface) listen() {
 	ls.on(s.host, "pointerdown", s.pointerDown)
 	ls.on(s.host, "pointerup", s.pointerUp)
 	ls.on(s.host, "pointercancel", s.pointerUp)
+	ls.on(s.doc, "pointermove", s.pointerMove)
 	ls.on(s.host, "click", s.click)
 	ls.on(s.host, "keydown", s.keyDown)
 	ls.on(s.host, "contextmenu", s.contextMenu)
@@ -2595,6 +2597,25 @@ func (s *surface) pointerUp(e js.Value) {
 		p.cancel = true
 	}
 	s.pressed(p.view, driver.EventPressUp)
+}
+
+// pointerMove cancels a press once the pointer has moved beyond the same
+// eight-point slop the headless and native gesture models use. Listening on
+// the document keeps a drag that leaves the original element from pressing it
+// when it comes back for pointerup/click.
+func (s *surface) pointerMove(e js.Value) {
+	p := &s.press
+	if !p.active || p.done || p.cancel || p.view == nil || e.Get("pointerId").Int() != p.pointer {
+		return
+	}
+	at := s.pointer(p.view, driver.EventPressDown, e).Page
+	dx, dy := float64(at.X-p.at.Page.X), float64(at.Y-p.at.Page.Y)
+	if math.Hypot(dx, dy) <= 8 {
+		return
+	}
+	p.cancel = true
+	s.pressed(p.view, driver.EventPressUp)
+	p.done = true
 }
 
 // click completes a press. Clicks also come from assistive technology,

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Cancel a web press after the pointer moves beyond eight points, matching headless and native drag behavior (#705 by @houko).
 - Add `nsgo build -release-notes`, a Markdown file of the release's notes that each appcast carries, which Sparkle's and WinSparkle's update dialogs show and the updater's prompt on Linux and Android shows as text, through `core.UpdateCheck.Notes` (#32 by @houko).
 - Restore the most recent surviving application menu and its `YieldsToMenu` shortcuts when the menu owner's macOS window closes (#714 by @houko).
 - Keep `nsgo dev`'s Command/Control+R reload binding alive in other windows after an app function's main view closes (#713 by @houko).

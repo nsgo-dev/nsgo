@@ -21,6 +21,10 @@ func TestPress(t *testing.T) {
 
 `TestMain` gives the platform the main thread when the tests run on a target.
 
+`Drag` cancels the press under the pointer once it moves more than 8 points from where it went down. The same rule applies to the web, so a drag that returns to its starting view does not fire `OnPress`.
+
+
+
 When a package needs process-wide setup and teardown, put them around `m.Run` in `MainFunc`; deferred cleanup runs before the test process exits:
 
 ```go
