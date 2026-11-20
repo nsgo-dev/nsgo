@@ -1403,6 +1403,18 @@ func TestSelectionItemsKeepTheirPatternWhenUnselected(t *testing.T) {
 	}
 }
 
+func TestScrollMoveIndicatorOnlyContinuesUserMomentum(t *testing.T) {
+	for name, v := range map[string]*view{
+		"app move":      {},
+		"animated move": {scrolling: &scrolling{}},
+		"user momentum": {scrolling: &scrolling{momentum: true}},
+	} {
+		if got := scrollMoveShowsIndicator(v); got != (name == "user momentum") {
+			t.Errorf("%s: scrollMoveShowsIndicator = %v", name, got)
+		}
+	}
+}
+
 // TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn checks that the environment reports levels and placement only for a surface with a top-level window of its own, as macOS does: not an embedded view, the app's own hidden surface or a tray icon's.
 func TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn(t *testing.T) {
 	for _, c := range []struct {

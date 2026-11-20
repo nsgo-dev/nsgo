@@ -1762,7 +1762,9 @@ func (w *window) scrollTo(v *view, offset driver.Point) bool {
 // moveOffset puts v's content at offset, unclamped, and reports it.
 func (w *window) moveOffset(v *view, offset driver.Point) {
 	v.offset = offset
-	w.showBar(v)
+	if scrollMoveShowsIndicator(v) {
+		w.showBar(v)
+	}
 	w.redrawView(v)
 	// Values bound to the offset move in the frame that shows it.
 	if w.animator.Scroll(v.id, offset) {
@@ -1829,6 +1831,7 @@ func (w *window) wheel(at driver.Point, notches driver.Points, tilt bool) {
 	from := v.offset
 	w.interruptScroll(v) // the wheel takes over
 	if w.scrollTo(v, to) {
+		w.showBar(v)
 		w.wheelTurned(v, v.offset.X-from.X+v.offset.Y-from.Y)
 	}
 }

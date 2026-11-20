@@ -152,6 +152,13 @@ func (w *window) scrollBy(v *view, d driver.Point) {
 	w.moveOffset(v, driver.Point{X: v.offset.X + d.X, Y: v.offset.Y + d.Y})
 }
 
+// scrollMoveShowsIndicator reports whether an offset move is the momentum or
+// snap continuation of user scrolling. App-owned ScrollTo, ScrollBy, reveal,
+// inset and animated moves leave the indicator alone.
+func scrollMoveShowsIndicator(v *view) bool {
+	return v.scrolling != nil && v.scrolling.momentum
+}
+
 // setSticky replaces scroll view v's sticky cells; cells no longer
 // sticky go back to their frames.
 func (w *window) setSticky(v *view, cells []driver.StickyCell) {

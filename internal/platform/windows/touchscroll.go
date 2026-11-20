@@ -120,6 +120,7 @@ func (w *window) touchMove(at driver.Point) bool {
 		return true
 	}
 	c := &v.scroll
+	w.showBar(v)
 	raw := t.drag.Move(c, at, time.Now())
 	lo, hi := scrollbar.Limits(c, v.frame.Size, v.size, v.refreshing)
 	viewport := scrollbar.Along(c, driver.Point{X: v.frame.Size.Width, Y: v.frame.Size.Height})
@@ -165,6 +166,9 @@ func (w *window) touchUp() bool {
 func (w *window) glide(v *view, m *scrollbar.Motion, momentum bool) {
 	started := v.glide == nil
 	v.glide = m
+	if momentum {
+		w.showBar(v)
+	}
 	if !started {
 		return
 	}

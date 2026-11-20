@@ -67,7 +67,7 @@ row.Reveal(core.RevealOptions{Vertical: core.ScrollAlignCenter, Animated: true})
 
 ## 平台
 
-每个后端都使用平台的滚动视图，因此惯性、回弹、滚动条和触摸滚动都是原生的。边缘效果不同：macOS 和 iOS 回弹，Android 拉伸，Windows 和 Linux 停止，Web 跟随浏览器。`EdgeEffects` 和 `EdgeBar` 在应用需要时把栏放在内容上方。
+每个后端都使用平台的滚动视图，因此惯性、回弹、滚动条和触摸滚动都是原生的。边缘效果不同：macOS 和 iOS 回弹，Android 拉伸，Windows 和 Linux 停止，Web 跟随浏览器。`EdgeEffects` 和 `EdgeBar` 在应用需要时把栏放在内容上方。 在 Windows 上，覆盖式滚动条会在滚轮、触摸、拖动滚动条及其惯性滚动时显示；应用自己的 `ScrollTo`、`ScrollBy`、视图显示、内嵌边距和动画不会显示它。
 
 ## 相关
 

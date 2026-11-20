@@ -67,7 +67,7 @@ A view the keyboard moves the focus to scrolls into view by itself.
 
 ## Platform
 
-Every backend uses the platform's scroll view, so flings, bounces, scroll bars and touch scrolling are native. Edge effects differ: macOS and iOS rubber-band, Android stretches, Windows and Linux stop, and the web follows the browser. `EdgeEffects` and `EdgeBar` add bars over the content where the app wants them.
+Every backend uses the platform's scroll view, so flings, bounces, scroll bars and touch scrolling are native. Edge effects differ: macOS and iOS rubber-band, Android stretches, Windows and Linux stop, and the web follows the browser. `EdgeEffects` and `EdgeBar` add bars over the content where the app wants them. On Windows, the overlay indicator appears for wheel, touch, bar-drag and their momentum, not for app-owned `ScrollTo`, `ScrollBy`, reveals, insets or animations.
 
 ## Related
 
