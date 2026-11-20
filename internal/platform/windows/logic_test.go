@@ -1377,6 +1377,18 @@ func TestStatusAndSearchFieldElements(t *testing.T) {
 	}
 }
 
+func TestMultiSelectableExposesSelectionProviderState(t *testing.T) {
+	e := &uiaElement{}
+	grid := &view{kind: driver.KindView, props: driver.ViewProps{Role: driver.RoleGrid, MultiSelectable: true}}
+	if s := e.spec(grid); !s.multiselectable || s.selectable {
+		t.Fatalf("multi-select grid spec = %+v, want provider without item pattern", s)
+	}
+	single := &view{kind: driver.KindView, props: driver.ViewProps{Role: driver.RoleGrid}}
+	if s := e.spec(single); s.multiselectable {
+		t.Fatalf("single-select grid spec = %+v, want no selection provider", s)
+	}
+}
+
 // TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn checks that the environment reports levels and placement only for a surface with a top-level window of its own, as macOS does: not an embedded view, the app's own hidden surface or a tray icon's.
 func TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn(t *testing.T) {
 	for _, c := range []struct {
