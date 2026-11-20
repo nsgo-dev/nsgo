@@ -311,6 +311,34 @@ func TestDialogPreservesAlertRoleOnTouch(t *testing.T) {
 	}
 }
 
+func TestDialogTouchOptions(t *testing.T) {
+	app, _ := start(t, phoneEnv, func(*core.Scope) core.Node {
+		return Dialog{Open: func() bool { return true }, Bare: true, NoGrabber: true,
+			ContentStyle: core.Style{Padding: core.All(24), Gap: 3}, Title: "Title", TestID: "dialog",
+			Children: []core.Node{core.Text{Content: "Body", TestID: "body"}}}
+	})
+	dialog := app.Find("dialog")
+	for _, v := range views(dialog) {
+		if v.Frame.Size.Width == 36 && v.Frame.Size.Height == 5 {
+			t.Fatal("bare touch dialog kept the default grabber")
+		}
+	}
+	body := app.Find("body")
+	if body.Parent == nil || body.Frame.Origin.X != 0 {
+		t.Fatalf("bare touch dialog unexpectedly padded content: frame=%+v parent=%+v", body.Frame, body.Parent)
+	}
+
+	app, _ = start(t, phoneEnv, func(*core.Scope) core.Node {
+		return Dialog{Open: func() bool { return true }, NoGrabber: true,
+			ContentStyle: core.Style{Padding: core.All(24), Gap: 3}, Title: "Title", TestID: "dialog",
+			Children: []core.Node{core.Text{Content: "Body", TestID: "body"}}}
+	})
+	body = app.Find("body")
+	if body.Parent == nil || body.Frame.Origin.X != 24 || body.Frame.Origin.Y < 24 {
+		t.Fatalf("touch content style = body frame %+v parent=%+v, want 24pt inset", body.Frame, body.Parent)
+	}
+}
+
 // A default action that closes the alert itself still reports the close, once.
 func TestAlertDefaultMayUpdateOpenItself(t *testing.T) {
 	each(t, func(t *testing.T, e core.Environment) {

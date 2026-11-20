@@ -133,10 +133,10 @@ func sheetPanel(cx *core.Scope, side core.Placement) core.Style {
 
 // sheetContent is a sheet's padded content at side, a grabber over it at
 // the bottom, clear of the safe area.
-func sheetContent(cx *core.Scope, side core.Placement, children []core.Node) []core.Node {
+func sheetContent(cx *core.Scope, side core.Placement, children []core.Node, noGrabber bool, style core.Style, styleFunc func() core.Style) []core.Node {
 	pad := core.All(16)
 	var out []core.Node
-	if side == core.PlaceBottom {
+	if side == core.PlaceBottom && !noGrabber {
 		pad.Top = 8
 		out = append(out, core.View{Style: core.Style{AlignSelf: core.AlignCenter, Width: core.Pt(36), Height: core.Pt(5),
 			CornerRadius: 3, Margin: core.Edges{Bottom: 8}}, StyleFunc: Filled(ColorsOf(cx).Border)})
@@ -150,7 +150,8 @@ func sheetContent(cx *core.Scope, side core.Placement, children []core.Node) []c
 	case core.PlaceRight:
 		safe = core.EnvEdges{Top: core.EnvSafeArea, Right: core.EnvSafeArea, Bottom: core.EnvSafeArea}
 	}
-	return []core.Node{core.View{Style: core.Style{Padding: pad, PaddingEnv: safe, Gap: 12, FlexShrink: 1},
+	contentStyle := core.Style{Padding: pad, PaddingEnv: safe, Gap: 12, FlexShrink: 1}.Merge(style)
+	return []core.Node{core.View{Style: contentStyle, StyleFunc: styleFunc,
 		Children: append(out, children...)}}
 }
 

@@ -28,6 +28,8 @@ ui.Dialog{
 
 `Title` 和 `Description` 位于表面顶部，打开期间会变化时用 `TitleFunc` 和 `DescriptionFunc`，`Footer` 放按钮。`Bare` 把整个表面交给 `Children`，用于应用自己布局的对话框，桌面上内容按 `Style` 和 `StyleFunc` 给出的圆角裁剪在表面边框以内，`Inset` 设置桌面对话框到窗口边缘的最小距离。
 
+在触摸屏的 sheet 上，`Bare` 会移除默认拖拽条和内容内边距，让 `Children` 填满面板。`NoGrabber` 只隐藏拖拽条，`ContentStyle` 和 `ContentStyleFunc` 自定义内容容器，`TitleStyle` 和 `TitleStyleFunc` 自定义标题。`StartingStyle` 和 `EndingStyle` 自定义 sheet 的进出动画；需要自定义时长时，在其中设置 `Transition`。
+
 `Style` 合并到表面的默认外观上，`StyleFunc` 在它之后合并，并跟踪读取的信号，包括外观设置，在打开期间和重新打开时都会更新。例如，先声明 `colors := ui.ColorsOf(cx)`，再用 `StyleFunc: func() core.Style { return core.Style{Background: colors.Surface()} }` 跟随主题。这两个字段也适用于 `ui.AlertDialog`。零值颜色保留已有颜色；要清除颜色，请使用 `core.RGBA(0xFFFFFF, 0)` 这样的非零透明色。
 
 ## Sheet

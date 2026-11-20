@@ -23,7 +23,10 @@ type Dialog struct {
 	TitleFunc       func() string
 	Description     string
 	DescriptionFunc func() string
-	Children        []core.Node
+	// TitleStyle overrides the title's typography on every presentation.
+	TitleStyle     core.Style
+	TitleStyleFunc func() core.Style
+	Children       []core.Node
 	// Footer holds the actions, at the end of a row on desktops, the
 	// last first in a stack across a sheet.
 	Footer                 []core.Node
@@ -35,6 +38,15 @@ type Dialog struct {
 	Inset core.Points
 	// Bare leaves out the surface's padding, gap and width, for content that fills it, sizes it and is clipped inside its rim to the corners Style and StyleFunc give it.
 	Bare bool
+	// NoGrabber hides the touch sheet's default drag handle.
+	NoGrabber bool
+	// ContentStyle and ContentStyleFunc override the touch sheet's padding and gap.
+	ContentStyle     core.Style
+	ContentStyleFunc func() core.Style
+	// StartingStyle and EndingStyle override the touch sheet's entry and exit
+	// styles. Include a Transition for custom timing.
+	StartingStyle core.Style
+	EndingStyle   core.Style
 	// Label names the dialog for assistive technology, Title when it and LabelFunc are not given, which reads Description after it. Role makes it an alert dialog, one asking for an answer, as a confirmation.
 	Label     string
 	LabelFunc func() string
@@ -61,7 +73,13 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 	if d.Title != "" || d.TitleFunc != nil || d.Description != "" || d.DescriptionFunc != nil {
 		var head []core.Node
 		if d.Title != "" || d.TitleFunc != nil {
-			head = append(head, core.Text{Content: d.Title, ContentFunc: d.TitleFunc, Role: core.RoleHeader, Style: TypeTitle, StyleFunc: Colored(colors.Text)})
+			head = append(head, core.Text{Content: d.Title, ContentFunc: d.TitleFunc, Role: core.RoleHeader, Style: TypeTitle.Merge(d.TitleStyle), StyleFunc: func() core.Style {
+				s := Colored(colors.Text)()
+				if d.TitleStyleFunc != nil {
+					s = s.Merge(d.TitleStyleFunc())
+				}
+				return s
+			}})
 		}
 		if d.Description != "" || d.DescriptionFunc != nil {
 			head = append(head, core.Text{Content: d.Description, ContentFunc: d.DescriptionFunc, Style: TypeBody, StyleFunc: Colored(colors.Muted)})
@@ -74,11 +92,15 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 			body = append(body, core.View{Style: core.Style{Direction: core.ColumnReverse, Gap: 8, Margin: core.Edges{Top: 8}},
 				Children: d.Footer})
 		}
+		children := body
+		if !d.Bare {
+			children = sheetContent(cx, core.PlaceBottom, body, d.NoGrabber, d.ContentStyle, d.ContentStyleFunc)
+		}
 		return base.Sheet{Open: d.Open, OnOpenChange: d.OnOpenChange, OnClose: d.OnClose, OnConfirm: d.OnConfirm, NoCloseOnEscape: d.NoCloseOnEscape,
 			Role:                   d.Role,
-			NoCloseOnBackdropPress: d.NoCloseOnBackdropPress, CloseOnSwipe: !d.NoCloseOnBackdropPress,
+			NoCloseOnBackdropPress: d.NoCloseOnBackdropPress, CloseOnSwipe: !d.NoCloseOnBackdropPress, StartingStyle: d.StartingStyle, EndingStyle: d.EndingStyle,
 			BackdropStyle: scrim, PopupStyleFunc: func() core.Style { return d.surfaceStyle(sheetPanel(cx, core.PlaceBottom)) },
-			Children: sheetContent(cx, core.PlaceBottom, body), Label: label, LabelFunc: labelFunc, AccessibilityDescription: d.Description, AccessibilityDescriptionFunc: d.DescriptionFunc, TestID: d.TestID}
+			Children: children, Label: label, LabelFunc: labelFunc, AccessibilityDescription: d.Description, AccessibilityDescriptionFunc: d.DescriptionFunc, TestID: d.TestID}
 	}
 	if d.Footer != nil {
 		body = append(body, core.View{Style: core.Style{Direction: core.Row, Wrap: core.Wrap, JustifyContent: core.JustifyEnd,

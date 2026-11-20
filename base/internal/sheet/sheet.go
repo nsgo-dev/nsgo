@@ -207,6 +207,8 @@ type Layer struct {
 	Backdrop      parts.Part
 	BackdropPress func()
 	Panel         parts.Part
+	Starting      parts.Part
+	Ending        parts.Part
 	// Swipe lets a finger drag the panel down, and Swiped hears a release
 	// that asks it to close.
 	Swipe  bool
@@ -243,11 +245,42 @@ func (l Layer) Node() core.Node {
 			Style:     parts.Fill.Merge(l.Backdrop.Style).Merge(core.Style{Animated: &core.AnimatedStyle{Opacity: opacity}}),
 			StyleFunc: l.Backdrop.Fn, NoFocus: true,
 			OnPress: func(core.PressEvent) { l.BackdropPress() }}
+		panelClass := l.Panel.Class
+		panelStyle := l.Panel.Style
+		panelFn := l.Panel.Fn
+		if !m.settled.Get() {
+			panelClass = parts.JoinClasses(panelClass, l.Starting.Class)
+			panelStyle = panelStyle.Merge(l.Starting.Style)
+			if l.Starting.Fn != nil {
+				old := panelFn
+				panelFn = func() core.Style {
+					var s core.Style
+					if old != nil {
+						s = old()
+					}
+					return s.Merge(l.Starting.Fn())
+				}
+			}
+		}
+		if m.closing.Get() {
+			panelClass = parts.JoinClasses(panelClass, l.Ending.Class)
+			panelStyle = panelStyle.Merge(l.Ending.Style)
+			if l.Ending.Fn != nil {
+				old := panelFn
+				panelFn = func() core.Style {
+					var s core.Style
+					if old != nil {
+						s = old()
+					}
+					return s.Merge(l.Ending.Fn())
+				}
+			}
+		}
 		panel := core.View{
-			Class: l.Panel.Class,
-			Style: panelPlace(l.Side).Merge(l.Panel.Style).Merge(core.Style{Animated: &core.AnimatedStyle{
+			Class: panelClass,
+			Style: panelPlace(l.Side).Merge(panelStyle).Merge(core.Style{Animated: &core.AnimatedStyle{
 				TranslateX: m.x, TranslateY: m.y}}),
-			StyleFunc: l.Panel.Fn, Role: l.Role, Label: l.Label, LabelFunc: l.LabelFunc, AccessibilityDescription: l.AccessibilityDescription,
+			StyleFunc: panelFn, Role: l.Role, Label: l.Label, LabelFunc: l.LabelFunc, AccessibilityDescription: l.AccessibilityDescription,
 			AccessibilityDescriptionFunc: l.AccessibilityDescriptionFunc, TestID: l.TestID, Children: l.Content,
 			// Its blank space takes presses, which would reach the backdrop.
 			OnPress: func(core.PressEvent) {}, NoFocus: true,

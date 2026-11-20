@@ -28,6 +28,8 @@ The app holds whether the dialog is open. `OnOpenChange` hears every change the 
 
 `Title` and `Description` head the surface, `TitleFunc` and `DescriptionFunc` when they change while it is open, and `Footer` holds its buttons. `Bare` leaves the whole surface to `Children`, for a dialog of the app's own layout, which desktops clip inside the surface's rim to the corners `Style` and `StyleFunc` give it, and `Inset` sets its least distance from the window's edges on desktops.
 
+On touch sheets, `Bare` now removes the default grabber and content padding so `Children` fill the panel. `NoGrabber` hides only the grabber, `ContentStyle` and `ContentStyleFunc` customize the content wrapper, and `TitleStyle` and `TitleStyleFunc` customize the title. `StartingStyle` and `EndingStyle` customize the sheet transition; include a `Transition` in them when you need custom timing.
+
 `Style` merges over the surface's look. `StyleFunc` merges after it and follows the signals it reads, including the appearance, while the dialog is open and when reopened. For example, `StyleFunc: func() core.Style { return core.Style{Background: colors.Surface()} }` follows the theme, where `colors := ui.ColorsOf(cx)`. Both fields also work on `ui.AlertDialog`. A zero color leaves the existing color in place; use a nonzero transparent color such as `core.RGBA(0xFFFFFF, 0)` to clear it.
 
 ## Sheets

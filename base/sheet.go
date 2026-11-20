@@ -37,6 +37,12 @@ type Sheet struct {
 	PopupClass        string
 	PopupStyle        core.Style
 	PopupStyleFunc    func() core.Style
+	// StartingStyle and EndingStyle style the panel while it enters and leaves;
+	// include a Transition in the style for custom timing.
+	StartingClass string
+	StartingStyle core.Style
+	EndingClass   string
+	EndingStyle   core.Style
 	// Class and Style style the layer that holds the backdrop and the
 	// panel, which covers the root view.
 	Class     string
@@ -68,7 +74,7 @@ func (s Sheet) Render(cx *core.Scope) core.Node {
 	}
 	m := sheet.NewMotion(cx, st.open, side)
 	st.lifecycle(cx, m.There)
-	return sheet.Layer{Motion: m, Side: side, Backdrop: parts.Of(s.BackdropClass, s.BackdropStyle, s.BackdropStyleFunc),
+	return sheet.Layer{Motion: m, Side: side, Starting: parts.Of(s.StartingClass, s.StartingStyle, nil), Ending: parts.Of(s.EndingClass, s.EndingStyle, nil), Backdrop: parts.Of(s.BackdropClass, s.BackdropStyle, s.BackdropStyleFunc),
 		BackdropPress: func() { st.cancel(ReasonBackdropPress, s.NoCloseOnBackdropPress) },
 		Panel:         parts.Of(s.PopupClass, s.PopupStyle, s.PopupStyleFunc),
 		Swipe:         s.CloseOnSwipe && side == core.PlaceBottom,
