@@ -119,6 +119,10 @@ type window struct {
 	onAllDesktops bool
 	// input is where the window takes the pointer (windowpointer.go).
 	input windowInput
+	// currentEvent is the GDK event being dispatched on the main thread.
+	// It is valid only during the callback, for actions needing the event,
+	// such as showing the window manager's title-bar menu.
+	currentEvent uintptr
 	// settingsHandlers are the handlers setupSettings connects to GTK's settings, which outlive the window.
 	settingsHandlers []uint64
 	// contrastHandler is the handler on GNOME's accessibility settings, which are not GTK's.

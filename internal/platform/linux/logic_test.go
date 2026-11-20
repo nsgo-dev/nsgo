@@ -556,7 +556,7 @@ func TestTitleBarDoubleClickFollowsGTK(t *testing.T) {
 	for setting, want := range map[string]titleBarAction{
 		"": titleBarToggleMaximize, "toggle-maximize": titleBarToggleMaximize,
 		"toggle-maximize-horizontally": titleBarToggleMaximize, "toggle-maximize-vertically": titleBarToggleMaximize,
-		"minimize": titleBarMinimize, "lower": titleBarLower, "none": titleBarNone, "menu": titleBarNone,
+		"minimize": titleBarMinimize, "lower": titleBarLower, "none": titleBarNone, "menu": titleBarShowMenu,
 	} {
 		if got := titleBarDoubleClickAction(setting); got != want {
 			t.Errorf("titleBarDoubleClickAction(%q) = %d, want %d", setting, got, want)

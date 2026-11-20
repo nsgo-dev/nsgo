@@ -88,6 +88,8 @@ func clickPressedCallback(gesture uintptr, n int32, x, y float64, data uintptr) 
 		return
 	}
 	w.hideMenuBar()
+	w.currentEvent = gtkEventControllerGetCurrentEvent(gesture)
+	defer func() { w.currentEvent = 0 }()
 	// Presses on a field, a page or a video's controls are theirs, even
 	// where they bubble up here.
 	if w.nativeAt(gtkWidgetPick(w.surface, x, y, gtkPickDefault)) {
@@ -808,13 +810,16 @@ const (
 	titleBarToggleMaximize
 	titleBarMinimize
 	titleBarLower
+	titleBarShowMenu
 )
 
-// titleBarDoubleClickAction reads GtkSettings' gtk-titlebar-double-click, the desktop's choice that GTK's own header bars follow (GNOME's action-double-click-titlebar), as GTK 4's GtkWindowHandle does: the maximize variants all toggle maximize, as does an unset or unknown value. GTK's "menu" shows the window manager's menu for the press's GdkEvent, which NSGo's press handling does not keep, so it does nothing.
+// titleBarDoubleClickAction reads GtkSettings' gtk-titlebar-double-click, the desktop's choice that GTK's own header bars follow (GNOME's action-double-click-titlebar), as GTK 4's GtkWindowHandle does: the maximize variants all toggle maximize, as does an unset or unknown value. GTK's "menu" shows the window manager's menu for the press's GdkEvent.
 func titleBarDoubleClickAction(setting string) titleBarAction {
 	switch setting {
-	case "none", "menu":
+	case "none":
 		return titleBarNone
+	case "menu":
+		return titleBarShowMenu
 	case "minimize":
 		return titleBarMinimize
 	case "lower":
@@ -837,6 +842,10 @@ func (w *window) titleBarDoubleClick() {
 	case titleBarLower:
 		if surface := gtkNativeGetSurface(w.win); surface != 0 {
 			gdkToplevelLower(surface)
+		}
+	case titleBarShowMenu:
+		if surface := gtkNativeGetSurface(w.win); surface != 0 && w.currentEvent != 0 {
+			gdkToplevelShowWindowMenu(surface, w.currentEvent)
 		}
 	}
 }
@@ -1137,6 +1146,8 @@ func shieldCallback(controller, event, data uintptr) int32 {
 	if w == nil || w.closing {
 		return 0
 	}
+	w.currentEvent = event
+	defer func() { w.currentEvent = 0 }()
 	return boolInt(w.shield(event))
 }
 
