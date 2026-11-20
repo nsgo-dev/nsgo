@@ -307,6 +307,10 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			// A pointer's position in its root view and modifier keys.
 			ev.Page = driver.Point{X: r.points(), Y: r.points()}
 			ev.Position = driver.Point{X: r.points(), Y: r.points()}
+			if ev.Kind == driver.EventPan {
+				// A pan's page point comes in the pointer's page slot.
+				ev.PagePosition = ev.Page
+			}
 			mods := r.byte()
 			ev.Modifiers = driver.Modifiers{Control: mods&1 != 0, Alt: mods&2 != 0, Shift: mods&4 != 0, Platform: mods&8 != 0}
 			if ev.Kind == driver.EventNative {

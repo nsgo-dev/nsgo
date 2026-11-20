@@ -147,7 +147,7 @@ func (w *window) panMove(p driver.Point) {
 		switch g.activation.Decide(d) {
 		case 1:
 			g.active = true
-			g.last, g.lastTime = d, now
+			g.last, g.lastTime, g.lastPage = d, now, p
 			w.pressCancel() // the pan took the press
 			w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureBegan, Point: d, Position: g.v.local(p), PagePosition: p})
 		case -1:

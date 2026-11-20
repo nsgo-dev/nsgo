@@ -2361,6 +2361,16 @@ func (s *surface) mouseEvent(v *view, kind driver.EventKind, e js.Value) driver.
 // e holds.
 func (s *surface) pointerAt(v *view, kind driver.EventKind, x, y float64, e js.Value) driver.Event {
 	lx, ly := v.localPoint(x, y)
+	return driver.Event{Kind: kind,
+		Point: driver.Point{X: driver.Points(lx), Y: driver.Points(ly)},
+		Page:  s.pagePoint(v, x, y),
+		Modifiers: driver.Modifiers{Control: e.Get("ctrlKey").Bool(), Alt: e.Get("altKey").Bool(),
+			Shift: e.Get("shiftKey").Bool(), Platform: e.Get("metaKey").Bool()},
+	}
+}
+
+// pagePoint is the client point (x, y) in v's page: the modal v is in, else the surface.
+func (s *surface) pagePoint(v *view, x, y float64) driver.Point {
 	root := s.host
 	for el := v.el; el.Truthy() && !el.Equal(s.host); el = el.Get("parentElement") {
 		if m := s.viewOf(el); m != nil && m.kind == driver.KindModal {
@@ -2369,13 +2379,7 @@ func (s *surface) pointerAt(v *view, kind driver.EventKind, x, y float64, e js.V
 		}
 	}
 	px, py := clientPoint(root, x, y)
-	return driver.Event{Kind: kind,
-		Point: driver.Point{X: driver.Points(lx), Y: driver.Points(ly)},
-		Page: driver.Point{X: driver.Points(px - root.Get("clientLeft").Float()),
-			Y: driver.Points(py - root.Get("clientTop").Float())},
-		Modifiers: driver.Modifiers{Control: e.Get("ctrlKey").Bool(), Alt: e.Get("altKey").Bool(),
-			Shift: e.Get("shiftKey").Bool(), Platform: e.Get("metaKey").Bool()},
-	}
+	return driver.Point{X: driver.Points(px - root.Get("clientLeft").Float()), Y: driver.Points(py - root.Get("clientTop").Float())}
 }
 
 // pressed sends kind about the press in progress, with where it began.
