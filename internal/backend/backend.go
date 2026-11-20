@@ -60,7 +60,7 @@ func Run(root engine.App, app func(*core.Scope), o Options) {
 	o.Width, o.Height = size.Width, size.Height
 	dev.Start()
 	if app != nil {
-		run(nil, launch.localizedApp(app), o)
+		run(nil, dev.WrapApp(launch.localizedApp(app)), o)
 	} else {
 		run(dev.Wrap(launch.localized(root)), nil, o)
 	}

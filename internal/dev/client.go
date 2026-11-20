@@ -80,13 +80,7 @@ func Wrap(app engine.App) engine.App {
 	return func(cx *core.Scope) core.Node {
 		failure := core.NewSignal(cx, devFailure{})
 		go listenDev(server, func(f devFailure) { cx.Post(func() { failure.Set(f) }) })
-		reload := func() {
-			go func() {
-				if resp, err := devtools.Fetch(http.MethodPost, server+"/_nsgo/reload", "", nil); err == nil {
-					resp.Body.Close()
-				}
-			}()
-		}
+		reload := reloadFunc(server)
 		// Command or Control+R builds and starts the app again, as the overlay's Reload button does, from every window and panel of the app, over the overlay and the app's own modals too. It leaves the key to the app: bound before the app renders, and in every other window before that window's own bindings, it yields to the app's own binding of the key while that one may fire, and to an enabled item of the application menu with the key as its shortcut.
 		cx.OnKeyWith("mod+r", core.KeyOptions{OverModals: true, YieldsToMenu: true, AllSurfaces: true}, reload)
 		return core.Group{
@@ -100,6 +94,31 @@ func Wrap(app engine.App) engine.App {
 				return devOverlay(cx, failure.Get(), func() { failure.Set(devFailure{}) }, reload)
 			}},
 		}
+	}
+}
+
+// WrapApp runs an app function under nsgo dev. Its reload binding belongs to
+// the app's own scope, which outlives the main view when another window keeps
+// the app running after that view closes.
+func WrapApp(app func(*core.Scope)) func(*core.Scope) {
+	server, page := devServerURL()
+	if server == "" || page {
+		return app
+	}
+	Start()
+	return func(cx *core.Scope) {
+		cx.OnKeyWith("mod+r", core.KeyOptions{OverModals: true, YieldsToMenu: true, AllSurfaces: true}, reloadFunc(server))
+		app(cx)
+	}
+}
+
+func reloadFunc(server string) func() {
+	return func() {
+		go func() {
+			if resp, err := devtools.Fetch(http.MethodPost, server+"/_nsgo/reload", "", nil); err == nil {
+				resp.Body.Close()
+			}
+		}()
 	}
 }
 

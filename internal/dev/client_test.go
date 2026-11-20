@@ -285,3 +285,60 @@ func TestDevReloadKeyInEveryWindow(t *testing.T) {
 		t.Fatalf("the windows' own mod+r ran %d times, want twice", own)
 	}
 }
+
+// The app scope owns dev's reload binding, so it survives disposal of the
+// main view while another app window keeps the process alive (#713).
+func TestDevReloadKeySurvivesMainViewClose(t *testing.T) {
+	var reloads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/_nsgo/reload" && r.Method == http.MethodPost {
+			reloads.Add(1)
+		}
+	}))
+	defer server.Close()
+	devServer = server.URL
+	t.Setenv("NSGO_DEV_SERVER", "")
+	t.Cleanup(func() { devServer = "" })
+
+	root := core.NewRoot(core.RootOptions{Post: func(func()) {}, Windows: &core.WindowOptions{Width: 400, Height: 300}})
+	tree := core.NewTree(root, core.ApproxTextEngine{})
+	defer root.Dispose()
+	var settings, main *core.Window
+	tree.Mount(core.AppRoot(WrapApp(func(cx *core.Scope) {
+		cx.SetMainView(Wrap(func(*core.Scope) core.Node { return core.View{} }))
+		settings = cx.OpenWindow(core.WindowOptions{Title: "Settings"}, func(*core.Scope) core.Node { return core.View{} })
+	})))
+	tree.Commit()
+	main = root.MainWindow()
+	if main == nil || settings == nil {
+		t.Fatal("the app did not open its main and settings windows")
+	}
+	main.Close()
+	tree.Commit()
+	var settingsTree *core.Tree
+	for _, s := range tree.Surfaces() {
+		if s.Window() == settings {
+			settingsTree = s
+		}
+	}
+	if settingsTree == nil {
+		t.Fatal("settings tree disappeared with the main window")
+	}
+	var keymap []driver.KeyBinding
+	for _, it := range settingsTree.Commit().Items {
+		if it.Kind == driver.ItemKeymap {
+			keymap = it.Keys
+		}
+	}
+	id, _ := driver.FindKey(keymap, []string{"mod+r"}, 0, false)
+	if id == 0 {
+		t.Fatalf("settings keymap %+v has no reload key after main close", keymap)
+	}
+	settingsTree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+	for deadline := time.Now().Add(5 * time.Second); reloads.Load() < 1 && time.Now().Before(deadline); {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := reloads.Load(); got != 1 {
+		t.Fatalf("reloads after main close = %d, want one", got)
+	}
+}

@@ -89,7 +89,7 @@ An Apple TV's icon is a layered card, not a square: `tvos` takes Xcode's `.brand
 
 On Android, `icon.android` makes the launcher icon adaptive, so launchers mask it to their shape and move it as they like instead of shrinking `png` onto a plate of their own. Each layer is 108 dp square, a PNG scaled to 432 px; the launcher shows the center 72 dp, 288 px, and masks it to a shape that may cut into everything outside the center 66 dp, 264 px, so keep the logo in that circle and let the background fill the whole square. `background` is a PNG or a color such as `"#1F1F1F"`. `monochrome`, a shape whose alpha is all that counts, is what Android 13 and later tint when the user turns on themed icons; without it the icon keeps its colors there. The package keeps `png` as the plain bitmap icon, which no launcher of Android 9 or later, the oldest NSGo runs on, picks over the adaptive one; without `png`, the tool draws it from the foreground over the background. Without `icon.android`, the launcher shows `png` as before.
 
-Every build also takes NSGo's own flags as it starts, such as `--nsgo-fps` ([Running and debugging](debugging.md#flags-of-every-build)).
+Every build also takes NSGo's own flags as it starts, such as `--nsgo-fps` ([Running and debugging](debugging.md#flags-of-every-build)). In `nsgo dev`, Command/Control+R reloads from every open window and remains available after the main view closes when another window keeps an app function running.
 
 ## Installers
 
