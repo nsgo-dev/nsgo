@@ -93,6 +93,9 @@ type Toast struct {
 	Label          string
 	// LabelFunc is a label that changes while the toast shows, as when a toast replaces it; it wins over Label, and the screen reader reads each new one.
 	LabelFunc func() string
+	// OnPress makes the toast itself a button. Child controls such as action
+	// buttons keep their own presses.
+	OnPress func()
 	// OnDismissRequest: the user swiped it away; dismiss it. It stays
 	// where the swipe took it.
 	OnDismissRequest func()
@@ -183,7 +186,15 @@ func (t Toast) Render(cx *core.Scope) core.Node {
 	if t.LabelFunc != nil {
 		rootLabel = ""
 	}
-	root := core.View{Role: core.RoleAlert, Label: rootLabel, LabelFunc: t.LabelFunc, TestID: t.TestID, Tooltip: t.Tooltip, Class: t.Class,
+	role := core.RoleAlert
+	if t.OnPress != nil {
+		role = core.RoleButton
+	}
+	var onPress func(core.PressEvent)
+	if t.OnPress != nil {
+		onPress = func(core.PressEvent) { t.OnPress() }
+	}
+	root := core.View{Role: role, Label: rootLabel, LabelFunc: t.LabelFunc, TestID: t.TestID, Tooltip: t.Tooltip, Class: t.Class, OnPress: onPress,
 		// The state's classes win over Class and Style, as its styles do
 		// and as CSS's state selectors do by their specificity.
 		ClassFunc: func() string {

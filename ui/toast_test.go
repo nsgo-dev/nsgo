@@ -46,6 +46,34 @@ func TestToasts(t *testing.T) {
 	})
 }
 
+func TestToastContentOptions(t *testing.T) {
+	each(t, func(t *testing.T, e core.Environment) {
+		var toaster *Toaster
+		pressed := false
+		app, _ := start(t, e, func(cx *core.Scope) core.Node {
+			toaster = NewToaster(cx)
+			return Toasts{Toaster: toaster, TestID: "toasts", CloseLabel: "Close"}
+		})
+		toaster.Show(ToastContent{ID: "plain", Title: "Plain", NoClose: true, Duration: -1})
+		toaster.Show(ToastContent{ID: "open", Title: "Open", Description: "Finished", Trailing: core.Text{Content: "Ready", TestID: "trailing"}, OnPress: func() { pressed = true }, Duration: -1})
+		app.Advance(time.Second)
+		if app.Exists("plain-close") {
+			t.Fatal("NoClose toast still has a close button")
+		}
+		if !app.Exists("text:Ready") {
+			t.Fatal("trailing toast content is missing")
+		}
+		if v := app.Find("open"); v.Props.Role != core.RoleButton || v.Props.Label != "Open. Finished" {
+			t.Fatalf("pressable toast props = role %v label %q", v.Props.Role, v.Props.Label)
+		}
+		app.Press("open")
+		app.Advance(time.Second)
+		if !pressed || app.Exists("open") {
+			t.Fatalf("whole-toast press: callback=%v exists=%v", pressed, app.Exists("open"))
+		}
+	})
+}
+
 // TestToastReplacementFollowsNewContent keeps a toast's mounted view when its
 // content is replaced with the same ID, while updating what it shows and does.
 func TestToastReplacementFollowsNewContent(t *testing.T) {

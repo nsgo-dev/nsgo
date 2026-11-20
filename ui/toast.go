@@ -34,11 +34,19 @@ type ToastContent struct {
 	Title       string
 	Description string
 	Leading     core.Node
-	Action      string
-	OnAction    func()
-	OnClose     func()
-	Duration    time.Duration
-	shown       uint64 // which Show it is, by which a replacement is told from the toast it replaces
+	// Trailing is content after Action and before the optional close button.
+	Trailing core.Node
+	Action   string
+	OnAction func()
+	// OnPress makes the toast surface a button and dismisses it after the
+	// callback. Action, Trailing and close-button children keep their presses.
+	OnPress func()
+	// NoClose omits this toast's close button. Swipe, Escape and its timeout
+	// still dismiss it.
+	NoClose  bool
+	OnClose  func()
+	Duration time.Duration
+	shown    uint64 // which Show it is, by which a replacement is told from the toast it replaces
 }
 
 type toastEntry = toast.Entry[string, ToastContent]
@@ -231,7 +239,10 @@ type Toasts struct {
 	Swipe      ToastSwipe
 	Inset      core.Points
 	CloseLabel string
-	TestID     string
+	// NoClose omits close buttons from every toast unless ToastContent opts in
+	// by leaving its own NoClose false (the per-toast field is the usual form).
+	NoClose bool
+	TestID  string
 }
 
 // Render implements core.Node.
@@ -306,7 +317,13 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 			t.Dismiss(id)
 		}}
 	})
-	children := []core.Node{leading, textBody, action, IconButton{Icon: lucide.X, Label: ts.CloseLabel, Size: 24, TestID: id + "-close", OnPress: func() { t.Dismiss(id) }}}
+	children := []core.Node{leading, textBody, action}
+	if content.Get().Trailing != nil {
+		children = append(children, content.Get().Trailing)
+	}
+	if !content.Get().NoClose && !ts.NoClose {
+		children = append(children, IconButton{Icon: lucide.X, Label: ts.CloseLabel, Size: 24, TestID: id + "-close", OnPress: func() { t.Dismiss(id) }})
+	}
 	swipe := ts.Swipe.direction(ts.Placement, core.Untracked(cx, cx.Env().RTL))
 	var enter core.Transform
 	switch {
@@ -319,10 +336,21 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 	default:
 		enter.TranslateY = 16
 	}
+	var onPress func()
+	if content.Get().OnPress != nil {
+		onPress = func() {
+			c := content.Get()
+			if c.OnPress != nil {
+				c.OnPress()
+			}
+			t.Dismiss(id)
+		}
+	}
 	return toast.Toast{TestID: id, SwipeDirection: swipe,
 		LabelFunc:        label,
 		Status:           func() toast.Status { return e().Status },
 		OnDismissRequest: func() { t.Dismiss(id) },
+		OnPress:          onPress,
 		StartingStyle:    core.Style{Opacity: core.Alpha(0), Transform: enter},
 		EndingStyle:      core.Style{Opacity: core.Alpha(0), Transform: core.Transform{Scale: 0.96}},
 		SwipingStyle:     core.Style{Transition: core.Transition{}},

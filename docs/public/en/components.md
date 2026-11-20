@@ -44,6 +44,8 @@ func (b Badge) Render(*core.Scope) core.Node {
 }
 ```
 
+`ui.ToastContent` can omit its close button with `NoClose`, add a `Trailing` node, and make the whole toast dismiss through `OnPress`; `Toasts.NoClose` applies the close-button choice to a stack.
+
 ## Signals
 
 A signal holds a value. Reading it inside a function an element calls, such as `ContentFunc`, subscribes that part of the screen, and only that part updates when the value changes.

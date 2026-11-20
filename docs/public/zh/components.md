@@ -44,6 +44,8 @@ func (b Badge) Render(*core.Scope) core.Node {
 }
 ```
 
+`ui.ToastContent` 可以用 `NoClose` 隐藏关闭按钮，用 `Trailing` 添加尾部节点，并用 `OnPress` 让整条 toast 响应按压并关闭；`Toasts.NoClose` 可对整个堆栈隐藏关闭按钮。
+
 ## Signal
 
 signal 保存一个值。在元素调用的函数（例如 `ContentFunc`）中读取它，就会让屏幕上的这一部分订阅它；值变化时，只有这一部分更新。

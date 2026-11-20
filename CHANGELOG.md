@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add `ToastContent.NoClose`, `Trailing` and `OnPress`, plus `Toasts.NoClose`, so apps can customize toast dismissal, trailing content and whole-toast presses while preserving child actions (#934 by @houko).
 - Register `url_schemes` in the iOS app and hand their links to `mobile.OnOpenLinks`, at a cold launch and while the app runs, through `scene:openURLContexts:` (#909 by @houko).
 - Register `url_schemes` in the iOS app and hand their links to `mobile.OnOpenLinks`, at a cold launch and while the app runs, through `scene:openURLContexts:` (#954 by @houko).
 - Let Android's system tab bar follow the app theme's surface, inactive text, active text and accent-container colors (#936 by @houko).
