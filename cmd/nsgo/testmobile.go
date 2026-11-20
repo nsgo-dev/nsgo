@@ -310,7 +310,8 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 				}
 				return errors.New("the device's log ended")
 			}, nil)
-			if ctx.Err() != nil {
+			// A run that read its exit mark passed or failed on its own, even if the deadline fell just after.
+			if readErr != nil && ctx.Err() != nil {
 				cmd.Process.Kill()
 				cmd.Wait()
 				androidTimeoutReport(out, token, captured.Bytes(), d)
@@ -327,9 +328,7 @@ func androidTestRunner(ctx context.Context, p *project, dir string, opts testOpt
 
 const androidTimeoutLogTail = 128 << 10
 
-// androidTimeoutReport captures the test's log before the runner clears it for
-// the next test. The start mark distinguishes an app that never reached the
-// host from a test that hung after it began.
+// androidTimeoutReport captures the test's log before the runner clears it for the next test. The start mark distinguishes an app that never reached the host from a test that hung after it began.
 func androidTimeoutReport(out io.Writer, token string, captured []byte, d device) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
