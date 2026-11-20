@@ -87,7 +87,8 @@ func TestExpandTargetsBareOS(t *testing.T) {
 	}{
 		{"windows", []string{"windows_arm64", "windows_x64"}},
 		{"linux", []string{"linux_arm64", "linux_x64"}},
-		{"macos", []string{"macos_arm64", "macos_x64"}},
+		{"macos", []string{"macos_arm64", "macos_x64", "macos_universal"}},
+		{"macos_universal", []string{"macos_universal"}},
 		// android_x64 stays out, as in "all": it needs an NDK.
 		{"android", []string{"android_arm64"}},
 	} {

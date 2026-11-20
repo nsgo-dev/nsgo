@@ -287,7 +287,7 @@ func openPage(url, dir string) (cmd *exec.Cmd, file string, err error) {
 
 // targets are the names nsgo.yaml and -target accept, each one package.
 var targets = []string{
-	"macos_arm64", "macos_x64",
+	"macos_arm64", "macos_x64", "macos_universal",
 	"windows_arm64", "windows_x64",
 	"linux_arm64", "linux_x64",
 	"ios", "ios_simulator",
@@ -372,6 +372,11 @@ func buildTarget(ctx context.Context, p *project, target, dir string) error {
 		return err
 	}
 	switch target {
+	case "macos_universal":
+		if p.channel() == channelStore {
+			return errors.New("macos_universal is available on the direct channel only")
+		}
+		return buildMacUniversal(ctx, p, dir)
 	case "macos_arm64", "macos_x64":
 		app, err := buildMacApp(ctx, p, dir, goArch(arch))
 		if err != nil {
@@ -525,6 +530,110 @@ func buildTarget(ctx context.Context, p *project, target, dir string) error {
 		return p.releaseTree(dir, "miniprogram/"+mp.name)
 	}
 	return fmt.Errorf("unknown target %q; use all or one of %s", target, strings.Join(targets, ", "))
+}
+
+// buildMacUniversal joins the two direct-channel macOS app builds before the
+// bundle is signed and packaged. Each architecture is built through the
+// normal pipeline first, so resources, widgets and optional libraries keep
+// the same inputs as their single-architecture counterparts.
+func buildMacUniversal(ctx context.Context, p *project, dir string) error {
+	work, err := os.MkdirTemp(dir, ".universal-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(work)
+	arm, err := buildMacApp(ctx, p, filepath.Join(work, "arm64"), "arm64")
+	if err != nil {
+		return err
+	}
+	x64, err := buildMacApp(ctx, p, filepath.Join(work, "x64"), "amd64")
+	if err != nil {
+		return err
+	}
+	app := filepath.Join(dir, p.Name+".app")
+	if err := copyDir(arm, app); err != nil {
+		return err
+	}
+	if err := lipoMacBinaries(ctx, p, app, x64); err != nil {
+		return err
+	}
+	if err := rewriteUniversalFeed(p, app); err != nil {
+		return err
+	}
+	if p.Sign.Identity != "" {
+		if err := signMacApp(ctx, p, app); err != nil {
+			return err
+		}
+	} else {
+		if err := signUniversalAdHoc(ctx, p, app); err != nil {
+			return err
+		}
+	}
+	dmg := ""
+	if p.installers() {
+		dmg, err = buildDMG(ctx, p, app, dir, "universal")
+		if err != nil {
+			return err
+		}
+	}
+	if err := notarizeMac(ctx, p, app, dmg); err != nil {
+		return err
+	}
+	return p.releaseInstaller("macos_universal", dmg)
+}
+
+// lipoMacBinaries replaces every known executable or dylib present in both
+// architecture bundles with a universal binary. Resource files remain those
+// from the arm64 bundle, which are identical inputs from buildMacApp.
+func lipoMacBinaries(ctx context.Context, p *project, app, other string) error {
+	return filepath.WalkDir(app, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() {
+			return walkErr
+		}
+		rel, err := filepath.Rel(app, path)
+		if err != nil {
+			return err
+		}
+		relSlash := filepath.ToSlash(rel)
+		if !strings.HasSuffix(relSlash, ".dylib") && !strings.HasPrefix(relSlash, "Contents/MacOS/") && !strings.Contains(relSlash, "/Contents/MacOS/") {
+			return nil
+		}
+		otherPath := filepath.Join(other, rel)
+		if _, err := os.Stat(otherPath); err != nil {
+			return nil
+		}
+		return run(ctx, "lipo", "-create", path, otherPath, "-output", path)
+	})
+}
+
+func rewriteUniversalFeed(p *project, app string) error {
+	path := filepath.Join(app, "Contents", "Info.plist")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	for _, arch := range []string{"macos_arm64", "macos_x64"} {
+		data = bytes.ReplaceAll(data, []byte(p.appcastURL(arch)), []byte(p.appcastURL("macos_universal")))
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+func signUniversalAdHoc(ctx context.Context, p *project, app string) error {
+	if appex := macWidgetsAppex(app); len(p.Widgets) > 0 {
+		if err := signMacWidgets(ctx, p, appex, "-"); err != nil {
+			return err
+		}
+	}
+	err := filepath.WalkDir(filepath.Join(app, "Contents"), func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil || entry.IsDir() || !strings.HasSuffix(path, ".dylib") {
+			return walkErr
+		}
+		return run(ctx, "codesign", "--force", "--sign", "-", path)
+	})
+	if err != nil {
+		return err
+	}
+	return run(ctx, "codesign", "--force", "--sign", "-", app)
 }
 
 // goArch maps x64, the name packages use, to Go's amd64.

@@ -269,6 +269,11 @@ func vetEnv(ctx context.Context, target string) ([]string, error) {
 	os, arch, _ := strings.Cut(target, "_")
 	switch os {
 	case "macos":
+		if target == "macos_universal" {
+			// The universal package runs the same Go source twice and joins
+			// the binaries. Vet it once with the arm64 build tags.
+			arch = "arm64"
+		}
 		return []string{"GOOS=darwin", "GOARCH=" + goArch(arch), "CGO_ENABLED=0"}, nil
 	case "windows", "linux":
 		return []string{"GOOS=" + os, "GOARCH=" + goArch(arch), "CGO_ENABLED=0"}, nil

@@ -30,7 +30,7 @@ Linux, Android and iOS have no such schedule, so `nsgo.Run` calls `updater.Check
 
 One platform reaches users through several channels, and the channel, not the platform, decides who updates the app. `updates.channel`, or `nsgo build -channel`, names it per build:
 
-- `direct`, the default with a key: the app's own downloads update themselves. macOS and Windows packages carry Sparkle and WinSparkle, and each release writes signed appcasts.
+- `direct`, the default with a key: the app's own downloads update themselves. macOS and Windows packages carry Sparkle and WinSparkle, and each release writes signed appcasts. `macos_universal` is the direct-channel macOS target that joins arm64 and x64 binaries, embedded libraries and widget extensions into one DMG and feed.
 - `store`: a store or package manager updates the app. Packages carry no updater and no appcast; iOS still asks the App Store, which needs no key.
 - `none`: nothing checks, for packagers who repackage the app.
 
