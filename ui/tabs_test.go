@@ -120,8 +120,7 @@ func TestTabsRTL(t *testing.T) {
 	}
 }
 
-// TestTabsOptionsFuncUpdatesInPlace keeps a tab's row and focus when its
-// options are replaced, while adding and removing rows around it.
+// TestTabsOptionsFuncUpdatesInPlace keeps a tab's row and focus when its options are replaced, while adding and removing rows around it, and its label follows.
 func TestTabsOptionsFuncUpdatesInPlace(t *testing.T) {
 	headless(t)
 	var options *core.Signal[[]Option[string]]
@@ -141,5 +140,8 @@ func TestTabsOptionsFuncUpdatesInPlace(t *testing.T) {
 	}
 	if !app.Exists("text:Beta (new)") || !app.Exists("id:c") || app.Exists("id:a") {
 		t.Fatal("the options function did not update tab rows")
+	}
+	if got := app.Find("id:b").Props.Label; got != "Beta (new)" {
+		t.Fatalf("the retained tab's accessibility label is %q, want the new one", got)
 	}
 }

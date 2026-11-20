@@ -37,11 +37,7 @@ func (t Tab) Render(cx *core.Scope) core.Node {
 	if press == nil {
 		press = func(core.PressEvent) {}
 	}
-	label := t.Label
-	if t.LabelFunc != nil {
-		label = t.LabelFunc()
-	}
-	return rovingView(cx, core.View{Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTab, Label: label, Hint: t.Hint, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
+	return rovingView(cx, core.View{Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTab, Label: t.Label, LabelFunc: t.LabelFunc, Hint: t.Hint, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
 		Disabled: t.Disabled, Invalid: t.Invalid, Selected: t.Selected, OnPress: press, Children: t.Children}, t.Selected, func() { press(core.PressEvent{}) })
 }
 
