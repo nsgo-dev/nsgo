@@ -1389,6 +1389,20 @@ func TestMultiSelectableExposesSelectionProviderState(t *testing.T) {
 	}
 }
 
+func TestSelectionItemsKeepTheirPatternWhenUnselected(t *testing.T) {
+	e := &uiaElement{}
+	for _, selected := range []bool{false, true} {
+		row := &view{kind: driver.KindView, props: driver.ViewProps{Role: driver.RoleRow, SelectionItem: true, Selected: selected}}
+		if s := e.spec(row); !s.selectable || s.selected != selected {
+			t.Errorf("selection item selected=%v has selectable=%v selected=%v", selected, s.selectable, s.selected)
+		}
+	}
+	row := &view{kind: driver.KindView, props: driver.ViewProps{Role: driver.RoleRow}}
+	if s := e.spec(row); s.selectable {
+		t.Error("a row without selection support exposed SelectionItem")
+	}
+}
+
 // TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn checks that the environment reports levels and placement only for a surface with a top-level window of its own, as macOS does: not an embedded view, the app's own hidden surface or a tray icon's.
 func TestWindowCapabilitiesNeedAWindowOfTheSurfacesOwn(t *testing.T) {
 	for _, c := range []struct {

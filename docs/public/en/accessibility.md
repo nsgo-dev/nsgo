@@ -71,6 +71,8 @@ core.View{
 
 `Expanded` says whether a disclosure or a menu button is open, `Busy` that content is loading, `Invalid` that the app rejected a field's content or a control's value (styled with `aria-invalid:`), and `Checked`, `Selected` and `Pressed` report a control's state. A control's parts can take its state through `PartStates`, so an indicator follows its checkbox without being a stop of its own.
 
+`SelectionItem` marks a view as an item in a selectable collection independently of its current `Selected` value. `base.DataTable` sets it on rows or cells when that table selects them, and `base.Tree` sets it on every row; Windows keeps the SelectionItem pattern and the web writes `aria-selected="true"` or `"false"`. A table without selection leaves rows without either marker.
+
 ## Live changes
 
 `LiveRegion` has screen readers announce a view's label and the text inside it as they change: `core.LiveRegionPolite` waits for the user to be idle, `LiveRegionAssertive` interrupts. `cx.Announce` says one message once.

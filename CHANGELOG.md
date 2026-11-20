@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Keep selectable table and tree rows exposed as selection items while unselected, with Windows' SelectionItem pattern and the web's `aria-selected="false"` (#735 by @houko).
 - Add `MultiSelectable` accessibility state for multi-row `DataTable` selection, exposing `aria-multiselectable`, UI Automation Selection and GTK multiselectable state (#734 by @houko).
 - Start Android and iPhone target test deadlines at the test host's start mark and report a separate launch timeout when the host does not start (#729 by @houko).
 - Restart Linux apps launched from an AppImage through the outer image path, remounting it after the old FUSE mount exits (#732 by @houko).

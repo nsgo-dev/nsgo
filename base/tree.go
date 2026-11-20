@@ -687,7 +687,7 @@ func (t Tree) Render(cx *core.Scope) core.Node {
 			}
 		})
 		label := func() string { return entry.Get().Label }
-		v := core.View{Ref: me, Role: core.RoleTreeItem, NoFocus: true, Disabled: disabled.Get, LabelFunc: label, Selected: isSelected,
+		v := core.View{Ref: me, Role: core.RoleTreeItem, NoFocus: true, Disabled: disabled.Get, LabelFunc: label, SelectionItem: func() bool { return true }, Selected: isSelected,
 			AccessibilityLevel: func() int { return entry.Get().Depth + 1 },
 			PartStates:         func() core.PartStates { return core.PartStates{Focused: atCursor() && focused.Get()} },
 			Class:              t.ItemClass, Style: t.ItemStyle, StyleFunc: t.ItemStyleFunc,

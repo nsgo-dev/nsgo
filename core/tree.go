@@ -1692,6 +1692,7 @@ func (t *Tree) mountView(cx *Scope, parent *node, v View) {
 		})
 	}
 	t.bindBool(cx, n, v.Selected, &n.props.Selected)
+	t.bindBool(cx, n, v.SelectionItem, &n.props.SelectionItem)
 	t.bindBool(cx, n, v.Checked, &n.props.Checked)
 	t.bindBool(cx, n, v.Indeterminate, &n.props.Indeterminate)
 	t.bindBool(cx, n, v.Pressed, &n.props.Pressed)

@@ -450,7 +450,7 @@ func (e *uiaElement) spec(v *view) uiaSpec {
 	}
 	s.expandable, s.expanded = p.Expandable, p.Expanded
 	s.multiselectable = p.MultiSelectable
-	s.selectable = p.Role == driver.RoleTab || p.Role == driver.RoleRadio || p.Role == driver.RoleOption || p.Selected
+	s.selectable = p.SelectionItem || p.Role == driver.RoleTab || p.Role == driver.RoleRadio || p.Role == driver.RoleOption || p.Selected
 	s.selected = p.Selected || p.Role == driver.RoleRadio && p.Checked
 	if e.w != nil {
 		s.focusable, s.focused = e.w.focusableView(v), e.w.focusedView() == v

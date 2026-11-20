@@ -2122,7 +2122,11 @@ func setViewProps(v *view, p *driver.ViewProps) {
 	setAttr(el, "aria-label", p.Label)
 	setAttr(el, "aria-description", p.HelpText())
 	setAttr(el, "aria-disabled", flag(p.Disabled))
-	setAttr(el, "aria-selected", flag(p.Selected))
+	selected := ""
+	if p.SelectionItem || p.Role == driver.RoleTab || p.Role == driver.RoleRadio || p.Role == driver.RoleOption {
+		selected = strconv.FormatBool(p.Selected)
+	}
+	setAttr(el, "aria-selected", selected)
 	multi := ""
 	if p.MultiSelectable {
 		multi = "true"

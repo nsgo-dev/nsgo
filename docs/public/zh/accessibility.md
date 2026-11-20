@@ -71,6 +71,9 @@ core.View{
 
 `Expanded` 说明展开控件或菜单按钮是否打开，`Busy` 表示内容仍在加载，`Invalid` 表示应用拒绝了字段的内容或控件的值（用 `aria-invalid:` 设置样式），`Checked`、`Selected` 和 `Pressed` 报告控件状态。控件的部件可以通过 `PartStates` 借用它的状态，因此指示器会跟随复选框，而不会成为单独的停靠点。
 
+
+`SelectionItem` 独立于当前 `Selected` 值，标记视图是可选集合中的一个项目。`base.DataTable` 在表格启用行或单元格选择时为它们设置此标记，`base.Tree` 为每一行设置；Windows 始终保留 SelectionItem 模式，Web 写入 `aria-selected="true"` 或 `"false"`。未启用选择的表格不会给行添加这两个标记。
+
 ## 实时变化
 
 `LiveRegion` 让屏幕阅读器在视图标签和其中文本变化时朗读：`core.LiveRegionPolite` 等用户空闲，`LiveRegionAssertive` 打断当前朗读。`cx.Announce` 朗读一次消息。

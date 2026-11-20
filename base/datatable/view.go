@@ -742,8 +742,9 @@ func (t *dataTable) bodyRow(cx *core.Scope, row *core.Memo[int], which tableRegi
 			}
 			return s.Merge(parts())
 		},
-		Role:     core.RoleRow,
-		Selected: selected.Get,
+		Role:          core.RoleRow,
+		SelectionItem: func() bool { return t.selectable().rows },
+		Selected:      selected.Get,
 		// The table is one stop of Tab, its grid.
 		NoFocus: true,
 		// The views of the cells take presses from assistive technology
@@ -889,8 +890,9 @@ func (t *dataTable) cell(cx *core.Scope, row, def *core.Memo[int], which tableRe
 				t.contextMenu(tableHit{row: r, col: d}, e.PagePosition)
 			}
 		},
-		Role:     core.RoleCell,
-		Selected: func() bool { f := marks.Get(); return f.selected || f.columnSelected },
+		Role:          core.RoleCell,
+		SelectionItem: func() bool { return t.selectable().cells },
+		Selected:      func() bool { f := marks.Get(); return f.selected || f.columnSelected },
 		ClassFunc: func() string {
 			t.layoutRev.Get()
 			col := t.column(def.Get())
