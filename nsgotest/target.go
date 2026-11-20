@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/automation"
@@ -145,10 +146,10 @@ func (t *target) surfaceEvent(surface uint32, ev driver.Event) {
 	}
 }
 
-// event queues what the next drain takes of an event the platform reported: scrolls, the focus and texts, and for a live app alerts answered.
+// event queues what the next drain takes of an event the platform reported: scrolls, the focus, texts and their selections, and for a live app alerts answered.
 func (t *target) event(ev driver.Event) {
 	switch ev.Kind {
-	case driver.EventScroll, driver.EventFocus, driver.EventBlur, driver.EventChangeText:
+	case driver.EventScroll, driver.EventFocus, driver.EventBlur, driver.EventChangeText, driver.EventSelectionChange:
 	case driver.EventAlert:
 		if !t.live {
 			return
@@ -379,6 +380,11 @@ func (t *target) drain() bool {
 		case driver.EventChangeText:
 			t.a.edits[ev.ID] = max(t.a.edits[ev.ID], ev.Count)
 			v.Text = ev.Text
+		case driver.EventSelectionChange:
+			// A field's; a selection area's carries its text instead.
+			if v.Kind == driver.KindInput {
+				v.Selection = driver.TextRange{Start: ev.Index, End: int(ev.Count)}
+			}
 		}
 	}
 	return len(updates) > 0
@@ -656,6 +662,31 @@ func (t *target) back()                      { t.check(t.surface.Back()) }
 func (t *target) typeText(v *View, text string) { t.check(t.surface.Type(text)) }
 func (t *target) compose(text string)           { t.ime(t.surface.Compose(text)) }
 func (t *target) commit(text string)            { t.ime(t.surface.Commit(text)) }
+
+// keyedSelection reports whether selectRange can move a field's selection on target, through a keyboard's editing keys: the desktops' and the web's.
+func keyedSelection(target string) bool {
+	return slices.Contains([]string{"macos", "windows", "linux", "web"}, target)
+}
+
+// selectRange moves a native field's selection through its keyboard: select all, collapse to the start, then a right arrow per character before start and a shifted one per character to end. The platform's own editing keys keep the field and the selection it reports in step, with no selection-change event made up. An arrow steps over a whole grapheme cluster while this counts code points, so a cluster of several, such as a letter and its combining mark or an emoji sequence, before end moves the range on.
+func (t *target) selectRange(v *View, start, end int) {
+	text := v.Text
+	start = min(max(start, 0), driver.UTF16Len(text))
+	end = min(max(end, 0), driver.UTF16Len(text))
+	if start > end {
+		start, end = end, start
+	}
+	t.check(t.surface.Key("mod+a"))
+	t.check(t.surface.Key("left"))
+	from, to := driver.UTF16Offset(text, start), driver.UTF16Offset(text, end)
+	for range utf8.RuneCountInString(text[:from]) {
+		t.check(t.surface.Key("right"))
+	}
+	for range utf8.RuneCountInString(text[from:to]) {
+		t.check(t.surface.Key("shift+right"))
+	}
+	t.settle()
+}
 
 // ime checks a composition step: a machine without an input method skips
 // the test.

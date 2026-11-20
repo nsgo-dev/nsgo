@@ -619,9 +619,13 @@ func (t *testSurface) Key(key string) error {
 		})
 		return nil
 	}
-	chars := keyChars[name]
-	if chars == "" {
+	chars, special := keyChars[name]
+	switch {
+	case !special:
 		chars = name
+	case chars == "":
+		// A key that types nothing carries AppKit's function key character, which a text field reads as the arrow or the Home it is; its name would be typed as text.
+		chars = string(keyEquivalents[name])
 	}
 	t.key(code, flags, chars, chars)
 	return nil

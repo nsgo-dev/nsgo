@@ -241,6 +241,8 @@ var (
 	textInsert  func(text uintptr, s *byte, length int32, position *int32)
 	textGetPosn func(text uintptr) int32
 	textSetPosn func(text uintptr, position int32)
+
+	textBufferDeleteSelection func(buffer uintptr, interactive, defaultEditable bool) bool
 )
 
 func loadEditing() {
@@ -248,11 +250,24 @@ func loadEditing() {
 		purego.RegisterLibFunc(&textInsert, gtkLib, "gtk_editable_insert_text")
 		purego.RegisterLibFunc(&textGetPosn, gtkLib, "gtk_editable_get_position")
 		purego.RegisterLibFunc(&textSetPosn, gtkLib, "gtk_editable_set_position")
+		purego.RegisterLibFunc(&textBufferDeleteSelection, gtkLib, "gtk_text_buffer_delete_selection")
 	}
 }
 
-// Type types into the focused field as its keys would: at the caret,
-// through GTK's own editing, so its signals report each change.
+// enter puts text in the field as GTK's editors put what a key or an input method commits: in place of the selection, else at the caret, through GTK's own editing so its signals report each change.
+func enter(v *view, text string) {
+	if v.textView != 0 {
+		textBufferDeleteSelection(v.buffer, true, true)
+		gtkTextBufferInsertAtCursor(v.buffer, cstr(text), -1)
+		return
+	}
+	gtkEditableDeleteSelection(v.entry)
+	at := textGetPosn(v.entry)
+	textInsert(v.entry, cstr(text), int32(len(text)), &at)
+	textSetPosn(v.entry, at)
+}
+
+// Type types into the focused field as its keys would: over the selection or at the caret.
 func (t *testSurface) Type(text string) error {
 	loadEditing()
 	for _, r := range text {
@@ -265,17 +280,11 @@ func (t *testSurface) Type(text string) error {
 		var err error
 		t.onLoop(func() {
 			v := t.focused()
-			switch {
-			case v == nil:
+			if v == nil {
 				err = errors.New("no field has the keyboard")
-			case v.textView != 0:
-				gtkTextBufferInsertAtCursor(v.buffer, cstr(string(r)), -1)
-			default:
-				at := textGetPosn(v.entry)
-				s := string(r)
-				textInsert(v.entry, cstr(s), int32(len(s)), &at)
-				textSetPosn(v.entry, at)
+				return
 			}
+			enter(v, string(r))
 		})
 		if err != nil {
 			return err
@@ -312,8 +321,7 @@ func (t *testSurface) Compose(text string) error {
 	return err
 }
 
-// Commit inserts text at the caret as the context's commit does, then
-// ends the preedit.
+// Commit enters text over the selection or at the caret as the context's commit does, then ends the preedit.
 func (t *testSurface) Commit(text string) error {
 	loadEditing()
 	var err error
@@ -323,13 +331,7 @@ func (t *testSurface) Commit(text string) error {
 		if v, w, err = t.imWidget(); err != nil {
 			return
 		}
-		if v.textView != 0 {
-			gtkTextBufferInsertAtCursor(v.buffer, cstr(text), -1)
-		} else {
-			at := textGetPosn(v.entry)
-			textInsert(v.entry, cstr(text), int32(len(text)), &at)
-			textSetPosn(v.entry, at)
-		}
+		enter(v, text)
 		gSignalEmitByName(w, cstr("preedit-changed"), cstr(""))
 	})
 	time.Sleep(10 * time.Millisecond)
@@ -343,6 +345,31 @@ var keyvals = map[string]uint32{
 	"pageup": 0xff55, "pagedown": 0xff56, "delete": 0xffff,
 	"shift": 0xffe1, "ctrl": 0xffe3, "control": 0xffe3, "mod": 0xffe3, "alt": 0xffe9, "option": 0xffe9,
 	"meta": 0xffeb, "super": 0xffeb, "cmd": 0xffeb,
+}
+
+// GtkMovementStep's values for moveSteps.
+const (
+	gtkMovementVisualPositions int32 = 1
+	gtkMovementWords           int32 = 2
+	gtkMovementDisplayLines    int32 = 3
+	gtkMovementDisplayLineEnds int32 = 4
+	gtkMovementParagraphs      int32 = 5
+	gtkMovementBufferEnds      int32 = 8
+)
+
+// moveStep is the move-cursor signal's step and count GTK binds a caret key to, alone and with Control.
+type moveStep struct {
+	step, ctrl, count int32
+}
+
+// moveSteps are GtkText's and GtkTextView's bindings of the caret keys; Up and Down move a text view's caret alone.
+var moveSteps = map[string]moveStep{
+	"left":  {gtkMovementVisualPositions, gtkMovementWords, -1},
+	"right": {gtkMovementVisualPositions, gtkMovementWords, 1},
+	"up":    {gtkMovementDisplayLines, gtkMovementParagraphs, -1},
+	"down":  {gtkMovementDisplayLines, gtkMovementParagraphs, 1},
+	"home":  {gtkMovementDisplayLineEnds, gtkMovementBufferEnds, -1},
+	"end":   {gtkMovementDisplayLineEnds, gtkMovementBufferEnds, 1},
 }
 
 // Key presses a key with modifiers through the window's controller first, then lets the focused field edit if the controller leaves it the key, and releases the key either way.
@@ -396,6 +423,14 @@ func (t *testSurface) Key(key string) error {
 			} else {
 				gtkEditableSelectRegion(v.entry, 0, -1)
 			}
+		case state&^(1<<0|1<<2) == 0 && moveSteps[name] != (moveStep{}) && (v.textView != 0 || name != "up" && name != "down"):
+			// The arrows, Home and End move the caret, extending the selection with Shift, by the move-cursor signal GTK's own key bindings for them emit.
+			m := moveSteps[name]
+			step := m.step
+			if state&(1<<2) != 0 {
+				step = m.ctrl
+			}
+			gSignalEmitByName(edit, cstr("move-cursor"), step, m.count, int32(state&1))
 		case state == 0 && name == "backspace":
 			gSignalEmitByName(edit, cstr("backspace"))
 		case state == 0 && (name == "enter" || name == "return") && v.textView == 0:

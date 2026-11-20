@@ -391,11 +391,11 @@ var cdpKeys = map[string]struct {
 	"meta": {"Meta", "MetaLeft", 91, ""}, "cmd": {"Meta", "MetaLeft", 91, ""}, "command": {"Meta", "MetaLeft", 91, ""},
 }
 
-// macCommands are the editing commands Chrome on macOS runs for keys, as
-// Playwright sends them: without them its headless build edits nothing.
+// macCommands are the editing commands Chrome on macOS runs for keys, as Playwright sends them: without them its headless build edits nothing.
 var macCommands = map[string]string{
 	"backspace": "deleteBackward", "delete": "deleteForward", "left": "moveLeft", "right": "moveRight",
 	"up": "moveUp", "down": "moveDown", "home": "moveToBeginningOfLine", "end": "moveToEndOfLine",
+	"shift+left": "moveLeftAndModifySelection", "shift+right": "moveRightAndModifySelection",
 	"meta+a": "selectAll", "meta+c": "copy", "meta+x": "cut", "meta+v": "paste", "meta+z": "undo",
 }
 

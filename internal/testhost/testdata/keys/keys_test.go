@@ -1,6 +1,7 @@
 package keys_test
 
 import (
+	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -164,5 +165,31 @@ func TestAFocusedViewHearsItsKeysBeforeTheKeymap(t *testing.T) {
 	app.Key("x")
 	if len(got) != 1 || bindings.Load() != 1 {
 		t.Fatalf("a key the view left: heard %d times, %d bindings; want 1 and 1", len(got), bindings.Load())
+	}
+}
+
+// Select moves the native field's selection under a target, so the edit after it acts on the range the test named rather than at the field's own caret.
+func TestSelectMovesTheNativeSelection(t *testing.T) {
+	if !slices.Contains([]string{"macos", "windows", "linux", "web"}, nsgotest.Target()) {
+		t.Skip("headless, Type writes at the field's end, and the phones' test hosts move only the test's model")
+	}
+	var selection atomic.Value
+	selection.Store(core.TextRange{})
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.Input{
+			TestID: "field", DefaultValue: "hello world",
+			Style:             core.Style{Width: core.Pt(240), Height: core.Pt(40)},
+			OnSelectionChange: func(r core.TextRange) { selection.Store(r) },
+		}
+	}, nsgotest.Size(300, 120))
+	app.Select("id:field", 6, 11)
+	if got, model := selection.Load(), app.Find("id:field").Selection; got != (core.TextRange{Start: 6, End: 11}) || model != (core.TextRange{Start: 6, End: 11}) {
+		t.Fatalf("the app heard the selection %v and the test's model has %v, want 6 to 11", got, model)
+	}
+	app.Type("id:field", "there")
+	app.Select("id:field", 0, 5)
+	app.Type("id:field", "goodbye")
+	if got := app.Find("id:field").Text; got != "goodbye there" {
+		t.Fatalf("typing did not replace the selected ranges: %q", got)
 	}
 }

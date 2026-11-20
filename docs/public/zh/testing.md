@@ -51,6 +51,8 @@ func TestMain(m *testing.M) {
 
 没有绑定消费按键、也没有应用菜单项以该键为快捷键时，`app.Key("mod+a")` 会全选当前文本框的内容，`mod+c`、`mod+x` 和 `mod+v` 会通过 `app.Clipboard` 复制、剪切和粘贴。在 macOS、Windows 或 Linux 的 `Environment` 中，没有被绑定、聚焦视图或文本框消费的按键会选择以它为快捷键的已启用应用菜单项，因此 `app.Key("mod+r")` 可以测试菜单快捷键能否到达对应的菜单项：已禁用的菜单项不响应，文本框获得焦点时，`NotInText` 菜单项不响应，也不让后面同快捷键的菜单项响应；在 Linux 上，没有按住 Control、Alt 或徽标键的按键不会选择任何菜单项。在无头测试中，带有标准角色但没有 `OnSelect` 的菜单项，无论由 `app.ChooseMenu` 还是快捷键选择，都会像桌面平台那样执行：Close 经由主窗口的 `OnClosing` 处理函数关闭主窗口；Quit 在 macOS 上询问 `OnQuitRequest` 处理函数，获准的请求计入 `app.Quits`，在 Windows 和 Linux 上则直接退出；Minimize、Zoom 和 Toggle Full Screen 只改变主窗口环境里报告的窗口状态，应用的其他窗口保持不变（`app.SetWindowEnvironment` 可以单独改任意一个窗口的环境）；编辑角色作用于已聚焦的文本框。其他角色，以及文本框中的 Undo 或 Redo，会让该步骤失败，而不是悄悄吞掉按键；在 `-target` 下，这样的菜单项会跳过测试。在无头测试、桌面目标和 Web 上，`KeyAlways` 绑定会在文本框编辑之前消费 Return、Backspace 和全选；`KeyAuto` 和 `KeyNotEditing` 则把这些键留给已聚焦的文本框。Android 和 iOS 的测试宿主还不会先把这些键交给键位绑定。已聚焦视图的 `OnKeyDown` 会最先收到 `app.Key`，单独的修饰键（`app.Key("shift")`）也算；它消费的键不会再交给任何绑定，无头测试以及桌面和 Web 目标上都是如此。
 
+在 macOS、Windows、Linux 和 Web 上以 `-target` 运行时，`app.Select(selector, start, end)` 用原生文本框的编辑键（全选和方向键）移动它的选区，之后的输入、复制或粘贴都作用于测试指定的范围；消费这些键的绑定或应用菜单项会把它们拦下。手机目标还不能移动原生选区：在那里它只移动测试模型中的选区，文本框设置了 `OnSelectionChange` 时则跳过该测试。
+
 ## 运行测试
 
 ```sh

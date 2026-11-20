@@ -106,6 +106,12 @@ func clickPressedCallback(gesture uintptr, n int32, x, y float64, data uintptr) 
 		gtkEventControllerGetCurrentEventState(gesture), int(n))
 }
 
+// onEntry reports whether surface point at is on the field v, the topmost field there.
+func (w *window) onEntry(v *view, at driver.Point) bool {
+	root := w.view(w.root)
+	return root != nil && hit(root, at, func(v *view) bool { return v.kind == driver.KindInput }) == v
+}
+
 // pointerDown follows a press of button at surface point at, the clicks'
 // press in a row, with modifiers state.
 func (w *window) pointerDown(at driver.Point, button uint32, device uintptr, state uint32, clicks int) {
@@ -122,8 +128,8 @@ func (w *window) pointerDown(at driver.Point, button uint32, device uintptr, sta
 	if button == 1 {
 		w.touch(w.mouse.Down(w.listensTouches(), at))
 	}
-	// A press on the surface leaves the focused field or page. A focused control keeps the focus, as on the other desktops: a press does not move it, and a handler that wants it elsewhere focuses that view itself.
-	if w.focusedEntry() != nil || w.focusedWeb() != nil {
+	// A press on the surface leaves the focused field or page, but not a press on the focused field itself, which the test host's presses bring here after giving it the focus. A focused control keeps the focus, as on the other desktops: a press does not move it, and a handler that wants it elsewhere focuses that view itself.
+	if f := w.focusedEntry(); f != nil && !w.onEntry(f, at) || w.focusedWeb() != nil {
 		w.focusEntry(nil)
 	}
 	w.pressOutside(at)

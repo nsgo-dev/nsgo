@@ -10,6 +10,7 @@
 - Stop a `tsx.View` that renders an `Export` from also running what the package's entry module mounts, with its effects, handlers, timers and animation frames (#923 by @houko).
 - Search a `ui/chat` transcript from Mod+F in a find bar that unfolds folded turns and reasoning, marks the matches in `ui.TextView` and reasoning, reveals each match clear of the bar and the composer and gives the focus back as it closes, with `core.FocusedRef` to read the focused view (#47 by @houko).
 - Add `desktop.QuickLook` and `desktop.CanQuickLook` to preview files in macOS's Quick Look panel (#370 by @houko).
+- Move the native field's selection with `nsgotest`'s `App.Select` under `-target` on macOS, Windows, Linux and the web, so the next edit acts on the selected range (#772 by @houko).
 - Add `TabStyle` and `IndicatorStyle` to `ui.Tabs` to restyle its tabs, the selected tab and the indicator (#958 by @houko).
 - Reload a TSX `<WebView>` in place with the new script when `injectedJavaScriptBeforeContentLoaded` changes, as `core.WebView.InjectedJavaScriptBeforeContentFunc` does, rather than replacing the web view (#895 by @houko).
 - Keep partial borders above Apple backdrop, material and glass layers while leaving app children above the border (#935 by @houko).
