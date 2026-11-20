@@ -101,6 +101,10 @@ func (t Turn) Render(cx *core.Scope) core.Node {
 	choice := core.NewSignal(cx, uint8(0))
 	folded := false
 	open := core.NewMemo(cx, func() bool {
+		// A search unfolds the turn without a choice of the user's, which its rules take up again once it closes.
+		if t.Conversation != nil && t.Conversation.searching() {
+			return true
+		}
 		held := hold()
 		if c := choice.Get(); c != 0 {
 			return c == 1

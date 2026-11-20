@@ -22,3 +22,21 @@ thinkingUntimed:
 thoughts:
   message: "Thoughts"
   description: What a reasoning block reads once it ends, when the app does not say what it cost.
+find:
+  message: "Find"
+  description: The label and placeholder of the conversation find field.
+previous:
+  message: "Previous"
+  description: The accessible label of the previous-match button.
+next:
+  message: "Next"
+  description: The accessible label of the next-match button.
+close:
+  message: "Close"
+  description: The accessible label of the button closing the conversation find bar.
+noResults:
+  message: "No results"
+  description: What the conversation find bar says when the query has no matches.
+matches:
+  message: "{selected, number} of {count, number}"
+  description: The selected match and total count in the conversation find bar.

@@ -220,14 +220,6 @@ What `base/terminal` still lacks of a terminal app's features, Ghostty's the ref
 | Drawn box characters, blinking and contrast | `cursor-style-blink`, `minimum-contrast`, `window-padding-color` | Box drawing, blocks and Powerline's separators are drawn so lines join, the cursor blinks, and minimum contrast and padding colors apply |
 | Search, images and shell integration | Find, the Kitty graphics protocol, `shell-integration` | A search highlights matches, programs show images, and OSC 133 prompts take Option+click to move the cursor |
 
-## Text views
-
-What `base/textview` and `ui/chat` still lack, from NSGo's own issues ([text view](architecture/textview.md)).
-
-| Item | Reference | Done when |
-| --- | --- | --- |
-| Transcript search | NSGo's [#47](https://github.com/nsgo-dev/nsgo/issues/47), [text-level search](architecture/text-search.md#chat-integration) | `ui/chat` adds a transcript find bar on `textview.Search`, opened with Mod+F, unfolding folded turns and reasoning while it is open and giving the focus back as it closes |
-
 ## Widgets
 
 What package `widget` lacks of WidgetKit and ActivityKit, and of widgets and Live Activities elsewhere ([tool](architecture/tool.md#widgets)).

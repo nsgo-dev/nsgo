@@ -54,6 +54,8 @@ textview.TextView{Markdown: "## 笔记\n\n一份 **原生** 文档。", Styles: 
 	OnLinkPress: func(e textview.LinkPressEvent) { open(e.URL) }}
 ```
 
+`textview.NewSearch` 搜索 `TextView` 显示的文字并高亮匹配项。将同一个 search 通过 `textview.ProvideSearch` 提供给多个视图，然后调用 `Open`、`SetQuery`、`Next` 和 `Previous`；`Count` 和 `Selected` 返回结果。用 `textview.PartSearch` 和 `textview.PartSearchSelected` 设置搜索部分的样式。
+
 ## 选择与无障碍
 
 `SelectableOn` 让用户选择和复制文本。带 `Selectable` 的 `core.View` 让其中的文本按文档顺序一起选择。`RoleHeader` 之类的 `Role` 告诉辅助技术这段文字是什么，`Label` 在原文不适合朗读时替换它。

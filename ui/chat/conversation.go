@@ -2,6 +2,7 @@ package chat
 
 import (
 	"github.com/nsgo-dev/nsgo/base"
+	"github.com/nsgo-dev/nsgo/base/textview"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/icons/lucide"
 	"github.com/nsgo-dev/nsgo/ui"
@@ -26,13 +27,16 @@ type ConversationState struct {
 	following              *core.Signal[bool]
 	composer, card, footer *core.Signal[core.Points]
 	composers              *core.Signal[int]
-	lastY                  core.Points
+	search                 *textview.Search
+	// bar is the find bar's box; focusBack is where the focus was as it opened.
+	bar, focusBack *core.Ref
+	lastY          core.Points
 }
 
 // NewConversationState makes a state at the latest turn.
 func NewConversationState(cx *core.Scope) *ConversationState {
 	return &ConversationState{scroll: &core.Ref{}, following: core.NewSignal(cx, true), composer: core.NewSignal(cx, core.Points(140)),
-		card: core.NewSignal(cx, chatRestingCard), footer: core.NewSignal(cx, core.Points(0)), composers: core.NewSignal(cx, 0)}
+		card: core.NewSignal(cx, chatRestingCard), footer: core.NewSignal(cx, core.Points(0)), composers: core.NewSignal(cx, 0), search: textview.NewSearch(cx), bar: &core.Ref{}}
 }
 
 // AtLatest reports whether the transcript follows its end.
@@ -50,6 +54,33 @@ func (s *ConversationState) Scroll() *core.Ref { return s.scroll }
 // ComposerHeight is the room the floating composer takes at the bottom,
 // for what the app overlays on an empty conversation.
 func (s *ConversationState) ComposerHeight() core.Points { return s.composer.Get() }
+
+// Search returns the transcript's search, which Conversation and FloatingConversation provide to every TextView in their children and open with Mod+F in a find bar.
+func (s *ConversationState) Search() *textview.Search { return s.search }
+
+// SearchOpen reports whether the transcript's find bar is open.
+func (s *ConversationState) SearchOpen() bool { return s.search.IsOpen() }
+
+// searching reports whether the find bar is open with a query, which unfolds the turns and reasoning sharing the state so that their text is searched.
+func (s *ConversationState) searching() bool { return s.search.IsOpen() && s.search.Query() != "" }
+
+// openSearch opens the find bar, noting where the focus is to give it back as the bar closes.
+func (s *ConversationState) openSearch(cx *core.Scope) {
+	if !s.search.IsOpen() {
+		s.focusBack = core.FocusedRef(cx)
+		s.search.Open()
+	}
+}
+
+// closeSearch closes the find bar, giving the focus back to where it was as the bar opened unless it already left the bar.
+func (s *ConversationState) closeSearch() {
+	back := s.focusBack
+	s.focusBack = nil
+	if back != nil && s.bar.HoldsFocus() {
+		back.Focus()
+	}
+	s.search.Close()
+}
 
 // pause stops following until the user returns to the end, so a disclosure
 // opening under the pointer keeps its header in place.
@@ -95,6 +126,7 @@ type Conversation struct {
 // Render implements core.Node.
 func (v Conversation) Render(cx *core.Scope) core.Node {
 	s := v.State
+	setupSearch(cx, s)
 	return core.View{TestID: v.TestID, Style: ui.FillRest, Children: []core.Node{
 		core.Scroll{Ref: s.scroll, OnScroll: s.scrolled, Style: ui.FillRest, Children: []core.Node{
 			chatTranscript(s, v.ContentWidth, core.Edges{Top: 22, Right: 20, Bottom: 22, Left: 20}, v.Children, nil),
@@ -102,6 +134,7 @@ func (v Conversation) Render(cx *core.Scope) core.Node {
 		core.Show{When: func() bool { return !s.AtLatest() }, Then: func(cx *core.Scope) core.Node {
 			return chatJumpButton(cx, s, v.JumpLabel, func() core.Points { return ui.ButtonHeight/2 - 6 }, false)
 		}},
+		findBar(s, 0, nil),
 	}}
 }
 
@@ -191,6 +224,7 @@ type FloatingConversation struct {
 // Render implements core.Node.
 func (v FloatingConversation) Render(cx *core.Scope) core.Node {
 	s := v.State
+	setupSearch(cx, s)
 	inset := max(0, v.TopInset)
 	transparent := core.Style{Background: core.Transparent}
 	// Only the scroll view clips: the composer's glass and shadow reach past
@@ -218,6 +252,7 @@ func (v FloatingConversation) Render(cx *core.Scope) core.Node {
 		core.Show{When: func() bool { return !s.AtLatest() }, Then: func(cx *core.Scope) core.Node {
 			return chatJumpButton(cx, s, v.JumpLabel, func() core.Points { return s.composer.Get() + 12 }, true)
 		}},
+		findBar(s, inset, s.composer.Get),
 		core.View{PointerEvents: core.PointerEventsBoxNone, OnLayout: func(b core.Bounds) { s.composer.Set(b.Size.Height) }, TestID: "chat-composer",
 			Style: core.Style{Position: core.Absolute, Left: core.Pt(0), Right: core.Pt(0), Bottom: core.Pt(0), AlignItems: core.AlignCenter},
 			StyleFunc: func() core.Style {
@@ -225,6 +260,20 @@ func (v FloatingConversation) Render(cx *core.Scope) core.Node {
 			},
 			Children: []core.Node{core.View{Style: chatColumn(v.ContentWidth), Children: v.Composer}}},
 	}}
+}
+
+// setupSearch provides the transcript's search to its text views, opens it with Mod+F and stops following the end as a match is revealed, so a streaming reply does not pull the transcript away from it.
+func setupSearch(cx *core.Scope, s *ConversationState) {
+	textview.ProvideSearch(cx, s.search)
+	cx.OnKeyWith("mod+f", core.KeyOptions{When: core.KeyAlways}, func() { s.openSearch(cx) })
+	last := 0
+	cx.Effect(func() {
+		selected := s.search.Selected()
+		if selected != 0 && selected != last {
+			s.pause()
+		}
+		last = selected
+	})
 }
 
 // FloatingMargin keeps a floating composer off the bottom edge: its footer,

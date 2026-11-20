@@ -1,9 +1,11 @@
 package chat
 
 import (
+	"strings"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/base"
+	"github.com/nsgo-dev/nsgo/base/textview"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/ui"
 	"github.com/nsgo-dev/nsgo/ui/chat/locales"
@@ -97,6 +99,10 @@ func (r Reasoning) Render(cx *core.Scope) core.Node {
 	choice := core.NewSignal(cx, uint8(0))
 	folded := false
 	open := core.NewMemo(cx, func() bool {
+		// A search unfolds the reasoning without a choice of the user's, which its rules take up again once it closes.
+		if r.Conversation != nil && r.Conversation.searching() {
+			return true
+		}
 		held := is(r.HoldOpen) || r.Conversation != nil && !r.Conversation.AtLatest()
 		if c := choice.Get(); c != 0 {
 			return c == 1
@@ -120,8 +126,13 @@ func (r Reasoning) Render(cx *core.Scope) core.Node {
 	}
 	body := r.Content
 	if body == nil {
-		body = func(*core.Scope) core.Node {
-			return core.Text{ContentFunc: r.Text, Selectable: core.SelectableOn, Style: core.Style{LineHeight: 20}}
+		body = func(cx *core.Scope) core.Node {
+			// A paragraph of the text as it is, not read as Markdown, in a text view so that a search finds it and marks its matches as ui's text views do.
+			styles := ui.Themed(cx, func() textview.Styles {
+				s := ui.TextViewStyles(cx)
+				return textview.Styles{textview.PartRoot: {LineHeight: 20}, textview.PartSearch: s[textview.PartSearch], textview.PartSearchSelected: s[textview.PartSearchSelected]}
+			})
+			return textview.TextView{DocumentFunc: func() textview.Document { return plainDocument(r.Text()) }, Selectable: true, StyleOf: func(p textview.Part) core.Style { return styles()[p] }}
 		}
 	}
 	row := core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, Height: core.Pt(24)}, Children: []core.Node{
@@ -150,4 +161,18 @@ func (r Reasoning) Render(cx *core.Scope) core.Node {
 		return core.View{TestID: r.TestID, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: 0, Gap: 4},
 			Children: []core.Node{row, detail}}
 	}}
+}
+
+// plainDocument is text as one paragraph, its line breaks kept.
+func plainDocument(text string) textview.Document {
+	var content []textview.Inline
+	for i, line := range strings.Split(text, "\n") {
+		if i > 0 {
+			content = append(content, textview.Break{})
+		}
+		if line != "" {
+			content = append(content, textview.Text{Text: line})
+		}
+	}
+	return textview.Document{Blocks: []textview.Block{textview.Paragraph{Content: content}}}
 }

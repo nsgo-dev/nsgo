@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/base"
+	"github.com/nsgo-dev/nsgo/base/textview"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/icons/lucide"
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -75,6 +76,90 @@ func startChat(t *testing.T, e core.Environment) (*nsgotest.App, *chatStage) {
 				OnSend: func() { s.sends++ }, OnStop: func() { s.stops++ }}}}
 	})
 	return app, s
+}
+
+// TestConversationSearch searches folded steps and reasoning across turns from Mod+F, reveals each selected match clear of the find bar and the floating composer, and closes with Escape, the focus back in the composer and the turns folded again.
+func TestConversationSearch(t *testing.T) {
+	var state *ConversationState
+	app := start(t, desktopEnv, func(cx *core.Scope) core.Node {
+		state = NewConversationState(cx)
+		draft := core.NewSignal(cx, "")
+		turn := func(n int) core.Node {
+			id := strconv.Itoa(n)
+			word := "hay"
+			if n%4 == 0 {
+				word = "needle"
+			}
+			return Turn{Status: func() Status { return Completed }, HasFinal: func() bool { return true }, Conversation: state,
+				Summary: func() string { return "Worked " + id }, Prompt: func(*core.Scope) core.Node { return core.Text{Content: "Prompt " + id} },
+				Reasoning: func(*core.Scope) core.Node {
+					return Reasoning{Text: func() string { return "reason " + id + " " + word }, Status: func() Status { return Completed }, Conversation: state}
+				},
+				Steps: func() []Step {
+					return []Step{{ID: "step", Message: func(*core.Scope) core.Node {
+						return textview.TextView{Markdown: "step " + id + " " + word}
+					}}}
+				},
+				Final: func(*core.Scope) core.Node {
+					return core.View{Style: core.Style{Height: core.Pt(240)}, Children: []core.Node{core.Text{Content: "Answer " + id}}}
+				}}
+		}
+		var turns []core.Node
+		for n := range 12 {
+			turns = append(turns, turn(n+1))
+		}
+		return core.View{Style: core.Style{Height: core.Pt(700)}, Children: []core.Node{FloatingConversation{State: state, JumpLabel: "Latest", TopInset: 20, Children: turns,
+			Composer: []core.Node{Composer{Draft: draft.Get, OnDraftChange: draft.Set, Label: "Message", SendLabel: "Send", StopLabel: "Stop", Glass: true, State: state}}}}}
+	})
+	if app.Exists("text:reason 4 needle") {
+		t.Fatal("a completed turn's reasoning should start folded")
+	}
+	app.Focus("id:composer")
+	app.Key("mod+f")
+	if !app.Find("id:chat-find-input").Focused {
+		t.Fatal("Mod+F did not focus the find field")
+	}
+	if app.Exists("text:reason 4 needle") {
+		t.Fatal("the find bar unfolded the transcript before a query")
+	}
+	app.Type("id:chat-find-input", "needle")
+	if !app.Exists("text:1 of 6") {
+		t.Fatalf("the count is not 1 of 6\n%s", app.Dump())
+	}
+	if !app.Exists("text:reason 4 needle") || !app.Exists("text:step 12 needle") {
+		t.Fatal("the search did not unfold the transcript's reasoning and steps")
+	}
+	clear := func(n int) {
+		t.Helper()
+		match, ok := state.Search().SelectedBounds()
+		bar, composer := app.Find("id:chat-find-input").Parent.Bounds(), app.Find("id:chat-composer").Bounds()
+		if !ok || match.Origin.Y < bar.Origin.Y+bar.Size.Height || match.Origin.Y+match.Size.Height > composer.Origin.Y {
+			t.Fatalf("match %d at %v is not clear of the bar %v and the composer %v", n, match, bar, composer)
+		}
+	}
+	clear(1)
+	for n := 2; n <= 6; n++ {
+		app.Press("id:chat-find-next")
+		if !app.Exists("text:" + strconv.Itoa(n) + " of 6") {
+			t.Fatalf("after next the count is not %d of 6", n)
+		}
+		clear(n)
+	}
+	app.Press("id:chat-find-previous")
+	if !app.Exists("text:5 of 6") {
+		t.Fatal("previous did not go back to 5 of 6")
+	}
+	app.Focus("id:chat-find-input")
+	app.Key("escape")
+	if app.Exists("id:chat-find-input") {
+		t.Fatal("Escape left the find bar open")
+	}
+	if !app.Find("id:composer").Focused {
+		t.Fatal("closing the find bar did not give the focus back to the composer")
+	}
+	if app.Exists("text:reason 4 needle") {
+		t.Fatal("the reasoning stayed unfolded after the search closed")
+	}
 }
 
 // TestTurnFolds checks a live group, then the fold a completed turn

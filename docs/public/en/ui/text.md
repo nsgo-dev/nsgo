@@ -54,6 +54,8 @@ textview.TextView{Markdown: "## Notes\n\nA **native** document.", Styles: ui.Tex
 	OnLinkPress: func(e textview.LinkPressEvent) { open(e.URL) }}
 ```
 
+`textview.NewSearch` searches the text a `TextView` shows and highlights its matches. Give several views the same search with `textview.ProvideSearch`, then call `Open`, `SetQuery`, `Next` and `Previous`; `Count` and `Selected` report the result. Search parts are styled with `textview.PartSearch` and `textview.PartSearchSelected`.
+
 ## Selection and accessibility
 
 `SelectableOn` lets the user select and copy a text. A `core.View` with `Selectable` makes its texts select together in document order. A `Role` such as `RoleHeader` tells assistive technology what the text is, and `Label` replaces it when the words are not the label.

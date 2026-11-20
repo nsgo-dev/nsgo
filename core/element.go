@@ -656,6 +656,18 @@ func (r *Ref) HoldsFocus() bool {
 	return false
 }
 
+// FocusedRef returns a reference to the element with the keyboard focus in cx's tree, as the platform last reported it, or nil when none has it; it is not tracked. The reference works while that element stays mounted, so what takes the focus without a trigger, such as a find bar a key opens, can give it back as it closes.
+func FocusedRef(cx *Scope) *Ref {
+	if cx == nil {
+		return nil
+	}
+	t := cx.tree()
+	if t == nil || t.focus == nil {
+		return nil
+	}
+	return &Ref{t: t, n: t.focus}
+}
+
 // Before reports whether r's view comes before other's in tree order,
 // the order Tab goes through them; views not mounted come last.
 func (r *Ref) Before(other *Ref) bool {

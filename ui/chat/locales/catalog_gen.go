@@ -40,6 +40,7 @@ func For(cx *core.Scope) Messages {
 var Parameters = map[string][]string{
 	"Thinking":   {"seconds"},
 	"ThoughtFor": {"seconds"},
+	"Matches":    {"selected", "count"},
 }
 
 // Translation is a language's messages another package supplies:
@@ -50,6 +51,7 @@ type Translation struct {
 	Texts      map[string]string
 	Thinking   func(seconds int) string
 	ThoughtFor func(seconds int) string
+	Matches    func(selected int, count int) string
 }
 
 var supplied = map[string]Translation{}
@@ -62,6 +64,11 @@ const (
 	textEdit
 	textThinkingUntimed
 	textThoughts
+	textFind
+	textPrevious
+	textNext
+	textClose
+	textNoResults
 	numTexts
 )
 
@@ -74,6 +81,11 @@ var keyOfText = [numTexts]string{
 	"edit",
 	"thinkingUntimed",
 	"thoughts",
+	"find",
+	"previous",
+	"next",
+	"close",
+	"noResults",
 }
 
 // textsEn are the messages without arguments in en.
@@ -83,7 +95,12 @@ var textsEn = i18n.NewTexts(""+
 	"Retry"+
 	"Edit"+
 	"Thinking…"+
-	"Thoughts",
+	"Thoughts"+
+	"Find"+
+	"Previous"+
+	"Next"+
+	"Close"+
+	"No results",
 	[]uint16{
 		4,
 		6,
@@ -91,6 +108,11 @@ var textsEn = i18n.NewTexts(""+
 		4,
 		11,
 		8,
+		4,
+		8,
+		4,
+		5,
+		10,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
@@ -100,7 +122,12 @@ var textsZhHans = i18n.NewTexts(""+
 	"重试"+
 	"编辑"+
 	"思考中…"+
-	"思考过程",
+	"思考过程"+
+	"查找"+
+	"上一个"+
+	"下一个"+
+	"关闭"+
+	"无结果",
 	[]uint16{
 		6,
 		9,
@@ -108,6 +135,11 @@ var textsZhHans = i18n.NewTexts(""+
 		6,
 		12,
 		12,
+		6,
+		9,
+		9,
+		6,
+		9,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -169,6 +201,9 @@ func Supply(lang string, t Translation) {
 	}
 	if t.ThoughtFor != nil {
 		s.ThoughtFor = t.ThoughtFor
+	}
+	if t.Matches != nil {
+		s.Matches = t.Matches
 	}
 	supplied[lang] = s
 	Catalog.Add(lang)
@@ -284,3 +319,72 @@ func Thoughts(cx *core.Scope) string { return For(cx).Thoughts() }
 
 // Thoughts is the package's Thoughts in the language of msgs.
 func (msgs Messages) Thoughts() string { return msgs.text(textThoughts) }
+
+// Find says "Find"
+// in the language the app shows under cx.
+//
+// The label and placeholder of the conversation find field.
+func Find(cx *core.Scope) string { return For(cx).Find() }
+
+// Find is the package's Find in the language of msgs.
+func (msgs Messages) Find() string { return msgs.text(textFind) }
+
+// Previous says "Previous"
+// in the language the app shows under cx.
+//
+// The accessible label of the previous-match button.
+func Previous(cx *core.Scope) string { return For(cx).Previous() }
+
+// Previous is the package's Previous in the language of msgs.
+func (msgs Messages) Previous() string { return msgs.text(textPrevious) }
+
+// Next says "Next"
+// in the language the app shows under cx.
+//
+// The accessible label of the next-match button.
+func Next(cx *core.Scope) string { return For(cx).Next() }
+
+// Next is the package's Next in the language of msgs.
+func (msgs Messages) Next() string { return msgs.text(textNext) }
+
+// Close says "Close"
+// in the language the app shows under cx.
+//
+// The accessible label of the button closing the conversation find bar.
+func Close(cx *core.Scope) string { return For(cx).Close() }
+
+// Close is the package's Close in the language of msgs.
+func (msgs Messages) Close() string { return msgs.text(textClose) }
+
+// NoResults says "No results"
+// in the language the app shows under cx.
+//
+// What the conversation find bar says when the query has no matches.
+func NoResults(cx *core.Scope) string { return For(cx).NoResults() }
+
+// NoResults is the package's NoResults in the language of msgs.
+func (msgs Messages) NoResults() string { return msgs.text(textNoResults) }
+
+// Matches says "{selected, number} of {count, number}"
+// in the language the app shows under cx.
+//
+// The selected match and total count in the conversation find bar.
+func Matches(cx *core.Scope, selected int, count int) string { return For(cx).Matches(selected, count) }
+
+// Matches is the package's Matches in the language of msgs.
+func (msgs Messages) Matches(selected int, count int) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.Matches(selected, count))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].Matches; f != nil {
+			return f(selected, count)
+		}
+		switch lang {
+		case "", "en":
+			return msgs.arg(i18n.FormatNumber("en", float64(selected))) + " of " + msgs.arg(i18n.FormatNumber("en", float64(count)))
+		case "zh-Hans":
+			return i18n.FormatNumber("zh-Hans", float64(selected)) + " / " + i18n.FormatNumber("zh-Hans", float64(count))
+		}
+	}
+}
