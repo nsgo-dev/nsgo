@@ -26,6 +26,7 @@ type Env struct {
 	screenColor, speech     *Signal[bool]
 	audio, speak            *Signal[bool]
 	camera                  *Signal[bool]
+	scanCode                *Signal[bool]
 	canSendInput            *Signal[bool]
 	canLookUp               *Signal[bool]
 	level, place            *Signal[bool]
@@ -102,6 +103,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		audio:            NewSignal(cx, false),
 		speak:            NewSignal(cx, false),
 		camera:           NewSignal(cx, false),
+		scanCode:         NewSignal(cx, false),
 		canSendInput:     NewSignal(cx, false),
 		canLookUp:        NewSignal(cx, false),
 		level:            NewSignal(cx, false),
@@ -218,6 +220,7 @@ func (e *Env) set(v Environment) {
 	e.audio.Set(v.Audio)
 	e.speak.Set(v.Speak)
 	e.camera.Set(v.Camera)
+	e.scanCode.Set(v.ScanCode)
 	e.canSendInput.Set(v.CanSendInput)
 	e.canLookUp.Set(v.CanLookUp)
 	e.level.Set(v.CanSetWindowLevel)
@@ -365,6 +368,9 @@ func (e *Env) CanSpeak() bool { return e.speak.Get() }
 // CanTakePhoto reports whether Scope.TakePhoto shows a camera here: iOS
 // and Android devices with one, and browsers on touch screens.
 func (e *Env) CanTakePhoto() bool { return e.camera.Get() }
+
+// CanScanCode reports whether Scope.ScanCode shows a camera that reads codes here: iOS devices with a camera, not the simulator.
+func (e *Env) CanScanCode() bool { return e.scanCode.Get() }
 
 // CanSendInput reports whether Ref.SendInput can give a web view's page
 // trusted input here. macOS supports this through AppKit; other backends

@@ -59,6 +59,8 @@ type Options struct {
 	PickImages func(driver.PickRequest, func([]driver.PickedFile))
 	// TakePhoto, when set, answers the camera requests the app asks for in place of the system's camera: done takes the photo, an error, or nil for a cancellation, and may be called on any goroutine. Tests use it on every target.
 	TakePhoto func(driver.PickRequest, func(*driver.PickedFile, error))
+	// ScanCode, when set, answers the codes the app asks to scan in place of the platform's camera, on every target: done takes the code read, nil when the user closes the scanner, or why it failed, and may be called on any goroutine.
+	ScanCode func(driver.ScanRequest, func(*driver.ScannedCode, error))
 }
 
 // Surface is an app shown on a platform. Its methods act as the user
@@ -141,13 +143,13 @@ func Current() Host { return host }
 // PostToTest queues fn on the goroutine of the test running app, an *nsgotest.App, to run as its next step or wait settles, also on a target, where nsgotest.App.Post runs fn on the engine's goroutine: tsx/tsxtest runs its test VM's work there, as the VM is the test's. nsgotest sets it.
 var PostToTest func(app any, fn func())
 
-// Pin applies what a test set in pin over env, as the platform reports it: the appearance, reduced motion, increased contrast, the login launch reason, the application in front and whether the platform follows it, the camera capability, and the locale, text size, device name and device model when set. The rest, such as the OS, the idiom and the safe area, stays the platform's.
+// Pin applies what a test set in pin over env, as the platform reports it: the appearance, reduced motion, increased contrast, the login launch reason, the application in front and whether the platform follows it, the camera and code scanner capabilities, and the locale, text size, device name and device model when set. The rest, such as the OS, the idiom and the safe area, stays the platform's.
 func Pin(env driver.Environment, pin *driver.Environment) driver.Environment {
 	if pin == nil {
 		return env
 	}
 	env.Dark, env.ReduceMotion, env.IncreaseContrast = pin.Dark, pin.ReduceMotion, pin.IncreaseContrast
-	env.Camera = pin.Camera
+	env.Camera, env.ScanCode = pin.Camera, pin.ScanCode
 	env.LaunchedAtLogin, env.FrontmostApp, env.CanReadFrontmostApp = pin.LaunchedAtLogin, pin.FrontmostApp, pin.CanReadFrontmostApp
 	if pin.Locale != "" {
 		env.Locale = pin.Locale

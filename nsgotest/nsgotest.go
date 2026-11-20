@@ -80,7 +80,7 @@ func Secrets(values map[string]string) Option {
 	return func(a *App) { a.seedSecrets = values }
 }
 
-// Environment starts the app in env from its first frame, as a platform reports it before the app mounts: screens have the system header where env has HeaderHeight. Under `nsgo test -target` it pins only the appearance, reduced motion, increased contrast, the login launch reason, the application in front and whether the platform follows it, camera availability, and, when set, the locale, text size, device name and device model; the OS, the idiom, the safe area and the header heights stay the platform's, so a test of another OS's layout runs headless or on that OS's target.
+// Environment starts the app in env from its first frame, as a platform reports it before the app mounts: screens have the system header where env has HeaderHeight. Under `nsgo test -target` it pins only the appearance, reduced motion, increased contrast, the login launch reason, the application in front and whether the platform follows it, camera and code scanner availability, and, when set, the locale, text size, device name and device model; the OS, the idiom, the safe area and the header heights stay the platform's, so a test of another OS's layout runs headless or on that OS's target.
 func Environment(env driver.Environment) Option {
 	return func(a *App) { a.env = &env }
 }
@@ -258,6 +258,9 @@ type App struct {
 	// Photos are the photos the app asked to take, oldest first, where the environment says Camera. TakePhoto answers each with the photo the user takes, or with why it failed; with none the user cancels. It answers headless and under `nsgo test -target` through the test host, without opening a system camera.
 	Photos    []driver.PickRequest
 	TakePhoto func(r driver.PickRequest) (*driver.PickedFile, error)
+	// Scans are the codes the app asked to scan, oldest first, where the environment says ScanCode. ScanCode answers each with the code the camera reads, or with why it failed; with none the user closes the scanner. It answers headless and on every target, in place of the camera.
+	Scans    []driver.ScanRequest
+	ScanCode func(r driver.ScanRequest) (*driver.ScannedCode, error)
 	// PickScreenColor answers Scope.PickScreenColor with the color the user
 	// samples; without it, or with false, the user cancels.
 	PickScreenColor func() (driver.Color, bool)

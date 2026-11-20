@@ -14,7 +14,7 @@ A service is a command item in the batch. One that answers, such as a clipboard 
 
 - `Tree.request` keeps the callback under the owner that asked, and the root runs it when that owner is gone, so a closed menu still hears its answer.
 - Platforms answer on any goroutine through `Engine.Dispatch`; slow work, such as encoding a photo, runs off the main thread first.
-- `nsgotest` answers from its model: `App.Clipboard`, `ClipboardImage` and `ClipboardFiles`, `OpenURL`, `PickImages`, `TakePhoto` (recording `Photos`), `PickFiles`, `PickDirectories`, `SaveFile`, `OpenFile`, `RevealFile`, `TrashFile`, `CanInstallPackages`, `OverlayPermission`, `AuthAnswer` (recording `AuthSessions`) and `WebCookies`, the web views' store, whose writes `SetWebCookies` may refuse and whose clearings `WebsiteDataClears` counts, and it records the shares, the packages installed, the install and overlay settings opened, the overlay over other apps (`App.Overlay`, [Android floating windows](android-floating-windows.md)), the appearance, quits and the context menu shown. Under `nsgo test -target`, `PickImages` and `TakePhoto` answers go through the test host in place of system pickers and cameras, and reach the app's engine as the platform's answers would. A speech session it runs hears what `HearSpeech` says and ends with `EndSpeech`; an utterance it speaks joins `Spoken` and speaks until `FinishSpeaking` ends it or the app stops it, and `App.Voices` answers `Scope.Voices`. `MicrophoneInput` gives the app a fake recorder for `microphone.RecordWAV`, which writes what `Microphone.Emit` sends into real WAV files and lists them in `Recordings`; it connects to the channel Android's runtime does, one per process, so one app at a time takes it ([Android recording](android-recording.md)).
+- `nsgotest` answers from its model: `App.Clipboard`, `ClipboardImage` and `ClipboardFiles`, `OpenURL`, `PickImages`, `TakePhoto` (recording `Photos`), `ScanCode` (recording `Scans`), `PickFiles`, `PickDirectories`, `SaveFile`, `OpenFile`, `RevealFile`, `TrashFile`, `CanInstallPackages`, `OverlayPermission`, `AuthAnswer` (recording `AuthSessions`) and `WebCookies`, the web views' store, whose writes `SetWebCookies` may refuse and whose clearings `WebsiteDataClears` counts, and it records the shares, the packages installed, the install and overlay settings opened, the overlay over other apps (`App.Overlay`, [Android floating windows](android-floating-windows.md)), the appearance, quits and the context menu shown. Under `nsgo test -target`, `PickImages`, `TakePhoto` and `ScanCode` answers go through the test host in place of system pickers, cameras and scanners, and reach the app's engine as the platform's answers would. A speech session it runs hears what `HearSpeech` says and ends with `EndSpeech`; an utterance it speaks joins `Spoken` and speaks until `FinishSpeaking` ends it or the app stops it, and `App.Voices` answers `Scope.Voices`. `MicrophoneInput` gives the app a fake recorder for `microphone.RecordWAV`, which writes what `Microphone.Emit` sends into real WAV files and lists them in `Recordings`; it connects to the channel Android's runtime does, one per process, so one app at a time takes it ([Android recording](android-recording.md)).
 
 ## Clipboard
 
@@ -79,6 +79,16 @@ Windows checks the registry first because the shell asks the user for an app for
 | Web | `<input type=file capture=environment>` on touch screens (`pointer: coarse`), which mobile browsers open as the camera; prepared with the browser's codecs | The browser's |
 
 The desktops show no camera ([roadmap](../roadmap.md#finish-the-existing-platforms)).
+
+## Scanning a code
+
+`ScanCode` shows the camera full screen and answers with the first code it reads of the kinds `ScanOptions.Kinds` asks for (a QR code alone by default), as `ItemScanCode` with a `ScanRequest`, answered by `EventPick` carrying a `*ScannedCode` (its kind and text), none when the user closes the scanner, and `Text` for a failure. It shares the picker's gate and the camera's permission. `Env.CanScanCode` says the platform shows a scanner; elsewhere `ScanCode` fails with `ErrNoScanner` without asking it. A code's binary data is not given, only its text.
+
+| Target | Scanner | Permission |
+| --- | --- | --- |
+| iOS | An `AVCaptureSession` of the default camera whose `AVCaptureMetadataOutput` reads the kinds asked for, those it supports (`apple.MetadataTypes`), in an `AVCaptureVideoPreviewLayer` presented full screen in a navigation controller with the system's Cancel button, which UIKit words; not on Apple TV or the simulator | As `TakePhoto`'s (`withCamera`) |
+
+Android, macOS, the desktops and the web show no scanner ([roadmap](../roadmap.md#finish-the-existing-platforms)).
 
 ## Files
 

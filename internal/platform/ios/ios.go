@@ -621,6 +621,7 @@ func (s *surface) environment() driver.Environment {
 		Speak:            apple.SpeakAvailable(),
 		Audio:            idiom != driver.IdiomTV && apple.AudioAvailable(), // none on tvOS in the first stages (docs/architecture/audio.md)
 		Camera:           cameraAvailable(),
+		ScanCode:         cameraAvailable() && idiom != driver.IdiomTV,
 		CanSendInput:     false,
 		HasWebView:       idiom != driver.IdiomTV,
 		SignInWithApple:  apple.AppleSignInAvailable(),
@@ -1011,6 +1012,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemTakePhoto:
 			s.takePhoto(*it.Pick, it.Count)
+			continue
+		case driver.ItemScanCode:
+			s.scanCode(*it.Scan, it.Count)
 			continue
 		case driver.ItemPickFiles:
 			s.pickFiles(*it.Files, it.Count)

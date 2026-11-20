@@ -58,6 +58,8 @@ type Environment struct {
 	Audio  bool
 	// Camera says ItemTakePhoto shows a camera here.
 	Camera bool
+	// ScanCode says ItemScanCode shows a camera that reads codes here.
+	ScanCode bool
 	// CanSendInput says Ref.SendInput can deliver trusted input to web views.
 	CanSendInput bool
 	// CanLookUp says ItemLookUp can show the system dictionary panel.

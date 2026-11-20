@@ -109,3 +109,39 @@ func TestTakePhotoWithoutAnAnswerCancels(t *testing.T) {
 	app.Press("id:take")
 	app.WaitFor("text:cancelled", 5*time.Second)
 }
+
+// scanApp is a button that asks to scan a code and shows what came back.
+func scanApp(cx *core.Scope) core.Node {
+	got := core.NewSignal(cx, "none")
+	return core.View{Children: []core.Node{
+		core.View{Role: core.RoleButton, Label: "Scan", TestID: "scan", Style: core.Style{Width: core.Pt(80), Height: core.Pt(30)},
+			OnPress: func(core.PressEvent) {
+				cx.ScanCode(core.ScanOptions{}, func(code *core.ScannedCode, err error) {
+					switch {
+					case err != nil:
+						got.Set("failed " + err.Error())
+					case code == nil:
+						got.Set("closed")
+					default:
+						got.Set("read " + code.Text)
+					}
+				})
+			}},
+		core.Text{ContentFunc: got.Get},
+	}}
+}
+
+// TestScanCodeAnswersTheApp checks that App.ScanCode answers the app's scan in place of the camera, headless and on every target (#429), and that without it the user closes the scanner.
+func TestScanCodeAnswersTheApp(t *testing.T) {
+	app := nsgotest.Start(t, scanApp, nsgotest.Environment(core.Environment{ScanCode: true}))
+	app.Press("id:scan")
+	app.WaitFor("text:closed", 5*time.Second)
+	app.ScanCode = func(core.ScanRequest) (*core.ScannedCode, error) {
+		return &core.ScannedCode{Kind: core.CodeQR, Text: "myapp://pair"}, nil
+	}
+	app.Press("id:scan")
+	app.WaitFor("text:read myapp://pair", 5*time.Second)
+	if len(app.Scans) != 2 || !app.Scans[1].Wants(core.CodeQR) {
+		t.Fatalf("scans recorded %+v, want two of a QR code", app.Scans)
+	}
+}

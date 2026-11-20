@@ -303,6 +303,17 @@ func (a *App) targetOptions(t *target) testhost.Options {
 			done(photo, err)
 		})
 	}
+	// ScanCode too, as TakePhoto.
+	scanCode := func(r driver.ScanRequest, done func(*driver.ScannedCode, error)) {
+		a.postTest(func() {
+			var code *driver.ScannedCode
+			var err error
+			if a.ScanCode != nil {
+				code, err = a.ScanCode(r)
+			}
+			done(code, err)
+		})
+	}
 	return testhost.Options{
 		CheckCommits: !automationBuild && !a.measure,
 		Size:         size, Environment: a.env, Storage: a.store, Secrets: a.Secrets, Host: a.host, Clock: clock,
@@ -311,6 +322,7 @@ func (a *App) targetOptions(t *target) testhost.Options {
 		Event:      t.surfaceEvent,
 		PickImages: pickImages,
 		TakePhoto:  takePhoto,
+		ScanCode:   scanCode,
 	}
 }
 

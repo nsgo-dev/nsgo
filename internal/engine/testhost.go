@@ -38,7 +38,7 @@ func (o *Options) UseTest(t testhost.Options, pin *TestPin) {
 		o.Size, o.Geometry = t.Size, driver.Geometry{}
 	}
 	o.Observe, o.Event = t.Observe, t.Event
-	o.TakePhoto = t.TakePhoto
+	o.TakePhoto, o.ScanCode = t.TakePhoto, t.ScanCode
 	o.LogPerf = t.FPS
 	// The machine's clipboard is never the test's, and its clock is.
 	o.Clipboard = &driver.MemoryClipboard{}

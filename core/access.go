@@ -48,7 +48,7 @@ const (
 	AccessOpenURL = "openUrl"
 	// AccessClipboard is reading and writing the system clipboard.
 	AccessClipboard = "clipboard"
-	// AccessPicker is the system's photo, camera and file pickers.
+	// AccessPicker is the system's photo, camera and file pickers, and its code scanner.
 	AccessPicker = "picker"
 	// AccessSpeech is the microphone and the speech recognizer.
 	AccessSpeech = "speech"

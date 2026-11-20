@@ -32,30 +32,32 @@ var cameraAvailable = sync.OnceValue(func() bool {
 	return objc.Send[bool](objc.ID(apple.Class("UIImagePickerController")), sel("isSourceTypeAvailable:"), sourceCamera)
 })
 
-// takePhoto has the user allow the camera, asking once, then presents it
-// for one photo; a refusal or an Info.plist without
-// NSCameraUsageDescription, for which iOS would end the app as it asks,
-// answers with why.
+// takePhoto has the user allow the camera, then presents it for one photo, or answers with why it cannot (withCamera).
 func (s *surface) takePhoto(r driver.PickRequest, id uint32) {
-	fail := func(why string) { s.engine.Dispatch(driver.Event{Kind: driver.EventPick, Count: id, Text: why}) }
+	withCamera("taking a photo", func(why string) { s.engine.Dispatch(driver.Event{Kind: driver.EventPick, Count: id, Text: why}) },
+		func() { s.presentCamera(r, id) })
+}
+
+// withCamera runs use once the user allowed the camera, asking once, for what (such as "taking a photo"); a device without one, a refusal or an Info.plist without NSCameraUsageDescription, for which iOS would end the app as it asks, calls fail with why instead.
+func withCamera(what string, fail func(why string), use func()) {
 	if !cameraAvailable() {
 		fail("this device has no camera")
 		return
 	}
 	if !privacy.DeclaresUsage("NSCameraUsageDescription") {
-		log.Print("nsgo: taking a photo needs NSCameraUsageDescription in the app's Info.plist (nsgo.yaml's apple.info)")
+		log.Printf("nsgo: %s needs NSCameraUsageDescription in the app's Info.plist (nsgo.yaml's apple.info)", what)
 		fail("the app declares no NSCameraUsageDescription")
 		return
 	}
 	// The camera's check and prompt are privacy's, which core's permission requests share.
 	switch privacy.Status(driver.PermissionCamera) {
 	case driver.PermissionGranted:
-		s.presentCamera(r, id)
+		use()
 	case driver.PermissionNotAsked:
 		privacy.Request(driver.PermissionCamera, func(status int) {
 			apple.OnMain(func() {
 				if status == driver.PermissionGranted {
-					s.presentCamera(r, id)
+					use()
 				} else {
 					fail("camera access denied")
 				}

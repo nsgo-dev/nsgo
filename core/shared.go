@@ -406,6 +406,8 @@ type (
 	// PickedFile is an image the user picked: its name, type, bytes, size
 	// in pixels and modification time.
 	PickedFile = driver.PickedFile
+	// ScanRequest is a scan as the platform carries it out, ScanOptions resolved, which nsgotest.App.ScanCode answers.
+	ScanRequest = driver.ScanRequest
 	// File is a file the user picked: its name, type, size, modification
 	// time and where it is on disk.
 	File = driver.File

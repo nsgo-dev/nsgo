@@ -6,6 +6,7 @@
 - Register `url_schemes` in the iOS app and hand their links to `mobile.OnOpenLinks`, at a cold launch and while the app runs, through `scene:openURLContexts:` (#909 by @houko).
 - Let Android's system tab bar follow the app theme's surface, inactive text, active text and accent-container colors (#936 by @houko).
 - Add touch-sheet options to `ui.Dialog` for bare content, grabber visibility, content/title styles and custom entry/exit motion (#933 by @houko).
+- Add `Scope.ScanCode`, which shows the camera full screen and answers with the first QR code or barcode it reads, on iOS devices through AVFoundation, with `Env.CanScanCode` and `nsgotest.App.ScanCode` answering it headless and on every target (#429 by @houko).
 - Pin `Environment.Camera` under `nsgo test -target` and deliver `App.TakePhoto` answers through the target test host instead of opening a system camera (#897, #948 by @houko).
 - Add Android's Material 3 `SystemSwitch` implementation for `ui.SwitchSystem`, with native checked, disabled and accessibility behavior (#937 by @houko).
 - Give macOS's default menu bar AppKit's app menu, with About, Hide, Hide Others and Show All, and Check for Updates… in apps that update themselves, and a Window menu listing the windows, where it held only Quit and Edit; it takes no ⌘H, ⌥⌘H or ⌘M from the app's own key bindings (#947 by @houko).

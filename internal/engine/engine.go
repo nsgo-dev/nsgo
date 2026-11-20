@@ -49,6 +49,7 @@ type observed struct {
 	observe   func(uint32, *driver.MountBatch)
 	clipboard *driver.MemoryClipboard
 	takePhoto func(driver.PickRequest, func(*driver.PickedFile, error))
+	scanCode  func(driver.ScanRequest, func(*driver.ScannedCode, error))
 	dispatch  func(driver.Event)
 }
 
@@ -71,7 +72,7 @@ func (o observedFonts) RegisterFont(data []byte) error {
 
 func (o observed) Mount(b *driver.MountBatch) {
 	o.observe(o.surface, b)
-	if o.clipboard != nil || o.takePhoto != nil {
+	if o.clipboard != nil || o.takePhoto != nil || o.scanCode != nil {
 		var kept []driver.MountItem
 		for i := range b.Items {
 			if o.takePhoto != nil && b.Items[i].Kind == driver.ItemTakePhoto && b.Items[i].Pick != nil {
@@ -86,6 +87,10 @@ func (o observed) Mount(b *driver.MountBatch) {
 					}
 					o.dispatch(ev)
 				})
+				continue
+			}
+			if it := b.Items[i]; it.Kind == driver.ItemScanCode && o.scanCode != nil {
+				o.answerScan(it)
 				continue
 			}
 			if o.clipboard == nil {
@@ -109,6 +114,20 @@ func (o observed) Mount(b *driver.MountBatch) {
 		}
 	}
 	o.Platform.Mount(b)
+}
+
+// answerScan answers it, a code to scan, from o's scanCode instead of the platform's camera.
+func (o observed) answerScan(it driver.MountItem) {
+	o.scanCode(*it.Scan, func(code *driver.ScannedCode, err error) {
+		ev := driver.Event{Kind: driver.EventPick, Count: it.Count}
+		switch {
+		case err != nil:
+			ev.Text = err.Error()
+		case code != nil:
+			ev.Data = code
+		}
+		o.dispatch(ev)
+	})
 }
 
 // App builds the root's content once.
@@ -164,6 +183,8 @@ type Options struct {
 	Clipboard *driver.MemoryClipboard
 	// TakePhoto, with Observe, answers camera requests in a test instead of handing them to the platform.
 	TakePhoto func(driver.PickRequest, func(*driver.PickedFile, error))
+	// ScanCode, with Observe, answers code scans in a test instead of handing them to the platform.
+	ScanCode func(driver.ScanRequest, func(*driver.ScannedCode, error))
 	// LogPerf logs Perf's readings once a second while the engine runs.
 	LogPerf bool
 }
@@ -341,7 +362,7 @@ func Start(p Platform, app App, opts Options) *Engine {
 	e.raw = opts.Environment
 	opts.Environment = e.effective(opts.Environment)
 	if observe := opts.Observe; observe != nil {
-		p = observed{Platform: p, surface: 0, observe: observe, clipboard: opts.Clipboard, takePhoto: opts.TakePhoto, dispatch: e.Dispatch}.platform()
+		p = observed{Platform: p, surface: 0, observe: observe, clipboard: opts.Clipboard, takePhoto: opts.TakePhoto, scanCode: opts.ScanCode, dispatch: e.Dispatch}.platform()
 	}
 	go e.run(p, app, opts, tokens)
 	if opts.LogPerf && opts.Perf != nil {
@@ -620,7 +641,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 				opened := m.attach
 				if opts.Observe != nil {
 					// A test host follows the windows the app opens too, and their clipboard commands use the test's clipboard.
-					opened = observed{Platform: opened, surface: m.surface, observe: opts.Observe, clipboard: opts.Clipboard, takePhoto: opts.TakePhoto, dispatch: (&Engine{runner: e.runner, surface: m.surface}).Dispatch}.platform()
+					opened = observed{Platform: opened, surface: m.surface, observe: opts.Observe, clipboard: opts.Clipboard, takePhoto: opts.TakePhoto, scanCode: opts.ScanCode, dispatch: (&Engine{runner: e.runner, surface: m.surface}).Dispatch}.platform()
 				}
 				attach(tree.Surfaces()[surfaceIndex], opened)
 				taken[i].attach = nil

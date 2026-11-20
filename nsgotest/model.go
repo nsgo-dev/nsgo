@@ -681,6 +681,23 @@ func (a *App) apply(b *driver.MountBatch) {
 				}
 			}
 			a.post(ev)
+		case driver.ItemScanCode:
+			a.Scans = append(a.Scans, *it.Scan)
+			if a.target != nil {
+				// The target's engine asks targetOptions' ScanCode.
+				break
+			}
+			ev := driver.Event{Kind: driver.EventPick, Count: it.Count}
+			if a.ScanCode != nil {
+				code, err := a.ScanCode(*it.Scan)
+				switch {
+				case err != nil:
+					ev.Text = err.Error()
+				case code != nil:
+					ev.Data = code
+				}
+			}
+			a.post(ev)
 		case driver.ItemPickFiles:
 			a.FilePicks = append(a.FilePicks, *it.Files)
 			var files []driver.File

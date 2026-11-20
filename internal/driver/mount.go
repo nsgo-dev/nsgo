@@ -367,6 +367,8 @@ const (
 	ItemPictureInPicture
 	// ItemPictureInPictureCommand starts, stops or acknowledges restoration.
 	ItemPictureInPictureCommand
+	// ItemScanCode shows the system's camera to read one code of the kinds Scan asks for; the platform answers with EventPick carrying Count and Data the *ScannedCode read, none when the user closed it, Text saying what failed. Sent only where the environment says ScanCode.
+	ItemScanCode
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -549,6 +551,8 @@ type MountItem struct {
 	Screen    *ScreenConfig
 	// Pick is ItemPickImages' and ItemTakePhoto's request.
 	Pick *PickRequest
+	// Scan is ItemScanCode's request.
+	Scan *ScanRequest
 	// Sensor is an ItemSensor's request, Speech an ItemSpeech's, Audio an ItemAudio's.
 	Sensor *SensorRequest
 	Speech *SpeechRequest
