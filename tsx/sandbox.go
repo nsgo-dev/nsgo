@@ -27,7 +27,13 @@ import (
 
 // Limits are what a bundle may use. Zero fields leave that unlimited.
 type Limits struct {
-	// Load is how long the bundle's script may run as it loads, and Call how long each call into JS may run (a handler, an effect, a render): past it, the call is cut with ErrBudget. CallTotal is, for a plugin (Load), the deadline of each Plugin.Call and of all the work it sets going, timers, intervals, frames, promise continuations and host requests' answers, however late they run: past it they are dropped and a call still waiting fails with ErrBudget. What the entry module sets going is held to Load the same way, and what the host delivers on its own, as an event, to CallTotal from its delivery. Zero leaves it unlimited.
+	// Load limits the entry script and Call limits each slice of JS. On
+	// goja, a Plugin.Call whose slice is cut fails with ErrBudget even
+	// after it has awaited. CallTotal limits the wall time of a plugin
+	// call and the work it starts; at that deadline its pending work is
+	// dropped and a call still waiting fails with ErrBudget. The entry
+	// module's work is held to Load and standalone host events to CallTotal
+	// when CallTotal is set. Zero leaves a budget unlimited.
 	Load, Call, CallTotal time.Duration
 	// Stack is how deep JS calls may nest.
 	Stack int
@@ -135,7 +141,7 @@ func ParseLimits(spec string) (Limits, error) {
 // Sandbox is what a bundle runs within: its limits, what it may reach and
 // import, the host it talks to and the storage it keeps.
 type Sandbox struct {
-	// plugin says Load runs it, whose calls Limits.CallTotal holds.
+	// plugin says Load runs it.
 	plugin bool
 	// exportView says a view renders one of its exports in place of what its entry module mounts.
 	exportView bool
@@ -273,14 +279,16 @@ func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {
 	if s.plugin && limits.CallTotal > 0 {
 		// What the entry module sets going as it loads runs until the load's deadline.
 		r.deadlines = true
-		r.current = r.newDeadline(cmp.Or(limits.Load, limits.CallTotal), nil, true)
+		r.current = newDeadline(cmp.Or(limits.Load, limits.CallTotal))
+		r.watch(r.current)
 		defer func() { r.current = nil }()
 	}
-	r.within(limits.Load, func() {
-		if _, err := r.vm.RunScript(name, src); err != nil {
-			panic(r.failure(err))
-		}
-	})
+	if err, _ := r.within(limits.Load, func() error {
+		_, err := r.vm.RunScript(name, src)
+		return err
+	}); err != nil {
+		panic(r.failure(err))
+	}
 	return r
 }
 
@@ -389,18 +397,29 @@ func (r *runtime) markStopped(err error) bool {
 
 // stopTimers stops the runtime's waiting timers, on the engine's goroutine.
 func (r *runtime) stopTimers() {
-	for _, stop := range r.timers.stop {
-		stop()
+	for id := range r.timers.stop {
+		r.stopTimer(id)
 	}
-	clear(r.timers.stop)
 }
 
-// failCalls fails the plugin calls still waiting for a result with err, on the engine's goroutine: once the runtime stopped, no JS settles them.
-func (r *runtime) failCalls(err error) {
-	for _, fail := range r.calls {
-		fail(err)
+// finish delivers a plugin call's result once, even if its promise later
+// settles or the plugin closes. Successful calls leave their work running.
+func (r *runtime) finish(dl *deadline, result any, err error) {
+	delete(r.calls, dl)
+	if done := dl.done; done != nil {
+		dl.done = nil
+		if dl.at.IsZero() {
+			dl.timers = nil
+		}
+		done(result, err)
 	}
-	clear(r.calls)
+}
+
+// failCalls fails the plugin calls still waiting for a result after it stops.
+func (r *runtime) failCalls(err error) {
+	for dl := range r.calls {
+		r.finish(dl, nil, err)
+	}
 }
 
 // stop stops the runtime for err: the JS running is cut and none runs after, while the views stay as they are, its timers are dropped and the plugin calls waiting fail with err. What runs it panics with err into the nearest core.Catch. Call it on the engine's goroutine.
@@ -458,54 +477,70 @@ func (r *runtime) newCoreElement(cx *core.Scope, props core.Node) *core.Element 
 	return core.NewElement(cx, props)
 }
 
-// within runs fn, a call into JS from Go, cut at budget when it is the
-// outermost. A stopped runtime runs nothing.
-func (r *runtime) within(budget time.Duration, fn func()) {
+// within runs one slice of JS. Only the outermost entry arms the slice
+// watchdog, and cut reports whether a deadline handled the interruption.
+func (r *runtime) within(budget time.Duration, fn func() error) (err error, cut bool) {
 	if r.stoppedErr() != nil {
-		return
+		return nil, false
 	}
-	outer := r.depth == 0
-	if outer {
-		r.cut = false
+	if r.depth > 0 {
+		return fn(), false
 	}
-	held := outer && r.deadlines
-	if held {
-		// What the host delivers on its own, as an event, has a deadline of its own from now.
-		prev := r.current
-		if r.current == nil {
-			r.current = r.newDeadline(r.limits.CallTotal, nil, false)
-		}
-		defer func() { r.current = prev }()
-		if r.passed(r.current) {
-			r.cut = true
-			return
-		}
+	prev := r.current
+	if prev == nil && r.deadlines {
+		// A standalone host event has a deadline from its delivery.
+		r.current = newDeadline(r.limits.CallTotal)
+	}
+	if r.passed(r.current) {
+		r.current = prev
+		return nil, true
 	}
 	r.depth++
-	defer func() { r.depth-- }()
-	if r.sandbox != nil && r.regexTimeout > 0 && outer && !js.Browser {
+	resumed := len(r.continuations.resume)
+	if r.regexTimeout > 0 && !js.Browser {
 		defer limitRegexps(r.regexTimeout)()
 	}
-	if (budget <= 0 && !held) || !outer {
-		fn()
-		return
+	r.sliceDeadline = r.current
+	var end time.Time
+	if budget > 0 {
+		end = time.Now().Add(budget)
 	}
-	end := time.Now().Add(budget)
-	if held && (budget <= 0 || r.current.at.Before(end)) {
-		end = r.current.at
+	if dl := r.current; dl != nil && !dl.at.IsZero() && (end.IsZero() || dl.at.Before(end)) {
+		end = dl.at
 	}
-	r.sliceEnd = end
-	r.slice = time.AfterFunc(time.Until(end), func() { r.vm.Interrupt(ErrBudget) })
+	var interrupt *sync.Once
+	if !end.IsZero() {
+		guard := new(sync.Once)
+		interrupt = guard
+		r.sliceEnd = end
+		r.slice = time.AfterFunc(time.Until(end), func() {
+			guard.Do(func() { r.vm.Interrupt(ErrBudget) })
+		})
+	}
 	defer func() {
-		r.slice.Stop()
-		r.slice = nil
-		r.vm.ClearInterrupt()
-		// A call cut as its deadline passed ends quietly: its call, if it is one, fails with ErrBudget, and what it set going is dropped.
-		if held && r.passed(r.current) {
-			r.cut = true
+		total, owner := r.sliceDeadline, r.current
+		if interrupt != nil {
+			r.slice.Stop()
+			// Do not let a watchdog racing Stop interrupt the next slice.
+			interrupt.Do(func() {})
+			r.vm.ClearInterrupt()
+			r.slice = nil
+		}
+		r.sliceDeadline = nil
+		// Goja may unwind an interrupted reaction without calling Exited.
+		for len(r.continuations.resume) > resumed {
+			r.continuations.Exited()
+		}
+		r.depth--
+		r.current = prev
+		cut = r.passed(total)
+		if stop, ok := err.(*js.InterruptedError); ok && owner != nil && owner.done != nil &&
+			!r.interrupted.Load() && errors.Is(stop, ErrBudget) {
+			r.expire(owner)
+			cut = true
 		}
 	}()
-	fn()
+	return fn(), false
 }
 
 // harden closes what makes code from strings and freezes the shared

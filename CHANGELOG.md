@@ -26,6 +26,7 @@
 - Add `core.Scroll.NoShrink`, and `noShrink` on TSX scroll views, to keep a scroll view at its requested size when its parent is short (#967 by @houko).
 - Add `LineWidth` to `ui.ProgressRing` and ring `ui.Spinner` to set the track and arc width (#960 by @houko).
 - Fail the `tsx.Plugin` calls still waiting on a promise when `Plugin.Close` closes the plugin, after its cleanups run (#893 by @houko).
+- Fail a native `tsx.Plugin.Call` once with `ErrBudget` when a slice exceeds `Limits.Call` after an `await`, without stopping independent calls (#1018 by @houko).
 - Keep the borders of `ui/chat`'s glass composer, `GlassPanel` and popovers on watchOS, which draws no Liquid Glass rim (#896 by @houko).
 - Close the windows a Linux app opened, and release their input editors' display-wide styles, when the app's own window stops (#901 by @houko).
 - Free removed overlays, tooltips, modals and fixed views with their subtrees, which their host kept for the app's lifetime.

@@ -59,7 +59,7 @@ func (r *runtime) limitMemory(limit int64) {
 	m.iterate, _ = js.AssertFunction(helpers.Get("iterate"))
 	m.project, _ = js.AssertFunction(helpers.Get("project"))
 	r.wrapConstructor("ArrayBuffer", 0)
-	for _, name := range []string{"Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array"} {
+	for _, name := range []string{"Uint8Array", "Uint8ClampedArray", "Int8Array", "Uint16Array", "Int16Array", "Uint32Array", "Int32Array", "Float16Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array"} {
 		r.wrapConstructor(name, g.Get(name).(*js.Object).Get("BYTES_PER_ELEMENT").ToInteger())
 	}
 

@@ -6,30 +6,33 @@ import (
 	"github.com/nsgo-dev/nsgo/tsx/internal/js"
 )
 
-// deadline is how long a plugin's work may run while Limits.CallTotal holds it: a call's from Plugin.Call, the entry module's from Load, held to Limits.Load, and that of what the host delivers on its own, such as an event, from its delivery. What the work sets going while it runs, a timer, an interval, a frame, a microtask or a host request's answer, carries the same deadline, however late it runs and through however many of them, and once the deadline passes all of it is dropped, intervals cleared: no work outlives the deadline it started under, and none takes another's. It lives on the engine's goroutine; only its watchdog fires on another, and posts.
+// A deadline owns a plugin call's async work, with or without a total time
+// limit. It also holds the total limits of module loading and host events.
+// Only the engine goroutine uses it; the watchdog posts to that goroutine.
 type deadline struct {
+	// at is zero when only the budget of each JS slice applies.
 	at      time.Time
 	expired bool
 	// timers are the ids of the timers it set, which expire stops.
 	timers map[int64]struct{}
-	// onExpire fails the call it is the deadline of, nil for others.
-	onExpire func()
+	// done is the pending call's callback, nil once it settles or for work
+	// that is not a Plugin.Call.
+	done func(any, error)
 	// watch is the timer that expires it on time, set once work waits on it.
 	watch *time.Timer
 }
 
-// newDeadline returns a deadline d from now, watched at once when watched, as a call's is, which must fail when it passes even while nothing runs.
-func (r *runtime) newDeadline(d time.Duration, onExpire func(), watched bool) *deadline {
-	dl := &deadline{at: time.Now().Add(d), onExpire: onExpire}
-	if watched {
-		r.watch(dl)
+func newDeadline(d time.Duration) *deadline {
+	dl := &deadline{}
+	if d > 0 {
+		dl.at = time.Now().Add(d)
 	}
 	return dl
 }
 
 // watch has dl expire on time from the engine's goroutine, once something waits on it.
 func (r *runtime) watch(dl *deadline) {
-	if dl.watch != nil || dl.expired {
+	if dl.at.IsZero() || dl.watch != nil || dl.expired {
 		return
 	}
 	dl.watch = time.AfterFunc(time.Until(dl.at), func() { r.cx.Post(func() { r.expire(dl) }) })
@@ -37,7 +40,10 @@ func (r *runtime) watch(dl *deadline) {
 
 // passed reports whether dl has run out, expiring it if it just did.
 func (r *runtime) passed(dl *deadline) bool {
-	if !dl.expired && !time.Now().Before(dl.at) {
+	if dl == nil {
+		return false
+	}
+	if !dl.expired && !dl.at.IsZero() && !time.Now().Before(dl.at) {
 		r.expire(dl)
 	}
 	return dl.expired
@@ -51,20 +57,16 @@ func (r *runtime) expire(dl *deadline) {
 	dl.expired = true
 	if dl.watch != nil {
 		dl.watch.Stop()
+		dl.watch = nil
 	}
 	for id := range dl.timers {
-		if stop := r.timers.stop[id]; stop != nil {
-			stop()
-			delete(r.timers.stop, id)
-		}
+		r.stopTimer(id)
 	}
-	clear(dl.timers)
-	if dl.onExpire != nil {
-		dl.onExpire()
-	}
+	dl.timers = nil
+	r.finish(dl, nil, ErrBudget)
 }
 
-// under runs fn, work dl's started, as dl's: not at all once dl passed. Outside a call into JS, fn's calls into JS run under dl; inside one, dl joins it (adopt).
+// under runs work with its owner unless it has already been dropped.
 func (r *runtime) under(dl *deadline, fn func()) {
 	if dl == nil {
 		fn()
@@ -73,23 +75,25 @@ func (r *runtime) under(dl *deadline, fn func()) {
 	if r.passed(dl) {
 		return
 	}
-	if r.depth > 0 {
-		r.adopt(dl)
-		fn()
-		return
-	}
 	prev := r.current
 	r.current = dl
 	defer func() { r.current = prev }()
+	if r.depth > 0 {
+		r.adopt(dl)
+	}
 	fn()
 }
 
-// adopt has the call into JS running hold to dl as well, when dl is the sooner: work two deadlines meet in, as a host request's answer in another's call, runs under the earlier, so it extends neither.
+// adopt keeps the earliest total deadline for the JS slice, separately
+// from the owner of the particular callback or promise reaction running.
 func (r *runtime) adopt(dl *deadline) {
-	if r.current != nil && !dl.at.Before(r.current.at) {
+	if dl.expired || dl.at.IsZero() {
 		return
 	}
-	r.current = dl
+	if earlier := r.sliceDeadline; earlier != nil && !earlier.at.IsZero() && !dl.at.Before(earlier.at) {
+		return
+	}
+	r.sliceDeadline = dl
 	if r.slice != nil && dl.at.Before(r.sliceEnd) {
 		r.sliceEnd = dl.at
 		r.slice.Reset(time.Until(dl.at))

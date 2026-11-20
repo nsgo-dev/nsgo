@@ -17,7 +17,27 @@ import (
 // timers are the VM's pending timers by ID.
 type timers struct {
 	next int64
-	stop map[int64]func() bool
+	stop map[int64]pendingTimer
+}
+
+type pendingTimer struct {
+	stop  func() bool
+	owner *deadline
+}
+
+func (r *runtime) removeTimer(id int64) func() bool {
+	t := r.timers.stop[id]
+	delete(r.timers.stop, id)
+	if t.owner != nil {
+		delete(t.owner.timers, id)
+	}
+	return t.stop
+}
+
+func (r *runtime) stopTimer(id int64) {
+	if stop := r.removeTimer(id); stop != nil {
+		stop()
+	}
 }
 
 // timerQuota throws when a sandbox's waiting timers, or frame callbacks,
@@ -29,7 +49,7 @@ func (r *runtime) timerQuota(waiting int) {
 }
 
 func (r *runtime) installTimers() {
-	r.timers.stop = map[int64]func() bool{}
+	r.timers.stop = map[int64]pendingTimer{}
 	set := func(repeat bool) func(js.FunctionCall) js.Value {
 		return func(call js.FunctionCall) js.Value {
 			fn := arg(call, 0)
@@ -38,9 +58,9 @@ func (r *runtime) installTimers() {
 			r.timerQuota(len(r.timers.stop))
 			r.timers.next++
 			id := r.timers.next
-			// The timer is work of what set it, and runs under its deadline, which drops it once it passed (deadline.go).
+			// A timer belongs to the work that scheduled it.
 			dl := r.current
-			if dl != nil {
+			if dl != nil && (dl.done != nil || !dl.at.IsZero()) {
 				if dl.timers == nil {
 					dl.timers = map[int64]struct{}{}
 				}
@@ -56,21 +76,19 @@ func (r *runtime) installTimers() {
 				// Timers belong to the app, not to what code runs when one
 				// is set.
 				r.cx.Run(func() {
-					r.timers.stop[id] = r.cx.AfterFunc(max(due.Sub(r.cx.Now()), 0), func() {
-						if dl != nil && r.passed(dl) {
-							delete(r.timers.stop, id)
+					stop := r.cx.AfterFunc(max(due.Sub(r.cx.Now()), 0), func() {
+						if r.passed(dl) {
+							r.removeTimer(id)
 							return
 						}
 						if repeat {
 							schedule()
 						} else {
-							delete(r.timers.stop, id)
-							if dl != nil {
-								delete(dl.timers, id)
-							}
+							r.removeTimer(id)
 						}
 						r.under(dl, func() { r.call(fn, args...) })
 					})
+					r.timers.stop[id] = pendingTimer{stop: stop, owner: dl}
 				})
 			}
 			schedule()
@@ -78,11 +96,7 @@ func (r *runtime) installTimers() {
 		}
 	}
 	clear := func(call js.FunctionCall) js.Value {
-		id := arg(call, 0).ToInteger()
-		if stop := r.timers.stop[id]; stop != nil {
-			stop()
-			delete(r.timers.stop, id)
-		}
+		r.stopTimer(arg(call, 0).ToInteger())
 		return js.Undefined()
 	}
 	_ = r.vm.Set("setTimeout", set(false))

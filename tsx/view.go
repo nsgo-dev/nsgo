@@ -128,45 +128,37 @@ func (p *Plugin) Exports() []string {
 	return out
 }
 
-// Call calls the plugin's export name with args, values JSON encodes, and has done hear what it returns, or what its promise resolves with, as JSON decodes it, on the engine's goroutine; err is what it threw or rejected with, a *core.Error when that carries a code, ErrNoExport, or why the plugin stopped or that it was closed, which a call still waiting on a promise hears too. Call it on the engine's goroutine.
+// Call calls the plugin's export name with JSON arguments and passes its result to done on the engine's goroutine, awaiting a returned promise. The error is what the export threw or rejected with (a *core.Error when it carries a code), ErrNoExport, ErrBudget for a cut slice or expired total budget, or why the plugin stopped or closed. Call it on the engine's goroutine.
 func (p *Plugin) Call(name string, args []any, done func(result any, err error)) {
 	r := p.r
 	if err := r.stoppedErr(); err != nil || p.cx.Disposed() {
 		done(nil, cmp.Or(err, errClosed))
 		return
 	}
-	var fn js.Value
+	var v js.Value
 	if p.exports != nil {
-		fn = p.exports.Get(name)
+		v = p.exports.Get(name)
 	}
-	if !isFunction(fn) {
+	fn, ok := js.AssertFunction(v)
+	if !ok {
 		done(nil, fmt.Errorf("%w: %q", ErrNoExport, name))
 		return
 	}
-	settled := false
-	key := new(int)
-	finish := func(v any, err error) {
-		if settled {
-			return
-		}
-		settled = true
-		delete(r.calls, key)
-		done(v, err)
-	}
 	if r.calls == nil {
-		r.calls = map[*int]func(error){}
+		r.calls = map[*deadline]struct{}{}
 	}
-	r.calls[key] = func(err error) { finish(nil, err) }
-	// The call and what it sets going run until its deadline (deadline.go): past it, the call fails with ErrBudget if it has not settled, and what is left of its work is dropped.
-	var dl *deadline
-	if r.deadlines {
-		dl = r.newDeadline(r.limits.CallTotal, func() { finish(nil, ErrBudget) }, true)
+	dl := newDeadline(r.limits.CallTotal)
+	dl.done = done
+	r.calls[dl] = struct{}{}
+	r.watch(dl)
+	owner := dl
+	if !r.deadlines && (js.Browser || r.limits.Call <= 0) {
+		owner = nil
 	}
-	p.cx.Run(func() { r.under(dl, func() { p.call(fn, args, dl, finish) }) })
+	p.cx.Run(func() { r.under(owner, func() { p.call(fn, args, dl) }) })
 }
 
-// call runs a Call of fn under dl, its deadline, nil without one, reporting to finish.
-func (p *Plugin) call(fn js.Value, args []any, dl *deadline, finish func(any, error)) {
+func (p *Plugin) call(fn js.Callable, args []any, dl *deadline) {
 	r := p.r
 	defer func() {
 		if x := recover(); x != nil {
@@ -178,38 +170,43 @@ func (p *Plugin) call(fn js.Value, args []any, dl *deadline, finish func(any, er
 			} else {
 				callErr = fmt.Errorf("%v", x)
 			}
-			finish(nil, callErr)
+			if r.depth == 0 && errors.Is(callErr, ErrBudget) && r.stoppedErr() == nil {
+				r.expire(dl)
+			} else {
+				r.finish(dl, nil, callErr)
+			}
 		}
 	}()
 	in := make([]js.Value, len(args))
 	for i, a := range args {
 		in[i] = r.vm.ToValue(a)
 	}
-	v := r.call(fn, in...)
+	v, err, _ := r.invoke(fn, js.Undefined(), in...)
 	if err := r.stoppedErr(); err != nil {
 		panic(err)
 	}
-	if dl != nil && dl.expired {
+	if dl.expired {
 		return
 	}
+	if err != nil {
+		panic(r.failure(err))
+	}
 	if _, ok := v.Export().(*js.Promise); !ok {
-		finish(exportJSON(v), nil)
+		r.finish(dl, exportJSON(v), nil)
 		return
 	}
 	then, _ := js.AssertFunction(v.(*js.Object).Get("then"))
 	onResolve := r.function(func(call js.FunctionCall) js.Value {
-		finish(exportJSON(arg(call, 0)), nil)
+		r.finish(dl, exportJSON(arg(call, 0)), nil)
 		return js.Undefined()
 	})
 	onReject := r.function(func(call js.FunctionCall) js.Value {
-		finish(nil, r.rejection(arg(call, 0)))
+		r.finish(dl, nil, r.rejection(arg(call, 0)))
 		return js.Undefined()
 	})
-	r.within(r.limits.Call, func() {
-		if _, err := then(v, onResolve, onReject); err != nil {
-			panic(err)
-		}
-	})
+	if _, err, _ := r.invoke(then, v, onResolve, onReject); err != nil {
+		panic(r.failure(err))
+	}
 }
 
 // Interrupt stops the plugin for err, ErrInterrupted when nil, from any goroutine: the JS running is cut and none runs after, its waiting timers and promise continuations are dropped, and the calls under way and every Call after fail with err.

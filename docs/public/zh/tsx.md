@@ -96,8 +96,9 @@ trust.Accept(p) // 运行之后，更旧的构建会被拒绝
 应用可以用 `pkg.SignDocument` 为自己的 JSON 文档（例如插件目录）签名，再用 `Signed.Open` 验证，密钥使用 `nsgo keygen` 生成的即可。每种文档使用一个带版本的独立 `app:` 上下文，例如 `app:catalog-v1`：一种文档不会被当作另一种文档，也不会被当作包、证书或吊销列表。`Open` 只信任传给它的公钥，不使用证书和吊销列表，并拒绝解码目标类型中没有的字段。信封中没有时间和序号，旧文档与新文档同样能通过验证：请在正文中放入版本或过期时间并加以检查。
 在原生沙箱中，`JSON.stringify`、带 reviver 的 `JSON.parse`、`Array.prototype.join`、`toString`、`toLocaleString` 和 `flat`，以及数组的 `String()`，深入超过 1,000 层时会抛出可捕获的 `RangeError`；一个在另一个内部调用时层数累计，数组的 `toString` 和它调用的 `join` 各算一层。更深的数据会让调用卡住或让应用退出。Web 使用浏览器的内置函数。
 
+在原生平台上，`Limits.Call` 限制每一段 JavaScript 的连续执行时间，包括定时器回调和 `await` 后恢复的执行。若其中一段被中断，仍在等待结果的 `Plugin.Call` 只回调一次并返回 `tsx.ErrBudget`，同时停止该调用剩余的定时器、忽略迟到的宿主应答。其他独立调用继续运行。回溯正则表达式使用加载与调用预算中较短的值作为匹配超时；未处理的超时也会变成 `tsx.ErrBudget`。
 
-原生沙箱中的回溯正则表达式使用加载和调用预算中较短的值作为匹配超时。未处理的超时会变成 `tsx.ErrBudget`，因此有问题的表达式不会无限期占用引擎。插件可以设置 `Limits.CallTotal`，作为每次调用及其启动的工作的截止时间：调用启动的定时器、interval、动画帧、Promise continuation 和宿主请求的应答，以及它们再启动的工作，从调用开始起最多运行 `CallTotal`，即使调用已经完成也是如此，到期后全部丢弃，interval 会被清除；仍在等待的调用以 `tsx.ErrBudget` 失败。入口模块加载时启动的工作使用加载的截止时间 `Limits.Load`，宿主主动送达的内容（例如事件）从送达时起有自己的截止时间。截止时间内的短暂延迟照常工作，一次调用的工作既不会缩短也不会延长另一次调用的截止时间。宿主也可以由任意 goroutine 上的 watchdog 调用 `Plugin.Interrupt`，它会停止插件、丢弃待处理的定时器，并让进行中和之后的调用失败。`Plugin.Close` 会运行插件的清理函数并释放插件，仍在等待的调用以“插件已关闭”的错误结束。
+`Limits.CallTotal` 为每次插件调用设置从调用开始算起的截止时间，等待时间也计入。即使调用已完成，它启动的定时器、interval、动画帧、Promise 后续回调和宿主应答仍受这个截止时间限制。到期后，待执行的工作被丢弃，仍在等待结果的调用以 `tsx.ErrBudget` 失败。入口模块启动的工作受 `Limits.Load` 限制，宿主主动送达的事件从送达时起受 `CallTotal` 限制。`Plugin.Interrupt` 可从任意 goroutine 停止插件，丢弃待处理的定时器，让进行中和之后的调用失败。`Plugin.Close` 会运行插件的清理函数，并让仍在等待的调用以“插件已关闭”的错误结束。
 
 Web 上暂时无法把包与页面隔离：包的代码能绕过它的权限，直接访问页面自己的网络、剪贴板和存储，信任库所在的存储也包括在内。因此在 Web 上 `tsx.View` 和 `tsx.Load` 会以 `tsx.ErrUnisolated` 拒绝运行包，除非设置 `Sandbox.WebUnisolated`，让它以页面的权限运行；这只适合你愿意像对待应用自身代码一样信任的包。
 

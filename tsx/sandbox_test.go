@@ -730,6 +730,79 @@ func advanceUntil(t *testing.T, app *nsgotest.App, timeout time.Duration, cond f
 	}
 }
 
+func TestPluginCallSliceTimeout(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("the page's engine cannot interrupt a running slice")
+	}
+	p := verified(t, `const spin = () => { for (;;) {} };
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+let later = 0;
+const interval = () => setInterval(() => { later++; }, 25);
+export async function first() { interval(); spin(); }
+export function timer() {
+	return new Promise(resolve => {
+		setTimeout(spin, 0);
+		setTimeout(() => { later++; resolve(1); }, 25);
+	});
+}
+export async function awaited() { interval(); await wait(0); spin(); }
+let resume;
+const shared = new Promise(resolve => { resume = resolve; });
+export async function sharedPromise() { interval(); await shared; spin(); }
+export function release() { setTimeout(resume, 0); }
+export async function peer() { await wait(10); return "ok"; }
+export function hits() { return later; }`, pkg.Capabilities{})
+	for _, tc := range []struct {
+		name, export string
+		total        time.Duration
+	}{
+		{"first-slice", "first", 0},
+		{"timer", "timer", 0},
+		{"after-await", "awaited", 0},
+		{"with-total-budget", "awaited", 10 * time.Second},
+		{"shared-promise", "sharedPromise", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			limits := tsx.Limits{Load: time.Second, Call: 100 * time.Millisecond, CallTotal: tc.total}
+			var plugin *tsx.Plugin
+			var loadErr error
+			app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+				plugin, loadErr = tsx.Load(cx, p, tsx.Sandbox{Limits: &limits})
+				return core.View{}
+			})
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			var callErr, peerErr error
+			var peer any
+			done := 0
+			app.Post(func() {
+				plugin.Call("peer", nil, func(v any, err error) { peer, peerErr = v, err })
+				plugin.Call(tc.export, nil, func(_ any, err error) { done++; callErr = err })
+				if tc.export == "sharedPromise" {
+					plugin.Call("release", nil, func(_ any, _ error) {})
+				}
+			})
+			app.Settle()
+			app.Advance(100 * time.Millisecond)
+			if done != 1 || !errors.Is(callErr, tsx.ErrBudget) {
+				t.Fatalf("done called %d times with %v, want once with ErrBudget", done, callErr)
+			}
+			if peer != "ok" || peerErr != nil {
+				t.Fatalf("independent call = %v, %v; want ok, nil", peer, peerErr)
+			}
+			if v, err := callPlugin(t, app, plugin, "hits"); err != nil || number(v) != 0 {
+				t.Fatalf("timers left by the cut call ran %v times, error %v", v, err)
+			}
+			app.Post(plugin.Close)
+			app.Settle()
+			if done != 1 {
+				t.Fatalf("done called %d times after Close, want once", done)
+			}
+		})
+	}
+}
+
 // TestPluginCallTotalStopsYieldingWork holds CallTotal to failing a call whose every slice stays within Call, as it yields to a timer between them, and to dropping its timers, so the app runs on.
 func TestPluginCallTotalStopsYieldingWork(t *testing.T) {
 	p := verified(t, `export async function loop() {

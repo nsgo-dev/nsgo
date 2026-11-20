@@ -7,7 +7,7 @@ require (
 	github.com/andybalholm/brotli v1.3.0
 	github.com/caelyreth/untie v0.5.0
 	github.com/dlclark/regexp2/v2 v2.11.0
-	github.com/dop251/goja v0.0.0-20261027234916-5f913d1693d9
+	github.com/dop251/goja v0.0.0-20261107113602-7c0a2f78433d
 	github.com/ebitengine/purego v0.11.3
 	github.com/evanw/esbuild v0.28.2
 	github.com/firede/limu v0.5.1

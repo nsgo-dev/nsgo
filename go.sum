@@ -12,8 +12,8 @@ github.com/caelyreth/untie v0.5.0 h1:qIOhfHtjlA3nfzWQaBFDFyZgWipYJs6YdMh1VV8948I
 github.com/caelyreth/untie v0.5.0/go.mod h1:5/Y+ktLaE+mTqFbl4IjAEQMMMjA3eEykEib+/ZIpVDg=
 github.com/dlclark/regexp2/v2 v2.11.0 h1:z5uRPHav+eTVpoffDSuUP2KPS4f1ONZaPDK73S8HA0w=
 github.com/dlclark/regexp2/v2 v2.11.0/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
-github.com/dop251/goja v0.0.0-20261027234916-5f913d1693d9 h1:K1R7adPxJGLfojyUBe6TuuqcvS6YqQAdg2HujQ9Il+Y=
-github.com/dop251/goja v0.0.0-20261027234916-5f913d1693d9/go.mod h1:L1yoLBco9M3b2Gdh1UZHg+BIePeAdV1bwknaLLxAgoc=
+github.com/dop251/goja v0.0.0-20261107113602-7c0a2f78433d h1:DSJoFa+vilN+3kTeC63oDEJFTRvmQ8wmsjwmqzsQfLo=
+github.com/dop251/goja v0.0.0-20261107113602-7c0a2f78433d/go.mod h1:L1yoLBco9M3b2Gdh1UZHg+BIePeAdV1bwknaLLxAgoc=
 github.com/ebitengine/purego v0.11.3 h1:OB+JLpdm7ioymhyA+6s5kbb/uOuYycAgL8NNTFc5MLg=
 github.com/ebitengine/purego v0.11.3/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
 github.com/evanw/esbuild v0.28.2 h1:A2uETn4jrQTcXaT/shwTDTYBxDjl7fV7nXmUrJxfA2w=

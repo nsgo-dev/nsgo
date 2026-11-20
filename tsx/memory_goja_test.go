@@ -46,6 +46,7 @@ func TestMemoryStopsWhatWouldNotFit(t *testing.T) {
 		`new ArrayBuffer(2 ** 52)`,
 		`new ArrayBuffer({ valueOf: () => 2 ** 32 })`,
 		`new Uint8Array(2 ** 32)`,
+		`new Float16Array(1 << 22)`,
 		`new Float64Array(2 ** 28)`,
 		`new BigUint64Array(2 ** 28)`,
 		`new Uint8Array({ length: 2 ** 32 })`,

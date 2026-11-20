@@ -69,11 +69,12 @@ func Hot(name, src string) (app func(cx *core.Scope) core.Node, update func(src 
 			return
 		}
 		r.cx.Run(func() {
-			r.within(r.limits.Load, func() {
-				if _, err := r.vm.RunScript(name, src); err != nil {
-					panic(err)
-				}
-			})
+			if err, _ := r.within(r.limits.Load, func() error {
+				_, err := r.vm.RunScript(name, src)
+				return err
+			}); err != nil {
+				panic(err)
+			}
 		})
 	}
 	return app, update
@@ -107,17 +108,19 @@ type runtime struct {
 	// the outermost of which has the time budget.
 	limits Limits
 	depth  int
-	// stopMu guards sandbox.stopped, which Plugin.Interrupt and CallTotal set from other goroutines; calls are the plugin calls waiting for a result, by their own key, failed as the runtime stops.
+	// stopMu guards sandbox.stopped; calls are the pending Plugin.Call callbacks on the engine's goroutine.
 	stopMu sync.Mutex
-	calls  map[*int]func(error)
+	calls  map[*deadline]struct{}
 	// interrupted says the host stopped the runtime (interrupt), and hears so through the calls that fail: the JS it cut ends without a panic into the app's Catch.
 	interrupted atomic.Bool
-	// deadlines says Limits.CallTotal holds the runtime, a plugin's (deadline.go): current is the deadline of what runs now, slice the timer cutting the call into JS running, at sliceEnd, and cut says the last one was cut as its deadline passed.
-	deadlines bool
-	current   *deadline
-	slice     *time.Timer
-	sliceEnd  time.Time
-	cut       bool
+	// deadlines enables CallTotal. current owns the JS work running now,
+	// and sliceDeadline is the earliest total deadline in the current slice.
+	deadlines     bool
+	current       *deadline
+	slice         *time.Timer
+	sliceEnd      time.Time
+	sliceDeadline *deadline
+	continuations continuations
 	// regexTimeout is the shortest sandbox budget, applied to regexp2
 	// patterns because its matcher does not observe goja's interrupt flag.
 	regexTimeout time.Duration
@@ -142,21 +145,38 @@ type runtime struct {
 // maxCallStack is how deep JS calls nest in any app.
 const maxCallStack = 10000
 
-// continuations runs promise reactions untracked (goja's
-// AsyncContextTracker).
+// continuations restores the owner of a promise reaction and runs it
+// untracked, even if a different call settled the promise.
 type continuations struct {
-	cx     *core.Scope
-	resume []func()
+	r      *runtime
+	resume []continuation
 }
 
-func (c *continuations) Grab() any { return nil }
+type continuation struct {
+	tracking func()
+	owner    *deadline
+}
 
-func (c *continuations) Resumed(any) { c.resume = append(c.resume, c.cx.PauseTracking()) }
+func (c *continuations) Grab() any { return c.r.current }
+
+func (c *continuations) Resumed(ctx any) {
+	r := c.r
+	c.resume = append(c.resume, continuation{tracking: r.cx.PauseTracking(), owner: r.current})
+	if dl, ok := ctx.(*deadline); ok && dl != nil {
+		r.current = dl
+		if r.depth > 0 {
+			r.adopt(dl)
+		}
+	}
+}
 
 func (c *continuations) Exited() {
 	n := len(c.resume) - 1
-	c.resume[n]()
+	prev := c.resume[n]
+	c.resume[n] = continuation{}
 	c.resume = c.resume[:n]
+	c.r.current = prev.owner
+	prev.tracking()
 }
 
 func newRuntime(cx *core.Scope) *runtime {
@@ -173,7 +193,8 @@ func newRuntime(cx *core.Scope) *runtime {
 	// Promise continuations run as the outermost JS call returns, which
 	// may be an effect's: what they read is not the effect's, as in NSH,
 	// whose VM runs them after the effect.
-	r.vm.SetAsyncContextTracker(&continuations{cx: cx})
+	r.continuations.r = r
+	r.vm.SetAsyncContextTracker(&r.continuations)
 	r.attachEngine()
 	r.vm.Set("require", r.require)
 	r.installGlobals()
@@ -269,16 +290,27 @@ func (r *runtime) call(fn js.Value, args ...js.Value) js.Value {
 	if !ok {
 		panic(r.vm.NewTypeError("nsgo: %s is not a function", fn))
 	}
-	v := js.Undefined()
-	var err error
-	r.within(r.limits.Call, func() { v, err = f(js.Undefined(), args...) })
+	v, err, cut := r.invoke(f, js.Undefined(), args...)
 	if err != nil {
-		if r.interrupted.Load() || r.cut {
+		if r.interrupted.Load() || cut {
 			return js.Undefined()
 		}
 		panic(r.failure(err))
 	}
+	if v == nil {
+		return js.Undefined()
+	}
 	return v
+}
+
+// invoke runs a function in a JS slice, reporting errors and whether an
+// expired deadline already dealt with the error.
+func (r *runtime) invoke(fn js.Callable, this js.Value, args ...js.Value) (v js.Value, err error, cut bool) {
+	err, cut = r.within(r.limits.Call, func() error {
+		v, err = fn(this, args...)
+		return err
+	})
+	return
 }
 
 // function makes a JS function of fn.
