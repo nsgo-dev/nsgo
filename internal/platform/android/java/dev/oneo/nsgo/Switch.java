@@ -15,8 +15,10 @@ public final class Switch extends CompoundButton {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final float density;
     private final RectF track = new RectF();
-    private boolean updating;
+    private boolean updating, toggling;
     private String size = "";
+    /** The listener the runtime sets, which hears the user's changes only. */
+    private OnCheckedChangeListener listener;
 
     public Switch(Context context) {
         super(context);
@@ -24,23 +26,38 @@ public final class Switch extends CompoundButton {
         setGravity(Gravity.CENTER);
         setClickable(true);
         setFocusable(true);
-        setOnCheckedChangeListener((button, checked) -> {
-            if (!updating) invalidate();
+        super.setOnCheckedChangeListener((button, checked) -> {
+            invalidate();
+            // The app's own setChecked is no choice of the user's: NSSwitch and UISwitch report none either.
+            if (!updating && listener != null) listener.onCheckedChanged(button, checked);
         });
         setButtonDrawable(null);
         setBackground(null);
     }
 
+    @Override
+    public void setOnCheckedChangeListener(OnCheckedChangeListener l) {
+        listener = l;
+    }
+
+    /** The app's state: CompoundButton's toggle, a tap's or TalkBack's, comes through here too, and stays the user's. */
+    @Override
     public void setChecked(boolean checked) {
-        updating = true;
+        boolean was = updating;
+        updating = !toggling;
         super.setChecked(checked);
-        updating = false;
+        updating = was;
         invalidate();
     }
 
     @Override
     public void toggle() {
-        super.toggle();
+        toggling = true;
+        try {
+            super.toggle();
+        } finally {
+            toggling = false;
+        }
         invalidate();
     }
 
