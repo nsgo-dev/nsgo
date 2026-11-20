@@ -29,7 +29,7 @@ The core does what needs no engine, as NSH's does:
 The engines draw the rest:
 
 - `Font.Size` is in points, the units of a view's size, on every engine. Pango's own sizes are typographic points it scales by its context's resolution, 96 dpi unless set, so Linux gives Pango absolute sizes (`pango_font_description_set_absolute_size`, `pango_attr_size_new_absolute`) and its editors' CSS pixels, which GTK does not scale (`TestFontSizesAreLogicalPixels`); the user's text size reaches it as `FontScale`, from `gtk-xft-dpi`.
-- `EllipsizeMode`. CoreText truncates the last line's rest at its head, middle or tail, and Pango the same way. Clipping keeps the lines whole and cuts them at the box.
+- `EllipsizeMode`. CoreText and Pango truncate the last line's rest at its head, middle or tail. CoreText keeps the offered width when the cut replaces a soft wrap, and aligns the last line after truncating it. Clipping keeps the lines whole and cuts them at the box.
 - DirectWrite and the web trim only tails, and Android's `TruncateAt` a head or middle on one line only. There `AttributedText.CutRest` replaces the lines past the last kept one with the most characters around an ellipsis that fit a line (`CutToFit`).
 - `AttributedText.Origin` maps the attachments a cut text kept back to the app's indices.
 - `TextAlignJustify` is each engine's justification; Android's needs no newer API than NSGo's minimum.

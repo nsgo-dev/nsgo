@@ -126,6 +126,74 @@ func TestTextEllipsizeModes(t *testing.T) {
 	}
 }
 
+func TestLimitedTextUsesAvailableWidth(t *testing.T) {
+	const width driver.Points = 72
+	for _, tc := range []struct {
+		name, text string
+		lines      int
+	}{
+		{"one line", "Earth Science Weekly", 1},
+		{"two lines", "Short line\nA Supercalifragilisticexpialidocious", 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := TextEngine{}.Prepare(&driver.AttributedText{Text: tc.text, MaxLines: tc.lines,
+				Style: driver.TextStyle{Font: driver.Font{Size: 13}, Color: driver.RGB(0)}})
+			defer p.Release()
+			size := p.Measure(width)
+			fitted := p.Layout(size).(*Layout)
+			defer fitted.Release()
+			fixed := p.Layout(driver.Size{Width: width, Height: size.Height}).(*Layout)
+			defer fixed.Release()
+			got, want := fitted.TextLines(), fixed.TextLines()
+			if len(got) != tc.lines || len(want) != tc.lines {
+				t.Fatalf("got %d lines at measured size %v and %d at width %v, want %d", len(got), size, len(want), width, tc.lines)
+			}
+			if g, w := got[tc.lines-1].Bounds.Size.Width, want[tc.lines-1].Bounds.Size.Width; g < w-0.5 {
+				t.Errorf("last line is %v points wide in the measured %v-point box, want %v as in the %v-point box", g, size.Width, w, width)
+			}
+		})
+	}
+}
+
+func TestLimitedTextKeepsWidthAtHardBreak(t *testing.T) {
+	p := TextEngine{}.Prepare(&driver.AttributedText{Text: "Short\nline", MaxLines: 1,
+		Style: driver.TextStyle{Font: driver.Font{Size: 13}, Color: driver.RGB(0)}})
+	defer p.Release()
+	if bounded, intrinsic := p.Measure(200), p.Measure(driver.Auto); bounded != intrinsic {
+		t.Errorf("text cut at a hard break measures %v with room to spare, want intrinsic size %v", bounded, intrinsic)
+	}
+}
+
+func TestLimitedTextAlignsEllipsis(t *testing.T) {
+	const width driver.Points = 72
+	for _, tc := range []struct {
+		name  string
+		align driver.TextAlign
+		rtl   bool
+		flush driver.Points
+	}{
+		{"center", driver.TextAlignCenter, false, 0.5},
+		{"end", driver.TextAlignEnd, false, 1},
+		{"RTL start", driver.TextAlignStart, true, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			at := driver.AttributedText{Text: "Earth Science Weekly", MaxLines: 1, Style: driver.TextStyle{
+				Font: driver.Font{Size: 13}, Color: driver.RGB(0), Align: tc.align, RTL: tc.rtl,
+			}}
+			_, l := render(t, &at, driver.Size{Width: width, Height: 24})
+			lines := l.TextLines()
+			if len(lines) != 1 {
+				t.Fatalf("got %d lines, want 1", len(lines))
+			}
+			b := lines[0].Bounds
+			want := (width - b.Size.Width) * tc.flush
+			if b.Size.Width <= 0 || b.Size.Width > width || b.Origin.X < want-0.5 || b.Origin.X > want+0.5 {
+				t.Errorf("truncated line at x=%v, width=%v: want x=%v within %v points", b.Origin.X, b.Size.Width, want, width)
+			}
+		})
+	}
+}
+
 func TestTextDecorationsAndShadow(t *testing.T) {
 	red := driver.RGB(0xff0000)
 	at := driver.AttributedText{Text: "Wavy", Style: driver.TextStyle{Font: driver.Font{Size: 20, Weight: 400}, Color: driver.RGB(0x000000),

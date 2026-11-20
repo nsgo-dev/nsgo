@@ -646,9 +646,10 @@ func (TextEngine) Prepare(t *driver.AttributedText) driver.PreparedText {
 	p := &prepared{str: str, maxLines: t.MaxLines, ellipsize: t.Ellipsize,
 		shadow: t.Shadow, text: t.Text, toUTF8: toUTF8,
 		toUTF16: toUTF16, decos: decorations(t, toUTF16), atts: t.Attachments, fonts: fonts}
-	if oneLineFast && isASCIILine(t.Text) && len(t.Attachments) == 0 && len(p.decos) == 0 && t.Style.LineHeight == 0 &&
-		!strings.ContainsAny(t.Text, "\n\r\t\v\f\u0085\u2028\u2029") {
-		p.oneLine, p.flush = true, flushOf(t.Style)
+	p.oneLine = oneLineFast && isASCIILine(t.Text) && len(t.Attachments) == 0 && len(p.decos) == 0 && t.Style.LineHeight == 0 &&
+		!strings.ContainsAny(t.Text, "\n\r\t\v\f\u0085\u2028\u2029")
+	if p.oneLine || p.maxLines > 0 && p.ellipsize != driver.EllipsizeClip {
+		p.flush = flushOf(t.Style)
 	}
 	if cfAttributedStringLength(str) == 0 {
 		f := Font(t.Style.Font)
@@ -690,11 +691,7 @@ type prepared struct {
 	// frame for a table of numbers. Each entry costs one CTFramesetter call
 	// through purego, so the answer is kept per width.
 	measured map[measureKey]driver.Size
-	// oneLine is set for a text that may be laid out as one CTLine where
-	// it fits: no breaks, attachments, drawn decorations or line height.
-	// A table's cells are; a framesetter typesets the text again for each
-	// size asked and each frame made, and line is typeset once. flush is
-	// where its paragraph aligns the line (CTLineGetPenOffsetForFlush).
+	// oneLine is set for a text that may be laid out as one CTLine where it fits: no breaks, attachments, drawn decorations or line height. A table's cells are; a framesetter typesets the text again for each size asked and each frame made, and line is typeset once. flush aligns that line or a truncated one.
 	oneLine bool
 	flush   float64
 	line    uintptr
@@ -804,8 +801,7 @@ func (p *prepared) measure(maxWidth driver.Points) driver.Size {
 		frame := p.frame(CGSize{Width: w, Height: tall})
 		defer Release(frame)
 		if lines := ctFrameGetLines(frame); cfArrayGetCount(lines) > p.maxLines {
-			size := firstLines(frame, lines, p.maxLines, tall)
-			return driver.Size{Width: driver.Points(size.Width), Height: driver.Points(framedHeight(size.Height))}
+			return p.limitedSize(frame, lines, maxWidth)
 		}
 	}
 	size := ctFramesetterSuggestSize(p.framesetter(), 0, 0, 0, w, unbounded, 0)
@@ -815,17 +811,29 @@ func (p *prepared) measure(maxWidth driver.Points) driver.Size {
 // framedHeight rounds a height measured outside a framesetter up to a whole point, as a framesetter sizes a frame: CoreText puts lines on whole points, so its heights are whole points while its widths keep their fractions, which the core rounds up to a device pixel. A text cut to its line limit is then as tall as its lines uncut.
 func framedHeight(h float64) float64 { return math.Ceil(h - 1e-3) }
 
-// firstLines returns the size of a frame's first n lines.
-func firstLines(frame, lines uintptr, n int, frameHeight float64) CGSize {
-	origins := make([]CGPoint, n)
-	ctFrameGetLineOrigins(frame, 0, n, &origins[0])
-	var width, descent float64
-	for i := range n {
-		var a, d, l float64
-		width = max(width, ctLineGetTypographicBounds(cfArrayGetValueAtIndex(lines, i), &a, &d, &l))
-		descent = d
+// limitedSize keeps the height of the first maxLines wrapped lines.
+func (p *prepared) limitedSize(frame, lines uintptr, maxWidth driver.Points) driver.Size {
+	last := cfArrayGetValueAtIndex(lines, p.maxLines-1)
+	var origin CGPoint
+	ctFrameGetLineOrigins(frame, p.maxLines-1, 1, &origin)
+	var descent float64
+	w := ctLineGetTypographicBounds(last, nil, &descent, nil)
+	h := driver.Points(framedHeight(tall - (origin.Y - descent)))
+	if !maxWidth.IsAuto() && p.ellipsize != driver.EllipsizeClip {
+		r := ctLineGetStringRange(last)
+		c, _ := utf8.DecodeLastRuneInString(p.text[:p.toUTF8[r.Location+r.Length]])
+		switch c {
+		case '\n', '\r', '\v', '\f', '\u0085', '\u2028', '\u2029':
+			// A forced break alone does not make the text wider.
+		default:
+			// The ellipsis can follow characters past the word wrap, so keep the width that lets those characters be drawn.
+			return driver.Size{Width: maxWidth, Height: h}
+		}
 	}
-	return CGSize{Width: width, Height: frameHeight - (origins[n-1].Y - descent)}
+	for i := range p.maxLines - 1 {
+		w = max(w, ctLineGetTypographicBounds(cfArrayGetValueAtIndex(lines, i), nil, nil, nil))
+	}
+	return driver.Size{Width: driver.Points(w), Height: h}
 }
 
 func (p *prepared) frame(size CGSize) uintptr {
@@ -883,14 +891,15 @@ func (p *prepared) layout(size driver.Size) *Layout {
 		l.str, l.box = cfRetain(p.str), box
 		return l
 	}
-	l.frame = p.frame(box)
 	if p.maxLines <= 0 {
+		l.frame = p.frame(box)
 		return l
 	}
-	all := p.frame(CGSize{Width: float64(size.Width) + 0.5, Height: tall})
+	all := p.frame(CGSize{Width: box.Width, Height: tall})
 	defer Release(all)
 	lines := ctFrameGetLines(all)
 	if cfArrayGetCount(lines) <= p.maxLines {
+		l.frame = p.frame(box)
 		return l
 	}
 	// The last line shown takes the rest of the text, truncated.
@@ -915,19 +924,19 @@ func (p *prepared) layout(size driver.Size) *Layout {
 	}
 	Release(rest)
 	l.shown, l.restStart = p.maxLines, r.Location
-	origins := make([]CGPoint, p.maxLines)
-	ctFrameGetLineOrigins(all, 0, p.maxLines, &origins[0])
-	// Origins count from the frame's bottom; keep them from its top.
 	l.origins = make([]CGPoint, p.maxLines)
-	for i, o := range origins {
-		l.origins[i] = CGPoint{X: o.X, Y: tall - o.Y}
+	ctFrameGetLineOrigins(all, 0, p.maxLines, &l.origins[0])
+	// Origins count from the frame's bottom; keep them from its top.
+	for i := range l.origins {
+		l.origins[i].Y = tall - l.origins[i].Y
+	}
+	if l.truncated != 0 && p.ellipsize != driver.EllipsizeClip {
+		l.origins[p.maxLines-1].X = ctLinePenOffsetForFlush(l.truncated, p.flush, float64(size.Width))
 	}
 	l.lines = make([]uintptr, p.maxLines-1)
 	for i := range l.lines {
 		l.lines[i] = cfRetain(cfArrayGetValueAtIndex(lines, i))
 	}
-	Release(l.frame)
-	l.frame = 0
 	return l
 }
 

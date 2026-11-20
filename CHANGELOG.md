@@ -86,6 +86,7 @@
 - Glide Android scroll views with OverScroller's spline fling, as Android's own scroll views do (#833 by @owocc).
 - Keep the code and message of what a TSX plugin's synchronous export throws in `Plugin.Call`'s error, as a rejected promise's, instead of the raw exception (#847 by @houko).
 - Draw a Linux input with no font family in the desktop's UI font, as a text is, instead of GTK's fallback "Sans 10": reading `gtk-font-name` at startup left GTK's default font stale, so an input and a text of the same style drew one string at different widths. An editor's style also no longer reaches another window's editor that has the same node id (#764 by @houko).
+- Use the available width and final alignment for ellipsized text that wraps past `MaxLines` on Apple platforms (#965 by @J4ck1e2000).
 - Keep what `ui.SidebarShell`'s sidebar, footer, headers and content hold and `ui.NavHeader`'s buttons clear of the left and right safe area, as on an iPhone in landscape, without padding a page inside the shell twice, and drop the gallery's own padding for it (#835 by @houko).
 - Have `nsgotest` count a press of another view as a new click on the macOS and Linux targets, as headless, so a press on a page that a press just pushed or popped reaches it instead of going to the page's previous view as a double click's second (#854 by @houko).
 
