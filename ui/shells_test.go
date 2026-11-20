@@ -485,6 +485,41 @@ func TestTabShellSafeArea(t *testing.T) {
 	check(run(ios, "house"), "iOS system bar", 34)
 }
 
+// TestTabShellBarHidden restores the section's safe area and removes the drawn bar while a pushed page asks the shell to hide it.
+func TestTabShellBarHidden(t *testing.T) {
+	var hide func(bool)
+	e := desktopEnv
+	e.SafeArea = core.Edges{Bottom: 34}
+	app, _ := shell(t, e, func(cx *core.Scope) core.Node {
+		hidden := core.NewSignal(cx, false)
+		hide = hidden.Set
+		return TabShell{TestID: "shell", BarHidden: hidden.Get, Tabs: []ShellTab{{Text: "Home", Content: func(cx *core.Scope) core.Node {
+			return core.View{TestID: "page", Style: FillRest, Children: []core.Node{
+				core.View{TestID: "actions", Style: core.Style{PaddingEnv: core.EnvEdges{Bottom: core.EnvSafeArea}}},
+			}}
+		}}}}
+	})
+	check := func(name string, bar bool, bottom core.Points) {
+		t.Helper()
+		if app.Exists("role:tablist") != bar {
+			t.Fatalf("%s: drawn bar shows = %v, want %v", name, !bar, bar)
+		}
+		if got := within(app.Find("shell"), "actions").Frame.Size.Height; got != bottom {
+			t.Fatalf("%s: a bottom padding of the safe area = %v, want %v", name, got, bottom)
+		}
+	}
+	check("shown", true, 0)
+	app.Post(func() { hide(true) })
+	app.Settle()
+	check("hidden", false, 34)
+	if got, want := app.Find("id:page").Frame.Size.Height, app.Find("id:shell").Frame.Size.Height; got != want {
+		t.Fatalf("hidden bar left page height %v below shell %v", got, want)
+	}
+	app.Post(func() { hide(false) })
+	app.Settle()
+	check("shown again", true, 0)
+}
+
 // TestTabShellAndroidSVGBar puts SVG icons in Android's system bar, reactively and beside a SystemIcon, while iOS keeps to SF Symbols and desktops draw the bar.
 func TestTabShellAndroidSVGBar(t *testing.T) {
 	var set func(*core.SVG)

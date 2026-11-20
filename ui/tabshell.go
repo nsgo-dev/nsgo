@@ -24,6 +24,8 @@ type TabShell struct {
 	Tabs     []ShellTab
 	Selected func() int
 	OnChange func(index int)
+	// BarHidden hides the system or drawn bar while it reports true, and restores the section's bottom safe area and TabBarInset.
+	BarHidden func() bool
 	// Label names the bar for assistive technology.
 	Label  string
 	TestID string
@@ -57,6 +59,7 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 	}
 	env := cx.Env()
 	floating := env.OS() == core.OSIOS && s.hasSystemBar(cx)
+	hidden := func() bool { return s.BarHidden != nil && s.BarHidden() }
 	var sections []core.Node
 	for i, tab := range s.Tabs {
 		// A section is built when first selected, then hidden while others
@@ -73,7 +76,7 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 					outer := core.InsetsFunc(cx)
 					core.ProvideInsets(cx, func() core.Edges {
 						in := outer()
-						if env.KeyboardHeight() == 0 {
+						if env.KeyboardHeight() == 0 && !hidden() {
 							in.Bottom = 0
 						}
 						return in
@@ -92,7 +95,7 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 	height := core.NewSignal(cx, core.Points(0))
 	if floating {
 		tabBarInsetKey.Provide(cx, func() core.Points {
-			if env.KeyboardHeight() > 0 {
+			if env.KeyboardHeight() > 0 || hidden() {
 				return 0
 			}
 			return height.Get()
@@ -108,7 +111,7 @@ func (s TabShell) Render(cx *core.Scope) core.Node {
 				if floating {
 					st = core.Style{Position: core.Absolute, Right: core.Pt(0), Bottom: core.Pt(0), Left: core.Pt(0)}
 				}
-				if env.KeyboardHeight() > 0 {
+				if env.KeyboardHeight() > 0 || hidden() {
 					st.Display = core.DisplayNone
 				}
 				return st
