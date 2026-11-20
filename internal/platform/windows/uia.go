@@ -51,6 +51,7 @@ var (
 	iidRangeValueProvider                  = parseGUID("36dc7aef-33e6-4691-afe1-2be7274b3d33")
 	iidExpandCollapseProvider              = parseGUID("d847d3a5-cab0-4a98-8c32-ecb45c59ad24")
 	iidSelectionItemProvider               = parseGUID("2acad808-b2d4-452d-a407-91ff1ad167b2")
+	iidSelectionProvider                   = parseGUID("fb8b03af-3bdf-48d4-bd36-1a65793be168")
 	iidValueProvider                       = parseGUID("c7935180-6fb3-4201-b174-7df73adbf64a")
 )
 
@@ -73,6 +74,7 @@ const (
 	patternRangeValue     = 10003
 	patternExpandCollapse = 10005
 	patternSelectionItem  = 10010
+	patternSelection      = 10001
 	patternToggle         = 10015
 
 	propRuntimeID             = 30000
@@ -175,7 +177,7 @@ type uiaIface struct {
 // uiaElement is one provider: the window and the view, or a canvas's
 // part of it (part 1 is the first), or the root (no view).
 type uiaElement struct {
-	simple, fragment, root, invoke, toggle, rangeValue, expand, selection, value uiaIface
+	simple, fragment, root, invoke, toggle, rangeValue, expand, selection, selectionProvider, value uiaIface
 
 	refs atomic.Int32
 	w    *window
@@ -201,7 +203,7 @@ func (w *window) element(id driver.NodeID, part int) *uiaElement {
 		vtbl *[16]uintptr
 	}{{&e.simple, &uiaSimpleVtbl}, {&e.fragment, &uiaFragmentVtbl}, {&e.root, &uiaRootVtbl},
 		{&e.invoke, &uiaInvokeVtbl}, {&e.toggle, &uiaToggleVtbl}, {&e.rangeValue, &uiaRangeVtbl},
-		{&e.expand, &uiaExpandVtbl}, {&e.selection, &uiaSelectionVtbl}, {&e.value, &uiaValueVtbl}} {
+		{&e.expand, &uiaExpandVtbl}, {&e.selection, &uiaSelectionVtbl}, {&e.selectionProvider, &uiaSelectionProviderVtbl}, {&e.value, &uiaValueVtbl}} {
 		f.i.vtbl, f.i.el = f.vtbl, e
 	}
 	w.uia[k] = e
@@ -287,6 +289,8 @@ func (e *uiaElement) pattern(iid guid) *uiaIface {
 		return &e.expand
 	case iid == iidSelectionItemProvider && s.selectable:
 		return &e.selection
+	case iid == iidSelectionProvider && s.multiselectable:
+		return &e.selectionProvider
 	case iid == iidValueProvider && v.field != nil && e.part == 0:
 		return &e.value
 	}
@@ -305,6 +309,8 @@ func patternIID(id uintptr) (guid, bool) {
 		return iidExpandCollapseProvider, true
 	case patternSelectionItem:
 		return iidSelectionItemProvider, true
+	case patternSelection:
+		return iidSelectionProvider, true
 	case patternValue:
 		return iidValueProvider, true
 	}
@@ -320,7 +326,7 @@ type uiaSpec struct {
 	invalid                        bool
 	enabled, focusable, focused    bool
 	invoke, ranged, expandable     bool
-	selectable, selected, expanded bool
+	selectable, selected, expanded, multiselectable bool
 	toggle                         int32 // ToggleState, -1 for none
 	min, max, now                  float32
 	live                           driver.LiveRegion
@@ -443,6 +449,7 @@ func (e *uiaElement) spec(v *view) uiaSpec {
 		s.ranged, s.min, s.max, s.now = true, p.Value.Min, p.Value.Max, p.Value.Now
 	}
 	s.expandable, s.expanded = p.Expandable, p.Expanded
+	s.multiselectable = p.MultiSelectable
 	s.selectable = p.Role == driver.RoleTab || p.Role == driver.RoleRadio || p.Role == driver.RoleOption || p.Selected
 	s.selected = p.Selected || p.Role == driver.RoleRadio && p.Checked
 	if e.w != nil {
@@ -957,6 +964,65 @@ func uiaSelectionContainer(i *uiaIface, out *unsafe.Pointer) uintptr {
 		p.refs.Add(1)
 		*out = unsafe.Pointer(&p.simple)
 	}
+	return sOK
+}
+
+// uiaGetSelection returns the selected direct children of a multi-select
+// container as UI Automation providers. SafeArray owns the references until
+// the client destroys it.
+func uiaGetSelection(i *uiaIface, out *uintptr) uintptr {
+	*out = 0
+	v, ok := i.el.alive()
+	if !ok || v == nil {
+		return uiaElementGone
+	}
+	s := i.el.spec(v)
+	if !s.multiselectable {
+		return 0x80070057 // E_INVALIDARG
+	}
+	var selected []*uiaElement
+	for _, child := range i.el.children() {
+		cv, alive := child.alive()
+		if alive && cv != nil && child.spec(cv).selected {
+			selected = append(selected, child)
+		}
+	}
+	arr, _, _ := safeArrayCreateVector.Call(vtUnknown, 0, uintptr(len(selected)))
+	if arr == 0 {
+		return 0x8007000E // E_OUTOFMEMORY
+	}
+	var raw uintptr
+	if ret, _, _ := safeArrayAccessData.Call(arr, uintptr(unsafe.Pointer(&raw))); ret != 0 {
+		return 0x80004005 // E_FAIL
+	}
+	slots := unsafe.Slice((*uintptr)(unsafe.Pointer(raw)), len(selected))
+	for n, child := range selected {
+		child.refs.Add(1)
+		slots[n] = uintptr(unsafe.Pointer(&child.simple))
+	}
+	safeArrayUnaccessData.Call(arr)
+	*out = arr
+	return sOK
+}
+
+func uiaCanSelectMultiple(i *uiaIface, out *int32) uintptr {
+	v, ok := i.el.alive()
+	if !ok || v == nil {
+		return uiaElementGone
+	}
+	if i.el.spec(v).multiselectable {
+		*out = 1
+	} else {
+		*out = 0
+	}
+	return sOK
+}
+
+func uiaSelectionRequired(i *uiaIface, out *int32) uintptr {
+	if _, ok := i.el.alive(); !ok {
+		return uiaElementGone
+	}
+	*out = 0
 	return sOK
 }
 

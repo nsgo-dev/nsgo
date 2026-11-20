@@ -13,7 +13,7 @@ import (
 // which callbacks receive only as words: their slots hold thunks that
 // move them (uiaFromPointThunk, uiaSetRangeThunk in uia_*.s).
 var uiaSimpleVtbl, uiaFragmentVtbl, uiaRootVtbl, uiaInvokeVtbl, uiaToggleVtbl, uiaRangeVtbl,
-	uiaExpandVtbl, uiaSelectionVtbl, uiaValueVtbl [16]uintptr
+	uiaExpandVtbl, uiaSelectionVtbl, uiaSelectionProviderVtbl, uiaValueVtbl [16]uintptr
 
 func init() {
 	uiaQI := syscall.NewCallback(uiaQueryInterface)
@@ -65,6 +65,11 @@ func init() {
 		syscall.NewCallback(uiaNotImplemented),
 		syscall.NewCallback(uiaIsSelected),
 		syscall.NewCallback(uiaSelectionContainer),
+	}
+	uiaSelectionProviderVtbl = [16]uintptr{uiaQI, uiaAR, uiaRel,
+		syscall.NewCallback(uiaGetSelection),
+		syscall.NewCallback(uiaCanSelectMultiple),
+		syscall.NewCallback(uiaSelectionRequired),
 	}
 	uiaValueVtbl = [16]uintptr{uiaQI, uiaAR, uiaRel,
 		syscall.NewCallback(uiaSetFieldValue),

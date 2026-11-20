@@ -4,6 +4,8 @@ Accessibility, pointer events, keyboard focus, touch areas, touches and the resp
 
 ## Accessibility
 
+`MultiSelectable` marks a grid, listbox or tree whose collection permits more than one selected item. The web maps it to `aria-multiselectable`, Windows exposes UI Automation's Selection provider, and GTK reports the multiselectable state; `base.DataTable` sets it for multi-row selection.
+
 Elements carry NSH's accessibility props: `Role` (a menu item's checked kinds, `RoleListbox`, `RoleOption`, `RoleGroup`, `RoleRegion`, `RoleNavigation`, `RoleTree`, `RoleTreeItem` and `RoleToolbar` among them, each on a backend's nearest role, as WebKit maps ARIA's; Android reads those as plain views for now, [roadmap](../roadmap.md#finish-the-existing-platforms)), `Pressed`, `Busy` and `Invalid` (ARIA's `aria-invalid`, which `aria-invalid:` styles), `Label` (`LabelFunc` when it changes), `AccessibilityDescription` (`AccessibilityDescriptionFunc` when it changes, read after the label) and `Hint`, `AccessibilityValue` (a range when `Max` is above `Min`, and `Text`), `Expanded`, `AccessibilityActions` with `OnAccessibilityAction`, `Accessible`, `ImportantForAccessibility`, `AccessibilityElementsHidden` and `LiveRegion`. `Ref.SetAccessibilityFocus` moves the screen reader, as an `ItemAccessibilityFocus` command.
 
 - The props go in `ViewProps`, except a label changing alone on mounted props, which goes as `ItemAccessibilityLabel`.

@@ -2123,6 +2123,11 @@ func setViewProps(v *view, p *driver.ViewProps) {
 	setAttr(el, "aria-description", p.HelpText())
 	setAttr(el, "aria-disabled", flag(p.Disabled))
 	setAttr(el, "aria-selected", flag(p.Selected))
+	multi := ""
+	if p.MultiSelectable {
+		multi = "true"
+	}
+	setAttr(el, "aria-multiselectable", multi)
 	setAttr(el, "aria-checked", checked)
 	setAttr(el, "aria-pressed", flag(p.Pressed))
 	setAttr(el, "aria-busy", flag(p.Busy))

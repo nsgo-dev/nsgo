@@ -67,7 +67,7 @@ func (p DataTable) Render(cx *core.Scope) core.Node {
 	font := t.font()
 	root := core.Style{Overflow: core.Hidden, FontSize: font.Size, FontFamily: font.Family}.Merge(p.Style)
 	return core.View{
-		Ref: t.focusRef, Role: core.RoleGrid, Label: p.Label, Focusable: func() bool { return true },
+		Ref: t.focusRef, Role: core.RoleGrid, MultiSelectable: p.MultiSelect && !p.NoRowSelect, Label: p.Label, Focusable: func() bool { return true },
 		OnFocus: func() { t.focused.Set(true) }, OnBlur: func() { t.focused.Set(false) },
 		TestID: p.TestID, OnLayout: p.OnLayout, Tooltip: p.Tooltip, Class: parts.JoinClasses(p.Classes.Root, p.Class), Style: root, StyleFunc: p.StyleFunc,
 		Children: []core.Node{core.View{

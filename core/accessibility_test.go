@@ -33,6 +33,7 @@ func TestAccessibilityPropsFollowTheirSignals(t *testing.T) {
 			View{TestID: "menu", Role: RoleButton, Expanded: open.Get},
 			View{TestID: "hidden", AccessibilityElementsHidden: hidden.Get},
 			View{TestID: "nohide", ImportantForAccessibility: ImportantNoHideDescendants},
+			View{TestID: "multi", Role: RoleGrid, MultiSelectable: true},
 			View{TestID: "no", ImportantForAccessibility: ImportantNo},
 		}}
 	})
@@ -50,6 +51,9 @@ func TestAccessibilityPropsFollowTheirSignals(t *testing.T) {
 	}
 	if p := props[h.find("no").id]; p.ElementsHidden || p.Accessible != driver.AccessibleNo {
 		t.Errorf("importantForAccessibility no props = %+v", p)
+	}
+	if p := props[h.find("multi").id]; !p.MultiSelectable || p.Role != RoleGrid {
+		t.Errorf("multi props = %+v", p)
 	}
 
 	now.Set(60)

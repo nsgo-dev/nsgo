@@ -1759,7 +1759,7 @@ func (t *Tree) setViewParts(n *node, v View) {
 	n.responder = v.Responder
 	n.match = v.MatchID
 	n.props = driver.ViewProps{Role: v.Role, Label: v.Label, Hint: v.Hint, Description: v.AccessibilityDescription,
-		LiveRegion: liveRegion(v.Role, v.LiveRegion), TestID: v.TestID, WindowDrag: v.Desktop.WindowDrag, SelectionArea: v.Selectable, PointerEvents: v.PointerEvents, HitSlop: v.HitSlop,
+		LiveRegion: liveRegion(v.Role, v.LiveRegion), TestID: v.TestID, MultiSelectable: v.MultiSelectable, WindowDrag: v.Desktop.WindowDrag, SelectionArea: v.Selectable, PointerEvents: v.PointerEvents, HitSlop: v.HitSlop,
 		DelayLongPress: v.DelayLongPress, NoFocus: v.NoFocus, Ripple: v.Android.Ripple}
 	n.material, n.elevation = v.IOS.BackdropMaterial, v.Android.Elevation
 	if v.EdgeBar.Scroll != nil {

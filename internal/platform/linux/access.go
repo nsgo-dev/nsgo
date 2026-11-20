@@ -184,6 +184,13 @@ func pressable(m driver.EventMask) bool {
 	return m.Has(driver.EventPress) || m.Has(driver.EventLongPress)
 }
 
+func boolToInt(v bool) int32 {
+	if v {
+		return 1
+	}
+	return 0
+}
+
 // prepareRoles finds the roles of the views b creates, from its props and
 // events, before they are made.
 func (w *window) prepareRoles(b *driver.MountBatch) {
@@ -232,6 +239,7 @@ func newAccessibleWidget(t uintptr, role int32) uintptr {
 // accessState is what was last given to GTK of a view.
 type accessState struct {
 	label, description, valueText string
+	multiSelectable               bool
 	min, max, now                 float32
 	ranged                        bool
 	states                        [8]int8 // disabled, selected, checked, pressed, expanded, hidden, busy, invalid: -1 unset, 0, 1, 2 mixed
@@ -251,7 +259,7 @@ func (w *window) updateAccess(v *view) bool {
 		label = v.plain
 	}
 	old := v.access
-	n := accessState{label: label, description: p.HelpText(), valueText: p.Value.Text, set: true, testID: p.TestID}
+	n := accessState{label: label, description: p.HelpText(), valueText: p.Value.Text, multiSelectable: p.MultiSelectable, set: true, testID: p.TestID}
 	if p.Value.IsRange() {
 		n.ranged, n.min, n.max, n.now = true, p.Value.Min, p.Value.Max, p.Value.Now
 	}
@@ -310,6 +318,16 @@ func (w *window) updateAccess(v *view) bool {
 	setString("label", n.label, old.label)
 	setString("description", n.description, old.description)
 	setString("value-text", n.valueText, old.valueText)
+	if n.multiSelectable != old.multiSelectable || !old.set {
+		prop := enumValue("property", "multiselectable")
+		if prop >= 0 {
+			var val gValue
+			gValueInit(uintptr(unsafe.Pointer(&val)), gTypeBoolean)
+			gValueSetBoolean(&val, boolToInt(n.multiSelectable))
+			gtkAccessibleUpdatePropertyValue(acc, 1, &prop, &val)
+			gValueUnset(uintptr(unsafe.Pointer(&val)))
+		}
+	}
 	if n.ranged != old.ranged || n.min != old.min || n.max != old.max || n.now != old.now {
 		for i, nick := range []string{"value-min", "value-max", "value-now"} {
 			prop := enumValue("property", nick)
