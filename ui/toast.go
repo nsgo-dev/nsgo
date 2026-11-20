@@ -38,11 +38,9 @@ type ToastContent struct {
 	Trailing core.Node
 	Action   string
 	OnAction func()
-	// OnPress makes the toast surface a button and dismisses it after the
-	// callback. Action, Trailing and close-button children keep their presses.
+	// OnPress makes the toast surface a button and dismisses it after the callback. Action, Trailing and close-button children keep their presses.
 	OnPress func()
-	// NoClose omits this toast's close button. Swipe, Escape and its timeout
-	// still dismiss it.
+	// NoClose omits this toast's close button. Swipe, Escape and its timeout still dismiss it.
 	NoClose  bool
 	OnClose  func()
 	Duration time.Duration
@@ -239,8 +237,7 @@ type Toasts struct {
 	Swipe      ToastSwipe
 	Inset      core.Points
 	CloseLabel string
-	// NoClose omits close buttons from every toast unless ToastContent opts in
-	// by leaving its own NoClose false (the per-toast field is the usual form).
+	// NoClose omits the close button from every toast in the stack, whatever its ToastContent.NoClose.
 	NoClose bool
 	TestID  string
 }

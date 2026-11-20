@@ -93,8 +93,7 @@ type Toast struct {
 	Label          string
 	// LabelFunc is a label that changes while the toast shows, as when a toast replaces it; it wins over Label, and the screen reader reads each new one.
 	LabelFunc func() string
-	// OnPress makes the toast itself a button. Child controls such as action
-	// buttons keep their own presses.
+	// OnPress makes the toast itself a button. Child controls such as action buttons keep their own presses.
 	OnPress func()
 	// OnDismissRequest: the user swiped it away; dismiss it. It stays
 	// where the swipe took it.
