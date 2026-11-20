@@ -513,7 +513,7 @@ func (s *surface) setMenu(entries []driver.MenuEntry) {
 			defer s.menu.Send(selRelease)
 			s.menu = 0
 		}
-		nsApp.Send(sel("setMainMenu:"), defaultMenu)
+		showDefaultMenu()
 		s.registerMenus(0)
 		return
 	}
@@ -569,8 +569,7 @@ func (s *surface) restoreMainMenu() {
 		next.setMenu(next.menuEntries)
 		return
 	}
-	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
-	nsApp.Send(sel("setMainMenu:"), defaultMenu)
+	showDefaultMenu()
 	s.registerMenus(0)
 	mainMenuSurface = nil
 }
@@ -741,13 +740,7 @@ func syncMenuItem(it, next objc.ID) {
 // relabelMenus says the menu bar again in the surface's language.
 func (s *surface) relabelMenus() {
 	if s.language != defaultLanguage {
-		nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
-		old := defaultMenu
-		defaultLanguage, defaultMenu = s.language, mainMenu(s.language)
-		if nsApp.Send(sel("mainMenu")) == old {
-			nsApp.Send(sel("setMainMenu:"), defaultMenu)
-		}
-		old.Send(selRelease)
+		rebuildDefaultMenu(s.language)
 	}
 	if s.menu != 0 {
 		s.setMenu(s.menuEntries)

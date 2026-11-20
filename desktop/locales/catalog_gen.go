@@ -96,6 +96,7 @@ const (
 	textStartSpeaking
 	textStopSpeaking
 	textBringAllToFront
+	textCheckForUpdates
 	textServices
 	textHelp
 	textRoleLink
@@ -157,6 +158,7 @@ var keyOfText = [numTexts]string{
 	"startSpeaking",
 	"stopSpeaking",
 	"bringAllToFront",
+	"checkForUpdates",
 	"services",
 	"help",
 	"roleLink",
@@ -216,6 +218,7 @@ var textsEn = i18n.NewTexts(""+
 	"Start Speaking"+
 	"Stop Speaking"+
 	"Bring All to Front"+
+	"Check for Updates…"+
 	"Services"+
 	"Help"+
 	"link"+
@@ -272,6 +275,7 @@ var textsEn = i18n.NewTexts(""+
 		14,
 		13,
 		18,
+		20,
 		8,
 		4,
 		4,
@@ -331,6 +335,7 @@ var textsZhHans = i18n.NewTexts(""+
 	"开始讲话"+
 	"停止讲话"+
 	"前置全部窗口"+
+	"检查更新…"+
 	"服务"+
 	"帮助"+
 	"链接"+
@@ -387,6 +392,7 @@ var textsZhHans = i18n.NewTexts(""+
 		12,
 		12,
 		18,
+		15,
 		6,
 		6,
 		6,
@@ -878,6 +884,15 @@ func BringAllToFront(cx *core.Scope) string { return For(cx).BringAllToFront() }
 
 // BringAllToFront is the package's BringAllToFront in the language of msgs.
 func (msgs Messages) BringAllToFront() string { return msgs.text(textBringAllToFront) }
+
+// CheckForUpdates says "Check for Updates…"
+// in the language the app shows under cx.
+//
+// The macOS app menu's item of an app that updates itself, which checks for a newer version now.
+func CheckForUpdates(cx *core.Scope) string { return For(cx).CheckForUpdates() }
+
+// CheckForUpdates is the package's CheckForUpdates in the language of msgs.
+func (msgs Messages) CheckForUpdates() string { return msgs.text(textCheckForUpdates) }
 
 // Services says "Services"
 // in the language the app shows under cx.

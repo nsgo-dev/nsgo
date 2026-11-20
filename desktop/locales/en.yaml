@@ -79,6 +79,9 @@ pasteAndMatchStyle: "Paste and Match Style"
 startSpeaking: "Start Speaking"
 stopSpeaking: "Stop Speaking"
 bringAllToFront: "Bring All to Front"
+checkForUpdates:
+  message: "Check for Updates…"
+  description: The macOS app menu's item of an app that updates itself, which checks for a newer version now.
 services:
   message: "Services"
   description: The title of the macOS app menu's submenu the system fills with other apps' services.

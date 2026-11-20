@@ -196,7 +196,7 @@ updates:
 
 | 目标 | direct 构建的更新方式 |
 | --- | --- |
-| macOS | `build` 打进应用的 Sparkle 每天检查，提示新版本，下载磁盘映像，校验签名，安装并重启应用 |
+| macOS | `build` 打进应用的 Sparkle 每天检查，提示新版本，下载磁盘映像，校验签名，安装并重启应用；默认的应用菜单里有「检查更新…」，自己设置菜单的应用用 `updater.Check` 加上这一项 |
 | Windows | 放在可执行文件旁的 WinSparkle 同样如此，WinSparkle 有该语言时用应用启动时显示的语言，并静默运行安装程序，由它启动新版本 |
 | Linux、Android | 应用读取自己的 appcast，用户选择更新后下载并校验签名软件包，通过 `pkexec dpkg` 安装后重启，或交给 Android 的软件包安装器；从 Arch 软件包或 AppImage 安装的应用，以及未签名的 appcast，改为打开该 Release 的页面 |
 | iOS | 应用查询负责更新它的 App Store，并打开其中的页面 |

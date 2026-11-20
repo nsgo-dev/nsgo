@@ -633,6 +633,10 @@ func Run(app engine.App, opts Options) {
 		s = startOwn(app, opts)
 	})
 	startSparkle()
+	if sparkle != 0 {
+		// The default menu was made before Sparkle ran, without Check for Updates….
+		rebuildDefaultMenu(defaultLanguage)
+	}
 	// AppKit delivers the login Apple event as launching finishes. Start the engine from that callback so the app sees its launch reason on its first execution.
 	nsApp.Send(sel("run"))
 	for o := range surfaces {
@@ -743,7 +747,7 @@ func startApp(opts Options, ready func(login bool)) objc.ID {
 	nsApp.Send(sel("setActivationPolicy:"), policy)
 	defaultLanguage, _ = apple.Locale()
 	defaultMenu = mainMenu(defaultLanguage)
-	nsApp.Send(sel("setMainMenu:"), defaultMenu)
+	showDefaultMenu()
 	delegate := objc.ID(register("NsgoAppDelegate", apple.Class("NSObject"), nil, []objc.MethodDef{{
 		Cmd: sel("applicationShouldTerminateAfterLastWindowClosed:"),
 		Fn:  func(self objc.ID, _ objc.SEL, app objc.ID) bool { return false },
@@ -1019,33 +1023,81 @@ func activateApp() {
 	}
 }
 
-// mainMenu is the menu bar of an app that sets none, in lang.
+// mainMenu is the menu bar of an app that sets none, in lang, after AppKit's template: the app menu with About, Check for Updates… where Sparkle runs (startSparkle comes first), Hide, Hide Others, Show All and Quit, then Edit and Window. It leaves out Services, whose one menu AppKit moves into each bar an app sets (registerMenus), so the default bar would keep an empty item; showDefaultMenu registers the Window menu.
+//
+// Hide and Hide Others carry no key equivalents, and the Window menu has no Minimize, which AppKit gives ⌘M whatever its key: the menu bar takes a key equivalent before the window's keyDown: matches the app's key bindings, so ⌘H, ⌥⌘H and ⌘M would stop reaching an app that binds them and sets no menu, as they reached it before. An app that wants those items and keys sets its menu with the roles, which carry them.
 func mainMenu(lang string) objc.ID {
 	msgs := locales.In(lang)
+	name := apple.BundleName(lang)
+	if name == "" {
+		name = apple.GoString(objc.ID(apple.Class("NSRunningApplication")).Send(sel("currentApplication")).Send(sel("localizedName")))
+	}
 	menu := func(title string) objc.ID {
 		return objc.ID(apple.Class("NSMenu")).Send(selAlloc).Send(sel("initWithTitle:"), apple.NSString(title))
 	}
-	item := func(m objc.ID, title, action, key string) {
-		m.Send(sel("addItemWithTitle:action:keyEquivalent:"), apple.NSString(title), sel(action), apple.NSString(key))
+	item := func(m objc.ID, title, action, key string) objc.ID {
+		return m.Send(sel("addItemWithTitle:action:keyEquivalent:"), apple.NSString(title), sel(action), apple.NSString(key))
+	}
+	separator := func(m objc.ID) {
+		m.Send(sel("addItem:"), objc.ID(apple.Class("NSMenuItem")).Send(sel("separatorItem")))
 	}
 	submenu := func(bar, m objc.ID) {
 		it := objc.ID(apple.Class("NSMenuItem")).Send(selNew)
 		it.Send(sel("setSubmenu:"), m)
 		bar.Send(sel("addItem:"), it)
+		it.Send(selRelease)
+		m.Send(selRelease)
 	}
 	bar := menu("")
 	app := menu("")
-	item(app, msgs.Quit(), "terminate:", "q")
+	item(app, msgs.AboutApp(name), "orderFrontStandardAboutPanel:", "")
+	if sparkle != 0 {
+		separator(app)
+		// SPUStandardUpdaterController answers checkForUpdates: and enables the item while no check runs.
+		item(app, msgs.CheckForUpdates(), "checkForUpdates:", "").Send(sel("setTarget:"), sparkle)
+	}
+	separator(app)
+	item(app, msgs.HideApp(name), "hide:", "")
+	item(app, msgs.HideOthers(), "hideOtherApplications:", "")
+	item(app, msgs.ShowAll(), "unhideAllApplications:", "")
+	separator(app)
+	item(app, msgs.QuitApp(name), "terminate:", "q")
 	submenu(bar, app)
 	edit := menu(msgs.Edit())
 	item(edit, msgs.Undo(), "undo:", "z")
 	item(edit, msgs.Redo(), "redo:", "Z")
+	separator(edit)
 	item(edit, msgs.Cut(), "cut:", "x")
 	item(edit, msgs.Copy(), "copy:", "c")
 	item(edit, msgs.Paste(), "paste:", "v")
 	item(edit, msgs.SelectAll(), "selectAll:", "a")
 	submenu(bar, edit)
+	window := menu(msgs.Window())
+	item(window, msgs.Zoom(), "performZoom:", "")
+	separator(window)
+	item(window, msgs.BringAllToFront(), "arrangeInFront:", "")
+	submenu(bar, window)
 	return bar
+}
+
+// rebuildDefaultMenu makes the default menu again in lang, and shows it where the old one was shown.
+func rebuildDefaultMenu(lang string) {
+	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+	old := defaultMenu
+	defaultLanguage, defaultMenu = lang, mainMenu(lang)
+	if nsApp.Send(sel("mainMenu")) == old {
+		showDefaultMenu()
+	}
+	old.Send(selRelease)
+}
+
+// showDefaultMenu makes the default menu the menu bar, with its Window menu as AppKit's, which lists the windows there.
+func showDefaultMenu() {
+	nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+	nsApp.Send(sel("setMainMenu:"), defaultMenu)
+	if n := objc.Send[int](defaultMenu, sel("numberOfItems")); n > 0 {
+		nsApp.Send(sel("setWindowsMenu:"), defaultMenu.Send(selItemAtIndex, n-1).Send(sel("submenu")))
+	}
 }
 
 // environment returns what AppKit tells about where the app runs.

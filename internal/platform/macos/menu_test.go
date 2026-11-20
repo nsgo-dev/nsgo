@@ -4,6 +4,7 @@ package macos
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/ebitengine/purego/objc"
@@ -314,6 +315,89 @@ func TestMenuEditingKeys(t *testing.T) {
 				t.Errorf("%q sends %v, want the item's own action", c.shortcut, got)
 			}
 			it.Send(selRelease)
+		}
+	})
+}
+
+// TestDefaultMenu checks the menu bar of an app that sets none: AppKit's template for the app menu, with Check for Updates… where Sparkle runs, and a Window menu that AppKit lists the windows in.
+func TestDefaultMenu(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		titles := func(m objc.ID) []string {
+			var out []string
+			for i := range objc.Send[int](m, sel("numberOfItems")) {
+				it := m.Send(selItemAtIndex, i)
+				if objc.Send[bool](it, sel("isSeparatorItem")) {
+					out = append(out, "-")
+					continue
+				}
+				out = append(out, apple.GoString(it.Send(sel("title"))))
+			}
+			return out
+		}
+		was, wasMenu, wasLang := sparkle, defaultMenu, defaultLanguage
+		defer func() { sparkle, defaultMenu, defaultLanguage = was, wasMenu, wasLang }()
+
+		sparkle = 0
+		bar := mainMenu("en")
+		defer bar.Send(selRelease)
+		app := bar.Send(selItemAtIndex, 0).Send(sel("submenu"))
+		got := titles(app)
+		if len(got) != 7 || !strings.HasPrefix(got[0], "About ") || got[2] != "Hide "+strings.TrimPrefix(got[0], "About ") || got[3] != "Hide Others" || got[4] != "Show All" || !strings.HasPrefix(got[6], "Quit ") {
+			t.Errorf("app menu %q", got)
+		}
+		if w := titles(bar.Send(selItemAtIndex, 2).Send(sel("submenu"))); !slices.Equal(w, []string{"Zoom", "-", "Bring All to Front"}) {
+			t.Errorf("Window menu %q", w)
+		}
+		// keyed finds the item of bar whose key equivalent is key with flags, as AppKit matches it.
+		var keyed func(m objc.ID, key string, flags uint) objc.ID
+		keyed = func(m objc.ID, key string, flags uint) objc.ID {
+			for i := range objc.Send[int](m, sel("numberOfItems")) {
+				it := m.Send(selItemAtIndex, i)
+				if sub := it.Send(sel("submenu")); sub != 0 {
+					if found := keyed(sub, key, flags); found != 0 {
+						return found
+					}
+					continue
+				}
+				const mask = flagShift | flagControl | flagOption | flagCommand
+				if apple.GoString(it.Send(sel("keyEquivalent"))) == key && objc.Send[uint](it, sel("keyEquivalentModifierMask"))&mask == flags {
+					return it
+				}
+			}
+			return 0
+		}
+		// The keys an app may bind itself stay the app's: the bar takes a key equivalent before keyDown: matches the app's bindings.
+		for _, k := range []struct {
+			key   string
+			flags uint
+		}{{"h", flagCommand}, {"h", flagCommand | flagOption}, {"m", flagCommand}} {
+			if it := keyed(bar, k.key, k.flags); it != 0 {
+				t.Errorf("the default menu's %q takes the key %q", apple.GoString(it.Send(sel("title"))), k.key)
+			}
+		}
+		if keyed(bar, "q", flagCommand) == 0 {
+			t.Error("Quit lost ⌘Q")
+		}
+
+		sparkle = objc.ID(apple.Class("NSObject")).Send(selNew)
+		defer sparkle.Send(selRelease)
+		withUpdates := mainMenu("zh-Hans")
+		defer withUpdates.Send(selRelease)
+		check := withUpdates.Send(selItemAtIndex, 0).Send(sel("submenu")).Send(selItemAtIndex, 2)
+		if title := apple.GoString(check.Send(sel("title"))); title != "检查更新…" || check.Send(sel("target")) != sparkle || objc.Send[objc.SEL](check, sel("action")) != sel("checkForUpdates:") {
+			t.Errorf("Check for Updates… is %q, target %v, want Sparkle's checkForUpdates:", title, check.Send(sel("target")))
+		}
+
+		defaultMenu = withUpdates
+		showDefaultMenu()
+		nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
+		if nsApp.Send(sel("windowsMenu")) != withUpdates.Send(selItemAtIndex, 2).Send(sel("submenu")) {
+			t.Error("the default Window menu is not AppKit's windowsMenu")
+		}
+		defaultMenu = wasMenu
+		if wasMenu != 0 {
+			showDefaultMenu()
 		}
 	})
 }
