@@ -97,9 +97,7 @@ func Wrap(app engine.App) engine.App {
 	}
 }
 
-// WrapApp runs an app function under nsgo dev. Its reload binding belongs to
-// the app's own scope, which outlives the main view when another window keeps
-// the app running after that view closes.
+// WrapApp runs an app function under nsgo dev. Its reload binding belongs to the app's own scope, which outlives the main view when another window keeps the app running after that view closes.
 func WrapApp(app func(*core.Scope)) func(*core.Scope) {
 	server, page := devServerURL()
 	if server == "" || page {

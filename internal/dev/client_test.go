@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -286,8 +287,7 @@ func TestDevReloadKeyInEveryWindow(t *testing.T) {
 	}
 }
 
-// The app scope owns dev's reload binding, so it survives disposal of the
-// main view while another app window keeps the process alive (#713).
+// The app scope owns dev's reload binding, so it survives disposal of the main view while another app window keeps the process alive (#713).
 func TestDevReloadKeySurvivesMainViewClose(t *testing.T) {
 	var reloads atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -313,8 +313,6 @@ func TestDevReloadKeySurvivesMainViewClose(t *testing.T) {
 	if main == nil || settings == nil {
 		t.Fatal("the app did not open its main and settings windows")
 	}
-	main.Close()
-	tree.Commit()
 	var settingsTree *core.Tree
 	for _, s := range tree.Surfaces() {
 		if s.Window() == settings {
@@ -322,23 +320,36 @@ func TestDevReloadKeySurvivesMainViewClose(t *testing.T) {
 		}
 	}
 	if settingsTree == nil {
-		t.Fatal("settings tree disappeared with the main window")
+		t.Fatal("the app has no settings tree")
 	}
 	var keymap []driver.KeyBinding
-	for _, it := range settingsTree.Commit().Items {
-		if it.Kind == driver.ItemKeymap {
-			keymap = it.Keys
+	press := func(when string, want int32) {
+		t.Helper()
+		for _, it := range settingsTree.Commit().Items {
+			if it.Kind == driver.ItemKeymap {
+				keymap = it.Keys
+			}
+		}
+		id, _ := driver.FindKey(keymap, []string{"mod+r"}, 0, false)
+		if id == 0 {
+			t.Fatalf("%s, the settings keymap %+v has no reload key", when, keymap)
+		}
+		settingsTree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
+		for deadline := time.Now().Add(5 * time.Second); reloads.Load() < want && time.Now().Before(deadline); {
+			time.Sleep(5 * time.Millisecond)
+		}
+		// A second binding firing too would reload twice.
+		time.Sleep(50 * time.Millisecond)
+		if got := reloads.Load(); got != want {
+			t.Fatalf("%s, reloads = %d, want %d", when, got, want)
 		}
 	}
-	id, _ := driver.FindKey(keymap, []string{"mod+r"}, 0, false)
-	if id == 0 {
-		t.Fatalf("settings keymap %+v has no reload key after main close", keymap)
+	// The main view's own binding and the app scope's are both bound while the main view shows; one press reloads once.
+	press("with the main view open", 1)
+	main.Close()
+	tree.Commit()
+	if !slices.Contains(tree.Surfaces(), settingsTree) {
+		t.Fatal("settings tree disappeared with the main window")
 	}
-	settingsTree.Dispatch(driver.Event{Kind: driver.EventKey, Count: id})
-	for deadline := time.Now().Add(5 * time.Second); reloads.Load() < 1 && time.Now().Before(deadline); {
-		time.Sleep(5 * time.Millisecond)
-	}
-	if got := reloads.Load(); got != 1 {
-		t.Fatalf("reloads after main close = %d, want one", got)
-	}
+	press("after the main view closed", 2)
 }
