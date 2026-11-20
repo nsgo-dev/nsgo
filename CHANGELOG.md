@@ -7,6 +7,7 @@
 - Let Android's system tab bar follow the app theme's surface, inactive text, active text and accent-container colors (#936 by @houko).
 - Add touch-sheet options to `ui.Dialog` for bare content, grabber visibility, content/title styles and custom entry/exit motion (#933 by @houko).
 - Add `Scope.ScanCode`, which shows the camera full screen and answers with the first QR code or barcode it reads, on iOS devices through AVFoundation, with `Env.CanScanCode` and `nsgotest.App.ScanCode` answering it headless and on every target (#429 by @houko).
+- Read QR codes and barcodes with `Scope.ScanCode` on Android too, from Camera2's preview with gozxing, for apps whose manifest asks for `CAMERA` (#429 by @houko).
 - Pin `Environment.Camera` under `nsgo test -target` and deliver `App.TakePhoto` answers through the target test host instead of opening a system camera (#897, #948 by @houko).
 - Add Android's Material 3 `SystemSwitch` implementation for `ui.SwitchSystem`, with native checked, disabled and accessibility behavior (#937 by @houko).
 - Ignore an inherited AppImage environment when registering Linux launch-at-login entries, unless the running executable is inside that image (#946 by @houko).

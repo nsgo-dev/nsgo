@@ -68,7 +68,7 @@ if desktop.CanLookUp(cx) {
 
 ## Photos and files
 
-`cx.PickImages` shows the system's photo picker and answers with `core.PickedFile`s, whose bytes, name, type and pixel size the app reads. `cx.TakePhoto` shows the camera where the platform has one; `cx.Env().CanTakePhoto` says whether it does. `cx.ScanCode` shows the camera full screen and answers with the first code it reads, a QR code unless `ScanOptions.Kinds` asks for others, or nil when the user closes it; `cx.Env().CanScanCode` says whether the platform has a scanner, iOS devices so far. It needs `NSCameraUsageDescription` on iOS, as `TakePhoto` does, and a code's text is untrusted input.
+`cx.PickImages` shows the system's photo picker and answers with `core.PickedFile`s, whose bytes, name, type and pixel size the app reads. `cx.TakePhoto` shows the camera where the platform has one; `cx.Env().CanTakePhoto` says whether it does. `cx.ScanCode` shows the camera full screen and answers with the first code it reads, a QR code unless `ScanOptions.Kinds` asks for others, or nil when the user closes it; `cx.Env().CanScanCode` says whether the platform has a scanner: iOS and Android devices so far. It needs `NSCameraUsageDescription` on iOS, as `TakePhoto` does, and `CAMERA` in `android.permissions` on Android, which reads every kind but PDF417; a code's text is untrusted input.
 
 In tests, `nsgotest.App.PickImages`, `nsgotest.App.TakePhoto` and `nsgotest.App.ScanCode` answer picks, camera requests and code scans in place of system UI, headless and under `nsgo test -target`; `nsgotest.Environment(core.Environment{Camera: true, ScanCode: true})` gives a target without a camera one.
 

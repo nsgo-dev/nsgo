@@ -29,7 +29,7 @@ final class Protocol {
     static Message readMessage(DataInputStream in) throws IOException {
         int kind = in.read();
         if (kind == -1) return null;
-        if (kind < BATCH || kind > COOKIES) throw invalidMessage("unexpected message kind " + kind);
+        if (kind < BATCH || kind > SCAN) throw invalidMessage("unexpected message kind " + kind);
         int length;
         try {
             length = in.readInt();
@@ -78,6 +78,8 @@ final class Protocol {
     static final int SECRET = 19;
     /** Sets, lists or clears the web views' cookies and storage: the surface, the request's count and a COOKIES_* op, then for COOKIES_ADD each cookie's URL and Set-Cookie value, for COOKIES_LIST the URL (webcookie.go). */
     static final int COOKIES = 20;
+    /** Starts or stops the code scanner: the surface, the request's count and a SCAN_START or SCAN_STOP (scan.go, Scanner). */
+    static final int SCAN = 21;
 
     // Java to Go.
     static final int START = 1;
@@ -110,6 +112,20 @@ final class Protocol {
     static final int COOKIES_SET = 21;
     /** Requests or cancels a canvas image: surface, key, generation, cancel. */
     static final int CANVAS_REQUEST = 22;
+    /** What the code scanner reports: the surface, the request's count and a SCAN_FRAME with the frame's width, height and luminance, a SCAN_CLOSED, or a SCAN_FAILED with why (scan.go). */
+    static final int SCAN_REPORT = 23;
+
+    /** Writes a message's part after its head. */
+    interface Body {
+        void write(DataOutputStream out) throws IOException;
+    }
+
+    // What a SCAN message asks and a SCAN_REPORT reports, as scan.go has them.
+    static final int SCAN_START = 0;
+    static final int SCAN_STOP = 1;
+    static final int SCAN_FRAME = 0;
+    static final int SCAN_CLOSED = 1;
+    static final int SCAN_FAILED = 2;
 
     // What a COOKIES message asks, as driver.WebCookiesOp has them.
     static final int COOKIES_ADD = 0;

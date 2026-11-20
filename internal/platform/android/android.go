@@ -83,6 +83,8 @@ const (
 	msgSecret = 19
 	// msgCookies sets, lists or clears the web views' CookieManager and storage (webcookie.go).
 	msgCookies = 20
+	// msgScan starts or stops the runtime's code scanner (scan.go).
+	msgScan = 21
 
 	// Java to Go.
 	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
@@ -116,6 +118,8 @@ const (
 	msgCookiesSet = 21
 	// msgCanvasRequest requests or cancels a canvas image: surface, key, request, cancel.
 	msgCanvasRequest = 22
+	// msgScanReport is what the code scanner reports: a frame of the camera, its close or its failure (scan.go).
+	msgScanReport = 23
 )
 
 // The parts of an image view's request msgImage carries.
@@ -431,6 +435,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.canvasRequest(&r)
 		case msgCookiesSet:
 			s.webCookiesSet(&r)
+		case msgScanReport:
+			s.scanReport(&r)
 		case msgDNS:
 			servers := make([]string, r.u32())
 			for i := range servers {
@@ -867,7 +873,7 @@ func (s *surface) Mount(b *driver.MountBatch) {
 
 // mount sends the batch of v's tree to Java, which names its surface, and loads the image sources it changed.
 func (s *surface) mount(v *treeView, b *driver.MountBatch) {
-	b = s.withoutWebCookies(v.id, s.withoutAuthSessions(v.id, s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutDesktopItems(withoutEffects(b))))))
+	b = s.withoutScans(v.id, s.withoutWebCookies(v.id, s.withoutAuthSessions(v.id, s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutDesktopItems(withoutEffects(b)))))))
 	// Android has no file manager an app can reveal in or trash through. The batch may be the engine's own, which a test's observer holds, so the items are filtered from a copy.
 	fileManager := func(it driver.MountItem) bool {
 		return it.Kind == driver.ItemRevealFile || it.Kind == driver.ItemTrashFile

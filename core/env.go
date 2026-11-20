@@ -369,7 +369,7 @@ func (e *Env) CanSpeak() bool { return e.speak.Get() }
 // and Android devices with one, and browsers on touch screens.
 func (e *Env) CanTakePhoto() bool { return e.camera.Get() }
 
-// CanScanCode reports whether Scope.ScanCode shows a camera that reads codes here: iOS devices with a camera, not the simulator.
+// CanScanCode reports whether Scope.ScanCode shows a camera that reads codes here: iOS devices with a camera, not the simulator, and Android devices with one whose app's manifest asks for CAMERA (nsgo.yaml's android.permissions).
 func (e *Env) CanScanCode() bool { return e.scanCode.Get() }
 
 // CanSendInput reports whether Ref.SendInput can give a web view's page

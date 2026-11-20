@@ -411,7 +411,10 @@ func readEnvironment(r *reader) driver.Environment {
 		env.Lifecycle = driver.LifecycleInactive
 	}
 	// The first byte's bits are all taken; a second holds what else the device can do.
-	env.Speak = r.byte()&1 != 0
+	more := r.byte()
+	env.Speak = more&1 != 0
+	// A camera the app may read frames of: one the device has, and CAMERA in the app's manifest.
+	env.ScanCode = more&2 != 0
 	env.Idiom = driver.Idiom(r.byte())
 	env.Locale = r.str()
 	env.DeviceName = r.str()

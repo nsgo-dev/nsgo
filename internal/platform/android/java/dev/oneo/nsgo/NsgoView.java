@@ -849,6 +849,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 case Protocol.COOKIES:
                     cookies(message);
                     break;
+                case Protocol.SCAN:
+                    scan(message);
+                    break;
                 case Protocol.WANT_FRAME:
                     ui.post(() -> {
                         frameWanted = true;
@@ -967,7 +970,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                     | (increaseContrast ? 128 : 0)
                     | (inactive ? 16 : 0) | (background ? 32 : 0) | (Services.hasCamera(getContext()) ? 64 : 0));
             // The first byte's eight bits are taken: what else the device can do follows in a second.
-            d.writeByte(Speaker.available(getContext()) ? 1 : 0);
+            d.writeByte((Speaker.available(getContext()) ? 1 : 0) | (Scanner.available(getContext()) ? 2 : 0));
             int idiom = config.smallestScreenWidthDp >= 600 ? Protocol.IDIOM_TABLET : Protocol.IDIOM_PHONE;
             if ((config.uiMode & Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION) {
                 idiom = Protocol.IDIOM_TV;
@@ -1127,6 +1130,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             return;
         }
         if (request == Sensors.PERMISSION_REQUEST) { if (sensors != null) sensors.permissionResult(); return; }
+        if (request == Scanner.PERMISSION_REQUEST) {
+            if (scanner != null) scanner.permissionResult(results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED);
+            return;
+        }
         if (request == Notifications.PERMISSION_REQUEST) {
             Notifications.markAsked(getContext());
             for (long count : permissionAsks) answerPermission(count);
@@ -3718,6 +3725,41 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 });
             }
         });
+    }
+
+    /** The code scanner on screen, on the UI thread; null without one. */
+    private Scanner scanner;
+
+    /** Takes a SCAN message on the engine's reader thread: starts a scanner for the request, closing one that shows, or stops the one Go found a code with. */
+    private void scan(DataInputStream in) throws IOException {
+        int surface = in.readInt(), count = in.readInt(), op = in.readByte();
+        ui.post(() -> {
+            if (op == Protocol.SCAN_STOP) {
+                if (scanner != null && scanner.answers(surface, count)) {
+                    scanner.stop();
+                    scanner = null;
+                }
+                return;
+            }
+            if (scanner != null) scanner.close();
+            scanner = new Scanner(this, surface, count, () -> scanner = null);
+            scanner.start(activity());
+        });
+    }
+
+    /** Sends what the scanner of surface's request count reports: what, a Protocol.SCAN_* report, then body's. */
+    void scanReport(int surface, int count, int what, Protocol.Body body) {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        try {
+            out.writeInt(surface);
+            out.writeInt(count);
+            out.writeByte(what);
+            if (body != null) body.write(out);
+        } catch (IOException impossible) {
+            throw new AssertionError(impossible);
+        }
+        write(Protocol.SCAN_REPORT, bytes.toByteArray());
     }
 
     private void cookiesSet(int surface, int count, String error, int op, String url, String header) {

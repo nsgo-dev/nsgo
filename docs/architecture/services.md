@@ -86,9 +86,10 @@ The desktops show no camera ([roadmap](../roadmap.md#finish-the-existing-platfor
 
 | Target | Scanner | Permission |
 | --- | --- | --- |
+| Android | Camera2's preview of the back camera in a full-screen dialog with a close button worded by the system (`Scanner.java`), sending the luminance of a frame up to 960 pixels long every 200 ms as `msgScanReport`; Go reads them with gozxing (`internal/platform/codescan`), every kind but PDF417, turning a frame a quarter for a barcode across it, and stops the scanner with `msgScan`. Android reads no codes itself without Google Play services, which the runtime does not link | `CAMERA`, which the app's manifest must ask for (`android.permissions`), asked once; without it `Env.CanScanCode` is false |
 | iOS | An `AVCaptureSession` of the default camera whose `AVCaptureMetadataOutput` reads the kinds asked for, those it supports (`apple.MetadataTypes`), in an `AVCaptureVideoPreviewLayer` presented full screen in a navigation controller with the system's Cancel button, which UIKit words; not on Apple TV or the simulator | As `TakePhoto`'s (`withCamera`) |
 
-Android, macOS, the desktops and the web show no scanner ([roadmap](../roadmap.md#finish-the-existing-platforms)).
+macOS, the desktops and the web show no scanner ([roadmap](../roadmap.md#finish-the-existing-platforms)).
 
 ## Files
 
