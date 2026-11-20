@@ -2599,10 +2599,7 @@ func (s *surface) pointerUp(e js.Value) {
 	s.pressed(p.view, driver.EventPressUp)
 }
 
-// pointerMove cancels a press once the pointer has moved beyond the same
-// eight-point slop the headless and native gesture models use. Listening on
-// the document keeps a drag that leaves the original element from pressing it
-// when it comes back for pointerup/click.
+// pointerMove cancels a press, and its pending long press, once the pointer has moved beyond the same eight-point slop the headless and native gesture models use. Listening on the document keeps a drag that leaves the original element from pressing it when it comes back for pointerup/click.
 func (s *surface) pointerMove(e js.Value) {
 	p := &s.press
 	if !p.active || p.done || p.cancel || p.view == nil || e.Get("pointerId").Int() != p.pointer {
@@ -2613,6 +2610,7 @@ func (s *surface) pointerMove(e js.Value) {
 	if math.Hypot(dx, dy) <= 8 {
 		return
 	}
+	s.stopLongPress()
 	p.cancel = true
 	s.pressed(p.view, driver.EventPressUp)
 	p.done = true
