@@ -38,3 +38,5 @@ require (
 )
 
 tool github.com/nsgo-dev/nsgo/cmd/nsgo
+
+replace github.com/dop251/goja => github.com/nsgo-dev/goja v0.0.0-20261120233924-6d8b53c7fffe

@@ -60,6 +60,7 @@ func main() { nsgo.Run(Root) }
 - `core.PanEvent` supplies `Position` in the view and `PagePosition` in its page on every phase.
 - A native `Plugin.Call` reports `tsx.ErrBudget` when `Limits.Call` cuts its JS, even after `await`. `Limits.CallTotal` also counts time spent waiting. Hosts can stop the plugin with `Plugin.Interrupt`. Sandboxed backtracking regexps use the shorter load or call budget as their match timeout.
 - In a native sandbox `JSON.stringify`, `JSON.parse` with a reviver, `Array.prototype.join`, `toString`, `toLocaleString` and `flat` throw a catchable `RangeError` past 1,000 levels, counted across nested calls, instead of hanging or overflowing the host's Go stack.
+- Native functions calling each other (built-in getters, `toString`/`valueOf`, `RegExp` `exec` dispatch, `Reflect.apply`/`construct`, bound-function and proxy chains) count against `Limits.Stack` and throw a catchable `RangeError`, and exporting a plugin value nested deeper fails with a `RangeError`, through NSGo's goja fork; apps must copy NSGo's `replace github.com/dop251/goja => github.com/nsgo-dev/goja ...` line into their own `go.mod`.
 - Register a getter's nonzero default with `tsx.Default("Max", float64(100))` so forwarded undefined props keep that default as they change.
 
 ## Layout and styles
