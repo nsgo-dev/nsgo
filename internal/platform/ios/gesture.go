@@ -305,7 +305,9 @@ func gateMoved(self objc.ID, _ objc.SEL, _, _ objc.ID) {
 	} else {
 		self.Send(selSetState, stateChanged)
 	}
-	g.view.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: g.handedOff(d), Velocity: g.velocity})
+	local := objc.Send[apple.CGPoint](g.finger, selLocationInView, g.view.native)
+	page := objc.Send[apple.CGPoint](g.finger, selLocationInView, g.view.surface.native)
+	g.view.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: g.handedOff(d), Position: driver.Point{X: driver.Points(local.X), Y: driver.Points(local.Y)}, PagePosition: driver.Point{X: driver.Points(page.X), Y: driver.Points(page.Y)}, Velocity: g.velocity})
 }
 
 // handedOff is how far drag d moves the pan: past what the scroll view it
@@ -348,7 +350,9 @@ func gateLifted(self, touches objc.ID, how int) {
 	if g.scroll != 0 {
 		at.Y = max(at.Y-g.offset, 0)
 	}
-	g.view.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: at, Velocity: velocity})
+	local := objc.Send[apple.CGPoint](g.finger, selLocationInView, g.view.native)
+	page := objc.Send[apple.CGPoint](g.finger, selLocationInView, g.view.surface.native)
+	g.view.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: at, Position: driver.Point{X: driver.Points(local.X), Y: driver.Points(local.Y)}, PagePosition: driver.Point{X: driver.Points(page.X), Y: driver.Points(page.Y)}, Velocity: velocity})
 }
 
 // gateHoldsBack reports whether other is the pan of a scroll view around

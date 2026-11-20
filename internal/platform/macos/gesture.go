@@ -23,6 +23,7 @@ type panTrack struct {
 	start    apple.CGPoint
 	active   bool
 	at       driver.Point // the translation last seen
+	page     driver.Point // current point in the surface
 	velocity driver.Point
 	time     float64 // when it was last seen, in seconds
 }
@@ -84,7 +85,7 @@ func mouseDragged(self objc.ID, cmd objc.SEL, event objc.ID) {
 		// Smoothed, so one uneven sample does not throw a flick.
 		t.velocity = driver.Point{X: inst.X*0.7 + t.velocity.X*0.3, Y: inst.Y*0.7 + t.velocity.Y*0.3}
 	}
-	t.at, t.time = d, now
+	t.at, t.page, t.time = d, driver.Point{X: driver.Points(at.X), Y: driver.Points(at.Y)}, now
 	phase := driver.GestureChanged
 	if !t.active {
 		switch t.view.activation.Decide(d) {
@@ -101,7 +102,8 @@ func mouseDragged(self objc.ID, cmd objc.SEL, event objc.ID) {
 			return
 		}
 	}
-	t.view.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: d, Velocity: t.velocity})
+	local := t.view.windowPoint(at)
+	t.view.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: d, Position: driver.Point{X: driver.Points(local.X), Y: driver.Points(local.Y)}, PagePosition: t.view.page(at), Velocity: t.velocity})
 }
 
 // endPan ends the pan a mouse up lifts, reporting whether one was active.
@@ -116,7 +118,9 @@ func (s *surface) endPan(event objc.ID) bool {
 	if objc.Send[float64](event, selTimestamp)-t.time > 0.05 {
 		velocity = driver.Point{}
 	}
-	t.view.report(driver.Event{Kind: driver.EventPan, Phase: driver.GestureEnded, Point: t.at, Velocity: velocity})
+	at := apple.CGPoint{X: float64(t.start.X) + float64(t.at.X), Y: float64(t.start.Y) - float64(t.at.Y)}
+	local := t.view.windowPoint(at)
+	t.view.report(driver.Event{Kind: driver.EventPan, Phase: driver.GestureEnded, Point: t.at, Position: driver.Point{X: driver.Points(local.X), Y: driver.Points(local.Y)}, PagePosition: t.view.page(at), Velocity: velocity})
 	return true
 }
 

@@ -268,8 +268,12 @@ func (s *surface) takePress(id int) {
 
 func (s *surface) panEvent(p *pointer, phase driver.GesturePhase) driver.Event {
 	vx, vy := velocity(p.samples)
+	lx, ly := p.pan.localPoint(p.x, p.y)
+	r := s.host.Call("getBoundingClientRect")
+	page := driver.Point{X: driver.Points(p.x - r.Get("left").Float() - s.host.Get("clientLeft").Float()), Y: driver.Points(p.y - r.Get("top").Float() - s.host.Get("clientTop").Float())}
 	return driver.Event{Kind: driver.EventPan, Phase: phase,
 		Point:    driver.Point{X: driver.Points(p.x - p.startX), Y: driver.Points(p.y - p.startY)},
+		Position: driver.Point{X: driver.Points(lx), Y: driver.Points(ly)}, PagePosition: page,
 		Velocity: driver.Point{X: driver.Points(vx), Y: driver.Points(vy)}}
 }
 

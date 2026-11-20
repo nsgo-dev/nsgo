@@ -65,6 +65,7 @@ type pan struct {
 	active     bool
 	failed     bool
 	last       driver.Point
+	lastPage   driver.Point
 	lastTime   time.Time
 	velocity   driver.Point
 	activation driver.PanActivation
@@ -278,7 +279,8 @@ func dragUpdateCallback(gesture uintptr, offsetX, offsetY float64, data uintptr)
 			return
 		}
 		g.active = true
-		w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureBegan, Point: d})
+		g.lastPage = now
+		w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureBegan, Point: d, Position: g.v.local(now), PagePosition: now})
 	}
 	dt := time.Since(g.lastTime).Seconds()
 	var velocity driver.Point
@@ -286,7 +288,8 @@ func dragUpdateCallback(gesture uintptr, offsetX, offsetY float64, data uintptr)
 		velocity = driver.Point{X: driver.Points(float64(now.X-g.last.X) / dt), Y: driver.Points(float64(now.Y-g.last.Y) / dt)}
 	}
 	g.last, g.lastTime, g.velocity = now, time.Now(), velocity
-	w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureChanged, Point: d, Velocity: velocity})
+	g.lastPage = now
+	w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureChanged, Point: d, Position: g.v.local(now), PagePosition: now, Velocity: velocity})
 }
 
 func dragEndCallback(gesture uintptr, offsetX, offsetY float64, data uintptr) {
@@ -318,9 +321,11 @@ func dragEndCallback(gesture uintptr, offsetX, offsetY float64, data uintptr) {
 	}
 	if !g.active {
 		g.active = true
-		w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureBegan, Point: d})
+		now := driver.Point{X: g.start.X + d.X, Y: g.start.Y + d.Y}
+		w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureBegan, Point: d, Position: g.v.local(now), PagePosition: now})
 	}
-	w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureEnded, Point: d, Velocity: g.velocity})
+	now := driver.Point{X: g.start.X + d.X, Y: g.start.Y + d.Y}
+	w.reportGesture(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureEnded, Point: d, Position: g.v.local(now), PagePosition: now, Velocity: g.velocity})
 }
 
 // longPressDelay is how long a press is held to be a long press, unless

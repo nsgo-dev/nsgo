@@ -1694,16 +1694,24 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             int index, int phase, float vx, float vy, float value, WebNode.Navigation nav,
             long time, long duration, boolean buffering, String data, boolean finished) {
         event(kind, id, count, x, y, text, width, height, index, phase, vx, vy, value, nav, time, duration, buffering,
-                data, finished, 0, 0, 0);
+                data, finished, 0, 0, 0, 0, 0);
     }
 
     /**
-     * Sends an event to the engine: its kind, node, count, point, text, size and index, then a gesture's phase, velocity and value, then a web view's navigation: flags of whether there is one, loading, canGoBack and canGoForward, and if there is, its URL and title; then a video's time and duration in milliseconds and whether it buffers; then a native view's callback arguments or a download as JSON, or the URL of a message's page, and whether an animation finished; then a pointer's position in its root view and the modifier keys (modifiers' bits).
+     * Sends an event to the engine: its kind, node, count, point, text, size and index, then a gesture's phase, velocity and value, then a web view's navigation: flags of whether there is one, loading, canGoBack and canGoForward, and if there is, its URL and title; then a video's time and duration in milliseconds and whether it buffers; then a native view's callback arguments or a download as JSON, or the URL of a message's page, and whether an animation finished; then a pointer's position in its root view, a pan's position in its view, and the modifier keys (modifiers' bits).
      */
     private void event(int kind, int id, long count, float x, float y, String text, float width, float height,
             int index, int phase, float vx, float vy, float value, WebNode.Navigation nav,
             long time, long duration, boolean buffering, String data, boolean finished,
             float pageX, float pageY, int mods) {
+        event(kind, id, count, x, y, text, width, height, index, phase, vx, vy, value, nav, time, duration, buffering,
+                data, finished, pageX, pageY, 0, 0, mods);
+    }
+
+    private void event(int kind, int id, long count, float x, float y, String text, float width, float height,
+            int index, int phase, float vx, float vy, float value, WebNode.Navigation nav,
+            long time, long duration, boolean buffering, String data, boolean finished,
+            float pageX, float pageY, float positionX, float positionY, int mods) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream d = new DataOutputStream(bytes);
         try {
@@ -1736,6 +1744,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             d.writeByte(finished ? 1 : 0);
             d.writeFloat(pageX);
             d.writeFloat(pageY);
+            d.writeFloat(positionX);
+            d.writeFloat(positionY);
             d.writeByte(mods);
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
@@ -5157,7 +5167,13 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 vx = velocity.getXVelocity(panPointer) / density;
                 vy = velocity.getYVelocity(panPointer) / density;
             }
-            gesture(pan, Protocol.EVENT_PAN, phase, panX, panY, vx, vy, 0);
+            int[] root = new int[2], view = new int[2];
+            getLocationInWindow(root);
+            pan.view.getLocationInWindow(view);
+            float rawX = downX + panX * density, rawY = downY + panY * density;
+            float pageX = (rawX - root[0]) / density, pageY = (rawY - root[1]) / density;
+            float positionX = (rawX - view[0]) / density, positionY = (rawY - view[1]) / density;
+            gesture(pan, Protocol.EVENT_PAN, phase, panX, panY, vx, vy, 0, positionX, positionY, pageX, pageY);
         }
 
         private void trackRotation(MotionEvent e, int action) {
@@ -5310,11 +5326,17 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
          * the event's size.
          */
         private void gesture(Node n, int kind, int phase, float x, float y, float vx, float vy, float value) {
+			gesture(n, kind, phase, x, y, vx, vy, value, 0, 0, 0, 0);
+		}
+
+		private void gesture(Node n, int kind, int phase, float x, float y, float vx, float vy, float value,
+				float positionX, float positionY, float pageX, float pageY) {
             float[] values = animator.gesture(kind, n.id, phase, x, y, value);
             if (values != null) applyAnimated();
             float w = values != null && values.length == 2 ? values[0] : 0;
             float h = values != null && values.length == 2 ? values[1] : 0;
-            if (n.has(kind)) event(kind, n.id, 0, x, y, "", w, h, 0, phase, vx, vy, value, null);
+            if (n.has(kind)) event(kind, n.id, 0, x, y, "", w, h, 0, phase, vx, vy, value, null,
+					0, 0, false, "", false, pageX, pageY, positionX, positionY, 0);
         }
     }
 

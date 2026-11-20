@@ -2514,7 +2514,7 @@ func (t *Tree) Dispatch(ev driver.Event) {
 				t.setState(n, statePressed, false) // the pan took the press
 			}
 			t.within(n.owner, func() {
-				h.pan(PanEvent{Phase: ev.Phase, Translation: ev.Point, Velocity: ev.Velocity, Values: ev.Values})
+				h.pan(PanEvent{Phase: ev.Phase, Translation: ev.Point, Velocity: ev.Velocity, Position: ev.Position, PagePosition: ev.PagePosition, Values: ev.Values})
 			})
 		}
 	case driver.EventPinch, driver.EventRotation:

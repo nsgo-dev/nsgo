@@ -101,7 +101,7 @@ func (s *surface) touchMove(at driver.Point, t float64) {
 				g.panning = true
 				s.cancelPress()
 				s.lockScrolls(p)
-				p.report(driver.Event{Kind: driver.EventPan, Phase: driver.GestureBegan, Point: d})
+				p.report(driver.Event{Kind: driver.EventPan, Phase: driver.GestureBegan, Point: d, Position: s.local(p, at), PagePosition: at})
 			case -1:
 				g.pan = nil
 			}
@@ -112,7 +112,7 @@ func (s *surface) touchMove(at driver.Point, t float64) {
 				// Smoothed, so one uneven sample does not throw a flick.
 				g.velocity = driver.Point{X: inst.X*0.7 + g.velocity.X*0.3, Y: inst.Y*0.7 + g.velocity.Y*0.3}
 			}
-			p.report(driver.Event{Kind: driver.EventPan, Phase: driver.GestureChanged, Point: d, Velocity: g.velocity})
+			p.report(driver.Event{Kind: driver.EventPan, Phase: driver.GestureChanged, Point: d, Position: s.local(p, at), PagePosition: at, Velocity: g.velocity})
 		}
 	}
 	g.last, g.lastTime = at, t
@@ -135,7 +135,7 @@ func (s *surface) touchUp(at driver.Point, t float64, cancelled bool) {
 			velocity = driver.Point{}
 		}
 		d := driver.Point{X: at.X - g.start.X, Y: at.Y - g.start.Y}
-		p.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: d, Velocity: velocity})
+		p.report(driver.Event{Kind: driver.EventPan, Phase: phase, Point: d, Position: s.local(p, at), PagePosition: at, Velocity: velocity})
 	}
 	s.unlockScrolls()
 	v := g.pressed

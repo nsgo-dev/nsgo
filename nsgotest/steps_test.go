@@ -466,6 +466,7 @@ func TestKeyRunsTheBindingTheFocusMatches(t *testing.T) {
 
 func TestDragsGoToWhatAFingerMoves(t *testing.T) {
 	var log []string
+	var pans []core.PanEvent
 	app := Start(t, func(cx *core.Scope) core.Node {
 		rows := make([]core.Node, 20)
 		for i := range rows {
@@ -474,13 +475,19 @@ func TestDragsGoToWhatAFingerMoves(t *testing.T) {
 		}
 		return core.View{Children: []core.Node{
 			core.View{TestID: "card", Style: core.Style{Height: core.Pt(60)},
-				OnPan: func(e core.PanEvent) { log = append(log, fmt.Sprintf("pan %v %v", e.Phase, e.Translation.X)) }},
+				OnPan: func(e core.PanEvent) {
+					pans = append(pans, e)
+					log = append(log, fmt.Sprintf("pan %v %v", e.Phase, e.Translation.X))
+				}},
 			core.Scroll{TestID: "list", Style: core.Style{Height: core.Pt(300)}, Children: rows},
 		}}
 	})
 	app.Drag("id:card", core.Point{X: 40})
 	if len(log) < 2 || log[0] != fmt.Sprintf("pan %v 10", core.GestureBegan) || log[len(log)-1] != fmt.Sprintf("pan %v 40", core.GestureEnded) {
 		t.Fatalf("the pan heard %v", log)
+	}
+	if len(pans) < 2 || pans[len(pans)-1].Position.X-pans[0].Position.X != pans[len(pans)-1].Translation.X-pans[0].Translation.X || pans[len(pans)-1].PagePosition.X-pans[0].PagePosition.X != pans[len(pans)-1].Translation.X-pans[0].Translation.X {
+		t.Fatalf("pan positions = %+v, want translation from begin to end", pans)
 	}
 	log = nil
 	app.Drag("id:row-1", core.Point{Y: -120})

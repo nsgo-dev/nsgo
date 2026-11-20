@@ -558,6 +558,9 @@ type PanEvent struct {
 	Phase       GesturePhase
 	Translation Point
 	Velocity    Point
+	// Position is the finger's point in the view; PagePosition is that point
+	// in the view's page. Both are reported for every phase.
+	Position, PagePosition Point
 	// Values are the PanValues as the pan begins and ends: a drag may grab
 	// them mid animation, which a snap after it starts from.
 	Values Point

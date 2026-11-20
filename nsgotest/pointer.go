@@ -321,7 +321,7 @@ func (v *View) scrollEnd() driver.Points {
 }
 
 func (a *App) pan(f *finger, phase driver.GesturePhase, t driver.Point) {
-	ev := driver.Event{Kind: driver.EventPan, ID: f.view.ID, Phase: phase, Point: t, Velocity: f.velocity()}
+	ev := driver.Event{Kind: driver.EventPan, ID: f.view.ID, Phase: phase, Point: t, Position: f.view.localPoint(f.at), PagePosition: f.at, Velocity: f.velocity()}
 	// A platform moves bound values before it reports the move.
 	a.anim.Gesture(&ev)
 	a.dispatch(ev)

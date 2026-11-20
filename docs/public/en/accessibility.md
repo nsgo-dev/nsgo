@@ -7,6 +7,8 @@ order: 61
 
 ## What a screen reader reads
 
+`core.PanEvent` includes `Position` in the view and `PagePosition` in the page on every pan phase, so drag tools do not need a separate press event to recover the finger location.
+
 A view's `Label` is what assistive technology says, `AccessibilityDescription` more about it, read after the label, `Hint` what activating it does, and `Role` what it is: `core.RoleButton`, `RoleLink`, `RoleHeader`, `RoleImage`, `RoleCheckbox`, `RoleSwitch`, `RoleRadio`, `RoleTab`, `RoleTextField`, `RoleSearchField`, `RoleStatus`, `RoleMenu`, `RoleMenuItem`, `RoleDialog`, `RoleAlertDialog`, `RoleAlert`, `RoleAdjustable`, `RoleProgressBar`, `RoleTable` and the rest. A status is a polite live region by default; a search field is a text field announced as a search box. A dialog is read with its role and label as it opens, and its description after them, as `ui.Dialog`'s title and description are. A text without a label is read as its content. `LabelFunc` and `AccessibilityDescriptionFunc` bind a label and a description that change, such as with the language or a count, on the same view, so a field keeps its focus and text.
 
 ```go

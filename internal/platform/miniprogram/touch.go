@@ -221,6 +221,8 @@ func (m *mounter) panEvent(p *pointer, phase driver.GesturePhase) driver.Event {
 	ev := m.pointer(p.pan, driver.EventPan, p.at)
 	ev.Phase = phase
 	ev.Point = driver.Point{X: p.at.X - p.start.X, Y: p.at.Y - p.start.Y}
+	ev.Position = m.pointer(p.pan, driver.EventPan, p.at).Point
+	ev.PagePosition = p.at
 	ev.Velocity = driver.Point{X: driver.Points(vx), Y: driver.Points(vy)}
 	return ev
 }

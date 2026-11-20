@@ -336,6 +336,9 @@ type Event struct {
 	Phase    GesturePhase
 	Velocity Point
 	Value    float32
+	// Position and PagePosition are the current point of a pan in its view
+	// and page coordinates. Point remains the pan's translation.
+	Position, PagePosition Point
 	// Navigation is a web view's state.
 	Navigation *WebNavigation
 	// Origin is the origin of the frame that posted a web view's message, as WebOrigin writes it, URL that frame's URL, and MainFrame whether that frame is the page's top one. A backend that cannot tell a frame's origin delivers the top frame's messages alone.

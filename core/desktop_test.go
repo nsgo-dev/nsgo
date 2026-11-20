@@ -28,10 +28,10 @@ func TestGesturesReportAndMerge(t *testing.T) {
 			t.Fatalf("props = %+v", it.ViewProps)
 		}
 	}
-	h.tree.Dispatch(driver.Event{Kind: driver.EventPan, ID: n.id, Phase: GestureBegan, Point: Point{X: 20, Y: 0}})
-	h.tree.Dispatch(driver.Event{Kind: driver.EventPan, ID: n.id, Phase: GestureEnded, Point: Point{X: 30, Y: 5}, Velocity: Point{X: 100, Y: 0}})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPan, ID: n.id, Phase: GestureBegan, Point: Point{X: 20, Y: 0}, Position: Point{X: 25, Y: 10}, PagePosition: Point{X: 35, Y: 20}})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventPan, ID: n.id, Phase: GestureEnded, Point: Point{X: 30, Y: 5}, Position: Point{X: 35, Y: 15}, PagePosition: Point{X: 45, Y: 25}, Velocity: Point{X: 100, Y: 0}})
 	h.tree.Dispatch(driver.Event{Kind: driver.EventPinch, ID: n.id, Phase: GestureChanged, Value: 1.5})
-	if len(pans) != 2 || pans[1].Translation != (Point{X: 30, Y: 5}) || pans[1].Velocity.X != 100 || pans[1].Phase != GestureEnded {
+	if len(pans) != 2 || pans[1].Translation != (Point{X: 30, Y: 5}) || pans[1].Position != (Point{X: 35, Y: 15}) || pans[1].PagePosition != (Point{X: 45, Y: 25}) || pans[1].Velocity.X != 100 || pans[1].Phase != GestureEnded {
 		t.Fatalf("pans = %+v", pans)
 	}
 	if !slices.Equal(scales, []float32{1.5}) {

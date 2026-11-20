@@ -70,6 +70,7 @@ type pan struct {
 	start      driver.Point // where the pointer went down, in client points
 	active     bool
 	last       driver.Point // the last translation reported
+	lastPage   driver.Point // the last pointer position in client points
 	lastTime   time.Time
 	velocity   driver.Point
 	activation driver.PanActivation
@@ -148,7 +149,7 @@ func (w *window) panMove(p driver.Point) {
 			g.active = true
 			g.last, g.lastTime = d, now
 			w.pressCancel() // the pan took the press
-			w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureBegan, Point: d})
+			w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureBegan, Point: d, Position: g.v.local(p), PagePosition: p})
 		case -1:
 			w.endPan()
 		}
@@ -159,7 +160,8 @@ func (w *window) panMove(p driver.Point) {
 		g.velocity = driver.Point{X: g.velocity.X*0.3 + vx*0.7, Y: g.velocity.Y*0.3 + vy*0.7}
 	}
 	g.last, g.lastTime = d, now
-	w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureChanged, Point: d, Velocity: g.velocity})
+	g.lastPage = p
+	w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureChanged, Point: d, Position: g.v.local(p), PagePosition: p, Velocity: g.velocity})
 }
 
 // panUp ends the drag at p and reports whether an active pan took it,
@@ -178,7 +180,7 @@ func (w *window) panUp(p driver.Point) bool {
 	if time.Since(g.lastTime) > 100*time.Millisecond {
 		velocity = driver.Point{} // the pointer stopped before it let go
 	}
-	w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureEnded, Point: d, Velocity: velocity})
+	w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureEnded, Point: d, Position: g.v.local(p), PagePosition: p, Velocity: velocity})
 	return true
 }
 
@@ -190,7 +192,7 @@ func (w *window) panLost() {
 	}
 	w.pan = nil
 	if g.active && !g.v.deleted {
-		w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureCancelled, Point: g.last})
+		w.gestured(driver.Event{Kind: driver.EventPan, ID: g.v.id, Phase: driver.GestureCancelled, Point: g.last, Position: g.v.local(g.lastPage), PagePosition: g.lastPage})
 	}
 }
 
