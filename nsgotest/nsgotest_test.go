@@ -719,8 +719,7 @@ func TestApplicationMenuRolesHeadless(t *testing.T) {
 		t.Fatalf("minimize and a second zoom reported maximized %v, full screen %v, minimized %v", env.Maximized(), env.FullScreen(), env.Minimized())
 	}
 
-	// A non-editing role with OnSelect is an app action on every desktop; it
-	// does not also minimize or quit.
+	// A non-editing role with OnSelect is an app action on every desktop; it does not also minimize or quit.
 	selected := 0
 	app = start(t, []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{
 		{Role: core.MenuQuit, OnSelect: func() { selected++ }},
