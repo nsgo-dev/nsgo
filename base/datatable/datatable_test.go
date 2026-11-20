@@ -24,6 +24,33 @@ func tableColumns(n int) []datatable.Column {
 	return cols
 }
 
+// The grid is the table's only Tab stop; its pointer hit layer is not one.
+func TestDataTableIsOneTabStop(t *testing.T) {
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Children: []core.Node{
+			datatable.DataTable{
+				TestID:   "table",
+				Label:    "Quotes",
+				Columns:  func() []datatable.Column { return tableColumns(3) },
+				RowCount: func() int { return 10 },
+				Text:     func(row, col int) string { return fmt.Sprintf("R%dC%d", row, col) },
+				Style:    core.Style{Width: core.Pt(300), Height: core.Pt(200)},
+			},
+			core.View{TestID: "after", Role: core.RoleButton, Label: "After", OnPress: func(core.PressEvent) {}, Style: core.Style{Width: core.Pt(80), Height: core.Pt(30)}},
+		}}
+	}, nsgotest.Size(400, 400), nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
+	app.Key("tab")
+	if !app.Find("id:table").Focused {
+		t.Fatal("Tab did not focus the table's grid")
+	}
+	// The table takes Tab itself to move between cells, so reach it backwards from the next control: Shift+Tab lands on the grid, not on the hit layer after it in tree order.
+	app.Focus("id:after")
+	app.Key("shift+tab")
+	if !app.Find("id:table").Focused {
+		t.Fatal("Shift+Tab from the next control did not reach the table's grid")
+	}
+}
+
 func TestDataTableMakesOnlyTheCellsInView(t *testing.T) {
 	var (
 		sel     []datatable.Selection

@@ -125,9 +125,9 @@ func (t *dataTable) hitLayer() core.Node {
 	behavior := core.ScrollBehavior{NoBounces: p.NoBounce}
 	pressed := func(e core.PressEvent) { t.press(t.hitAt(e.Position), e.Clicks, e.Modifiers) }
 	box := core.View{
-		// The hit layer handles pointer presses but is not itself an
-		// accessibility element; keyboard focus belongs to the named grid.
+		// The hit layer handles pointer presses but is neither an accessibility element nor a Tab stop; keyboard focus belongs to the named grid.
 		ImportantForAccessibility: core.ImportantNo,
+		NoFocus:                   true,
 		StyleFunc: func() core.Style {
 			return core.Style{MinWidth: core.Pct(100), Width: px(t.contentWidth()), Height: px(t.sizes.Get().y.extent())}
 		},
@@ -744,7 +744,7 @@ func (t *dataTable) bodyRow(cx *core.Scope, row *core.Memo[int], which tableRegi
 		},
 		Role:     core.RoleRow,
 		Selected: selected.Get,
-		// The table is one stop of Tab, its hit layer.
+		// The table is one stop of Tab, its grid.
 		NoFocus: true,
 		// The views of the cells take presses from assistive technology
 		// and tests; a pointer reaches the hit layer.
