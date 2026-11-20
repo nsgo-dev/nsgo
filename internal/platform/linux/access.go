@@ -184,13 +184,6 @@ func pressable(m driver.EventMask) bool {
 	return m.Has(driver.EventPress) || m.Has(driver.EventLongPress)
 }
 
-func boolToInt(v bool) int32 {
-	if v {
-		return 1
-	}
-	return 0
-}
-
 // prepareRoles finds the roles of the views b creates, from its props and
 // events, before they are made.
 func (w *window) prepareRoles(b *driver.MountBatch) {
@@ -318,14 +311,17 @@ func (w *window) updateAccess(v *view) bool {
 	setString("label", n.label, old.label)
 	setString("description", n.description, old.description)
 	setString("value-text", n.valueText, old.valueText)
-	if n.multiSelectable != old.multiSelectable || !old.set {
-		prop := enumValue("property", "multiselectable")
-		if prop >= 0 {
+	if n.multiSelectable != old.multiSelectable {
+		// GTK_ACCESSIBLE_PROPERTY_MULTI_SELECTABLE, whose nick has a hyphen.
+		prop := enumValue("property", "multi-selectable")
+		if n.multiSelectable {
 			var val gValue
 			gValueInit(uintptr(unsafe.Pointer(&val)), gTypeBoolean)
-			gValueSetBoolean(&val, boolToInt(n.multiSelectable))
+			gValueSetBoolean(&val, 1)
 			gtkAccessibleUpdatePropertyValue(acc, 1, &prop, &val)
 			gValueUnset(uintptr(unsafe.Pointer(&val)))
+		} else {
+			gtkAccessibleResetProperty(acc, prop)
 		}
 	}
 	if n.ranged != old.ranged || n.min != old.min || n.max != old.max || n.now != old.now {

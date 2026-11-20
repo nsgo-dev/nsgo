@@ -172,10 +172,9 @@ type View struct {
 	// Disabled stops presses and is reported to assistive technology.
 	Disabled func() bool
 	Selected func() bool
-	// MultiSelectable tells assistive technology that this grid, listbox or
-	// tree permits more than one selected item.
+	// MultiSelectable tells assistive technology that this grid, listbox or tree permits more than one selected item.
 	MultiSelectable bool
-	Checked  func() bool
+	Checked         func() bool
 	// Indeterminate is neither checked nor unchecked, as a "select all"
 	// over a partial selection.
 	Indeterminate func() bool

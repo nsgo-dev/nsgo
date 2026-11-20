@@ -967,9 +967,7 @@ func uiaSelectionContainer(i *uiaIface, out *unsafe.Pointer) uintptr {
 	return sOK
 }
 
-// uiaGetSelection returns the selected direct children of a multi-select
-// container as UI Automation providers. SafeArray owns the references until
-// the client destroys it.
+// uiaGetSelection returns the selected direct children of a multi-select container as UI Automation providers. The SafeArray owns the references until the client destroys it.
 func uiaGetSelection(i *uiaIface, out *uintptr) uintptr {
 	*out = 0
 	v, ok := i.el.alive()

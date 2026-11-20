@@ -929,12 +929,11 @@ type ViewProps struct {
 	Disabled    bool
 	// Selected, Checked and Indeterminate (mixed) are reported to
 	// assistive technology, and Expanded when Expandable.
-	Selected      bool
-	// MultiSelectable says a RoleGrid, RoleListbox or RoleTree permits
-	// selecting more than one of its items.
+	Selected bool
+	// MultiSelectable says a RoleGrid, RoleListbox or RoleTree permits selecting more than one of its items.
 	MultiSelectable bool
-	Checked       bool
-	Indeterminate bool
+	Checked         bool
+	Indeterminate   bool
 	// Pressed is a toggle that is on and Busy an element still loading;
 	// Invalid a field whose content the app rejected (aria-invalid).
 	Pressed    bool
