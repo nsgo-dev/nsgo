@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/tsx/pkg"
+	"github.com/yuin/goldmark"
 )
 
 // nsgo.yaml's updates have the app update the way its platform and the
@@ -63,6 +64,31 @@ type updatesConfig struct {
 	// without a Feed of its own.
 	public ed25519.PublicKey
 	repo   string
+	// notes is build's -release-notes file, and notesHTML its Markdown as
+	// the HTML the appcasts describe the release with.
+	notes     string
+	notesHTML string
+}
+
+// readReleaseNotes renders -release-notes' Markdown, if any, into the HTML
+// each appcast's item carries as its description, which Sparkle and
+// WinSparkle show in their update dialogs and the other backends' updater
+// shows as text.
+func (p *project) readReleaseNotes() error {
+	u := &p.Updates
+	if u.notes == "" {
+		return nil
+	}
+	data, err := os.ReadFile(u.notes)
+	if err != nil {
+		return fmt.Errorf("-release-notes: %w", err)
+	}
+	var b bytes.Buffer
+	if err := goldmark.Convert(data, &b); err != nil {
+		return fmt.Errorf("-release-notes: %w", err)
+	}
+	u.notesHTML = strings.TrimSpace(b.String())
+	return nil
 }
 
 // validateUpdates reads updates' key and makes its feed whole.
@@ -488,7 +514,7 @@ func (p *project) writeAppcast(target, installer string) error {
 	if err != nil {
 		return err
 	}
-	item := appcastItem{name: name, version: p.Version, build: p.BundleVersion(), page: p.releasePage(),
+	item := appcastItem{name: name, version: p.Version, build: p.BundleVersion(), page: p.releasePage(), notes: p.Updates.notesHTML,
 		url: p.downloadURL(filepath.Base(installer)), os: system, length: len(data), sha256: fmt.Sprintf("%x", sha256.Sum256(data)), published: time.Now()}
 	if key != nil {
 		item.signature = base64.StdEncoding.EncodeToString(ed25519.Sign(key, data))
@@ -517,6 +543,8 @@ type appcastItem struct {
 	signature string
 	// arguments are what WinSparkle runs the installer with.
 	arguments string
+	// notes is the release's notes in HTML, "" without any.
+	notes     string
 	published time.Time
 }
 
@@ -531,6 +559,10 @@ func (it appcastItem) feed() []byte {
 	fmt.Fprintf(&b, "      <title>%s</title>\n", xmlText(it.name+" "+it.version))
 	if it.page != "" {
 		fmt.Fprintf(&b, "      <link>%s</link>\n", xmlText(it.page))
+	}
+	if it.notes != "" {
+		// CDATA cannot hold its own end, so one in the notes ends a section and starts the next.
+		fmt.Fprintf(&b, "      <description><![CDATA[%s]]></description>\n", strings.ReplaceAll(it.notes, "]]>", "]]]]><![CDATA[>"))
 	}
 	fmt.Fprintf(&b, "      <pubDate>%s</pubDate>\n", it.published.UTC().Format(time.RFC1123Z))
 	fmt.Fprintf(&b, "      <sparkle:version>%s</sparkle:version>\n", xmlText(it.build))

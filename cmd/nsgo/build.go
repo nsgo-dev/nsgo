@@ -27,6 +27,9 @@ import (
 // buildAll writes one directory per target: <output>/<name>-<version>-<target>.
 func buildAll(ctx context.Context, p *project) error {
 	p.Release = true
+	if err := p.readReleaseNotes(); err != nil {
+		return err
+	}
 	buildTargets, err := expandTargets(p.Build.Targets)
 	if err != nil {
 		return err

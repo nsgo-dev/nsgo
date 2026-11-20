@@ -192,6 +192,8 @@ updates:
 
 `nsgo keygen` 打印一对密钥，不写任何文件：把公钥填进 `updates.key` 并提交；私钥不要放进仓库，存进密码管理器，并在构建发布的地方设为 `NSGO_UPDATES_KEY`，例如 GitHub Actions 的 secret。每次 direct 构建都用私钥签名安装程序，并在旁边写出 `appcast-<目标>.xml`：一个 [Sparkle](https://sparkle-project.org) 格式的更新源，应用从 `feed` 下读取它，把 appcast 和安装程序一起上传即可。没有私钥时，`build` 不写 macOS 和 Windows 的 appcast，因为它们只安装签过名的安装程序；Linux 和 Android 应用读到未签名的 appcast 时，打开该 Release 的页面，不安装其中的软件包。
 
+`-release-notes notes.md` 把一份 Markdown 格式的更新说明（例如 changelog 中该版本的一节）写进每个 appcast，渲染为 HTML，文件里原有的 HTML 不保留。Sparkle 和 WinSparkle 在更新对话框中显示它，Linux 和 Android 的更新提示把它作为文本显示在版本号下方，最多 1,500 个字符；应用通过 `core.UpdateCheck.Notes` 读取。
+
 | 目标 | direct 构建的更新方式 |
 | --- | --- |
 | macOS | `build` 打进应用的 Sparkle 每天检查，提示新版本，下载磁盘映像，校验签名，安装并重启应用 |

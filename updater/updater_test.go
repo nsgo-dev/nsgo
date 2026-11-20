@@ -3,6 +3,7 @@ package updater_test
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,6 +53,23 @@ func TestUpdateOpensTheNewerVersion(t *testing.T) {
 	}
 	if !slices.Equal(app.UpdateChecks, []bool{false, false}) {
 		t.Errorf("checks %v", app.UpdateChecks)
+	}
+}
+
+func TestUpdateShowsTheReleaseNotes(t *testing.T) {
+	notes := newer
+	notes.Notes = "• A dark theme"
+	app := start(t, notes)
+	app.Press("text:Check")
+	if a := app.Alerts(); len(a) != 1 || a[0].Message != "Hello 1.1 is available. You have 1.0.\n\n• A dark theme" {
+		t.Fatalf("alerts %+v", a)
+	}
+	app.Answer(1)
+	notes.Notes = strings.Repeat("a", 2000)
+	app = start(t, notes)
+	app.Press("text:Check")
+	if a := app.Alerts(); len(a) != 1 || !strings.HasSuffix(a[0].Message, "\n\n"+strings.Repeat("a", 1500)+"…") {
+		t.Fatalf("long notes shown as %q", a[0].Message)
 	}
 }
 

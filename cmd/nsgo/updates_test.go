@@ -225,3 +225,44 @@ func TestWriteAppcast(t *testing.T) {
 		t.Error("another key signed the installer")
 	}
 }
+
+func TestWriteAppcastReleaseNotes(t *testing.T) {
+	p, key := updatingProject(t, "")
+	t.Setenv("NSGO_UPDATES_KEY", pkg.EncodeSecretKey(key))
+	if err := p.cleanReleaseDir(); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"hello-1.2.0-windows-x64-setup.exe": "installer",
+		"notes.md": "Faster `sync`, and:\n\n- A dark theme\n- No more ]]> in feeds\n\n<script>alert(1)</script>\n"})
+	p.Updates.notes = filepath.Join(dir, "notes.md")
+	if err := p.readReleaseNotes(); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.releaseInstaller("windows_x64", filepath.Join(dir, "hello-1.2.0-windows-x64-setup.exe")); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(p.releaseDir(), "appcast-windows_x64.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Sparkle and WinSparkle read the description as HTML, which leaves the notes' raw HTML out.
+	var feed struct {
+		Description string `xml:"channel>item>description"`
+	}
+	if err := xml.Unmarshal(data, &feed); err != nil {
+		t.Fatal(err)
+	}
+	want := "<p>Faster <code>sync</code>, and:</p>\n<ul>\n<li>A dark theme</li>\n<li>No more ]]&gt; in feeds</li>\n</ul>\n<!-- raw HTML omitted -->"
+	if feed.Description != want {
+		t.Errorf("description %q, want %q", feed.Description, want)
+	}
+	item, err := updates.ParseAppcast(data)
+	if err != nil || item.Notes != "Faster sync, and:\n• A dark theme\n• No more ]]> in feeds" {
+		t.Errorf("ParseAppcast's notes %q, %v", item.Notes, err)
+	}
+	p.Updates.notes = filepath.Join(dir, "missing.md")
+	if err := p.readReleaseNotes(); err == nil {
+		t.Error("missing release notes read")
+	}
+}

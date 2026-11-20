@@ -192,6 +192,8 @@ updates:
 
 `nsgo keygen` prints a key pair and writes no file: put the public key in `updates.key` and commit it, and keep the secret one out of the repository, in a password manager and in `NSGO_UPDATES_KEY` where releases build, such as a GitHub Actions secret. Each direct build signs the installers with the secret key and writes `appcast-<target>.xml` beside them, a feed in [Sparkle](https://sparkle-project.org)'s format that the app reads under `feed`: upload the appcasts with the installers. Without the secret key, `build` writes no macOS or Windows appcast, as those install only signed installers, and Linux and Android apps reading an unsigned appcast open the release's page instead of installing its package.
 
+`-release-notes notes.md` puts a Markdown file of the release's notes, such as its changelog section, into each appcast, rendered as HTML without the file's own raw HTML. Sparkle and WinSparkle show it in their update dialogs, and the prompt on Linux and Android shows it as text below the version, up to 1,500 characters; apps read it as `core.UpdateCheck.Notes`.
+
 | Target | How a direct build updates |
 | --- | --- |
 | macOS | Sparkle, which `build` puts into the app, checks daily, offers the new version, downloads the disk image, checks its signature, installs it and restarts the app |

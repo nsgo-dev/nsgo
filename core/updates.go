@@ -22,6 +22,9 @@ type UpdateCheck struct {
 	// and URL the page that gets it: the App Store's on iOS, the
 	// release's elsewhere.
 	Version, URL string
+	// Notes are Version's release notes as plain text, "" when its feed
+	// has none.
+	Notes string
 	// Download is the signed package for Version, when this target can
 	// install it itself. Signature and SHA256 authenticate its bytes; Key is
 	// the public Ed25519 key from the app's update configuration.
@@ -39,7 +42,7 @@ func DownloadUpdate(ctx context.Context, update UpdateCheck, dir string, progres
 	if driver.UpdateDownload == nil {
 		return "", errors.New("core: update download is unavailable")
 	}
-	d := driver.Update{App: update.App, Current: update.Current, Version: update.Version, URL: update.URL,
+	d := driver.Update{App: update.App, Current: update.Current, Version: update.Version, URL: update.URL, Notes: update.Notes,
 		Download: update.Download, Signature: update.Signature, SHA256: update.SHA256, Key: update.Key, Size: update.Size}
 	path, err := driver.UpdateDownload(ctx, d, dir, func(p driver.UpdateDownloadProgress) {
 		if progress != nil {
@@ -110,7 +113,7 @@ func (cx *Scope) CheckForUpdates(background bool, done func(UpdateCheck)) {
 	t.request(cx, driver.MountItem{Kind: driver.ItemCheckForUpdates, On: background}, func(ev driver.Event) {
 		c := UpdateCheck{Shown: ev.Finished}
 		if u, ok := ev.Data.(*driver.Update); ok && u != nil {
-			c.App, c.Current, c.Version, c.URL = u.App, u.Current, u.Version, u.URL
+			c.App, c.Current, c.Version, c.URL, c.Notes = u.App, u.Current, u.Version, u.URL, u.Notes
 			c.Download, c.Signature, c.SHA256, c.Key, c.Size = u.Download, u.Signature, u.SHA256, u.Key, u.Size
 			if u.Err != "" {
 				c.Err = errors.New(u.Err)

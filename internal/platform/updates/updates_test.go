@@ -201,3 +201,16 @@ func TestStoreInstalls(t *testing.T) {
 		t.Error("Checks: an appcast or the App Store is not checked")
 	}
 }
+
+func TestNotesText(t *testing.T) {
+	for _, c := range []struct{ html, want string }{
+		{"", ""},
+		{"<p>Faster <code>sync</code>,\nand more.</p>", "Faster sync, and more."},
+		{"<h2>New</h2>\n<ul>\n<li>A <strong>dark</strong> theme</li>\n<li><p>Tabs</p></li>\n</ul>\n<p>Fixes &amp; more</p>", "New\n• A dark theme\n• Tabs\nFixes & more"},
+		{"Plain text", "Plain text"},
+	} {
+		if got := notesText(c.html); got != c.want {
+			t.Errorf("notesText(%q) = %q, want %q", c.html, got, c.want)
+		}
+	}
+}

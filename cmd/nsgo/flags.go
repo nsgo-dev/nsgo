@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -226,6 +227,7 @@ type buildFlags struct {
 	install *boolOverride
 	jobs    *override[int]
 	channel *override[string]
+	notes   string
 	run     bool
 	embed   bool
 	dynamic bool
@@ -243,6 +245,7 @@ func bindBuildFlags(fs *flag.FlagSet) *buildFlags {
 	f.install = boolFlag(fs, "installers", "package macOS, Windows and Linux targets for users to install: a disk image, an NSIS installer, Debian and Arch packages (default: nsgo.yaml's build.installers, else true)")
 	f.jobs = intFlag(fs, "jobs", "how many targets build at once, sharing compile workers across them (default: nsgo.yaml's build.jobs, else half the CPUs)")
 	f.channel = stringFlag(fs, "channel", "the `channel` the packages are handed out through, which decides how they update: direct, store or none (default: nsgo.yaml's updates.channel)")
+	fs.StringVar(&f.notes, "release-notes", "", "a Markdown `file` of the release's notes, which the appcasts carry for the update prompts to show")
 	fs.BoolVar(&f.run, "run", false, "start the package built for this machine: the app, the iPhone's, simulator's or Android device's, or the site served")
 	fs.StringVar(&f.device, "device", "", "the `device` -run starts the package on: an iPhone's name, UDID, serial or ECID, a simulator's name or UDID, or an adb serial or emulator's AVD name (default: the only one connected, or the booted simulator)")
 	fs.StringVar(&f.team, "team", "", "the Apple developer `team` -run signs the iPhone's package with (default: the team Xcode last used)")
@@ -269,6 +272,9 @@ func (f *buildFlags) apply(p *project) {
 	}
 	f.jobs.replace(&p.Build.Jobs)
 	f.channel.replace(&p.Updates.Channel)
+	if f.notes != "" {
+		p.Updates.notes, _ = filepath.Abs(f.notes)
+	}
 	p.Build.LDFlags = append(p.Build.LDFlags, (*f.ldflags)...)
 	p.Build.run, p.Build.embed, p.Build.dynamic = f.run, f.embed, f.dynamic
 	p.Build.device, p.Build.team = f.device, f.team

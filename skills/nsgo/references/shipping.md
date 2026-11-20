@@ -46,6 +46,7 @@ go tool nsgo build                       # every target nsgo.yaml lists
 go tool nsgo build -target web           # or all, macos, windows, macos_arm64, ios, android_arm64, miniprogram_wechat, ...
 go tool nsgo build -run -device "iPhone" # build and start or install it
 go tool nsgo build -channel store        # store packages instead of installers and self-updates
+go tool nsgo build -release-notes notes.md  # the release's notes, which the update prompts show
 ```
 
 Packages land in `dist/<name>-<version>-<target>`, and everything to hand out in `dist/releases`, each file named `<name>-<version>-<system>-<arch>` with its `.sha256`. Builds are release builds; `go tool nsgo dev -release` runs one with hot reload for measuring.

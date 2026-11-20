@@ -12,7 +12,7 @@ import (
 // running one is the newest, or why it could not check.
 type Update struct {
 	App, Current                     string
-	Version, URL                     string
+	Version, URL, Notes              string
 	Download, Signature, SHA256, Key string
 	Size                             int64
 	Err                              string

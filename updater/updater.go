@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -122,7 +123,7 @@ func check(cx *core.Scope, background bool, answered func(core.UpdateCheck)) {
 		default:
 			cx.ShowAlert(core.AlertConfig{
 				Title:   msgs.UpdateAvailable(c.App),
-				Message: msgs.UpdateAvailableMessage(c.App, c.Version, c.Current),
+				Message: updateMessage(msgs.UpdateAvailableMessage(c.App, c.Version, c.Current), c.Notes),
 				Actions: []core.AlertAction{{Label: msgs.Update(), Role: core.AlertDefault},
 					{Label: msgs.Later(), Role: core.AlertCancel}},
 				Cancelable: true,
@@ -137,6 +138,21 @@ func check(cx *core.Scope, background bool, answered func(core.UpdateCheck)) {
 			})
 		}
 	})
+}
+
+// maxNotes is how many characters of a release's notes the prompt shows; longer notes end in an ellipsis, as the release's page has them whole.
+const maxNotes = 1500
+
+// updateMessage is the prompt's message: the line offering the version, then its notes, if any, cut to maxNotes characters.
+func updateMessage(offer, notes string) string {
+	notes = strings.TrimSpace(notes)
+	if notes == "" {
+		return offer
+	}
+	if r := []rune(notes); len(r) > maxNotes {
+		notes = strings.TrimSpace(string(r[:maxNotes])) + "…"
+	}
+	return offer + "\n\n" + notes
 }
 
 // stagingDir is the directory under the app's cache that holds the package downloadAndInstall stages, which only it writes.

@@ -102,7 +102,7 @@ func Find(ctx context.Context, c Config) driver.Update {
 	if err == nil {
 		var item Item
 		if item, err = ParseAppcast(body); err == nil && Newer(item.Build, c.build()) {
-			u.Version, u.URL = item.Version, item.Link
+			u.Version, u.URL, u.Notes = item.Version, item.Link, item.Notes
 			// Only a package signed with the app's key is installed; an unsigned appcast, which a release built without NSGO_UPDATES_KEY writes, offers the release's page instead.
 			if item.Signature != "" && c.Key != "" {
 				u.Download, u.Signature, u.SHA256, u.Key, u.Size = item.Download, item.Signature, item.SHA256, c.Key, item.Size
@@ -193,6 +193,8 @@ type Item struct {
 	Version, Build string
 	// Link is the release's page, else its download.
 	Link string
+	// Notes are the release's notes as plain text, "" without any.
+	Notes string
 	// Download and its integrity metadata name the package itself.
 	Download, Signature, SHA256 string
 	Size                        int64
@@ -204,6 +206,7 @@ type Item struct {
 type appcast struct {
 	Items []struct {
 		Link         string `xml:"link"`
+		Description  string `xml:"description"`
 		Version      string `xml:"http://www.andymatuschak.org/xml-namespaces/sparkle version"`
 		ShortVersion string `xml:"http://www.andymatuschak.org/xml-namespaces/sparkle shortVersionString"`
 		Enclosure    struct {
@@ -233,6 +236,7 @@ func ParseAppcast(data []byte) (Item, error) {
 		}
 		item.Version = first(it.ShortVersion, it.Enclosure.ShortVersion, item.Build)
 		item.Link = first(webURL(it.Link), webURL(it.Enclosure.URL))
+		item.Notes = notesText(it.Description)
 		if item.Build != "" && item.Link != "" && (newest.Build == "" || Newer(item.Build, newest.Build)) {
 			newest = item
 		}
