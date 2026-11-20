@@ -932,8 +932,7 @@ type ViewProps struct {
 	Selected bool
 	// MultiSelectable says a RoleGrid, RoleListbox or RoleTree permits selecting more than one of its items.
 	MultiSelectable bool
-	// SelectionItem says the view is one item in a selectable collection;
-	// it stays true when the item is not currently selected.
+	// SelectionItem says the view is one item in a selectable collection; it stays true when the item is not currently selected.
 	SelectionItem bool
 	Checked       bool
 	Indeterminate bool

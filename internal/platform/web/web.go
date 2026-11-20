@@ -2122,8 +2122,9 @@ func setViewProps(v *view, p *driver.ViewProps) {
 	setAttr(el, "aria-label", p.Label)
 	setAttr(el, "aria-description", p.HelpText())
 	setAttr(el, "aria-disabled", flag(p.Disabled))
-	selected := ""
-	if p.SelectionItem || p.Role == driver.RoleTab || p.Role == driver.RoleRadio || p.Role == driver.RoleOption {
+	// A selected view says so; an item of a selectable collection, a tab or an option also says when it is not.
+	selected := flag(p.Selected)
+	if p.SelectionItem || p.Role == driver.RoleTab || p.Role == driver.RoleOption {
 		selected = strconv.FormatBool(p.Selected)
 	}
 	setAttr(el, "aria-selected", selected)

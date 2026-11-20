@@ -174,8 +174,7 @@ type View struct {
 	Selected func() bool
 	// MultiSelectable tells assistive technology that this grid, listbox or tree permits more than one selected item.
 	MultiSelectable bool
-	// SelectionItem says this view is an item in a selectable collection,
-	// independently of whether Selected is true.
+	// SelectionItem says this view is an item in a selectable collection, independently of whether Selected is true.
 	SelectionItem func() bool
 	Checked       func() bool
 	// Indeterminate is neither checked nor unchecked, as a "select all"

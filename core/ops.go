@@ -198,6 +198,7 @@ func (t *Tree) setView(n *node, v View) {
 		p.NoFocus = !p.Focusable
 	}
 	p.Selected = read(v.Selected)
+	p.SelectionItem = read(v.SelectionItem)
 	p.Checked = read(v.Checked)
 	p.Indeterminate = read(v.Indeterminate)
 	p.Pressed = read(v.Pressed)
