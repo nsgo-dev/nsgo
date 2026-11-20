@@ -26,8 +26,16 @@ func TestRestartProgram(t *testing.T) {
 		t.Errorf("an executable restarts with %q", got)
 	}
 	t.Setenv("APPIMAGE", "/tmp/example.AppImage")
-	if got := restartProgram(exe, []string{"--again"}); !slices.Equal(got, []string{"/tmp/example.AppImage", "--again"}) {
+	t.Setenv("APPDIR", "/tmp/.mount_example")
+	if got := restartProgram("/tmp/.mount_example/usr/bin/app", []string{"--again"}); !slices.Equal(got, []string{"/tmp/example.AppImage", "--again"}) {
 		t.Errorf("an AppImage restarts with %q", got)
+	}
+	// A program an AppImage app started inherits its APPIMAGE and APPDIR, but is not in the image.
+	if got := restartProgram("/usr/local/bin/app", nil); !slices.Equal(got, []string{"/usr/local/bin/app"}) {
+		t.Errorf("an executable started from an AppImage app restarts with %q", got)
+	}
+	if got := restartProgram("/tmp/.mount_example2/usr/bin/app", nil); !slices.Equal(got, []string{"/tmp/.mount_example2/usr/bin/app"}) {
+		t.Errorf("an executable beside the AppImage's mount restarts with %q", got)
 	}
 }
 
