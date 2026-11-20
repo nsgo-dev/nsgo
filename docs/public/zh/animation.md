@@ -89,6 +89,8 @@ core.View{Style: core.Style{Animation: core.KeyframeAnimation{
 
 `ValueKeyframes` 像 Web Animations 一样让动画值经过多个停靠点，支持偏移、分段缓动、延迟、次数和方向。手势也可以驱动值：`View.PanValues`、`PinchValue` 和 `RotationValue` 在手势开始时从原值出发，在主线程上移动它们。
 
+`core.PanEvent` 在每个 pan 阶段提供视图内的 `Position` 和页面内的 `PagePosition`，因此拖拽工具无需依赖单独的按压事件来获取手指位置。
+
 ## 下一步
 
 - [样式与主题](styles.md)：过渡移动的属性。

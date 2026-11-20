@@ -89,6 +89,8 @@ core.View{Style: core.Style{Animation: core.KeyframeAnimation{
 
 `ValueKeyframes` moves an animated value through stops as Web Animations does, with offsets, a per-segment easing, a delay, iterations and a direction. Gestures can drive values too: `View.PanValues`, `PinchValue` and `RotationValue` move them on the main thread from where they were as the gesture began.
 
+`core.PanEvent` includes `Position` in the view and `PagePosition` in the page on every pan phase, so drag tools do not need a separate press event to recover the finger location.
+
 ## Next
 
 - [Styles and themes](styles.md): the properties a transition moves.

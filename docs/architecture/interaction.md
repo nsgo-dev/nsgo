@@ -101,6 +101,8 @@ The app's own requests to move the focus, `Ref.Focus`, an input's `AutoFocus`, `
 - `View.PanValues` binds a drag to animated values: the platform moves them before it reports each move, so the view follows on the main thread, as NSH's bound values do. A drag through `OnPan` and a signal costs a commit per turn.
 - A pinch reports its `Position` in the view: the fingers' middle, or the pointer over a trackpad, so a canvas zooms around it.
 
+`core.PanEvent` reports the current `Position` in the view and `PagePosition` in its page on every phase, alongside its translation and velocity.
+
 Windows shows the overlay scroll indicator for user scrolling and its momentum, not app-owned offset changes.
 
 `View.OnWheel`, which NSH lacks, takes the wheel and touchpad scrolls over a view before the scroll views around it, for what pans and zooms itself, such as a flow diagram; a scroll view inside the view takes its own first. `WheelEvent.Delta` is how far the content moves, a notch about 100 points as browsers scroll, and `Touchpad` tells a touch surface's scroll from a wheel's turns. The engine adds queued turns of one view up rather than replacing them.
@@ -121,5 +123,3 @@ Files dragged from other apps follow NSH's `file-drop.md`. `View.OnFileDrop` rec
 - The destination is the innermost view under the pointer whose mask has `EventFileDrop`, unless it is disabled; the topmost modal bounds the search. The platform decides on the main thread from the mounted views and answers Copy or nothing.
 - Leaving one destination for another reports a leave, then an enter. A deleted destination hears nothing more, since its ID may be reused.
 - macOS takes `NSPasteboardTypeFileURL` on the surface, Windows registers an OLE `IDropTarget` written in Go while a view listens, and Linux adds a `GtkDropTarget` for `GdkFileList`. Browsers hide paths, so the web delivers each file as a `blob:` URL, its name as the fragment; the backend keeps the dropped `File` by URL, so `FileFromURL` gives its size, type and time and reads its `Blob` a slice at a time, and fetches a `blob:` URL the page made otherwise.
-
-`core.PanEvent` reports the current `Position` in the view and `PagePosition` in its page on every phase, alongside its translation and velocity.
