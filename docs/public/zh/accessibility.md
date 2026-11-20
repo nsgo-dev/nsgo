@@ -67,6 +67,8 @@ core.View{
 }
 ```
 
+`MultiSelectable` 标记允许同时选择多个项目的网格、列表框或树。`base.DataTable` 在多行选择时设置它；Web、Windows 和 Linux 会暴露对应的辅助功能标记。
+
 `Expanded` 说明展开控件或菜单按钮是否打开，`Busy` 表示内容仍在加载，`Invalid` 表示应用拒绝了字段的内容或控件的值（用 `aria-invalid:` 设置样式），`Checked`、`Selected` 和 `Pressed` 报告控件状态。控件的部件可以通过 `PartStates` 借用它的状态，因此指示器会跟随复选框，而不会成为单独的停靠点。
 
 ## 实时变化
