@@ -527,6 +527,12 @@ export interface CompositeAnimation {
   stop(): void;
   reset(): void;
 }
+/** A tween Animated.tween started: finished promises whether it reached its toValue; stop leaves the number where it is, reset gives update its from again. */
+export interface TweenRun {
+  finished: Promise<boolean>;
+  stop(): void;
+  reset(): void;
+}
 export interface AnimatedModule {
   timing(value: AnimatedValue, config: { toValue: number; duration?: number; easing?: Easing; delay?: number }): CompositeAnimation;
   spring(value: AnimatedValue, config: SpringConfig): CompositeAnimation;
@@ -546,6 +552,8 @@ export interface AnimatedModule {
   diffClamp(a: AnimatedNode, min: number, max: number, options?: { snap?: boolean }): AnimatedNode;
   sampleSpring(config: SpringConfig & { from?: number }): number[];
   sampleDecay(config: DecayConfig & { from?: number }): number[];
+  /** Calls update with numbers from from (default 0) to toValue on each display frame, as timing moves a value, for what an AnimatedNode cannot reach, such as a figure counting up in a text; under reduced motion it calls update with from, then toValue, at once. */
+  tween(config: { from?: number; toValue: number; duration?: number; easing?: Easing; delay?: number }, update: (value: number) => void): TweenRun;
 }
 export declare const Animated: AnimatedModule;
 export interface EasingCurves {

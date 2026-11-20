@@ -259,26 +259,40 @@ func AtFrameRate(a *Animation, rate float64) *Animation {
 	return a
 }
 
-// AnimationRun is an animation StartAnimation runs on the platform.
+// AnimationRun is an animation StartAnimation runs on the platform, or a Tween.
 type AnimationRun struct {
 	t     *Tree
-	id    uint32
+	id    uint32 // 0 for a tween reduced motion ended at once, which the platform never ran
 	ended bool
+	// halt stops a tween's frames; rewind gives its update its from again.
+	halt, rewind func()
 }
 
 // Stop ends the run where its values are, unfinished.
 func (r *AnimationRun) Stop() {
 	if !r.ended {
 		r.ended = true
-		r.t.anim.add(driver.AnimationOp{Kind: driver.AnimStop, ID: r.id})
+		if r.halt != nil {
+			r.halt()
+		}
+		if r.id != 0 {
+			r.t.anim.add(driver.AnimationOp{Kind: driver.AnimStop, ID: r.id})
+		}
 	}
 }
 
-// Reset ends the run, unfinished if it still runs, and puts the values it
-// moves back where they were as it started.
+// Reset ends the run, unfinished if it still runs, and puts the values it moves back where they were as it started.
 func (r *AnimationRun) Reset() {
 	r.ended = true
-	r.t.anim.add(driver.AnimationOp{Kind: driver.AnimReset, ID: r.id})
+	if r.halt != nil {
+		r.halt()
+	}
+	if r.rewind != nil {
+		r.rewind()
+	}
+	if r.id != 0 {
+		r.t.anim.add(driver.AnimationOp{Kind: driver.AnimReset, ID: r.id})
+	}
 }
 
 // StartAnimation runs a on the platform and calls done, if not nil,
@@ -287,6 +301,36 @@ func (r *AnimationRun) Reset() {
 // its values ends it early. The owner going stops it.
 func (cx *Scope) StartAnimation(a *Animation, done func(finished bool)) *AnimationRun {
 	return cx.startAnimation(a, done, false)
+}
+
+// Tween calls update with numbers from from to to on each display frame, over c's duration after its delay, eased as Timing moves a value: for what the animation graph cannot draw, such as a figure counting up in a text. It calls done, if not nil, under the current owner with whether it reached to, once, as StartAnimation does. It counts as an animation that ends, so an nsgotest step that starts it waits for to; under reduced motion it calls update with from, then to, at once. Its run's Stop leaves the number where it is and Reset gives update from again; the owner going stops it.
+func (cx *Scope) Tween(from, to float64, c TimingConfig, update func(float64), done func(finished bool)) *AnimationRun {
+	update(from)
+	if Untracked(cx, cx.Env().ReduceMotion) {
+		update(to)
+		if done != nil {
+			done(true)
+		}
+		return &AnimationRun{t: cx.tree(), ended: true, rewind: func() { update(from) }}
+	}
+	// The platform runs a Timing of a value nothing shows for the step's sake, and its end gives update to; the frames between are Go's.
+	a := Timing(NewAnimatedValue(cx, from), to, c)
+	var halt func()
+	run := cx.StartAnimation(a, func(finished bool) {
+		halt()
+		if finished {
+			update(to)
+		}
+		if done != nil {
+			done(finished)
+		}
+	})
+	halt = cx.animate(c.Delay, a.Timing.Duration, c.Easing, func(progress float64) {
+		update(from + (to-from)*progress)
+	})
+	run.halt = halt
+	run.rewind = func() { update(from) }
+	return run
 }
 
 // startAnimation is StartAnimation; endless marks a run its done starts

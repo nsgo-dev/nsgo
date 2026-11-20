@@ -38,6 +38,15 @@ angle := core.Interpolate(scroll, core.Interpolation{
 
 `Scope.RequestAnimationFrame` 在下一个显示帧运行一次函数，`Scope.Animate` 在该时钟上推进一段时间。两者都运行在响应式图的 goroutine 上，因此可以设置 signal。
 
+`Scope.Tween` 在该时钟上推进一个数字，用于动画值够不到的地方，比如文本里向上滚动的数字：它像 `Timing` 移动值那样，把从一个数到另一个数的每个值传给一个函数，最后再传一次终值。启动它的 `nsgotest` 步骤会像等待动画一样等到终值；开启减弱动态效果时，它立即给出终值。TSX 的 `Animated.tween` 与之相同。
+
+```go
+freed := core.NewSignal(cx, 0.0)
+cx.Tween(0, 18.7, core.TimingConfig{Duration: 600 * time.Millisecond, Easing: core.BezierEasing(core.EaseOut)}, freed.Set, nil)
+
+core.Text{ContentFunc: func() string { return fmt.Sprintf("%.1f GB 可释放", freed.Get()) }}
+```
+
 ## 过渡
 
 `Transition` 在视图的样式或类名变化时，由平台播放过渡，每帧不需要引擎参与。`Properties` 指定哪些属性移动；为 0 时表示除尺寸位置外的所有属性。

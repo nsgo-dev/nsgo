@@ -699,6 +699,33 @@ func (r *runtime) animatedModule() js.Value {
 		o := r.options(arg(call, 0))
 		return r.vm.ToValue(core.SampleDecay(o.float("from", 0), r.decayConfig(arg(call, 0))))
 	})
+	// tween runs Scope.Tween at once: update gets each number, and the run it returns stops or resets it and promises whether it reached toValue.
+	set("tween", func(call js.FunctionCall) js.Value {
+		cfg, update := arg(call, 0), arg(call, 1)
+		if !isFunction(update) {
+			panic(r.vm.NewTypeError("nsgo: Animated.tween takes an update function"))
+		}
+		o := r.options(cfg)
+		dl := r.current
+		if dl != nil {
+			r.watch(dl)
+		}
+		p, resolve, _ := r.newPromise()
+		run := r.cx.Tween(o.float("from", 0), o.float("toValue", 0), r.timingConfig(cfg), func(v float64) {
+			r.under(dl, func() { r.call(update, r.vm.ToValue(v)) })
+		}, func(finished bool) { r.inJS(func() { _ = resolve(finished) }) })
+		h := r.vm.NewObject()
+		_ = h.Set("finished", p)
+		_ = h.Set("stop", r.function(func(js.FunctionCall) js.Value {
+			run.Stop()
+			return js.Undefined()
+		}))
+		_ = h.Set("reset", r.function(func(js.FunctionCall) js.Value {
+			run.Reset()
+			return js.Undefined()
+		}))
+		return h
+	})
 	return m
 }
 

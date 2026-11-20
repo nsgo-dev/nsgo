@@ -197,6 +197,18 @@ mount(App);`)
 	}
 }
 
+// Animated.tween hands each number to its update and lands on toValue in the step that starts it; its run's finished promise says it got there.
+func TestAnimatedTweenCountsUp(t *testing.T) {
+	app := run(t, `import { mount, signal, Animated, Text } from "nsgo";
+function App() {
+	const n = signal(0), said = signal("");
+	Animated.tween({ from: 0, toValue: 40, duration: 200 }, v => n.set(Math.round(v))).finished.then(f => said.set("finished " + f));
+	return <Text>{() => "n " + n() + " " + said()}</Text>;
+}
+mount(App);`)
+	app.WaitFor("text:n 40 finished true", time.Second)
+}
+
 func TestAnimatedNodesCompute(t *testing.T) {
 	app := run(t, `import { mount, signal, createAnimatedValue, createMotion, Animated, LayoutAnimation, Text, View } from "nsgo";
 function App() {

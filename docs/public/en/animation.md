@@ -38,6 +38,15 @@ angle := core.Interpolate(scroll, core.Interpolation{
 
 `Scope.RequestAnimationFrame` runs a function once at the next display frame, and `Scope.Animate` steps a duration on that clock. Both run on the graph's goroutine, so they can set signals.
 
+`Scope.Tween` steps a number on that clock for what an animated value cannot reach, such as a figure counting up in a text: it calls a function with each number from one to another, as `Timing` would move a value, and once more with the last. An `nsgotest` step that starts it waits for the last, as for an animation, and under reduced motion it gives the last at once. TSX's `Animated.tween` is the same.
+
+```go
+freed := core.NewSignal(cx, 0.0)
+cx.Tween(0, 18.7, core.TimingConfig{Duration: 600 * time.Millisecond, Easing: core.BezierEasing(core.EaseOut)}, freed.Set, nil)
+
+core.Text{ContentFunc: func() string { return fmt.Sprintf("%.1f GB can be freed", freed.Get()) }}
+```
+
 ## Transitions
 
 A `Transition` animates a view's style or classes when they change, on the platform, with no work for the engine per frame. `Properties` says what moves; 0 means every property but the frame.

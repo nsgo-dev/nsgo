@@ -16,6 +16,7 @@ nsgo.Animated.spring
 nsgo.Animated.stagger
 nsgo.Animated.subtract
 nsgo.Animated.timing
+nsgo.Animated.tween
 nsgo.AnimatedNode
 nsgo.AnimatedValue
 nsgo.AuthSession

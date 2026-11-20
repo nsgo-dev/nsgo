@@ -83,14 +83,15 @@ func (rt *runtime) removeFrame(cb *frameCallback) {
 	}
 }
 
-// Animate calls step with the eased progress from 0 to 1 once a display
-// frame for d, on the graph's goroutine, ending with exactly 1, unless the
-// current owner is disposed or stop is called first. Each step's changes
-// commit as one batch, so prefer a style Transition for what a platform
-// can animate itself.
+// Animate calls step with the eased progress from 0 to 1 once a display frame for d, on the graph's goroutine, ending with exactly 1, unless the current owner is disposed or stop is called first. Each step's changes commit as one batch, so prefer a style Transition for what a platform can animate itself.
 func (cx *Scope) Animate(d time.Duration, curve Curve, step func(progress float64)) (stop func()) {
+	return cx.animate(0, d, BezierEasing(curve), step)
+}
+
+// animate is Animate after delay, with any of the animation graph's easings, so Tween steps a number as Timing moves a value.
+func (cx *Scope) animate(delay, d time.Duration, easing Easing, step func(progress float64)) (stop func()) {
 	o := cx.current()
-	start := cx.rt.clock.Now()
+	start := cx.rt.clock.Now().Add(delay)
 	stopped := false
 	var cancel func()
 	var tick func(at time.Time)
@@ -98,11 +99,15 @@ func (cx *Scope) Animate(d time.Duration, curve Curve, step func(progress float6
 		if stopped {
 			return
 		}
+		if at.Before(start) {
+			cancel = o.RequestAnimationFrame(tick)
+			return
+		}
 		x := 1.0
 		if d > 0 {
 			x = math.Min(float64(at.Sub(start))/float64(d), 1)
 		}
-		step(curve.At(x))
+		step(easing.At(x))
 		if x < 1 {
 			cancel = o.RequestAnimationFrame(tick)
 		}
