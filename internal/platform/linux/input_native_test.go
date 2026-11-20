@@ -107,19 +107,26 @@ func TestTextViewTakesTheLineHeight(t *testing.T) {
 	purego.RegisterLibFunc(&lineYrange, gtkLib, "gtk_text_view_get_line_yrange")
 	purego.RegisterLibFunc(&measure, gtkLib, "gtk_widget_measure")
 	purego.RegisterLibFunc(&gtkLabelGetYalign, gtkLib, "gtk_label_get_yalign")
+	// The title is set as the app is built, which can be before the tree with its editors is mounted.
+	deadline := time.Now().Add(10 * time.Second)
 	var views []*view
-	w.onLoop(t, func() {
-		for _, v := range w.entries {
-			if v.textView != 0 && !slices.Contains(views, v) {
-				views = append(views, v)
+	for len(views) != 2 {
+		views = views[:0]
+		w.onLoop(t, func() {
+			for _, v := range w.entries {
+				if v.textView != 0 && !slices.Contains(views, v) {
+					views = append(views, v)
+				}
 			}
+		})
+		if len(views) != 2 {
+			if time.Now().After(deadline) {
+				t.Fatalf("%d text views, want 2", len(views))
+			}
+			time.Sleep(50 * time.Millisecond)
 		}
-	})
-	if len(views) != 2 {
-		t.Fatalf("%d text views, want 2", len(views))
 	}
 	// GTK lays a text view's lines out at its width once it has one, wrapping them until then.
-	deadline := time.Now().Add(10 * time.Second)
 	for laidOut := false; !laidOut; {
 		w.onLoop(t, func() {
 			laidOut = gtkWidgetGetWidth(views[0].textView) >= 290 && gtkWidgetGetWidth(views[1].textView) >= 290
