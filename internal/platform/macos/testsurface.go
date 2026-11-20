@@ -710,8 +710,39 @@ func (t *testSurface) composited(bounds apple.CGRect) []byte {
 	if float64(width) < math.Floor(bounds.Size.Width*scale) || float64(height) < math.Floor(bounds.Size.Height*scale) {
 		return nil
 	}
-	png, _ := apple.PNGImage(image)
+	png, _ := pngFromCGImage(image)
 	return png
+}
+
+// pngFromCGImage encodes image after converting it to sRGB. WindowServer uses the display's color space for a composited capture, which is commonly Display P3. Keeping that profile in a test screenshot makes raw pixel comparisons depend on the display that ran the test. NSBitmapImageRep does the color conversion before ImageIO writes the PNG.
+func pngFromCGImage(image uintptr) ([]byte, error) {
+	rep := objc.ID(apple.Class("NSBitmapImageRep")).Send(sel("alloc")).Send(sel("initWithCGImage:"), objc.ID(image))
+	if rep == 0 {
+		return apple.PNGImage(image)
+	}
+	defer rep.Send(selRelease)
+	return pngFromBitmapRep(rep)
+}
+
+// pngFromBitmapRep encodes rep as a PNG in sRGB, converting it from the window's color space, which the AppKit fallback's bitmap also carries.
+func pngFromBitmapRep(rep objc.ID) ([]byte, error) {
+	if rep == 0 {
+		return nil, errors.New("macos: empty bitmap image")
+	}
+	converted := rep
+	space := objc.ID(apple.Class("NSColorSpace")).Send(sel("sRGBColorSpace"))
+	if space != 0 {
+		if candidate := rep.Send(sel("bitmapImageRepByConvertingToColorSpace:renderingIntent:"), space, uint(0)); candidate != 0 {
+			converted = candidate
+		}
+	}
+	const pngType = 4
+	data := converted.Send(sel("representationUsingType:properties:"), uint(pngType),
+		objc.ID(apple.Class("NSDictionary")).Send(sel("dictionary")))
+	if data == 0 {
+		return nil, errors.New("macos: cannot encode bitmap image")
+	}
+	return apple.Bytes(data), nil
 }
 
 func (t *testSurface) Screenshot() ([]byte, error) {
@@ -734,13 +765,7 @@ func (t *testSurface) Screenshot() ([]byte, error) {
 			return
 		}
 		v.Send(sel("cacheDisplayInRect:toBitmapImageRep:"), bounds, rep)
-		const pngType = 4
-		data := rep.Send(sel("representationUsingType:properties:"), uint(pngType),
-			objc.ID(apple.Class("NSDictionary")).Send(sel("dictionary")))
-		if data == 0 {
-			return
-		}
-		png = apple.Bytes(data)
+		png, _ = pngFromBitmapRep(rep)
 	})
 	if png == nil {
 		return nil, errors.New("the window drew nothing")

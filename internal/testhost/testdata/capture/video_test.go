@@ -50,7 +50,7 @@ func TestVideoShowsWhatIsBehindItsTransparentPixels(t *testing.T) {
 	if s := got(); s != "load" {
 		t.Fatalf("the video reported %q", s)
 	}
-	// The colours are the display's, Display P3 on most Macs, so each check leaves room for the conversion.
+	// The video's frames are scaled and compressed, so each check leaves room around the colour it wants.
 	red := func(r, g, b uint32) bool { return r > 200 && g < 80 && b < 80 }
 	blue := func(r, g, b uint32) bool { return b > 200 && r < 80 && g < 80 }
 	cyan := func(r, g, b uint32) bool { return r <= 160 && g >= 200 && b >= 200 }

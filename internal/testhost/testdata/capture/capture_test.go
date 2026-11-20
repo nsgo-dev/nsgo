@@ -31,7 +31,7 @@ func TestCaptureShowsCompositedEffects(t *testing.T) {
 		r, g, b, _ = img.At(p.X, p.Y).RGBA()
 		return r >> 8, g >> 8, b >> 8
 	}
-	// The colours are the display's, Display P3 on most Macs, so each check leaves room for the conversion.
+	// Antialiasing and the shadow's edge blend into neighbours, so each check leaves room around the colour it wants.
 	if r, g, b := at(70, 70); r > 160 || g < 200 || b < 200 {
 		t.Errorf("the inverted red box shows %d,%d,%d, want cyan", r, g, b)
 	}
@@ -66,5 +66,22 @@ func TestPartialBorderShowsOverABackdrop(t *testing.T) {
 	}
 	if r, g, b := at(150, 147); r > 180 && g < 110 && b < 110 {
 		t.Errorf("the bottom edge shows the top border's red %d,%d,%d: the ring is upside down", r, g, b)
+	}
+}
+
+// TestCaptureIsSRGB checks that a macOS capture holds the sRGB values the app set rather than the display's, which on a Display P3 Mac read #2B7766 back as about #417567 (#311).
+func TestCaptureIsSRGB(t *testing.T) {
+	if nsgotest.Target() != "macos" {
+		t.Skip("checks the macOS test host's capture")
+	}
+	app := nsgotest.Start(t, func(*core.Scope) core.Node {
+		return core.View{Style: core.Style{Width: core.Pt(100), Height: core.Pt(100), Background: core.RGB(0x2b7766)}}
+	}, nsgotest.Size(100, 100))
+	img := app.Capture()
+	b := img.Bounds()
+	r, g, bl, _ := img.At(b.Min.X+b.Dx()/2, b.Min.Y+b.Dy()/2).RGBA()
+	near := func(got uint32, want uint32) bool { return got>>8+3 >= want && got>>8 <= want+3 }
+	if !near(r, 0x2b) || !near(g, 0x77) || !near(bl, 0x66) {
+		t.Errorf("the capture shows #%02x%02x%02x, want #2b7766", r>>8, g>>8, bl>>8)
 	}
 }
