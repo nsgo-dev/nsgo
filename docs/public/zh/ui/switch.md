@@ -28,7 +28,7 @@ ui.Switch{Checked: sync.Get, OnChange: sync.Set, Label: "自动同步", Size: ui
 
 ## 平台
 
-控件由应用绘制，所以各处看起来一样。按压、焦点和读屏器来自平台。手机上的开关按设计与桌面上的尺寸相同；`SizeSmall` 用于紧凑的行，而不是某种设备。
+默认控件由应用绘制，所以各处看起来一样。`Variant: ui.SwitchSystem` 请求平台控件：macOS 的 NSSwitch、iOS 的 UISwitch，以及 Android 的 Material 3 52 × 32 dp 开关。其他目标使用默认外观。按压、焦点和读屏器来自平台。默认开关按设计与桌面上的尺寸相同；`SizeSmall` 用于紧凑的行，而不是某种设备。
 
 ## 相关
 

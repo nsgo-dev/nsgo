@@ -9,7 +9,7 @@ import (
 )
 
 func TestSystemSwitchFollowsTheApp(t *testing.T) {
-	for _, os := range []driver.OS{driver.OSMacOS, driver.OSIOS} {
+	for _, os := range []driver.OS{driver.OSMacOS, driver.OSIOS, driver.OSAndroid} {
 		app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 			on := core.NewSignal(cx, false)
 			return core.SystemSwitch{Checked: on.Get, OnChange: on.Set, Size: "small", Label: "Wi-Fi", TestID: "switch"}
@@ -28,9 +28,9 @@ func TestSystemSwitchFollowsTheApp(t *testing.T) {
 func TestSystemSwitchShowsNothingElsewhere(t *testing.T) {
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		return core.SystemSwitch{TestID: "switch"}
-	}, nsgotest.Environment(driver.Environment{OS: driver.OSAndroid}))
+	}, nsgotest.Environment(driver.Environment{OS: driver.OSWindows}))
 	if v := app.FindMounted("id:switch"); v.Component != "" {
-		t.Fatalf("Android mounted the component %q", v.Component)
+		t.Fatalf("Windows mounted the component %q", v.Component)
 	}
 }
 

@@ -28,7 +28,7 @@ The switch reports `RoleSwitch` and its on or off state. `Label` is what assisti
 
 ## Platform
 
-The control is drawn by the app, so it looks the same everywhere. Presses, focus and the screen reader are the platform's. A phone's switch is the same size as a desktop's by design; `SizeSmall` is for dense rows, not for a device.
+The default control is drawn by the app, so it looks the same everywhere. `Variant: ui.SwitchSystem` asks for the platform control: NSSwitch on macOS, UISwitch on iOS and Material 3's 52 × 32 dp switch on Android. Other targets use the default look. Presses, focus and the screen reader are the platform's. A phone's default switch is the same size as a desktop's by design; `SizeSmall` is for dense rows, not for a device.
 
 ## Related
 

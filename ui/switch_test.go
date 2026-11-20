@@ -38,7 +38,7 @@ func TestSystemSwitchIsThePlatformsOnApple(t *testing.T) {
 	for _, tc := range []struct {
 		os     core.OS
 		native bool
-	}{{core.OSMacOS, true}, {core.OSIOS, true}, {core.OSAndroid, false}, {core.OSWindows, false}} {
+	}{{core.OSMacOS, true}, {core.OSIOS, true}, {core.OSAndroid, true}, {core.OSWindows, false}} {
 		app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 			on := core.NewSignal(cx, true)
 			return Switch{Checked: on.Get, OnChange: on.Set, Label: "Wi-Fi", Variant: SwitchSystem}

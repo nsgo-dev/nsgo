@@ -2,8 +2,9 @@ package core
 
 import "github.com/nsgo-dev/nsgo/internal/driver"
 
-// SystemSwitch is the platform's own switch, NSSwitch on macOS and
-// UISwitch on iOS, a native component they register; ui.Switch's
+// SystemSwitch is the platform's own switch, NSSwitch on macOS,
+// UISwitch on iOS and Material 3's framework switch on Android, native
+// components they register; ui.Switch's
 // SwitchSystem variant shows it there. Elsewhere it shows nothing, and
 // SystemSwitchAvailable says whether it shows. The switch shows the
 // user's choice at once, as the system's does, and its size is the
@@ -24,10 +25,10 @@ type SystemSwitch struct {
 	TestID string
 }
 
-// SystemSwitchAvailable reports whether the platform has a SystemSwitch: macOS and iOS, not a watch, which reports iOS, or a web build that runs as them.
+// SystemSwitchAvailable reports whether the platform has a SystemSwitch: macOS, iOS (not a watch), or Android's Material 3 switch, or a web build that runs as them.
 func SystemSwitchAvailable(cx *Scope) bool {
 	os := cx.Env().host()
-	return os == OSMacOS || (os == OSIOS && cx.Env().Idiom() != IdiomWatch)
+	return os == OSMacOS || os == OSAndroid || (os == OSIOS && cx.Env().Idiom() != IdiomWatch)
 }
 
 // Render implements Node.

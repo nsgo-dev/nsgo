@@ -106,6 +106,9 @@ func (s *surface) configureNative(key nativeKey, c *driver.NativeConfig) nativeI
 		if factory == nil && c.Component == driver.TabBarComponent {
 			factory = newTabBar
 		}
+		if factory == nil && c.Component == driver.SwitchComponent {
+			factory = newSystemSwitch
+		}
 		if factory == nil {
 			// The host's, if Java has one of the name.
 			v.host = true
