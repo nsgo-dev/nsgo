@@ -729,3 +729,30 @@ func TestDialogShadowsThePagesKeys(t *testing.T) {
 		t.Fatalf("after the dialog: log = %q, want %q", log, want)
 	}
 }
+
+// A sheet's StartingStyle shows while it comes in, and its EndingStyle while it goes.
+func TestSheetStartingAndEndingStyles(t *testing.T) {
+	var open *core.Signal[bool]
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		open = core.NewSignal(cx, false)
+		return base.Sheet{Open: open.Get, TestID: "sheet", OnOpenChange: func(o bool, _ base.Reason) { open.Set(o) },
+			PopupStyle:    core.Style{Height: core.Pt(300)},
+			StartingStyle: core.Style{Opacity: core.Alpha(0.25)},
+			EndingStyle:   core.Style{Opacity: core.Alpha(0.5)},
+			Children:      []core.Node{core.Text{Content: "inside"}}}
+	})
+	open.Set(true)
+	app.Settle()
+	if got := app.Find("id:sheet").Style.Opacity; got != 0.25 {
+		t.Errorf("coming in, the panel's opacity is %v, want the starting style's", got)
+	}
+	app.Advance(300 * time.Millisecond)
+	if got := app.Find("id:sheet").Style.Opacity; got != 1 {
+		t.Errorf("in place, the panel's opacity is %v, want its own", got)
+	}
+	open.Set(false)
+	app.Settle()
+	if got := app.Find("id:sheet").Style.Opacity; got != 0.5 {
+		t.Errorf("going, the panel's opacity is %v, want the ending style's", got)
+	}
+}

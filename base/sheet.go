@@ -37,8 +37,7 @@ type Sheet struct {
 	PopupClass        string
 	PopupStyle        core.Style
 	PopupStyleFunc    func() core.Style
-	// StartingStyle and EndingStyle style the panel while it enters and leaves;
-	// include a Transition in the style for custom timing.
+	// StartingStyle and EndingStyle style the panel while it enters and leaves; include a Transition in the style for custom timing.
 	StartingClass string
 	StartingStyle core.Style
 	EndingClass   string

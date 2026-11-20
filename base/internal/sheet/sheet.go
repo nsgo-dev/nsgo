@@ -245,40 +245,41 @@ func (l Layer) Node() core.Node {
 			Style:     parts.Fill.Merge(l.Backdrop.Style).Merge(core.Style{Animated: &core.AnimatedStyle{Opacity: opacity}}),
 			StyleFunc: l.Backdrop.Fn, NoFocus: true,
 			OnPress: func(core.PressEvent) { l.BackdropPress() }}
-		panelClass := l.Panel.Class
-		panelStyle := l.Panel.Style
-		panelFn := l.Panel.Fn
-		if !m.settled.Get() {
-			panelClass = parts.JoinClasses(panelClass, l.Starting.Class)
-			panelStyle = panelStyle.Merge(l.Starting.Style)
-			if l.Starting.Fn != nil {
-				old := panelFn
-				panelFn = func() core.Style {
-					var s core.Style
-					if old != nil {
-						s = old()
+		// The panel takes Starting until its motion in settles and Ending once it closes, reading them as the motion goes, as the Show's content is built once.
+		panelFn := func() core.Style {
+			var s core.Style
+			if l.Panel.Fn != nil {
+				s = l.Panel.Fn()
+			}
+			for _, p := range []struct {
+				on   bool
+				part parts.Part
+			}{{!m.settled.Get(), l.Starting}, {m.closing.Get(), l.Ending}} {
+				if p.on {
+					s = s.Merge(p.part.Style)
+					if p.part.Fn != nil {
+						s = s.Merge(p.part.Fn())
 					}
-					return s.Merge(l.Starting.Fn())
 				}
 			}
+			return s
 		}
-		if m.closing.Get() {
-			panelClass = parts.JoinClasses(panelClass, l.Ending.Class)
-			panelStyle = panelStyle.Merge(l.Ending.Style)
-			if l.Ending.Fn != nil {
-				old := panelFn
-				panelFn = func() core.Style {
-					var s core.Style
-					if old != nil {
-						s = old()
-					}
-					return s.Merge(l.Ending.Fn())
+		var panelClassFn func() string
+		if l.Starting.Class != "" || l.Ending.Class != "" {
+			panelClassFn = func() string {
+				var c string
+				if !m.settled.Get() {
+					c = parts.JoinClasses(c, l.Starting.Class)
 				}
+				if m.closing.Get() {
+					c = parts.JoinClasses(c, l.Ending.Class)
+				}
+				return c
 			}
 		}
 		panel := core.View{
-			Class: panelClass,
-			Style: panelPlace(l.Side).Merge(panelStyle).Merge(core.Style{Animated: &core.AnimatedStyle{
+			Class: l.Panel.Class, ClassFunc: panelClassFn,
+			Style: panelPlace(l.Side).Merge(l.Panel.Style).Merge(core.Style{Animated: &core.AnimatedStyle{
 				TranslateX: m.x, TranslateY: m.y}}),
 			StyleFunc: panelFn, Role: l.Role, Label: l.Label, LabelFunc: l.LabelFunc, AccessibilityDescription: l.AccessibilityDescription,
 			AccessibilityDescriptionFunc: l.AccessibilityDescriptionFunc, TestID: l.TestID, Children: l.Content,

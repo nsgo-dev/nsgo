@@ -43,8 +43,7 @@ type Dialog struct {
 	// ContentStyle and ContentStyleFunc override the touch sheet's padding and gap.
 	ContentStyle     core.Style
 	ContentStyleFunc func() core.Style
-	// StartingStyle and EndingStyle override the touch sheet's entry and exit
-	// styles. Include a Transition for custom timing.
+	// StartingStyle and EndingStyle override the touch sheet's entry and exit styles. Include a Transition for custom timing.
 	StartingStyle core.Style
 	EndingStyle   core.Style
 	// Label names the dialog for assistive technology, Title when it and LabelFunc are not given, which reads Description after it. Role makes it an alert dialog, one asking for an answer, as a confirmation.
