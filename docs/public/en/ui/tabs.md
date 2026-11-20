@@ -31,6 +31,8 @@ ui.Tabs[string]{Variant: ui.TabsUnderline, Equal: true, Size: ui.SizeSmall, Opti
 
 An option can carry an `Icon`, a `Disabled` function, a `Content` node and a `TestID`. `Content` replaces the label and inherits the tab's text style.
 
+Use `OptionsFunc` when the tabs follow a signal. NSGo updates rows in place by their values, keeping the selected tab and keyboard focus when that value remains offered; a value that disappears is left unselected until the app changes it.
+
 ## Tab bars
 
 `ui.TabShell` keeps top-level sections over a bottom bar at every window width. It uses the system's bar on iOS when every tab supplies `SystemIcon`, and on Android when each supplies `SystemIcon` or an SVG `Icon`; there a `SystemIcon` that names an Android drawable takes precedence, and the SVG shows for any other name, such as an SF Symbol's. Otherwise it draws the bar with the supplied SVG icons. A bar it draws keeps clear of the bottom safe area itself, so `core.EnvSafeArea` at the bottom of a section above it, a `base.Nav` page's included, is 0; under iOS's floating system bar, keep content clear with `ui.TabBarInset`.

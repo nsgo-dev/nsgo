@@ -12,6 +12,7 @@
 - Add Android's Material 3 `SystemSwitch` implementation for `ui.SwitchSystem`, with native checked, disabled and accessibility behavior (#937 by @houko).
 - Ignore an inherited AppImage environment when registering Linux launch-at-login entries, unless the running executable is inside that image (#946 by @houko).
 - Give macOS's default menu bar AppKit's app menu, with About, Hide, Hide Others and Show All, and Check for Updates… in apps that update themselves, and a Window menu listing the windows, where it held only Quit and Edit; it takes no ⌘H, ⌥⌘H or ⌘M from the app's own key bindings (#947 by @houko).
+- Add `ui.Tabs.OptionsFunc`, which updates tab rows in place while retaining a selected value and keyboard focus when it remains offered (#922 by @houko).
 - Let `ui.TabShell.BarHidden` hide a system or drawn tab bar while a detail page shows and restore the section's bottom safe area (#932 by @houko).
 - Add `Position` and `PagePosition` to `core.PanEvent` on every pan phase across native, web, mini program and headless targets (#706 by @houko).
 - Cancel a web press after the pointer moves beyond eight points, matching headless and native drag behavior (#705 by @houko).

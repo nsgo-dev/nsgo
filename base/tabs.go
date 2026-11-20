@@ -22,6 +22,8 @@ type Tab struct {
 	StyleFunc func() core.Style
 	Children  []core.Node
 	Label     string
+	// LabelFunc keeps the accessible label bound while the tab stays mounted.
+	LabelFunc func() string
 	Hint      string
 	TestID    string
 	// OnLayout and Tooltip are its view's, as a core.View's.
@@ -35,7 +37,11 @@ func (t Tab) Render(cx *core.Scope) core.Node {
 	if press == nil {
 		press = func(core.PressEvent) {}
 	}
-	return rovingView(cx, core.View{Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTab, Label: t.Label, Hint: t.Hint, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
+	label := t.Label
+	if t.LabelFunc != nil {
+		label = t.LabelFunc()
+	}
+	return rovingView(cx, core.View{Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTab, Label: label, Hint: t.Hint, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
 		Disabled: t.Disabled, Invalid: t.Invalid, Selected: t.Selected, OnPress: press, Children: t.Children}, t.Selected, func() { press(core.PressEvent{}) })
 }
 

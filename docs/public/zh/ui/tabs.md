@@ -31,6 +31,8 @@ ui.Tabs[string]{Variant: ui.TabsUnderline, Equal: true, Size: ui.SizeSmall, Opti
 
 选项可以带 `Icon`、`Disabled` 函数、`Content` 节点和 `TestID`。`Content` 替代标签文字，并继承标签的文本样式。
 
+标签跟随 signal 时使用 `OptionsFunc`。NSGo 按选项值原地更新标签；只要该值仍在列表中，就会保留选中状态和键盘焦点。值被移除后保持未选中，直到应用更新它。
+
 ## 标签栏
 
 `ui.TabShell` 将顶层分区放在底部标签栏上方，窗口宽度不会改变这一形式。iOS 上每个标签都提供 `SystemIcon` 时使用系统标签栏；Android 上每个标签提供 `SystemIcon` 或 SVG `Icon` 即可，此时能对应 Android drawable 的 `SystemIcon` 优先，其他名称（例如 SF Symbol 名称）显示 SVG。其他情况使用所提供的 SVG 绘制标签栏。它自己绘制的底部栏会避开底部安全区域，因此其上方分区（包括 `base.Nav` 的页面）底部的 `core.EnvSafeArea` 为 0；在 iOS 浮动的系统标签栏下，用 `ui.TabBarInset` 让内容避开它。

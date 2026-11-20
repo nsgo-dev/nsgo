@@ -28,7 +28,9 @@ var tabsSlide = core.Transition{Duration: 180 * time.Millisecond, Easing: core.E
 type Tabs[T comparable] struct {
 	Variant TabsVariant
 	Options []Option[T]
-	Value   func() T
+	// OptionsFunc, when set, returns the options in place of Options and updates tabs in place when the values it reads change, keeping the selected tab and focus where their values remain offered.
+	OptionsFunc func() []Option[T]
+	Value       func() T
 	// OnChange receives the value of a pressed tab other than the selected
 	// one.
 	OnChange func(T)
@@ -46,12 +48,18 @@ type Tabs[T comparable] struct {
 func (t Tabs[T]) Render(cx *core.Scope) core.Node {
 	colors := ColorsOf(cx)
 	underline := t.Variant == TabsUnderline
+	options := func() []Option[T] {
+		if t.OptionsFunc != nil {
+			return t.OptionsFunc()
+		}
+		return t.Options
+	}
 	selected := func() int {
 		if t.Value == nil {
 			return 0
 		}
 		v := t.Value()
-		for i, o := range t.Options {
+		for i, o := range options() {
 			if o.Value == v {
 				return i
 			}
@@ -69,12 +77,20 @@ func (t Tabs[T]) Render(cx *core.Scope) core.Node {
 	if t.Equal {
 		// A grid's tracks are one width whether the list fills its parent or
 		// fits the widest tab.
-		list.Display, list.GridTemplateColumns = core.DisplayGrid, core.GridTracks(fmt.Sprintf("repeat(%d, minmax(0, 1fr))", max(1, len(t.Options))))
+		list.Display = core.DisplayGrid
 	} else if !underline {
 		list.AlignSelf = core.AlignStart
 	}
 	width := core.NewSignal(cx, core.Points(0))
-	frames := make([]*core.Signal[core.Bounds], len(t.Options))
+	frames := map[T]*core.Signal[core.Bounds]{}
+	frame := func(value T) *core.Signal[core.Bounds] {
+		if f := frames[value]; f != nil {
+			return f
+		}
+		f := core.NewSignal(cx, core.Bounds{})
+		frames[value] = f
+		return f
+	}
 	// Only a change of tab slides: the indicator follows a tab that a
 	// resize moves at once.
 	sliding := core.NewSignal(cx, false)
@@ -89,7 +105,8 @@ func (t Tabs[T]) Render(cx *core.Scope) core.Node {
 	indicator := core.View{PointerEvents: core.PointerEventsNone, OnTransitionEnd: func() { sliding.Set(false) }, StyleFunc: func() core.Style {
 		var f core.Bounds
 		if i := selected(); i >= 0 {
-			f = frames[i].Get()
+			o := options()[i]
+			f = frame(o.Value).Get()
 		}
 		left := f.Origin.X
 		// Right to left, Left is the distance from the list's right.
@@ -114,11 +131,9 @@ func (t Tabs[T]) Render(cx *core.Scope) core.Node {
 		// Selection keeps the weight, so it never moves the labels.
 		return core.Style{Color: Alpha(colors.Text(), 0.6), Selected: &core.Style{Color: colors.Text()}, FocusVisible: FocusRing(cx, -2), Disabled: Dimmed()}
 	}
-	for i := range frames {
-		frames[i] = core.NewSignal(cx, core.Bounds{})
-	}
-	tabs := []core.Node{indicator}
-	for i, o := range t.Options {
+	tabs := []core.Node{indicator, core.Each(options, func(o Option[T]) T { return o.Value }, func(rowCx *core.Scope, item func() Option[T], index func() int) core.Node {
+		o := item()
+		f := frame(o.Value)
 		children := []core.Node{o.Content}
 		if o.Content == nil {
 			children = nil
@@ -126,21 +141,25 @@ func (t Tabs[T]) Render(cx *core.Scope) core.Node {
 				children = append(children, Icon(o.Icon, t.Size.mark(), Inherited))
 			}
 			if o.Label != "" {
-				children = append(children, core.Text{Content: o.Label, MaxLines: 1})
+				children = append(children, core.Text{ContentFunc: func() string { return item().Label }, MaxLines: 1})
 			}
 		}
-		tabs = append(tabs, base.Tab{Selected: func() bool { return selected() == i }, Disabled: o.Disabled,
+		return base.Tab{Selected: func() bool { return selected() == index() }, Disabled: func() bool { return item().Disabled != nil && item().Disabled() },
 			OnPress: func(core.PressEvent) {
-				if t.OnChange != nil && core.Untracked(cx, selected) != i {
-					t.OnChange(o.Value)
+				if t.OnChange != nil && core.Untracked(cx, selected) != index() {
+					t.OnChange(item().Value)
 				}
 			},
-			OnLayout: frames[i].Set, Style: tab, StyleFunc: tabLook, Children: children, Label: o.Label, TestID: o.TestID})
-	}
+			OnLayout: f.Set, Style: tab, StyleFunc: tabLook, Children: children, LabelFunc: func() string { return item().Label }, TestID: o.TestID}
+	})}
 	return base.Tabs{Style: list, StyleFunc: func() core.Style {
-		if underline {
-			return t.Style
+		style := core.Style{}
+		if t.Equal {
+			style.GridTemplateColumns = core.GridTracks(fmt.Sprintf("repeat(%d, minmax(0, 1fr))", max(1, len(options()))))
 		}
-		return core.Style{Background: Alpha(colors.Text(), 0.06)}.Merge(t.Style)
+		if underline {
+			return style.Merge(t.Style)
+		}
+		return core.Style{Background: Alpha(colors.Text(), 0.06)}.Merge(style).Merge(t.Style)
 	}, OnLayout: func(b core.Bounds) { width.Set(b.Size.Width) }, Children: tabs, Label: t.Label, TestID: t.TestID}
 }

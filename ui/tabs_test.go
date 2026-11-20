@@ -119,3 +119,27 @@ func TestTabsRTL(t *testing.T) {
 		checkIndicator(t, app, name, name+"-1")
 	}
 }
+
+// TestTabsOptionsFuncUpdatesInPlace keeps a tab's row and focus when its
+// options are replaced, while adding and removing rows around it.
+func TestTabsOptionsFuncUpdatesInPlace(t *testing.T) {
+	headless(t)
+	var options *core.Signal[[]Option[string]]
+	value := "b"
+	app, _ := start(t, desktopEnv, func(cx *core.Scope) core.Node {
+		options = core.NewSignalFunc(cx, []Option[string]{{Value: "a", Label: "Alpha", TestID: "a"}, {Value: "b", Label: "Beta", TestID: "b"}}, nil)
+		return Tabs[string]{TestID: "tabs", OptionsFunc: options.Get, Value: func() string { return value }, OnChange: func(v string) { value = v }}
+	})
+	app.Focus("id:b")
+	if !app.Find("id:b").Focused {
+		t.Fatal("the tab did not take focus")
+	}
+	options.Set([]Option[string]{{Value: "b", Label: "Beta (new)", TestID: "b"}, {Value: "c", Label: "Gamma", TestID: "c"}})
+	app.Settle()
+	if !app.Find("id:b").Focused || !app.Find("id:b").Props.Selected {
+		t.Fatal("updating options moved focus or selection from the retained tab")
+	}
+	if !app.Exists("text:Beta (new)") || !app.Exists("id:c") || app.Exists("id:a") {
+		t.Fatal("the options function did not update tab rows")
+	}
+}
