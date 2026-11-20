@@ -22,8 +22,7 @@ type UpdateCheck struct {
 	// and URL the page that gets it: the App Store's on iOS, the
 	// release's elsewhere.
 	Version, URL string
-	// Notes are Version's release notes as plain text, "" when its feed
-	// has none.
+	// Notes are Version's release notes as plain text, "" when its feed has none.
 	Notes string
 	// Download is the signed package for Version, when this target can
 	// install it itself. Signature and SHA256 authenticate its bytes; Key is

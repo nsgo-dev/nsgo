@@ -22,6 +22,8 @@ func notesText(description string) string {
 		}
 		line.Reset()
 	}
+	// A feed another tool wrote may describe the release with a whole page, whose script, style and title are no text of the notes.
+	skip := 0
 	for {
 		tt := z.Next()
 		switch tt {
@@ -29,9 +31,20 @@ func notesText(description string) string {
 			end()
 			return strings.Join(lines, "\n")
 		case html.TextToken:
-			line.Write(z.Text())
+			if skip == 0 {
+				line.Write(z.Text())
+			}
 		case html.StartTagToken, html.EndTagToken, html.SelfClosingTagToken:
 			name, _ := z.TagName()
+			switch string(name) {
+			case "script", "style", "title", "head":
+				if tt == html.StartTagToken {
+					skip++
+				} else if tt == html.EndTagToken && skip > 0 {
+					skip--
+				}
+				continue
+			}
 			switch string(name) {
 			case "p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "pre", "blockquote", "hr", "tr":
 				end()

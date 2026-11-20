@@ -64,16 +64,12 @@ type updatesConfig struct {
 	// without a Feed of its own.
 	public ed25519.PublicKey
 	repo   string
-	// notes is build's -release-notes file, and notesHTML its Markdown as
-	// the HTML the appcasts describe the release with.
+	// notes is build's -release-notes file, and notesHTML its Markdown as the HTML the appcasts describe the release with.
 	notes     string
 	notesHTML string
 }
 
-// readReleaseNotes renders -release-notes' Markdown, if any, into the HTML
-// each appcast's item carries as its description, which Sparkle and
-// WinSparkle show in their update dialogs and the other backends' updater
-// shows as text.
+// readReleaseNotes renders -release-notes' Markdown, if any, into the HTML each appcast's item carries as its description, which Sparkle and WinSparkle show in their update dialogs and the other backends' updater shows as text.
 func (p *project) readReleaseNotes() error {
 	u := &p.Updates
 	if u.notes == "" {

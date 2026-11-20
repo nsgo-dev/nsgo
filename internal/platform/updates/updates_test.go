@@ -208,6 +208,7 @@ func TestNotesText(t *testing.T) {
 		{"<p>Faster <code>sync</code>,\nand more.</p>", "Faster sync, and more."},
 		{"<h2>New</h2>\n<ul>\n<li>A <strong>dark</strong> theme</li>\n<li><p>Tabs</p></li>\n</ul>\n<p>Fixes &amp; more</p>", "New\n• A dark theme\n• Tabs\nFixes & more"},
 		{"Plain text", "Plain text"},
+		{"<html><head><title>v2</title><style>p { color: red }</style></head><body><p>Fixes</p><script>track()</script></body></html>", "Fixes"},
 	} {
 		if got := notesText(c.html); got != c.want {
 			t.Errorf("notesText(%q) = %q, want %q", c.html, got, c.want)
