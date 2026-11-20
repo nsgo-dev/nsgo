@@ -1020,6 +1020,10 @@ func (w *window) menuShortcut(key string) bool {
 
 // chooseMenu carries out an item's role and tells the app about it. An editing role tells the app only when neither the focused field, the focused page nor the text selection takes it.
 func (w *window) chooseMenu(ref menuRef) {
+	if ref.id != 0 && !ref.role.EditsText() && ref.role != driver.MenuPasteAndMatchStyle {
+		w.engine.Dispatch(driver.Event{Kind: driver.EventMenu, Count: ref.id})
+		return
+	}
 	edited := false
 	switch ref.role {
 	case driver.MenuQuit:

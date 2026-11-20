@@ -873,6 +873,8 @@ func (s *surface) item(e driver.MenuEntry) objc.ID {
 	case e.Role != driver.MenuRoleNone:
 		if e.ID != 0 && (e.Role.EditsText() || e.Role == driver.MenuPasteAndMatchStyle) {
 			action = selMenuRoleChosen
+		} else if e.ID != 0 {
+			action = selMenuChosen
 		} else {
 			action = sel(roleActions[e.Role])
 		}

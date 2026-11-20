@@ -139,7 +139,7 @@ type MenuItem struct {
 	// When says whether the shortcut chooses the item while a text input
 	// or a web view has the keyboard focus.
 	When MenuWhen
-	// OnSelect runs when the item is chosen, by a click or its shortcut. An editing Role (MenuUndo through MenuSelectAll, MenuPasteAndMatchStyle and MenuDelete) goes to the focused field or web view first, and Copy and Select All to selected text, so OnSelect runs when none of them takes it: Select All selecting the app's own items, as Finder's does.
+	// OnSelect runs when the item is chosen, by a click or its shortcut. An editing Role (MenuUndo through MenuSelectAll, MenuPasteAndMatchStyle and MenuDelete) goes to the focused field or web view first, and Copy and Select All to selected text, so OnSelect runs when none of them takes it: Select All selecting the app's own items, as Finder's does. For every other Role, OnSelect replaces the standard role action, so an item with MenuQuit or MenuMinimize and OnSelect runs the callback without quitting or minimizing.
 	OnSelect func()
 }
 

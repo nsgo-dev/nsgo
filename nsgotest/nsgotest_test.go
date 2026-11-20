@@ -719,9 +719,25 @@ func TestApplicationMenuRolesHeadless(t *testing.T) {
 		t.Fatalf("minimize and a second zoom reported maximized %v, full screen %v, minimized %v", env.Maximized(), env.FullScreen(), env.Minimized())
 	}
 
+	// A non-editing role with OnSelect is an app action on every desktop; it
+	// does not also minimize or quit.
+	selected := 0
+	app = start(t, []desktop.MenuItem{{Label: "App", Items: []desktop.MenuItem{
+		{Role: core.MenuQuit, OnSelect: func() { selected++ }},
+		{Role: core.MenuMinimize, OnSelect: func() { selected++ }},
+	}}}, func(cx *core.Scope) core.Node {
+		env = cx.Env()
+		return core.Text{Content: "main"}
+	}, mac)
+	app.ChooseMenu("App", "Quit")
+	app.ChooseMenu("App", "Minimize")
+	if selected != 2 || app.Quits != 0 || env.Minimized() {
+		t.Fatalf("role callbacks ran %d times, quit %d times, minimized %v", selected, app.Quits, env.Minimized())
+	}
+
 	// The editing roles act on the focused field; one with OnSelect runs it only when no field takes it.
 	var pastes []string
-	selected := 0
+	selected = 0
 	app = start(t, []desktop.MenuItem{{Label: "Edit", Items: []desktop.MenuItem{
 		{Role: core.MenuCopy}, {Role: core.MenuPaste}, {Role: core.MenuPasteAndMatchStyle}, {Role: core.MenuDelete},
 		{Role: core.MenuSelectAll, OnSelect: func() { selected++ }}, {Role: core.MenuUndo},

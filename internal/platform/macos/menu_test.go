@@ -225,6 +225,11 @@ func TestMenuRoleItems(t *testing.T) {
 			t.Errorf("role fallback action = %v, tag %d, role %v", got, objc.Send[int](it, sel("tag")), s.roleFallback[7])
 		}
 		it.Send(selRelease)
+		it = s.item(driver.MenuEntry{Label: "Minimize", Role: driver.MenuMinimize, ID: 8})
+		if got := objc.Send[objc.SEL](it, sel("action")); got != selMenuChosen || objc.Send[int](it, sel("tag")) != 8 {
+			t.Errorf("non-editing role callback action = %v, tag %d; want callback action and tag", got, objc.Send[int](it, sel("tag")))
+		}
+		it.Send(selRelease)
 		delete(menuTargets, s.menuTarget)
 	})
 }
