@@ -797,8 +797,7 @@ func TestApplicationMenuRolesHeadless(t *testing.T) {
 	}
 }
 
-// macOS target test windows keep geometry fixtures larger than the screen, so
-// AppKit's visible-frame constraint cannot silently change layout assertions.
+// macOS target test windows keep geometry fixtures larger than the screen, so AppKit's visible-frame constraint cannot silently change layout assertions.
 func TestMacOSTestSurfaceKeepsRequestedSize(t *testing.T) {
 	if Target() != "" && Target() != "macos" {
 		t.Skip("checks the macOS target test surface")

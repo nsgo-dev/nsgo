@@ -442,8 +442,7 @@ func loadAppKit() {
 		// A transparent window is borderless, which AppKit otherwise keeps from the keyboard.
 		Cmd: sel("canBecomeKeyWindow"), Fn: yes,
 	}, {
-		// Test windows are geometry fixtures: AppKit's default screen
-		// constraint would silently shrink a requested nsgotest.Size.
+		// Test windows are geometry fixtures: AppKit's default screen constraint would silently shrink a requested nsgotest.Size.
 		Cmd: sel("constrainFrameRect:toScreen:"), Fn: func(self objc.ID, cmd objc.SEL, frame apple.CGRect, screen objc.ID) apple.CGRect {
 			if s := windowSurface(self); s != nil && s.test != nil {
 				return frame
