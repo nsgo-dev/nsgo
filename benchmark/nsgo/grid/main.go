@@ -3,6 +3,8 @@
 package main
 
 import (
+	"os"
+	"slices"
 	"strconv"
 	"time"
 
@@ -12,9 +14,9 @@ import (
 )
 
 const (
-	cols, rows = 30, 20
-	cellW      = 40
-	cellH      = 20
+	defaultCols, defaultRows = 30, 20
+	cellW                    = 40
+	cellH                    = 20
 )
 
 var (
@@ -22,26 +24,40 @@ var (
 	zebra = core.RGB(0xf6f7f9)
 )
 
+// gridSize reads the optional dimensions used for a layer-capacity run, NSGO_GRID_COLS and NSGO_GRID_ROWS, which the runner's -grid-cols and -grid-rows set. The defaults keep the published 600-cell case unchanged. Invalid and nonpositive values fall back so a benchmark typo cannot make an empty window.
+func gridSize() (cols, rows int) {
+	return gridDimension(os.Getenv("NSGO_GRID_COLS"), defaultCols),
+		gridDimension(os.Getenv("NSGO_GRID_ROWS"), defaultRows)
+}
+
+func gridDimension(value string, fallback int) int {
+	if n, err := strconv.Atoi(value); err == nil && n > 0 {
+		return n
+	}
+	return fallback
+}
+
 func root(cx *core.Scope) core.Node {
+	cols, rows := gridSize()
 	// A row is one signal of its numbers: a tick sets every row once.
 	seed := uint32(42)
 	next := func() int {
 		seed = seed*1664525 + 1013904223
 		return int(seed>>16) % 10000
 	}
-	values := make([]*core.Signal[[cols]int], rows)
+	values := make([]*core.Signal[[]int], rows)
 	for r := range values {
-		var v [cols]int
+		v := make([]int, cols)
 		for c := range v {
 			v[c] = next()
 		}
-		values[r] = core.NewSignal(cx, v)
+		values[r] = core.NewSignalFunc(cx, v, slices.Equal)
 	}
 	var frame func(time.Time)
 	frame = func(time.Time) {
 		bench.Frame()
 		for _, row := range values {
-			var v [cols]int
+			v := make([]int, cols)
 			for c := range v {
 				v[c] = next()
 			}
@@ -72,4 +88,7 @@ func root(cx *core.Scope) core.Node {
 	return core.View{Style: core.Style{FlexGrow: 1, Padding: core.All(16)}, Children: lines}
 }
 
-func main() { nsgo.Run(root, nsgo.WindowSize(cols*cellW+32, rows*cellH+32)) }
+func main() {
+	cols, rows := gridSize()
+	nsgo.Run(root, nsgo.WindowSize(core.Points(cols*cellW+32), core.Points(rows*cellH+32)))
+}

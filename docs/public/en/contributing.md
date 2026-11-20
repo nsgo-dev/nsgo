@@ -38,6 +38,8 @@ go tool nsgo check -target all     # vet every available Go/Xcode target instead
 go tool nsgo test                  # every package's tests
 go tool nsgo test -bench . ./core  # core's benchmarks
 (cd benchmark && go run ./runner)  # measure against other frameworks
+# capacity curve for NSGo's 600-cell grid, without rebuilding it
+(cd benchmark && go run ./runner -frameworks nsgo -cases grid -grid-cols 20 -grid-rows 15 -out /tmp/grid.json)
 ```
 
 `-target` vets the targets it names instead of the host and, in NSGo's repository, the dev client, which the plain `check` vets. To vet the platforms a change touches, name them all in one check, such as `check -target web,android -jobs 2`, rather than starting several: `-jobs n` vets up to n targets at once, each `go vet` with n compile workers, where the default is one target at a time with Go's default, and a check started while another runs in the same module waits for it and says so. CI's `check.yml` vets every target.

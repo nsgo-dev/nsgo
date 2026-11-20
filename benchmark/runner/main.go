@@ -12,6 +12,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -51,6 +52,8 @@ type Results struct {
 	// CompositorAtRest is the compositor's CPU by case with none of the
 	// programs open, which their Compositor leaves out.
 	CompositorAtRest map[string]float64 `json:"compositorAtRest,omitempty"`
+	// Grid is the grid case's columns by rows, such as 20x15, when -grid-cols or -grid-rows changed them from 30x20, so a capacity run's results are not taken for the published case's.
+	Grid string `json:"grid,omitempty"`
 }
 
 // Machine is what the results were measured on.
@@ -93,6 +96,8 @@ func main() {
 	cs := flag.String("cases", strings.Join(cases, ","), "the `cases` to measure")
 	runs := flag.Int("runs", 3, "runs of each program, interleaved; the median is kept")
 	seconds := flag.Int("seconds", 10, "how long a run measures, after it settled")
+	gridCols := flag.Int("grid-cols", 0, "grid columns for the NSGo stress case, default 30")
+	gridRows := flag.Int("grid-rows", 0, "grid rows for the NSGo stress case, default 20")
 	nsgoVersion := flag.String("nsgo-version", "", "NSGo's commit, where the checkout has no Git history")
 	out := flag.String("out", filepath.Join("results", runtime.GOOS+".json"), "where to write the results")
 	flag.Parse()
@@ -107,6 +112,9 @@ func main() {
 		Cases:    map[string]map[string]*Measure{},
 
 		CompositorAtRest: map[string]float64{},
+	}
+	if *gridCols > 0 || *gridRows > 0 {
+		r.Grid = fmt.Sprintf("%dx%d", cmp.Or(max(*gridCols, 0), 30), cmp.Or(max(*gridRows, 0), 20))
 	}
 	bins := map[string]map[string]string{}
 	for _, fw := range strings.Split(*fws, ",") {
@@ -139,7 +147,8 @@ func main() {
 					continue
 				}
 				fmt.Fprintf(os.Stderr, "%s %s, run %d of %d\n", c, fw, run+1, *runs)
-				m, err := measure(bin, c, time.Duration(*seconds)*time.Second)
+				env := gridEnvironment(c, *gridCols, *gridRows)
+				m, err := measure(bin, c, time.Duration(*seconds)*time.Second, env)
 				if err == nil && ok {
 					m.Compositor = max(m.Compositor-baseline, 0)
 				}
@@ -268,9 +277,10 @@ const settle = 3 * time.Second
 
 // measure runs a program once: its start, then, once it settled, its CPU
 // over d, its frames and its memory.
-func measure(bin, c string, d time.Duration) (*Measure, error) {
+func measure(bin, c string, d time.Duration, env []string) (*Measure, error) {
 	cmd := exec.Command(bin)
 	cmd.Dir = filepath.Dir(bin)
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stderr = io.Discard
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -341,6 +351,21 @@ func measure(bin, c string, d time.Duration) (*Measure, error) {
 		m.FPS = median(fps)
 	}
 	return m, nil
+}
+
+// gridEnvironment passes dimensions only to the NSGo grid process. A zero keeps the case's published 30 by 20 default, while setting either flag lets a run measure the layer-capacity curve without rebuilding the binary.
+func gridEnvironment(c string, cols, rows int) []string {
+	if c != "grid" {
+		return nil
+	}
+	env := make([]string, 0, 2)
+	if cols > 0 {
+		env = append(env, "NSGO_GRID_COLS="+strconv.Itoa(cols))
+	}
+	if rows > 0 {
+		env = append(env, "NSGO_GRID_ROWS="+strconv.Itoa(rows))
+	}
+	return env
 }
 
 var framesLine = regexp.MustCompile(`^bench frames ([0-9.]+)$`)

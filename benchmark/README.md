@@ -36,6 +36,7 @@ nothing else running and the display awake:
 go run ./runner                                   # every framework and case, 3 runs of 10 s
 go run ./runner -frameworks nsgo,nsh -cases list  # some of them
 go run ./runner -frameworks nsgo -cases grid      # where NSGo's frames run out
+go run ./runner -frameworks nsgo -cases grid -grid-cols 20 -grid-rows 15 -out /tmp/grid.json
 go run ./runner -runs 1 -seconds 3 -out /tmp/x.json
 ```
 
@@ -60,6 +61,8 @@ each value's median:
 Updates follow the display: frames stay at its refresh rate while an app keeps
 up, and a 120 Hz display does twice a 60 Hz one's work. Compare results of one
 machine, not across machines.
+
+The grid is configurable for capacity runs without rebuilding the benchmark. `-grid-cols` and `-grid-rows` set the dimensions for the NSGo `grid` process, with the published 30 by 20 case as the default, and the results name the size they used in `grid`. Run one dimension at a time and compare the resulting FPS, CPU and memory on the same machine, writing them with `-out` elsewhere than the published `results/`. The flags only affect `grid`; other cases keep their normal process environment.
 
 The compositor's rest follows everything else on screen, so close other
 apps, or at least keep them still. On Windows, run it from the desktop's own
