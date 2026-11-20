@@ -67,7 +67,9 @@ func (p DataTable) Render(cx *core.Scope) core.Node {
 	font := t.font()
 	root := core.Style{Overflow: core.Hidden, FontSize: font.Size, FontFamily: font.Family}.Merge(p.Style)
 	return core.View{
-		Role: core.RoleGrid, Label: p.Label, TestID: p.TestID, OnLayout: p.OnLayout, Tooltip: p.Tooltip, Class: parts.JoinClasses(p.Classes.Root, p.Class), Style: root, StyleFunc: p.StyleFunc,
+		Ref: t.focusRef, Role: core.RoleGrid, Label: p.Label, Focusable: func() bool { return true },
+		OnFocus: func() { t.focused.Set(true) }, OnBlur: func() { t.focused.Set(false) },
+		TestID: p.TestID, OnLayout: p.OnLayout, Tooltip: p.Tooltip, Class: parts.JoinClasses(p.Classes.Root, p.Class), Style: root, StyleFunc: p.StyleFunc,
 		Children: []core.Node{core.View{
 			// The frame is the padding box: the layers lie in it, and its
 			// size is the viewport's.
@@ -123,14 +125,13 @@ func (t *dataTable) hitLayer() core.Node {
 	behavior := core.ScrollBehavior{NoBounces: p.NoBounce}
 	pressed := func(e core.PressEvent) { t.press(t.hitAt(e.Position), e.Clicks, e.Modifiers) }
 	box := core.View{
-		Ref: t.focusRef,
+		// The hit layer handles pointer presses but is not itself an
+		// accessibility element; keyboard focus belongs to the named grid.
+		ImportantForAccessibility: core.ImportantNo,
 		StyleFunc: func() core.Style {
 			return core.Style{MinWidth: core.Pct(100), Width: px(t.contentWidth()), Height: px(t.sizes.Get().y.extent())}
 		},
 		OnPress: pressed,
-		// Tab stops at the table here: its keys follow.
-		OnFocus: func() { t.focused.Set(true) },
-		OnBlur:  func() { t.focused.Set(false) },
 		OnMouseMove: func(e core.MouseEvent) {
 			if e.PressedButton == core.MouseButtonNone {
 				t.hoverAt(e.Position)

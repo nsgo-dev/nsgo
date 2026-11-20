@@ -47,9 +47,14 @@ func TestDataTableMakesOnlyTheCellsInView(t *testing.T) {
 			OnVisibleRowsChange: func(s, e int) { rows = [2]int{s, e} },
 			OnColumnResize:      func(key string, w core.Points) { resized = append(resized, fmt.Sprint(key, " ", w)) },
 		}
-	}, nsgotest.Size(400, 400))
+	}, nsgotest.Size(400, 400), nsgotest.Environment(core.Environment{OS: core.OSMacOS, Idiom: core.IdiomDesktop}))
 	if v := app.Find("id:table"); v.Props.Role != core.RoleGrid || v.Props.Label != "Quotes" {
 		t.Fatalf("table role %v label %q, want a grid", v.Props.Role, v.Props.Label)
+	}
+	app.Press("text:R3C2")
+	focused := app.Find("id:table")
+	if !focused.Focused || focused.Props.Role != core.RoleGrid || focused.Props.Label != "Quotes" {
+		t.Fatalf("focused table = focused %v, role %v, label %q; want the named grid", focused.Focused, focused.Props.Role, focused.Props.Label)
 	}
 	cells := len(app.Query("role:cell"))
 	if cells == 0 || cells > 400 {
