@@ -12,11 +12,13 @@ import (
 // ringSize is a ProgressRing's and a Spinner's diameter by default.
 const ringSize core.Points = 32
 
-// ProgressRing is Progress as a ring: the accent, or Tint, runs clockwise from twelve o'clock over a track, or, Indeterminate, a quarter of it turns once every 1.4 s, still under reduced motion. Value is from 0 to 100, as Progress's. Size is its diameter, 32 pt when 0; the line is a tenth of it, 3 pt at most.
+// ProgressRing is Progress as a ring: the accent, or Tint, runs clockwise from twelve o'clock over a track, or, Indeterminate, a quarter of it turns once every 1.4 s, still under reduced motion. Value is from 0 to 100, as Progress's. Size is its diameter, 32 pt when 0; LineWidth is the track and arc width, a tenth of the diameter and 3 pt at most when 0.
 type ProgressRing struct {
 	Value         func() float32
 	Indeterminate func() bool
 	Size          core.Points
+	// LineWidth is the track's and arc's width. When 0, it is a tenth of Size and at most 3 pt.
+	LineWidth core.Points
 	// Tint colors the arc, the accent when nil, and the track under it, a quarter as opaque, where the theme's line would not show, such as on an accent fill.
 	Tint func() core.Color
 	// Label names the task for assistive technology.
@@ -57,7 +59,11 @@ func (p ProgressRing) Render(cx *core.Scope) core.Node {
 		if dia <= 0 {
 			return
 		}
-		width := min(dia/10, 3)
+		width := float32(p.LineWidth)
+		if width <= 0 {
+			width = min(dia/10, 3)
+		}
+		width = min(width, dia)
 		r := (dia - width) / 2
 		x, y := float32(s.Width)/2, float32(s.Height)/2
 		d.SetLineWidth(width).SetLineCap(core.CapRound)

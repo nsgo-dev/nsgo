@@ -26,6 +26,8 @@ const (
 type Spinner struct {
 	Variant SpinnerVariant
 	Size    core.Points
+	// LineWidth is the ring's track and arc width. When 0, ProgressRing's default is used. It has no effect on SpinnerSpokes.
+	LineWidth core.Points
 	// Tint colors it, as ProgressRing's: the ring the accent when nil, the spokes the muted text.
 	Tint   func() core.Color
 	Label  string
@@ -36,7 +38,7 @@ type Spinner struct {
 // Render implements core.Node.
 func (s Spinner) Render(cx *core.Scope) core.Node {
 	if s.Variant != SpinnerSpokes {
-		return ProgressRing{Indeterminate: func() bool { return true }, Size: s.Size, Tint: s.Tint, Label: s.Label, TestID: s.TestID, Style: s.Style}
+		return ProgressRing{Indeterminate: func() bool { return true }, Size: s.Size, LineWidth: s.LineWidth, Tint: s.Tint, Label: s.Label, TestID: s.TestID, Style: s.Style}
 	}
 	size := s.Size
 	if size <= 0 {

@@ -53,6 +53,26 @@ func TestProgressRingTint(t *testing.T) {
 	}
 }
 
+func TestProgressRingLineWidth(t *testing.T) {
+	app, _ := start(t, desktopEnv, func(cx *core.Scope) core.Node {
+		return ProgressRing{TestID: "ring", Size: 34, LineWidth: 4, Value: func() float32 { return 50 }}
+	})
+	var widths []float32
+	for _, child := range views(app.Find("ring")) {
+		if child.Kind != driver.KindCanvas {
+			continue
+		}
+		for _, op := range child.Ops {
+			if op.Kind == driver.DrawLineWidth {
+				widths = append(widths, op.W)
+			}
+		}
+	}
+	if len(widths) != 1 || widths[0] != 4 {
+		t.Fatalf("line widths = %v, want [4]", widths)
+	}
+}
+
 // canvasStrokes are the stroke colors of the first canvas from v down, in order.
 func canvasStrokes(v *nsgotest.View) []core.Color {
 	for _, child := range views(v) {
