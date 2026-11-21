@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -48,9 +49,11 @@ type devOptions struct {
 	device    string // the iPhone, simulator or Android device to run on
 	team      string // the Apple developer team the iOS target signs with
 	release   bool   // build as nsgo build does, for measuring
-	trace     bool   // print the running app's commits
-	highlight bool   // outline what the running app's commits changed
-	devtools  bool   // open DevTools for the running app
+	debug     bool   // run a native desktop app under Delve
+	debugger  *devDebugger
+	trace     bool // print the running app's commits
+	highlight bool // outline what the running app's commits changed
+	devtools  bool // open DevTools for the running app
 	// automation lets tools drive the running app (automation.go); hub relays their requests.
 	automation bool
 	hub        *automationHub
@@ -63,6 +66,17 @@ type devOptions struct {
 
 // dev builds and runs the app, with a dev server its builds connect to: a failed build shows over the app, and Command or Control+R in the app, outside the browser, builds and starts it again unless the app binds the key itself, with OnKey or an enabled item of its application menu (internal/dev's Wrap). It exits once the app does. With nsgo.yaml's hot reload it rebuilds and restarts the app whenever a Go file it compiles from, go.mod, nsgo.yaml or a catalog changes, and keeps the running app when a build fails. After each Go build of an app with a tsconfig.json it writes the TSX's types to .nsgo/types, for editors.
 func dev(ctx context.Context, p *project, opts devOptions) error {
+	if opts.debug {
+		if err := checkDevDebug(p, opts); err != nil {
+			return err
+		}
+		d, err := newDevDebugger(p)
+		if err != nil {
+			return err
+		}
+		opts.debugger = d
+		defer os.RemoveAll(d.root)
+	}
 	if opts.automation {
 		switch {
 		case opts.release:
@@ -136,8 +150,17 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 		dirs, sources := splitSources(dirs)
 		fingerprint := scan(dirs)
 		err = catalogErr
+		if opts.debugger != nil {
+			opts.debugger.buildDir = ""
+			if err == nil {
+				err = opts.debugger.nextBuild()
+			}
+		}
 		if err == nil {
 			err = s.build(ctx, p)
+		}
+		if err != nil && opts.debugger != nil {
+			os.RemoveAll(opts.debugger.buildDir)
 		}
 		if opts.hub != nil {
 			opts.hub.setBuilding(false)
@@ -167,6 +190,9 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 			if next, err := s.start(ctx, p); err != nil {
 				if starting != nil {
 					starting.fail()
+				}
+				if opts.debugger != nil {
+					return err
 				}
 				fail("run failed: %v", err)
 			} else {
@@ -200,8 +226,12 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 		// The flags and the rest of nsgo.yaml may have changed too.
 		if next, err := load(p.Dir); err == nil {
 			opts.apply(next)
-			next.prepareDev(opts)
-			*p = *next
+			if err := checkDevDebug(next, opts); err != nil {
+				warn("%v", err)
+			} else {
+				next.prepareDev(opts)
+				*p = *next
+			}
 		} else {
 			warn("%v", err)
 		}
@@ -212,6 +242,7 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 func (p *project) prepareDev(opts devOptions) {
 	p.Release, p.Dev.Client, p.Dev.Trace, p.Dev.Highlight, p.Dev.Devtools, p.Dev.Automation = opts.release, true, opts.trace, opts.highlight, opts.devtools, opts.automation
 	p.Dev.Layout = opts.layout
+	p.devDebug = opts.debug
 	p.useDevIcons()
 }
 
@@ -742,7 +773,7 @@ func simulatorEnv(opts devOptions) []string {
 func macSession(opts devOptions) session {
 	return session{
 		build: func(ctx context.Context, p *project) error {
-			dir := p.cache("dev", "macos")
+			dir := opts.desktopBuildDir(p, "macos")
 			os.RemoveAll(dir)
 			app, err := buildMacApp(ctx, p, dir, runtime.GOARCH)
 			if err != nil || len(p.Widgets) == 0 {
@@ -753,7 +784,7 @@ func macSession(opts devOptions) session {
 			return run(ctx, "pluginkit", "-a", macWidgetsAppex(app))
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
-			dir := p.cache("dev", "macos")
+			dir := opts.desktopBuildDir(p, "macos")
 			bin := filepath.Join(dir, p.Name+".app", "Contents", "MacOS", p.Name)
 			return startDesktopDev(p, opts, dir, bin)
 		},
@@ -765,7 +796,7 @@ func macSession(opts devOptions) session {
 func windowsSession(opts devOptions) session {
 	return session{
 		build: func(ctx context.Context, p *project) error {
-			dir := p.cache("dev", "windows")
+			dir := opts.desktopBuildDir(p, "windows")
 			os.RemoveAll(dir)
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return err
@@ -773,7 +804,7 @@ func windowsSession(opts devOptions) session {
 			return buildWindows(ctx, p, dir, runtime.GOARCH)
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
-			dir := p.cache("dev", "windows")
+			dir := opts.desktopBuildDir(p, "windows")
 			bin := filepath.Join(dir, p.Name+".exe")
 			return startDesktopDev(p, opts, dir, bin)
 		},
@@ -785,7 +816,7 @@ func windowsSession(opts devOptions) session {
 func linuxSession(opts devOptions) session {
 	return session{
 		build: func(ctx context.Context, p *project) error {
-			dir := p.cache("dev", "linux")
+			dir := opts.desktopBuildDir(p, "linux")
 			os.RemoveAll(dir)
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return err
@@ -793,7 +824,7 @@ func linuxSession(opts devOptions) session {
 			return buildLinux(ctx, p, dir, runtime.GOARCH)
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
-			dir := p.cache("dev", "linux")
+			dir := opts.desktopBuildDir(p, "linux")
 			bin := filepath.Join(dir, p.Name)
 			return startDesktopDev(p, opts, dir, bin)
 		},
@@ -872,7 +903,7 @@ func startProcessIn(dir string, env []string, name string, args ...string) (stop
 		close(done)
 	}()
 	var once sync.Once
-	stopped := false
+	var stopped atomic.Bool
 	stop = func() {
 		once.Do(func() {
 			select {
@@ -880,7 +911,7 @@ func startProcessIn(dir string, env []string, name string, args ...string) (stop
 				return
 			default:
 			}
-			stopped = true
+			stopped.Store(true)
 			if runtime.GOOS == "windows" {
 				// Ask the app's windows to close, so it saves and exits;
 				// a process without one is killed below.
@@ -899,7 +930,7 @@ func startProcessIn(dir string, env []string, name string, args ...string) (stop
 	wait = func(ctx context.Context) error {
 		select {
 		case <-done:
-			if stopped {
+			if stopped.Load() {
 				return nil
 			}
 			var exit *exec.ExitError

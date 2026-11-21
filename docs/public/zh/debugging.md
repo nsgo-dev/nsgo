@@ -26,6 +26,32 @@ go tool nsgo dev -target android            # 通过 adb 在连接的设备或�
 
 `-h` 列出全部参数。
 
+## Go 调试器
+
+把与你的 Go 版本兼容的 [Delve](https://github.com/go-delve/delve/blob/master/Documentation/installation/README.md) 放到 `PATH` 上，命令名为 `dlv`。用下列命令运行原生桌面应用，保留调试信息并关闭 Go 优化。
+
+```sh
+go tool nsgo dev -target native -debug
+```
+
+从 Delve 的 `API server listening at` 输出中复制端口。在装有 Go 扩展的 VS Code 中添加用于连接调试器的配置，把 `40000` 换成这个端口。
+
+```json
+{
+  "name": "Attach to NSGo",
+  "type": "go",
+  "request": "attach",
+  "mode": "remote",
+  "debugAdapter": "dlv-dap",
+  "host": "127.0.0.1",
+  "port": 40000
+}
+```
+
+在 GoLand 中添加 **Go Remote** 运行配置，主机填 `127.0.0.1`，端口填同一个值。在应用的 Go 代码中设置断点，连接调试器，再执行会运行到该断点的操作。Go 重编译成功后，连接同一地址，让调试器把断点发给新进程。TSX 改动仍走热重载。
+
+macOS、Windows 和 Linux 可用 `-target native -debug`。用开发构建调试，用 `-release` 测量发布构建。
+
 ## 错误
 
 构建失败时，错误显示在运行中的应用上方，带有复制错误和重新构建的按钮；修好文件后，下一次保存就会替换它。组件渲染时 panic 也以同样方式显示。在应用里按 Command+R（非 Apple 平台为 Control+R）随时可以重新构建并重启应用，错误显示时也可以，除非应用自己绑定了这个键，无论是用 `cx.OnKey` 还是作为应用菜单里一个启用的菜单项；在浏览器里这个键照常刷新页面。应用自己的输出（比如 `log.Print`）出现在终端里工具输出的下方。
