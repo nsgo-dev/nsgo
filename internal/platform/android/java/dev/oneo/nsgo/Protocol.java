@@ -263,6 +263,8 @@ final class Protocol {
     static final int ORIENTATION_LANDSCAPE_LEFT = 4;
     static final int ORIENTATION_LANDSCAPE_RIGHT = 8;
     static final int ORIENTATION_LANDSCAPE = 12;
+    static final int ITEM_SAVE_PREFLIGHT_ANSWER = 112;
+    static final int ITEM_SAVE_FILE_PREFLIGHT = 113;
 
     // What EVENT_OVERLAY_PERMISSION answers ITEM_OVERLAY_PERMISSION with, and why an overlay ends, as the driver's.
     static final int OVERLAY_DENIED = 0;
@@ -363,6 +365,7 @@ final class Protocol {
     static final int EVENT_OVERLAY_PERMISSION = 80;
     static final int EVENT_OPEN_LINKS = 87;
     static final int EVENT_SPEAK = 90;
+    static final int EVENT_SAVE_PREFLIGHT = 97;
 
     // Reasons carried in EVENT_VIDEO_PAUSE's index, as core.VideoPauseReason.
     static final int VIDEO_PAUSE_INTERRUPTION = 0;
