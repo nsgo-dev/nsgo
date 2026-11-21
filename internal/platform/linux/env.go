@@ -105,6 +105,7 @@ func (w *window) environment() driver.Environment {
 		Minimized:        minimized,
 		WindowFrame:      frame,
 		Lifecycle:        w.lifecycle(),
+		LowPowerMode:     lowPowerMode(),
 		Speak:            speakAvailable(),
 
 		// GTK keeps only a window's size (setFrame), so no window is placed, and a Wayland compositor stacks its windows itself.

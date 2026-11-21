@@ -110,6 +110,9 @@ type Environment struct {
 	// Lifecycle is whether the app is in use: the window's, an embedded
 	// surface's the host window's.
 	Lifecycle Lifecycle
+	// ThermalState and LowPowerMode describe system power constraints.
+	ThermalState ThermalState
+	LowPowerMode LowPowerMode
 	// AppClip says the app runs as an iOS App Clip, and OpenedURL is the
 	// web link that last opened it: the clip's invocation, or a universal
 	// link; "" when none did.
@@ -121,6 +124,26 @@ type Environment struct {
 	FrontmostApp        FrontmostAppInfo
 	CanReadFrontmostApp bool
 }
+
+// ThermalState is the system's current thermal pressure.
+type ThermalState uint8
+
+const (
+	ThermalUnknown ThermalState = iota
+	ThermalNominal
+	ThermalFair
+	ThermalSerious
+	ThermalCritical
+)
+
+// LowPowerMode says whether the system's energy-saving mode is on.
+type LowPowerMode uint8
+
+const (
+	LowPowerUnknown LowPowerMode = iota
+	LowPowerOff
+	LowPowerOn
+)
 
 // FrontmostAppInfo is the application in front on the desktop.
 type FrontmostAppInfo struct {
