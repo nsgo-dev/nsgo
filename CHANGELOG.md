@@ -15,7 +15,7 @@
 - Keep an image with its surrounding text when the rich editor's schema defines `inlineImage`, and keep the image's title and link when writing Markdown (#1174 by @shuuul).
 - Slide the title of `ui.SidebarShell`'s content with the content until it meets the sidebar's toggle, where it jumped as the sidebar hid or showed, and add `examples/shell` of the inset shell.
 - Keep desktop frame callbacks running by choosing a visible driving window deterministically (#1159 by @houko).
-- Add `Scope.RequestOrientation`, which shows an iOS or Android phone's interface in the given orientations while the scope lives, the newest live request winning and the app's own policy coming back once none is left, and `nsgotest.App.Orientation`, which reports the mask in effect (#1136 by @houko).
+- Add scoped `Scope.RequestOrientation` for iOS, Android and the browser, with `nsgotest.App.Orientation` for tests and browser refusal logging for full screen and orientation locks (#1136 and #1568 by @houko).
 - Update web image views with each pixel buffer version in place (#1099 by @houko).
 - Add pixel buffers to WeChat mini program images and mini program canvas drawings (#1101 by @houko).
 - Add `apple.multiple_scenes`, which writes `UIApplicationSupportsMultipleScenes`, and show each further scene an iPad connects for it, as the user opens another window of the app, in a window of its own: a tree of the app's one engine showing the main view, with its own size, safe area, status bar and orientations, kept while UIKit disconnects the scene and ended as the system discards it (#49 by @houko).
