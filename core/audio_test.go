@@ -85,7 +85,7 @@ func TestSoundsLoadOnceAndPlay(t *testing.T) {
 
 	// Playbacks overlap, each a command in the turn's batch, the voice clamped with 0 as 1.
 	sounds[0].Play(SoundVoice{})
-	sounds[1].Play(SoundVoice{Volume: 0.5, Rate: 1.2})
+	sounds[1].Play(SoundVoice{Volume: 0.5, Rate: 1.2, Loop: true})
 	sounds[2].Play(SoundVoice{Volume: 3, Rate: 9})
 	sounds[2].Play(SoundVoice{Volume: -1, Rate: 0.1})
 	var voices []SoundVoice
@@ -93,9 +93,9 @@ func TestSoundsLoadOnceAndPlay(t *testing.T) {
 		if it.Count != id || it.Audio.Command != driver.AudioPlay {
 			t.Fatalf("play = %d %v", it.Count, it.Audio.Command)
 		}
-		voices = append(voices, SoundVoice{it.Audio.Volume, it.Audio.Rate})
+		voices = append(voices, SoundVoice{Volume: it.Audio.Volume, Rate: it.Audio.Rate, Loop: it.Audio.Loop})
 	}
-	if want := []SoundVoice{{1, 1}, {0.5, 1.2}, {1, 2}, {0, 0.5}}; !slices.Equal(voices, want) {
+	if want := []SoundVoice{{Volume: 1, Rate: 1}, {Volume: 0.5, Rate: 1.2, Loop: true}, {Volume: 1, Rate: 2}, {Rate: 0.5}}; !slices.Equal(voices, want) {
 		t.Fatalf("voices %v, want %v", voices, want)
 	}
 

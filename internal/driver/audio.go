@@ -59,14 +59,25 @@ type AudioRequest struct {
 	MaxDuration time.Duration
 	// Volume runs from 0 to 1 and Rate from 0.5 to 2; AudioPlay's, AudioOpen's and AudioSet's.
 	Volume, Rate float32
-	// Loop has a player start over at its end, with no AudioEnded.
-	Loop bool
+	// Loop repeats a playback of a sound or a player. A player uses
+	// LoopStart from AudioOpen and sends no AudioEnded while it loops.
+	Loop      bool
+	LoopStart time.Duration
 	// Session is a player's: what it does to other apps' audio while it plays. Sounds mix with other apps' audio.
 	Session AudioSession
 	// ProgressInterval is the time between a playing player's AudioProgress reports, at least 16 milliseconds.
 	ProgressInterval time.Duration
 	// Position is AudioOpen's and AudioSeek's.
 	Position time.Duration
+}
+
+// AudioLoopStart keeps a loop's start inside a finite track. An offset
+// at or beyond the end falls back to the start of the track.
+func AudioLoopStart(offset, duration time.Duration) time.Duration {
+	if offset >= duration {
+		return 0
+	}
+	return max(0, offset)
 }
 
 // AudioPhase is what an EventAudio reports of a sound or a player.
