@@ -355,6 +355,8 @@ type window struct {
 	batch uint64 // batches applied
 	hwnd  uintptr
 	title string
+
+	powerNotification uintptr
 	// primary is the backend's own surface. Opened surfaces share its engine
 	// and message loop, but closing one must not end the process.
 	primary    bool
@@ -899,6 +901,7 @@ func (w *window) startEngine(app engine.App, opts Options, size driver.Size) {
 		}
 	}
 	w.engine = engine.Start(w, app, eopts)
+	w.watchPower()
 }
 
 // openSurface creates an opened window on the backend's message loop and
@@ -2336,6 +2339,10 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 	case wmSettingChange:
 		// Theme ("ImmersiveColorSet"), locale and accessibility changes.
 		w.updateEnvironment()
+	case wmPowerBroadcast:
+		if w.powerChanged(wParam, lParam) {
+			return 1
+		}
 	case wmDisplayChange:
 		for _, other := range windows {
 			if other.engine != nil {
@@ -2621,6 +2628,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 			return r
 		}
 	case wmDestroy:
+		w.stopPower()
 		w.closeCanvasImages()
 		w.removeTrays()
 		w.unregisterHotKeys()

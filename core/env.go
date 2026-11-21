@@ -50,6 +50,8 @@ type Env struct {
 	version        *Signal[OSVersion]
 	idiom          *Signal[Idiom]
 	lifecycle      *Signal[Lifecycle]
+	thermal        *Signal[ThermalState]
+	lowPower       *Signal[LowPowerMode]
 	appClip        *Signal[bool]
 	openedURL      *Signal[string]
 	appearance     *Signal[Appearance]
@@ -127,6 +129,8 @@ func newEnv(cx *Scope, app *Env) *Env {
 		version:          NewSignal(cx, OSVersion{}),
 		idiom:            NewSignal(cx, IdiomPhone),
 		lifecycle:        NewSignal(cx, LifecycleActive),
+		thermal:          NewSignal(cx, ThermalUnknown),
+		lowPower:         NewSignal(cx, LowPowerUnknown),
 		appClip:          NewSignal(cx, false),
 		openedURL:        NewSignal(cx, ""),
 		launchedAtLogin:  NewSignal(cx, false),
@@ -247,6 +251,8 @@ func (e *Env) set(v Environment) {
 	e.appleKeys.Set(!v.Simulated && (v.OS == OSMacOS || v.OS == OSIOS) || v.AppleKeyboard)
 	e.idiom.Set(v.Idiom)
 	e.lifecycle.Set(v.Lifecycle)
+	e.thermal.Set(v.ThermalState)
+	e.lowPower.Set(v.LowPowerMode)
 	e.appClip.Set(v.AppClip)
 	e.openedURL.Set(v.OpenedURL)
 	e.launchedAtLogin.Set(v.LaunchedAtLogin)
@@ -264,6 +270,14 @@ func (e *Env) DeviceName() string { return e.deviceName.Get() }
 
 // DeviceModel returns the device's hardware model: its model identifier on Apple's platforms, such as "iPhone15,2" or "Mac15,7", its maker and model on Android, such as "Google Pixel 8", and the firmware's product name on Windows and Linux; it is empty on the web and where the hardware names none.
 func (e *Env) DeviceModel() string { return e.deviceModel.Get() }
+
+// ThermalState returns the system's thermal pressure, or ThermalUnknown
+// when the system does not report it.
+func (e *Env) ThermalState() ThermalState { return e.thermal.Get() }
+
+// LowPowerMode reports whether the system's energy-saving mode is on,
+// or LowPowerUnknown when the system does not report it.
+func (e *Env) LowPowerMode() LowPowerMode { return e.lowPower.Get() }
 
 // Window returns the surface's size.
 func (e *Env) Window() Size { return e.window.Get() }
