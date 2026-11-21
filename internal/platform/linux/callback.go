@@ -45,6 +45,7 @@ var (
 	cbWebLoadFailed          uintptr
 	cbWebResourceStarted     uintptr
 	cbWebPolicy              uintptr
+	cbWebCreate              uintptr
 	cbWebPermission          uintptr
 	cbWebMessage             uintptr
 	cbWebMap                 uintptr
@@ -135,6 +136,7 @@ func init() {
 	cbWebLoadFailed = newCallback(webLoadFailedCallback)
 	cbWebResourceStarted = newCallback(webResourceStartedCallback)
 	cbWebPolicy = newCallback(webPolicyCallback)
+	cbWebCreate = newCallback(webCreateCallback)
 	cbWebPermission = newCallback(webPermissionCallback)
 	cbWebMessage = newCallback(webMessageCallback)
 	cbWebMap = newCallback(webMapCallback)
