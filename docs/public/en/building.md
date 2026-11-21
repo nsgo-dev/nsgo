@@ -27,6 +27,17 @@ Everything to hand out lands in `dist/releases`, the only directory to look in:
 
 Each file is named `<name>-<version>-<system>-<arch>`, such as `hello-1.2.0-windows-x64-setup.exe`, so users find their system's on a release page, and has its `.sha256` beside it. A build of another version empties the directory first; builds of the same version, on other machines too, add to it. Simulators' and watchOS's packages stay in their `dist/<name>-<version>-<target>` directories.
 
+### Offline web packages
+
+Set `web.offline: true` in `nsgo.yaml` to cache a web release on its first online launch.
+
+```yaml
+web:
+  offline: true
+```
+
+Serve the published directory over HTTPS, or use `go tool nsgo build -target web -run` on localhost. The service worker caches the page, WebAssembly, scripts and packaged resources. Online visits load the published version. After the installation succeeds and the previous release's tabs close, the latest release can launch from its cache. Requests for an app's online services still need a connection.
+
 ## nsgo.yaml
 
 ```yaml

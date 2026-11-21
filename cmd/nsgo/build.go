@@ -1083,6 +1083,13 @@ func buildHarmonyHAP(ctx context.Context, p *project, dir, site string, code int
 // keeps the names and follows nsgo dev's server.
 func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 	wasm := filepath.Join(dir, "app.wasm")
+	offline := !dev && p.Web.Offline
+	var published []string
+	publish := func(name string) {
+		if offline {
+			published = append(published, name)
+		}
+	}
 	if !dev {
 		// A release's TSX is split: the page fetches each module an
 		// import() names when the import runs. Its files hold the scripts
@@ -1091,6 +1098,7 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 		split, err := compileSplit(p.Dir, func(file, name string, data []byte) (string, error) {
 			data = []byte(websrc.Bundle(name, string(data)))
 			file = hashedName(file, data)
+			publish(file)
 			if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(file)), 0o755); err != nil {
 				return "", err
 			}
@@ -1132,6 +1140,7 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 	write := func(name string, data []byte) (string, error) {
 		if !dev {
 			name = hashedName(name, data)
+			publish(name)
 		}
 		return name, os.WriteFile(filepath.Join(dir, name), data, 0o644)
 	}
@@ -1182,8 +1191,12 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 		if err := os.Rename(wasm, filepath.Join(dir, app.Wasm)); err != nil {
 			return err
 		}
+		publish(app.Wasm)
 		if app.Resources, err = copyHashedResources(p, dir); err != nil {
 			return err
+		}
+		for _, name := range app.Resources {
+			publish(name)
 		}
 	}
 	if img != nil {
@@ -1209,7 +1222,16 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 		if err := writeWebManifest(p, dir, icons); err != nil {
 			return err
 		}
-		page["Manifest"] = true
+		page["Manifest"] = "manifest.webmanifest"
+		if offline {
+			data, err := os.ReadFile(filepath.Join(dir, "manifest.webmanifest"))
+			if err != nil {
+				return err
+			}
+			if page["Manifest"], err = write("manifest.webmanifest", data); err != nil {
+				return err
+			}
+		}
 	}
 	data, err := json.MarshalIndent(app, "", "  ")
 	if err != nil {
@@ -1227,15 +1249,21 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 	if page["Style"], err = write("page.css", pageCSS(p)); err != nil {
 		return err
 	}
-	if page["Module"], err = write("mount.js", mountJS(app.Loader, string(data))); err != nil {
+	if page["Module"], err = write("mount.js", mountJS(app.Loader, string(data), offline)); err != nil {
 		return err
 	}
 	f, err := os.Create(filepath.Join(dir, "index.html"))
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return indexHTML.Execute(f, page)
+	err = indexHTML.Execute(f, page)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil || !offline {
+		return err
+	}
+	return writeOfflineWorker(dir, append(published, "index.html"))
 }
 
 // webApp is a site's nsgo.json, which names the files of the app for the
@@ -1290,11 +1318,18 @@ func pageCSS(p *project) []byte {
 // mountJS is the module that runs the app, and says so when the app cannot
 // start. It keeps Safari, which ignores the viewport's user-scalable, from
 // zooming the page under a pinch.
-func mountJS(loader, config string) []byte {
+func mountJS(loader, config string, offline bool) []byte {
+	var register string
+	if offline {
+		register = `.then(() => {
+  navigator.serviceWorker?.register(new URL(` + strconv.Quote("./"+offlineWorkerName) + `, import.meta.url), { updateViaCache: "none" })
+    .catch((e) => console.warn("The app could not be made available offline:", e));
+})`
+	}
 	return []byte(`// Written by nsgo: the page runs the app.
 import { mount } from ` + strconv.Quote("./"+loader) + `;
 document.addEventListener("gesturestart", (e) => e.preventDefault());
-mount(null, null, { config: ` + config + ` }).catch((e) => {
+mount(null, null, { config: ` + config + ` })` + register + `.catch((e) => {
   console.error(e);
   const message = document.createElement("pre");
   message.textContent = "The app could not be loaded: " + e.message;
@@ -1321,7 +1356,7 @@ var indexHTML = template.Must(template.New("index").Parse(`<!doctype html>
 <link rel="apple-touch-icon" href="{{.TouchIcon}}">
 {{- end}}
 {{- if .Manifest}}
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="{{.Manifest}}">
 {{- end}}
 <link rel="stylesheet" href="{{.Style}}">
 <script src="{{.Exec}}"></script>
