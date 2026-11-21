@@ -2,7 +2,7 @@ package driver
 
 import "time"
 
-// The limits a sound is held to, NSH's: its encoded bytes, which the platform's reader checks before decoding; its decoded length, which the platform decodes no more of; the sounds one engine holds and their decoded bytes, which the core counts; and the playbacks at once, past which the platform stops the oldest.
+// The default limits a sound is held to, from NSH: its encoded bytes, which the platform's reader checks before decoding; its decoded length, which the platform decodes no more of; the sounds one engine holds and their decoded bytes, which the core counts; and the playbacks at once, past which the platform stops the oldest.
 const (
 	MaxSoundBytes    = 8 << 20
 	MaxSoundDuration = 5 * time.Second
@@ -54,9 +54,13 @@ type AudioRequest struct {
 	Command AudioCommand
 	// Source is AudioLoad's and AudioOpen's: an "asset:" path in the app's resources, a file path or file: URL, a data: URL, an http(s) URL, or Data. A platform reads it as it reads an image's.
 	Source ImageSource
-	// MaxBytes and MaxDuration are AudioLoad's limits.
-	MaxBytes    int64
-	MaxDuration time.Duration
+	// MaxBytes, MaxDecodedBytes and MaxDuration bound AudioLoad.
+	MaxBytes, MaxDecodedBytes int64
+	MaxDuration               time.Duration
+	// MaxPlaybacks bounds AudioPlay. Restricted playbacks also have the
+	// default restricted playback cap across the same native output.
+	MaxPlaybacks int
+	Restricted   bool
 	// Volume runs from 0 to 1 and Rate from 0.5 to 2; AudioPlay's, AudioOpen's and AudioSet's.
 	Volume, Rate float32
 	// Loop has a player start over at its end, with no AudioEnded.

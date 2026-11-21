@@ -185,6 +185,7 @@ The [games plan (#1047)](https://github.com/nsgo-dev/nsgo/issues/1047) targets m
 | Key release and held keys | [#1046](https://github.com/nsgo-dev/nsgo/issues/1046) | Games receive key releases and can read which keys are held |
 | Gamepads | [#1049](https://github.com/nsgo-dev/nsgo/issues/1049) | Games read controller buttons and axes on each target that supports controllers |
 | Audio | [#1050](https://github.com/nsgo-dev/nsgo/issues/1050) | `audio.Sound` and `audio.Player` play on Windows, Linux, Android and the web as they do on macOS and iOS |
+| Sound limits | [#1222](https://github.com/nsgo-dev/nsgo/issues/1222), [audio playback](architecture/audio.md#errors-and-limits) | Windows, Linux, Android and the web honor the Go engine's sound limits as their playback backends land, and TSX exercises its default quotas when it exposes sounds |
 | Pixel buffers | [#1051](https://github.com/nsgo-dev/nsgo/issues/1051) | A buffer rewritten at 60 fps draws without blank frames on Android and the web, and Android canvases draw the same buffers |
 | Batched sprites | [#1053](https://github.com/nsgo-dev/nsgo/issues/1053) | `Drawing.DrawAtlas` matches the equivalent individual draws by pixel comparison, with timings before and after batching |
 | Pointer lock and relative motion | [#1054](https://github.com/nsgo-dev/nsgo/issues/1054) | Games can lock the pointer and read relative mouse motion on desktops and the web |

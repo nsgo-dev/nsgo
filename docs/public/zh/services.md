@@ -399,6 +399,10 @@ cx.Purchase("com.example.pro.monthly", core.PurchaseOptions{AccountToken: userUU
 
 在应用启动时注册 `OnPurchaseUpdate`：在任何处理函数之前到达的更新会留给第一个注册的。`cx.CurrentEntitlements` 回答用户当前拥有的内容，供启动时解锁；「恢复购买」按钮调用 `cx.SyncPurchases`，它可能要求用户登录。`AccountToken` 是应用自己的 UUID，交易和 App Store 发给服务器的通知都会带上它。macOS 只有 Mac App Store 构建能销售，App Clip 不销售任何东西；Android、watchOS、Windows、Linux、Web 和小程序目前回答 `PurchasesUnavailable`。用 `nsgotest` 测试购买，它的 `Products`、`PurchaseAnswer`、`UpdatePurchase` 和 `UnfinishedTransactions` 代替商店。在 TSX 中，`Purchases` 模块需要 `purchases` 能力：`purchase` 解析为 `{ status: "purchased", transaction }`、`"pending"` 或 `"cancelled"`，`on("update", listener)` 接收更新。
 
+## 音效限制
+
+加载音效前，可以调用 `audio.SetSoundLimits(cx, audio.SoundLimits{MaxSounds: 200, MaxDuration: 20 * time.Second})` 调整引擎的限制。也可以设置 `MaxEncodedBytes`、`MaxDecodedBytes` 和 `MaxPlaybacks`。零值使用默认限制：单个音效编码后最多 8 MiB、时长最多 5 秒，引擎最多 64 个音源、解码后总计最多 16 MiB，每个输出最多同时播放 32 路。已加载的音效会继续计入新的限制。受限作用域在引擎预算内继续使用默认限制。
+
 ## 朗读文本
 
 `cx.Speak` 在 `cx.Env().CanSpeak()` 为真时用系统中某种语言的语音朗读文本：macOS、iOS、tvOS、Android、Windows、Web，以及装有 speech-dispatcher 的 Linux。同一时间只朗读一段：新的 `Speak` 会打断正在朗读的那段，`cx.StopSpeaking` 和发起朗读的作用域结束也会停止它。`done` 只会收到一次结束方式：读完、被停止，或因 `core.SpeakError` 失败，例如没有安装该语言的语音时返回 `core.SpeakLanguageUnavailable`。
