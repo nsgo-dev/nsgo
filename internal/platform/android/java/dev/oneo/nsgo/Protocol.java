@@ -115,6 +115,8 @@ final class Protocol {
     static final int CANVAS_REQUEST = 22;
     /** What the code scanner reports: the surface, the request's count and a SCAN_FRAME with the frame's width, height and luminance, a SCAN_CLOSED, or a SCAN_FAILED with why (scan.go). */
     static final int SCAN_REPORT = 23;
+    /** A hardware key: surface, view, scan code, Android key code, flags and name. */
+    static final int PHYSICAL_KEY = 24;
 
     /** Writes a message's part after its head. */
     interface Body {

@@ -95,10 +95,11 @@ type Tree struct {
 	keyID       uint32
 	keysChanged bool
 	// held counts the keys down on the surface by name, from EventKeyDown and EventKeyUp, so both Shifts read as one "shift" until both are up; heldRead is what KeysDown reads, made by the first read, which asks the platform for every key (heldKeys).
-	held     map[string]int
-	heldRead *Signal[[]string]
-	heldKeys bool
-	backs    []*backHandler
+	held, heldCodes    map[string]int
+	heldRead, codeRead *Signal[[]string]
+	keyCodeNames       *Signal[map[string]string]
+	heldKeys           bool
+	backs              []*backHandler
 	// regions are the live regions, which the views do not number: an owner may have no view but a region, as a Holder's content may (keyPlaces).
 	regions map[*node]struct{}
 	// peeking is the screen a back gesture may uncover (Tree.peek).
@@ -2695,24 +2696,25 @@ func (t *Tree) KeyDown(ev driver.Event) bool {
 
 func (t *Tree) keyDown(ev driver.Event) bool {
 	if !ev.Repeat {
-		t.holdKey(ev.Text, 1)
+		t.holdKey(ev.Text, ev.KeyCode, 1)
 	}
+	t.observeKeyCode(ev.KeyCode, ev.Text)
 	n := t.node(ev.ID)
 	if n == nil || n.h.keyDown == nil {
 		return false
 	}
-	fn, e := n.h.keyDown, KeyEvent{Key: ev.Text, Modifiers: ev.Modifiers, Repeat: ev.Repeat}
+	fn, e := n.h.keyDown, KeyEvent{Key: ev.Text, Code: ev.KeyCode, Modifiers: ev.Modifiers, Repeat: ev.Repeat}
 	return t.within2(n, func() bool { return fn(e) })
 }
 
 // keyUp counts EventKeyUp ev's key as up and runs OnKeyUp of the view its down went to, a view gone or ID 0 hearing nothing.
 func (t *Tree) keyUp(ev driver.Event) {
-	t.holdKey(ev.Text, -1)
+	t.holdKey(ev.Text, ev.KeyCode, -1)
 	n := t.node(ev.ID)
 	if n == nil || n.h.keyUp == nil {
 		return
 	}
-	fn, e := n.h.keyUp, KeyEvent{Key: ev.Text, Modifiers: ev.Modifiers}
+	fn, e := n.h.keyUp, KeyEvent{Key: ev.Text, Code: ev.KeyCode, Modifiers: ev.Modifiers}
 	t.within(n.owner, func() { fn(e) })
 }
 

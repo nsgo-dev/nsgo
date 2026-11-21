@@ -138,34 +138,35 @@ var (
 )
 
 const (
-	wmDestroy       = 0x0002
-	wmMove          = 0x0003
-	wmSize          = 0x0005
-	wmPaint         = 0x000F
-	wmEraseBkgnd    = 0x0014
-	wmSettingChange = 0x001A
-	wmDisplayChange = 0x007E
-	wmDPIChanged    = 0x02E0
-	wmShowWindow    = 0x0018
-	wmActivateApp   = 0x001C
-	wmMouseActivate = 0x0021
-	wmKeyDown       = 0x0100
-	wmKeyUp         = 0x0101
-	wmChar          = 0x0102
-	wmSysKeyDown    = 0x0104
-	wmCommand       = 0x0111
-	wmLButtonDown   = 0x0201
-	wmLButtonUp     = 0x0202
-	wmRButtonDown   = 0x0204
-	wmMouseWheel    = 0x020A
-	wmMouseHWheel   = 0x020E
-	wmAppCommand    = 0x0319     // what DefWindowProc makes of XBUTTON1 and back keys
-	wmApply         = 0x8000 + 1 // WM_APP + 1: batches are queued
-	wmRun           = 0x8000 + 2 // functions are queued
-	wmAlert         = 0x8000 + 3 // alerts are queued
-	wmFrame         = 0x8000 + 4 // the app waits for a display frame
-	wmSysCommand    = 0x0112
-	scClose         = 0xF060 // SC_CLOSE, in WM_SYSCOMMAND's wParam
+	wmDestroy             = 0x0002
+	wmMove                = 0x0003
+	wmSize                = 0x0005
+	wmPaint               = 0x000F
+	wmEraseBkgnd          = 0x0014
+	wmSettingChange       = 0x001A
+	wmInputLanguageChange = 0x0051
+	wmDisplayChange       = 0x007E
+	wmDPIChanged          = 0x02E0
+	wmShowWindow          = 0x0018
+	wmActivateApp         = 0x001C
+	wmMouseActivate       = 0x0021
+	wmKeyDown             = 0x0100
+	wmKeyUp               = 0x0101
+	wmChar                = 0x0102
+	wmSysKeyDown          = 0x0104
+	wmCommand             = 0x0111
+	wmLButtonDown         = 0x0201
+	wmLButtonUp           = 0x0202
+	wmRButtonDown         = 0x0204
+	wmMouseWheel          = 0x020A
+	wmMouseHWheel         = 0x020E
+	wmAppCommand          = 0x0319     // what DefWindowProc makes of XBUTTON1 and back keys
+	wmApply               = 0x8000 + 1 // WM_APP + 1: batches are queued
+	wmRun                 = 0x8000 + 2 // functions are queued
+	wmAlert               = 0x8000 + 3 // alerts are queued
+	wmFrame               = 0x8000 + 4 // the app waits for a display frame
+	wmSysCommand          = 0x0112
+	scClose               = 0xF060 // SC_CLOSE, in WM_SYSCOMMAND's wParam
 
 	wsOverlappedWindow = 0x00CF0000
 	wsCaption          = 0x00C00000
@@ -560,8 +561,9 @@ type window struct {
 	swap *swapChain
 
 	// heldKeys is ItemKeymap's ask for every key's down and up (driver.MountItem.HeldKeys); keysHeld the keys reported going down and not yet up, by physical key (physicalKey).
-	heldKeys bool
-	keysHeld map[uint32]heldKey
+	heldKeys  bool
+	keyLayout uintptr
+	keysHeld  map[uint32]heldKey
 }
 
 // Window procedures are process-wide callbacks; they find their window
@@ -1397,7 +1399,11 @@ func (w *window) apply(b *driver.MountBatch) {
 			w.imageInfo(it)
 			continue
 		case driver.ItemKeymap:
+			started := it.HeldKeys && !w.heldKeys
 			w.setKeymap(it.Keys, it.HeldKeys)
+			if started {
+				w.updateEnvironment()
+			}
 			continue
 		case driver.ItemTitle, driver.ItemWindow, driver.ItemMenu, driver.ItemDockMenu, driver.ItemRecentFile:
 			// An embedding host owns its window and menu bar.
@@ -2355,6 +2361,8 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		w.menuLoop(message == wmEnterMenuLoop, wParam != 0)
 	case wmSettingChange:
 		// Theme ("ImmersiveColorSet"), locale and accessibility changes.
+		w.updateEnvironment()
+	case wmInputLanguageChange:
 		w.updateEnvironment()
 	case wmDisplayChange:
 		for _, other := range windows {

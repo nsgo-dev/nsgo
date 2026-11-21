@@ -356,6 +356,9 @@ type Event struct {
 	Data any
 	// Repeat is whether EventKeyDown's key is a held key's auto-repeat.
 	Repeat bool
+	// KeyCode is the physical position of an EventKeyDown or EventKeyUp,
+	// named as KeyboardEvent.code. It is empty when the position is unknown.
+	KeyCode string
 	// Forced is whether EventQuitRequest was issued by the system to end its session.
 	Forced bool
 	// Finished is whether an animation ran to its end, or the platform

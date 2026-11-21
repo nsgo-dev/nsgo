@@ -198,8 +198,9 @@ type surface struct {
 	mouse   driver.Point
 	mouseIn bool
 	// heldKeys is whether the app asked for every key held (MountItem.HeldKeys), and keysHeld the keys whose down focusKeyDown reported, by physical key, until they come up.
-	heldKeys bool
-	keysHeld map[string]heldKey
+	heldKeys     bool
+	keysHeld     map[string]heldKey
+	keyCodeNames map[string]string
 }
 
 // view is the element of one NodeID.

@@ -120,6 +120,8 @@ const (
 	msgCanvasRequest = 22
 	// msgScanReport is what the code scanner reports: a frame of the camera, its close or its failure (scan.go).
 	msgScanReport = 23
+	// msgPhysicalKey reports a hardware key and its scan code (keycodes.go).
+	msgPhysicalKey = 24
 )
 
 // The parts of an image view's request msgImage carries.
@@ -437,6 +439,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.webCookiesSet(&r)
 		case msgScanReport:
 			s.scanReport(&r)
+		case msgPhysicalKey:
+			s.physicalKey(&r)
 		case msgDNS:
 			servers := make([]string, r.u32())
 			for i := range servers {
@@ -1481,6 +1485,7 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 				// The ID EventKey reports when the binding fires.
 				w.u32(k.ID)
 			}
+			w.flags(it.HeldKeys)
 		case driver.ItemStatusBar:
 			c := it.StatusBar
 			w.byte(byte(c.Style))

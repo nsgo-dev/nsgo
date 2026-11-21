@@ -533,6 +533,7 @@ func keyPressedCallback(controller uintptr, keyval, keycode, state uint32, data 
 		return 0
 	}
 	// GTK reports no auto-repeats: a key pressed again before it was released repeats.
+	w.keyLayoutChanged(controller)
 	_, repeat := w.held[keycode]
 	if w.held == nil {
 		w.held = map[uint32]heldKey{}
@@ -931,7 +932,8 @@ func (w *window) keyDown(keycode, keyval, state uint32, repeat bool) bool {
 		return false
 	}
 	name, mods, modifier := w.keyEvent(keycode, keyval, state, true)
-	if name == "" {
+	position := keyCode(keycode)
+	if name == "" && position == "" {
 		return false
 	}
 	var id driver.NodeID
@@ -942,7 +944,7 @@ func (w *window) keyDown(keycode, keyval, state uint32, repeat bool) bool {
 		k.id, k.name, k.reported = id, name, true
 		w.held[keycode] = k
 	}
-	ev := driver.Event{Kind: driver.EventKeyDown, ID: id, Text: name, Modifiers: mods, Repeat: repeat}
+	ev := driver.Event{Kind: driver.EventKeyDown, ID: id, Text: name, KeyCode: position, Modifiers: mods, Repeat: repeat}
 	if !hears {
 		// A down no view hears is only followed, so it goes without holding up the main loop.
 		w.engine.Dispatch(ev)
@@ -963,14 +965,14 @@ func (w *window) keyUp(keycode, keyval, state uint32) {
 		return
 	}
 	_, mods, _ := w.keyEvent(keycode, keyval, state, false)
-	w.engine.Dispatch(driver.Event{Kind: driver.EventKeyUp, ID: k.id, Text: k.name, Modifiers: mods})
+	w.engine.Dispatch(driver.Event{Kind: driver.EventKeyUp, ID: k.id, Text: k.name, KeyCode: keyCode(keycode), Modifiers: mods})
 }
 
 // releaseKeys reports every key held whose down was reported as coming up, with no modifiers, and forgets every key held, as the window loses the keyboard: their releases go to another window, and a key pressed again on return is a new press, not a repeat.
 func (w *window) releaseKeys() {
-	for _, k := range w.held {
+	for keycode, k := range w.held {
 		if k.reported && w.engine != nil {
-			w.engine.Dispatch(driver.Event{Kind: driver.EventKeyUp, ID: k.id, Text: k.name})
+			w.engine.Dispatch(driver.Event{Kind: driver.EventKeyUp, ID: k.id, Text: k.name, KeyCode: keyCode(keycode)})
 		}
 	}
 	clear(w.held)

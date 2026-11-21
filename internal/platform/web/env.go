@@ -72,7 +72,17 @@ func (s *surface) watchChanges() {
 	g.Call("addEventListener", "resize", w.changed)
 	g.Call("addEventListener", "languagechange", w.changed)
 	// The page's visibility and focus are the app's lifecycle.
-	g.Call("addEventListener", "focus", w.changed)
+	g.Call("addEventListener", "focus", js.FuncOf(func(js.Value, []js.Value) any {
+		s.updateEnv()
+		s.readKeyboardLayout()
+		return nil
+	}))
+	if keyboard := g.Get("navigator").Get("keyboard"); keyboard.Truthy() && keyboard.Get("addEventListener").Type() == js.TypeFunction {
+		keyboard.Call("addEventListener", "layoutchange", js.FuncOf(func(js.Value, []js.Value) any {
+			s.readKeyboardLayout()
+			return nil
+		}))
+	}
 	g.Call("addEventListener", "blur", w.changed)
 	s.doc.Call("addEventListener", "visibilitychange", w.changed)
 	// A page that loses the focus or hides hears no key come up, so every key held comes up then.
@@ -151,8 +161,9 @@ func (s *surface) environment() driver.Environment {
 		return driver.Points(f)
 	}
 	env := driver.Environment{
-		ScreenColor: js.Global().Get("EyeDropper").Truthy(),
-		Speak:       speakAvailable(),
+		KeyCodeNames: s.keyCodeNames,
+		ScreenColor:  js.Global().Get("EyeDropper").Truthy(),
+		Speak:        speakAvailable(),
 		// Browsers on touch screens open the camera for an input's capture.
 		Camera: g.Call("matchMedia", "(pointer: coarse)").Get("matches").Bool(),
 		SafeArea: driver.Edges{
