@@ -256,11 +256,14 @@ func steps(a, b driver.Point, step driver.Points) []driver.Point {
 }
 
 var (
-	cgEventCreateScrollWheelEvent2 func(source uintptr, units uint32, count uint32, w1, w2, w3 int32) uintptr
-	cgEventSetIntegerValueField    func(event uintptr, field uint32, value int64)
-	cgEventSetLocation             func(event uintptr, p apple.CGPoint)
-	cgWindowListCreateImage        func(bounds apple.CGRect, option uint32, window uint32, imageOption uint32) uintptr
-	screenshotFallbackOnce         sync.Once
+	cgEventCreateScrollWheelEvent2   func(source uintptr, units uint32, count uint32, w1, w2, w3 int32) uintptr
+	cgEventSetIntegerValueField      func(event uintptr, field uint32, value int64)
+	cgEventSetLocation               func(event uintptr, p apple.CGPoint)
+	cgWindowListCreateImage          func(bounds apple.CGRect, option uint32, window uint32, imageOption uint32) uintptr
+	cgWindowListCreateImageFromArray func(bounds apple.CGRect, windows uintptr, imageOption uint32) uintptr
+	cfWindowIDArrayCreate            func(allocator uintptr, values *uintptr, count int, callbacks uintptr) uintptr
+	cgPopupMenuLevel                 int32
+	screenshotFallbackOnce           sync.Once
 )
 
 func loadCG() {
@@ -277,6 +280,17 @@ func loadCG() {
 	// Deprecated since macOS 14; a system without it captures through AppKit instead of failing to load.
 	if _, err := purego.Dlsym(cg, "CGWindowListCreateImage"); err == nil {
 		purego.RegisterLibFunc(&cgWindowListCreateImage, cg, "CGWindowListCreateImage")
+	}
+	if addr, err := purego.Dlsym(cg, "CGWindowListCreateImageFromArray"); err == nil {
+		cf, err := purego.Dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", purego.RTLD_NOW)
+		if err == nil {
+			purego.RegisterFunc(&cgWindowListCreateImageFromArray, addr)
+			purego.RegisterLibFunc(&cfWindowIDArrayCreate, cf, "CFArrayCreate")
+			if cgWindowLevelForKey == nil {
+				purego.RegisterLibFunc(&cgWindowLevelForKey, cg, "CGWindowLevelForKey")
+			}
+			cgPopupMenuLevel = cgWindowLevelForKey(11) // kCGPopUpMenuWindowLevelKey
+		}
 	}
 }
 
@@ -819,7 +833,10 @@ func (t *testSurface) Answer(id uint32, index int) error {
 	return err
 }
 
-// composited is the PNG of the view's bounds as WindowServer composites its window, nil when it cannot have them. CGWindowListCreateImage asks for the frame already on screen, so it keeps the Core Animation shadows, masks, filters, presentation layers and insertion point that an AppKit cacheDisplayInRect: redraw omits. Only the surface's own window is asked for: with no window number, kCGNullWindowID would capture whatever other apps show in that rectangle. A window that is not visible on the active Space, ordered out or minimized, is not asked for, so it draws through AppKit as before; nor is an image smaller than the view's pixels kept.
+// composited captures the surface's window and any native popup it is
+// tracking, clipped to the view's bounds. WindowServer keeps the Core
+// Animation effects an AppKit cacheDisplayInRect: redraw omits. Hidden
+// windows and images smaller than the view's pixels use that redraw instead.
 func (t *testSurface) composited(bounds apple.CGRect) []byte {
 	w := t.s.window
 	if w == 0 || bounds.Size.Width <= 0 || bounds.Size.Height <= 0 ||
@@ -830,7 +847,7 @@ func (t *testSurface) composited(bounds apple.CGRect) []byte {
 	if number <= 0 {
 		return nil
 	}
-	if loadCG(); cgWindowListCreateImage == nil {
+	if loadCG(); cgWindowListCreateImage == nil && cgWindowListCreateImageFromArray == nil {
 		return nil
 	}
 	// screenPoint is in the global top-left coordinates CGWindowListCreateImage takes.
@@ -840,8 +857,12 @@ func (t *testSurface) composited(bounds apple.CGRect) []byte {
 		windowImageBoundsIgnoreFrame = 1 << 0
 		windowImageBestResolution    = 1 << 3
 	)
-	image := cgWindowListCreateImage(apple.Rect(origin.X, origin.Y, bounds.Size.Width, bounds.Size.Height),
-		windowListIncludingWindow, uint32(number), windowImageBoundsIgnoreFrame|windowImageBestResolution)
+	rect := apple.Rect(origin.X, origin.Y, bounds.Size.Width, bounds.Size.Height)
+	const imageOptions = windowImageBoundsIgnoreFrame | windowImageBestResolution
+	image := t.popupImage(rect, uint32(number), imageOptions)
+	if image == 0 && cgWindowListCreateImage != nil {
+		image = cgWindowListCreateImage(rect, windowListIncludingWindow, uint32(number), imageOptions)
+	}
 	if image == 0 {
 		return nil
 	}
@@ -853,6 +874,50 @@ func (t *testSurface) composited(bounds apple.CGRect) []byte {
 	}
 	png, _ := pngFromCGImage(image)
 	return png
+}
+
+// popupImage uses only explicit window IDs: other apps' windows must never
+// appear in the capture, even if they overlap the window or its menu.
+func (t *testSurface) popupImage(bounds apple.CGRect, window, options uint32) uintptr {
+	if t.s.popup == 0 || !t.s.tracking || cgWindowListCreateImageFromArray == nil || !loadWindowList() {
+		return 0
+	}
+	const windowListAboveWindow = 1 << 1
+	list := cgWindowListCopyWindowInfo(windowListAboveWindow, window)
+	if list == 0 {
+		return 0
+	}
+	defer apple.Release(uintptr(list))
+	ownerKey := apple.NSString("kCGWindowOwnerPID")
+	layerKey := apple.NSString("kCGWindowLayer")
+	numberKey := apple.NSString("kCGWindowNumber")
+	pid := os.Getpid()
+	var ids [8]uintptr
+	windows := ids[:0]
+	// The WindowServer list is front to back, so the submenus precede
+	// their parent menu and the test window goes last.
+	for i := range objc.Send[uint](list, sel("count")) {
+		info := list.Send(sel("objectAtIndex:"), i)
+		if objc.Send[int](info.Send(sel("objectForKey:"), ownerKey), sel("integerValue")) != pid ||
+			objc.Send[int32](info.Send(sel("objectForKey:"), layerKey), sel("intValue")) != cgPopupMenuLevel {
+			continue
+		}
+		if id := objc.Send[uint32](info.Send(sel("objectForKey:"), numberKey), sel("unsignedIntValue")); id != 0 {
+			windows = append(windows, uintptr(id))
+		}
+	}
+	if len(windows) == 0 {
+		return 0
+	}
+	windows = append(windows, uintptr(window))
+	// CGWindowIDs are packed into a CFArray as pointer-sized integers,
+	// not as CFNumbers. A nil callback table keeps them as raw values.
+	array := cfWindowIDArrayCreate(0, &windows[0], len(windows), 0)
+	if array == 0 {
+		return 0
+	}
+	defer apple.Release(array)
+	return cgWindowListCreateImageFromArray(bounds, array, options)
 }
 
 // pngFromCGImage encodes image after converting it to sRGB. WindowServer uses the display's color space for a composited capture, which is commonly Display P3. Keeping that profile in a test screenshot makes raw pixel comparisons depend on the display that ran the test. NSBitmapImageRep does the color conversion before ImageIO writes the PNG.

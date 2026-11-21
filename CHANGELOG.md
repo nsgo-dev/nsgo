@@ -41,6 +41,7 @@
 - Stop resolving and emitting the whole tree when the platform reports only a new window frame, maximized state, lifecycle or title bar, as on every step of a window drag; what reads them through `Env` still updates (#178 by @houko).
 - Convert macOS `nsgotest` captures and screenshots to sRGB, so their pixels no longer depend on whether the Mac's display is Display P3 (#311 by @houko).
 - Render iOS and tvOS `nsgotest` captures and screenshots in sRGB (#1031 by @houko).
+- Include open native popups in macOS `nsgotest` captures, clipped to the test window and excluding other windows (#396 by @J4ck1e2000).
 - Stop a `tsx.View` that renders an `Export` from also running what the package's entry module mounts, with its effects, handlers, timers and animation frames (#923 by @houko).
 - Search a `ui/chat` transcript from Mod+F in a find bar that unfolds folded turns and reasoning, marks the matches in `ui.TextView` and reasoning, reveals each match clear of the bar and the composer and gives the focus back as it closes, with `core.FocusedRef` to read the focused view (#47 by @houko).
 - Let `nsgotest` find and drive an app's other windows through `App.Surface` (#1085 by @houko).
