@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add the portable `gpu` package (`gpu.View`, buffers, textures, samplers, render targets, bind groups, and pipelines), vertex+fragment WGSL/`shaderir` compilation and MSL/HLSL/GLSL/WGSL emitters, off-commit `engine.Platform.SubmitGPU`, and headless `nsgotest` software 3D rasterization with `App.GPUFrames` and `App.GPUReadPixels` (#1059, #1110).
 - Add `ui/editor`, `base/editor`'s code editor in ui's colors and code type, following the theme, with the app's styles merged over it part by part.
 - Highlight every row of a soft-wrapped line in `base/editor`'s selections and matches, whose rows before the last showed nothing.
 - Draw `ui.Button`'s primary, secondary and ghost variants without a rim, and fill the secondary one with the text's color at a low opacity instead of an opaque gray.

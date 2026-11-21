@@ -399,6 +399,7 @@ var viewItemNames = map[driver.ItemKind]string{
 	driver.ItemShaderTransition:   "ItemShaderTransition",
 	driver.ItemShaderInput:        "ItemShaderInput",
 	driver.ItemMatch:              "ItemMatch",
+	driver.ItemGPU:                "ItemGPU",
 }
 
 func (a *App) apply(b *driver.MountBatch) {
@@ -407,6 +408,7 @@ func (a *App) apply(b *driver.MountBatch) {
 		a.LayoutAnimation = b.LayoutAnimation
 	}
 	var resized []*View
+	var gpuConfigured []*View
 	for _, it := range b.Items {
 		v := a.views[it.ID]
 		if name := viewItemNames[it.Kind]; v == nil && (name != "" || it.ID != 0 && it.Kind != driver.ItemCreate) {
@@ -423,6 +425,7 @@ func (a *App) apply(b *driver.MountBatch) {
 				v.detach()
 			}
 			a.anim.Forget(it.ID)
+			a.deleteGPUView(it.ID)
 			delete(a.views, it.ID)
 			delete(a.edits, it.ID)
 		case driver.ItemRemove:
@@ -549,6 +552,11 @@ func (a *App) apply(b *driver.MountBatch) {
 			v.ShaderStarts++
 		case driver.ItemShaderInput:
 			v.ShaderInputs++
+		case driver.ItemGPU:
+			if it.GPU != nil {
+				a.configureGPUView(v, *it.GPU)
+				gpuConfigured = append(gpuConfigured, v)
+			}
 		case driver.ItemAnimation:
 			a.anim.Apply(it.Animation)
 			for _, op := range it.Animation {
@@ -898,6 +906,7 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 		}
 	}
+	a.syncGPUViews(gpuConfigured, resized)
 	// As macOS, Windows, Linux, Android and the web do (UIKit leaves the offset until a touch), content that shrank or a viewport that grew under an offset past the new end pulls it back to the end, once the rest of the batch (the ScrollBy keeping the visible content in place) is applied.
 	for _, v := range resized {
 		if v.Kind != driver.KindScroll || v.Scroll.Zooms() || a.views[v.ID] != v {

@@ -121,6 +121,7 @@ var itemNames = map[ItemKind]string{
 	ItemAudio:        "audio", ItemAuthSession: "auth-session", ItemSpeak: "speak",
 	ItemSignInWithApple: "sign-in-with-apple", ItemAppleCredentialState: "apple-credential-state",
 	ItemPurchase: "purchase", ItemWebCookies: "web-cookies", ItemLookUp: "look-up", ItemQuickLook: "quick-look",
+	ItemGPU: "gpu",
 }
 
 // TraceLine is the item as traces print it: its kind, its view and what
@@ -195,6 +196,8 @@ func (k ViewKind) String() string {
 		return "video"
 	case KindShader:
 		return "shader"
+	case KindGPU:
+		return "gpu"
 	}
 	return "?"
 }

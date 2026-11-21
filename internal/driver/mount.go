@@ -44,6 +44,8 @@ const (
 	// KindShader fills itself with a fragment shader on the GPU
 	// (ItemShader).
 	KindShader
+	// KindGPU hosts a native 3D GPU-backed surface (ItemGPU, docs/architecture/gpu.md).
+	KindGPU
 )
 
 // ItemKind is what a mount item does.
@@ -370,6 +372,8 @@ const (
 	ItemScanCode
 	// ItemQuickLook shows the system's file preview panel on QuickLook's Paths, starting at its Index. Sent only where the environment says CanQuickLook.
 	ItemQuickLook
+	// ItemGPU configures a KindGPU view's swapchain color/depth formats and sample count (GPU).
+	ItemGPU
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -529,6 +533,7 @@ type MountItem struct {
 	Alert     *AlertConfig
 	Drawing   *Drawing
 	Shader    *Shader
+	GPU       *GPUViewConfig
 	// Keys are ItemKeymap's bindings, oldest first; see FindKey.
 	Keys []KeyBinding
 	// HeldKeys is ItemKeymap's ask for every key going down and up on the surface, not only those of a focused view that hears keys: the platform reports a down no such view hears with ID 0 (EventKeyDown) and its up (EventKeyUp), for core.KeysDown. It leaves out keys typed while a text input or a web view has the focus or an input method composes, as for a view's keys.
