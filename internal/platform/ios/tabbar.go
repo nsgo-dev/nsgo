@@ -7,15 +7,17 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/mobile/locales"
 )
 
 // tabBar is core.TabBar's component, which the backend registers itself
 // as NSH's system_tab_bar.rs: a UITabBar whose items are the app's tabs,
 // their icons SF Symbols, reporting the user's choice as "change".
 type tabBar struct {
-	cx    *driver.NativeContext
-	bar   objc.ID
-	items []objc.ID
+	cx     *driver.NativeContext
+	bar    objc.ID
+	items  []objc.ID
+	badges driver.TabBadges
 	// selected is the selected tab's index, kept for props in any order.
 	selected int
 }
@@ -105,6 +107,10 @@ func (t *tabBar) SetProp(name string, value any) {
 		t.bar.Send(sel("setItems:animated:"), array, false)
 		array.Send(selRelease)
 		t.showSelected()
+		t.showBadges()
+	case "badges":
+		t.badges, _ = value.(driver.TabBadges)
+		t.showBadges()
 	case "selectedIndex":
 		i, _ := value.(float64)
 		t.selected = int(i)
@@ -117,6 +123,23 @@ func (t *tabBar) SetProp(name string, value any) {
 			tint = uiColor(driver.Color(c))
 		}
 		t.bar.Send(sel("setTintColor:"), tint)
+	}
+}
+
+// showBadges updates the existing items. A space lets UIKit draw its native badge without visible text for a dot.
+func (t *tabBar) showBadges() {
+	messages := locales.In(t.badges.Language)
+	for i, item := range t.items {
+		var value, spoken string
+		if i < len(t.badges.Items) {
+			badge := t.badges.Items[i]
+			value, spoken = badge.Text, badge.Text
+			if value == "" && badge.Dot {
+				value, spoken = " ", messages.TabBadgeNew()
+			}
+		}
+		item.Send(sel("setBadgeValue:"), nsOrNil(value))
+		item.Send(selSetAccessibilityValue, nsOrNil(spoken))
 	}
 }
 

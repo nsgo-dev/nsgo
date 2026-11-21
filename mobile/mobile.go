@@ -18,6 +18,8 @@ type (
 	TabBar = core.TabBar
 	// TabBarItem is one tab of a TabBar.
 	TabBarItem = core.TabBarItem
+	// TabBadge shows text or a dot on a tab. The zero value clears it.
+	TabBadge = core.TabBadge
 	// InputAccessoryView is a bar that rides above the software keyboard
 	// while an Input naming its ID in InputAccessoryViewID has focus. It
 	// is as wide as the surface and as tall as its content, and shows

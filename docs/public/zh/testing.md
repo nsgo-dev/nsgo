@@ -69,6 +69,8 @@ func TestMain(m *testing.M) {
 
 `nsgotest.LiveActivities(true)` 记录实时活动的开始、更新、提醒和结束。`app.LiveActivities()` 按开始顺序返回活动，包含内容变化和最终内容。`nsgotest.LiveActivities(false)` 让开始活动的调用返回 `widget.ErrActivitiesDisabled`。这些选项在测试期间接管相应的进程级服务，在原生目标上也一样。调用这些服务的测试应按顺序运行。
 
+`app.FindMounted("id:tab-bar").TabBadge(index)` 在无头和目标平台测试中返回原生标签页的文字或圆点徽标。自行绘制的 `ui.TabShell` 标签项通过 `Props.Value.Text` 提供徽标的朗读内容。
+
 ## 运行测试
 
 ```sh

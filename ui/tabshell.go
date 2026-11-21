@@ -4,6 +4,7 @@ import (
 	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/mobile"
+	"github.com/nsgo-dev/nsgo/mobile/locales"
 )
 
 // ShellTab is a top-level section of a TabShell.
@@ -13,6 +14,8 @@ type ShellTab struct {
 	Icon func() *core.SVG
 	// SystemIcon is the platform's name for the tab's icon on iOS and Android, as mobile.TabBarItem's Icon.
 	SystemIcon string
+	// Badge is the mark at the tab's icon corner, or beside a text-only tab's label, on the system and drawn bars. The zero value clears it.
+	Badge func() mobile.TabBadge
 	// Content is the section, such as a base.Nav's stack of pages. It is
 	// built when the tab is first selected and kept while others show.
 	Content func(cx *core.Scope) core.Node
@@ -130,12 +133,25 @@ func (s TabShell) bar(cx *core.Scope, selected func() int, change func(int)) cor
 	colors := ColorsOf(cx)
 	var tabs []core.Node
 	for i, tab := range s.Tabs {
+		label := line(tab.Text, TypeCaption.Merge(core.Style{FontWeight: Medium}), 1)
 		var content []core.Node
 		if tab.Icon != nil {
-			content = append(content, Icon(tab.Icon, 22, Inherited))
+			content = append(content, shellTabBadge(Icon(tab.Icon, 22, Inherited), tab.Badge, colors.Danger))
+		} else {
+			label = shellTabBadge(label, tab.Badge, colors.Danger)
 		}
-		content = append(content, line(tab.Text, TypeCaption.Merge(core.Style{FontWeight: Medium}), 1))
+		content = append(content, label)
 		tabs = append(tabs, base.Tab{Label: tab.Text, Selected: func() bool { return selected() == i },
+			AccessibilityValue: func() core.AccessibilityValue {
+				if tab.Badge == nil {
+					return core.AccessibilityValue{}
+				}
+				badge := tab.Badge()
+				if badge.Text == "" && badge.Dot {
+					return core.AccessibilityValue{Text: locales.TabBadgeNew(cx)}
+				}
+				return core.AccessibilityValue{Text: badge.Text}
+			},
 			OnPress: func(core.PressEvent) { change(i) },
 			Style: core.Style{FlexGrow: 1, FlexBasis: core.Pt(0), MinWidth: core.Pt(0), AlignItems: core.AlignCenter,
 				JustifyContent: core.JustifyCenter, Gap: 2, MinHeight: core.Pt(RowHeight + 4), CornerRadius: RadiusControl,
@@ -153,6 +169,33 @@ func (s TabShell) bar(cx *core.Scope, selected func() int, change func(int)) cor
 		}, Children: []core.Node{
 			base.Tabs{Label: s.Label, TestID: "tab-bar", Style: core.Style{Direction: core.Row, FlexGrow: 1, Gap: 4}, Children: tabs},
 		}}
+}
+
+// shellTabBadge anchors the mark to the icon or, for a text-only tab, its label.
+func shellTabBadge(face core.Node, badge func() mobile.TabBadge, color func() core.Color) core.Node {
+	if badge == nil {
+		return face
+	}
+	return core.View{Children: []core.Node{face, core.Show{
+		When: func() bool { return badge() != (mobile.TabBadge{}) },
+		Then: func(*core.Scope) core.Node {
+			return core.View{
+				Style: core.Style{Position: core.Absolute, Top: core.Pt(-2), Right: core.Pt(-8),
+					AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, MaxWidth: core.Pt(56)},
+				StyleFunc: func() core.Style {
+					size, padding := core.Points(16), core.Points(4)
+					if badge().Text == "" {
+						size, padding = 6, 0
+					}
+					return core.Style{Height: core.Pt(size), MinWidth: core.Pt(size), Padding: core.Symmetric(0, padding),
+						CornerRadius: size / 2, Background: color()}
+				},
+				PointerEvents: core.PointerEventsNone, AccessibilityElementsHidden: func() bool { return true },
+				Children: []core.Node{core.Text{ContentFunc: func() string { return badge().Text },
+					Style: core.Style{FontSize: 10, LineHeight: 12, FontWeight: Medium, Color: core.RGB(0xffffff)}, MaxLines: 1}},
+			}
+		},
+	}}}
 }
 
 // hasSystemBar says whether the system's tab bar shows the tabs, checking the icon sources without reading their reactive values.
@@ -173,6 +216,9 @@ func (s TabShell) systemItems(android bool) []mobile.TabBarItem {
 	items := make([]mobile.TabBarItem, len(s.Tabs))
 	for i, tab := range s.Tabs {
 		items[i] = mobile.TabBarItem{Title: tab.Text, Icon: tab.SystemIcon}
+		if tab.Badge != nil {
+			items[i].Badge = tab.Badge()
+		}
 		if android && tab.Icon != nil {
 			items[i].SVG = tab.Icon()
 		}

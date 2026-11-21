@@ -24,6 +24,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 ## Using them well
 
 - Set `tabBarBackground`, `tabBarIdle`, `tabBarSelected` and `tabBarIndicator` as Android `mobile.TabBar` palette roles. A custom palette uses `Accent` for selected content by default.
+- Set `mobile.TabBarItem.Badge` to a `mobile.TabBadge` with `Text` or `Dot`. Update it through `ItemsFunc`, or give `ui.ShellTab.Badge` a getter. Assert a native item with `nsgotest.View.TabBadge(index)`.
 
 - For a marker band behind wrapped text, give a `core.Span` a `Background` and `BackgroundInsetTop`, such as `core.Pct(62)` ([text](https://nsgo.dev/docs/text.md#runs-and-links)).
 - `core.Canvas.Draw` runs again when a signal it reads, its size or the available fonts change; `cx.RegisterFont` updates its glyphs and `Drawing.TextMetrics` once the font loads, including asynchronously on the web ([canvas](https://nsgo.dev/docs/canvas.md)).

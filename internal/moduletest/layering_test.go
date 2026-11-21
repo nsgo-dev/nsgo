@@ -70,7 +70,7 @@ var layers = []struct {
 	{"internal/platform/videoalpha", nil},
 	{"internal/platform/videoalpha/clips", nil},
 	{"internal/platform/webstyle", []string{"internal/driver"}},
-	{"internal/platform/", append([]string{"internal/driver", "internal/engine", "internal/testhost", "desktop/locales"}, platformShared...)},
+	{"internal/platform/", append([]string{"internal/driver", "internal/engine", "internal/testhost", "desktop/locales", "mobile/locales"}, platformShared...)},
 	{"nsgotest", []string{"core", "internal/automation", "internal/devtools", "internal/driver", "internal/testhost", "widget"}},
 	{"", []string{"core", "internal/backend", "internal/dev", "internal/engine"}},
 	// The backend runs the app on the platform build tags pick, with the launch flags, the dev client, restarts and, where the platform's updater keeps no schedule, update checks.
@@ -83,6 +83,7 @@ var layers = []struct {
 	// The code nsgo writes from catalogs runs on i18n.
 	{"i18n", []string{"core", "internal/cldr"}},
 	{"base/", []string{"core", "base/", "i18n"}},
+	{"mobile/locales", []string{"core", "i18n"}},
 	{"mobile", []string{"core"}},
 	{"audio", []string{"core"}},
 	{"desktop/locales", []string{"core", "i18n"}},
@@ -91,7 +92,7 @@ var layers = []struct {
 	{"updater", []string{"core", "updater/locales"}},
 	{"icons/", []string{"core"}},
 	{"ui/chat/locales", []string{"core", "i18n"}},
-	{"ui/", []string{"core", "base/", "ui/", "mobile", "desktop", "icons/"}},
+	{"ui/", []string{"core", "base/", "ui/", "mobile", "mobile/locales", "desktop", "icons/"}},
 	// The TSX test runner drives apps through nsgotest, and runs its VM's work on the test goroutine through nsgotest's hook in internal/testhost (PostToTest), as App.Post runs on the engine's on a target.
 	{"tsx/tsxtest", []string{"core", "internal/driver", "internal/testhost", "nsgotest", "tsx", "tsx/"}},
 	// The nsgo tool links the bundler, so it reaches no runtime.
