@@ -986,6 +986,7 @@ func (s *surface) close() {
 		}
 	}
 	s.awake.releaseAll()
+	apple.ReleaseCanvasImages(s)
 	s.loopback.Close()
 	if s.audio != nil {
 		s.audio.Close()
@@ -1978,6 +1979,14 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemImageInfo:
 			apple.ImageInfo(it, s.engine.Dispatch)
+			continue
+		case driver.ItemKeepImage:
+			if !s.closed {
+				apple.KeepCanvasImage(s, it.Value)
+			}
+			continue
+		case driver.ItemReleaseImage:
+			apple.ReleaseCanvasImage(s, it.Value)
 			continue
 		case driver.ItemAnnounce:
 			announce(it.Value)

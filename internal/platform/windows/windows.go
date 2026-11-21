@@ -471,6 +471,7 @@ type window struct {
 	epoch    time.Time
 	// canvasImages are the images canvases draw, by ImageSource.Key.
 	canvasImages   map[string]*imageSlot
+	canvasKept     map[string]int
 	canvasImageUse uint64
 	// canvasPass is canvasImageUse when the last paint ended: images used since then are the current paint's, which eviction keeps; canvasPassPosted says an endCanvasPass is posted.
 	canvasPass       uint64
@@ -1400,6 +1401,12 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemImageInfo:
 			w.imageInfo(it)
+			continue
+		case driver.ItemKeepImage:
+			w.keepCanvasImage(it.Value)
+			continue
+		case driver.ItemReleaseImage:
+			w.releaseCanvasImage(it.Value)
 			continue
 		case driver.ItemKeymap:
 			w.setKeymap(it.Keys, it.HeldKeys)
