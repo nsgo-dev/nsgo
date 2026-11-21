@@ -28,7 +28,7 @@
 - Add `LineWidth` to `ui.ProgressRing` and ring `ui.Spinner` to set the track and arc width (#960 by @houko).
 - Fail the `tsx.Plugin` calls still waiting on a promise when `Plugin.Close` closes the plugin, after its cleanups run (#893 by @houko).
 - Fail a native `tsx.Plugin.Call` once with `ErrBudget` when a slice exceeds `Limits.Call` after an `await`, without stopping independent calls (#1039 by @J4ck1e2000).
-- Throw a catchable `RangeError` in a native sandbox, instead of overflowing the host's Go stack, when native functions call each other past `Limits.Stack` (built-in getters, `toString`/`valueOf`, `RegExp` `exec` dispatch, `Reflect.apply`/`construct`, bound-function and proxy chains), and fail converting a plugin value nested past it with a `RangeError`, by building with a goja fork that apps add to their `go.mod` with the same `replace` (#928 by @houko).
+- Throw a catchable `RangeError` in a native sandbox, instead of overflowing the host's Go stack, when native functions call each other past `Limits.Stack` (built-in getters, `toString`/`valueOf`, `RegExp` `exec` dispatch, `Reflect.apply`/`construct`, bound-function and proxy chains), and fail converting a plugin value nested past it with a `RangeError`, by building with a goja fork that apps add to their `go.mod` with the same `replace` (#1063 by @houko).
 - Keep the borders of `ui/chat`'s glass composer, `GlassPanel` and popovers on watchOS, which draws no Liquid Glass rim (#896 by @houko).
 - Close the windows a Linux app opened, and release their input editors' display-wide styles, when the app's own window stops (#901 by @houko).
 - Free removed overlays, tooltips, modals and fixed views with their subtrees, which their host kept for the app's lifetime.
