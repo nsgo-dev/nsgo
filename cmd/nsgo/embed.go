@@ -111,6 +111,8 @@ __attribute__((objc_runtime_visible))
 /// return from its own.
 @property (nonatomic, readonly) UIStatusBarStyle preferredStatusBarStyle;
 @property (nonatomic, readonly) BOOL prefersStatusBarHidden;
+/// Whether the app lets UIKit hide the home indicator.
+@property (nonatomic, readonly) BOOL prefersHomeIndicatorAutoHidden;
 
 /// Sends the app an event (core.Scope.OnHostEvent), kept until it has a
 /// listener.
