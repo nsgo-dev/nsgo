@@ -43,9 +43,10 @@ type agent struct {
 
 // followed is a surface the agent follows: its model, and what the app opened it as. It hears the surface as its devtools.Follower.
 type followed struct {
-	g   *agent
-	id  uint32
-	app *App
+	g      *agent
+	id     uint32
+	app    *App
+	native devtools.Surface
 	// opened is set for a window, a panel or a tray icon's view the app opened, of kind and title.
 	opened bool
 	kind   driver.SurfaceKind
@@ -118,6 +119,7 @@ func (g *agent) Registered(s devtools.Surface) {
 	var f *followed
 	if s.Graph() == g.graph {
 		f = g.follow(uint32(s.ID()))
+		f.native = s
 	}
 	g.mu.Unlock()
 	if f != nil {
@@ -208,6 +210,9 @@ func (g *agent) Do(request []byte) []byte {
 	var answer automation.Answer
 	if err := json.Unmarshal(request, &req); err != nil {
 		answer = automation.Reply(0, nil, automation.Errorf(automation.InvalidRequest, "%v", err))
+	} else if req.Method == automation.ListAppTools {
+		result, err := g.appTool(req)
+		answer = automation.Reply(req.ID, result, err)
 	} else {
 		g.work.Lock()
 		result, err := g.do(req)
@@ -225,7 +230,10 @@ func (g *agent) do(req automation.Request) (any, *automation.Error) {
 		params = nil
 	}
 	if params == nil {
-		return nil, automation.Errorf(automation.UnknownMethod, "the app answers no method %q", req.Method)
+		if automation.Params[req.Method] != nil {
+			return nil, automation.Errorf(automation.UnknownMethod, "the app answers no method %q", req.Method)
+		}
+		return g.appTool(req)
 	}
 	p := params()
 	if len(req.Params) > 0 {

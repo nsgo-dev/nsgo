@@ -43,6 +43,7 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `updater`, `updater/locales` | `nsh/updater` | Updating the app the way its platform and channel do: Sparkle, WinSparkle, the appcast `nsgo build` signs, or the App Store ([updates](docs/architecture/updates.md)) |
 | `widget` | — | Timelines of views that macOS and iOS widgets show, drawn by a SwiftUI extension the tool compiles, and Live Activities, which the extension draws on iOS and Android's runtime posts as Live Updates ([widgets](docs/architecture/tool.md#widgets)) |
 | `nsgotest` | `nsh-testing` | App tests, headless or on a platform, and the agent `nsgo dev -automation` drives a running app through ([testing](docs/architecture/testing.md)) |
+| `automation` | — | Registers app-defined MCP tools for Go apps and libraries ([automation](docs/architecture/tool.md#automation)) |
 | `internal/automation` | — (MyGo's `plugins/automation`) | The requests the nsgo tool sends a running dev build's agent ([automation](docs/architecture/tool.md#automation)) |
 | `internal/testhost` | `nsh-testing`'s agent | A backend's test host for `nsgotest`: the main thread, native input, screenshots |
 | `internal/mimeinfo` | — | Fixed extension/MIME tables shared by packaging and the driver, independent of the host's database |

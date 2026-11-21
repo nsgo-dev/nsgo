@@ -2,10 +2,13 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"strconv"
 
 	"github.com/nsgo-dev/nsgo"
+	"github.com/nsgo-dev/nsgo/automation"
 	"github.com/nsgo-dev/nsgo/base"
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/desktop"
@@ -16,6 +19,23 @@ func main() { nsgo.Run(App) }
 // App sets the menu and the Dock menu, which on macOS the app's own surface holds, and the main window's view.
 func App(app *core.Scope) {
 	count := core.NewSignal(app, 0)
+	if err := automation.Register(app, automation.Tool{
+		Name:        "set_count",
+		Description: "Set the counter to a test value",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"count":{"type":"integer"}},"required":["count"]}`),
+		Handler: func(_ context.Context, args json.RawMessage) (any, error) {
+			var input struct {
+				Count int `json:"count"`
+			}
+			if err := json.Unmarshal(args, &input); err != nil {
+				return nil, err
+			}
+			count.Set(input.Count)
+			return input, nil
+		},
+	}); err != nil {
+		panic(err)
+	}
 	answer := core.NewSignal(app, "none")
 	ask := func(cx *core.Scope) {
 		base.ShowAlertDialog(cx, base.AlertDialog{Title: "Keep going?", Actions: []core.AlertAction{{Label: "Yes"}, {Label: "No", Role: core.AlertCancel}}},

@@ -137,6 +137,7 @@ const maxRuns = 1_000_000
 
 type runtime struct {
 	graphOwner
+	automation   automationToolRegistry
 	aborted      bool // fault recovery must never schedule another computation
 	checkCommits bool
 	classCache   parseCache[classSource, *classList]

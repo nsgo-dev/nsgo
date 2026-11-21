@@ -396,7 +396,7 @@ What NSGo's own [#57](https://github.com/nsgo-dev/nsgo/issues/57) asks for, whic
 
 ## Automation
 
-What `nsgo dev -automation` and `nsgo mcp` lack beyond macOS ([tool](architecture/tool.md#automation)). NSH has no counterpart; MyGo's `plugins/automation` is the reference.
+What `nsgo dev -automation` and `nsgo mcp` lack beyond macOS ([tool](architecture/tool.md#automation)). NSH has no counterpart; MyGo's `plugins/automation` is the reference. App-defined MCP tools share this transport, so they reach each target when its automation does.
 
 | Item | Reference | Done when |
 | --- | --- | --- |
