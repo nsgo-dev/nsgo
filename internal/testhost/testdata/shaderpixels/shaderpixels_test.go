@@ -130,7 +130,12 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	waitForVersion := func(n uint64, allowed func(colors) bool) {
 		t.Helper()
 		want := palette[n%uint64(len(palette))]
-		deadline := time.Now().Add(4 * time.Second)
+		timeout := 4 * time.Second
+		if n == 0 {
+			// The first version waits for the shader's GL surface, which the Android emulator's software renderer can take several seconds to create after a heavy test.
+			timeout = 20 * time.Second
+		}
+		deadline := time.Now().Add(timeout)
 		for {
 			got := capture()
 			if got == want {
