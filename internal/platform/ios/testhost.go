@@ -70,7 +70,11 @@ func (host) Open(root func(cx *core.Scope) core.Node, o testhost.Options) (testh
 	if err := awaitActive(); err != nil {
 		return nil, err
 	}
-	return &testSurface{s: runner, test: test}, nil
+	surface := &testSurface{s: runner, test: test}
+	if onTV() {
+		return surface, nil
+	}
+	return &touchTestSurface{surface}, nil
 }
 
 // awaitActive waits for an Apple TV app to become active, as it does a
@@ -107,6 +111,9 @@ type testSurface struct {
 	s    *surface
 	test *testOpen
 }
+
+// touchTestSurface adds multi-touch input on iPhone and iPad.
+type touchTestSurface struct{ *testSurface }
 
 // IOKit's digitizer and keyboard events and BackBoardServices' digitizer
 // info, from IOHIDEvent.h and BKSHIDEvent.h.
@@ -186,6 +193,11 @@ const (
 
 // touch is one finger at p, window w's points, in ph.
 func touch(w objc.ID, p driver.Point, ph phase) {
+	touchesAt(w, ph, p)
+}
+
+// touchesAt sends the fingers together in one digitizer event to window w, keeping each finger's index and identity until it lifts.
+func touchesAt(w objc.ID, ph phase, points ...driver.Point) {
 	onMainSync(func() {
 		touching := uint8(0)
 		if ph != up {
@@ -201,13 +213,15 @@ func touch(w objc.ID, p driver.Point, ph phase) {
 			return
 		}
 		hidSetInteger(hand, fieldIntegrated, 1)
-		finger := hidFinger(0, now, 1, 2, mask, float64(p.X), float64(p.Y), 0, float64(touching), 0, touching, touching, 0)
-		if finger != 0 {
-			hidSetFloat(finger, fieldMajorRadius, 5)
-			hidSetFloat(finger, fieldMinorRadius, 5)
-			hidSetInteger(finger, fieldIntegrated, 1)
-			hidAppend(hand, finger, 0)
-			apple.Release(finger)
+		for i, p := range points {
+			finger := hidFinger(0, now, uint32(i+1), uint32(i+2), mask, float64(p.X), float64(p.Y), 0, float64(touching), 0, touching, touching, 0)
+			if finger != 0 {
+				hidSetFloat(finger, fieldMajorRadius, 5)
+				hidSetFloat(finger, fieldMinorRadius, 5)
+				hidSetInteger(finger, fieldIntegrated, 1)
+				hidAppend(hand, finger, 0)
+				apple.Release(finger)
+			}
 		}
 		enqueue(w, hand)
 	})
@@ -285,6 +299,25 @@ func (t *testSurface) Drag(path []driver.Point) error {
 		return errors.New("an empty drag")
 	}
 	fingerAlong(t.s.window, path)
+	return nil
+}
+
+func (t *touchTestSurface) Pinch(at driver.Point, scales []float32) error {
+	if len(scales) == 0 {
+		return nil
+	}
+	const radius = 16
+	send := func(ph phase, scale float32) {
+		d := radius * driver.Points(scale)
+		touchesAt(t.s.window, ph, driver.Point{X: at.X - d, Y: at.Y}, driver.Point{X: at.X + d, Y: at.Y})
+	}
+	send(down, 1)
+	for _, scale := range scales {
+		time.Sleep(32 * time.Millisecond)
+		send(move, scale)
+	}
+	time.Sleep(32 * time.Millisecond)
+	send(up, scales[len(scales)-1])
 	return nil
 }
 

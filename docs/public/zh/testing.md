@@ -63,6 +63,8 @@ func TestMain(m *testing.M) {
 
 `app.Orientation` 保存当前生效的 `Scope.RequestOrientation` 方向集合。使用应用原有的方向策略时，该值为零。
 
+`app.DoublePress(selector)` 在一个步骤内连续按压两次，让平台识别双击或双触。`app.Pan` 使用目标的拖动输入，每个偏移量都相对于起点。`app.Pinch` 支持无头模式，也可在 macOS、iOS、Android 和 Web 上驱动平台的手势处理。iOS 上的每个缩放值决定两根手指的间距，UIKit 在移动超过识别阈值后才开始报告手势。Android 上的两根手指会先张开至原生识别阈值，再依次应用指定的缩放值。如果当前目标不支持捏合输入，`Pinch` 会跳过测试的剩余步骤，并报告不支持的目标。
+
 ## 小组件和实时活动
 
 `nsgotest.Widgets(true)` 记录应用通过 `widget.Update` 发布的内容。用 `app.Widgets()` 读取每类小组件的最新时间线。条目没有指定日期时，使用应用的墙钟时间。`nsgotest.Widgets(false)` 让 `widget.Available()` 返回 false，并让更新返回 `widget.ErrNoWidgets`。

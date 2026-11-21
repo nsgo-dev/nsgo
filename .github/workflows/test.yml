@@ -295,6 +295,7 @@ jobs:
           go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
           go tool nsgo test -target ios_simulator -timeout 1m -run '^TestIOSCaptureIsSRGB$' ./internal/testhost/testdata/capture
           go tool nsgo test -target ios_simulator -timeout 1m -run '^Test(Scroll|List)PastItsEndComesBackToIt$' ./nsgotest
+          go tool nsgo test -target ios_simulator -timeout 1m -run '^(TestPanEndsAtTheLastOffset|TestPinchReportsScaleAndPhase|TestPressesCountConsecutiveClicks)$' ./internal/testhost/testdata/press
           go tool nsgo test -target watchos_simulator -timeout 1m ./internal/platform/watchos
 
   windows:
