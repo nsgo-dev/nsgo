@@ -8,6 +8,8 @@
 - Stand `ui.Slider` and `ui.Progress`, and their `base` forms, up with `Axis: base.Vertical`, and fill them from the other end with `Inverted`, top to bottom when vertical.
 - Add `ui.ProgressRing.StartAngle` and `CounterClockwise` to start the arc anywhere and run it, or an indeterminate ring's turn, counterclockwise.
 - Add package `gamepad` (`Pads`, `State`, W3C Standard Gamepad button and axis constants), `core.Env.SupportsGamepads`, platform backends on macOS, iOS, Windows, Linux, Android and the web, and `nsgotest` fake gamepad helpers (`ConnectGamepad`, `DisconnectGamepad`, `SetGamepadButton`, `SetGamepadAxis`) (#1049).
+- Add the `nsgo/gamepad` TSX module (`supported`, `pads`, `state`, `Button`, `Axis`) and its TypeScript declarations, gated by the `gamepad` capability (`core.AccessGamepad`) (#1116).
+- Add opt-in gamepad focus navigation (`gamepad.EnableFocusNavigation`, `gamepad.CaptureInput`, `core.MoveFocus`, `core.ActivateFocused`, `core.TriggerBack`) so D-pad and left stick traverse native focus stops, South activates, East triggers back, and mounted gameplay views can pause navigation cleanly (#1123).
 - Add `ui/editor`, `base/editor`'s code editor in ui's colors and code type, following the theme, with the app's styles merged over it part by part.
 - Highlight every row of a soft-wrapped line in `base/editor`'s selections and matches, whose rows before the last showed nothing.
 - Draw `ui.Button`'s primary, secondary and ghost variants without a rim, and fill the secondary one with the text's color at a low opacity instead of an opaque gray.
