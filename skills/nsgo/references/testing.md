@@ -56,6 +56,8 @@ A press can name a text field directly. Read `app.Find("id:field").Focused` afte
 
 `Key("mod+a")` selects a focused field unless a binding or an application-menu item with that shortcut takes it. Headless, on desktop targets and on the web, `KeyAlways` takes Return, Backspace and select-all before the field acts; `KeyAuto` and `KeyNotEditing` leave them to the field. The Android and iOS test hosts do not give the keymap these keys first yet. A focused view's `OnKeyDown` hears `Key` before any binding, a modifier alone (`Key("shift")`) included, and a key it consumes fires none; `Key` is a full press, so `OnKeyUp` hears its release. `KeyDown(key)` and `KeyUp(key)` hold and release one key, never a chord; a held modifier joins later keys (`KeyDown("shift")` then `Key("a")` is Shift+A), and `KeyUp` of a key not held fails. Android, HarmonyOS and watchOS targets skip them.
 
+Use `app.Window` and `nsgotest.WindowAction` constants such as `nsgotest.WindowSetConstraints` to assert what the app asked of its main window. In headless tests, `app.Shares` records the files, text and anchor of each share request.
+
 ## Tests without the network
 
 Keep a test off the network and disk the user owns: inject the fetcher or the `http.Client` into the component, or serve answers from `net/http/httptest`, and give storage and secrets through `nsgotest.Storage` and `nsgotest.Secrets`, so no test reaches the machine's keychain. A resource's loading and error states are then tested by answering slowly or with an error.
