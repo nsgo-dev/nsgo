@@ -370,6 +370,8 @@ const (
 	ItemScanCode
 	// ItemQuickLook shows the system's file preview panel on QuickLook's Paths, starting at its Index. Sent only where the environment says CanQuickLook.
 	ItemQuickLook
+	// ItemSystemGestures replaces the surface's gesture deferrals with SystemGestures.
+	ItemSystemGestures
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -587,7 +589,9 @@ type MountItem struct {
 	Open        *SharedFile
 	// QuickLook is ItemQuickLook's request.
 	QuickLook *QuickLookRequest
-	Share     *ShareRequest
+	// SystemGestures is ItemSystemGestures' complete surface preference.
+	SystemGestures *SystemGestureOptions
+	Share          *ShareRequest
 	// Surface is ItemOpenSurface's window, Tray ItemTray's icon, and On
 	// ItemDock's and ItemSetLaunchAtLogin's choice and whether
 	// ItemCheckForUpdates checks in the background.

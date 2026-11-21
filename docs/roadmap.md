@@ -191,6 +191,7 @@ The [games plan (#1047)](https://github.com/nsgo-dev/nsgo/issues/1047) targets m
 | Android native view classes | [#1055](https://github.com/nsgo-dev/nsgo/issues/1055) | An app ships a prebuilt `View` class and shows it through `core.Native` without requiring a JDK or Android SDK on the build machine |
 | Desktop multi-touch | [#1056](https://github.com/nsgo-dev/nsgo/issues/1056) | Windows and Linux touchscreens report separate fingers to `OnTouch` |
 | GPU view for 3D | [#1059](https://github.com/nsgo-dev/nsgo/issues/1059), [open design decisions (#1104)](https://github.com/nsgo-dev/nsgo/issues/1104) | A depth-tested mesh draws with textures and lighting on the six targets after the API and backend choices are settled |
+| HarmonyOS system edge gestures | [#1218](https://github.com/nsgo-dev/nsgo/issues/1218) | Establish whether ArkUI offers a supported way to defer navigation gestures over game controls, as iOS and Android do |
 | Additional targets | [#1117](https://github.com/nsgo-dev/nsgo/issues/1117) | HarmonyOS, mini programs, watchOS and tvOS each have a documented scope for game input, drawing, audio and frame timing |
 
 ## Diagrams
