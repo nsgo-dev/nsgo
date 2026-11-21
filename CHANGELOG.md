@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add text-based YAML and Markdown store listings with pre-upload validation and App Store Connect and Google Play upload support in `nsgo publish -store` (#1564).
 - Restore web builds with pixel-backed custom cursors (#1206 by @houko).
 - Add `nsgo build -channel steam` for desktop depots with development-only `steam_appid.txt` support (#1227 by @houko).
 - Keep a read-only input's text selectable and copyable on macOS and iOS, the latter with no keyboard, stop edits at once in a macOS field made read-only while it is edited, and make `Readonly` and `Disabled` stop edits on HarmonyOS, which ignored them.
