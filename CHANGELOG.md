@@ -12,6 +12,7 @@
 - Cut `ui.BadgeVariant` to neutral, accent, success, warn and danger: `BadgeUp` becomes `BadgeSuccess`, and `BadgeInfo`, `BadgeDown` and `BadgeOutline`, which repeated other looks, are gone, with `"info"`, `"up"`, `"down"` and `"outline"` in TSX.
 - Let `richeditor.View.NodeViews` draw inline leaves in the text, where a press selects the node and an edit can replace it whole (#1172 by @shuuul).
 - Keep an image with its surrounding text when the rich editor's schema defines `inlineImage`, and keep the image's title and link when writing Markdown (#1174 by @shuuul).
+- Add `Drawing.DrawAtlas` to draw many transformed tiles from one source image in a single canvas operation (#1103 by @houko).
 - Add `apple.multiple_scenes`, which writes `UIApplicationSupportsMultipleScenes`, and show each further scene an iPad connects for it, as the user opens another window of the app, in a window of its own: a tree of the app's one engine showing the main view, with its own size, safe area, status bar and orientations, kept while UIKit disconnects the scene and ended as the system discards it (#49 by @houko).
 - Acknowledge macOS logout, restart and shutdown after app cleanup and expose those requests through `desktop.QuitRequest.Forced()` (#1081 by @houko).
 - Add `Style` and `StyleFunc` to `ui.Sheet` for surface backgrounds, corners and padding (#1036 by @houko).

@@ -123,6 +123,11 @@ jobs:
           GDK_BACKEND: x11
           GSK_RENDERER: cairo
         run: xvfb-run -a go tool nsgo test -target linux ./internal/testhost/testdata/pick
+      - name: Compare native Cairo atlas pixels
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: xvfb-run -a go tool nsgo test -target linux -run '^TestCanvasAtlasMatchesDrawImageFrom$' ./internal/testhost/testdata/capture
       - name: Test browser empty web sources
         run: go tool nsgo test -target web -run '^TestEmptyWebSourceIsOpaque$' ./internal/platform/web
       - name: Test
@@ -142,6 +147,8 @@ jobs:
         run: go tool nsgo test -target web ./internal/testhost/testdata/press
       - name: Test browser editing keys and bindings
         run: go tool nsgo test -target web ./internal/testhost/testdata/keys
+      - name: Compare canvas atlas pixels in Chromium
+        run: go tool nsgo test -target web -run '^TestCanvasAtlasMatchesDrawImageFrom$' ./internal/testhost/testdata/capture
       - name: Test browser backend
         run: go tool nsgo test -target web ./internal/platform/web
       - name: Test browser TSX selectors and hardening
@@ -181,6 +188,8 @@ jobs:
             NSGO_ANDROID_E2E=1 NSGO_ANDROID_DEVICE=emulator-5554 go tool nsgo test -run '^TestAndroidProcessExitResults$' ./cmd/nsgo || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestGreets$' ./examples/hello || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m ./internal/testhost/testdata/press || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
+            go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestCanvasAtlasWire$' ./internal/platform/android
+            go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestCanvasAtlasMatchesDrawImageFrom$' ./internal/testhost/testdata/capture
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestHardwareKeys' ./internal/platform/android || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestMountFlushesDeferredShaderPixels$' ./internal/platform/android || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run 'ListTouchStopsMomentum$' ./internal/platform/android || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
@@ -279,6 +288,7 @@ jobs:
           go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
           go tool nsgo test -target ios_simulator -timeout 1m -run '^TestIOSCaptureIsSRGB$' ./internal/testhost/testdata/capture
           go tool nsgo test -target ios_simulator -timeout 1m -run '^Test(Scroll|List)PastItsEndComesBackToIt$' ./nsgotest
+          go tool nsgo test -target ios_simulator -timeout 1m -run '^TestCanvasAtlasMatchesDrawImageFrom$' ./internal/testhost/testdata/capture
           go tool nsgo test -target watchos_simulator -timeout 1m ./internal/platform/watchos
 
   windows:
@@ -305,6 +315,8 @@ jobs:
         run: go tool nsgo test -target windows ./internal/testhost/testdata/websource
       - name: Test native photo pick answers
         run: go tool nsgo test -target windows ./internal/testhost/testdata/pick
+      - name: Compare Direct2D atlas pixels in direct and cached drawing
+        run: go tool nsgo test -run '^TestCanvasAtlasDrawsLikeImages$' ./internal/platform/windows
       - name: Test native focus, styles, activation and label relationships
         run: go tool nsgo test -run '^(TestRefFocusUsesNativeKeyboardStops|TestNativeLabeledByProvider)$' ./internal/platform/windows
       - name: Test UI Automation property-changed events
