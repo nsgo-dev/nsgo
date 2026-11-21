@@ -46,6 +46,7 @@ nsgo
 │   │   └── locales                      Its menus' and permission guide's words, which backends read
 │   ├── updater                          Updating the app the platform's way
 │   │   └── locales                      Its alerts' words
+│   ├── crash                            Fatal Go and native crash capture for the next launch
 │   ├── icons/lucide                     The bundled icons
 │   └── i18n                             The language the app shows
 │       └── internal/cldr                Dates and pseudo locales by CLDR's data
@@ -143,6 +144,7 @@ A line means "imports". `internal/moduletest/layering_test.go` checks the graph 
 - `audio` imports only `core`, as `mobile` does: `core` does the engine's part, so its sounds and players reach the platform through the batch.
 - `i18n` imports only `core` and `internal/cldr`; `base`'s packages import it for their catalogs, as `ui/chat/locales` does for its own.
 - `updater` imports only `core` and its catalogs; `internal/backend` imports it, to check as the app starts where the platform's updater keeps no schedule.
+- `crash` imports only `core` and stands beside `microphone` and `widget` as a system-reaching package: it routes `runtime/debug.SetCrashOutput` and platform uncaught exception handlers (purego on Apple, `syscall` on Windows, `syscall/js` on the web) into `LogsDir/crashes`; `internal/backend` installs it at startup and wires `engine.OnPanic`, and `nsgotest` imports it to seed synthetic reports in app tests.
 - `ui` imports `base`, `core`, `mobile`, `desktop` and the icons; `base` never imports it.
 - `tsx/tsxtest` is the one package that imports both `tsx` and `nsgotest`, and `tsx/ui` with the packages below it the TSX packages that import `ui`. `tsx/internal/js`, the engines' API, imports nothing of NSGo's, and on the web reaches the page through `syscall/js`.
 - `base/terminal` is the one package of `base` that is not portable: it loads libghostty-vt through purego, runs programs on desktops and remote sessions there and on iOS, and elsewhere builds to report that it cannot (`unportable` in `layering_test.go`).

@@ -44,6 +44,7 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
+	"github.com/nsgo-dev/nsgo/crash"
 	"github.com/nsgo-dev/nsgo/internal/devtools"
 	"github.com/nsgo-dev/nsgo/internal/driver"
 )
@@ -492,6 +493,9 @@ type App struct {
 	lastPress   driver.NodeID
 	lastPressAt time.Time
 	clicks      uint32
+	// seedCrashReports and crashStore hold synthetic crash reports seeded by CrashReports.
+	seedCrashReports []crash.CrashReport
+	crashStore       *crash.Store
 }
 
 // Start runs app, a root view, and settles it; the test's cleanup disposes it. Under `nsgo test -target` it opens the app on that platform instead, in the main window on macOS, as there nsgo.Run shows a root view. With a macOS Environment app shows in the main window, as nsgo.Run shows a root view there, which steps act on; with any other, Windows and Linux included, it fills the app's one surface, as nsgo.Run's does. An app run with its function is tested with StartApp.
@@ -615,6 +619,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		a.root.Dispose()
 	})
 	a.seed()
+	a.seedCrashes(logs)
 	a.start = a.Clock.Now()
 	a.anim = driver.NewAnimator(func(ev driver.Event) {
 		a.mu.Lock()

@@ -52,6 +52,7 @@ public final class NsgoEngine {
     public NsgoEngine(Context context) {
         if (context == null) throw new NullPointerException("context");
         application = context.getApplicationContext();
+        CrashReports.install(application.getFilesDir());
     }
 
     /**
@@ -65,6 +66,7 @@ public final class NsgoEngine {
         out = new DataOutputStream(new BufferedOutputStream(process.getOutputStream()));
         String dir = builder.environment().get("NSGO_DATA_DIR");
         data = dir == null ? application.getFilesDir() : new File(dir);
+        CrashReports.install(data);
         watchTimeZone();
     }
 

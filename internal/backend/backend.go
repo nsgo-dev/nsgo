@@ -61,6 +61,7 @@ func Run(root engine.App, app func(*core.Scope), o Options) {
 	size := o.Constraints.Clamp(core.Size{Width: o.Width, Height: o.Height})
 	o.Width, o.Height = size.Width, size.Height
 	dev.Start()
+	installCrashReporting()
 	if app != nil {
 		run(nil, dev.WrapApp(launch.localizedApp(app)), o)
 	} else {

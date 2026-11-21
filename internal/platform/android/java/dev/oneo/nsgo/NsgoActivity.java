@@ -37,6 +37,7 @@ public class NsgoActivity extends Activity {
             setTheme(theme);
         }
         super.onCreate(state);
+        CrashReports.install(getFilesDir());
         Window window = getWindow();
         WindowManager.LayoutParams lp = window.getAttributes();
         lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;

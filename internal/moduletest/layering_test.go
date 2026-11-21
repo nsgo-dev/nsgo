@@ -26,6 +26,9 @@ var layers = []struct {
 	{"internal/audiosession", nil},
 	// The automation's protocol, which the nsgo tool and the agent in a running app speak, is the standard library's JSON alone.
 	{"internal/automation", nil},
+	// Crash reports route Go's runtime crash output and each platform's native
+	// uncaught exception handler to LogsDir/crashes (or localStorage on web).
+	{"crash", []string{"core"}},
 	// Widgets take core's colors, edges and fonts, and reach WidgetKit
 	// through the files and the library the tool's extension shares, and
 	// Android's runtime through the driver's Live Updates.
@@ -71,10 +74,10 @@ var layers = []struct {
 	{"internal/platform/videoalpha/clips", nil},
 	{"internal/platform/webstyle", []string{"internal/driver"}},
 	{"internal/platform/", append([]string{"internal/driver", "internal/engine", "internal/testhost", "desktop/locales"}, platformShared...)},
-	{"nsgotest", []string{"core", "internal/automation", "internal/devtools", "internal/driver", "internal/testhost"}},
+	{"nsgotest", []string{"core", "crash", "internal/automation", "internal/devtools", "internal/driver", "internal/testhost"}},
 	{"", []string{"core", "internal/backend", "internal/dev", "internal/engine"}},
-	// The backend runs the app on the platform build tags pick, with the launch flags, the dev client, restarts and, where the platform's updater keeps no schedule, update checks.
-	{"internal/backend", []string{"core", "internal/dev", "internal/engine", "internal/platform/", "internal/restart", "updater"}},
+	// The backend runs the app on the platform build tags pick, with the launch flags, crash reporting, the dev client, restarts and, where the platform's updater keeps no schedule, update checks.
+	{"internal/backend", []string{"core", "crash", "internal/dev", "internal/engine", "internal/platform/", "internal/restart", "updater"}},
 	// The dev client nsgo.Run starts in nsgo dev's builds; release builds link its no-op Start and Wrap alone.
 	{"internal/dev", []string{"core", "internal/engine"}},
 	{"internal/restart", []string{"internal/platform/appimage"}},
@@ -109,7 +112,7 @@ var layers = []struct {
 	{"tsx/", []string{"core", "base/", "mobile", "desktop", "internal/devtools", "tsx", "tsx/bundler", "tsx/internal/js", "tsx/pkg", "tsx/websrc"}},
 	// Apps use the public packages only, and the hosts that embed an
 	// example app its package.
-	{"examples/", []string{"", "audio", "core", "base/", "ui/", "mobile", "desktop", "desktop/locales", "i18n", "icons/", "nsgotest", "tsx/", "updater", "widget", "examples/"}},
+	{"examples/", []string{"", "audio", "core", "crash", "base/", "ui/", "mobile", "desktop", "desktop/locales", "i18n", "icons/", "nsgotest", "tsx/", "updater", "widget", "examples/"}},
 	// The nsgo tool links no component or runtime, so changing them does
 	// not build it again; it writes TSX declarations by running the app.
 	{"cmd/", []string{"core", "cmd/", "internal/automation", "internal/mimeinfo", "internal/platform/android/runtime", "tsx/bundler", "tsx/pkg", "tsx/websrc"}},
