@@ -32,6 +32,12 @@ type Environment struct {
 	Maximized bool
 	// FullScreen is whether the window fills its screen in full screen.
 	FullScreen bool
+	// CanFullScreen reports whether WindowSetFullScreen and WindowToggleFullScreen can enter full screen on this surface: desktop windows and browsers that allow the Fullscreen API.
+	CanFullScreen bool
+	// CanLockOrientation reports whether ItemOrientation can lock the interface orientation on this surface: iOS, Android, and browsers exposing screen.orientation.lock.
+	CanLockOrientation bool
+	// Orientation is the surface's current interface orientation (OrientationPortrait, OrientationPortraitUpsideDown, OrientationLandscapeLeft or OrientationLandscapeRight), or zero when unknown.
+	Orientation Orientation
 	// Minimized is whether the surface's window is minimized, an embedded surface's host window; false without desktop windows and where the compositor reports no minimized state.
 	Minimized bool
 	// WindowFrame is where the window is and how large, as WindowSetFrame

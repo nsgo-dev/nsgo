@@ -288,7 +288,7 @@ cx.RequestAnimationFrame(loop)
 
 ## 全屏
 
-在 macOS、Windows 和 Linux 上，`desktop.SetFullScreen(cx, true, displayID)` 会铺满 `cx.Env().Displays()` 中指定的显示器。不传 ID 时使用窗口所在的显示器。未知 ID 不改变窗口。重复同一请求没有影响。`desktop.SetFullScreen(cx, false)` 退出全屏并恢复之前的窗口位置和大小。在 Web 上请从点击处理函数进入全屏，由浏览器选择显示器，`cx.Env().FullScreen()` 跟踪进入和退出，包括按 Esc 退出。
+在 macOS、Windows 和 Linux 上，`desktop.SetFullScreen(cx, true, displayID)` 会铺满 `cx.Env().Displays()` 中指定的显示器。不传 ID 时使用窗口所在的显示器。未知 ID 不改变窗口。重复同一请求没有影响。`desktop.SetFullScreen(cx, false)` 退出全屏并恢复之前的窗口位置和大小。在 Web 上可先读取 `desktop.CanFullScreen(cx)`，并从点击处理函数进入全屏（使用浏览器 Fullscreen API 并在需要时回退到 `webkit*` 前缀）；由浏览器选择显示器，`cx.Env().FullScreen()` 跟踪进入和退出（包括按 Esc 退出），浏览器拒绝请求（例如不在用户手势中调用或浏览器不支持全屏）会通过 `desktop.OnFullScreenError` 报告 `core.CodeDenied` 或 `core.CodeUnavailable`。
 ## 登录
 
 `cx.AuthSession` 在系统的认证会话里用 OAuth 服务登录，而不是在网页视图里：macOS 和 iOS 用 `ASWebAuthenticationSession`，Windows、Linux 以及没有设置 scheme 的 Mac 用默认浏览器加回环地址重定向，Web 用弹出窗口。协议由应用负责：它生成 PKCE 校验码和 state，为传给它的重定向地址拼出授权 URL，并在用 code 换令牌前检查回调。取消不算失败：`errors.Is(err, core.AuthCancelled)` 表示用户关闭了会话，或返回的 `cancel` 结束了它。
@@ -434,11 +434,13 @@ cx.BiometricAvailability(func(kind core.BiometricKind) {
 
 ## 界面方向
 
-在全屏播放器的作用域内调用 `cx.RequestOrientation(core.OrientationLandscape)`，可请求 iOS 或 Android 将界面切换到横屏。仍存活的作用域中，最新的请求生效。作用域结束后，恢复上一个请求，或者回到应用原有的方向策略。桌面平台和 Web 忽略此调用。
+在全屏播放器或游戏的作用域内调用 `cx.RequestOrientation(core.OrientationLandscape)`，可请求 iOS、Android 或支持的移动浏览器将界面切换到横屏。仍存活的作用域中，最新的请求生效。作用域结束后，恢复上一个请求，或者回到应用原有的方向策略（在 Web 上解除锁定）。桌面平台忽略此调用。
 
 在 iOS 16 及更新版本上，请求可立即旋转界面。在较早的 iOS 版本上，请求限制下次系统旋转可选的方向。已显示的模态视图的 `IOS.SupportedOrientations` 优先。Android 无法表达某些横竖屏的组合，此时会固定到其中一个方向，优先保留当前方向。在大屏幕或多窗口模式下，Android 可能忽略方向请求。
 
-`nsgotest.App.Orientation` 记录最新请求的方向集合，零表示使用应用原有的方向策略。
+在 Web 上，`cx.Env().CanLockOrientation()` 表示浏览器是否提供 `screen.orientation.lock`，`cx.Env().Orientation()` 跟踪 `screen.orientation` 变化。在同一点击处理函数中同时调用 `desktop.SetFullScreen(cx, true)` 与 `cx.RequestOrientation(...)` 时，Web 后端会等全屏进入完成后再锁定方向，从而在 Android Chrome 等要求先进入全屏的浏览器中一次点击即可完成。浏览器拒绝锁定（例如 Safari 以 `core.CodeUnavailable` 拒绝 `screen.orientation.lock`，或非全屏下返回 `core.CodeDenied`）会通过 `cx.OnOrientationError` 报告。
+
+`nsgotest.App.Orientation` 记录最新请求的方向集合，零表示使用应用原有的方向策略；`nsgotest.App.OrientationError` 与 `nsgotest.App.FullScreenError` 可在无头测试中模拟浏览器拒绝。
 
 ## Android 上的悬浮窗
 

@@ -225,7 +225,7 @@ func connect(opts Options) *surface {
 		lines:    make(chan []driver.TextLine, 1),
 		carets:   make(chan driver.CaretLayout, 1),
 		started:  make(chan struct{}),
-		env:      driver.Environment{OS: driver.OSAndroid, HasWebView: true, ScheduledNotifications: true},
+		env:      driver.Environment{OS: driver.OSAndroid, HasWebView: true, ScheduledNotifications: true, CanLockOrientation: true},
 		main:     treeView{images: map[driver.NodeID]*imageView{}},
 		overlays: map[uint32]*overlay{},
 

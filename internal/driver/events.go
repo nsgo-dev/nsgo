@@ -276,6 +276,10 @@ const (
 	EventOpenScene
 	// EventKeyUp reports a key coming up that went down while view ID had the keyboard focus, or with ID 0 one that went down while no view hearing keys had it, after its EventKeyDown: Text is the name the down reported, Modifiers the keys still held, the released one not among them, and Repeat false. The platform reports it asynchronously (Engine.Dispatch), as an up cannot be consumed, for each down it reported, wherever the focus has gone since, and an up for every key still held when the window loses the focus. It names a view but is never in a mask: a view that hears keys has EventKeyDown's bit, which a kind past 63 could not have, as Android's runtime shifts a kind into a 64-bit mask.
 	EventKeyUp
+	// EventFullScreenError reports that the platform refused or failed to enter or leave full screen (WindowSetFullScreen, WindowToggleFullScreen): Index is a RefusalReason and Text explains why.
+	EventFullScreenError
+	// EventOrientationError reports that the platform refused or failed to lock or unlock the interface orientation (ItemOrientation): Index is a RefusalReason and Text explains why.
+	EventOrientationError
 )
 
 // EventVideoPause reports that the platform paused video ID, not the app's Paused: Index is why (VideoPauseInterruption, ...). An EventMask has no room for another kind, so it shares EventImageInfo's, an answer that names no view and is never in a mask; Android's Protocol.java mirrors it.
@@ -300,6 +304,16 @@ const (
 	VideoErrorOther = iota
 	// VideoErrorAlphaUnsupported is a local file that declares an alpha channel the platform's player cannot keep.
 	VideoErrorAlphaUnsupported
+)
+
+// Why EventFullScreenError or EventOrientationError says a request was refused, in Index.
+const (
+	// RefusalOther is a platform failure without a more specific classification.
+	RefusalOther = iota
+	// RefusalUnavailable says the platform or browser does not support the operation, such as Safari rejecting screen.orientation.lock.
+	RefusalUnavailable
+	// RefusalDenied says the platform or browser refused the operation due to policy, permissions or missing user gesture, such as NotAllowedError or SecurityError.
+	RefusalDenied
 )
 
 // What EventInputModality reports.

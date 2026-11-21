@@ -454,3 +454,78 @@ func TestMenuWhenLeavesInputsTheirKeys(t *testing.T) {
 		t.Errorf("NotInText = %v: auto leaves select all, notEditing every key", got)
 	}
 }
+
+func TestFullScreenAndOrientationRefusalsAndEnv(t *testing.T) {
+	var (
+		root, child *Scope
+		env         *Env
+		fsErrs      []error
+		orientErrs  []error
+	)
+	h := newHost(t, Size{Width: 300, Height: 600}, func(cx *Scope) Node {
+		root = cx
+		env = cx.Env()
+		child = cx.Child()
+		child.Run(func() {
+			child.OnFullScreenError(func(err error) { fsErrs = append(fsErrs, err) })
+			child.OnOrientationError(func(err error) { orientErrs = append(orientErrs, err) })
+		})
+		return View{}
+	})
+	h.commit()
+	h.tree.SetEnvironment(driver.Environment{
+		CanFullScreen:      true,
+		CanLockOrientation: true,
+		FullScreen:         true,
+		Orientation:        OrientationLandscapeLeft,
+	})
+	if !env.CanFullScreen() || !env.CanLockOrientation() || !env.FullScreen() || env.Orientation() != OrientationLandscapeLeft {
+		t.Fatalf("env = fs:%v canFS:%v canOrient:%v orient:%v", env.FullScreen(), env.CanFullScreen(), env.CanLockOrientation(), env.Orientation())
+	}
+
+	h.tree.Dispatch(driver.Event{Kind: driver.EventFullScreenError, Index: driver.RefusalDenied, Text: "requires user gesture"})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventOrientationError, Index: driver.RefusalUnavailable, Text: "NotSupportedError"})
+	if len(fsErrs) != 1 || ErrorCode(fsErrs[0]) != CodeDenied || fsErrs[0].Error() != "requires user gesture" {
+		t.Fatalf("fsErrs = %+v", fsErrs)
+	}
+	if len(orientErrs) != 1 || ErrorCode(orientErrs[0]) != CodeUnavailable || orientErrs[0].Error() != "NotSupportedError" {
+		t.Fatalf("orientErrs = %+v", orientErrs)
+	}
+
+	// Disposing child unregisters its error listeners.
+	child.Dispose()
+	h.tree.Dispatch(driver.Event{Kind: driver.EventFullScreenError, Index: driver.RefusalOther, Text: "late"})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventOrientationError, Index: driver.RefusalOther, Text: "late"})
+	if len(fsErrs) != 1 || len(orientErrs) != 1 {
+		t.Fatalf("disposed listeners still fired: fs=%d orient=%d", len(fsErrs), len(orientErrs))
+	}
+
+	// After an orientation refusal, requesting the same mask again emits ItemOrientation again.
+	s1 := root.Child()
+	s1.Run(func() { s1.RequestOrientation(OrientationLandscape) })
+	hasOrient := func(b *driver.MountBatch) bool {
+		if b == nil {
+			return false
+		}
+		for _, it := range b.Items {
+			if it.Kind == driver.ItemOrientation && Orientation(it.Count) == OrientationLandscape {
+				return true
+			}
+		}
+		return false
+	}
+	if !hasOrient(h.commit()) {
+		t.Fatal("initial orientation request did not emit ItemOrientation")
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventOrientationError, Index: driver.RefusalDenied, Text: "fullscreen required"})
+	// An unrelated commit must not spam ItemOrientation.
+	if hasOrient(h.commit()) {
+		t.Fatal("unrelated commit re-emitted failed orientation")
+	}
+	// A new request for the same mask retries.
+	s2 := root.Child()
+	s2.Run(func() { s2.RequestOrientation(OrientationLandscape) })
+	if !hasOrient(h.commit()) {
+		t.Fatal("retry after orientation refusal did not re-emit ItemOrientation")
+	}
+}

@@ -192,6 +192,11 @@ func Maximized(cx *core.Scope) bool { return cx.Env().Maximized() }
 // FullScreen reports whether the window is in full screen.
 func FullScreen(cx *core.Scope) bool { return cx.Env().FullScreen() }
 
+// CanFullScreen reports whether SetFullScreen and ToggleFullScreen can enter
+// full screen on this surface: desktop windows and browsers whose Fullscreen
+// API is available and enabled.
+func CanFullScreen(cx *core.Scope) bool { return cx.Env().CanFullScreen() }
+
 // Minimized reports whether the window is minimized, so an app can stop work the user cannot see and resume it once the window is restored. It is always false on phones and the web, and on Wayland, which reports no minimized state.
 func Minimized(cx *core.Scope) bool { return cx.Env().Minimized() }
 
@@ -215,8 +220,14 @@ func ToggleFullScreen(cx *core.Scope) { cx.ToggleFullScreen() }
 // SetFullScreen enters or leaves full screen. A display ID from Env.Displays
 // selects a desktop display. An omitted ID uses the window's current display.
 // On the web, call it from a press or another user gesture. The browser chooses
-// the display and Env.FullScreen follows changes, including leaving with Esc.
+// the display, Env.FullScreen follows changes including leaving with Esc, and
+// refusals report through OnFullScreenError.
 func SetFullScreen(cx *core.Scope, on bool, displayID ...string) { cx.SetFullScreen(on, displayID...) }
+
+// OnFullScreenError runs fn, while cx lives, when the platform refuses or fails
+// to enter or leave full screen, such as a browser rejecting a request outside
+// a user gesture (core.CodeDenied) or without Fullscreen support (core.CodeUnavailable).
+func OnFullScreenError(cx *core.Scope, fn func(error)) { cx.OnFullScreenError(fn) }
 
 // CloseWindow closes the window as its close button does: the window's
 // OnClosing handlers may keep it, and the app ends by its shutdown mode.

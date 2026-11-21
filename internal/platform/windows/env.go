@@ -97,6 +97,7 @@ func (w *window) environment() driver.Environment {
 		WindowMaterial:   w.material,
 		Maximized:        w.zoomed(),
 		FullScreen:       w.chrome.fullScreen,
+		CanFullScreen:    w.kind == driver.SurfaceWindow && !w.embedded && !(w.primary && w.opts.Hidden),
 		Minimized:        isIconicWindow(w.owner()),
 		WindowFrame:      w.windowFrame(),
 		Lifecycle:        w.lifecycle(),

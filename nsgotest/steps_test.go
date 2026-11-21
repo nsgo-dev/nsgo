@@ -980,3 +980,74 @@ func TestOrientationRequestsFollowTheirScopes(t *testing.T) {
 	app.Settle()
 	check(0)
 }
+
+func TestFullScreenAndOrientationRefusalsHeadless(t *testing.T) {
+	var (
+		root       *core.Scope
+		fsErrs     []error
+		orientErrs []error
+		env        *core.Env
+	)
+	app := Start(t, func(cx *core.Scope) core.Node {
+		root = cx
+		env = cx.Env()
+		desktop.OnFullScreenError(cx, func(err error) { fsErrs = append(fsErrs, err) })
+		cx.OnOrientationError(func(err error) { orientErrs = append(orientErrs, err) })
+		return core.View{Children: []core.Node{
+			core.View{
+				TestID: "enter",
+				Style:  core.Style{Width: core.Pt(80), Height: core.Pt(32)},
+				OnPress: func(core.PressEvent) {
+					desktop.SetFullScreen(cx, true)
+					cx.RequestOrientation(core.OrientationLandscape)
+				},
+			},
+			core.View{
+				TestID: "exit",
+				Style:  core.Style{Width: core.Pt(80), Height: core.Pt(32)},
+				OnPress: func(core.PressEvent) {
+					desktop.SetFullScreen(cx, false)
+				},
+			},
+		}}
+	}, Environment(driver.Environment{
+		OS:                 driver.OSWeb,
+		CanFullScreen:      true,
+		CanLockOrientation: true,
+		Orientation:        driver.OrientationPortrait,
+	}))
+
+	if !desktop.CanFullScreen(root) || !env.CanLockOrientation() || env.Orientation() != core.OrientationPortrait {
+		t.Fatalf("env caps: canFS=%v canOrient=%v orient=%v", desktop.CanFullScreen(root), env.CanLockOrientation(), env.Orientation())
+	}
+
+	// Simulate Safari refusing orientation lock and browser refusing fullscreen outside gesture.
+	app.FullScreenError = func(on bool, _ string) error {
+		return &core.Error{Code: core.CodeDenied, Message: "requires user gesture"}
+	}
+	app.OrientationError = func(core.Orientation) error {
+		return core.Unavailable("screen.orientation.lock() is not available on this device")
+	}
+	app.Press("id:enter")
+	if env.FullScreen() || app.Orientation != 0 {
+		t.Fatalf("refused enter mutated state: fs=%v orient=%v", env.FullScreen(), app.Orientation)
+	}
+	if len(fsErrs) != 1 || core.ErrorCode(fsErrs[0]) != core.CodeDenied {
+		t.Fatalf("fsErrs = %+v, want 1 CodeDenied", fsErrs)
+	}
+	if len(orientErrs) != 1 || core.ErrorCode(orientErrs[0]) != core.CodeUnavailable {
+		t.Fatalf("orientErrs = %+v, want 1 CodeUnavailable", orientErrs)
+	}
+
+	// Clear refusals and press again: enters fullscreen and locks landscape.
+	app.FullScreenError = nil
+	app.OrientationError = nil
+	app.Press("id:enter")
+	if !env.FullScreen() || app.Orientation != core.OrientationLandscape {
+		t.Fatalf("accepted enter: fs=%v orient=%v", env.FullScreen(), app.Orientation)
+	}
+	app.Press("id:exit")
+	if env.FullScreen() {
+		t.Fatal("exit did not leave full screen")
+	}
+}

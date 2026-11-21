@@ -82,3 +82,49 @@ func TestExplicitFullScreenFollowsBrowser(t *testing.T) {
 	doc.Call("exitFullscreen")
 	wait("browser exit reaching Env", func() bool { return !s.isFullScreen() && stateIs("windowed") })
 }
+
+func TestWebOrientationRefusalAndEnvCapabilities(t *testing.T) {
+	doc := js.Global().Get("document")
+	if !doc.Truthy() {
+		t.Skip("requires browser document")
+	}
+	mount := doc.Call("createElement", "div")
+	mount.Set("id", "nsgo-orientation-test")
+	mount.Get("style").Set("height", "240px")
+	doc.Get("body").Call("appendChild", mount)
+	defer mount.Call("remove")
+
+	var (
+		root      *core.Scope
+		env       *core.Env
+		orientErr error
+	)
+	s := open(func(cx *core.Scope) core.Node {
+		root = cx
+		env = cx.Env()
+		cx.OnOrientationError(func(err error) { orientErr = err })
+		return core.View{TestID: "lock", Style: core.Style{Width: core.Pt(160), Height: core.Pt(40)},
+			OnPress: func(core.PressEvent) {
+				cx.RequestOrientation(core.OrientationLandscape)
+			},
+			Children: []core.Node{core.Text{Content: "lock"}}}
+	}, Options{Mount: "#nsgo-orientation-test"}, nil)
+	defer s.engine.Close()
+
+	wantCanFS := doc.Get("fullscreenEnabled").Truthy() || doc.Get("webkitFullscreenEnabled").Truthy()
+	if env.CanFullScreen() != wantCanFS {
+		t.Fatalf("Env.CanFullScreen() = %v, want %v", env.CanFullScreen(), wantCanFS)
+	}
+	// Requesting orientation lock outside full screen in a desktop headless browser
+	// is rejected by the browser (NotSupportedError or SecurityError) and reported
+	// cleanly rather than silently dropped.
+	root.Post(func() { root.RequestOrientation(core.OrientationLandscape) })
+	for limit := time.Now().Add(4 * time.Second); orientErr == nil; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(limit) {
+			t.Fatal("timed out waiting for browser orientation refusal report")
+		}
+	}
+	if code := core.ErrorCode(orientErr); code != core.CodeUnavailable && code != core.CodeDenied && orientErr.Error() == "" {
+		t.Fatalf("unexpected orientation refusal: %v (code %q)", orientErr, code)
+	}
+}

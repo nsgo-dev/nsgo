@@ -107,9 +107,9 @@ func (c *clicks) down(p driver.Point) int {
 }
 
 type surface struct {
-	doc                  js.Value
-	host                 js.Value
-	fullScreenTransition fullScreenTransition
+	doc    js.Value
+	host   js.Value
+	screen *screenController
 	// simulate is the OS the page runs as (Options.OS).
 	simulate driver.OS
 	// rtl is the app's direction (driver.ItemDirection), which alerts lay
@@ -360,6 +360,7 @@ func open(app engine.App, opts Options, test *testOpen) *surface {
 		doc.Get("head").Call("appendChild", base)
 	}
 	s := &surface{doc: doc, host: host, components: opts.Components, unknown: map[string]bool{}, dom: newDOM(), effects: map[*view]bool{}}
+	s.screen = newScreenController(jsScreen{s: s})
 	s.animator = driver.NewAnimator(func(e driver.Event) { s.engine.Dispatch(e) })
 	// Inside the host, measured text inherits what drawn text does.
 	s.measure = doc.Call("createElement", "div")
@@ -1515,6 +1516,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemWindow:
 			s.windowCommand(it.Window)
 			continue
+		case driver.ItemOrientation:
+			s.screen.setOrientation(driver.Orientation(it.Count))
+			continue
 		case driver.ItemBlockNative:
 			s.touch.blocked = it.ID != 0
 			continue
@@ -2466,28 +2470,11 @@ func (s *surface) windowCommand(c *driver.WindowCommand) {
 	}
 }
 
-// call calls the first of methods el has, ignoring a promise's rejection,
-// such as a browser refusing full screen without a user gesture.
-func call(el js.Value, methods ...string) {
-	for _, m := range methods {
-		if el.Get(m).Type() != js.TypeFunction {
-			continue
-		}
-		if r := el.Call(m); r.Type() == js.TypeObject && r.Get("catch").Type() == js.TypeFunction {
-			r.Call("catch", ignore)
-		}
-		return
-	}
-}
-
 // canMove reports whether the browser moves an element in one step
 // (Element.moveBefore).
 var canMove = sync.OnceValue(func() bool {
 	return js.Global().Get("Element").Get("prototype").Get("moveBefore").Type() == js.TypeFunction
 })
-
-// ignore is a promise rejection handler doing nothing.
-var ignore = js.FuncOf(func(js.Value, []js.Value) any { return nil })
 
 // listen follows presses on the whole page: the nearest pressable view
 // takes a press, unless a text field holds it first. The document's

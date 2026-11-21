@@ -102,6 +102,7 @@ func (w *window) environment() driver.Environment {
 		TitleBar:         w.titleBarArea(),
 		Maximized:        w.win != 0 && gtkWindowIsMaximized(w.win) != 0,
 		FullScreen:       w.chrome.fullScreen,
+		CanFullScreen:    w.ownWindow(),
 		Minimized:        minimized,
 		WindowFrame:      frame,
 		Lifecycle:        w.lifecycle(),
