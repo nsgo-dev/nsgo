@@ -53,6 +53,8 @@ go tool nsgo build -release-notes notes.md  # the release's notes, which the upd
 
 Packages land in `dist/<name>-<version>-<target>`, and everything to hand out in `dist/releases`, each file named `<name>-<version>-<system>-<arch>` with its `.sha256`. Builds are release builds; `go tool nsgo dev -release` runs one with hot reload for measuring.
 
+For Google Play, build with `-target android -channel store`, then use `go tool nsgo publish -target android --track internal`. Set `NSGO_PLAY_CREDENTIALS` to the service account JSON key or its file path. [Google Play publishing](https://nsgo.dev/docs/building.md#publish-to-google-play)
+
 For Steam, upload the desktop target directories directly. Native dev with `steam.app_id` writes `steam_appid.txt` into its build and starts there. The depot output excludes that file, installers and self-updaters.
 
 ## Documents
