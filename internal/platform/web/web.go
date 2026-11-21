@@ -1386,6 +1386,14 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemOpenURL:
 			s.openURL(it.Value, it.Count)
 			continue
+		case driver.ItemKeepAwake:
+			if it.Awake != nil && it.Awake.Display {
+				s.keepDisplayAwake(it.Count)
+			}
+			continue
+		case driver.ItemReleaseAwake:
+			s.releaseDisplayAwake(it.Count)
+			continue
 		case driver.ItemSensor:
 			if it.Sensor.Command != driver.SensorStop {
 				s.engine.Dispatch(driver.NoSensor(it))
@@ -2421,6 +2429,8 @@ func (s *surface) windowCommand(c *driver.WindowCommand) {
 		}
 	case driver.WindowClose:
 		js.Global().Call("close")
+	case driver.WindowDestroy:
+		s.clearDisplayHolds()
 	}
 }
 

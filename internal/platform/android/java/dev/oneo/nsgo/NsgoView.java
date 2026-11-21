@@ -163,6 +163,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private final ArrayList<Node> outside = new ArrayList<>();
     private final int[] location = new int[2];
     private NsgoEngine engine;
+    private final Set<Integer> displayHolds = new HashSet<>();
     /** The window's folds and hinges while the view is in one, null where the device reports none. */
     private Folds folds;
     private final Runnable foldsReported = this::foldsChanged;
@@ -719,6 +720,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * Lets go of what serves the app's process once it ends or the view stops, on the UI thread: the network callback, the decoders, back and the native components, as an ended app sends no deletes. It runs again harmlessly.
      */
     private void release() {
+        clearDisplayHolds();
         if (sensors != null) { sensors.close(); sensors = null; }
         if (network != null) {
             getContext().getSystemService(ConnectivityManager.class).unregisterNetworkCallback(network);
@@ -738,10 +740,17 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         destroyComponents();
     }
 
+    private void clearDisplayHolds() {
+        if (displayHolds.isEmpty()) return;
+        displayHolds.clear();
+        setKeepScreenOn(false);
+    }
+
     /**
      * Lets go of an overlay's view as its window closes, on the UI thread: its decoders and every node's web view, video and native component, as a closed tree deletes none of its views.
      */
     void releaseOverlay() {
+        clearDisplayHolds();
         canvasImages.close();
         decoder.shutdownNow();
         folders.shutdownNow();
@@ -2695,6 +2704,16 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
             case Protocol.ITEM_HAPTIC:
                 haptic(in.readInt());
+                break;
+            case Protocol.ITEM_KEEP_AWAKE: {
+                int id = in.readInt();
+                boolean display = in.readUnsignedByte() != 0;
+                // Android folds visible views' requests into their window's FLAG_KEEP_SCREEN_ON.
+                if (display && displayHolds.add(id) && displayHolds.size() == 1) setKeepScreenOn(true);
+                break;
+            }
+            case Protocol.ITEM_RELEASE_AWAKE:
+                if (displayHolds.remove(in.readInt()) && displayHolds.isEmpty()) setKeepScreenOn(false);
                 break;
             case Protocol.ITEM_SENSOR: {
                 if (sensors == null) sensors = new Sensors(getContext(), this::activity, engine, this::keeperEnded);
