@@ -29,7 +29,7 @@ final class Protocol {
     static Message readMessage(DataInputStream in) throws IOException {
         int kind = in.read();
         if (kind == -1) return null;
-        if (kind < BATCH || kind > SCAN) throw invalidMessage("unexpected message kind " + kind);
+        if (kind < BATCH || kind > FRAME_RATE) throw invalidMessage("unexpected message kind " + kind);
         int length;
         try {
             length = in.readInt();
@@ -66,6 +66,7 @@ final class Protocol {
     static final int TEST = 10;
     static final int HOST_CALL = 11;
     static final int CARETS = 12;
+    /** Requests a frame from the surface named by its ID, or the first surface without a payload. */
     static final int WANT_FRAME = 13;
     static final int FONT_DATA = 14;
     static final int FOLDER = 15;
@@ -80,6 +81,8 @@ final class Protocol {
     static final int COOKIES = 20;
     /** Starts or stops the code scanner: the surface, the request's count and a SCAN_START or SCAN_STOP (scan.go, Scanner). */
     static final int SCAN = 21;
+    /** Sets the surface's preferred frame rate: its ID and a float in Hz. */
+    static final int FRAME_RATE = 22;
 
     // Java to Go.
     static final int START = 1;
@@ -93,7 +96,7 @@ final class Protocol {
     static final int TEST_REPLY = 9;
     static final int HOST = 10;
     static final int CARET_LINES = 11;
-    /** A Choreographer frame began, answering WANT_FRAME: its frameTimeNanos as a long. */
+    /** A Choreographer frame began, answering WANT_FRAME: its frameTimeNanos as a long, then the optional surface ID. */
     static final int FRAME = 12;
     static final int FOLDER_REPLY = 13;
     static final int FETCHED = 14;
