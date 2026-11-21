@@ -82,7 +82,15 @@ func buildAndroidAPK(ctx context.Context, p *project, dir, goarch string) (strin
 // buildAndroidAAB writes <dir>/<name>.aab for one architecture, the
 // Android App Bundle Google Play takes, signed with the upload key.
 func buildAndroidAAB(ctx context.Context, p *project, dir, goarch string) (string, error) {
-	return buildAndroidPackage(ctx, p, dir, goarch, ".aab", apk.WriteBundle)
+	packs, err := p.storeAssetPacks()
+	if err != nil {
+		return "", err
+	}
+	write := func(w io.Writer, template []byte, m apk.Manifest, files []apk.File, key *apk.Key) error {
+		m.AssetPacks = packs
+		return apk.WriteBundle(w, template, m, files, key)
+	}
+	return buildAndroidPackage(ctx, p, dir, goarch, ".aab", write)
 }
 
 // buildAndroidPackage writes <dir>/<name><ext> for one architecture with
