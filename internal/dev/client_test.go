@@ -353,3 +353,55 @@ func TestDevReloadKeySurvivesMainViewClose(t *testing.T) {
 	}
 	press("after the main view closed", 2)
 }
+
+func TestDevToolsDisposalsCommand(t *testing.T) {
+	devtools.Enabled = true
+	t.Cleanup(func() {
+		devtools.Enabled = false
+		for _, s := range devtools.Surfaces() {
+			devtools.Unregister(s)
+		}
+	})
+	var pending []func()
+	root := core.NewRoot(core.RootOptions{Post: func(fn func()) { pending = append(pending, fn) }})
+	defer root.Dispose()
+	tree := core.NewTree(root, core.ApproxTextEngine{})
+	var child *core.Scope
+	tree.Mount(func(cx *core.Scope) core.Node {
+		child = cx.Child()
+		child.Run(func() { child.Cleanup(func() {}) })
+		return core.View{}
+	})
+	tree.Commit()
+	child.Dispose()
+
+	surfaces := devtools.Surfaces()
+	if len(surfaces) == 0 {
+		t.Fatal("surface did not register")
+	}
+	id := surfaces[len(surfaces)-1].ID()
+	out := &devOut{wake: make(chan struct{}, 1), hurry: make(chan struct{}, 1)}
+	runDevCommand(devCommand{Op: "disposals", Surface: id}, out)
+	for _, fn := range pending {
+		fn()
+	}
+	pending = nil
+	out.mu.Lock()
+	got := out.pending.String()
+	out.pending.Reset()
+	out.mu.Unlock()
+	if !strings.Contains(got, `"type":"disposals"`) || !strings.Contains(got, `"Kind":"cleanup"`) {
+		t.Fatalf("disposals reply = %s", got)
+	}
+
+	runDevCommand(devCommand{Op: "clear-disposals", Surface: id}, out)
+	for _, fn := range pending {
+		fn()
+	}
+	out.mu.Lock()
+	cleared := out.pending.String()
+	out.mu.Unlock()
+	if !strings.Contains(cleared, `"type":"disposals"`) || strings.Contains(cleared, `"Kind":"cleanup"`) {
+		t.Fatalf("clear-disposals reply = %s", cleared)
+	}
+}

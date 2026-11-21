@@ -30,6 +30,7 @@ type devState struct {
 	commit map[ranKey]*driver.Ran
 	// graph numbers the graph within the process (devtools.Surface.Graph).
 	graph int
+	devDisposals
 }
 
 // graphs counts the graphs made while devtools.Enabled.
@@ -60,8 +61,10 @@ type devComp struct {
 }
 
 func newDevState() *devState {
-	return &devState{components: map[*Scope]devComponent{}, values: map[*Scope][]*devValue{}, byID: map[uint64]*devValue{}, comps: map[*computation]*devComp{},
+	d := &devState{components: map[*Scope]devComponent{}, values: map[*Scope][]*devValue{}, byID: map[uint64]*devValue{}, comps: map[*computation]*devComp{},
 		sweepAt: minSweep, commit: map[ranKey]*driver.Ran{}, graph: int(graphs.Add(1))}
+	d.initDisposals()
+	return d
 }
 
 // minSweep is the fewest signals devSignal lets byID hold before it sweeps.
@@ -264,6 +267,7 @@ func (d *devState) forget(s *Scope) {
 	if s.comp != nil {
 		delete(d.comps, s.comp)
 	}
+	d.forgetDisposals(s)
 }
 
 // callerSite is the site of the first caller outside core and NSGo's internal packages, skip frames up, as a whole path.
@@ -365,6 +369,9 @@ func (s *devSurface) Set(signal uint64, value string) error {
 	}
 	return v.set(value)
 }
+
+func (s *devSurface) Disposals() []driver.Disposal { return s.t.rt.dev.recentDisposals() }
+func (s *devSurface) ClearDisposals()              { s.t.rt.dev.clearDisposals() }
 
 func (s *devSurface) Hot(n int) []devtools.Computation {
 	// Computations of one kind made at one site, as a list's rows' bindings, count as one.
@@ -549,6 +556,9 @@ func (s *devSurface) Owners() devtools.Owner {
 	walk = func(o *Scope) (devtools.Owner, bool) {
 		count++
 		out := devtools.Owner{Name: "scope"}
+		if name, site := d.scopeLabelOf(o); name != "" {
+			out.Name, out.Site = name, site
+		}
 		if c, ok := d.components[o]; ok {
 			out.Name, out.Site = c.name, c.site
 		}
@@ -567,6 +577,7 @@ func (s *devSurface) Owners() devtools.Owner {
 				out.Computations = []devtools.Computation{c}
 			}
 		}
+		out.Resources = d.ownerResources(o)
 		for _, v := range d.values[o] {
 			text := v.get()
 			out.Values = append(out.Values, devtools.Value{ID: v.id, Site: v.site, Type: v.typ, Text: text, Editable: v.set != nil, Readers: v.readers()})
@@ -579,7 +590,7 @@ func (s *devSurface) Owners() devtools.Owner {
 				out.Children = append(out.Children, child)
 			}
 		}
-		keep := len(out.Values) > 0 || len(out.Children) > 0 || out.Site != "" || o.parent == nil
+		keep := len(out.Values) > 0 || len(out.Resources) > 0 || len(out.Children) > 0 || out.Site != "" || o.parent == nil
 		if _, ok := d.components[o]; ok {
 			keep = true
 		}

@@ -3,6 +3,7 @@ package driver
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -34,6 +35,8 @@ type Causes struct {
 	App, Layout time.Duration
 	// Ran are the computations that ran, by kind and the line that made them, the longest first; they are named only while DevTools record sites (devtools.Enabled).
 	Ran []Ran
+	// Disposals link each disposed owner or re-running computation to the resource, window and custom cleanups it triggered; populated in dev and test builds while DevTools record.
+	Disposals []Disposal `json:",omitempty"`
 }
 
 // Ran is the runs of the computations of one kind made at one line, and their time.
@@ -43,8 +46,30 @@ type Ran struct {
 	Took       time.Duration
 }
 
+// Disposal links a disposed owner (or re-running computation) to the resource, window and custom cleanups it triggered.
+type Disposal struct {
+	Owner     string
+	OwnerSite string `json:",omitempty"`
+	Reason    string
+	Site      string         `json:",omitempty"`
+	Cleanups  []CleanupEvent `json:",omitempty"`
+}
+
+// CleanupEvent is one resource, window or custom cleanup triggered by an owner's disposal.
+type CleanupEvent struct {
+	Kind      string
+	Detail    string `json:",omitempty"`
+	Site      string `json:",omitempty"`
+	Owner     string `json:",omitempty"`
+	OwnerSite string `json:",omitempty"`
+}
+
 // traceRan is how many of a commit's computations a trace names.
-const traceRan = 5
+const (
+	traceRan       = 5
+	traceDisposals = 8
+	traceCleanups  = 6
+)
 
 // Write is the signal writes one line made: the app's line, as dir/file.go:line, or for writes NSGo made of its own, as an animation's, NSGo's function that made them.
 type Write struct {
@@ -86,6 +111,52 @@ func (c *Causes) write(s *strings.Builder) {
 		}
 		s.WriteString("\n")
 	}
+	for _, d := range c.Disposals[:min(len(c.Disposals), traceDisposals)] {
+		fmt.Fprintf(s, "   disposed %s", d.Owner)
+		if d.OwnerSite != "" {
+			fmt.Fprintf(s, " (%s)", shortSite(d.OwnerSite))
+		}
+		if d.Reason != "" {
+			fmt.Fprintf(s, " [%s", d.Reason)
+			if d.Site != "" {
+				fmt.Fprintf(s, " %s", shortSite(d.Site))
+			}
+			s.WriteByte(']')
+		}
+		s.WriteString(" → ")
+		for i, cl := range d.Cleanups[:min(len(d.Cleanups), traceCleanups)] {
+			if i > 0 {
+				s.WriteString(", ")
+			}
+			s.WriteString(cl.Kind)
+			if cl.Detail != "" {
+				fmt.Fprintf(s, " %q", cl.Detail)
+			}
+			if cl.Site != "" {
+				fmt.Fprintf(s, " (%s)", shortSite(cl.Site))
+			}
+		}
+		if more := len(d.Cleanups) - traceCleanups; more > 0 {
+			fmt.Fprintf(s, " and %d more", more)
+		}
+		s.WriteString("\n")
+	}
+	if more := len(c.Disposals) - traceDisposals; more > 0 {
+		fmt.Fprintf(s, "   and %d more disposals\n", more)
+	}
+}
+
+// shortSite shortens an absolute file:line site to dir/file.go:line for terminal traces.
+func shortSite(site string) string {
+	i := strings.LastIndexByte(site, ':')
+	if i <= 0 {
+		return site
+	}
+	file, line := site[:i], site[i+1:]
+	if !filepath.IsAbs(file) {
+		return site
+	}
+	return filepath.Base(filepath.Dir(file)) + "/" + filepath.Base(file) + ":" + line
 }
 
 func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }

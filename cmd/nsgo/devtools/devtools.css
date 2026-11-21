@@ -58,3 +58,13 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .box.content { background: rgba(111, 168, 220, 0.35); border-style: solid; padding: 8px; }
 #commits td, #hot td { white-space: nowrap; }
 #commits { overflow-x: auto; }
+.split-col { display: flex; flex-direction: column; }
+.subpane { flex: 1; min-height: 0; display: flex; flex-direction: column; border-bottom: 1px solid var(--line); }
+.subpane:last-child { border-bottom: none; }
+.causal-heading { font-size: 11px; color: var(--muted); font-weight: 600; margin: 6px 0 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+.causal-table { margin-bottom: 6px; }
+.causal-table td { white-space: normal; }
+.causal-item { margin: 1px 0; }
+.chip.dispose { color: var(--bad); border-color: var(--bad); }
+.chip.res { color: var(--good); border-color: var(--good); }
+.arrow { color: var(--muted); margin: 0 4px; }

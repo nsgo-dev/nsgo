@@ -82,7 +82,7 @@ func (cx *Scope) Speak(text string, voice Voice, done func(stopped bool, err err
 		return nil
 	}
 	rt.speaking = u
-	u.owner.addCleanup(u.stop)
+	u.owner.addResourceCleanup("speak", voice.Lang, u, u.stop)
 	lang := voice.Lang
 	if lang == "" {
 		lang = Untracked(cx, cx.Env().Locale)
@@ -160,6 +160,7 @@ func (u *utterance) end(stopped bool, err error) {
 		return
 	}
 	u.ended = true
+	u.owner.releaseResourceCleanup(u)
 	if rt := u.tree.rt; rt.speaking == u {
 		rt.speaking = nil
 	}

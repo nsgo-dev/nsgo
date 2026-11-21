@@ -34,14 +34,15 @@ type devCommand struct {
 
 // devMessage is what the app tells the DevTools page. Type comes first: the server tells the automation's answers by it (cmd/nsgo's automationMessage).
 type devMessage struct {
-	Type    string                 `json:"type"`
-	Surface int                    `json:"surface"`
-	ID      uint32                 `json:"id,omitempty"`
-	Error   string                 `json:"error,omitempty"`
-	Data    any                    `json:"data,omitempty"`
-	Commit  *devCommit             `json:"commit,omitempty"`
-	Step    *devtools.Step         `json:"step,omitempty"`
-	Hot     []devtools.Computation `json:"hot,omitempty"`
+	Type      string                 `json:"type"`
+	Surface   int                    `json:"surface"`
+	ID        uint32                 `json:"id,omitempty"`
+	Error     string                 `json:"error,omitempty"`
+	Data      any                    `json:"data,omitempty"`
+	Commit    *devCommit             `json:"commit,omitempty"`
+	Step      *devtools.Step         `json:"step,omitempty"`
+	Hot       []devtools.Computation `json:"hot,omitempty"`
+	Disposals []driver.Disposal      `json:"disposals,omitempty"`
 }
 
 // maxUnapplied bounds the batches waiting for the platform that DevTools remember: a platform that applies none, as Android's Java runtime reports none, keeps no more.
@@ -182,6 +183,11 @@ func runDevCommand(c devCommand, out *devOut) {
 			reply(m)
 		case "hot":
 			reply(devMessage{Type: "hot", Hot: s.Hot(max(c.N, 1))})
+		case "disposals":
+			reply(devMessage{Type: "disposals", Disposals: s.Disposals()})
+		case "clear-disposals":
+			s.ClearDisposals()
+			reply(devMessage{Type: "disposals"})
 		}
 	})
 }

@@ -42,7 +42,10 @@
   <section id="profiler" class="tab">
     <div class="split">
       <div class="pane"><div class="toolbar"><strong>Commits</strong><button id="commits-pause">Pause</button><button id="commits-clear">Clear</button></div><div id="commits" class="list"></div></div>
-      <div class="pane"><div class="toolbar"><strong>Computations that ran in the last second</strong></div><div id="hot" class="list"></div></div>
+      <div class="pane split-col">
+        <div class="subpane"><div class="toolbar"><strong>Computations that ran in the last second</strong></div><div id="hot" class="list"></div></div>
+        <div class="subpane"><div class="toolbar"><strong>Owner disposals → cleanups</strong><button id="disposals-clear">Clear</button></div><div id="disposals" class="list"></div></div>
+      </div>
     </div>
   </section>
   <section id="recorder" class="tab">

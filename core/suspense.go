@@ -65,7 +65,7 @@ func (t *Tree) mountSuspense(cx *Scope, parent *node, s Suspense) {
 	if s.Fallback != nil {
 		t.mount(cx, parent, Show{When: b.waiting.Get, Then: s.Fallback})
 	}
-	cx.Cleanup(func() { delete(t.suspended, b.content) })
+	cx.current().addCleanup(func() { delete(t.suspended, b.content) })
 }
 
 // suspend has the Suspense around the computation running now wait for r, which it read, for as long as that run is the computation's last: a run again or the computation's end lets it go. owner is any scope of r's graph.

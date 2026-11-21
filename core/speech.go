@@ -81,7 +81,7 @@ func (cx *Scope) StartSpeech(opts SpeechOptions) (*SpeechSession, error) {
 	t.alertID++
 	s := &SpeechSession{rt: rt, tree: t, owner: cx.current(), id: t.alertID, opts: opts}
 	rt.speech = s
-	s.owner.addCleanup(s.Abort)
+	s.owner.addResourceCleanup("speech", opts.Lang, s, s.Abort)
 	if !Untracked(cx, cx.Env().CanRecognizeSpeech) {
 		cx.Post(func() { s.end(driver.SpeechEvent{Phase: driver.SpeechEnded, Error: driver.SpeechUnavailable}) })
 		return s, nil
@@ -150,6 +150,7 @@ func (s *SpeechSession) end(report driver.SpeechEvent) {
 		return
 	}
 	s.ended = true
+	s.owner.releaseResourceCleanup(s)
 	if s.rt.speech == s {
 		s.rt.speech = nil
 	}

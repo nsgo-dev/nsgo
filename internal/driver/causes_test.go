@@ -40,6 +40,21 @@ func TestTraceNamesWhatACommitFollowedFrom(t *testing.T) {
 	if strings.Contains(b.String(), "after") || strings.Contains(b.String(), "ran") {
 		t.Errorf("a batch without causes names some: %q", b.String())
 	}
+
+	b.Reset()
+	WriteTrace(&b, "commit 5", &MountBatch{Causes: &Causes{
+		Disposals: []Disposal{{
+			Owner: "binding", OwnerSite: "/repo/app/page.go:30", Reason: "rerun", Site: "/repo/app/page.go:42",
+			Cleanups: []CleanupEvent{
+				{Kind: "window", Detail: "Settings", Site: "/repo/app/toolbar.go:88"},
+				{Kind: "audio-player", Detail: "asset:bg.mp3", Site: "/repo/app/player.go:20"},
+			},
+		}},
+	}}, 0)
+	want := `   disposed binding (app/page.go:30) [rerun app/page.go:42] → window "Settings" (app/toolbar.go:88), audio-player "asset:bg.mp3" (app/player.go:20)` + "\n"
+	if !strings.Contains(b.String(), want) {
+		t.Errorf("trace =\n%s\nwant substring %q", b.String(), want)
+	}
 }
 
 func TestApplyReportsThePlatformsTimeOnlyWhenAsked(t *testing.T) {

@@ -190,12 +190,28 @@ func (cx *Scope) OpenPanel(opts PanelOptions, content func(cx *Scope) Node) *Win
 	return w
 }
 
+func surfaceKindName(k driver.SurfaceKind) string {
+	switch k {
+	case driver.SurfacePanel:
+		return "panel"
+	case driver.SurfaceOverlay:
+		return "overlay"
+	case driver.SurfaceTrayIcon:
+		return "tray-view"
+	case driver.SurfaceScene:
+		return "scene"
+	}
+	return "window"
+}
+
 // openSurface opens a surface of cfg's kind showing content under owner:
 // a tree of its own, which the platform attaches as ItemOpenSurface asks.
 func (rt *runtime) openSurface(owner *Scope, cfg driver.SurfaceConfig, content func(cx *Scope) Node) *Window {
 	app := rt.tree
 	s := &Scope{}
 	owner.adopt(s)
+	kind := surfaceKindName(cfg.Kind)
+	rt.labelScope(s, kind, cfg.Title)
 	rt.surfaceID++
 	t := newTree(s, app.text, rt.surfaceID)
 	cfg.ID = t.id
@@ -211,7 +227,7 @@ func (rt *runtime) openSurface(owner *Scope, cfg driver.SurfaceConfig, content f
 	t.Resize(Size{Width: cfg.Width, Height: cfg.Height}, Geometry{})
 	app.commands = append(app.commands, driver.MountItem{Kind: driver.ItemOpenSurface, Surface: &cfg})
 	app.changed = true
-	s.addCleanup(w.gone)
+	s.addResourceCleanup(kind, cfg.Title, w, w.gone)
 	if content != nil {
 		t.Mount(content)
 	}
@@ -594,7 +610,11 @@ func (cx *Scope) NewTray(opts TrayOptions) *Tray {
 		tr.view = rt.openSurface(owner, driver.SurfaceConfig{Kind: driver.SurfaceTrayIcon, Width: width, Height: 22,
 			Tray: tr.cfg.ID}, opts.View)
 	}
-	owner.addCleanup(tr.Remove)
+	detail := opts.Tooltip
+	if detail == "" {
+		detail = opts.Title
+	}
+	owner.addResourceCleanup("tray", detail, tr, tr.Remove)
 	return tr
 }
 
@@ -636,6 +656,7 @@ func (tr *Tray) Remove() {
 		return
 	}
 	tr.removed = true
+	tr.owner.releaseResourceCleanup(tr)
 	delete(tr.rt.trays, tr.cfg.ID)
 	if !tr.rt.root.disposed {
 		tr.cfg.Removed = true
@@ -720,7 +741,7 @@ func (cx *Scope) RegisterHotKey(key string, fn func()) *HotKey {
 		state: NewSignal(cx, HotKeyPending)}
 	rt.hotKeys = append(rt.hotKeys, h)
 	rt.sendHotKeys()
-	h.owner.addCleanup(func() {
+	h.owner.addResourceCleanup("hotkey", h.Key, h, func() {
 		rt.hotKeys = slices.DeleteFunc(rt.hotKeys, func(o *hotKey) bool { return o == h })
 		if !rt.root.disposed {
 			rt.sendHotKeys()

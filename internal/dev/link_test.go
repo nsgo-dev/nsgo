@@ -9,7 +9,8 @@ import (
 )
 
 // devClientSymbols are functions only the dev client has, which nsgo dev's builds link with the nsgodev tag; small ones the compiler inlines are left out, as they leave no symbol.
-var devClientSymbols = []string{"internal/dev.startDevTools", "internal/dev.runDevCommand", "internal/dev.listenDevTools", "internal/dev.traceTo", "internal/dev.parseDevLayout"}
+var devClientSymbols = []string{"internal/dev.startDevTools", "internal/dev.runDevCommand", "internal/dev.listenDevTools", "internal/dev.traceTo", "internal/dev.parseDevLayout",
+	"core.(*Scope).noteCleanupAdded", "core.(*Scope).beginExplicitDispose"}
 
 // devOverlaySymbols are functions of DevTools' overlay in core, the layout audit's among them, which only the dev client mounts (core.UpdateHighlights).
 var devOverlaySymbols = []string{"core.(*Tree).mountHighlights", "core.(*Tree).auditBoxes", "core.paintAudit", "core.(*layoutAudit).readout", "(*Tree).keepAudit"}

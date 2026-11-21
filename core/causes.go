@@ -54,6 +54,7 @@ func (rt *runtime) takeCauses() *driver.Causes {
 	c := &driver.Causes{Memos: rt.causes.memos, Renders: rt.causes.renders, Effects: rt.causes.effects, Layout: rt.causes.layout}
 	if rt.dev != nil {
 		c.Ran = rt.dev.takeRan(maxRan)
+		c.Disposals = rt.dev.takeDisposals()
 	}
 	for site, n := range rt.causes.writes {
 		c.Writes = append(c.Writes, driver.Write{Site: site, Count: n})

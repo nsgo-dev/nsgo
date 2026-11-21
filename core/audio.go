@@ -220,6 +220,7 @@ type soundWait struct {
 
 // Sound is a short sound decoded into memory, played any number of times, overlapping: the core's part of audio.Sound, which apps use. Its methods are called on the engine's goroutine.
 type Sound struct {
+	owner  *Scope
 	buffer *soundBuffer
 	closed bool
 }
@@ -304,9 +305,9 @@ func (b *soundBuffer) drop() {
 
 // newSound is a Sound over b that owner closes as it goes.
 func (b *soundBuffer) newSound(owner *Scope) *Sound {
-	s := &Sound{buffer: b}
+	s := &Sound{owner: owner, buffer: b}
 	b.open++
-	owner.addCleanup(s.Close)
+	owner.addResourceCleanup("sound", b.key.source, s, s.Close)
 	return s
 }
 
@@ -383,6 +384,7 @@ func (s *Sound) Close() {
 		return
 	}
 	s.closed = true
+	s.owner.releaseResourceCleanup(s)
 	if s.buffer.open--; s.buffer.open == 0 {
 		s.buffer.drop()
 	}
@@ -433,7 +435,7 @@ func (cx *Scope) NewAudioPlayer(src AudioSource, opts AudioPlayerOptions) *Audio
 	opts.ProgressInterval = videoInterval(opts.ProgressInterval)
 	p := &AudioPlayer{rt: cx.rt, tree: cx.tree(), owner: owner, id: audioIDs.Add(1), src: src, opts: opts, volume: 1, rate: 1}
 	p.refused = audioRefusal(cx, src)
-	owner.addCleanup(p.Close)
+	owner.addResourceCleanup("audio-player", src.URI, p, p.Close)
 	return p
 }
 
@@ -603,6 +605,7 @@ func (p *AudioPlayer) Close() {
 		return
 	}
 	p.closed, p.wanted, p.plays = true, false, nil
+	p.owner.releaseResourceCleanup(p)
 	if p.opened {
 		delete(p.rt.audioState().players, p.id)
 		p.send(driver.AudioClose)

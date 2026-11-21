@@ -200,7 +200,7 @@ func (cx *Scope) newSensor(r driver.SensorRequest) (*SensorStream, error) {
 		t.sensors = map[uint32]*SensorStream{}
 	}
 	t.sensors[s.id] = s
-	s.owner.addCleanup(s.Stop)
+	s.owner.addResourceCleanup("sensor", "", s, s.Stop)
 	return s, nil
 }
 
@@ -253,6 +253,7 @@ func (s *SensorStream) Stop() {
 		return
 	}
 	s.stopped = true
+	s.owner.releaseResourceCleanup(s)
 	delete(s.tree.sensors, s.id)
 	if s.stopEffect != nil {
 		s.stopEffect()

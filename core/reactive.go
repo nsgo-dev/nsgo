@@ -310,7 +310,9 @@ func (cx *Scope) Dispose() {
 			rt.flush()
 		}
 	}()
+	endDispose := cx.beginExplicitDispose()
 	cx.disposeOwned()
+	endDispose.finish()
 	cx.disposed = true
 	if rt.dev != nil {
 		rt.dev.forget(cx)
@@ -364,13 +366,17 @@ func (cx *Scope) disposeOwned() {
 	}
 	cx.first, cx.last = nil, nil
 	for i := len(cx.cleanups) - 1; i >= 0; i-- {
+		cx.noteCleanupRunning(i)
 		cx.rt.guard(cx, cx.cleanups[i])
 	}
 	cx.cleanups = nil
 	// After the cleanups, which may arm timers of their own.
-	cx.stopTimers()
+	if stopped := cx.stopTimers(); stopped > 0 {
+		cx.noteTimersStopped(stopped)
+	}
 	cx.values = nil
 	if cx.cancel != nil {
+		cx.noteContextCancelled()
 		cx.cancel()
 		cx.ctx, cx.cancel = nil, nil
 	}
@@ -388,7 +394,7 @@ func (cx *Scope) disposeDetached() {
 }
 
 // Cleanup registers fn to run when the current owner is disposed or runs again, last registered first, as testing.T.Cleanup does. Readers of what fn writes run once the disposal, or the owner's new run, is over, never against a half-disposed tree.
-func (cx *Scope) Cleanup(fn func()) { cx.current().addCleanup(fn) }
+func (cx *Scope) Cleanup(fn func()) { cx.current().addResourceCleanup("cleanup", "", nil, fn) }
 
 func (o *Scope) addCleanup(fn func()) {
 	if o.disposed {
@@ -396,6 +402,18 @@ func (o *Scope) addCleanup(fn func()) {
 		return
 	}
 	o.cleanups = append(o.cleanups, fn)
+}
+
+// addResourceCleanup registers fn on o and, in instrumented builds while DevTools record, tags it with its resource kind, detail and handle so DevTools can show owned resources and attribute disposal cleanups.
+func (o *Scope) addResourceCleanup(kind, detail string, handle any, fn func()) {
+	if o.disposed {
+		o.noteImmediateCleanup(kind, detail)
+		o.rt.guard(o, fn)
+		return
+	}
+	idx := len(o.cleanups)
+	o.cleanups = append(o.cleanups, fn)
+	o.noteCleanupAdded(idx, kind, detail, handle)
 }
 
 // Context returns a context cancelled when the current owner is disposed
@@ -480,8 +498,8 @@ func (o *Scope) removeTimer(t *afterTimer) {
 	o.timerMu.Unlock()
 }
 
-// stopTimers stops the timers the owner has pending, those whose call waits in the post queue included.
-func (o *Scope) stopTimers() {
+// stopTimers stops the timers the owner has pending, those whose call waits in the post queue included, returning how many were stopped.
+func (o *Scope) stopTimers() int {
 	o.timerMu.Lock()
 	timers := make([]*afterTimer, 0, len(o.timers))
 	for t := range o.timers {
@@ -489,9 +507,13 @@ func (o *Scope) stopTimers() {
 	}
 	o.timers = nil
 	o.timerMu.Unlock()
+	stopped := 0
 	for _, t := range timers {
-		t.stop()
+		if t.stop() {
+			stopped++
+		}
 	}
+	return stopped
 }
 
 // AfterFunc runs fn on the graph's goroutine after d, unless the current owner is disposed first or stop is called. stop reports whether it stopped the timer before fn ran, and may be called on any goroutine. A timer that has fired or been stopped keeps nothing on its owner, so re-arming one under a long-lived scope, as a debounce or a repeating tick does, does not grow it.
@@ -792,7 +814,9 @@ func (c *computation) run() {
 	rt := c.rt
 	// The batch covers the disposal too, so a cleanup's write runs nothing before c has run again.
 	rt.batch++
+	endDispose := c.beginRerunDispose()
 	c.disposeOwned()
+	endDispose.finish()
 	c.unlink()
 	c.state = clean
 	prevOwner, prevObs := rt.owner, rt.observer

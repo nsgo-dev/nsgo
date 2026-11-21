@@ -66,6 +66,10 @@ type Surface interface {
 	Set(signal uint64, value string) error
 	// Hot returns the computations that ran most since the last call, at most n.
 	Hot(n int) []Computation
+	// Disposals returns recent owner disposals and the resource, window and custom cleanups they triggered.
+	Disposals() []driver.Disposal
+	// ClearDisposals forgets the recorded disposal history.
+	ClearDisposals()
 	// Follow has f hear the surface's batches and events from now on, nil none.
 	Follow(f Follower)
 }
@@ -107,13 +111,21 @@ type Prop struct {
 	Value string `json:"value"`
 }
 
-// Owner is an owner of the graph: a component's scope, a computation's, a region's or the root, with the values and computations it holds and the owners under it.
+// Owner is an owner of the graph: a component's scope, a computation's, a region's or the root, with the values, computations and resources it holds and the owners under it.
 type Owner struct {
 	Name         string        `json:"name"`
 	Site         string        `json:"site,omitempty"`
 	Values       []Value       `json:"values,omitempty"`
 	Computations []Computation `json:"computations,omitempty"`
+	Resources    []Resource    `json:"resources,omitempty"`
 	Children     []Owner       `json:"children,omitempty"`
+}
+
+// Resource is an active window, audio player, sound, tray, holder, hotkey, stream or cleanup owned by an owner.
+type Resource struct {
+	Kind   string `json:"kind"`
+	Detail string `json:"detail,omitempty"`
+	Site   string `json:"site,omitempty"`
 }
 
 // Value is a signal: where it was made, its Go type and its value as text, and whether Set takes it.

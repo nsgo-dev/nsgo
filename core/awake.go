@@ -37,11 +37,12 @@ func (cx *Scope) KeepAwake(reason string, opts KeepAwakeOptions) (release func()
 	release = func() {
 		owner.Post(func() {
 			if done.CompareAndSwap(false, true) {
+				owner.releaseResourceCleanup(&done)
 				releaseNow()
 			}
 		})
 	}
-	owner.addCleanup(func() {
+	owner.addResourceCleanup("keep-awake", reason, &done, func() {
 		if done.CompareAndSwap(false, true) {
 			releaseNow()
 		}

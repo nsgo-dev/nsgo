@@ -24,7 +24,8 @@ type Holder struct {
 func NewHolder(cx *Scope, content func(cx *Scope) Node) *Holder {
 	h := &Holder{t: cx.tree(), content: content, scope: &Scope{}}
 	cx.adopt(h.scope)
-	h.scope.addCleanup(h.discard)
+	cx.rt.labelScope(h.scope, "holder", "")
+	h.scope.addResourceCleanup("holder", "", h, h.discard)
 	return h
 }
 
