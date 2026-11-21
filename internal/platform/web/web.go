@@ -156,6 +156,7 @@ type surface struct {
 	keys           []driver.KeyBinding // the keymap
 	live           js.Value            // the region announcements are read from
 	watch          watch
+	hapticPlaying  bool
 	env            driver.Environment // as last sent
 	gestures       gestures
 	// canvasImages are the images canvases draw, by ImageSource.Key.
@@ -1452,6 +1453,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 			continue
 		case driver.ItemAnnounce:
 			s.announce(it.Value)
+			continue
+		case driver.ItemHapticPattern:
+			s.playHapticPattern(it.HapticPattern)
 			continue
 		case driver.ItemKeymap:
 			s.setKeymap(it.Keys)

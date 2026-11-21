@@ -56,6 +56,8 @@ type Environment struct {
 	Speech bool
 	Speak  bool
 	Audio  bool
+	// HapticPatterns reports support for playing timed haptic events.
+	HapticPatterns bool
 	// Camera says ItemTakePhoto shows a camera here.
 	Camera bool
 	// ScanCode says ItemScanCode shows a camera that reads codes here.

@@ -79,6 +79,7 @@ func (s *surface) watchChanges() {
 	// in its back-forward cache to show again, where it may also discard
 	// it unheard: the OnQuit handlers run then too, kept for the next.
 	g.Call("addEventListener", "pagehide", js.FuncOf(func(_ js.Value, args []js.Value) any {
+		s.stopHapticPattern()
 		if args[0].Get("persisted").Bool() {
 			s.engine.Hide()
 		} else {
@@ -113,6 +114,9 @@ func (s *surface) updateEnv() {
 		s.watchRatio(ratio)
 	}
 	if env := s.environment(); !env.Equal(s.env) {
+		if env.Lifecycle == driver.LifecycleBackground || !env.HapticPatterns {
+			s.stopHapticPattern()
+		}
 		repaint := env.PixelRatio != s.env.PixelRatio
 		s.env = env
 		s.engine.SetEnvironment(env)
@@ -139,8 +143,9 @@ func (s *surface) environment() driver.Environment {
 		return driver.Points(f)
 	}
 	env := driver.Environment{
-		ScreenColor: js.Global().Get("EyeDropper").Truthy(),
-		Speak:       speakAvailable(),
+		ScreenColor:    js.Global().Get("EyeDropper").Truthy(),
+		Speak:          speakAvailable(),
+		HapticPatterns: hapticPatternsAvailable(g.Get("navigator")),
 		// Browsers on touch screens open the camera for an input's capture.
 		Camera: g.Call("matchMedia", "(pointer: coarse)").Get("matches").Bool(),
 		SafeArea: driver.Edges{

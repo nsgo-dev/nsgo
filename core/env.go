@@ -25,6 +25,7 @@ type Env struct {
 	contrast                *Signal[bool]
 	screenColor, speech     *Signal[bool]
 	audio, speak            *Signal[bool]
+	hapticPatterns          *Signal[bool]
 	camera                  *Signal[bool]
 	scanCode                *Signal[bool]
 	canSendInput            *Signal[bool]
@@ -102,6 +103,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		screenColor:      NewSignal(cx, false),
 		speech:           NewSignal(cx, false),
 		audio:            NewSignal(cx, false),
+		hapticPatterns:   NewSignal(cx, false),
 		speak:            NewSignal(cx, false),
 		camera:           NewSignal(cx, false),
 		scanCode:         NewSignal(cx, false),
@@ -220,6 +222,7 @@ func (e *Env) set(v Environment) {
 	e.screenColor.Set(v.ScreenColor)
 	e.speech.Set(v.Speech)
 	e.audio.Set(v.Audio)
+	e.hapticPatterns.Set(v.HapticPatterns)
 	e.speak.Set(v.Speak)
 	e.camera.Set(v.Camera)
 	e.scanCode.Set(v.ScanCode)
@@ -364,6 +367,9 @@ func (e *Env) CanRecognizeSpeech() bool { return e.speech.Get() }
 
 // CanPlayAudio reports whether the platform plays the audio package's sounds and players; elsewhere they fail with AudioUnavailable without asking it.
 func (e *Env) CanPlayAudio() bool { return e.audio.Get() }
+
+// CanPlayHapticPattern reports whether the platform can play timed haptics.
+func (e *Env) CanPlayHapticPattern() bool { return e.hapticPatterns.Get() }
 
 // CanSpeak reports whether Scope.Speak speaks text here: macOS, iOS, tvOS, Android, Windows, the web where the browser has speechSynthesis, and Linux where speech-dispatcher is installed. Elsewhere an utterance fails with SpeakUnavailable without asking the platform.
 func (e *Env) CanSpeak() bool { return e.speak.Get() }
