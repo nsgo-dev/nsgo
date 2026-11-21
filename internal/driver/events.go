@@ -274,6 +274,10 @@ const (
 	EventWebCookies
 	// EventOpenScene reports that the platform connected a scene beyond the ones the app shows, which it numbers Count, as iPadOS connects one for each window the user opens: the core opens a SurfaceScene showing the main view, whose ItemOpenSurface names Count as its Scene for the platform to attach.
 	EventOpenScene
+	// EventPointerDelta carries a PointerDelta from the lock numbered Count.
+	EventPointerDelta
+	// EventPointerUnlocked says the lock numbered Count was released or refused.
+	EventPointerUnlocked
 )
 
 // EventVideoPause reports that the platform paused video ID, not the app's Paused: Index is why (VideoPauseInterruption, ...). An EventMask has no room for another kind, so it shares EventImageInfo's, an answer that names no view and is never in a mask; Android's Protocol.java mirrors it.

@@ -139,8 +139,9 @@ func (s *surface) environment() driver.Environment {
 		return driver.Points(f)
 	}
 	env := driver.Environment{
-		ScreenColor: js.Global().Get("EyeDropper").Truthy(),
-		Speak:       speakAvailable(),
+		ScreenColor:    js.Global().Get("EyeDropper").Truthy(),
+		CanLockPointer: webCanLockPointer(s.doc),
+		Speak:          speakAvailable(),
 		// Browsers on touch screens open the camera for an input's capture.
 		Camera: g.Call("matchMedia", "(pointer: coarse)").Get("matches").Bool(),
 		SafeArea: driver.Edges{

@@ -110,6 +110,9 @@ func (w *window) setKeymap(keys []driver.KeyBinding) { w.keys = keys }
 
 // keyDown offers a key going down to the focused view that hears keys (View.OnKeyDown), before the keymap and the view's own keys, and reports whether it consumed the key. A modifier alone is reported but never consumed: no binding takes one, and the window follows the modifiers through its messages.
 func (w *window) keyDown(vk, lParam uintptr) bool {
+	if w.escapePointer(vk) {
+		return true
+	}
 	v := w.focusedView()
 	if w.engine == nil || v == nil || v.deleted || v.field != nil || !v.events.Has(driver.EventKeyDown) {
 		return false

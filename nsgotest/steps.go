@@ -821,6 +821,10 @@ func (a *App) Key(key string) {
 	}
 	k := driver.NormalizeKey(key)
 	a.inputBy(driver.ModalityKeyboard)
+	if (k == "escape" || strings.HasSuffix(k, "+escape")) && a.unlockPointer() {
+		a.done()
+		return
+	}
 	names := a.keyNames(k)
 	if a.keyDown(k) {
 		a.done()

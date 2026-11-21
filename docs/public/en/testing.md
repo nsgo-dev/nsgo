@@ -41,6 +41,8 @@ An app run with its function, `nsgo.Run(func(app *core.Scope) {...})`, is tested
 
 `app.PressWith("id:row", core.Modifiers{Shift: true})` holds modifiers for one press; `PressAtWith(selector, core.Point{X: 20, Y: 10}, mods)` presses a point in the view. `Shift`, `Control`, `Alt` and `Platform` (Command on Apple, the Windows/Super key elsewhere) reach `OnPressDown`, `OnPressUp` and `OnPress`, headless and through native target input. Native platform conventions still apply: Chrome on macOS turns Control-click into a context menu. A later `Press` or `PressAt` has no modifiers. watchOS rejects modified presses because it has no keyboard modifier input.
 
+After the app locks the pointer, `app.PointerDelta(dx, dy)` sends relative motion to the locked view. Headless tests enable it with `nsgotest.Environment(core.Environment{CanLockPointer: true})`. Escape releases the lock in both headless and target tests.
+
 A press can name a text field directly. Headless and on macOS, Windows and Linux, read `app.Find("id:field").Focused` immediately after the press, including when the pressed view's handler focuses the field.
 
 `app.Focus(selector)` reaches a field as a tap does and, in a desktop or web `Environment` or on those targets, a pressable or `Focusable` view through Tab, so a following `app.Key("Return")` presses it. A `Ref.Focus()` the app calls follows the same stops: fields everywhere, other views only on desktops, the web and Apple TV, so a headless test of a button's focus needs one of those environments. A pressable view has any of `OnPress`, `OnPressDown`, `OnPressUp` or `OnLongPress`, as on the platforms; Return or Space on it sends the down, up and press events it handles, so a view with only `OnLongPress` takes the focus but no key presses it.

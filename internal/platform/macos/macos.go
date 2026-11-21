@@ -724,7 +724,11 @@ func surfaceMoved(self objc.ID, cmd objc.SEL) {
 		return
 	}
 	s := v.surface
-	s.window = self.Send(selWindow)
+	window := self.Send(selWindow)
+	if s.window != window {
+		s.releasePointer(true)
+	}
+	s.window = window
 	if s.engine != nil {
 		s.observeWebFocus()
 	}
@@ -949,6 +953,7 @@ func (s *surface) close() {
 		return
 	}
 	s.closed = true
+	s.releasePointer(false)
 	if dockMenu.target == s {
 		clearDockMenu()
 	}
@@ -1136,6 +1141,7 @@ func (s *surface) environment() driver.Environment {
 		Speak:            apple.SpeakAvailable(),
 		Audio:            apple.AudioAvailable(),
 		CanSendInput:     true,
+		CanLockPointer:   true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
 		Purchases:        apple.PurchasesAvailable(),
@@ -1234,6 +1240,9 @@ func (s *surface) refresh() {
 	if s == nil || s.engine == nil {
 		return
 	}
+	if lockedPointer.owner == s && !s.canHoldPointer() {
+		s.releasePointer(true)
+	}
 	s.layoutTrafficLights()
 	if env := s.environment(); !env.Equal(s.env) {
 		rescale := env.PixelRatio != s.env.PixelRatio
@@ -1261,7 +1270,7 @@ func (s *surface) observe() {
 	for _, name := range []string{"NSWindowDidResizeNotification", "NSWindowDidMoveNotification",
 		"NSWindowDidEnterFullScreenNotification", "NSWindowDidExitFullScreenNotification",
 		"NSWindowDidMiniaturizeNotification", "NSWindowDidDeminiaturizeNotification",
-		"NSWindowDidChangeOcclusionStateNotification"} {
+		"NSWindowDidChangeOcclusionStateNotification", "NSWindowDidResignKeyNotification"} {
 		s.stops = append(s.stops, apple.Observe(center, apple.Global(appKitPath, name), func(note objc.ID) {
 			if note.Send(sel("object")) != s.window {
 				return
@@ -1363,7 +1372,20 @@ func (s *surface) filterEvent(event objc.ID) objc.ID {
 		return event
 	}
 	const typeLeftDown, typeLeftUp, typeRightDown, typeMouseMoved, typeLeftDragged, typeRightDragged, typeKeyDown, typeFlagsChanged, typeScrollWheel, typeOtherDown, typeOtherDragged = 1, 2, 3, 5, 6, 7, 10, 12, 22, 25, 27
-	switch objc.Send[uint](event, sel("type")) {
+	kind := objc.Send[uint](event, sel("type"))
+	if lockedPointer.owner == s {
+		switch kind {
+		case typeMouseMoved, typeLeftDragged, typeRightDragged, typeOtherDragged:
+			s.pointerMotion(objc.Send[float64](event, sel("deltaX")), objc.Send[float64](event, sel("deltaY")))
+			return 0
+		case typeKeyDown:
+			if keyName(event) == "escape" {
+				s.releasePointer(true)
+				return 0
+			}
+		}
+	}
+	switch kind {
 	case typeFlagsChanged:
 		s.modifiersChanged(event)
 		s.modifierDown(event)
@@ -1766,6 +1788,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemOpenURL:
 			s.openURL(it.Value, it.Count)
+			continue
+		case driver.ItemPointerLock:
+			s.pointerLock(it)
 			continue
 		case driver.ItemLookUp:
 			s.lookUp(it.Value, it.Frame)

@@ -338,6 +338,7 @@ func (a *App) closed(surface *core.Tree) {
 		a.PopupMenu, a.popupID, a.popupTree = nil, 0, nil
 	}
 	if surface == a.tree {
+		a.pointerLock = driver.PointerLock{}
 		a.views, a.rootID, a.tree, a.main, a.Keymap, a.keyBindings = map[driver.NodeID]*View{}, 0, a.appTree, nil, nil, nil
 	}
 	a.showMenu()
@@ -555,6 +556,8 @@ func (a *App) apply(b *driver.MountBatch) {
 					b.Pull = op.Node
 				}
 			}
+		case driver.ItemPointerLock:
+			a.setPointerLock(it)
 		case driver.ItemFocus, driver.ItemBlur:
 			if a.target != nil && a.target.reportsNativeFocus() {
 				continue

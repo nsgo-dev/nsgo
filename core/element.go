@@ -55,6 +55,9 @@ type View struct {
 	OnMouseEnter func(MouseEvent)
 	OnMouseLeave func(MouseEvent)
 	OnMouseMove  func(MouseEvent)
+	// OnPointerDelta hears relative movement to the right and down while
+	// the view holds a pointer lock (Ref.LockPointer).
+	OnPointerDelta func(dx, dy float64)
 	// OnContextMenu receives a secondary click in the view.
 	OnContextMenu func(ContextMenuEvent)
 	// OnTouch hears the fingers on the surface while one that went down

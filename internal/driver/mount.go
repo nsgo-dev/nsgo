@@ -371,6 +371,9 @@ const (
 	ItemScanCode
 	// ItemQuickLook shows the system's file preview panel on QuickLook's Paths, starting at its Index. Sent only where the environment says CanQuickLook.
 	ItemQuickLook
+	// ItemPointerLock captures relative motion for ID, numbered Count.
+	// On requests a lock. A false On releases the matching request.
+	ItemPointerLock
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.

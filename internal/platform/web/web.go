@@ -135,6 +135,7 @@ type surface struct {
 	metrics      js.Value      // a canvas's 2D context, for fonts' metrics
 	engine       *engine.Engine
 	views        []*view // index is NodeID
+	pointerLock  webPointerLock
 	press        press
 	touch        fingers
 	covers       []covered // what the modals made inert, oldest first
@@ -1427,6 +1428,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 			// No toasts; a page neither quits nor shows native menus, and
 			// the core never asks it to.
 			continue
+		case driver.ItemPointerLock:
+			s.setPointerLock(it)
+			continue
 		case driver.ItemImageInfo:
 			s.imageInfo(it)
 			continue
@@ -2401,6 +2405,8 @@ func (s *surface) windowCommand(c *driver.WindowCommand) {
 		}
 	case driver.WindowClose:
 		js.Global().Call("close")
+	case driver.WindowDestroy:
+		s.losePointerLock()
 	}
 }
 
@@ -2432,6 +2438,7 @@ var ignore = js.FuncOf(func(js.Value, []js.Value) any { return nil })
 // listeners see presses outside views and Escape anywhere.
 func (s *surface) listen() {
 	var ls listeners
+	s.listenPointerLock(&ls)
 	ls.on(s.host, "pointerdown", s.pointerDown)
 	ls.on(s.host, "pointerup", s.pointerUp)
 	ls.on(s.host, "pointercancel", s.pointerUp)
@@ -2448,6 +2455,12 @@ func (s *surface) listen() {
 	s.listenFiles(&ls)
 	// Captured, so shortcuts come before what has focus.
 	s.doc.Call("addEventListener", "keydown", js.FuncOf(func(_ js.Value, args []js.Value) any {
+		e := args[0]
+		if e.Get("key").String() == "Escape" && s.losePointerLock() {
+			e.Call("preventDefault")
+			e.Call("stopPropagation")
+			return nil
+		}
 		if s.owns() {
 			if !modifierKey(args[0].Get("key").String()) {
 				s.engine.InputModality(driver.ModalityKeyboard)
@@ -2605,6 +2618,9 @@ func (s *surface) pointerUp(e js.Value) {
 
 // pointerMove cancels a press, and its pending long press, once the pointer has moved beyond the same eight-point slop the headless and native gesture models use. Listening on the document keeps a drag that leaves the original element from pressing it when it comes back for pointerup/click.
 func (s *surface) pointerMove(e js.Value) {
+	if s.pointerLock.active != nil {
+		return
+	}
 	p := &s.press
 	if !p.active || p.done || p.cancel || p.view == nil || e.Get("pointerId").Int() != p.pointer {
 		return

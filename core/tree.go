@@ -58,6 +58,9 @@ type Tree struct {
 	reports   []report
 	stacks    []*node
 
+	pointerLock     *pointerLock
+	nextPointerLock uint32
+
 	// fit is the largest size of a panel that takes its content's (PanelOptions.FitContent), zero for a surface of the platform's size; reportedSize is the size its platform last reported, which a fitted size differing from is sent (driver.WindowFitSize), and refit says the environment has yet to hear t.size.
 	fit, reportedSize Size
 	refit             bool
@@ -357,6 +360,7 @@ type handlers struct {
 	press, longPress, pressDown, pressUp func(PressEvent)
 	focusIn, focusOut                    func()
 	mouseEnter, mouseLeave, mouseMove    func(MouseEvent)
+	pointerDelta                         func(dx, dy float64)
 	textSelection                        func(TextSelection)
 	focus, blur                          func()
 	keyDown                              func(KeyEvent) bool
@@ -1775,7 +1779,7 @@ func (t *Tree) setViewParts(n *node, v View) {
 	n.ownPointer, n.showsExpanded = v.PointerEvents, v.ShowsExpanded
 	t.pointersMoved = t.pointerStyled
 	n.h = handlers{focusIn: v.OnFocusIn, focusOut: v.OnFocusOut, press: v.OnPress, longPress: v.OnLongPress, pressDown: v.OnPressDown, pressUp: v.OnPressUp,
-		mouseEnter: v.OnMouseEnter, mouseLeave: v.OnMouseLeave, mouseMove: v.OnMouseMove,
+		mouseEnter: v.OnMouseEnter, mouseLeave: v.OnMouseLeave, mouseMove: v.OnMouseMove, pointerDelta: v.OnPointerDelta,
 		textSelection: v.OnTextSelection,
 		layout:        v.OnLayout, contextMenu: v.OnContextMenu, touch: v.OnTouch, touchCapture: v.OnTouchCapture,
 		pan: v.OnPan, pinch: v.OnPinch, rotation: v.OnRotation, wheel: v.OnWheel,
@@ -2237,6 +2241,9 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		return
 	}
 	switch ev.Kind {
+	case driver.EventPointerDelta, driver.EventPointerUnlocked:
+		t.pointerLockEvent(ev)
+		return
 	case driver.EventTouch:
 		t.touched(ev)
 		return

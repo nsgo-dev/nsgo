@@ -55,6 +55,8 @@ func TestMain(m *testing.M) {
 
 在 macOS、Windows、Linux 和 Web 上以 `-target` 运行时，`app.Select(selector, start, end)` 用原生文本框的编辑键（全选和方向键）移动它的选区，之后的输入、复制或粘贴都作用于测试指定的范围；消费这些键的绑定或应用菜单项会把它们拦下。手机目标还不能移动原生选区：在那里它只移动测试模型中的选区，文本框设置了 `OnSelectionChange` 时则跳过该测试。
 
+应用锁定指针后，`app.PointerDelta(dx, dy)` 向锁定的视图发送相对位移。无头测试用 `nsgotest.Environment(core.Environment{CanLockPointer: true})` 启用此功能。无头测试和目标测试都可用 Escape 解锁。
+
 ## 运行测试
 
 ```sh

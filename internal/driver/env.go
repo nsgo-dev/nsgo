@@ -62,6 +62,8 @@ type Environment struct {
 	ScanCode bool
 	// CanSendInput says Ref.SendInput can deliver trusted input to web views.
 	CanSendInput bool
+	// CanLockPointer says ItemPointerLock can capture relative motion.
+	CanLockPointer bool
 	// CanLookUp says ItemLookUp can show the system dictionary panel.
 	CanLookUp bool
 	// CanQuickLook says ItemQuickLook can show the system's file preview panel.
