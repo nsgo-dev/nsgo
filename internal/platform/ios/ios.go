@@ -24,6 +24,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
 	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/queue"
+	"github.com/nsgo-dev/nsgo/internal/platform/scrollbar"
 	"github.com/nsgo-dev/nsgo/internal/platform/updates"
 	"github.com/nsgo-dev/nsgo/internal/testhost"
 )
@@ -185,7 +186,7 @@ type surface struct {
 	rtl, directed bool
 	// stickyBound are the scroll views with sticky cells whose insets
 	// follow animated values.
-	stickyBound map[*view]bool
+	stickyBound scrollbar.StickyBindings[*view]
 	app         engine.App
 	id          string
 	native      objc.ID
