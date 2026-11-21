@@ -95,11 +95,12 @@ type webOp struct {
 	Path      []struct {
 		X, Y float64
 	} `json:"path,omitempty"`
-	Text   string  `json:"text,omitempty"`
-	Key    string  `json:"key,omitempty"`
-	Width  float64 `json:"width,omitempty"`
-	Height float64 `json:"height,omitempty"`
-	Code   int     `json:"code,omitempty"`
+	Scales []float32 `json:"scales,omitempty"`
+	Text   string    `json:"text,omitempty"`
+	Key    string    `json:"key,omitempty"`
+	Width  float64   `json:"width,omitempty"`
+	Height float64   `json:"height,omitempty"`
+	Code   int       `json:"code,omitempty"`
 }
 
 // runWebTest runs one test's process: a page in a fresh context.
@@ -277,6 +278,36 @@ func mustJSON(v any) string {
 // webTestScale is the device scale of the page tests run in.
 const webTestScale = 2
 
+// pinch sends two trusted touches around one center. The browser finds
+// their targets and dispatches the pointer events the app uses.
+func (p *webPage) pinch(op webOp) error {
+	type touchPoint struct {
+		X  float64 `json:"x"`
+		Y  float64 `json:"y"`
+		ID int     `json:"id"`
+	}
+	points := func(scale float32) []touchPoint {
+		const radius = 12
+		d := radius * float64(scale)
+		return []touchPoint{{X: op.X - d, Y: op.Y, ID: 0}, {X: op.X + d, Y: op.Y, ID: 1}}
+	}
+	send := func(kind string, points []touchPoint) error {
+		_, err := p.call("Input.dispatchTouchEvent", map[string]any{"type": kind, "touchPoints": points})
+		return err
+	}
+	if err := send("touchStart", points(1)); err != nil {
+		return err
+	}
+	for _, scale := range op.Scales {
+		time.Sleep(16 * time.Millisecond)
+		if err := send("touchMove", points(scale)); err != nil {
+			_ = send("touchCancel", []touchPoint{})
+			return err
+		}
+	}
+	return send("touchEnd", []touchPoint{})
+}
+
 func (p *webPage) do(op webOp, data *any) error {
 	switch op.Op {
 	case "viewport":
@@ -321,6 +352,8 @@ func (p *webPage) do(op webOp, data *any) error {
 			x, y = to.X, to.Y
 		}
 		return p.mouse("mouseReleased", x, y, "left", 0, 1)
+	case "pinch":
+		return p.pinch(op)
 	case "scroll":
 		p.mouse("mouseMoved", op.X, op.Y, "none", 0, 0)
 		n := int(math.Max(math.Abs(op.DX), math.Abs(op.DY))/20) + 1
