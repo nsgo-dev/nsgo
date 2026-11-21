@@ -475,6 +475,10 @@ android:
 
 iOS and watchOS give location and motion, macOS location, tvOS one fix at a time and Android both through the framework's own providers, without Google Play services. The web, Windows, Linux and mini programs answer unavailable. In TSX, `Sensors` has `permission`, `requestPermission`, `locate`, `watchLocation` and `watchMotion`, under the package capabilities `location`, `backgroundLocation` and `motion`, in milliseconds.
 
+## Audio timing
+
+Use `audio.Now(cx)` as the clock for timed playback. Set `audio.Voice.StartAt` to a future time when `audio.CanSchedule(cx)` is true. Call `audio.OutputLatency(cx, func(latency time.Duration, known bool) { ... })` for the active output route. macOS and iOS support timed starts. The callback's `known` value tells whether the route reported a latency.
+
 ## Next
 
 - [Notifications](notifications.md): permission, badges and presses.

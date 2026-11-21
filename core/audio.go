@@ -21,6 +21,9 @@ type AudioSource struct {
 // SoundVoice is how a playback of a sound plays: the core's part of audio.Voice, which apps use. Volume runs from 0 to 1 and Rate from 0.5 to 2; 0 is 1 for both, as Video's, and other values are clamped.
 type SoundVoice struct {
 	Volume, Rate float32
+	// StartAt schedules this playback on the clock returned by audio.Now.
+	// A zero or past time plays as soon as possible.
+	StartAt time.Time
 }
 
 // AudioError is why a sound or a player failed, named as NSH's codes, which follow the web's MediaError: the core's part of audio.Error, which apps use. A failure that says more is one wrapped with the platform's words, which errors.Is and errors.As find.
@@ -167,6 +170,27 @@ func (rt *runtime) audioEvent(ev driver.Event) {
 func (t *Tree) sendAudio(id uint32, r driver.AudioRequest) {
 	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemAudio, Count: id, Audio: &r})
 	t.changed = true
+}
+
+// AudioOutputLatency implements audio.OutputLatency. An unavailable route
+// returns zero with known false.
+func (cx *Scope) AudioOutputLatency(done func(latency time.Duration, known bool)) {
+	if done == nil {
+		return
+	}
+	owner := cx.current()
+	t := cx.tree()
+	if cx.denied(serviceAudio, "") || t == nil || !Untracked(cx, cx.Env().CanPlayAudio) {
+		owner.Post(func() { done(0, false) })
+		return
+	}
+	t.request(cx, driver.MountItem{Kind: driver.ItemAudio, Audio: &driver.AudioRequest{Command: driver.AudioReadLatency}}, func(ev driver.Event) {
+		if !owner.Disposed() {
+			if e, _ := ev.Data.(*driver.AudioEvent); e != nil {
+				done(e.Latency, e.Latency > 0)
+			}
+		}
+	})
 }
 
 // audioRefusal is AudioNotAllowed when the current owner's Access refuses audio, or src's URI when it is no bytes the app holds, wrapping the refusal.
@@ -364,7 +388,7 @@ func (s *Sound) Play(v SoundVoice) {
 	if s.closed {
 		return
 	}
-	s.buffer.key.tree.sendAudio(s.buffer.id, driver.AudioRequest{Command: driver.AudioPlay, Volume: audioVolume(v.Volume), Rate: audioRate(v.Rate)})
+	s.buffer.key.tree.sendAudio(s.buffer.id, driver.AudioRequest{Command: driver.AudioPlay, Volume: audioVolume(v.Volume), Rate: audioRate(v.Rate), StartAt: v.StartAt})
 }
 
 // Stop stops every playback of the sound's source.

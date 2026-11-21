@@ -68,6 +68,7 @@ var gated = map[string]service{
 	"OpenPanel":                     serviceOverlay,
 	"SetMainView":                   serviceOverlay,
 	"LoadSound":                     serviceAudio,
+	"AudioOutputLatency":            serviceAudio,
 	"NewAudioPlayer":                serviceAudio,
 	"AuthSession":                   serviceAuthSession,
 	"Locate":                        serviceLocation,

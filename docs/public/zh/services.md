@@ -441,6 +441,10 @@ mobile.RequestOverlayPermission(cx, func(p core.OverlayPermission) {
 })
 ```
 
+## 音频时序
+
+用 `audio.Now(cx)` 读取预约播放的时钟。`audio.CanSchedule(cx)` 为 true 时，可将 `audio.Voice.StartAt` 设置为将来的时刻。调用 `audio.OutputLatency(cx, func(latency time.Duration, known bool) { ... })` 可读取当前音频输出路径的延迟。macOS 和 iOS 支持预约播放，回调中的 `known` 表示当前路径是否报告了延迟。
+
 ## 下一步
 
 - [通知](notifications.md)：权限、图标角标和点按。

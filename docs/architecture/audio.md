@@ -48,6 +48,14 @@ Both are called on the engine's goroutine, as every scope service is; other goro
 
 `Env.CanPlayAudio` says the platform plays audio. Elsewhere, `LoadSound` and `Play` fail at once with `Unavailable`, without asking the platform.
 
+## Timing
+
+Set `audio.Voice.StartAt` to a future `time.Time` from `audio.Now(cx)` to schedule a loaded sound. All voices share the engine clock. A zero or past time plays at the next opportunity. On macOS and iOS the backend translates the remaining interval to an `AVAudioTime` on the hardware host clock, schedules the decoded buffer and starts its player node at that time. A pending voice counts toward the playback limit and keeps the output ready until it plays or stops.
+
+`audio.CanSchedule(cx)` reports support for a timed start. `audio.OutputLatency(cx, done)` asks the current audio route for its presentation latency. The callback returns a duration and whether the route reported it. Apple reads the I/O node's `presentationLatency`, with the audio session's `outputLatency` as an iOS fallback. A query can create the output graph and leaves it stopped until a sound starts.
+
+The `nsgotest` audio fake uses its manual clock and records `StartAt` in each sound's `Plays`. Set `App.AudioOutputLatency` to model a known delay.
+
 ## Errors and limits
 
 Failures are an `audio.Error`, named as NSH's codes, which follow the web's `MediaError`: `NotAllowed` (refused by a capability, or the web's autoplay policy before a user gesture), `Network`, `Decode` (a format the platform cannot read: an error, never silence), `NotSupported`, `QuotaExceeded`, `Unavailable` and `Failed`. A player's error arrives through `OnError` and `Play`'s callback, and it is failed: it plays nothing until `Play` or `Preload` loads it again.

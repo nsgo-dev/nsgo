@@ -93,9 +93,9 @@ func TestSoundsLoadOnceAndPlay(t *testing.T) {
 		if it.Count != id || it.Audio.Command != driver.AudioPlay {
 			t.Fatalf("play = %d %v", it.Count, it.Audio.Command)
 		}
-		voices = append(voices, SoundVoice{it.Audio.Volume, it.Audio.Rate})
+		voices = append(voices, SoundVoice{Volume: it.Audio.Volume, Rate: it.Audio.Rate})
 	}
-	if want := []SoundVoice{{1, 1}, {0.5, 1.2}, {1, 2}, {0, 0.5}}; !slices.Equal(voices, want) {
+	if want := []SoundVoice{{Volume: 1, Rate: 1}, {Volume: 0.5, Rate: 1.2}, {Volume: 1, Rate: 2}, {Rate: 0.5}}; !slices.Equal(voices, want) {
 		t.Fatalf("voices %v, want %v", voices, want)
 	}
 
