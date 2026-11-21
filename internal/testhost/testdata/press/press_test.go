@@ -25,7 +25,8 @@ func TestPressesCountConsecutiveClicks(t *testing.T) {
 			return core.View{TestID: id, Style: core.Style{Width: core.Pt(100), Height: core.Pt(60)},
 				OnPress: func(e core.PressEvent) { got = append(got, e.Clicks) }}
 		}
-		return core.View{Style: core.Style{Gap: 30}, Children: []core.Node{button("first"), button("second")}}
+		// Away from the edges, where an iPad's system gestures hold back a touch that follows one quickly.
+		return core.View{Style: core.Style{Gap: 30, Padding: core.All(80)}, Children: []core.Node{button("first"), button("second")}}
 	}, nsgotest.Size(300, 300))
 	app.DoublePress("first")
 	app.Press("second")
