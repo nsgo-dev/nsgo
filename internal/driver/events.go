@@ -276,6 +276,8 @@ const (
 	EventOpenScene
 	// EventKeyUp reports a key coming up that went down while view ID had the keyboard focus, or with ID 0 one that went down while no view hearing keys had it, after its EventKeyDown: Text is the name the down reported, Modifiers the keys still held, the released one not among them, and Repeat false. The platform reports it asynchronously (Engine.Dispatch), as an up cannot be consumed, for each down it reported, wherever the focus has gone since, and an up for every key still held when the window loses the focus. It names a view but is never in a mask: a view that hears keys has EventKeyDown's bit, which a kind past 63 could not have, as Android's runtime shifts a kind into a 64-bit mask.
 	EventKeyUp
+	// EventDiscovery reports local service operation Count with a *DiscoveryReply in Data.
+	EventDiscovery
 )
 
 // EventVideoPause reports that the platform paused video ID, not the app's Paused: Index is why (VideoPauseInterruption, ...). An EventMask has no room for another kind, so it shares EventImageInfo's, an answer that names no view and is never in a mask; Android's Protocol.java mirrors it.

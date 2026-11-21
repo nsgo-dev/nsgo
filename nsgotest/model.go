@@ -876,6 +876,8 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 		case driver.ItemSensor:
 			a.sensor(it.Count, *it.Sensor)
+		case driver.ItemDiscovery:
+			a.discover(it)
 		case driver.ItemSpeech:
 			a.speech(it.Count, *it.Speech)
 		case driver.ItemAuthSession:
