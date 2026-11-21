@@ -26,6 +26,17 @@ Set `Mobile` (TSX `mobile`) to show a page as a phone sees it on Windows, macOS 
 
 `core.Video` plays a file or URL in the platform's player. A transparent clip shows what is behind it as HEVC with alpha in a `.mov` on macOS (iOS is not yet checked), and as VP9 with alpha in WebM on Linux with GStreamer's codecalpha plug-in (`gstreamer1.0-plugins-bad`, which a Linux package can recommend in `nsgo.yaml`). On macOS, iOS, Windows and Linux, a local clip whose alpha cannot be kept (WebM on Apple platforms, HEVC on Linux, and any on Windows until Media Foundation's alpha output has been checked on a Windows machine) makes `OnError` say so instead of the video showing in an opaque box: the error is a `*core.MediaError` whose `Reason` is `core.MediaErrorAlphaUnsupported`, so the app can decode that clip itself instead. Android and the web, and remote URLs on every platform, play such clips as their decoder outputs them, which may be opaque.
 
+On Android, set `Video.Headers` to send HTTP request headers such as `Referer`, `User-Agent` or `Cookie` with a URL:
+
+```go
+core.Video{
+    Source:  "https://video.example/clip.mp4",
+    Headers: map[string]string{"Referer": "https://video.example/player"},
+}
+```
+
+The video copies the map when it mounts and uses the same headers if `SourceFunc` supplies a new URL.
+
 ## Components
 
 A component is a function that takes a scope and returns an element. It runs once; what changes later is driven by signals.

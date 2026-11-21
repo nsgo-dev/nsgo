@@ -58,6 +58,7 @@ On Linux, initialization checks whether the system bubblewrap can start WebKitGT
 ## Videos
 
 - A source is a URL, a file path or an `asset:` path resolved against the app's resources.
+- `Video.Headers` copies the HTTP request headers when the video mounts. Android passes them to `MediaPlayer.setDataSource(Context, Uri, Map)` for HTTP and HTTPS sources, including a new URL from `SourceFunc`. The device test in `testdata/videoheaders` checks the headers before and after a same-origin redirect while an MP4 plays.
 - `EventLoad` carries the duration and the picture's size in points; `EventProgress` comes every `ProgressInterval` while playing.
 - `EventEnd` follows the platform: AVFoundation and Android report every end, then a repeating video starts over; a looping Media Foundation engine, `<video>` or GTK stream never ends.
 - A non-repeating video stays at its end through unrelated configuration changes. Changing `Paused` to true and then false replays it from the beginning unless the native scrubber moved it before the end, in which case it resumes there; seeking before the end resumes there when `Paused` is false, and leaves it paused otherwise. Opening another source starts from that source's beginning.

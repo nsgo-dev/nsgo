@@ -1460,6 +1460,7 @@ type StatusBarConfig struct {
 // ProgressInterval at least 16 milliseconds.
 type VideoConfig struct {
 	Source               string
+	Headers              *VideoHeaders
 	Paused               bool
 	Muted                bool
 	Volume               float32
