@@ -96,12 +96,17 @@ func buildAll(ctx context.Context, p *project) error {
 	if p.Build.run {
 		for _, target := range buildTargets {
 			if runnable(target) {
-				return runPackage(ctx, p, target, filepath.Join(p.Build.Output, fmt.Sprintf("%s-%s-%s", p.Name, p.Version, target)))
+				return runPackage(ctx, p, target, p.packageDir(target))
 			}
 		}
 		return fmt.Errorf("-run: none of %s runs on this machine", strings.Join(buildTargets, ", "))
 	}
 	return nil
+}
+
+// packageDir is the output directory of one built target.
+func (p *project) packageDir(target string) string {
+	return filepath.Join(p.Build.Output, fmt.Sprintf("%s-%s-%s", p.Name, p.Version, target))
 }
 
 // buildPackages builds each target's package into its directory, up to
@@ -138,7 +143,7 @@ func buildPackages(ctx context.Context, p *project, targets []string, jobs int) 
 		progress.hold = jobs > 1
 		wg.Go(func() {
 			defer func() { <-slots }()
-			dir := filepath.Join(p.Build.Output, fmt.Sprintf("%s-%s-%s", p.Name, p.Version, target))
+			dir := p.packageDir(target)
 			q := *p
 			q.buildParallel = compileWorkers(jobs)
 			q.released = nil

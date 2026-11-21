@@ -55,6 +55,8 @@ Packages land in `dist/<name>-<version>-<target>`, and everything to hand out in
 
 For Steam, upload the desktop target directories directly. Native dev with `steam.app_id` writes `steam_appid.txt` into its build and starts there. The depot output excludes that file, installers and self-updaters.
 
+Publish built web and desktop packages with `go tool nsgo publish itch -target web,macos_arm64`. Set `itch.project` in `nsgo.yaml` and pass `BUTLER_API_KEY` as a CI secret ([itch.io publishing](https://nsgo.dev/docs/building.md#publish-on-itchio)).
+
 ## Documents
 
 Declare `file_types` in `nsgo.yaml` and handle paths with `desktop.OnOpenFiles`. macOS, Windows (NSIS/MSIX) and Linux packages register them; Windows retains the user's default handler. Linux infers common extensions from a fixed table and defines unknown app-owned types as `application/x-<type id>`; set `mime: [video/mp4]` to reference existing types, especially for unknown imported extensions. AppImage needs desktop integration to install the bundled entry and any custom MIME definitions.
