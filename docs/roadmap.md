@@ -366,11 +366,9 @@ What the desktop installers ([tool](architecture/tool.md#installers)) and the st
 | Install scripts from GitHub | — | `install.sh` and `install.ps1` install from a published release; so far they installed from the releases directory served on each machine (2026-11-10) |
 | The Windows installer's pages | — | Its directory, progress and finish pages, in Chinese among others, are checked on a screen; so far the installer ran silently alone (2026-11-10) |
 | Store packages accepted | — | App Store Connect, Partner Center, Flathub and Play Console take a signed upload of each; so far the Mac App Store's package ran sandboxed unsigned, the MSIX registered and started on Windows from its unpacked manifest, the Flatpak's metadata passed `appstreamcli validate` and the App Bundle passed `bundletool validate` and `jarsigner -verify` and ran on Android 10 and 14 from its APKs (2026-11-11) |
-| Universal Mac App Store packages | `lipo` | A store build of both macOS targets makes one package of a universal app, as App Store Connect takes one build per version; so far each architecture has its own, as only the direct channel's `macos_universal` joins them |
 | Signed MSIX | `AppxSignature.p7x` | A certificate in `sign` signs the MSIX, so it installs outside the Store with `Add-AppxPackage` or App Installer |
 | MSIX names and logos | `resources.pri` | The MSIX names the app in each of its languages and carries its logos at every scale, which need a resource index |
 | Flatpak bundles | OSTree, `flatpak build-bundle` | `build` writes a `.flatpak` users install directly, and the manifest is built with flatpak-builder on GNOME's runtime |
-| App Bundles of both ABIs | — | One App Bundle holds arm64 and x86_64, as Play serves both from one upload; so far each target writes its own |
 | AppImage updates | `.upd_info`, zsync | The AppImage carries its update information, so AppImageUpdate and launchers update it |
 
 ## Updates
