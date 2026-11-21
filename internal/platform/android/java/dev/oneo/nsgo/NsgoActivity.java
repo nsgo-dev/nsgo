@@ -1,9 +1,13 @@
 package dev.oneo.nsgo;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.MutableContextWrapper;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.ContextThemeWrapper;
@@ -62,14 +66,31 @@ public class NsgoActivity extends Activity {
         setContentView(view);
         view.notificationPressed(getIntent().getStringExtra(Notifications.EXTRA));
         view.liveActionPressed(getIntent());
+        if (state == null) openLink(getIntent());
     }
 
     @Override
-    protected void onNewIntent(android.content.Intent intent) {
+    protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         // A notification's press, the activity running.
         view.notificationPressed(intent.getStringExtra(Notifications.EXTRA));
         view.liveActionPressed(intent);
+        openLink(intent);
+    }
+
+    /** Delivers a URL that the launcher activity declares in its intent filters. */
+    private void openLink(Intent intent) {
+        if (!Intent.ACTION_VIEW.equals(intent.getAction())) return;
+        Uri uri = intent.getData();
+        if (uri == null || uri.getScheme() == null) return;
+        // Explicit intents can bypass the filters. Match an implicit browser intent against our own package.
+        Intent link = new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE).setPackage(getPackageName());
+        for (ResolveInfo match : getPackageManager().queryIntentActivities(link, PackageManager.MATCH_DEFAULT_ONLY)) {
+            if (getComponentName().getClassName().equals(match.activityInfo.name)) {
+                view.openLink(uri.toString());
+                return;
+            }
+        }
     }
 
     /**
@@ -93,7 +114,7 @@ public class NsgoActivity extends Activity {
     }
 
     @Override
-    protected void onActivityResult(int request, int result, android.content.Intent data) {
+    protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         view.activityResult(request, result, data);
     }

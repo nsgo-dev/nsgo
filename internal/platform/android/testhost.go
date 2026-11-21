@@ -188,6 +188,11 @@ func (t *testSurface) SetEnvironment(env driver.Environment) error {
 // ChooseMenu implements testhost.Surface: no native menu bar shows here.
 func (t *testSurface) ChooseMenu(uint32) error { return testhost.ErrNoMenu }
 
+// OpenLinks delivers the URLs supplied by the test to the app's engine.
+func (t *testSurface) OpenLinks(links []string) {
+	t.s.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
+}
+
 // ChooseDockMenu implements testhost.Surface: Android has no app icon menu.
 func (t *testSurface) ChooseDockMenu(uint32) error { return testhost.ErrNoMenu }
 

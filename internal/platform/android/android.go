@@ -336,6 +336,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 				ev.Touches, ev.TouchGeometry = readTouchEvent(data)
 			}
 			switch ev.Kind {
+			case driver.EventOpenLinks:
+				ev.Data, ev.Text = []string{ev.Text}, ""
 			case driver.EventPaste:
 				ev.Data, ev.Text = readPaste(ev.Text, data), ""
 			case driver.EventClipboard:

@@ -3,6 +3,7 @@ package nsgotest
 import (
 	"cmp"
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -224,9 +225,19 @@ func (a *App) ChooseDockMenu(path ...string) {
 	}
 }
 
-// OpenLinks asks the app to open links, as the system does with a link of one of its URL schemes (url_schemes), or one a second launch on Windows and Linux names: desktop.OnOpenLinks hears them, or the first handler registered once one is. Headless only.
+// OpenLinks asks the app to open links, as the system does with a link of one of its URL schemes (url_schemes), or one a second launch on Windows and Linux names. The first registered desktop.OnOpenLinks or mobile.OnOpenLinks handler takes any waiting links. Runs headless and on iOS and Android targets.
 func (a *App) OpenLinks(links ...string) {
 	a.t.Helper()
+	if a.target != nil {
+		a.step("openLinks(%q)", links)
+		surface, ok := a.target.surface.(testhost.OpenLinksSurface)
+		if !ok {
+			a.t.Skip("nsgotest: OpenLinks runs headless and on iOS and Android targets")
+		}
+		surface.OpenLinks(slices.Clone(links))
+		a.done()
+		return
+	}
 	a.dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
 }
 

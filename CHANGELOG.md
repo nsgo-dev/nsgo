@@ -80,7 +80,7 @@
 - Add `ui.IconButtonFilled`, a flat filled circle whose face color `IconButton.Fill` sets (#959 by @houko).
 - Add `ui.Option.Group`, which shows adjacent options of a `ui.Select` or `ui.Combobox` under a header that cannot be chosen or focused, in Go and TSX (#906 by @houko).
 - Add `ToastContent.NoClose`, `Trailing` and `OnPress`, plus `Toasts.NoClose`, so apps can customize toast dismissal, trailing content and whole-toast presses while preserving child actions (#934 by @houko).
-- Register `url_schemes` in the iOS app and hand their links to `mobile.OnOpenLinks`, at a cold launch and while the app runs, through `scene:openURLContexts:` (#909 by @houko).
+- Deliver links of declared `url_schemes` to `mobile.OnOpenLinks` on iOS and Android at launch and while the app runs (#909, #1080 by @houko).
 - Let Android's system tab bar follow the app theme's surface, inactive text, active text and accent-container colors (#936 by @houko).
 - Add touch-sheet options to `ui.Dialog` for bare content, grabber visibility, content/title styles and custom entry/exit motion (#933 by @houko).
 - Add `Scope.ScanCode`, which shows the camera full screen and answers with the first QR code or barcode it reads, on iOS devices through AVFoundation, with `Env.CanScanCode` and `nsgotest.App.ScanCode` answering it headless and on every target (#429 by @houko).

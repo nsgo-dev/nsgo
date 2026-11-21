@@ -259,7 +259,7 @@ desktop.OnOpenFiles(cx, func(paths []string) { open(paths[0]) })
 
 ## Links
 
-`url_schemes` gives the app links of its own, such as `myapp://settings`, which open it from a browser, another app, `open`, `start` or `xdg-open`. The macOS app and the iOS app register them, as do the Windows installer and MSIX package and the Linux desktop entry, which the Debian, Arch, AppImage and Flatpak packages carry; uninstalling removes them:
+`url_schemes` gives the app links of its own, such as `myapp://settings`, which open it from a browser, another app, `open`, `start` or `xdg-open`. The macOS, iOS and Android apps register them, as do the Windows installer and MSIX package and the Linux desktop entry, which the Debian, Arch, AppImage and Flatpak packages carry. Uninstalling removes them.
 
 ```yaml
 url_schemes: [myapp]
@@ -271,7 +271,7 @@ The app hears them with `desktop.OnOpenLinks`, also while it runs: on Windows an
 desktop.OnOpenLinks(cx, func(links []string) { show(links[0]) })
 ```
 
-On iOS the app hears them with `mobile.OnOpenLinks`, as a link from Safari, another app or a widget opens it. `app.OpenLinks("myapp://settings")` delivers one in a test. Android doesn't take them yet.
+On iOS and Android, `mobile.OnOpenLinks` hears links at launch and while the app runs. Open one with `xcrun simctl openurl booted myapp://settings` on the iOS simulator or `adb shell am start -a android.intent.action.VIEW -d myapp://settings` on Android. `app.OpenLinks("myapp://settings")` delivers one in a test.
 
 ## Mini programs
 

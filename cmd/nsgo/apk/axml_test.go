@@ -82,6 +82,50 @@ func TestEncodeManifest(t *testing.T) {
 	}
 }
 
+func TestEncodeManifestURLSchemes(t *testing.T) {
+	manifest := Manifest{Package: "dev.oneo.nsgo.test"}
+	for _, schemes := range [][]string{nil, {"myapp", "myapp-dev"}} {
+		manifest.URLSchemes = schemes
+		data, err := EncodeManifest(androidruntime.Manifest, manifest)
+		if err != nil {
+			t.Fatal(err)
+		}
+		activity := decodeXML(t, data).root.child(t, "application").child(t, "activity")
+		if got := activity.string(t, "name"); got != "dev.oneo.nsgo.NsgoActivity" {
+			t.Fatalf("activity = %q", got)
+		}
+		if got := len(activity.kids); got != 1+len(schemes) {
+			t.Fatalf("activity has %d children for %d schemes, want %d", got, len(schemes), 1+len(schemes))
+		}
+		launcher := activity.kids[0]
+		if launcher.name != "intent-filter" || launcher.child(t, "action").string(t, "name") != "android.intent.action.MAIN" ||
+			launcher.child(t, "category").string(t, "name") != "android.intent.category.LAUNCHER" {
+			t.Fatal("the launcher filter changed")
+		}
+		if len(schemes) == 0 {
+			for _, attr := range activity.attrs {
+				if attr.id == androidAttrs["launchMode"].id {
+					t.Fatal("an app without URL schemes changes the default launch mode")
+				}
+			}
+			continue
+		}
+		if attr := activity.attr(t, "launchMode"); attr.kind != typeInt || attr.data != 2 {
+			t.Fatalf("launchMode = %+v, want singleTask as an integer", attr)
+		}
+		for i, scheme := range schemes {
+			filter := activity.kids[i+1]
+			if filter.name != "intent-filter" || len(filter.kids) != 4 ||
+				filter.child(t, "action").string(t, "name") != "android.intent.action.VIEW" ||
+				filter.kids[1].name != "category" || filter.kids[1].string(t, "name") != "android.intent.category.DEFAULT" ||
+				filter.kids[2].name != "category" || filter.kids[2].string(t, "name") != "android.intent.category.BROWSABLE" ||
+				filter.child(t, "data").string(t, "scheme") != scheme {
+				t.Fatalf("bad intent filter for %q: %+v", scheme, filter)
+			}
+		}
+	}
+}
+
 // TestEncodeManifestPermissions checks that the app's permissions join
 // the runtime's once each, and that a name that is none fails.
 func TestEncodeManifestPermissions(t *testing.T) {
@@ -377,6 +421,8 @@ func TestFrameworkAttributeIDs(t *testing.T) {
 		"targetSdkVersion":            0x01010270,
 		"name":                        0x01010003,
 		"label":                       0x01010001,
+		"launchMode":                  0x0101001d,
+		"scheme":                      0x01010027,
 		"exported":                    0x01010010,
 		"authorities":                 0x01010018,
 		"grantUriPermissions":         0x0101001b,

@@ -15,7 +15,7 @@ var systemSchemes = map[string]bool{
 	"data": true, "about": true, "blob": true, "javascript": true, "asset": true, "x-apple-helpviewer": true,
 }
 
-// validateURLSchemes checks url_schemes, the schemes of the app's own links, which the desktop packages register so their links reach desktop.OnOpenLinks: the macOS app with Launch Services, the Windows installer and MSIX package with the shell, and the Linux desktop entry as x-scheme-handler types. It lowercases them.
+// validateURLSchemes checks and lowercases url_schemes, the schemes packages register for the app's own links.
 func (p *project) validateURLSchemes() error {
 	seen := map[string]bool{}
 	for i, s := range p.URLSchemes {

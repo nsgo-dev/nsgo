@@ -153,6 +153,7 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 		Label:             p.Name,
 		Names:             names.android(),
 		VersionName:       p.Version,
+		URLSchemes:        p.URLSchemes,
 		VersionCode:       p.versionCode(),
 		Icon:              icon,
 		Adaptive:          adaptive,

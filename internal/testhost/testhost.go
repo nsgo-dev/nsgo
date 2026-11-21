@@ -138,6 +138,11 @@ type KeyHoldSurface interface {
 	KeyUp(key string) error
 }
 
+// OpenLinksSurface delivers links to the app under test as the system would.
+type OpenLinksSurface interface {
+	OpenLinks(links []string)
+}
+
 // KeyboardSurface is a surface whose window takes the keyboard only while its app is active, as macOS's does.
 type KeyboardSurface interface {
 	// PrepareKeyboard activates the app and waits for its window to take the keyboard when the run opted in to that (nsgo test -target macos -activate), and does nothing otherwise.

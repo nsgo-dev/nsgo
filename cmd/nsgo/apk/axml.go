@@ -23,6 +23,8 @@ type Manifest struct {
 	Names       map[string]string
 	VersionName string
 	VersionCode int
+	// URLSchemes are the app's own links, registered on the launcher activity.
+	URLSchemes []string
 	// Icon is the launcher icon, an IconSize PNG; nil keeps the system's.
 	Icon []byte
 	// Adaptive is the adaptive launcher icon's layers, which @mipmap/ic_launcher names from API 26 on, Icon below it; nil leaves Icon alone.
@@ -96,6 +98,8 @@ var androidAttrs = map[string]attrSpec{
 	"minSdkVersion":       {0x0101020c, typeInt, parseInt},
 	"targetSdkVersion":    {0x01010270, typeInt, parseInt},
 	"name":                {0x01010003, typeString, nil},
+	"launchMode":          {0x0101001d, typeInt, parseLaunchMode},
+	"scheme":              {0x01010027, typeString, nil},
 	"label":               {0x01010001, typeString, nil},
 	"exported":            {0x01010010, typeBool, parseBool},
 	"authorities":         {0x01010018, typeString, nil},
@@ -278,6 +282,18 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 	if m.LoopbackCleartext {
 		setAttr(app, androidNS, "networkSecurityConfig", fmt.Sprintf("@0x%08x", networkSecurityID(m)))
 	}
+	if len(m.URLSchemes) > 0 {
+		launcher := xml.Attr{Name: xml.Name{Space: androidNS, Local: "name"}, Value: "dev.oneo.nsgo.NsgoActivity"}
+		activity := child(app, "activity")
+		if activity == nil || !slices.Contains(activity.attrs, launcher) {
+			return nil, errors.New("manifest: no NsgoActivity for URL schemes")
+		}
+		// Reuse the running app's task even when the link comes from another app.
+		setAttr(activity, androidNS, "launchMode", "singleTask")
+		for _, scheme := range m.URLSchemes {
+			activity.kids = append(activity.kids, openLinkFilter(scheme))
+		}
+	}
 	perms := m.Permissions
 	if m.Recording {
 		perms = append(slices.Clip(perms), recordingPermissions...)
@@ -325,6 +341,28 @@ func appManifest(template []byte, m Manifest) (*node, error) {
 		setAttr(sdk, androidNS, "targetSdkVersion", strconv.Itoa(m.TargetSDK))
 	}
 	return root, nil
+}
+
+func openLinkFilter(scheme string) *node {
+	filter := &node{name: xml.Name{Local: "intent-filter"}}
+	for _, element := range []struct{ tag, attr, value string }{
+		{"action", "name", "android.intent.action.VIEW"},
+		{"category", "name", "android.intent.category.DEFAULT"},
+		{"category", "name", "android.intent.category.BROWSABLE"},
+		{"data", "scheme", scheme},
+	} {
+		kid := &node{name: xml.Name{Local: element.tag}}
+		setAttr(kid, androidNS, element.attr, element.value)
+		filter.kids = append(filter.kids, kid)
+	}
+	return filter
+}
+
+func parseLaunchMode(s string) (uint32, error) {
+	if s == "singleTask" {
+		return 2, nil // ActivityInfo.LAUNCH_SINGLE_TASK.
+	}
+	return 0, fmt.Errorf("unknown launch mode %q", s)
 }
 
 // foregroundService declares the runtime's service name, not exported, as a foreground service of types, names of foregroundServiceTypes.

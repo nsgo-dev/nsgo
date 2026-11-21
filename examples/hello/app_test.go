@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -97,4 +98,40 @@ func TestNotificationServicesAnswer(t *testing.T) {
 		t.Error("the system did not take a notification the app may show")
 	}
 	app.Press("id:close")
+}
+
+// OpenLinks delivers links as the system does: a handler hears them, one that registers later hears those that came before it, and the app routes them where it chooses.
+func TestOpenLinksReachTheApp(t *testing.T) {
+	var listen func()
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		shown := core.NewSignal(cx, "home")
+		listening := core.NewSignal(cx, false)
+		listen = func() { listening.Set(true) }
+		return core.View{Children: []core.Node{
+			core.Text{ContentFunc: shown.Get, TestID: "page"},
+			core.Show{When: listening.Get, Then: func(cx *core.Scope) core.Node {
+				mobile.OnOpenLinks(cx, func(links []string) {
+					for _, link := range links {
+						if u, err := url.Parse(link); err == nil && u.Scheme == "umapp" {
+							shown.Set(u.Host)
+						}
+					}
+				})
+				return nil
+			}},
+		}}
+	})
+	app.OpenLinks("umapp://settings/mobile")
+	if got := app.Find("id:page").Text; got != "home" {
+		t.Fatalf("page %q before listening, want home", got)
+	}
+	app.Post(func() { listen() })
+	app.Settle()
+	if got := app.Find("id:page").Text; got != "settings" {
+		t.Fatalf("page %q after a link, want settings", got)
+	}
+	app.OpenLinks("umapp://profile", "https://example.com")
+	if got := app.Find("id:page").Text; got != "profile" {
+		t.Fatalf("page %q after another batch of links, want profile", got)
+	}
 }
