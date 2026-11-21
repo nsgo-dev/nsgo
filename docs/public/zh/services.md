@@ -394,6 +394,10 @@ cx.Speak("おはようございます", core.Voice{Lang: "ja-JP", Rate: 0.8}, fu
 
 `Rate` 和 `Pitch` 的范围是 0.5 到 2，1 为语音本身的语速和音高。`cx.Voices("ja", ...)` 列出某种语言已安装的语音，应用可以提示用户安装缺少的语音，或让用户挑选，把选中语音的 `ID` 填进 `core.Voice`。浏览器要等用户在页面上按过某个控件后才会朗读，在此之前返回 `core.SpeakNotAllowed`。TSX 包里的 Go 组件需要 `text_to_speech` 能力才能朗读。
 
+## 音频播放
+
+用 `audio.LoadSound` 加载可以重叠播放的短音效，用 `audio.NewPlayer` 流式播放可控制的音频。macOS、iOS 和 Android 支持 WAV、AAC（`.m4a`）和 MP3。用 `cx.Env().CanPlayAudio` 检查当前平台是否支持播放。Android 会在视图离开屏幕时暂停播放器，每个音效解码后最多 1 MiB。
+
 ## 生物识别
 
 `cx.BiometricAvailability` 回答设备是否录入了面容 ID、触控 ID 或指纹；Android 不说明录入的是哪一种，所以在 Android 上录入了指纹时回答指纹，否则在设备有面部识别硬件时回答面部。`cx.AuthenticateBiometric` 带着一个不能为空的原因请系统确认用户身份，回答成功、失败、取消或不可用。它不会替应用选择密码作为后备方式。

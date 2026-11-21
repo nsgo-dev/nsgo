@@ -66,6 +66,7 @@ func (s *surface) forget(o *overlay) {
 		delete(o.view.images, id)
 	}
 	s.canvasRequests.closeSurface(o.view.id)
+	s.audioFiles.closeSurface(o.view.id)
 	s.closeSurfaceNatives(o.view.id)
 }
 

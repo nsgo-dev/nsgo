@@ -140,6 +140,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * The first view, which the engine serves, for an overlay's view: null for the first view itself. The first view receives every message and hands an overlay's batches and images on to its view, whose events name its surface.
      */
     private final NsgoView primary;
+    // The first view owns the engine's sounds and players, including its overlays'.
+    private Audio audio;
     /** The surface this view shows, 0 for the first view's, else an overlay's (driver.SurfaceOverlay). */
     private final int surface;
     final CanvasImages<CanvasNode.Picture> canvasImages = new CanvasImages<>(this::requestCanvasImage, p -> p.bitmap.recycle(), ui::post);
@@ -471,7 +473,23 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     }
 
     @Override
+    public void onVisibilityAggregated(boolean visible) {
+        super.onVisibilityAggregated(visible);
+        if (!visible) pauseAudio();
+    }
+
+    private boolean audioVisible() {
+        return isAttachedToWindow() && isShown() && getWindowVisibility() == View.VISIBLE;
+    }
+
+    private void pauseAudio() {
+        Audio shared = (primary == null ? this : primary).audio;
+        if (shared != null) shared.pauseSurface(surface);
+    }
+
+    @Override
     protected void onDetachedFromWindow() {
+        pauseAudio();
         releaseEnvironment();
         // An app waiting for the folds starts as the view leaves its window, as it would have without them.
         releaseStart();
@@ -512,6 +530,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     public void detachFromEngine() {
         if (!attached) return;
         attached = false;
+        pauseAudio();
         unregisterBack();
     }
 
@@ -719,6 +738,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * Lets go of what serves the app's process once it ends or the view stops, on the UI thread: the network callback, the decoders, back and the native components, as an ended app sends no deletes. It runs again harmlessly.
      */
     private void release() {
+        if (audio != null) { audio.close(); audio = null; }
         if (sensors != null) { sensors.close(); sensors = null; }
         if (network != null) {
             getContext().getSystemService(ConnectivityManager.class).unregisterNetworkCallback(network);
@@ -742,6 +762,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * Lets go of an overlay's view as its window closes, on the UI thread: its decoders and every node's web view, video and native component, as a closed tree deletes none of its views.
      */
     void releaseOverlay() {
+        if (primary.audio != null) primary.audio.closeSurface(surface);
         canvasImages.close();
         decoder.shutdownNow();
         folders.shutdownNow();
@@ -852,6 +873,13 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 case Protocol.SCAN:
                     scan(message);
                     break;
+                case Protocol.AUDIO_FILE: {
+                    int from = message.readInt(), id = message.readInt();
+                    String path = Protocol.readString(message);
+                    String code = Protocol.readString(message), reason = Protocol.readString(message);
+                    ui.post(() -> { if (audio != null) audio.file(from, id, path, code, reason); });
+                    break;
+                }
                 case Protocol.WANT_FRAME:
                     ui.post(() -> {
                         frameWanted = true;
@@ -970,7 +998,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                     | (increaseContrast ? 128 : 0)
                     | (inactive ? 16 : 0) | (background ? 32 : 0) | (Services.hasCamera(getContext()) ? 64 : 0));
             // The first byte's eight bits are taken: what else the device can do follows in a second.
-            d.writeByte((Speaker.available(getContext()) ? 1 : 0) | (Scanner.available(getContext()) ? 2 : 0));
+            d.writeByte((Speaker.available(getContext()) ? 1 : 0) | (Scanner.available(getContext()) ? 2 : 0) | 4);
             int idiom = config.smallestScreenWidthDp >= 600 ? Protocol.IDIOM_TABLET : Protocol.IDIOM_PHONE;
             if ((config.uiMode & Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION) {
                 idiom = Protocol.IDIOM_TV;
@@ -2741,6 +2769,12 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 String text = Protocol.readString(in), lang = Protocol.readString(in), voice = Protocol.readString(in);
                 float rate = in.readFloat(), pitch = in.readFloat();
                 Speaker.handle(this, count, command, text, lang, voice, rate, pitch);
+                break;
+            }
+            case Protocol.ITEM_AUDIO: {
+                NsgoView first = primary == null ? this : primary;
+                if (first.audio == null) first.audio = new Audio(first.getContext(), first::write);
+                first.audio.command(surface, audioVisible(), in);
                 break;
             }
             case Protocol.ITEM_BIOMETRIC_AUTHENTICATE: {

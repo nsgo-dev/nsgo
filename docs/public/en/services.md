@@ -281,6 +281,10 @@ cx.Speak("Guten Morgen", core.Voice{Lang: "de-DE", Rate: 0.8}, func(stopped bool
 
 `Rate` and `Pitch` run from 0.5 to 2, 1 being the voice's own. `cx.Voices("ja", ...)` lists the voices installed for a language, so the app can ask the user to install one it lacks or let them pick one, whose `ID` goes in `core.Voice`. Browsers speak only after the user has pressed something on the page, and fail with `core.SpeakNotAllowed` before. A TSX package's Go components speak only with the `text_to_speech` capability.
 
+## Audio playback
+
+Use `audio.LoadSound` for short cues that can overlap and `audio.NewPlayer` for streamed audio with playback controls. macOS, iOS and Android support WAV, AAC (`.m4a`) and MP3. Use `cx.Env().CanPlayAudio` to detect playback support. Android pauses a player when its view leaves the screen and limits each decoded sound to 1 MiB.
+
 ## Biometrics
 
 `cx.BiometricAvailability` reports whether Face ID, Touch ID or a device fingerprint is enrolled; Android does not say which kind is enrolled, so there it reports a fingerprint when one is enrolled and otherwise face when the device has face hardware. `cx.AuthenticateBiometric` asks the system to confirm the user with a reason, which must not be empty, and reports success, failure, cancellation or unavailability. It does not choose a passcode fallback for the app.
