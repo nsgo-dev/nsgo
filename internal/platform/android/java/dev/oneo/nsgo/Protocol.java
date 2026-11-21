@@ -29,7 +29,7 @@ final class Protocol {
     static Message readMessage(DataInputStream in) throws IOException {
         int kind = in.read();
         if (kind == -1) return null;
-        if (kind < BATCH || kind > SCAN) throw invalidMessage("unexpected message kind " + kind);
+        if (kind < BATCH || kind > ASSET_READ) throw invalidMessage("unexpected message kind " + kind);
         int length;
         try {
             length = in.readInt();
@@ -80,6 +80,8 @@ final class Protocol {
     static final int COOKIES = 20;
     /** Starts or stops the code scanner: the surface, the request's count and a SCAN_START or SCAN_STOP (scan.go, Scanner). */
     static final int SCAN = 21;
+    /** Reads a bundled file: its request ID and the path under assets/. */
+    static final int ASSET_READ = 22;
 
     // Java to Go.
     static final int START = 1;
@@ -115,6 +117,12 @@ final class Protocol {
     static final int CANVAS_REQUEST = 22;
     /** What the code scanner reports: the surface, the request's count and a SCAN_FRAME with the frame's width, height and luminance, a SCAN_CLOSED, or a SCAN_FAILED with why (scan.go). */
     static final int SCAN_REPORT = 23;
+    /** Streams a bundled file: its request ID, an ASSET_* status byte and the chunk or error text. */
+    static final int ASSET_REPLY = 24;
+    static final int ASSET_CHUNK = 0;
+    static final int ASSET_DONE = 1;
+    static final int ASSET_MISSING = 2;
+    static final int ASSET_FAILED = 3;
 
     /** Writes a message's part after its head. */
     interface Body {

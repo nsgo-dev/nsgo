@@ -65,7 +65,9 @@ func startTest(app engine.App, opts Options, test *testWindow) *surface {
 		monitor = engine.NewPerfMonitor()
 		ownPerf = monitor
 	}
-	eopts := engine.Options{Environment: s.env, Perf: monitor, Thread: apple.RaiseThread, Appearance: opts.Appearance,
+	eopts := engine.Options{
+		ReadAsset:   imageload.ReadAsset,
+		Environment: s.env, Perf: monitor, Thread: apple.RaiseThread, Appearance: opts.Appearance,
 		Secrets: apple.Keychain{}, Windows: &engine.WindowOptions{Title: opts.Title, Width: opts.Width, Height: opts.Height}}
 	eopts.SetDirs(engine.AppDirs(opts.ID))
 	eopts.UseTest(test.options, &test.pin)

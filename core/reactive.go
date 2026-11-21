@@ -98,6 +98,8 @@ type RootOptions struct {
 	Storage *Store
 	// Secrets is the platform's secure store, which Scope.Secrets keeps secrets in; nil where there is none, so Secrets fails with ErrSecretsUnavailable.
 	Secrets SecretStore
+	// ReadAsset reads a slash-separated resource path on a worker goroutine; nil where the host cannot read bundled files.
+	ReadAsset func(context.Context, string) ([]byte, error)
 	// DataDir, CacheDir and LogsDir are the app's directories, "" where the target has none.
 	DataDir, CacheDir, LogsDir string
 	// Host is the channel to the host app that embeds the app: its
@@ -121,7 +123,7 @@ func NewRoot(opts RootOptions) *Scope {
 		opts.Clock = SystemClock{}
 	}
 	rt := &runtime{graphOwner: newGraphOwner(opts.CheckCommits), post: opts.Post, clock: opts.Clock, report: opts.Report, checkCommits: opts.CheckCommits,
-		store: opts.Storage, secrets: opts.Secrets, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
+		store: opts.Storage, secrets: opts.Secrets, readAsset: opts.ReadAsset, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
 		requestFrame: opts.RequestFrame, windows: opts.Windows, takesHotKeys: opts.HotKeys, tray: opts.Tray}
 	rt.root = &Scope{rt: rt}
 	if devtools.Enabled {
@@ -168,6 +170,7 @@ type runtime struct {
 	store          *Store
 	storage        *storageWatch
 	secrets        driver.SecretStore
+	readAsset      func(context.Context, string) ([]byte, error)
 	dataDir        string
 	cacheDir       string
 	logsDir        string

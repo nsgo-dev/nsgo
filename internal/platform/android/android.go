@@ -84,7 +84,8 @@ const (
 	// msgCookies sets, lists or clears the web views' CookieManager and storage (webcookie.go).
 	msgCookies = 20
 	// msgScan starts or stops the runtime's code scanner (scan.go).
-	msgScan = 21
+	msgScan      = 21
+	msgAssetRead = 22 // read a file through the APK's AssetManager
 
 	// Java to Go.
 	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
@@ -120,6 +121,7 @@ const (
 	msgCanvasRequest = 22
 	// msgScanReport is what the code scanner reports: a frame of the camera, its close or its failure (scan.go).
 	msgScanReport = 23
+	msgAssetReply = 24 // one chunk or the final result of msgAssetRead
 )
 
 // The parts of an image view's request msgImage carries.
@@ -174,6 +176,8 @@ type surface struct {
 	staged map[uint64]string
 	// folders are the folder picks and reads Java has yet to answer.
 	folders folders
+	// assets are the bundled files Java is reading.
+	assets assetReads
 	// downloads are the image downloads Java has yet to finish.
 	downloads downloads
 	// secrets are the secret requests Java has yet to answer.
@@ -251,6 +255,7 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 		kind, payload, err := readMessage(in)
 		if err != nil {
 			// The runtime is gone, and the app with it.
+			s.assets.close()
 			if s.engine != nil {
 				s.engine.Close()
 			}
@@ -412,6 +417,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.surfaceReport(&r)
 		case msgFolderReply:
 			s.folderReply(&r)
+		case msgAssetReply:
+			s.assets.reply(&r)
 		case msgSecretReply:
 			s.secretReply(&r)
 		case msgFetched:
@@ -462,7 +469,7 @@ func init() {
 // startEngine starts app's engine at size with the fold geometry g measured at it; test, when set, is what a test host opens it with.
 func (s *surface) startEngine(app engine.App, size driver.Size, g driver.Geometry, appearance driver.Appearance, test *testOpen) {
 	eopts := engine.Options{Size: size, Geometry: g, Environment: s.env, Appearance: appearance, Host: s.hostOptions(),
-		Secrets: keystore{s}}
+		Secrets: keystore{s}, ReadAsset: s.readAsset}
 	// The runtime passes the app's own files and cache directories.
 	data, logs := os.Getenv("NSGO_DATA_DIR"), ""
 	if data != "" {
@@ -1156,11 +1163,11 @@ func (s *surface) send(kind byte, body func(w *writer)) error {
 		return err
 	}
 	binary.BigEndian.PutUint32(w.buf[1:], uint32(len(w.buf)-5))
-	s.out.Write(w.buf)
+	_, err := s.out.Write(w.buf)
 	if cap(w.buf) <= 1<<20 { // let an image's buffer go
 		s.buf = w.buf
 	}
-	return nil
+	return err
 }
 
 func readMessage(r *bufio.Reader) (byte, []byte, error) {
