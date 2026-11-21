@@ -125,9 +125,11 @@ func (c *WindowClosing) Cancel() { c.canceled = true }
 func (c *WindowClosing) Canceled() bool { return c != nil && c.canceled }
 
 // OpenWindow is the core's part of desktop.OpenWindow, which apps use: it
-// opens a window showing content, which belongs to the current owner and
-// closes when that owner goes. It returns nil where the platform opens no
-// windows.
+// opens a window showing content, which belongs to cx itself rather than
+// the running owner, so opening a window with the app's scope from a
+// button or menu handler keeps it open after that handler's scope goes,
+// closing only when cx goes or Close is called. It returns nil where the
+// platform opens no windows or cx is disposed.
 func (cx *Scope) OpenWindow(opts WindowOptions, content func(cx *Scope) Node) *Window {
 	return cx.openWindow(opts, content, false)
 }
@@ -135,7 +137,7 @@ func (cx *Scope) OpenWindow(opts WindowOptions, content func(cx *Scope) Node) *W
 // openWindow is OpenWindow, opening the main window when main is set.
 func (cx *Scope) openWindow(opts WindowOptions, content func(cx *Scope) Node, main bool) *Window {
 	rt := cx.rt
-	if rt.windows == nil {
+	if rt.windows == nil || cx.disposed {
 		return nil
 	}
 	if opts.Key != "" {
@@ -154,7 +156,7 @@ func (cx *Scope) openWindow(opts WindowOptions, content func(cx *Scope) Node, ma
 	}
 	limits := opts.Constraints.Normalized()
 	size := limits.Clamp(Size{Width: opts.Width, Height: opts.Height})
-	w := rt.openSurface(cx.current(), driver.SurfaceConfig{Kind: driver.SurfaceWindow, Title: opts.Title,
+	w := rt.openSurface(cx, driver.SurfaceConfig{Kind: driver.SurfaceWindow, Title: opts.Title,
 		Width: size.Width, Height: size.Height, Frame: opts.Frame, Hidden: opts.Hidden, Material: opts.Material, Constraints: limits,
 		Workspaces: opts.Workspaces, PointerEvents: cx.windowPointer(opts.PointerEvents),
 		Transparent: opts.Transparent, NoShadow: opts.NoShadow, SkipTaskbar: opts.SkipTaskbar, Main: main}, content)
@@ -170,10 +172,12 @@ func (cx *Scope) openWindow(opts WindowOptions, content func(cx *Scope) Node, ma
 
 // OpenPanel is the core's part of desktop.OpenPanel, which apps use: it
 // opens a hidden panel showing content, for Show, Toggle or a tray icon
-// to show. It returns nil where the platform opens no windows.
+// to show. Like OpenWindow, the panel belongs to cx itself rather than the
+// running owner, closing when cx goes or Close is called. It returns nil
+// where the platform opens no windows or cx is disposed.
 func (cx *Scope) OpenPanel(opts PanelOptions, content func(cx *Scope) Node) *Window {
 	rt := cx.rt
-	if rt.windows == nil {
+	if rt.windows == nil || cx.disposed {
 		return nil
 	}
 	if opts.Width <= 0 || opts.Height <= 0 {
@@ -182,7 +186,7 @@ func (cx *Scope) OpenPanel(opts PanelOptions, content func(cx *Scope) Node) *Win
 	cfg := driver.SurfaceConfig{Kind: driver.SurfacePanel, Width: opts.Width, Height: opts.Height, Hidden: true,
 		HideOnBlur: opts.HideOnBlur, NoActivate: opts.NoActivate, Material: opts.Material,
 		PointerEvents: cx.windowPointer(opts.PointerEvents), Transparent: opts.Transparent}
-	w := rt.openSurface(cx.current(), cfg, content)
+	w := rt.openSurface(cx, cfg, content)
 	if opts.FitContent {
 		// Its first commit, which lays it out, sizes it before anything shows it.
 		w.t.fitContent(Size{Width: opts.Width, Height: opts.Height})
@@ -567,13 +571,13 @@ type Tray struct {
 	removed bool
 }
 
-// NewTray is the core's part of desktop.NewTray, which apps use: it adds a tray icon, the macOS menu bar's or the Windows notification area's, which the current owner keeps.
+// NewTray is the core's part of desktop.NewTray, which apps use: it adds a tray icon, the macOS menu bar's or the Windows notification area's, which belongs to cx itself rather than the running owner.
 func (cx *Scope) NewTray(opts TrayOptions) *Tray {
 	rt := cx.rt
-	if rt.windows == nil && !rt.tray {
+	if (rt.windows == nil && !rt.tray) || cx.disposed {
 		return nil
 	}
-	owner := cx.current()
+	owner := cx
 	rt.trayID++
 	tr := &Tray{rt: rt, owner: owner, opts: opts, cfg: driver.TrayConfig{ID: rt.trayID, Icon: opts.Icon,
 		Template: opts.Template, Title: opts.Title, Tooltip: opts.Tooltip}}
