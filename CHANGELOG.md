@@ -12,6 +12,7 @@
 - Let underline tabs set their indicator color and fit it to the selected tab's content, with `indicatorColor` and `indicatorFit` in TSX (#1037 by @houko).
 - Use Material navigation app bars on Android `ui.NavPage` screens, including a collapsing large-title bar (#485 by @houko).
 - Add a Windows system caption button style for hidden title bars, preserving Snap Layout hit testing (#679 by @houko).
+- Set light and dark launch backgrounds and centered images for iOS and Android 12 or later with `launch_screen` (#1219 by @houko).
 - Add `android.loopback_cleartext` to allow plain HTTP to loopback in Android APKs and App Bundles (#1061 by @houko).
 - Send deferred shader pixels on Android without waiting for another app update (#1112 by @houko).
 - Keep an iOS app's engine, state and screens when UIKit disconnects its scene and connects a new one while the process lives, showing the running app in the new window rather than starting a second engine over it (#1030 by @houko).
