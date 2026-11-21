@@ -395,6 +395,10 @@ func pickedFolders(urls objc.ID, limit int) []driver.Directory {
 // saveFile presents UIDocumentPickerViewController exporting a copy of
 // the file r saves, under its name.
 func (s *surface) saveFile(r driver.SaveRequest, id uint32) {
+	if r.Preflight {
+		s.engine.Dispatch(driver.Event{Kind: driver.EventFiles, Count: id, Text: driver.NoSavePreflight})
+		return
+	}
 	path, err := r.Stage(filepath.Join(os.TempDir(), "nsgo-save"))
 	if err != nil {
 		s.engine.Dispatch(driver.Event{Kind: driver.EventFiles, Count: id, Text: err.Error()})
@@ -404,6 +408,7 @@ func (s *surface) saveFile(r driver.SaveRequest, id uint32) {
 	urls.Send(sel("addObject:"), objc.ID(apple.Class("NSURL")).Send(sel("fileURLWithPath:"), apple.NSString(path)))
 	picker := objc.ID(apple.Class("UIDocumentPickerViewController")).Send(selAlloc).
 		Send(sel("initForExportingURLs:asCopy:"), urls, true)
+	setDocumentStart(picker, r.Start)
 	s.presentDocuments(picker, documentRequest{id: id, staged: filepath.Dir(path)})
 }
 

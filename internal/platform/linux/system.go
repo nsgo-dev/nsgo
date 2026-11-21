@@ -464,6 +464,7 @@ func (w *window) saveFile(r driver.SaveRequest, id uint32) {
 		return
 	}
 	gtkFileDialogSetModal(dialog, 1)
+	configureFileDialog(dialog, "", "", r.Start)
 	gtkFileDialogSetInitialName(dialog, cstr(r.Name))
 	gtkFileDialogSave(dialog, w.toplevel(), 0, cbAsync, async(func(source, result uintptr) {
 		var gerr uintptr
@@ -478,16 +479,12 @@ func (w *window) saveFile(r driver.SaveRequest, id uint32) {
 		}
 		path := filePath(file)
 		gObjectUnref(file)
-		go func() {
-			if path == "" {
-				ev.Text = "the chosen file has no path"
-			} else if err := r.SaveTo(path); err != nil {
-				ev.Text = err.Error()
-			} else {
-				ev.Finished, ev.Data = true, path
-			}
+		if path == "" {
+			ev.Text = "the chosen file has no path"
 			w.engine.Dispatch(ev)
-		}()
+			return
+		}
+		go w.saves.Save(r, id, path, w.engine.Dispatch)
 	}))
 }
 
