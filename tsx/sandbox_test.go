@@ -947,11 +947,11 @@ export function counts() { return [n]; }`, time.Second, 300*time.Millisecond)
 
 // TestPluginLoadDeadlineStopsAModuleTimer holds an interval the entry module sets as it loads to the load's deadline.
 func TestPluginLoadDeadlineStopsAModuleTimer(t *testing.T) {
-	start := time.Now()
 	app, plugin := deadlinePlugin(t, `let n = 0;
 setInterval(() => { n++; }, 1);
 export function counts() { return [n]; }`, 300*time.Millisecond, time.Second)
-	runUntil(app, start, 150*time.Millisecond)
+	start := time.Now()
+	app.Advance(time.Millisecond)
 	if c := counts(t, app, plugin); c[0] == 0 {
 		t.Fatal("the module's interval did not run within the load's deadline")
 	}
