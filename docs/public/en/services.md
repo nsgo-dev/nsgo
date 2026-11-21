@@ -269,6 +269,10 @@ core.View{
 }
 ```
 
+## Full screen
+
+`desktop.SetFullScreen(cx, true, displayID)` fills the display named by `cx.Env().Displays()` on macOS, Windows and Linux. Omit the ID to use the window's current display. An unknown ID leaves the window where it is. Repeating the same request has no effect. `desktop.SetFullScreen(cx, false)` leaves full screen and restores the window's previous frame. On the web, enter from a press handler. The browser chooses the display, and `cx.Env().FullScreen()` follows entry and exit, including Esc.
+
 ## Speaking text
 
 `cx.Speak` reads text aloud in the system's voice for a language where `cx.Env().CanSpeak()` says the platform speaks: macOS, iOS, tvOS, Android, Windows, the web and Linux with speech-dispatcher. One utterance speaks at a time: another `Speak` cuts the one speaking, and so do `cx.StopSpeaking` and the end of the scope that spoke it. `done` hears once how it ended: finished, stopped, or failed with a `core.SpeakError`, such as `core.SpeakLanguageUnavailable` when no voice installed speaks the language.
