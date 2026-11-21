@@ -39,6 +39,8 @@ build:
 
 A flag replaces the value it names (`-target`, `-version`, `-output`, or the signing profiles `-profile`, `-widgets-profile` and `-clip-profile`); `go tool nsgo build -h` lists them. Read the version-matched [Building and shipping](https://nsgo.dev/docs/building.md) page for the rest: installers, store packages, signing, notarizing, GitHub releases, updates, file types, App Clips, widgets and mini programs.
 
+Set `launch_screen.background` to a quoted `"#RRGGBB"` color and/or `launch_screen.image` to a centered PNG path on iOS and Android 12 or later. Use `launch_screen.dark` to override either field for dark appearance ([Launch screen](https://nsgo.dev/docs/building.md#launch-screen)).
+
 ## Build
 
 ```sh
