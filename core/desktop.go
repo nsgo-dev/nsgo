@@ -32,6 +32,15 @@ func (cx *Scope) ToggleMaximize() { cx.window(WindowCommand{Action: WindowToggle
 // ToggleFullScreen is the core's part of desktop.ToggleFullScreen, which apps use.
 func (cx *Scope) ToggleFullScreen() { cx.window(WindowCommand{Action: WindowToggleFullScreen}) }
 
+// SetFullScreen is the core's part of desktop.SetFullScreen, which apps use.
+func (cx *Scope) SetFullScreen(on bool, displayID ...string) {
+	c := WindowCommand{Action: driver.WindowSetFullScreen, On: on}
+	if on && len(displayID) != 0 {
+		c.DisplayID = displayID[0]
+	}
+	cx.window(c)
+}
+
 // CloseWindow is the core's part of desktop.CloseWindow, which apps use.
 func (cx *Scope) CloseWindow() { cx.window(WindowCommand{Action: WindowClose}) }
 

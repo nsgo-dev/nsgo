@@ -906,6 +906,7 @@ const (
 	WindowMinimize         = driver.WindowMinimize
 	WindowToggleMaximize   = driver.WindowToggleMaximize
 	WindowToggleFullScreen = driver.WindowToggleFullScreen
+	WindowSetFullScreen    = driver.WindowSetFullScreen
 	WindowClose            = driver.WindowClose
 	WindowSetFrame         = driver.WindowSetFrame
 	WindowSetLevel         = driver.WindowSetLevel

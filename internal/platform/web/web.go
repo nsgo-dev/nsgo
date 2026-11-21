@@ -106,8 +106,9 @@ func (c *clicks) down(p driver.Point, v *view) int {
 }
 
 type surface struct {
-	doc  js.Value
-	host js.Value
+	doc                  js.Value
+	host                 js.Value
+	fullScreenTransition fullScreenTransition
 	// simulate is the OS the page runs as (Options.OS).
 	simulate driver.OS
 	// rtl is the app's direction (driver.ItemDirection), which alerts lay
@@ -2617,11 +2618,9 @@ func (s *surface) pressed(v *view, kind driver.EventKind) {
 func (s *surface) windowCommand(c *driver.WindowCommand) {
 	switch c.Action {
 	case driver.WindowToggleFullScreen:
-		if s.doc.Get("fullscreenElement").Truthy() || s.doc.Get("webkitFullscreenElement").Truthy() {
-			call(s.doc, "exitFullscreen", "webkitExitFullscreen")
-		} else {
-			call(s.doc.Get("documentElement"), "requestFullscreen", "webkitRequestFullscreen")
-		}
+		s.setFullScreen(!s.isFullScreen())
+	case driver.WindowSetFullScreen:
+		s.setFullScreen(c.On)
 	case driver.WindowClose:
 		js.Global().Call("close")
 	}
@@ -2917,6 +2916,13 @@ func (s *surface) escape(e js.Value) {
 		return
 	}
 	if e.Get("key").String() != "Escape" || e.Get("isComposing").Bool() || e.Get("defaultPrevented").Bool() {
+		return
+	}
+	// A browser that delivers Escape to the page leaves full screen before
+	// the app treats the key as a back action.
+	if s.isFullScreen() {
+		e.Call("preventDefault")
+		s.setFullScreen(false)
 		return
 	}
 	if n := len(s.alerts); n > 0 {
