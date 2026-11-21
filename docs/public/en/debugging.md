@@ -32,6 +32,28 @@ A failed build shows over the running app, with buttons to copy the error and to
 
 Before running, `go tool nsgo check` vets the app and type-checks its TSX; `-target all` vets it for every target, so code behind another platform's build tags is checked from a Mac too.
 
+## Crash reports
+
+`nsgo.Run` installs package `crash` at startup so fatal Go runtime errors (such as concurrent map writes or unhandled OS signals via `runtime/debug.SetCrashOutput`), uncaught engine panics and native platform exceptions survive until the next launch:
+
+- **macOS and iOS**: captures uncaught Objective-C `NSException`s (name, reason and call stack symbols) via Foundation's `NSSetUncaughtExceptionHandler` through purego.
+- **Windows**: captures unhandled native exceptions (exception code, address and parameters) via `SetUnhandledExceptionFilter`.
+- **Linux**: captures fatal Go errors and synchronous fatal signals through Go's signal-safe `debug.SetCrashOutput`.
+- **Android**: captures Go fatal errors through `debug.SetCrashOutput` and uncaught Java exceptions through `Thread.setDefaultUncaughtExceptionHandler`.
+- **Web**: records `error` and `unhandledrejection` events in `localStorage` (falling back to memory when storage is unavailable).
+
+At each startup, any non-empty crash files from a previous run are rotated into atomic pending `crash.CrashReport` files under `LogsDir/crashes` together with the crashing launch's `AppVersion`, `BuildNumber`, `OS` and `Arch` from its startup metadata sidecar, so a subsequent run never overwrites them.
+
+```go
+reports, _ := crash.Pending(cx)
+for _, r := range reports {
+	// Show or upload r.Kind, r.AppVersion, r.BuildNumber, r.Timestamp, r.Trace...
+	_ = crash.AcknowledgeIn(cx, r.ID)
+}
+```
+
+`crash.Pending(cx)`, `crash.AcknowledgeIn(cx, id)` and `crash.AcknowledgeAllIn(cx)` read and delete reports in the app's `LogsDir` (or the web store when `LogsDir` is empty), keeping parallel `nsgotest` tests isolated. Process-level callers outside a scope may call `crash.PendingReports()`, `crash.Acknowledge(id)` and `crash.AcknowledgeAll()`.
+
 ### Linux web views
 
 Ubuntu 24.04 and later can restrict unprivileged user namespaces through AppArmor. When bubblewrap cannot start WebKitGTK's sandbox, NSGo logs the error and shows a placeholder. Some WebKitGTK versions otherwise exit with `SIGTRAP` while opening the first web view. [Ubuntu AppArmor documentation](https://documentation.ubuntu.com/security/security-features/privilege-restriction/apparmor/)

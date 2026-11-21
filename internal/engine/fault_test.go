@@ -186,3 +186,33 @@ func surfaceDestroyed(p *recorder) bool {
 		return it.Window.Action == driver.WindowDestroy
 	})
 }
+
+func TestOnPanicHook(t *testing.T) {
+	prev := OnPanic
+	t.Cleanup(func() { OnPanic = prev })
+
+	got := make(chan string, 1)
+	OnPanic = func(value any, stack []byte) {
+		if value == "hooked panic" && len(stack) > 0 {
+			select {
+			case got <- string(stack):
+			default:
+			}
+		}
+	}
+
+	p := &recorder{}
+	e := Start(p, func(*core.Scope) core.Node { panic("hooked panic") }, Options{
+		Size: driver.Size{Width: 100, Height: 100},
+	})
+	defer e.Close()
+
+	select {
+	case stack := <-got:
+		if !strings.Contains(stack, "TestOnPanicHook") {
+			t.Fatalf("unexpected stack:\n%s", stack)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("OnPanic was not called for uncaught panic")
+	}
+}

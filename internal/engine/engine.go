@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"errors"
 	"log"
 	"net/url"
 	"os"
@@ -343,6 +344,12 @@ type keyDownRequest struct {
 // builds set it, as their dev client starts.
 var Trace func(b *driver.MountBatch, took time.Duration)
 
+// OnPanic, when set, hears every uncaught *core.PanicError that reaches an
+// engine's fault boundary without being handled by a core.Catch boundary.
+// internal/backend wires this to package crash so recovered panics are
+// persisted for the next launch.
+var OnPanic func(value any, stack []byte)
+
 // Start runs app on a new goroutine, its first surface on p.
 func Start(p Platform, app App, opts Options) *Engine {
 	e := &Engine{runner: &runner{
@@ -420,6 +427,12 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 	var taken []message
 	report := func(err error) {
 		log.Printf("nsgo: the app failed: %v", err)
+		if OnPanic != nil {
+			var pe *core.PanicError
+			if errors.As(err, &pe) {
+				OnPanic(pe.Value, pe.Stack)
+			}
+		}
 		if opts.Host.OnError != nil {
 			opts.Host.OnError(err)
 		}
