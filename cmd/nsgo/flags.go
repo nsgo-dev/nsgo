@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // override is a flag that remembers whether the user gave it, so nsgo dev
@@ -113,6 +114,7 @@ type devFlags struct {
 	team      string
 	release   bool
 	trace     bool
+	profile   devProfileOptions
 	highlight bool
 	devtools  bool
 	auto      bool
@@ -190,6 +192,9 @@ func bindDevFlags(fs *flag.FlagSet) *devFlags {
 	fs.StringVar(&f.device, "device", "", "the `device` to run on: an iPhone's name, UDID, serial or ECID, a simulator's name or UDID, or an adb serial or emulator's AVD name (default: the only one connected, or the booted simulator)")
 	fs.BoolVar(&f.release, "release", false, "build stripped release binaries, as nsgo build does, for measuring with -fps")
 	fs.BoolVar(&f.trace, "trace", false, "print each commit's time, mount items and the writes that caused it from the running app")
+	fs.StringVar(&f.profile.kind, "profile", "", "capture a running app's runtime profile: cpu, heap or trace")
+	fs.DurationVar(&f.profile.duration, "profile-duration", 10*time.Second, "the capture duration for -profile cpu or trace")
+	fs.StringVar(&f.profile.output, "profile-output", "", "the local profile file (default: .nsgo/profiles/cpu.pprof, heap.pprof or execution.trace)")
 	fs.BoolVar(&f.highlight, "highlight", false, "outline for a moment each view a commit of the running app changed")
 	fs.BoolVar(&f.devtools, "devtools", false, "open DevTools in the browser: the running app's views, state, profiler and a test recorder")
 	fs.Var(&f.layout, "layout", "show DevTools' layout audit over the running app: alone every view's boxes, or what follows = joined by commas, bounds, grid (8 points) and grid=N, as -layout=bounds,grid=4")
@@ -204,7 +209,7 @@ func bindDevFlags(fs *flag.FlagSet) *devFlags {
 // options are dev's options of the flags that name no nsgo.yaml value.
 func (f *devFlags) options() devOptions {
 	return devOptions{apply: f.apply, port: f.port, open: f.open, device: f.device, team: f.team, release: f.release, trace: f.trace,
-		highlight: f.highlight, devtools: f.devtools, layout: string(f.layout), automation: f.auto, fps: f.fps, lang: f.lang, clip: f.clip}
+		highlight: f.highlight, devtools: f.devtools, layout: string(f.layout), automation: f.auto, fps: f.fps, lang: f.lang, clip: f.clip, profile: f.profile}
 }
 
 func (f *devFlags) apply(p *project) {
