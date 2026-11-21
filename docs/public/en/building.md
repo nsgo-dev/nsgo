@@ -154,13 +154,24 @@ sign:
 
 The runtime targets API 36 when `android.target_sdk` is unset. A release build warns when it is set below 36 because Google Play requires API 36 from August 31, 2026.
 
-Without `sign.macos_profile` the Mac package is unsigned: it runs sandboxed on your Mac, which tests the sandbox, but uploads nowhere. A sandboxed app reaches only its own container, the network and the files the user picks; widgets cannot share timelines from the sandbox yet, so a store build refuses them. Upload the `.pkg` with Transporter, the `.msix` in Partner Center, the `.aab` in Play Console, and submit `flatpak/<id>.yml` to Flathub once the release holds the archives it names; `flatpak-builder` builds it locally too. Windows installs an MSIX outside the Store only when it is signed, which the Store does.
+Set `sign.macos_profile` to sign the Mac package for upload. The unsigned package still runs in the sandbox, which lets you test access to the app's container, the network and the files the user picks. Store builds currently refuse widgets because they cannot share timelines from the sandbox. Upload the `.msix` in Partner Center and the `.aab` in Play Console. Submit `flatpak/<id>.yml` to Flathub once the release holds the archives it names. `flatpak-builder` builds it locally too. Windows installs an MSIX outside the Store only when it is signed, which the Store does.
 
 On macOS, a scroll view's edge effects (`Scroll.EdgeEffects`) and a backdrop `Blur` with no `IOS.BackdropMaterial` blur through Core Animation's private `CABackdropLayer` and `CAFilter`, as AppKit's own edge effects and materials do, since no public API blurs by a radius or varies a blur across a view. App Store review may reject apps that use private APIs: NSGo calls them only for scroll views with edge bars and those blurs, but every macOS build contains their names.
 
 Every Apple bundle `build` writes, the app, its widget extension, App Clip and Apple Watch app, and a `-dynamic` `-embed` framework, carries a privacy manifest, `PrivacyInfo.xcprivacy`, declaring the required-reason APIs NSGo and Go's runtime use: user defaults (`CA92.1`), file timestamps (`C617.1`) and system boot time (`35F9.1`). `apple.privacy` adds the app's own: `accessed_apis`, each category's reasons, `tracking`, `tracking_domains` and `collected_data`, entries of `NSPrivacyCollectedDataTypes` as Apple names them; a `PrivacyInfo.xcprivacy` in `resources/` is merged with them rather than replaced.
 
 The Info.plist of each iOS, tvOS and watchOS bundle `build` writes for devices, the app's, its widget extension's and App Clip's, carries the SDK and Xcode `DT` keys App Store Connect checks, read from the Xcode that builds it, and `UIRequiredDeviceCapabilities: [arm64]`; simulator bundles leave them out, and a key `apple.info` sets keeps its value. `apple.multiple_scenes: true` sets `UIApplicationSupportsMultipleScenes` in an iOS app's scene manifest, which is false by default: on an iPad the user can then open more than one window of the app, and each shows the app's main view anew, with state of its own and the app's shared signals and storage, until the user closes it.
+
+## App Store Connect
+
+Create an app in App Store Connect and sign an iOS device IPA with an App Store distribution profile or a macOS store PKG with your team's installer identity. On a Mac with Xcode, set `NSGO_NOTARY_KEY` to the path of your App Store Connect team key's `.p8` file, `NSGO_NOTARY_KEY_ID` to its key ID, and `NSGO_NOTARY_ISSUER` to its issuer ID. Give that key access to the app and permission to upload builds.
+
+```sh
+go tool nsgo publish ios path/to/Hello.ipa
+go tool nsgo publish macos path/to/Hello.pkg
+```
+
+The tool checks the bundle's build number before uploading, then reports Apple's processing result for TestFlight. Increase `build_number` for the next upload. macOS build numbers increase across all app versions, while iOS can restart the sequence for a new version. Submit a processed build for App Review separately in App Store Connect. [Apple's distribution guide](https://developer.apple.com/documentation/xcode/preparing-your-app-for-distribution)
 
 ## Steam depots
 

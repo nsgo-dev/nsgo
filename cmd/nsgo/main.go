@@ -17,6 +17,7 @@
 //	nsgo keygen                                          print a key pair for updates or signed packages
 //	nsgo certify -key P -apps A [-days N] [-out F]       certify a release key for apps
 //	nsgo publish -cert C [-entry E] [-min-runtime V] [-out F] [dir | package]
+//	nsgo publish ios|macos <file>
 //	                                                      compile a TSX app into a signed package, or sign one again
 //	nsgo verify  [-root P,... [-revocations F,...]] package
 //	                                                      check a package and print what it holds
@@ -185,6 +186,10 @@ func main() {
 		}
 		err = certify(o)
 	case "publish":
+		if len(args) > 0 && (args[0] == "ios" || args[0] == "macos") {
+			err = publishApple(ctx, args[0], args[1:])
+			break
+		}
 		fs := flag.NewFlagSet("publish", flag.ExitOnError)
 		var o publishOptions
 		fs.StringVar(&o.cert, "cert", "", "the release key's certificate `file`; its secret key is NSGO_RELEASE_KEY's")
@@ -249,6 +254,7 @@ func usage() {
   nsgo keygen
   nsgo certify -key P -apps A [-days N] [-out F]
   nsgo publish -cert C [-entry E] [-min-runtime V] [-extra F] [-out F] [dir | package]
+  nsgo publish ios|macos <file>
   nsgo verify  [-root P,... [-revocations F,...]] package
   nsgo revoke  -sequence N [-days N] [-keys IDs] [-packages H,...] -out F
 
