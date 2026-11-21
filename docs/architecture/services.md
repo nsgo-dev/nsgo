@@ -215,6 +215,19 @@ All six share one item, `ItemPurchase` (`driver.PurchaseRequest`), answered by `
 
 `nsgotest` keeps a store where the environment says `Purchases`: `Products` are what it sells, `PurchaseRequests` every request, `PurchaseAnswer` answers each purchase, which without it buys a product among `Products`, `Unfinished`, `Entitlements` and `Finished` follow the transactions, `SyncAnswer` answers a sync, `UpdatePurchase` delivers an update and the `UnfinishedTransactions` option those the store hands the app as it starts.
 
+## Store reviews
+
+`RequestReview` sends `ItemRequestReview` where `Env.CanRequestReview` is true (and a confined owner passes `confinedMay`), and is a no-op elsewhere. The platform reports nothing back: stores throttle review prompts silently.
+
+| Target | Prompt | Notes |
+| --- | --- | --- |
+| macOS | `SKStoreReviewController requestReview` (`apple/review.go`) | Loads `StoreKit.framework` lazily via purego on the main thread |
+| iOS | `SKStoreReviewController requestReviewInScene:` for the active `UIWindowScene`, falling back to `requestReview` (`apple/review.go`, `ios/ios.go`) | `CanRequestReview` is false on tvOS |
+| Android | `Services.requestReview` invokes Google Play In-App Review (`ReviewManagerFactory`) through reflection | Compiles with no Play dependency and is a silent no-op when the Play Review library is absent |
+| Windows, Linux, Web, watchOS, mini programs, HarmonyOS | None (`CanRequestReview` is false) | Clean no-op |
+
+`nsgotest` counts each `ItemRequestReview` in `App.ReviewRequests`.
+
 ## Secrets
 
 `Scope.Secrets` returns the app's secure store, which NSH has not: strings by account under a service, as MyGo's `App.Secrets` and keytar keep them. Unlike the other services it is synchronous, as `Storage` is, and no item of the batch: the platform gives the engine a `driver.SecretStore` (`engine.Options.Secrets`, `RootOptions.Secrets`) whose calls run on the goroutine that makes them, so an app calls them off the engine's, as a keychain may wait for the user. `core.Secrets` is a value: its `Service`, the app's ID by default, else its executable's name, `AccessGroup` and `Accessible` name and protect the items, so an app reads what an earlier build or another framework wrote by naming them as it did. A target without a store, or a store finding none (`driver.ErrNoSecretStore`), answers `ErrSecretsUnavailable`; nothing falls back to `storage.json`.

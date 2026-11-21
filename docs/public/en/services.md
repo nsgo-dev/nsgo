@@ -429,6 +429,16 @@ cx.Purchase("com.example.pro.monthly", core.PurchaseOptions{AccountToken: userUU
 
 Register `OnPurchaseUpdate` as the app starts: updates that come before any handler wait for the first. `cx.CurrentEntitlements` answers what the user owns now, to unlock it at launch, and a Restore Purchases button calls `cx.SyncPurchases`, which may ask the user to sign in. `AccountToken` is a UUID of the app's own that the transaction and the App Store's server notifications carry. macOS sells only in a Mac App Store build, and an App Clip sells nothing; Android, watchOS, Windows, Linux, the web and mini programs answer `PurchasesUnavailable` for now. Test purchases with `nsgotest`, whose `Products`, `PurchaseAnswer`, `UpdatePurchase` and `UnfinishedTransactions` stand in for the store. In TSX, the `Purchases` module needs the `purchases` capability: `purchase` resolves with `{ status: "purchased", transaction }`, `"pending"` or `"cancelled"`, and `on("update", listener)` hears updates.
 
+## Store reviews
+
+`cx.RequestReview()` asks the platform's store to show an in-app rating prompt where `cx.Env().CanRequestReview()` is true: macOS (`SKStoreReviewController.requestReview`), iOS (`SKStoreReviewController.requestReviewInScene:` for the active window scene, falling back to `requestReview`) and Android (Google Play In-App Review when the Play Review library is present). The store decides whether and when to show the prompt and reports no outcome; on Windows, Linux, the web and other targets without an in-app review prompt, `CanRequestReview()` is false and `RequestReview()` is a no-op. In tests, `nsgotest.App.ReviewRequests` counts each request made where `nsgotest.Environment` sets `CanRequestReview`.
+
+```go
+if cx.Env().CanRequestReview() {
+	cx.RequestReview()
+}
+```
+
 ## Overlays on Android
 
 `mobile.OpenOverlay` shows a view of the app's over other apps on Android, a tree of its own that shares the app's signals, and a foreground service keeps the app running while it shows. The app lists `SYSTEM_ALERT_WINDOW` under `android.permissions`, and the user grants it in the system's settings, which `mobile.RequestOverlayPermission` opens; without it the overlay ends at once and `OnEnd` hears why. It takes touches but leaves the keys and the touches around it to the app in front, unless it is `Focusable` or `Passive`, and moves with `desktop.SetWindowFrame` from its content. Other platforms open none.
