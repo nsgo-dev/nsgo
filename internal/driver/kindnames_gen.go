@@ -226,6 +226,7 @@ var eventKindNames = map[EventKind]string{
 	EventOpenScene:             "EventOpenScene",
 	EventKeyUp:                 "EventKeyUp",
 	EventMouseUp:               "EventMouseUp",
+	EventShared:                "EventShared",
 }
 
 // String returns the kind's name, as a log or an event prints it.

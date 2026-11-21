@@ -71,7 +71,7 @@ var unsupportedEvents = map[string]string{
 		EventQuitRequest EventDockMenu EventHotKeyState EventWindowPlacementFailed`,
 	"Apple only": `EventSignInWithApple EventOpenScene`,
 	// Services main added after this target, which no HarmonyOS kit answers here yet.
-	"services added since": `EventAuthSession EventOpenLinks EventPurchase
+	"services added since": `EventAuthSession EventOpenLinks EventShared EventPurchase
 		EventPurchaseUpdate EventSensor EventSpeak EventWebCookies`,
 	// The app hears neither: the core sends no audio where the environment
 	// says none, and asks about a quit only where the platform ends apps

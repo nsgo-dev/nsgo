@@ -99,7 +99,7 @@ var exempt = map[string][]string{
 		"SetWindowShadow", "SetSkipTaskbar", "RequestOrientation",
 		"SetApplicationMenu", "ExitApp", "OnQuitRequest", "OnQuit", "Quit", "Restart",
 		"SetShutdownMode", "SetMainWindow", "OnReopen", "NewTray", "RegisterHotKey", "SetDockVisible",
-		"SetLaunchAtLogin", "OnOpenFiles", "OnOpenLinks", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
+		"SetLaunchAtLogin", "OnOpenFiles", "OnOpenLinks", "OnShared", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
 		"OpenInstallSettings", "Store", "DataDir", "CacheDir", "LogsDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
 		"SetTaskProgress", "SetDockMenu", "AddRecentFile", "ClearRecentFiles", "LookUp", "QuickLook"},
 	"stopping what the code's own requests started, which asked the gate": {"StopSpeaking"},
