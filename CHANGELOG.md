@@ -10,6 +10,7 @@
 - Highlight every row of a soft-wrapped line in `base/editor`'s selections and matches, whose rows before the last showed nothing.
 - Draw `ui.Button`'s primary, secondary and ghost variants without a rim, and fill the secondary one with the text's color at a low opacity instead of an opaque gray.
 - Cut `ui.BadgeVariant` to neutral, accent, success, warn and danger: `BadgeUp` becomes `BadgeSuccess`, and `BadgeInfo`, `BadgeDown` and `BadgeOutline`, which repeated other looks, are gone, with `"info"`, `"up"`, `"down"` and `"outline"` in TSX.
+- Bundle third-party license notices with built apps and expose them through `core.ThirdPartyNotices` (#1244 by @houko).
 - Let `richeditor.View.NodeViews` draw inline leaves in the text, where a press selects the node and an edit can replace it whole (#1172 by @shuuul).
 - Keep an image with its surrounding text when the rich editor's schema defines `inlineImage`, and keep the image's title and link when writing Markdown (#1174 by @shuuul).
 - Add `apple.multiple_scenes`, which writes `UIApplicationSupportsMultipleScenes`, and show each further scene an iPad connects for it, as the user opens another window of the app, in a window of its own: a tree of the app's one engine showing the main view, with its own size, safe area, status bar and orientations, kept while UIKit disconnects the scene and ended as the system discards it (#49 by @houko).
