@@ -38,6 +38,7 @@ Apps import the public packages; `internal/` holds the implementation, which onl
 | `i18n`, `*/locales`, `internal/cldr` | — | The language the app shows, and what the code `nsgo` writes from a package's catalogs runs on, formatting by CLDR's data; `base`'s own catalogs ([languages](docs/architecture/languages.md)) |
 | `icons/lucide`, `tools/lucidegen` | — (NSH loads SVG as images) | The bundled Lucide pack, an accessor per icon, and its generator ([icons](docs/architecture/icons.md)) |
 | `audio` | `nsh`'s `Sound` and `AudioPlayer` | Sounds decoded once and played overlapping, and players of long audio, on core's part; macOS and iOS play them so far ([audio playback](docs/architecture/audio.md)) |
+| `cloud` | — | Provider-neutral cloud key-value and file/snapshot storage: iCloud KV store and ubiquity files on macOS and iOS, Google Play Games Saved Games hook on Android, and isolated per-app in-memory testing in `nsgotest` ([cloud storage](docs/architecture/cloud.md)) |
 | `microphone` | — | Recording the default input on macOS and iOS, and WAV files on Android in the runtime's foreground service ([Android recording](docs/architecture/android-recording.md)), reporting `ErrUnsupported` elsewhere |
 | `internal/audiosession` | — | iOS's one `AVAudioSession`, set by the highest level its holders ask for: videos, speech, `microphone` and audio's players and sounds ([sessions](docs/architecture/audio.md#sessions)) |
 | `updater`, `updater/locales` | `nsh/updater` | Updating the app the way its platform and channel do: Sparkle, WinSparkle, the appcast `nsgo build` signs, or the App Store ([updates](docs/architecture/updates.md)) |
@@ -145,6 +146,7 @@ Record a design question here, and confirm the answer with the user before choos
 | [Scrolling](docs/architecture/scrolling.md) | `Scroll`, `List` or a scroll view |
 | [Interaction](docs/architecture/interaction.md) | Accessibility, pointers, focus, touches, gestures or drops |
 | [Services](docs/architecture/services.md) | A service, a menu, the desktop window or the app's lifecycle |
+| [Cloud storage](docs/architecture/cloud.md) | `cloud`, iCloud KV/ubiquity files, Play Games saved games, entitlements or `nsgotest` cloud simulation |
 | [Remote push](docs/architecture/remote-push.md) | Remote notification tokens, payload delivery or provider adapters |
 | [Contacts and calendar](docs/architecture/contacts-calendar.md) | Contacts, calendars, events or their permissions, which are designed and not built |
 | [Location and motion](docs/architecture/location-motion.md) | Location fixes, motion samples or sensor permissions |

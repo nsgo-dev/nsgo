@@ -852,6 +852,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 case Protocol.SCAN:
                     scan(message);
                     break;
+                case Protocol.CLOUD_STORAGE:
+                    CloudStorage.handle(activity(), payload, report -> write(Protocol.CLOUD_STORAGE_REPORT, report));
+                    break;
                 case Protocol.WANT_FRAME:
                     ui.post(() -> {
                         frameWanted = true;

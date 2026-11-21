@@ -793,6 +793,7 @@ func (s *surface) environment() driver.Environment {
 		HasWebView:       idiom != driver.IdiomTV,
 		SignInWithApple:  apple.AppleSignInAvailable(),
 		Purchases:        apple.PurchasesAvailable(),
+		CloudStorage:     apple.CloudStorageAvailable(),
 		VerticalBarEdge:  verticalBarEdge(traits),
 		Lifecycle:        appLifecycle(),
 		AppClip:          appClip(),

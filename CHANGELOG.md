@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add package `cloud` for provider-neutral cloud key-value and file/snapshot storage (iCloud KV store and ubiquity containers on macOS and iOS, Google Play Games Saved Games bridge on Android, `ErrUnavailable` elsewhere), `core.Env.CanUseCloudStorage`, `nsgo.yaml` `cloud:`/`icloud:` Apple entitlements in `nsgo build`, and an isolated per-app in-memory cloud store in `nsgotest` with change and conflict simulation (#1241).
 - Add `ui/editor`, `base/editor`'s code editor in ui's colors and code type, following the theme, with the app's styles merged over it part by part.
 - Highlight every row of a soft-wrapped line in `base/editor`'s selections and matches, whose rows before the last showed nothing.
 - Draw `ui.Button`'s primary, secondary and ghost variants without a rim, and fill the secondary one with the text's color at a low opacity instead of an opaque gray.

@@ -1144,6 +1144,7 @@ func (s *surface) environment() driver.Environment {
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
 		Purchases:        apple.PurchasesAvailable(),
+		CloudStorage:     apple.CloudStorageAvailable(),
 		RTL:              rtl,
 		PixelRatio:       s.backingScale(),
 		Locale:           locale,

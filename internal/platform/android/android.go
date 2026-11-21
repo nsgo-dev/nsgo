@@ -85,6 +85,8 @@ const (
 	msgCookies = 20
 	// msgScan starts or stops the runtime's code scanner (scan.go).
 	msgScan = 21
+	// msgCloudStorage sends a JSON cloud storage command to the Android runtime (driver.SendCloudStorage).
+	msgCloudStorage = 22
 
 	// Java to Go.
 	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
@@ -120,6 +122,8 @@ const (
 	msgCanvasRequest = 22
 	// msgScanReport is what the code scanner reports: a frame of the camera, its close or its failure (scan.go).
 	msgScanReport = 23
+	// msgCloudStorageReport is what the Android runtime's Play Games Snapshots hook reports, JSON (driver.ReportCloudStorage).
+	msgCloudStorageReport = 24
 )
 
 // The parts of an image view's request msgImage carries.
@@ -238,6 +242,9 @@ func connect(opts Options) *surface {
 	})
 	driver.ConnectRecordings(func(msg []byte) {
 		s.send(msgRecording, func(w *writer) { w.buf = append(w.buf, msg...) })
+	})
+	driver.ConnectCloudStorage(func(msg []byte) {
+		s.send(msgCloudStorage, func(w *writer) { w.buf = append(w.buf, msg...) })
 	})
 	return s
 }
@@ -437,6 +444,19 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.webCookiesSet(&r)
 		case msgScanReport:
 			s.scanReport(&r)
+		case msgCloudStorageReport:
+			report := slices.Clone(payload)
+			var state struct {
+				Type      string `json:"type"`
+				Available bool   `json:"available"`
+			}
+			if json.Unmarshal(report, &state) == nil && state.Type == "state" && s.env.CloudStorage != state.Available {
+				s.env.CloudStorage = state.Available
+				if s.engine != nil {
+					s.engine.SetEnvironment(s.env)
+				}
+			}
+			driver.ReportCloudStorage(report)
 		case msgDNS:
 			servers := make([]string, r.u32())
 			for i := range servers {
