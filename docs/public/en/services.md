@@ -485,6 +485,23 @@ android:
 
 iOS and watchOS give location and motion, macOS location, tvOS one fix at a time and Android both through the framework's own providers, without Google Play services. The web, Windows, Linux and mini programs answer unavailable. In TSX, `Sensors` has `permission`, `requestPermission`, `locate`, `watchLocation` and `watchMotion`, under the package capabilities `location`, `backgroundLocation` and `motion`, in milliseconds.
 
+## Gamepads
+
+Package `gamepad` reads connected game controllers in the W3C Standard Gamepad layout (`ButtonSouth`/`ButtonA` through `ButtonHome`, `AxisLeftX`/`AxisLeftY`/`AxisRightX`/`AxisRightY`). `cx.Env().SupportsGamepads()` reports whether the target supports controllers (macOS, iOS, Windows, Linux, Android and browsers with the Gamepad API).
+
+`gamepad.Pads(cx)` is a tracked reactive read that rerenders scopes when controllers connect or disconnect without rerendering on button or stick changes. Inside a `RequestAnimationFrame` loop, `gamepad.State(cx, id)` returns the controller's buttons (`[0, 1]`, with `Pad.Pressed` true at `>= 0.5`) and axes (`[-1, 1]`, negative left/up and positive right/down) snapshotted once per display frame.
+
+```go
+var loop func(time.Time)
+loop = func(time.Time) {
+	if pad, ok := gamepad.State(cx, 0); ok {
+		move(pad.Axes[gamepad.AxisLeftX], pad.Axes[gamepad.AxisLeftY], pad.Pressed(gamepad.ButtonA))
+	}
+	cx.RequestAnimationFrame(loop)
+}
+cx.RequestAnimationFrame(loop)
+```
+
 ## Next
 
 - [Notifications](notifications.md): permission, badges and presses.
