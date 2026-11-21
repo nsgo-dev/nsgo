@@ -298,6 +298,7 @@ func (s *surface) close() {
 	}
 	s.closed = true
 	s.sensors.Close()
+	s.stopPictureInPictureTimer()
 	s.dropLink()
 	for _, stop := range s.stops {
 		stop()
