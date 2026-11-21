@@ -458,6 +458,12 @@ android:
 
 iOS and watchOS give location and motion, macOS location, tvOS one fix at a time and Android both through the framework's own providers, without Google Play services. The web, Windows, Linux and mini programs answer unavailable. In TSX, `Sensors` has `permission`, `requestPermission`, `locate`, `watchLocation` and `watchMotion`, under the package capabilities `location`, `backgroundLocation` and `motion`, in milliseconds.
 
+## Audio playback
+
+Use `audio.LoadSound` for a short cue that can play several times over itself, or `audio.NewPlayer` for streamed audio with pause, seek, playback rate and looping. `cx.Env().CanPlayAudio()` reports support. macOS, iOS and the web play audio. WAV, AAC and MP3 are supported on those targets.
+
+Browsers require a user gesture for audible playback. Load short sounds ahead of time, then call `Sound.Play` after a click, tap or key press. A sound played before a gesture is silent. A player's `Play` callback receives `audio.NotAllowed` if the browser blocks playback. Retry from a user gesture.
+
 ## Next
 
 - [Notifications](notifications.md): permission, badges and presses.
