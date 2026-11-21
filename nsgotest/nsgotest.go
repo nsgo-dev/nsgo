@@ -364,7 +364,11 @@ type App struct {
 	Guide              core.Permission
 	guideID            uint32
 	// Orientation is the app's current interface orientation request. Zero means the app uses the system policy.
-	Orientation core.Orientation
+	// OrientationError, when set, refuses non-zero RequestOrientation requests headless and reports the returned error through Scope.OnOrientationError instead of updating Orientation.
+	// FullScreenError, when set, refuses SetFullScreen and ToggleFullScreen commands headless and reports the returned error through desktop.OnFullScreenError instead of toggling Env.FullScreen.
+	Orientation      core.Orientation
+	OrientationError func(core.Orientation) error
+	FullScreenError  func(on bool, displayID string) error
 	// Awake is the keep-awake holds the app keeps, oldest first, each gone once released. AwakeHolds records every hold the app took and AwakeReleases the IDs of the holds it released, oldest first. None changes the test machine's power state.
 	Awake         []AwakeHold
 	AwakeHolds    []AwakeHold

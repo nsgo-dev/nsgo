@@ -718,7 +718,14 @@ func (a *App) apply(b *driver.MountBatch) {
 				a.PendingNotifications = slices.DeleteFunc(a.PendingNotifications, func(o core.Notification) bool { return o.ID == it.Value })
 			}
 		case driver.ItemOrientation:
-			a.Orientation = core.Orientation(it.Count)
+			mask := core.Orientation(it.Count)
+			if a.target == nil && a.OrientationError != nil && mask != 0 {
+				if err := a.OrientationError(mask); err != nil {
+					a.post(driver.Event{Kind: driver.EventOrientationError, Index: refusalReason(err), Text: err.Error()})
+					continue
+				}
+			}
+			a.Orientation = mask
 		case driver.ItemBadge:
 			a.Badge = int(it.Count)
 		case driver.ItemKeepAwake:
@@ -937,6 +944,9 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.dockMenu, a.DockMenu, a.dockTree = it.Menu, menuItems(it.Menu), a.responseTree
 		case driver.ItemWindow:
 			a.Window = append(a.Window, *it.Window)
+			if a.target == nil && (it.Window.Action == driver.WindowSetFullScreen || it.Window.Action == driver.WindowToggleFullScreen) {
+				a.applyFullScreenCommand(it.Window)
+			}
 		case driver.ItemOpenSurface:
 			a.Opened = append(a.Opened, surfaceRecord(it.Surface))
 			if it.Surface.Kind == driver.SurfaceOverlay {
@@ -1582,5 +1592,55 @@ func (a *App) evictCanvasImages(reserve int, pass uint64) {
 		}
 		delete(a.canvasImages, oldest)
 		unkept--
+	}
+}
+
+func (a *App) applyFullScreenCommand(c *driver.WindowCommand) {
+	t := a.responseTree
+	if t == nil {
+		t = a.tree
+	}
+	var env driver.Environment
+	if a.env != nil {
+		env = *a.env
+	}
+	if a.appTree != nil && t != nil {
+		env = a.surfaceEnv(t, env)
+	}
+	cur := env.FullScreen
+	on := !cur
+	if c.Action == driver.WindowSetFullScreen {
+		on = c.On
+	}
+	if a.FullScreenError != nil {
+		if err := a.FullScreenError(on, c.DisplayID); err != nil {
+			a.post(driver.Event{Kind: driver.EventFullScreenError, Index: refusalReason(err), Text: err.Error()})
+			return
+		}
+	}
+	if cur == on || t == nil {
+		return
+	}
+	env.FullScreen = on
+	if a.appTree != nil {
+		if a.own == nil {
+			a.own = map[uint32][]func(*driver.Environment){}
+		}
+		a.own[t.ID()] = append(a.own[t.ID()], func(e *driver.Environment) { e.FullScreen = on })
+		t.SetEnvironment(env)
+		return
+	}
+	a.env = &env
+	t.SetEnvironment(env)
+}
+
+func refusalReason(err error) int {
+	switch core.ErrorCode(err) {
+	case core.CodeUnavailable:
+		return driver.RefusalUnavailable
+	case core.CodeDenied:
+		return driver.RefusalDenied
+	default:
+		return driver.RefusalOther
 	}
 }

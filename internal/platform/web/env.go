@@ -88,8 +88,28 @@ func (s *surface) watchChanges() {
 		}
 		return nil
 	}))
-	s.doc.Call("addEventListener", "fullscreenchange", w.changed)
-	s.doc.Call("addEventListener", "webkitfullscreenchange", w.changed)
+	fsChanged := js.FuncOf(func(js.Value, []js.Value) any {
+		s.screen.onFullScreenChange()
+		return nil
+	})
+	fsError := js.FuncOf(func(js.Value, []js.Value) any {
+		s.screen.onFullScreenErrorEvent(nil)
+		return nil
+	})
+	s.doc.Call("addEventListener", "fullscreenchange", fsChanged)
+	s.doc.Call("addEventListener", "webkitfullscreenchange", fsChanged)
+	s.doc.Call("addEventListener", "fullscreenerror", fsError)
+	s.doc.Call("addEventListener", "webkitfullscreenerror", fsError)
+	orientChanged := js.FuncOf(func(js.Value, []js.Value) any {
+		s.screen.onOrientationChange()
+		return nil
+	})
+	if scr := g.Get("screen"); scr.Truthy() {
+		if orient := scr.Get("orientation"); orient.Truthy() && orient.Get("addEventListener").Type() == js.TypeFunction {
+			orient.Call("addEventListener", "change", orientChanged)
+		}
+	}
+	g.Call("addEventListener", "orientationchange", orientChanged)
 	// A page that hides is the app quitting, unless the browser keeps it
 	// in its back-forward cache to show again, where it may also discard
 	// it unheard: the OnQuit handlers run then too, kept for the next.
@@ -165,17 +185,20 @@ func (s *surface) environment() driver.Environment {
 			Top: length("paddingTop"), Right: length("paddingRight"),
 			Bottom: length("paddingBottom"), Left: length("paddingLeft"),
 		},
-		Dark:             w.dark.Get("matches").Bool(),
-		ReduceMotion:     w.reduce.Get("matches").Bool(),
-		IncreaseContrast: w.contrast.Get("matches").Bool(),
-		FontScale:        float32(length("width") / 16),
-		PixelRatio:       float32(g.Get("devicePixelRatio").Float()),
-		OS:               driver.OSWeb,
-		HasWebView:       true,
-		CustomCursor:     true,
-		AppleKeyboard:    apple,
-		Idiom:            driver.IdiomPhone,
-		FullScreen:       s.isFullScreen(),
+		Dark:               w.dark.Get("matches").Bool(),
+		ReduceMotion:       w.reduce.Get("matches").Bool(),
+		IncreaseContrast:   w.contrast.Get("matches").Bool(),
+		FontScale:          float32(length("width") / 16),
+		PixelRatio:         float32(g.Get("devicePixelRatio").Float()),
+		OS:                 driver.OSWeb,
+		HasWebView:         true,
+		CustomCursor:       true,
+		AppleKeyboard:      apple,
+		Idiom:              driver.IdiomPhone,
+		FullScreen:         s.isFullScreen(),
+		CanFullScreen:      s.screen.host.canFullScreen(),
+		CanLockOrientation: s.screen.host.canLockOrientation(),
+		Orientation:        s.screen.host.currentOrientation(),
 	}
 	if w.desktop.Get("matches").Bool() {
 		env.Idiom = driver.IdiomDesktop

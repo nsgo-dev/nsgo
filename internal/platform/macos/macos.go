@@ -1175,6 +1175,7 @@ func (s *surface) environment() driver.Environment {
 		WindowMaterial:   s.material,
 		Maximized:        !s.embedded && objc.Send[bool](s.window, sel("isZoomed")),
 		FullScreen:       !s.embedded && s.window != 0 && objc.Send[uint](s.window, selStyleMask)&maskFullScreen != 0,
+		CanFullScreen:    s.ownWindow(),
 		Minimized:        s.window != 0 && objc.Send[bool](s.window, sel("isMiniaturized")),
 		WindowFrame:      s.windowFrame(),
 		Lifecycle:        s.lifecycle(),

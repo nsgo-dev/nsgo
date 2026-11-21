@@ -73,7 +73,8 @@ var unsupportedEvents = map[string]string{
 	"Apple only": `EventSignInWithApple EventOpenScene`,
 	// Services main added after this target, which no HarmonyOS kit answers here yet.
 	"services added since": `EventAuthSession EventOpenLinks EventPurchase
-		EventPurchaseUpdate EventSensor EventSpeak EventWebCookies`,
+		EventPurchaseUpdate EventSensor EventSpeak EventWebCookies
+		EventFullScreenError EventOrientationError`,
 	// The app hears neither: the core sends no audio where the environment
 	// says none, and asks about a quit only where the platform ends apps
 	// itself.

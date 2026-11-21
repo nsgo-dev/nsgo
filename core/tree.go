@@ -83,6 +83,8 @@ type Tree struct {
 	headerViews         []*node
 	status              statusBars
 	orientations        orientationRequests
+	fullScreenErrors    []*errorHandler
+	orientationErrors   []*errorHandler
 	anim                animations
 	layoutAnim          *LayoutAnimation
 	fontScale           float32

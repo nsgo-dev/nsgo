@@ -859,6 +859,17 @@ func (t *Tree) surfaceEvent(ev driver.Event) bool {
 				t.within(h.owner, func() { h.fn(err) })
 			}
 		}
+	case driver.EventFullScreenError:
+		err := refusalError(ev.Index, ev.Text)
+		for _, h := range slices.Clone(t.fullScreenErrors) {
+			t.within(h.owner, func() { h.fn(err) })
+		}
+	case driver.EventOrientationError:
+		t.orientations.failed = true
+		err := refusalError(ev.Index, ev.Text)
+		for _, h := range slices.Clone(t.orientationErrors) {
+			t.within(h.owner, func() { h.fn(err) })
+		}
 	case driver.EventWindowEnded:
 		if w := t.window; w != nil && !w.closed {
 			w.end(OverlayEnd(ev.Index))

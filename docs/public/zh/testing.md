@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 
 在 macOS、Windows、Linux 和 Web 上以 `-target` 运行时，`app.Select(selector, start, end)` 用原生文本框的编辑键（全选和方向键）移动它的选区，之后的输入、复制或粘贴都作用于测试指定的范围；消费这些键的绑定或应用菜单项会把它们拦下。手机目标还不能移动原生选区：在那里它只移动测试模型中的选区，文本框设置了 `OnSelectionChange` 时则跳过该测试。
 
-`app.Orientation` 保存当前生效的 `Scope.RequestOrientation` 方向集合。使用应用原有的方向策略时，该值为零。
+`app.Orientation` 保存当前生效的 `Scope.RequestOrientation` 方向集合。使用应用原有的方向策略时，该值为零。无头测试中可设置 `app.OrientationError` 或 `app.FullScreenError` 模拟浏览器拒绝，分别送达 `Scope.OnOrientationError` 和 `desktop.OnFullScreenError`。
 
 ## 小组件和实时活动
 

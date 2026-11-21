@@ -17,6 +17,9 @@ type Env struct {
 	safe, titleBar          *Signal[Edges]
 	maximized               *Signal[bool]
 	fullScreen              *Signal[bool]
+	canFullScreen           *Signal[bool]
+	canLockOrientation      *Signal[bool]
+	orientation             *Signal[Orientation]
 	minimized               *Signal[bool]
 	windowFrame             *Signal[WindowFrame]
 	keyboard                *Signal[Points]
@@ -83,65 +86,68 @@ type displayList struct{ values []DisplayInfo }
 // app sets for all of them with the first's, app.
 func newEnv(cx *Scope, app *Env) *Env {
 	e := &Env{
-		deviceName:       NewSignal(cx, ""),
-		deviceModel:      NewSignal(cx, ""),
-		window:           NewSignal(cx, Size{}),
-		geometry:         NewSignalFunc(cx, driver.Divide(Size{}, nil), Geometry.Equal),
-		verticalBar:      NewSignal(cx, VerticalBarUnspecified),
-		safe:             NewSignal(cx, Edges{}),
-		titleBar:         NewSignal(cx, Edges{}),
-		maximized:        NewSignal(cx, false),
-		fullScreen:       NewSignal(cx, false),
-		minimized:        NewSignal(cx, false),
-		windowFrame:      NewSignal(cx, WindowFrame{}),
-		keyboard:         NewSignal(cx, Points(0)),
-		keyboardDuration: NewSignal(cx, 250*time.Millisecond),
-		dark:             NewSignal(cx, false),
-		reduce:           NewSignal(cx, false),
-		contrast:         NewSignal(cx, false),
-		systemRTL:        NewSignal(cx, false),
-		reader:           NewSignal(cx, false),
-		screenColor:      NewSignal(cx, false),
-		speech:           NewSignal(cx, false),
-		audio:            NewSignal(cx, false),
-		speak:            NewSignal(cx, false),
-		gamepads:         NewSignal(cx, false),
-		camera:           NewSignal(cx, false),
-		scanCode:         NewSignal(cx, false),
-		canSendInput:     NewSignal(cx, false),
-		canLookUp:        NewSignal(cx, false),
-		canQuickLook:     NewSignal(cx, false),
-		level:            NewSignal(cx, false),
-		place:            NewSignal(cx, false),
-		workspaces:       NewSignal(cx, false),
-		hasWebView:       NewSignal(cx, false),
-		appleSignIn:      NewSignal(cx, false),
-		purchases:        NewSignal(cx, false),
-		canRequestReview: NewSignal(cx, false),
-		scheduled:        NewSignal(cx, false),
-		transparent:      NewSignal(cx, false),
-		taskbar:          NewSignal(cx, false),
-		fontScale:        NewSignal(cx, float32(1)),
-		ratio:            NewSignal(cx, float32(1)),
-		locale:           NewSignal(cx, ""),
-		forced:           NewSignal(cx, ""),
-		settings:         NewSignal(cx, LocaleSettings{}),
-		displays:         NewSignal(cx, &displayList{}),
-		os:               NewSignal(cx, OS("")),
-		version:          NewSignal(cx, OSVersion{}),
-		idiom:            NewSignal(cx, IdiomPhone),
-		lifecycle:        NewSignal(cx, LifecycleActive),
-		appClip:          NewSignal(cx, false),
-		openedURL:        NewSignal(cx, ""),
-		launchedAtLogin:  NewSignal(cx, false),
-		frontmost:        NewSignal(cx, FrontmostAppInfo{}),
-		canReadFrontmost: NewSignal(cx, false),
-		customCursor:     NewSignal(cx, false),
-		appearance:       NewSignal(cx, AppearanceSystem),
-		appleKeys:        NewSignal(cx, false),
-		material:         NewSignal(cx, WindowMaterialNone),
-		clear:            NewSignal(cx, false),
-		tokens:           NewSignalFunc(cx, hostColors{}, nil),
+		deviceName:         NewSignal(cx, ""),
+		deviceModel:        NewSignal(cx, ""),
+		window:             NewSignal(cx, Size{}),
+		geometry:           NewSignalFunc(cx, driver.Divide(Size{}, nil), Geometry.Equal),
+		verticalBar:        NewSignal(cx, VerticalBarUnspecified),
+		safe:               NewSignal(cx, Edges{}),
+		titleBar:           NewSignal(cx, Edges{}),
+		maximized:          NewSignal(cx, false),
+		fullScreen:         NewSignal(cx, false),
+		canFullScreen:      NewSignal(cx, false),
+		canLockOrientation: NewSignal(cx, false),
+		orientation:        NewSignal(cx, Orientation(0)),
+		minimized:          NewSignal(cx, false),
+		windowFrame:        NewSignal(cx, WindowFrame{}),
+		keyboard:           NewSignal(cx, Points(0)),
+		keyboardDuration:   NewSignal(cx, 250*time.Millisecond),
+		dark:               NewSignal(cx, false),
+		reduce:             NewSignal(cx, false),
+		contrast:           NewSignal(cx, false),
+		systemRTL:          NewSignal(cx, false),
+		reader:             NewSignal(cx, false),
+		screenColor:        NewSignal(cx, false),
+		speech:             NewSignal(cx, false),
+		audio:              NewSignal(cx, false),
+		speak:              NewSignal(cx, false),
+		gamepads:           NewSignal(cx, false),
+		camera:             NewSignal(cx, false),
+		scanCode:           NewSignal(cx, false),
+		canSendInput:       NewSignal(cx, false),
+		canLookUp:          NewSignal(cx, false),
+		canQuickLook:       NewSignal(cx, false),
+		level:              NewSignal(cx, false),
+		place:              NewSignal(cx, false),
+		workspaces:         NewSignal(cx, false),
+		hasWebView:         NewSignal(cx, false),
+		appleSignIn:        NewSignal(cx, false),
+		purchases:          NewSignal(cx, false),
+		canRequestReview:   NewSignal(cx, false),
+		scheduled:          NewSignal(cx, false),
+		transparent:        NewSignal(cx, false),
+		taskbar:            NewSignal(cx, false),
+		fontScale:          NewSignal(cx, float32(1)),
+		ratio:              NewSignal(cx, float32(1)),
+		locale:             NewSignal(cx, ""),
+		forced:             NewSignal(cx, ""),
+		settings:           NewSignal(cx, LocaleSettings{}),
+		displays:           NewSignal(cx, &displayList{}),
+		os:                 NewSignal(cx, OS("")),
+		version:            NewSignal(cx, OSVersion{}),
+		idiom:              NewSignal(cx, IdiomPhone),
+		lifecycle:          NewSignal(cx, LifecycleActive),
+		appClip:            NewSignal(cx, false),
+		openedURL:          NewSignal(cx, ""),
+		launchedAtLogin:    NewSignal(cx, false),
+		frontmost:          NewSignal(cx, FrontmostAppInfo{}),
+		canReadFrontmost:   NewSignal(cx, false),
+		customCursor:       NewSignal(cx, false),
+		appearance:         NewSignal(cx, AppearanceSystem),
+		appleKeys:          NewSignal(cx, false),
+		material:           NewSignal(cx, WindowMaterialNone),
+		clear:              NewSignal(cx, false),
+		tokens:             NewSignalFunc(cx, hostColors{}, nil),
 	}
 	if app != nil {
 		e.forced, e.appearance, e.tokens = app.forced, app.appearance, app.tokens
@@ -212,6 +218,9 @@ func (e *Env) set(v Environment) {
 	e.titleBar.Set(v.TitleBar)
 	e.maximized.Set(v.Maximized)
 	e.fullScreen.Set(v.FullScreen)
+	e.canFullScreen.Set(v.CanFullScreen)
+	e.canLockOrientation.Set(v.CanLockOrientation)
+	e.orientation.Set(v.Orientation)
 	e.minimized.Set(v.Minimized)
 	e.windowFrame.Set(v.WindowFrame)
 	e.keyboard.Set(v.KeyboardHeight)
@@ -310,6 +319,15 @@ func (e *Env) Maximized() bool { return e.maximized.Get() }
 // FullScreen reports whether the window is in full screen: the core's
 // part of desktop.FullScreen, which apps use.
 func (e *Env) FullScreen() bool { return e.fullScreen.Get() }
+
+// CanFullScreen reports whether SetFullScreen and ToggleFullScreen can enter full screen here: the core's part of desktop.CanFullScreen, which apps use.
+func (e *Env) CanFullScreen() bool { return e.canFullScreen.Get() }
+
+// CanLockOrientation reports whether Scope.RequestOrientation can lock the interface orientation here: iOS, Android, and browsers exposing screen.orientation.lock. A browser may still refuse a lock at runtime, reporting it through Scope.OnOrientationError.
+func (e *Env) CanLockOrientation() bool { return e.canLockOrientation.Get() }
+
+// Orientation returns the surface's current interface orientation (OrientationPortrait, OrientationPortraitUpsideDown, OrientationLandscapeLeft or OrientationLandscapeRight), or zero where the platform does not report it.
+func (e *Env) Orientation() Orientation { return e.orientation.Get() }
 
 // Minimized reports whether the window is minimized: the core's part of desktop.Minimized, which apps use.
 func (e *Env) Minimized() bool { return e.minimized.Get() }

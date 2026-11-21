@@ -278,6 +278,10 @@ const (
 	EventKeyUp
 	// EventMouseUp reports a mouse button coming up (Button, Count the consecutive click count, Point in the view, Page in its root view, Modifiers the keys held) on the view its down went to (ID), or with ID 0 when no view hearing mouse buttons was under the pointer, and for every held button when the window loses focus (with zero Count and Modifiers). Like EventKeyUp, it is never in a mask: a view that hears mouse buttons has EventMouseDown's bit, which a kind past 63 could not have.
 	EventMouseUp
+	// EventFullScreenError reports that the platform refused or failed to enter or leave full screen (WindowSetFullScreen, WindowToggleFullScreen): Index is a RefusalReason and Text explains why.
+	EventFullScreenError
+	// EventOrientationError reports that the platform refused or failed to lock or unlock the interface orientation (ItemOrientation): Index is a RefusalReason and Text explains why.
+	EventOrientationError
 )
 
 // EventVideoPause reports that the platform paused video ID, not the app's Paused: Index is why (VideoPauseInterruption, ...). An EventMask has no room for another kind, so it shares EventImageInfo's, an answer that names no view and is never in a mask; Android's Protocol.java mirrors it.
@@ -305,6 +309,16 @@ const (
 	VideoErrorOther = iota
 	// VideoErrorAlphaUnsupported is a local file that declares an alpha channel the platform's player cannot keep.
 	VideoErrorAlphaUnsupported
+)
+
+// Why EventFullScreenError or EventOrientationError says a request was refused, in Index.
+const (
+	// RefusalOther is a platform failure without a more specific classification.
+	RefusalOther = iota
+	// RefusalUnavailable says the platform or browser does not support the operation, such as Safari rejecting screen.orientation.lock.
+	RefusalUnavailable
+	// RefusalDenied says the platform or browser refused the operation due to policy, permissions or missing user gesture, such as NotAllowedError or SecurityError.
+	RefusalDenied
 )
 
 // What EventInputModality reports.

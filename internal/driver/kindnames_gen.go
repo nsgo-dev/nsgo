@@ -228,6 +228,8 @@ var eventKindNames = map[EventKind]string{
 	EventOpenScene:             "EventOpenScene",
 	EventKeyUp:                 "EventKeyUp",
 	EventMouseUp:               "EventMouseUp",
+	EventFullScreenError:       "EventFullScreenError",
+	EventOrientationError:      "EventOrientationError",
 }
 
 // String returns the kind's name, as a log or an event prints it.

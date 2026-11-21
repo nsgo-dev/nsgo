@@ -292,7 +292,7 @@ cx.RequestAnimationFrame(loop)
 
 ## Full screen
 
-`desktop.SetFullScreen(cx, true, displayID)` fills the display named by `cx.Env().Displays()` on macOS, Windows and Linux. Omit the ID to use the window's current display. An unknown ID leaves the window where it is. Repeating the same request has no effect. `desktop.SetFullScreen(cx, false)` leaves full screen and restores the window's previous frame. On the web, enter from a press handler. The browser chooses the display, and `cx.Env().FullScreen()` follows entry and exit, including Esc.
+`desktop.SetFullScreen(cx, true, displayID)` fills the display named by `cx.Env().Displays()` on macOS, Windows and Linux. Omit the ID to use the window's current display. An unknown ID leaves the window where it is. Repeating the same request has no effect. `desktop.SetFullScreen(cx, false)` leaves full screen and restores the window's previous frame. On the web, check `desktop.CanFullScreen(cx)` and enter from a press handler (using the browser's Fullscreen API with `webkit*` fallback); the browser chooses the display, `cx.Env().FullScreen()` follows entry and exit including Esc, and refusals (such as entering outside a user gesture or in a browser without Fullscreen support) report to `desktop.OnFullScreenError` with `core.CodeDenied` or `core.CodeUnavailable`.
 ## Speaking text
 
 `cx.Speak` reads text aloud in the system's voice for a language where `cx.Env().CanSpeak()` says the platform speaks: macOS, iOS, tvOS, Android, Windows, the web and Linux with speech-dispatcher. One utterance speaks at a time: another `Speak` cuts the one speaking, and so do `cx.StopSpeaking` and the end of the scope that spoke it. `done` hears once how it ended: finished, stopped, or failed with a `core.SpeakError`, such as `core.SpeakLanguageUnavailable` when no voice installed speaks the language.
@@ -438,11 +438,13 @@ Register `OnPurchaseUpdate` as the app starts: updates that come before any hand
 
 ## Interface orientation
 
-Call `cx.RequestOrientation(core.OrientationLandscape)` in a full-screen player's scope to ask iOS or Android for landscape. The latest request whose scope is alive takes effect. When that scope ends, the previous request resumes or the app returns to its usual orientation policy. Desktops and the web ignore the call.
+Call `cx.RequestOrientation(core.OrientationLandscape)` in a full-screen player or game scope to ask iOS, Android or a supporting mobile browser for landscape. The latest request whose scope is alive takes effect. When that scope ends, the previous request resumes or the app returns to its usual orientation policy (unlocking on the web). Desktop targets ignore the call.
 
 On iOS 16 and later the request can rotate the interface immediately. On older iOS versions it restricts the next system rotation. A presented modal's `IOS.SupportedOrientations` takes precedence. On Android, a mix of portrait and landscape directions that the system cannot represent is reduced to one allowed direction, preferring the one already shown. Android may disregard orientation requests in large-screen or multi-window modes.
 
-`nsgotest.App.Orientation` records the latest requested mask, with zero for the usual orientation policy.
+On the web, `cx.Env().CanLockOrientation()` says whether `screen.orientation.lock` is exposed, and `cx.Env().Orientation()` follows `screen.orientation` changes. Call `desktop.SetFullScreen(cx, true)` and `cx.RequestOrientation(...)` from the same press handler so browsers like Chrome on Android enter full screen first and then lock the orientation in one tap. Browser refusals (such as Safari rejecting `screen.orientation.lock` with `core.CodeUnavailable`, or a lock outside full screen failing with `core.CodeDenied`) report to `cx.OnOrientationError`.
+
+`nsgotest.App.Orientation` records the latest requested mask, with zero for the usual orientation policy, and `nsgotest.App.OrientationError` and `nsgotest.App.FullScreenError` simulate browser refusals headless.
 
 ## Store reviews
 

@@ -41,6 +41,23 @@ func (cx *Scope) SetFullScreen(on bool, displayID ...string) {
 	cx.window(c)
 }
 
+// OnFullScreenError is the core's part of desktop.OnFullScreenError, which apps use.
+func (cx *Scope) OnFullScreenError(fn func(error)) {
+	if fn == nil {
+		return
+	}
+	owner := cx.current()
+	t := cx.tree()
+	if t == nil || owner.disposed {
+		return
+	}
+	h := &errorHandler{owner: owner, fn: fn}
+	t.fullScreenErrors = append(t.fullScreenErrors, h)
+	owner.addCleanup(func() {
+		t.fullScreenErrors = slices.DeleteFunc(t.fullScreenErrors, func(o *errorHandler) bool { return o == h })
+	})
+}
+
 // CloseWindow is the core's part of desktop.CloseWindow, which apps use.
 func (cx *Scope) CloseWindow() { cx.window(WindowCommand{Action: WindowClose}) }
 

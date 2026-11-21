@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+
+	"github.com/nsgo-dev/nsgo/internal/driver"
 )
 
 // The stable codes of failures an app can handle, NSH's and Node's: the
@@ -69,4 +71,16 @@ func ErrorCode(err error) string {
 		return CodeDenied
 	}
 	return ""
+}
+
+// refusalError turns a platform refusal event (EventFullScreenError, EventOrientationError) into a coded core error when the refusal has a stable classification.
+func refusalError(reason int, text string) error {
+	switch reason {
+	case driver.RefusalUnavailable:
+		return Unavailable(text)
+	case driver.RefusalDenied:
+		return &Error{Code: CodeDenied, Message: text}
+	default:
+		return errors.New(text)
+	}
 }
