@@ -106,8 +106,9 @@ func (c *clicks) down(p driver.Point) int {
 }
 
 type surface struct {
-	doc  js.Value
-	host js.Value
+	motion motionService
+	doc    js.Value
+	host   js.Value
 	// simulate is the OS the page runs as (Options.OS).
 	simulate driver.OS
 	// rtl is the app's direction (driver.ItemDirection), which alerts lay
@@ -1387,9 +1388,7 @@ func (s *surface) mount(b *driver.MountBatch) {
 			s.openURL(it.Value, it.Count)
 			continue
 		case driver.ItemSensor:
-			if it.Sensor.Command != driver.SensorStop {
-				s.engine.Dispatch(driver.NoSensor(it))
-			}
+			s.sensor(it)
 			continue
 		case driver.ItemBiometricAvailability, driver.ItemBiometricAuthenticate:
 			s.engine.Dispatch(driver.NoBiometric(it))
