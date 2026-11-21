@@ -10,6 +10,7 @@
 - Highlight every row of a soft-wrapped line in `base/editor`'s selections and matches, whose rows before the last showed nothing.
 - Draw `ui.Button`'s primary, secondary and ghost variants without a rim, and fill the secondary one with the text's color at a low opacity instead of an opaque gray.
 - Cut `ui.BadgeVariant` to neutral, accent, success, warn and danger: `BadgeUp` becomes `BadgeSuccess`, and `BadgeInfo`, `BadgeDown` and `BadgeOutline`, which repeated other looks, are gone, with `"info"`, `"up"`, `"down"` and `"outline"` in TSX.
+- Set full screen explicitly on a chosen desktop display or through a web press with `desktop.SetFullScreen` (#1214 by @houko).
 - Let `richeditor.View.NodeViews` draw inline leaves in the text, where a press selects the node and an edit can replace it whole (#1172 by @shuuul).
 - Keep an image with its surrounding text when the rich editor's schema defines `inlineImage`, and keep the image's title and link when writing Markdown (#1174 by @shuuul).
 - Slide the title of `ui.SidebarShell`'s content with the content until it meets the sidebar's toggle, where it jumped as the sidebar hid or showed, and add `examples/shell` of the inset shell.

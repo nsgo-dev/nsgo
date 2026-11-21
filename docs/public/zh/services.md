@@ -286,6 +286,9 @@ loop = func(time.Time) {
 cx.RequestAnimationFrame(loop)
 ```
 
+## 全屏
+
+在 macOS、Windows 和 Linux 上，`desktop.SetFullScreen(cx, true, displayID)` 会铺满 `cx.Env().Displays()` 中指定的显示器。不传 ID 时使用窗口所在的显示器。未知 ID 不改变窗口。重复同一请求没有影响。`desktop.SetFullScreen(cx, false)` 退出全屏并恢复之前的窗口位置和大小。在 Web 上请从点击处理函数进入全屏，由浏览器选择显示器，`cx.Env().FullScreen()` 跟踪进入和退出，包括按 Esc 退出。
 ## 登录
 
 `cx.AuthSession` 在系统的认证会话里用 OAuth 服务登录，而不是在网页视图里：macOS 和 iOS 用 `ASWebAuthenticationSession`，Windows、Linux 以及没有设置 scheme 的 Mac 用默认浏览器加回环地址重定向，Web 用弹出窗口。协议由应用负责：它生成 PKCE 校验码和 state，为传给它的重定向地址拼出授权 URL，并在用 code 换令牌前检查回调。取消不算失败：`errors.Is(err, core.AuthCancelled)` 表示用户关闭了会话，或返回的 `cancel` 结束了它。
