@@ -142,10 +142,10 @@ type sliderDrag struct {
 
 // sliderCtl is what the slider's parts and listeners share.
 type sliderCtl struct {
-	s        Slider
-	cx       *core.Scope
-	own      *core.Signal[SliderValue]
-	pending  *core.Signal[*SliderValue]
+	s       Slider
+	cx      *core.Scope
+	own     *core.Signal[SliderValue]
+	pending *core.Signal[*SliderValue]
 	// backward holds when max lies toward the indicator's top or left.
 	backward func() bool
 	rail     core.Bounds
