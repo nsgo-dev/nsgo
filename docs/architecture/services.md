@@ -1,6 +1,6 @@
 # Services
 
-Services are what the platform does for the app outside its views: alerts, the clipboard, opening links, the photo picker, taking a photo, file and folder picks and saves, opening and sharing the app's files, installing packages on Android, speech recognition, speaking text, biometrics, secrets, Sign in with Apple, in-app purchases, sign-in sessions, notifications and the badge, the system's permissions, keeping the computer awake, haptics, the app's lifecycle, the appearance, keyboard shortcuts, the status bar, the desktop window and quitting. Read this before changing one, in `core` or in a backend; [application and windows](application.md) covers the windows, tray icons and global shortcuts an app opens. A service goes to the platform of the window the code asking is in.
+Services are what the platform does for the app outside its views: alerts, the clipboard, opening links, the photo picker, taking a photo, file and folder picks and saves, opening and sharing the app's files, installing packages on Android, speech recognition, speaking text, biometrics, secrets, disk space, Sign in with Apple, in-app purchases, sign-in sessions, notifications and the badge, the system's permissions, keeping the computer awake, haptics, the app's lifecycle, the appearance, keyboard shortcuts, the status bar, the desktop window and quitting. Read this before changing one, in `core` or in a backend; [application and windows](application.md) covers the windows, tray icons and global shortcuts an app opens. A service goes to the platform of the window the code asking is in.
 
 Audio playback is the `audio` package, whose engine part `core` carries as a service through the batch ([audio playback](audio.md)). macOS and iOS play it so far; elsewhere an app plays sound only through a `Video`.
 
@@ -214,6 +214,22 @@ All six share one item, `ItemPurchase` (`driver.PurchaseRequest`), answered by `
 | Windows, Linux, the web, mini programs | Unavailable ([roadmap](../roadmap.md#from-nsgos-issues)) | |
 
 `nsgotest` keeps a store where the environment says `Purchases`: `Products` are what it sells, `PurchaseRequests` every request, `PurchaseAnswer` answers each purchase, which without it buys a product among `Products`, `Unfinished`, `Entitlements` and `Finished` follow the transactions, `SyncAnswer` answers a sync, `UpdatePurchase` delivers an update and the `UnfinishedTransactions` option those the store hands the app as it starts.
+
+## Disk space
+
+`Scope.DiskSpace` answers with the capacity of the volume containing `DataDir`, in bytes, as [#1078](https://github.com/nsgo-dev/nsgo/issues/1078) specifies. NSH has no counterpart. `ItemDiskSpace` carries the directory and returns `EventDiskSpace` with the readings or an error. Filesystem calls run on workers; the callback runs on the engine's goroutine. `nsgotest.DiskSpace` pins the answer for both headless and platform tests.
+
+| Target | Capacity reported |
+| --- | --- |
+| macOS and iOS | Foundation's total capacity and its capacity for important and opportunistic usage |
+| tvOS and watchOS | Foundation's total and available capacity, with the available figure for either usage |
+| Android | `StatFs`'s total capacity and `StorageManager`'s allocatable space for the path's UUID, which counts cache the OS can reclaim. The same allocatable figure applies to either usage |
+| Windows | `GetDiskFreeSpaceExW`'s total and available capacity for the current user, subject to disk quotas |
+| Linux | `statvfs`'s total blocks and blocks available to an unprivileged caller, in fragments |
+| Web | The origin's estimated quota and quota minus estimated usage, from `navigator.storage.estimate()` |
+| HarmonyOS and mini programs | `ErrDiskSpaceUnavailable` |
+
+Apple's query runs only when the project declares `NSPrivacyAccessedAPICategoryDiskSpace` with a reason in `apple.privacy.accessed_apis`. The tool carries that setting into the Apple binary with a linker flag, including embedded frameworks, and emits the reasons in `PrivacyInfo.xcprivacy`. Without a declaration the backend answers `ErrNotDeclared` before reading any capacity key.
 
 ## Secrets
 

@@ -1421,6 +1421,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 		case driver.ItemReadClipboard:
 			s.readClipboard(it)
 			continue
+		case driver.ItemDiskSpace:
+			s.diskSpace(it.Count)
+			continue
 		case driver.ItemSetClipboardImage:
 			if data, ok := it.Data.([]byte); ok {
 				s.setClipboardImage(data)
