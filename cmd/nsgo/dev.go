@@ -243,7 +243,9 @@ func (o devOptions) appFlags() []string {
 	if o.fps {
 		flags = append(flags, "--nsgo-fps")
 	}
-	if o.lang != "" {
+	// The preview uses -lang as its initial locale, then restores the
+	// locale picked in its own controls on subsequent starts.
+	if o.lang != "" && o.preview == nil {
 		flags = append(flags, "--nsgo-lang="+o.lang)
 	}
 	return flags
