@@ -210,7 +210,8 @@ type View struct {
 	// LabelledBy names the view from these visible elements, in order, ahead of Label. Without it or Label, LabelFor labels name a control in tree order. Missing, hidden, repeated and cyclic references are ignored. LabelledBy alone does not forward presses.
 	LabelledBy []*Ref
 	// Hint says what activating the element does, read after its label.
-	Hint string
+	Hint     string
+	HintFunc func() string
 	// AccessibilityDescription says more about the element, read after
 	// its label and before Hint, as ARIA's aria-description: a dialog's
 	// message, what a field expects.
@@ -342,6 +343,7 @@ type Text struct {
 	LabelFor   *Ref
 	LabelledBy []*Ref
 	Hint       string
+	HintFunc   func() string
 	// LiveRegion has screen readers announce the text as it changes; a RoleStatus text is a polite one when 0.
 	LiveRegion LiveRegion
 	TestID     string
@@ -568,10 +570,11 @@ type Scroll struct {
 	Ref          *Ref
 	// Role and Label are what it is for assistive technology, as a list
 	// box's, and Busy says it is still loading.
-	Role   Role
-	Label  string
-	Busy   func() bool
-	TestID string
+	Role      Role
+	Label     string
+	LabelFunc func() string
+	Busy      func() bool
+	TestID    string
 }
 
 // Render implements Node.
@@ -797,6 +800,7 @@ type Image struct {
 	OnLayout  func(Bounds)
 	Ref       *Ref
 	Label     string
+	LabelFunc func() string
 	// ElementsHidden hides it from assistive technology, as a part of a
 	// control that says it for it.
 	ElementsHidden bool
@@ -868,10 +872,11 @@ type Overlay struct {
 	// OnTransitionEnd is View's.
 	OnTransitionEnd func()
 	// Ref names the overlay's view: its bounds.
-	Ref    *Ref
-	Role   Role
-	Label  string
-	TestID string
+	Ref       *Ref
+	Role      Role
+	Label     string
+	LabelFunc func() string
+	TestID    string
 }
 
 // Render implements Node.
@@ -935,6 +940,7 @@ type Modal struct {
 	OnShown, OnDismissed func()
 	Role                 Role
 	Label                string
+	LabelFunc            func() string
 	TestID               string
 }
 
