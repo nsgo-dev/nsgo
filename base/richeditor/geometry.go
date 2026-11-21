@@ -209,6 +209,16 @@ func (v *rv) SelectionRect() (Rect2, bool) {
 				}
 			}
 		}
+		if len(boxes) == 0 {
+			// An inline node's selection reaches across the atom.
+			if a, ok := v.CoordsAtPos(s.From()); ok {
+				z, have := v.CoordsAtPos(s.To())
+				if !have || z.Y != a.Y {
+					z = a
+				}
+				boxes = append(boxes, Rect2{a.X, min(a.Y, z.Y), z.X + z.Width - a.X, max(a.Height, z.Y+z.Height-a.Y)})
+			}
+		}
 	default:
 		boxes = v.selectionRects()
 		if len(boxes) == 0 {

@@ -61,8 +61,12 @@ type NodeProps struct {
 	SetAttrs func(attrs Attrs)
 }
 
-// NodeView renders a node type's blocks, in place of the editor's: its
-// element follows Node, and never changes the node but through SetAttrs.
+// NodeView renders a node type in place of the editor's: its element
+// follows Node, and never changes the node but through SetAttrs. A block's
+// is its block; an inline node's is a view in the text's lines, an
+// attachment in place of what RenderText or LeafText calls it, which copy
+// takes instead, and a press on it selects the node, atomically as it stays
+// one position.
 type NodeView func(cx *core.Scope, props NodeProps) core.Node
 
 // View is a rich text editor over a Session: the document's blocks in a
@@ -76,7 +80,8 @@ type View struct {
 	Markdown string
 	// Placeholder shows while the document is empty.
 	Placeholder string
-	// NodeViews render node types by name.
+	// NodeViews render node types by name: a block's in place of its own,
+	// an inline node's as a view in the line where the node stands.
 	NodeViews map[string]NodeView
 	// BubbleMenu is the app's content in an overlay over the selection's
 	// lines, shown while it returns one.
@@ -194,6 +199,9 @@ type piece struct {
 	composition bool
 	leaf        *Node
 	widget      *Decoration
+	// attach is a leaf a NodeView renders, a view in place of the piece's
+	// text and still one position.
+	attach bool
 }
 
 // rv is a View's controller.
@@ -444,6 +452,10 @@ func (v *rv) buildText(b *block) {
 	textAt := 0
 	add := func(p piece, docAt, docLen int, atom bool) {
 		l := utf16Len(p.text)
+		if p.attach {
+			// Its view stands in for the text, one position long.
+			l = 1
+		}
 		pieces = append(pieces, p)
 		runs = append(runs, textRun{docAt, docLen, textAt, l, atom, p.widget != nil && p.widget.Side < 0})
 		textAt += l
@@ -526,7 +538,7 @@ func (v *rv) buildText(b *block) {
 			case c.Type.Spec.LeafText != nil:
 				text = c.Type.Spec.LeafText(c)
 			}
-			add(piece{text: text, marks: c.Marks, leaf: c, classes: classes(at, at+size)}, at, size, true)
+			add(piece{text: text, marks: c.Marks, leaf: c, classes: classes(at, at+size), attach: v.p.NodeViews[c.Type.Name] != nil}, at, size, true)
 		}
 		at += size
 	}
@@ -539,7 +551,7 @@ func (v *rv) buildText(b *block) {
 }
 
 func samePiece(a, b piece) bool {
-	return a.text == b.text && a.composition == b.composition && a.leaf == b.leaf && marksEqual(a.marks, b.marks) && slices.Equal(a.classes, b.classes) &&
+	return a.text == b.text && a.composition == b.composition && a.leaf == b.leaf && a.attach == b.attach && marksEqual(a.marks, b.marks) && slices.Equal(a.classes, b.classes) &&
 		(a.widget == nil) == (b.widget == nil) && (a.widget == nil || a.widget.Key != "" && a.widget.Key == b.widget.Key && a.widget.Side == b.widget.Side)
 }
 
@@ -628,9 +640,81 @@ func (v *rv) spans(b *block) []core.Span {
 			continue
 		}
 		st, class := v.markStyle(p, s)
+		if p.attach {
+			// The node's own view is a view in the line; its text is what
+			// copying takes.
+			out[i] = core.Span{Content: p.text, Class: class, Style: st, Attachment: inlineView{v: v, b: b, leaf: p.leaf}}
+			continue
+		}
 		out[i] = core.Span{Content: p.text, Style: st, Class: class}
 	}
 	return out
+}
+
+// inlineView is an inline node's own view in a textblock's line. It compares
+// by the leaf, so the view keeps its scope while the node stays the same.
+type inlineView struct {
+	v    *rv
+	b    *block
+	leaf *Node
+}
+
+// leafAt is the leaf's offset in its textblock's content, -1 when the block
+// no longer holds it.
+func (w inlineView) leafAt() int {
+	at := 0
+	for _, c := range w.b.nowNode.Content.Content {
+		if c == w.leaf {
+			return at
+		}
+		at += c.NodeSize()
+	}
+	return -1
+}
+
+// pos is the leaf's document position, -1 once the node is gone.
+func (w inlineView) pos() int {
+	w.b.posRev.Get()
+	off := w.leafAt()
+	if off < 0 {
+		return -1
+	}
+	return w.b.pos + 1 + off
+}
+
+// Render implements core.Node.
+func (w inlineView) Render(cx *core.Scope) core.Node {
+	v := w.v
+	f := v.p.NodeViews[w.leaf.Type.Name]
+	if f == nil {
+		return core.Group{}
+	}
+	props := NodeProps{
+		Node:   func() *Node { return w.leaf },
+		Pos:    w.pos,
+		Editor: v.s,
+		Selected: func() bool {
+			v.rev.Get()
+			n, ok := v.s.State().Selection.(*NodeSelection)
+			return ok && w.pos() >= 0 && n.From() == w.pos()
+		},
+		SetAttrs: func(a Attrs) {
+			if pos := w.pos(); pos >= 0 {
+				tr := v.s.State().Tr()
+				for k, val := range a {
+					tr.SetNodeAttribute(pos, k, val)
+				}
+				v.s.Dispatch(tr)
+			}
+		},
+	}
+	return core.View{OnPress: func(core.PressEvent) {
+		st := v.s.State()
+		if pos := w.pos(); pos >= 0 && isNodeSelectable(w.leaf) {
+			v.sinkRef.Focus()
+			v.s.Dispatch(st.Tr().SetSelection(NodeSelectionAt(st.Doc, pos)))
+		}
+	}, Children: []core.Node{f(cx, props)}}
 }
 
 func (v *rv) nodeLook(b *block, s *Styles) (core.Style, string) {
@@ -730,7 +814,9 @@ func (v *rv) innerView(cx *core.Scope, b *block) core.Node {
 	switch {
 	case b.typ.IsTextblock():
 		return core.Text{Ref: b.ref, SpansFunc: func() []core.Span { return v.spans(b) }, StyleFunc: look, ClassFunc: class,
-			PointerEvents: core.PointerEventsNone,
+			// The text itself takes no presses: the content box places the
+			// caret by them; its inline views take their own.
+			PointerEvents: core.PointerEventsBoxNone,
 			OnLayout:      bump, OnTextLayout: func([]core.TextLine) { v.geo.Update(func(i int) int { return i + 1 }) }}
 	case tableRole(b.typ) == "table":
 		return v.tableView(cx, b, look, class)

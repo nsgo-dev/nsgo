@@ -267,6 +267,41 @@ func TestViewShowsWidgetDecorations(t *testing.T) {
 	}
 }
 
+func TestViewShowsInlineNodeViews(t *testing.T) {
+	s := session(t, "hi\n")
+	if !s.RunNamed("insertMention", richeditor.Attrs{"id": "1", "label": "Alice"}) {
+		t.Fatal("insert")
+	}
+	app := nsgotest.Start(t, view(s, func(v *richeditor.View) {
+		v.NodeViews = map[string]richeditor.NodeView{
+			"mention": func(cx *core.Scope, p richeditor.NodeProps) core.Node {
+				return core.View{TestID: "mention", Style: core.Style{Width: core.Pt(30), Height: core.Pt(10)},
+					Children: []core.Node{core.Text{ContentFunc: func() string { return p.Node().AttrStr("label") }}}}
+			},
+		}
+	}), desktop())
+	// The node's own view is in the line, not its text.
+	chip := app.Find("id:mention")
+	if chip.Parent == nil {
+		t.Fatal("the mention's view is not mounted")
+	}
+	app.Find("text:Alice")
+	if got := s.Text(); got != "@Alice hi" {
+		t.Fatalf("text %q", got)
+	}
+	// A press selects the node atomically.
+	app.Press("id:mention")
+	sel, ok := s.State().Selection.(*richeditor.NodeSelection)
+	if !ok || sel.Node.Type.Name != "mention" || sel.From() != 1 {
+		t.Fatalf("selection %+v", s.State().Selection)
+	}
+	// Typing replaces the node whole, one position.
+	app.Type("role:textbox", "Z")
+	if got := s.Text(); got != "Z hi" {
+		t.Fatalf("typed %q", got)
+	}
+}
+
 // pageX is a view's left in the surface.
 func pageX(v *nsgotest.View) core.Points {
 	x := v.Frame.Origin.X
