@@ -372,6 +372,8 @@ const (
 	ItemQuickLook
 	// ItemOrientation asks the app to use the Orientation mask in Count, or the platform default when zero.
 	ItemOrientation
+	// ItemDiskSpace asks for the capacity of the volume containing Value, answered by EventDiskSpace carrying Count.
+	ItemDiskSpace
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.

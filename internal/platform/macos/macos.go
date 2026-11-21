@@ -1850,6 +1850,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 		case driver.ItemReadClipboard:
 			s.readClipboard(it)
 			continue
+		case driver.ItemDiskSpace:
+			go apple.DiskSpace(it.Value, it.Count, true, s.engine.Dispatch)
+			continue
 		case driver.ItemSetClipboardImage:
 			if data, ok := it.Data.([]byte); ok {
 				setClipboardImage(data)

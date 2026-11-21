@@ -813,6 +813,8 @@ func (a *App) apply(b *driver.MountBatch) {
 				a.postTo(a.popupTree, driver.Event{Kind: driver.EventMenuClosed, Count: a.popupID})
 			}
 			a.PopupMenu, a.PopupAt, a.popupID, a.popupTree = it.Menu, it.Point, it.Count, a.responseTree
+		case driver.ItemDiskSpace:
+			a.post(driver.DiskSpaceEvent(it.Count, a.diskSpace.Space, a.diskSpace.Err))
 		case driver.ItemImageInfo:
 			ev := driver.Event{Kind: driver.EventImageInfo, Count: it.Count}
 			if size, ok := a.ImageSizes[it.Image.Source.URI]; ok {
