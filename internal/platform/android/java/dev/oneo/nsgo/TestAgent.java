@@ -14,6 +14,8 @@ import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.PixelCopy;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
@@ -229,7 +231,7 @@ final class TestAgent {
                 return;
             }
             case "screenshot":
-                view.testReply(id, "", screenshot());
+                screenshot(id);
                 return;
             case "signature":
                 view.testReply(id, "", signature());
@@ -425,15 +427,40 @@ final class TestAgent {
         throw new IllegalArgumentException("the alert has no action " + index);
     }
 
-    /** The window drawn into a bitmap, as a PNG in base64. */
-    private String screenshot() {
+    /** Captures the window, including hardware-textured views, as a PNG in base64. */
+    private void screenshot(int id) {
         View root = activity().getWindow().getDecorView();
         Bitmap bitmap = Bitmap.createBitmap(Math.max(root.getWidth(), 1), Math.max(root.getHeight(), 1), Bitmap.Config.ARGB_8888);
-        root.draw(new Canvas(bitmap));
+        if (hasTextureView(root)) {
+            try {
+                PixelCopy.request(activity().getWindow(), bitmap,
+                        result -> finishScreenshot(id, root, bitmap, result == PixelCopy.SUCCESS), ui);
+                return;
+            } catch (IllegalArgumentException ignored) {
+                // The hardware surface may not be ready yet.
+            }
+        }
+        finishScreenshot(id, root, bitmap, false);
+    }
+
+    private void finishScreenshot(int id, View root, Bitmap bitmap, boolean composed) {
+        if (!composed) root.draw(new Canvas(bitmap));
         ByteArrayOutputStream png = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, png);
         bitmap.recycle();
-        return Base64.encodeToString(png.toByteArray(), Base64.NO_WRAP);
+        view.testReply(id, "", Base64.encodeToString(png.toByteArray(), Base64.NO_WRAP));
+    }
+
+    private static boolean hasTextureView(View node) {
+        if (node.getVisibility() != View.VISIBLE) return false;
+        if (node instanceof TextureView) return ((TextureView) node).isAvailable();
+        if (node instanceof ViewGroup) {
+            ViewGroup children = (ViewGroup) node;
+            for (int i = 0; i < children.getChildCount(); i++) {
+                if (hasTextureView(children.getChildAt(i))) return true;
+            }
+        }
+        return false;
     }
 
     /**
