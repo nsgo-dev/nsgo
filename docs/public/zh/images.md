@@ -46,6 +46,12 @@ NSGo 在带着新 `Version` 的提交运行时复制像素，所以应用可以�
 
 macOS、iOS、tvOS、watchOS、Windows 和 Linux 直接绘制像素。Android 和 Web 的图片视图通过每个版本生成一次的 PNG 显示像素，并把它当作新图片加载，所以两个版本之间视图会空白，直到新图片加载完成；Web 的画布直接绘制像素。HarmonyOS 和小程序暂不显示像素。
 
+## 截取视图
+
+用已挂载视图的 `core.Ref` 调用 `cx.Capture(&ref, done)`，传入 `nil` 则截取当前表面。回调在引擎 goroutine 中收到按表面像素比例生成的 PNG 字节或错误。用 `core.ImageSource{Data: png}` 显示结果。要分享截图，可把字节写成应用缓存目录中的 `.png` 文件，再把路径传给 `core.ShareOptions.Files`。[分享文件](services.md#打开链接与文件)
+
+截图取视图边界内可见的表面像素。macOS、iOS、tvOS、Windows、Linux、Android 和 Web 支持截图。Android 截取活动窗口。Web 将应用 DOM 绘制到画布中，包含 NSGo 着色器的输出，省略嵌入的框架、无法读取的图片和部分 CSS 效果。
+
 ## 资源与像素密度
 
 `resources/` 下的文件随应用一起发布。`core.Src("asset:images/cover.png")` 加载其中一个，`Scales: core.ScalesOf(1, 2, 3)` 按屏幕像素比选择 `cover.png`、`cover@2x.png` 或 `cover@3x.png`。

@@ -46,6 +46,12 @@ NSGo copies the pixels when the commit that carries a new `Version` runs, so the
 
 macOS, iOS, tvOS, watchOS, Windows and Linux draw the pixels directly. Android and the web show an image view's pixels through a PNG made once per version, loaded as a new image, so the view is blank between versions until it loads; the web's canvases draw the pixels directly. HarmonyOS and mini programs do not show pixels yet.
 
+## Capture a view
+
+Call `cx.Capture(&ref, done)` with a mounted view's `core.Ref`, or `cx.Capture(nil, done)` for the current surface. The callback receives PNG bytes at the surface's pixel scale or an error on the engine goroutine. Use `core.ImageSource{Data: png}` to display the result. To share it, write the bytes to a `.png` file in the app's cache directory and pass its path in `core.ShareOptions.Files`. [Sharing files](services.md#opening-links-and-files)
+
+Capture takes the visible surface pixels within the view's bounds. It is available on macOS, iOS, tvOS, Windows, Linux, Android and the web. Android captures the activity's window. Web capture paints the app's DOM into a canvas, including NSGo shader output, and omits embedded frames, images it cannot read and some CSS effects.
+
 ## Resources and scales
 
 Files under `resources/` ship with the app. `core.Src("asset:images/cover.png")` loads one, and `Scales: core.ScalesOf(1, 2, 3)` picks `cover.png`, `cover@2x.png` or `cover@3x.png` for the screen's pixel ratio.

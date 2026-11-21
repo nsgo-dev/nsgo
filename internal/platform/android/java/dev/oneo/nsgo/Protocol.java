@@ -115,6 +115,7 @@ final class Protocol {
     static final int CANVAS_REQUEST = 22;
     /** What the code scanner reports: the surface, the request's count and a SCAN_FRAME with the frame's width, height and luminance, a SCAN_CLOSED, or a SCAN_FAILED with why (scan.go). */
     static final int SCAN_REPORT = 23;
+    static final int CAPTURE_REPLY = 24;
 
     /** Writes a message's part after its head. */
     interface Body {
@@ -238,6 +239,7 @@ final class Protocol {
     static final int ITEM_PICK_DIRECTORIES = 62;
     static final int ITEM_OPEN_FILE = 63;
     static final int ITEM_SHARE = 64;
+    static final int ITEM_CAPTURE = 111;
     static final int ITEM_INSTALL_PACKAGE = 65;
     static final int ITEM_CAN_INSTALL_PACKAGES = 66;
     static final int ITEM_INSTALL_SETTINGS = 67;

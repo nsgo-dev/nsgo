@@ -191,7 +191,7 @@ const (
 	// share sheet showed, ItemInstallPackage Count with whether the
 	// installer started, ItemCanInstallPackages Count with whether the
 	// app may install packages and ItemInstallSettings Count with whether
-	// the setting opened (all Finished); Text is what failed.
+	// the setting opened (all Finished). ItemCapture returns the PNG in Data ([]byte); Text is what failed.
 	EventFiles
 	// EventModalShown and EventModalDismissed report that the platform
 	// finished presenting modal ID and taking it away, where it says so.

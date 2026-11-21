@@ -424,10 +424,11 @@ func (l *ShaderLayer) loadImage(i int, src driver.ImageSource) {
 }
 
 var (
-	cgBitmapContextCreate  func(data uintptr, w, h, bits, row uintptr, space uintptr, info uint32) uintptr
-	cgBitmapContextGetData func(ctx uintptr) uintptr
-	bitmapsLoaded          sync.Once
-	blank                  objc.ID
+	cgBitmapContextCreate      func(data uintptr, w, h, bits, row uintptr, space uintptr, info uint32) uintptr
+	cgBitmapContextGetData     func(ctx uintptr) uintptr
+	cgBitmapContextCreateImage func(ctx uintptr) uintptr
+	bitmapsLoaded              sync.Once
+	blank                      objc.ID
 )
 
 // mtlRegion is MTLRegion: an origin and a size, three each.
@@ -440,6 +441,7 @@ func loadBitmaps() {
 	cg := load("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
 	purego.RegisterLibFunc(&cgBitmapContextCreate, cg, "CGBitmapContextCreate")
 	purego.RegisterLibFunc(&cgBitmapContextGetData, cg, "CGBitmapContextGetData")
+	purego.RegisterLibFunc(&cgBitmapContextCreateImage, cg, "CGBitmapContextCreateImage")
 }
 
 // textureOf returns image's pixels, w by h, as a Metal texture of

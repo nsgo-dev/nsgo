@@ -1349,6 +1349,9 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemTrashFile:
 			w.trashFile(*it.Open, it.Count)
 			continue
+		case driver.ItemCapture:
+			w.capture(it.ID, it.Count)
+			continue
 		case driver.ItemShare:
 			w.engine.Dispatch(driver.Event{Kind: driver.EventFiles, Count: it.Count, Text: driver.NoShareSheet})
 			continue

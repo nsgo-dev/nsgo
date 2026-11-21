@@ -119,7 +119,8 @@ const (
 	// msgCanvasRequest requests or cancels a canvas image: surface, key, request, cancel.
 	msgCanvasRequest = 22
 	// msgScanReport is what the code scanner reports: a frame of the camera, its close or its failure (scan.go).
-	msgScanReport = 23
+	msgScanReport   = 23
+	msgCaptureReply = 24 // a capture result: surface, count, error and PNG
 )
 
 // The parts of an image view's request msgImage carries.
@@ -416,6 +417,9 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.secretReply(&r)
 		case msgFetched:
 			s.fetched(&r)
+		case msgCaptureReply:
+			surface, count, failure := r.u32(), r.u32(), r.str()
+			s.dispatchTo(surface, driver.Event{Kind: driver.EventFiles, Count: count, Text: failure, Data: r.buf})
 		case msgTestReply:
 			if s.testReply != nil {
 				s.testReply(&r)
@@ -1451,6 +1455,9 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.str(it.Open.Name)
 		case driver.ItemCanInstallPackages, driver.ItemInstallSettings:
 			w.u32(it.Count)
+		case driver.ItemCapture:
+			w.u32(it.Count)
+			w.flags(it.ID == 0)
 		case driver.ItemShare:
 			// The text, then each file as ItemOpenFile's.
 			w.u32(it.Count)

@@ -121,6 +121,7 @@ var itemNames = map[ItemKind]string{
 	ItemAudio:        "audio", ItemAuthSession: "auth-session", ItemSpeak: "speak",
 	ItemSignInWithApple: "sign-in-with-apple", ItemAppleCredentialState: "apple-credential-state",
 	ItemPurchase: "purchase", ItemWebCookies: "web-cookies", ItemLookUp: "look-up", ItemQuickLook: "quick-look",
+	ItemCapture: "capture",
 }
 
 // TraceLine is the item as traces print it: its kind, its view and what
