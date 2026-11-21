@@ -31,6 +31,7 @@
 - Let `nsgo init -template` generate an app from a Go module's template (#1125 by @houko).
 - Report what each text of a selection area has selected in `TextSelection.Ranges`: the text's `Ref` and the UTF-16 offsets of its content, so an app can tell a selection of repeated text apart from the same words elsewhere, on macOS, Linux and Windows and in `nsgotest`, where `App.SelectTextRange` injects a precise selection by offsets; `TextSelection` is no longer comparable with `==` (#1173 by @shuuul).
 - Add `apple.multiple_scenes`, which writes `UIApplicationSupportsMultipleScenes`, and show each further scene an iPad connects for it, as the user opens another window of the app, in a window of its own: a tree of the app's one engine showing the main view, with its own size, safe area, status bar and orientations, kept while UIKit disconnects the scene and ended as the system discards it (#49 by @houko).
+- Honor quit requests from Windows and Linux menus, tray icons, and window closes, and run bounded cleanup when the session ends (#1082 by @houko).
 - Acknowledge macOS logout, restart and shutdown after app cleanup and expose those requests through `desktop.QuitRequest.Forced()` (#1081 by @houko).
 - Add `Style` and `StyleFunc` to `ui.Sheet` for surface backgrounds, corners and padding (#1036 by @houko).
 - Align baseline attachments containing text to their first text line (#1038 by @houko).
