@@ -59,6 +59,7 @@ type devOptions struct {
 	lang       string // the locale to run the app in: --nsgo-lang
 	clip       string // the URL the App Clip opens from, run in the app's place
 	server     *devServer
+	preview    *previewSession
 }
 
 // dev builds and runs the app, with a dev server its builds connect to: a failed build shows over the app, and Command or Control+R in the app, outside the browser, builds and starts it again unless the app binds the key itself, with OnKey or an enabled item of its application menu (internal/dev's Wrap). It exits once the app does. With nsgo.yaml's hot reload it rebuilds and restarts the app whenever a Go file it compiles from, go.mod, nsgo.yaml or a catalog changes, and keeps the running app when a build fails. After each Go build of an app with a tsconfig.json it writes the TSX's types to .nsgo/types, for editors.
@@ -78,6 +79,9 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 	}
 	defer srv.close()
 	srv.dir = p.Dir
+	if opts.preview != nil {
+		srv.dir = opts.preview.projectDir
+	}
 	opts.server = srv
 	if opts.automation {
 		hub, err := newAutomationHub(srv, p.Dev.Target)
@@ -118,7 +122,14 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 		// may need. One listing serves both, listed again when the
 		// catalogs' new code may import more.
 		stage(ctx, "generating catalogs")
-		pkgs, catalogErr := p.appPackages(ctx, ".")
+		var pkgs []goPackage
+		var catalogErr error
+		if opts.preview != nil {
+			catalogErr = opts.preview.writeHost(ctx, p, opts.lang)
+		}
+		if catalogErr == nil {
+			pkgs, catalogErr = p.appPackages(ctx, ".")
+		}
 		if catalogErr == nil {
 			var wrote bool
 			if wrote, catalogErr = p.writeCatalogs(ctx, pkgs, false); wrote {
@@ -127,6 +138,12 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 		}
 		stage(ctx, "finding sources")
 		dirs := sourceDirs(p.Dir, pkgs)
+		if opts.preview != nil {
+			dirs = append(dirs, opts.preview.source, opts.preview.projectDir, moduleRootOf(opts.preview.source))
+			if p.Theme != "" {
+				dirs = append(dirs, p.Theme)
+			}
+		}
 		if p.Web.Host != "" {
 			dirs = append(dirs, p.resolve(p.Web.Host))
 		}
@@ -198,7 +215,11 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 			return *reason
 		}
 		// The flags and the rest of nsgo.yaml may have changed too.
-		if next, err := load(p.Dir); err == nil {
+		loadNext := func() (*project, error) { return load(p.Dir) }
+		if opts.preview != nil {
+			loadNext = opts.preview.project
+		}
+		if next, err := loadNext(); err == nil {
 			opts.apply(next)
 			next.prepareDev(opts)
 			*p = *next
@@ -222,7 +243,9 @@ func (o devOptions) appFlags() []string {
 	if o.fps {
 		flags = append(flags, "--nsgo-fps")
 	}
-	if o.lang != "" {
+	// The preview uses -lang as its initial locale, then restores the
+	// locale picked in its own controls on subsequent starts.
+	if o.lang != "" && o.preview == nil {
 		flags = append(flags, "--nsgo-lang="+o.lang)
 	}
 	return flags
