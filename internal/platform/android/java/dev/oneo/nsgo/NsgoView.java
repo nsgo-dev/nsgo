@@ -43,6 +43,7 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.Choreographer;
+import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.Gravity;
 import android.view.InputDevice;
@@ -58,6 +59,8 @@ import android.view.ViewGroupOverlay;
 import android.view.ViewConfiguration;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
+import android.view.Window;
+import android.view.WindowManager;
 import android.view.WindowInsets;
 import android.view.WindowInsetsAnimation;
 import android.view.WindowInsetsController;
@@ -245,6 +248,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     /** A new node's style and props, as the first batch encoded them (startDefault). */
     private byte[] defaultStyle, defaultProps;
     private boolean ticking, frameWanted;
+    private float preferredFrameRate;
+    private long lastFrameSent;
+    private double requestedFramePeriod;
     private final LinkedHashSet<Node> moving = new LinkedHashSet<>();
     private final ArrayList<Ghost> ghosts = new ArrayList<>();
     private final Set<View> ghostViews = new HashSet<>();
@@ -427,6 +433,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
         // A rotation or a display change moves an overlay's usable area: its window moves back onto it before it reports its frame.
         if (primary != null) primary.overlays.fit(this);
+        if (preferredFrameRate > 0) refreshRateHint();
         environment();
         if (primary == null) systemBars();
     }
@@ -434,6 +441,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        if (preferredFrameRate > 0) refreshRateHint();
         // Embedded hosts may already have a focused sibling; keep it there.
         if (getRootView().findFocus() == null) requestFocus();
         accessibility.addTouchExplorationStateChangeListener(screenReader);
@@ -852,12 +860,26 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 case Protocol.SCAN:
                     scan(message);
                     break;
-                case Protocol.WANT_FRAME:
+                case Protocol.WANT_FRAME: {
+                    int id = payload.length == 0 ? 0 : message.readInt();
                     ui.post(() -> {
-                        frameWanted = true;
-                        startTicking();
+                        NsgoView view = id == 0 ? this : overlays.view(id);
+                        if (view != null) {
+                            view.frameWanted = true;
+                            view.startTicking();
+                        }
                     });
                     break;
+                }
+                case Protocol.FRAME_RATE: {
+                    int id = message.readInt();
+                    float rate = message.readFloat();
+                    ui.post(() -> {
+                        NsgoView view = id == 0 ? this : overlays.view(id);
+                        if (view != null) view.preferFrameRate(rate);
+                    });
+                    break;
+                }
                 default:
                     text(kind, message);
             }
@@ -3092,6 +3114,50 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         });
     }
 
+    private void preferFrameRate(float rate) {
+        if (preferredFrameRate == rate) return;
+        preferredFrameRate = rate;
+        lastFrameSent = 0;
+        requestedFramePeriod = rate > 0 ? 1_000_000_000.0 / rate : 0;
+        refreshRateHint();
+    }
+
+    /** A Window's refresh hint is the Surface.setFrameRate equivalent for a View hierarchy. */
+    private void refreshRateHint() {
+        float rate = preferredFrameRate;
+        Display display = getDisplay();
+        if (rate > 0 && Build.VERSION.SDK_INT < 34) {
+            // Before API 34 the hint has to be a display-supported rate.
+            float closest = 0;
+            if (display != null) {
+                for (float hz : display.getSupportedRefreshRates()) {
+                    if (closest == 0 || Math.abs(hz - rate) < Math.abs(closest - rate)) closest = hz;
+                }
+            }
+            rate = closest;
+        }
+        if (primary != null) {
+            primary.overlays.preferFrameRate(surface, rate);
+            return;
+        }
+        Activity activity = activity();
+        if (activity instanceof NsgoActivity) {
+            Window window = activity.getWindow();
+            WindowManager.LayoutParams params = window.getAttributes();
+            if (params.preferredRefreshRate != rate) {
+                params.preferredRefreshRate = rate;
+                window.setAttributes(params);
+            }
+        } else if (Build.VERSION.SDK_INT >= 35) {
+            setRequestedFrameRate(rate > 0 ? rate : REQUESTED_FRAME_RATE_CATEGORY_DEFAULT);
+        }
+    }
+
+    private boolean frameIsDue(long vsync) {
+        double allowance = Math.min(requestedFramePeriod / 8, 500_000);
+        return lastFrameSent == 0 || vsync - lastFrameSent >= requestedFramePeriod - allowance;
+    }
+
     private void startTicking() {
         if (ticking) return;
         ticking = true;
@@ -3104,10 +3170,13 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      */
     private void tick(long now) {
         ticking = false;
-        if (frameWanted) {
+        if (frameWanted && frameIsDue(now)) {
             frameWanted = false;
+            lastFrameSent = now;
             // The frame's vsync time, on System.nanoTime's clock, for RequestAnimationFrame's time.
-            write(Protocol.FRAME, java.nio.ByteBuffer.allocate(8).putLong(now).array());
+            java.nio.ByteBuffer frame = java.nio.ByteBuffer.allocate(surface == 0 ? 8 : 12).putLong(now);
+            if (surface != 0) frame.putInt(surface);
+            write(Protocol.FRAME, frame.array());
         }
         if (animator.running()) animator.step(now);
         applyAnimated();
@@ -3151,7 +3220,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
         }
         more |= !ghosts.isEmpty();
-        if (more) startTicking();
+        if (more || frameWanted) startTicking();
     }
 
     /**

@@ -40,6 +40,17 @@ type Platform interface {
 	RequestFrame()
 }
 
+// frameRateSetter is a platform whose display clock takes a preferred rate.
+type frameRateSetter interface {
+	SetPreferredFrameRate(driver.FrameRateRange)
+}
+
+func setPreferredFrameRate(p Platform, rate driver.FrameRateRange) {
+	if setter, ok := p.(frameRateSetter); ok {
+		setter.SetPreferredFrameRate(rate)
+	}
+}
+
 // observed is a platform whose batches a test host sees first. With a
 // clipboard of the test's, the app's clipboard items go to it instead:
 // reads are answered there, and the platform never sees them.
@@ -68,6 +79,10 @@ var _ driver.FontRegistrar = observedFonts{}
 
 func (o observedFonts) RegisterFont(data []byte) error {
 	return o.Platform.(driver.FontRegistrar).RegisterFont(data)
+}
+
+func (o observed) SetPreferredFrameRate(rate driver.FrameRateRange) {
+	setPreferredFrameRate(o.Platform, rate)
 }
 
 func (o observed) Mount(b *driver.MountBatch) {
@@ -465,20 +480,24 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			log.Printf("nsgo: the app's directory could not be made: %v", err)
 		}
 	}
-	// surfaces are the attached ones by ID, the first's 0; frameAsked is
-	// set while a display frame was asked for.
-
-	frameAsked := false
-	requestFrame := func() {
-		frameAsked = true
-		// A window's display ticks; the first surface may have none.
-		for id, s := range surfaces {
-			if id != 0 {
-				s.p.RequestFrame()
-				return
+	var tree *core.Tree
+	// The app's own tree on desktop has no window. It borrows the first
+	// attached window's display clock while callbacks are waiting on it.
+	var appFrameSource uint32
+	requestFrame := func(id uint32) {
+		if id == 0 && opts.Windows != nil && tree != nil {
+			appFrameSource = 0
+			for _, t := range tree.Surfaces() {
+				if s := surfaces[t.ID()]; s != nil && !t.Closed() {
+					appFrameSource = t.ID()
+					id = appFrameSource
+					break
+				}
 			}
 		}
-		p.RequestFrame()
+		if s := surfaces[id]; s != nil {
+			s.p.RequestFrame()
+		}
 	}
 	root = core.NewRoot(core.RootOptions{
 		CheckCommits: opts.CheckCommits,
@@ -486,18 +505,23 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		Clock:        opts.Clock,
 		Report:       report,
 		// The platform owns the display frame: the engine only asks.
-		RequestFrame: requestFrame,
-		Storage:      opts.Storage,
-		Secrets:      opts.Secrets,
-		DataDir:      opts.DataDir,
-		CacheDir:     opts.CacheDir,
-		LogsDir:      opts.LogsDir,
-		Host:         opts.Host.Channel,
-		Windows:      opts.Windows,
-		HotKeys:      opts.HotKeys,
-		Tray:         opts.Tray,
+		RequestSurfaceFrame: requestFrame,
+		SetFrameRate: func(id uint32, rate core.FrameRateRange) {
+			if s := surfaces[id]; s != nil {
+				setPreferredFrameRate(s.p, driver.FrameRateRange(rate))
+			}
+		},
+		Storage:  opts.Storage,
+		Secrets:  opts.Secrets,
+		DataDir:  opts.DataDir,
+		CacheDir: opts.CacheDir,
+		LogsDir:  opts.LogsDir,
+		Host:     opts.Host.Channel,
+		Windows:  opts.Windows,
+		HotKeys:  opts.HotKeys,
+		Tray:     opts.Tray,
 	})
-	tree := core.NewTree(root, p)
+	tree = core.NewTree(root, p)
 	e.tree = tree
 	tree.Resize(opts.Size, opts.Geometry)
 	tree.SetEnvironment(opts.Environment)
@@ -516,9 +540,18 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			t.SetViewPacing(false)
 		}
 		surfaces[t.ID()] = s
+		if rate := t.PreferredFrameRate(); rate != (core.FrameRateRange{}) {
+			setPreferredFrameRate(p, driver.FrameRateRange(rate))
+		}
 		return s
 	}
 	attach(tree, p)
+	removeSurface := func(id uint32) {
+		delete(surfaces, id)
+		if tree.FramePending() && appFrameSource == id {
+			requestFrame(0)
+		}
+	}
 	// commitOne applies what changed in s and records what it cost when a
 	// monitor measures or a trace hears; start is when the wake-up that
 	// led here began.
@@ -565,7 +598,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			case t.Closed():
 				t.Forget()
 				if s != nil {
-					delete(surfaces, t.ID())
+					removeSurface(t.ID())
 					s.p.Mount(destroyed())
 				}
 			case s != nil:
@@ -617,13 +650,19 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			case m.synced != nil:
 				continue
 			case m.frame:
-				frameAsked = false
 				// A display's time is on the system clock's base, which an app's own clock does not share.
 				at := m.frameAt
 				if opts.Clock != nil {
 					at = time.Time{}
 				}
-				root.RunFrameAt(at)
+				appWaits := tree.FramePending() && m.surface != 0 && appFrameSource == m.surface
+				if s := surfaces[m.surface]; s != nil {
+					s.tree.RunFrameAt(at)
+				}
+				if appWaits {
+					appFrameSource = 0
+					tree.RunFrameAt(at)
+				}
 				continue
 			case m.fn != nil:
 				m.fn()
@@ -655,10 +694,13 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 					// A test host follows the windows the app opens too, and their clipboard commands use the test's clipboard.
 					opened = observed{Platform: opened, surface: m.surface, observe: opts.Observe, clipboard: opts.Clipboard, takePhoto: opts.TakePhoto, scanCode: opts.ScanCode, dispatch: (&Engine{runner: e.runner, surface: m.surface}).Dispatch}.platform()
 				}
-				attach(tree.Surfaces()[surfaceIndex], opened)
+				attached := attach(tree.Surfaces()[surfaceIndex], opened)
 				taken[i].attach = nil
-				if frameAsked {
-					m.attach.RequestFrame()
+				if opts.Windows != nil && tree.FramePending() && appFrameSource == 0 {
+					requestFrame(0)
+				}
+				if attached.tree.FramePending() && appFrameSource != m.surface {
+					attached.p.RequestFrame()
 				}
 				continue
 			}
@@ -674,7 +716,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 			switch {
 			case m.detach:
 				if m.surface != 0 {
-					delete(surfaces, m.surface)
+					removeSurface(m.surface)
 				}
 			case m.resize != nil:
 				// One batch, so no effect sees the new size with the old environment it came with.
@@ -791,7 +833,7 @@ func (e *Engine) enqueue(m message) {
 			m.event.Delta.Y += q.event.Delta.Y
 			*q = m
 			merged = true
-		case m.frame && q.frame,
+		case m.frame && q.frame && same,
 			m.env != nil && q.env != nil && same,
 			m.tokens != nil && q.tokens != nil,
 			m.fonts && q.fonts,
@@ -949,10 +991,10 @@ func (e *Engine) Language() string {
 
 // Frame reports that the display frame the app asked for has begun. The
 // engine runs the callbacks waiting for it on its goroutine, then commits.
-func (e *Engine) Frame() { e.push(message{frame: true}) }
+func (e *Engine) Frame() { e.push(message{surface: e.surface, frame: true}) }
 
 // FrameAt is Frame for a frame whose time the display gave, on time.Now's base: when it shows, or when it began where the platform tells no more (core.Scope.RunFrameAt). driver.DisplayTime brings a platform's timestamp to that base.
-func (e *Engine) FrameAt(at time.Time) { e.push(message{frame: true, frameAt: at}) }
+func (e *Engine) FrameAt(at time.Time) { e.push(message{surface: e.surface, frame: true, frameAt: at}) }
 
 // Resize sets the surface size and the fold geometry measured at it, the zero Geometry for a surface without a fold. A change of the geometry alone is a resize to the same size.
 func (e *Engine) Resize(size driver.Size, g driver.Geometry) {

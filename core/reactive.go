@@ -94,6 +94,10 @@ type RootOptions struct {
 	Report func(error)
 	// RequestFrame tells the host that the app waits for the next display frame: it calls Scope.RunFrame, or Scope.RunFrameAt with the display's time for the frame, when that frame begins, and is not asked again until then. It runs on the graph's goroutine, so it must not block. A host without display frames leaves it nil, and the callbacks wait.
 	RequestFrame func()
+	// RequestSurfaceFrame is RequestFrame for a host with independent displays. It calls Tree.RunFrameAt for the surface named by id.
+	RequestSurfaceFrame func(id uint32)
+	// SetFrameRate updates the host's preferred display rate for the surface, if the host can change it. It must not block.
+	SetFrameRate func(id uint32, rate FrameRateRange)
 	// Storage keeps the app's entries; a store in memory when nil.
 	Storage *Store
 	// Secrets is the platform's secure store, which Scope.Secrets keeps secrets in; nil where there is none, so Secrets fails with ErrSecretsUnavailable.
@@ -122,7 +126,7 @@ func NewRoot(opts RootOptions) *Scope {
 	}
 	rt := &runtime{graphOwner: newGraphOwner(opts.CheckCommits), post: opts.Post, clock: opts.Clock, report: opts.Report, checkCommits: opts.CheckCommits,
 		store: opts.Storage, secrets: opts.Secrets, dataDir: opts.DataDir, cacheDir: opts.CacheDir, logsDir: opts.LogsDir,
-		requestFrame: opts.RequestFrame, windows: opts.Windows, takesHotKeys: opts.HotKeys, tray: opts.Tray}
+		requestFrame: opts.RequestFrame, requestSurfaceFrame: opts.RequestSurfaceFrame, setFrameRate: opts.SetFrameRate, windows: opts.Windows, takesHotKeys: opts.HotKeys, tray: opts.Tray}
 	rt.root = &Scope{rt: rt}
 	if devtools.Enabled {
 		rt.dev = newDevState()
@@ -157,21 +161,23 @@ type runtime struct {
 	clock            Clock
 	report           func(error)
 
-	// The callbacks waiting for the next display frame, whether the host has been asked for it, and the last frame's time, which the next never precedes.
-	frames         []*frameCallback
-	frameRequested bool
-	frameAt        time.Time
-	requestFrame   func()
-	env            *Env
-	tree           *Tree
-	root           *Scope
-	store          *Store
-	storage        *storageWatch
-	secrets        driver.SecretStore
-	dataDir        string
-	cacheDir       string
-	logsDir        string
-	host           *hostApp
+	// firstFrames serves the first tree and scopes with no tree. Every
+	// other surface keeps its own queue and cadence.
+	firstFrames         frameQueue
+	frameRequested      bool // a request to a host with one shared clock
+	requestFrame        func()
+	requestSurfaceFrame func(uint32)
+	setFrameRate        func(uint32, FrameRateRange)
+	env                 *Env
+	tree                *Tree
+	root                *Scope
+	store               *Store
+	storage             *storageWatch
+	secrets             driver.SecretStore
+	dataDir             string
+	cacheDir            string
+	logsDir             string
+	host                *hostApp
 	// restricted says an owner was given an Access (ProvideAccess), so
 	// requests look for one.
 	restricted bool
