@@ -21,6 +21,8 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
@@ -84,6 +86,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -378,6 +381,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        updateGestureRects();
         if (primary != null) {
             // An overlay's size goes with its environment.
             environment();
@@ -418,6 +422,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onConfigurationChanged(Configuration config) {
         super.onConfigurationChanged(config);
+        updateGestureRects();
         // Text prepared before a change of density keeps its pixel size
         // until the engine prepares it again.
         float d = getResources().getDisplayMetrics().density;
@@ -434,6 +439,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        updateGestureRects();
         // Embedded hosts may already have a focused sibling; keep it there.
         if (getRootView().findFocus() == null) requestFocus();
         accessibility.addTouchExplorationStateChangeListener(screenReader);
@@ -512,12 +518,14 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     public void detachFromEngine() {
         if (!attached) return;
         attached = false;
+        updateGestureRects();
         unregisterBack();
     }
 
     private void attachRunningEngine() {
         engine.attach(this);
         attached = true;
+        updateGestureRects();
         if (Build.VERSION.SDK_INT >= 33 && isAttachedToWindow() && backCallback == null) registerBack();
         host.start();
     }
@@ -731,6 +739,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         recordingStarts.clear();
         recordingAsks.clear();
         attached = false;
+        gestureRects = Collections.emptyList();
+        updateGestureRects();
         keptOffScreen = false;
         unregisterBack();
         // Overlays are the system's windows, not the activity's: nothing else removes them as the process ends, and they would stay above every app, frozen, with the service's notification.
@@ -742,6 +752,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * Lets go of an overlay's view as its window closes, on the UI thread: its decoders and every node's web view, video and native component, as a closed tree deletes none of its views.
      */
     void releaseOverlay() {
+        gestureRects = Collections.emptyList();
+        updateGestureRects();
         canvasImages.close();
         decoder.shutdownNow();
         folders.shutdownNow();
@@ -2693,6 +2705,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 event(Protocol.EVENT_OPEN_URL, 0, count, 0, 0, "", 0, 0, 0, 0, 0, 0, 0, null, 0, 0, false, "", opened);
                 break;
             }
+            case Protocol.ITEM_SYSTEM_GESTURES:
+                readGestureRects(in);
+                break;
             case Protocol.ITEM_HAPTIC:
                 haptic(in.readInt());
                 break;
@@ -3464,6 +3479,40 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             if (c instanceof Activity) return (Activity) c;
         }
         return null;
+    }
+
+    // The wire rectangles are in surface points. Keep them so resize and
+    // display changes can recalculate the clipped pixel rectangles.
+    private List<RectF> gestureRects = Collections.emptyList();
+    private List<Rect> appliedGestureRects = Collections.emptyList();
+
+    private void readGestureRects(DataInputStream in) throws IOException {
+        int count = in.readInt();
+        ArrayList<RectF> rects = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            float x = in.readFloat(), y = in.readFloat();
+            float width = in.readFloat(), height = in.readFloat();
+            rects.add(new RectF(x, y, x + width, y + height));
+        }
+        gestureRects = rects;
+        updateGestureRects();
+    }
+
+    private void updateGestureRects() {
+        if (Build.VERSION.SDK_INT < 29 || (gestureRects.isEmpty() && appliedGestureRects.isEmpty())) return;
+        List<Rect> pixels = new ArrayList<>();
+        if (attached || primary != null) {
+            float scale = getResources().getDisplayMetrics().density;
+            for (RectF area : gestureRects) {
+                Rect rect = new Rect((int) Math.floor(area.left * scale), (int) Math.floor(area.top * scale),
+                        (int) Math.ceil(area.right * scale), (int) Math.ceil(area.bottom * scale));
+                if (rect.intersect(0, 0, getWidth(), getHeight())) pixels.add(rect);
+            }
+        }
+        if (!pixels.equals(appliedGestureRects)) {
+            setSystemGestureExclusionRects(pixels);
+            appliedGestureRects = pixels;
+        }
     }
 
     /**
