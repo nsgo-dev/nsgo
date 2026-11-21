@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Add `nsgo build -channel steam` for desktop depots with development-only `steam_appid.txt` support (#1227 by @houko).
+- Add `nsgo build -channel steam` for desktop depots with development-only `steam_appid.txt` support and bundled GTK 4 on Linux x64 (#1227 and #1290 by @houko).
 - Keep a read-only input's text selectable and copyable on macOS and iOS, the latter with no keyboard, stop edits at once in a macOS field made read-only while it is edited, and make `Readonly` and `Disabled` stop edits on HarmonyOS, which ignored them.
 - Stand `ui.Slider` and `ui.Progress`, and their `base` forms, up with `Axis: base.Vertical`, and fill them from the other end with `Inverted`, top to bottom when vertical.
 - Add `ui.ProgressRing.StartAngle` and `CounterClockwise` to start the arc anywhere and run it, or an indeterminate ring's turn, counterclockwise.

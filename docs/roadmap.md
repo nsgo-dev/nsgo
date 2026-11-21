@@ -368,6 +368,7 @@ What the desktop installers ([tool](architecture/tool.md#installers)) and the st
 | MSIX names and logos | `resources.pri`, [#1415](https://github.com/nsgo-dev/nsgo/issues/1415) | The MSIX names the app in each of its languages and carries its logos at every scale, which need a resource index |
 | Flatpak bundles | OSTree, `flatpak build-bundle`, [#1416](https://github.com/nsgo-dev/nsgo/issues/1416) | `build` writes a `.flatpak` users install directly, and the manifest is built with flatpak-builder on GNOME's runtime |
 | App Bundles of both ABIs | [#1231](https://github.com/nsgo-dev/nsgo/issues/1231) | One App Bundle holds arm64 and x86_64, as Play serves both from one upload; so far each target writes its own |
+| Linux arm64 Steam runtime | [Steam verification (#1228)](https://github.com/nsgo-dev/nsgo/issues/1228) | An arm64 depot includes its own GTK 4 libraries and opens in a Steam runtime for arm64 |
 | AppImage updates | `.upd_info`, zsync, [#1417](https://github.com/nsgo-dev/nsgo/issues/1417) | The AppImage carries its update information, so AppImageUpdate and launchers update it |
 
 ## Updates
