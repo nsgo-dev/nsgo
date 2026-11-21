@@ -866,30 +866,42 @@ var errNoInstaller = Unavailable("core: only Android installs packages")
 // InstallPackage is the core's part of mobile.InstallPackage, which apps
 // use: it hands the APK at path to Android's package installer.
 func (cx *Scope) InstallPackage(path string, done func(started bool, err error)) {
-	answer := func(started bool, err error) {
-		if done != nil {
-			done(started, err)
-		}
+	if cx.tree() == nil {
+		return
 	}
+	if cx.Env().hostUntracked() != OSAndroid {
+		if done != nil {
+			done(false, errNoInstaller)
+		}
+		return
+	}
+	cx.installPackage(SharedFile{Path: path, MIME: "application/vnd.android.package-archive"}, done)
+}
+
+func (cx *Scope) installPackage(f SharedFile, done func(bool, error)) {
 	t := cx.tree()
 	if t == nil {
 		return
 	}
-	if cx.Env().hostUntracked() != OSAndroid {
-		answer(false, errNoInstaller)
-		return
-	}
-	r, err := resolveShared(SharedFile{Path: path, MIME: "application/vnd.android.package-archive"})
+	r, err := resolveShared(f)
 	if err != nil {
-		answer(false, err)
+		if done != nil {
+			done(false, err)
+		}
 		return
 	}
 	t.request(cx, driver.MountItem{Kind: driver.ItemInstallPackage, Open: &r}, func(ev driver.Event) {
-		if ev.Text != "" {
-			answer(false, errors.New(ev.Text))
+		if done == nil {
 			return
 		}
-		answer(ev.Finished, nil)
+		switch ev.Text {
+		case "":
+			done(ev.Finished, nil)
+		case driver.NoInstaller:
+			done(false, Unavailable(ev.Text))
+		default:
+			done(false, errors.New(ev.Text))
+		}
 	})
 }
 
