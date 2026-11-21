@@ -313,6 +313,13 @@ func (t *Tree) refuseSource(n *node, permission string, uri, refused *string, re
 
 // refuseImage empties the image sources n's Access refuses; one the app holds the bytes or pixels of loads nothing.
 func (t *Tree) refuseImage(n *node, src *ImageSource, refused *string, report func(error)) {
+	if src.Recording != nil {
+		if uri := refusedRecording(n.owner, src.Recording, map[*driver.CanvasRecording]bool{}); uri != "" {
+			*src = ImageSource{}
+			t.refuseSource(n, AccessNetwork, &uri, refused, report)
+		}
+		return
+	}
 	if len(src.Data) > 0 || src.Pixels != nil {
 		return
 	}
@@ -331,4 +338,26 @@ func (t *Tree) refuseImage(n *node, src *ImageSource, refused *string, report fu
 		}
 	}
 	src.Variants = kept
+}
+
+// refusedRecording checks the image sources nested inside a retained drawing.
+func refusedRecording(owner *Scope, record *driver.CanvasRecording, seen map[*driver.CanvasRecording]bool) string {
+	if seen[record] {
+		return ""
+	}
+	seen[record] = true
+	for _, op := range record.Ops {
+		if op.Image == nil {
+			continue
+		}
+		src := op.Image
+		if src.Recording != nil {
+			if uri := refusedRecording(owner, src.Recording, seen); uri != "" {
+				return uri
+			}
+		} else if len(src.Data) == 0 && src.Pixels == nil && sourceRefusal(owner, AccessNetwork, src.URI) != nil {
+			return src.URI
+		}
+	}
+	return ""
 }

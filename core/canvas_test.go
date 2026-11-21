@@ -84,3 +84,13 @@ func TestFontChangeDoesNotDrawDisposedCanvases(t *testing.T) {
 		t.Fatalf("disposed canvas drew again: draws=%d, items=%v", draws, kinds(batch))
 	}
 }
+
+func TestCanvasRecordingChoosesAssetsAtTheRecordedScale(t *testing.T) {
+	h := newHost(t, Size{Width: 40, Height: 40}, nil)
+	src := RecordCanvasImage(h.root, Size{Width: 20, Height: 20}, 2, func(d *Drawing) {
+		d.DrawImage(ImageSource{URI: "asset:tiles.png", Scales: ScalesOf(1, 2)}, 0, 0)
+	})
+	if got := src.Recording.Ops[0].Image.URI; got != "asset:tiles@2x.png" {
+		t.Fatalf("image URI = %q, want asset:tiles@2x.png", got)
+	}
+}

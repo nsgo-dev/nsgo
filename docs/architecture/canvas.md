@@ -26,6 +26,12 @@ A drawing answers without the platform, during `Draw` and after it, so `OnPress`
 - `IsPointInPath` and `IsPointInStroke` replay what was recorded for its transform, current path and line style and test the flattened path; `PathContains` and `StrokeContains` test a `Path`. Strokes take joins as round and dashes as solid.
 - Bound arguments count as recorded.
 
+## Offscreen images
+
+`core.RecordCanvasImage` records a standalone drawing in points at a chosen pixel scale. It uses the scope's text engine and its callback runs outside reactive tracking. The source has its own identity and can be drawn in later frames. Record a new source to change its contents. The source's native raster is built after its input images are ready and kept while the source is in use. The raster on Windows is a Direct2D target bitmap. If the device is replaced, the player can replay the recording on the new device.
+
+An offscreen drawing uses the values recorded in its operations. To update a paint for an animation, record a new source. A canvas can move or scale an existing source with its own animated arguments.
+
 ## View paints
 
 `FillFromView`, `StrokeFromView`, `LineWidthFromView` and `LineDashFromView` record an operation whose value is the canvas view's SVG paint style ([styles](styles.md)), noted in `Drawing.ViewPaints` with the initial paint where no view sets one. The core resolves the inherited `Fill`, `Stroke`, `StrokeWidth` and `StrokeDash`, with `PaintCurrentColor` the view's text color, and sends `Drawing.Painted`: a change of them sends the drawing again without drawing it again, and no platform knows of them. A canvas that has drawn nothing sends no empty first drawing.
@@ -91,6 +97,7 @@ The web replays canvases 120 ms after a scroll zoom's last step, at the screen's
 
 | NSH | NSGo | Why |
 | --- | --- | --- |
+| A canvas keeps a static prefix within its own drawing | A standalone recording can also become an image reused across frames | A tile layer or minimap can outlive any one canvas recording |
 | Any number or color may be an animated value, bound where it is passed | `Bind` binds the last operation's argument | Go has no union of a number and a node; one method keeps every drawing call plain |
 | Nodes reach only GPUI's accessibility and the headless driver | Nodes reach each backend's accessibility, except Windows' and Linux's | NSGo has no GPUI backend; native accessibility is where screen readers look |
 | `font` is a CSS shorthand string | A `Font` value | Styles are Go values |

@@ -141,6 +141,7 @@ func loadCanvas(cg uintptr) {
 	}
 	reg(&cgGradientCreate, cg, "CGGradientCreateWithColorComponents")
 	reg(&cgImageCreateWithImageInRect, cg, "CGImageCreateWithImageInRect")
+	reg(&cgBitmapContextCreateImage, cg, "CGBitmapContextCreateImage")
 	reg(&cgPathCreateWithRoundedRect, cg, "CGPathCreateWithRoundedRect")
 }
 
@@ -759,8 +760,12 @@ func (p *player) image(op *driver.DrawOp) {
 	src := img.image
 	if op.X2 != 0 || op.Y2 != 0 {
 		// The part named in points of the image, in its pixels.
-		k := img.width / max(float64(img.points.Width), 1e-9)
-		src = cgImageCreateWithImageInRect(img.image, Rect(f(op.X1)*k, f(op.Y1)*k, f(op.X2)*k, f(op.Y2)*k))
+		x := img.width / max(float64(img.points.Width), 1e-9)
+		y := x
+		if op.Image.Recording != nil {
+			y = img.height / max(float64(img.points.Height), 1e-9)
+		}
+		src = cgImageCreateWithImageInRect(img.image, Rect(f(op.X1)*x, f(op.Y1)*y, f(op.X2)*x, f(op.Y2)*y))
 		if src == 0 {
 			return
 		}
@@ -810,6 +815,9 @@ func endCanvasPass() {
 // canvasImage returns src's image, or nil while it loads, and has the
 // host draw again once it has loaded.
 func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
+	if src.Recording != nil {
+		return recordedCanvasImage(src, host)
+	}
 	if src.Pixels != nil {
 		return canvasFrame(src)
 	}

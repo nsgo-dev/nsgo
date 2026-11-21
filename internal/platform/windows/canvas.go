@@ -121,7 +121,8 @@ type canvasPlayer struct {
 	off *comObject
 	// split is what a list played over the static part leaves out
 	// (canvascache.go).
-	split driver.CanvasSplit
+	split  driver.CanvasSplit
+	waited bool
 }
 
 // changedCanvases draws again the canvases whose bound arguments changed.
@@ -976,8 +977,9 @@ func (c *canvasPlayer) image(op *driver.DrawOp) {
 	if op.Image == nil {
 		return
 	}
-	s := c.p.w.canvasImage(*op.Image)
+	s := c.p.canvasSource(*op.Image, c.v)
 	if s == nil || s.pic == nil {
+		c.waited = c.waited || s == nil || s.load != nil
 		return
 	}
 	bmp := s.bitmapOf(c.p.dc, 0)
@@ -990,9 +992,13 @@ func (c *canvasPlayer) image(op *driver.DrawOp) {
 		w, h = float32(nat.Width), float32(nat.Height)
 	}
 	k := float32(s.pic.width) / max(float32(nat.Width), 1e-3)
+	ky := k
+	if op.Image.Recording != nil {
+		ky = float32(s.pic.height) / max(float32(nat.Height), 1e-3)
+	}
 	src := rectF{0, 0, float32(s.pic.width), float32(s.pic.height)}
 	if op.X2 != 0 || op.Y2 != 0 {
-		src = rectF{op.X1 * k, op.Y1 * k, (op.X1 + op.X2) * k, (op.Y1 + op.Y2) * k}
+		src = rectF{op.X1 * k, op.Y1 * ky, (op.X1 + op.X2) * k, (op.Y1 + op.Y2) * ky}
 	}
 	dst := rectF{op.X, op.Y, op.X + w, op.Y + h}
 	alpha := c.st.alpha
@@ -1092,6 +1098,10 @@ func (w *window) endCanvasPass() {
 
 func (w *window) closeCanvasImages() {
 	w.canvasClosed = true
+	for key, s := range w.canvasRecordings {
+		s.reset(driver.ImageSource{})
+		delete(w.canvasRecordings, key)
+	}
 	for _, s := range w.canvasFrames {
 		s.reset(driver.ImageSource{})
 	}

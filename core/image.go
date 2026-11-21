@@ -163,12 +163,16 @@ func ScalesOf(scales ...float32) ImageScales {
 // (asset:/a.png at 2 is asset:/a@2x.png); without scales, for the 1x pick
 // or with a query or fragment, which no file name has, the URI stays.
 func (t *Tree) pickScale(s ImageSource) ImageSource {
+	return pickImageScale(s, t.root.Env().ratio.GetUntracked())
+}
+
+func pickImageScale(s ImageSource, ratio float32) ImageSource {
 	scales := s.Scales
 	s.Scales = 0
 	if scales == 0 || s.Variants == nil && (!strings.HasPrefix(s.URI, "asset:") || strings.ContainsAny(s.URI, "?#")) {
 		return s
 	}
-	pick := scales.Pick(t.root.Env().ratio.GetUntracked())
+	pick := scales.Pick(ratio)
 	if pick == 1 {
 		return s
 	}

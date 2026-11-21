@@ -160,7 +160,8 @@ type surface struct {
 	env            driver.Environment // as last sent
 	gestures       gestures
 	// canvasImages are the images canvases draw, by ImageSource.Key.
-	canvasImages map[string]*canvasImage
+	canvasImages     map[string]*canvasImage
+	canvasRecordings map[string]*canvasImage
 	// canvasFrames are the canvases of the pixels canvases drew last (canvasFrame).
 	canvasFrames      []canvasFrame
 	canvasFramePixels int // the pixels of canvasFrames together

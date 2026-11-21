@@ -200,7 +200,7 @@ func (t *Tree) mountCanvas(cx *Scope, parent *node, c Canvas) {
 		if cn.drawing == nil && len(d.Ops) == 0 && len(d.Nodes) == 0 {
 			return
 		}
-		t.pickDrawingScales(d)
+		pickDrawingScales(d, t.root.Env().ratio.GetUntracked())
 		if t.rt.restricted {
 			t.refuseDrawingImages(n, d)
 		}
@@ -209,12 +209,11 @@ func (t *Tree) mountCanvas(cx *Scope, parent *node, c Canvas) {
 	})
 }
 
-// pickDrawingScales has the images d draws name the variant for the
-// screen, as Image's do.
-func (t *Tree) pickDrawingScales(d *Drawing) {
+// pickDrawingScales chooses the images' variants for the recording's pixel ratio.
+func pickDrawingScales(d *Drawing, ratio float32) {
 	for i := range d.Ops {
 		if op := &d.Ops[i]; op.Kind == driver.DrawImage && op.Image != nil && op.Image.Scales != 0 {
-			src := t.pickScale(*op.Image)
+			src := pickImageScale(*op.Image, ratio)
 			op.Image = &src
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"strings"
+	"weak"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/webstyle"
@@ -18,8 +19,9 @@ import (
 // applies to its tree of views: it keeps the views' frames, styles and text,
 // as a batch sends what changed, and writes one operation for each.
 type mounter struct {
-	s     *surface
-	views map[driver.NodeID]*view
+	s          *surface
+	views      map[driver.NodeID]*view
+	recordings map[string]weak.Pointer[driver.CanvasRecording]
 	// order counts the inserts, so a press goes to the view drawn last
 	// among those stacked.
 	order uint32
@@ -77,6 +79,7 @@ func newMounter(s *surface) *mounter {
 // mount applies a batch and hands its operations to the render layer.
 func (m *mounter) mount(b *driver.MountBatch) {
 	m.o.reset()
+	m.collectCanvasSources()
 	if m.anim != nil {
 		// The animator starts a run where its clock is, so bring it to now
 		// before a batch adds one.
@@ -118,7 +121,7 @@ func (m *mounter) applyAnimated() bool {
 	})
 	m.anim.ChangedCanvases(func(id driver.NodeID) {
 		if v := m.views[id]; v != nil && v.drawing != nil {
-			m.o.op("cv", id).str(canvasJSON(m.anim.CanvasOps(id, v.drawing)))
+			m.canvasDrawing(id, m.anim.CanvasOps(id, v.drawing))
 			changed = true
 		}
 	})
@@ -194,7 +197,7 @@ func (m *mounter) item(b *driver.MountBatch, it *driver.MountItem) {
 				ops = m.anim.CanvasOps(it.ID, it.Drawing)
 			}
 		}
-		m.o.op("cv", it.ID).str(canvasJSON(ops))
+		m.canvasDrawing(it.ID, ops)
 	case driver.ItemImage:
 		src, fit, data := "", "cover", ""
 		if it.Image != nil {

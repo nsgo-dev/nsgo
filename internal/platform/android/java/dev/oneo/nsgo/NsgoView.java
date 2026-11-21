@@ -146,6 +146,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     /** The first view's overlays over other apps, null on an overlay's view. */
     private final Overlays overlays;
     /** Canvas decodes can be removed from the queue when their cache entry is evicted. */
+    private final Map<String, CanvasRecording> canvasRecordings = new HashMap<>();
     private final Map<Integer, FutureTask<Void>> canvasDecodes = new HashMap<>();
     /** Decodes images off the UI thread, one at a time. */
     private final ThreadPoolExecutor decoder = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
@@ -725,6 +726,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             network = null;
         }
         canvasImages.close();
+        canvasRecordings.clear();
         decoder.shutdownNow();
         folders.shutdownNow();
         // An ended process hears no answer, and a late grant starts nothing.
@@ -743,6 +745,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      */
     void releaseOverlay() {
         canvasImages.close();
+        canvasRecordings.clear();
         decoder.shutdownNow();
         folders.shutdownNow();
         for (int i = 0; i < nodes.size(); i++) {
@@ -1425,11 +1428,23 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     private void canvasImage(DataInputStream in) throws IOException {
         String key = Protocol.readString(in);
         int generation = in.readInt();
-        boolean unavailable = in.readBoolean();
+        int kind = in.readUnsignedByte();
+        if (kind == 3) {
+            canvasRecordings.remove(key);
+            canvasImages.forget(key);
+            return;
+        }
+        if (kind == 2) {
+            if (canvasImages.wants(key, generation)) {
+                canvasRecordings.put(key, new CanvasRecording(generation, in));
+                if (finishCanvasRecordings()) redrawCanvases();
+            }
+            return;
+        }
         float scale = in.readFloat();
         byte[] data = new byte[in.readInt()];
         in.readFully(data);
-        if (unavailable) {
+        if (kind == 1) {
             if (canvasImages.unavailable(key, generation)) redrawCanvases();
             return;
         }
@@ -1445,12 +1460,60 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             CanvasNode.Picture picture = bitmap == null ? null : new CanvasNode.Picture(bitmap, scale);
             ui.post(() -> {
                 canvasDecodes.remove(generation);
-                if (canvasImages.complete(key, generation, picture)) redrawCanvases();
+                boolean loaded = canvasImages.complete(key, generation, picture);
+                if (finishCanvasRecordings() || loaded) redrawCanvases();
             });
             return null;
         });
         canvasDecodes.put(generation, task);
         decoder.execute(task);
+    }
+
+    private static final class CanvasRecording {
+        final int generation, pw, ph;
+        final float width, height;
+        final byte[] ops;
+
+        CanvasRecording(int generation, DataInputStream in) throws IOException {
+            this.generation = generation;
+            pw = in.readInt();
+            ph = in.readInt();
+            width = in.readFloat();
+            height = in.readFloat();
+            ops = new byte[in.readInt()];
+            in.readFully(ops);
+        }
+    }
+
+    /** Replays newly ready recordings, including ones which use a recording that just became ready. */
+    private boolean finishCanvasRecordings() {
+        boolean ready = false;
+        boolean changed;
+        do {
+            changed = false;
+            var entries = canvasRecordings.entrySet().iterator();
+            while (entries.hasNext()) {
+                var entry = entries.next();
+                String key = entry.getKey();
+                CanvasRecording c = entry.getValue();
+                if (!canvasImages.wants(key, c.generation)) {
+                    entries.remove();
+                    continue;
+                }
+                CanvasNode.Picture picture;
+                try {
+                    picture = CanvasNode.renderRecording(c.pw, c.ph, c.width, c.height, c.ops, canvasImages);
+                    if (picture == null) continue;
+                } catch (RuntimeException | OutOfMemoryError e) {
+                    Log.w(TAG, "canvas recording: " + e);
+                    picture = null;
+                }
+                ready |= canvasImages.complete(key, c.generation, picture);
+                entries.remove();
+                changed = true;
+            }
+        } while (changed && !canvasRecordings.isEmpty());
+        return ready;
     }
 
     /** Answers ITEM_SPEAK count of this view's tree: an utterance's end, stopped or with error, one of driver's Speak errors, or the voices as JSON. */

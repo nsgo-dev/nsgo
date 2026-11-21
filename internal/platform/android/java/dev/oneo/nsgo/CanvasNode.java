@@ -43,11 +43,16 @@ final class CanvasNode extends View {
     /** An image canvases draw, decoded once, with its pixels a point. */
     static final class Picture {
         final Bitmap bitmap;
-        final float scale;
+        final float scale, scaleY;
 
         Picture(Bitmap bitmap, float scale) {
+            this(bitmap, scale, scale);
+        }
+
+        Picture(Bitmap bitmap, float scale, float scaleY) {
             this.bitmap = bitmap;
             this.scale = scale > 0 ? scale : 1;
+            this.scaleY = scaleY > 0 ? scaleY : 1;
         }
     }
 
@@ -130,6 +135,20 @@ final class CanvasNode extends View {
     /** Replays a static drawing, also used by the tab bar's SVG icons. */
     static void play(Canvas canvas, float width, float height, byte[] ops) {
         new Player(canvas, width, height, null).play(ByteBuffer.wrap(ops));
+    }
+
+    static Picture renderRecording(int pw, int ph, float w, float h, byte[] ops, CanvasImages<Picture> pictures) {
+        Bitmap bitmap = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        float sx = pw / w, sy = ph / h;
+        canvas.scale(sx, sy);
+        Player p = new Player(canvas, w, h, pictures);
+        p.play(ByteBuffer.wrap(ops));
+        if (p.waited) {
+            bitmap.recycle();
+            return null;
+        }
+        return new Picture(bitmap, sx, sy);
     }
 
     // Assistive technology sees the parts as virtual views.
@@ -790,6 +809,8 @@ final class CanvasNode extends View {
             canvas.restore();
         }
 
+        private boolean waited;
+
         private void image(ByteBuffer b) {
             String key = string(b);
             b.getFloat(); // the density its name gives, which the picture carries
@@ -797,18 +818,21 @@ final class CanvasNode extends View {
             float sx = b.getFloat(), sy = b.getFloat(), sw = b.getFloat(), sh = b.getFloat();
             if (pictures == null) return;
             CanvasImages<Picture>.Lease lease = pictures.acquire(key);
-            if (lease == null) return;
+            if (lease == null) {
+                waited |= pictures.pending(key);
+                return;
+            }
             try {
                 Picture p = lease.value;
-                float natW = p.bitmap.getWidth() / p.scale, natH = p.bitmap.getHeight() / p.scale;
+                float natW = p.bitmap.getWidth() / p.scale, natH = p.bitmap.getHeight() / p.scaleY;
                 if (w == 0 && h == 0) {
                     w = natW;
                     h = natH;
                 }
                 Rect src = null;
                 if (sw != 0 || sh != 0) {
-                    src = new Rect(Math.round(sx * p.scale), Math.round(sy * p.scale), Math.round((sx + sw) * p.scale),
-                            Math.round((sy + sh) * p.scale));
+                    src = new Rect(Math.round(sx * p.scale), Math.round(sy * p.scaleY), Math.round((sx + sw) * p.scale),
+                            Math.round((sy + sh) * p.scaleY));
                 }
                 paint.reset();
                 paint.setAntiAlias(true);

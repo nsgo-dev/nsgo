@@ -31,6 +31,23 @@ d.SetFillGradient(core.CanvasLinear(0, 0, float32(size.Width), 0,
 )).FillRect(0, 0, float32(size.Width), 40)
 ```
 
+
+## Cache an offscreen drawing
+
+Record a static tile layer or minimap at its own size and pixel scale. Keep the source and draw it in later frames.
+
+```go
+tiles := core.RecordCanvasImage(cx, core.Size{Width: 256, Height: 256}, 2, func(d *core.Drawing) {
+	d.SetFillColor(core.RGB(0x3a7040)).FillRect(0, 0, 256, 256)
+	// Record the tile layer's other shapes and images here.
+})
+canvas := core.Canvas{Draw: func(d *core.Drawing, _ core.Size) {
+	d.DrawImage(tiles, 0, 0)
+}}
+```
+
+Record a new source when the tiles change. The recording callback reads its inputs once. A signal can hold a pointer to the source so that changing it redraws each canvas using it.
+
 ## Text, images and parts
 
 `MeasureText`, `TextMetrics` and `SetTextAlign` lay text out on the platform's text engine, so labels use the same fonts as the rest of the app. `DrawImage`, `DrawImageIn` and `DrawImageFrom` draw pictures, and `OnPress` can test the last drawing with `IsPointInPath` and `IsPointInStroke`.

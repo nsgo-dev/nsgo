@@ -80,7 +80,7 @@ final class CanvasImages<T> {
                 // A load under way stays: cancelling it would leave what waits for it, a canvas or a shader that draws only when its images arrive, without the image until it draws again.
                 Map.Entry<String, Entry> oldest = null;
                 for (Map.Entry<String, Entry> item : entries.entrySet()) {
-                    if (!item.getValue().pending) {
+                    if (!item.getValue().pending && !item.getKey().startsWith("\0canvas:")) {
                         oldest = item;
                         break;
                     }
@@ -95,6 +95,16 @@ final class CanvasImages<T> {
         }
         entry.used = use;
         return entry.value == null ? null : new Lease(entry);
+    }
+
+    synchronized boolean pending(String key) {
+        Entry e = entries.get(key);
+        return e != null && e.pending;
+    }
+
+    synchronized void forget(String key) {
+        Entry e = entries.remove(key);
+        if (e != null) retire(key, e);
     }
 
     synchronized boolean wants(String key, int generation) {

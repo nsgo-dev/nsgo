@@ -8,7 +8,7 @@ import { camera, cameraPicker } from '@kit.CameraKit';
 import { fileIo as fs, fileUri, picker } from '@kit.CoreFileKit';
 import { accessibility } from '@kit.AccessibilityKit';
 import { formProvider, formBindingData } from '@kit.FormKit';
-import { display, window, typeNode, BuilderNode, NodeController, FrameNode, UIContext, componentSnapshot } from '@kit.ArkUI';
+import { display, window, typeNode, BuilderNode, NodeController, FrameNode, UIContext, componentSnapshot, LengthMetricsUnit } from '@kit.ArkUI';
 import { displaySync } from '@kit.ArkGraphics2D';
 import { common, ConfigurationConstant, abilityAccessCtrl, bundleManager } from '@kit.AbilityKit';
 import type { Permissions, PermissionRequestResult } from '@kit.AbilityKit';
@@ -186,7 +186,27 @@ interface CanvasOp {
   co?: number;
   d?: number[];
   img?: string;
+  recording?: string;
 }
+
+interface CanvasRecordingData {
+  w: number;
+  h: number;
+  pw: number;
+  ph: number;
+  ops: CanvasOp[];
+}
+
+class CanvasRecording {
+  data: CanvasRecordingData;
+  pixels?: image.PixelMap;
+
+  constructor(data: CanvasRecordingData) {
+    this.data = data;
+  }
+}
+
+const canvasRecordings: Map<string, CanvasRecording> = new Map();
 
 interface CanvasGradientData {
   radial?: boolean;
@@ -594,6 +614,13 @@ class Tree {
             p.children = p.children.slice(0, at).concat([id], p.children.slice(at));
           }
         }
+      } else if (code === 'cr') {
+        const data = JSON.parse(o[3] as string) as CanvasRecordingData;
+        canvasRecordings.set(o[2] as string, new CanvasRecording(data));
+      } else if (code === 'cd') {
+        const key = o[2] as string;
+        canvasRecordings.get(key)?.pixels?.release();
+        canvasRecordings.delete(key);
       } else if (code === 'r' || code === 'd') {
         const v = this.nodes.get(id);
         if (v === undefined) {
@@ -2178,8 +2205,8 @@ struct CanvasView {
   }
 
   // roundRect adds a rounded rectangle to the current path.
-  private roundRect(x: number, y: number, w: number, h: number, r: number): void {
-    const ctx = this.ctx;
+  private roundRect(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    x: number, y: number, w: number, h: number, r: number): void {
     const rr = Math.min(r, Math.min(w, h) / 2);
     ctx.moveTo(x + rr, y);
     ctx.lineTo(x + w - rr, y);
@@ -2196,11 +2223,14 @@ struct CanvasView {
   // drawImage draws an image op: at its natural size when W and H are 0,
   // else into that rectangle, from the part X1, Y1, X2, Y2 of it when the
   // source rectangle is given. The op is in points and the pixels are not.
-  private drawImage(ctx: CanvasRenderingContext2D, pm: image.PixelMap, o: CanvasOp): void {
+  private drawImage(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    pm: image.PixelMap, o: CanvasOp, rec?: CanvasRecordingData): void {
     const d = density();
     const size = pm.getImageInfoSync().size;
-    const nw = size.width / d;
-    const nh = size.height / d;
+    const nw = rec?.w ?? size.width / d;
+    const nh = rec?.h ?? size.height / d;
+    const sx = size.width / nw;
+    const sy = size.height / nh;
     const w = o.w ?? 0;
     const h = o.h ?? 0;
     const dw = w === 0 && h === 0 ? nw : w;
@@ -2211,7 +2241,7 @@ struct CanvasView {
       ctx.drawImage(pm, x, y, dw, dh);
       return;
     }
-    ctx.drawImage(pm, (o.x1 ?? 0) * d, (o.y1 ?? 0) * d, (o.x2 ?? 0) * d, (o.y2 ?? 0) * d, x, y, dw, dh);
+    ctx.drawImage(pm, (o.x1 ?? 0) * sx, (o.y1 ?? 0) * sy, (o.x2 ?? 0) * sx, (o.y2 ?? 0) * sy, x, y, dw, dh);
   }
 
   // loadImage decodes an image op once; a repaint draws it when it comes.
@@ -2247,12 +2277,13 @@ struct CanvasView {
       this.loading.delete(key);
       this.missing.add(key);
       console.error('NSGO harmony: canvas image failed: ' + e);
+      this.paint();
     }
   }
 
   // gradientOf builds a canvas gradient, or undefined when it is conic.
-  private gradientOf(g: CanvasGradientData): CanvasGradient | undefined {
-    const ctx = this.ctx;
+  private gradientOf(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    g: CanvasGradientData): CanvasGradient | undefined {
     let grad: CanvasGradient;
     if (g.radial === true) {
       grad = ctx.createRadialGradient(g.x1 ?? 0, g.y1 ?? 0, g.r1 ?? 0, g.x2 ?? 0, g.y2 ?? 0, g.r2 ?? 0);
@@ -2270,7 +2301,31 @@ struct CanvasView {
     if (!this.ready || this.drawing === '') {
       return;
     }
-    const ctx = this.ctx;
+    let ops: CanvasOp[] = [];
+    try {
+      ops = JSON.parse(this.drawing) as CanvasOp[];
+    } catch (e) {
+      console.error('NSGO harmony: canvas failed: ' + e);
+      return;
+    }
+    this.play(this.ctx, ops, 1, 1);
+  }
+
+  private recording(rec: CanvasRecording): image.PixelMap | undefined {
+    if (rec.pixels !== undefined) {
+      return rec.pixels;
+    }
+    const r = rec.data;
+    const ctx = new OffscreenCanvasRenderingContext2D(r.pw, r.ph, new RenderingContextSettings(true), LengthMetricsUnit.PX);
+    if (!this.play(ctx, r.ops, r.pw / r.w, r.ph / r.h)) {
+      return undefined;
+    }
+    rec.pixels = ctx.getPixelMap(0, 0, r.pw, r.ph);
+    return rec.pixels;
+  }
+
+  private play(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    ops: CanvasOp[], sx: number, sy: number): boolean {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.lineWidth = 1;
@@ -2285,13 +2340,8 @@ struct CanvasView {
     ctx.shadowOffsetY = 0;
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, 100000, 100000);
-    let ops: CanvasOp[] = [];
-    try {
-      ops = JSON.parse(this.drawing) as CanvasOp[];
-    } catch (e) {
-      console.error('NSGO harmony: canvas failed: ' + e);
-      return;
-    }
+    ctx.scale(sx, sy);
+    let waiting = false;
     const caps: CanvasLineCap[] = ['butt', 'round', 'square'];
     const joins: CanvasLineJoin[] = ['miter', 'round', 'bevel'];
     const comps: string[] = ['source-over', 'source-in', 'source-out', 'source-atop',
@@ -2340,7 +2390,7 @@ struct CanvasView {
           ctx.rect(o.x ?? 0, o.y ?? 0, o.w ?? 0, o.h ?? 0);
           break;
         case 13:
-          this.roundRect(o.x ?? 0, o.y ?? 0, o.w ?? 0, o.h ?? 0, o.r ?? 0);
+          this.roundRect(ctx, o.x ?? 0, o.y ?? 0, o.w ?? 0, o.h ?? 0, o.r ?? 0);
           break;
         case 14:
           ctx.ellipse(o.x ?? 0, o.y ?? 0, o.r ?? 0, o.ry ?? 0, 0, 0, Math.PI * 2);
@@ -2394,7 +2444,7 @@ struct CanvasView {
           break;
         case 27:
           if (o.g !== undefined) {
-            const g = this.gradientOf(o.g);
+            const g = this.gradientOf(ctx, o.g);
             if (g !== undefined) {
               fill = g;
               ctx.fillStyle = g;
@@ -2403,7 +2453,7 @@ struct CanvasView {
           break;
         case 28:
           if (o.g !== undefined) {
-            const g = this.gradientOf(o.g);
+            const g = this.gradientOf(ctx, o.g);
             if (g !== undefined) {
               stroke = g;
               ctx.strokeStyle = g;
@@ -2414,7 +2464,8 @@ struct CanvasView {
           ctx.transform(o.x1 ?? 1, o.y1 ?? 0, o.x2 ?? 0, o.y2 ?? 1, o.x ?? 0, o.y ?? 0);
           break;
         case 30:
-          ctx.setTransform(o.x1 ?? 1, o.y1 ?? 0, o.x2 ?? 0, o.y2 ?? 1, o.x ?? 0, o.y ?? 0);
+          ctx.setTransform((o.x1 ?? 1) * sx, (o.y1 ?? 0) * sy, (o.x2 ?? 0) * sx, (o.y2 ?? 1) * sy,
+            (o.x ?? 0) * sx, (o.y ?? 0) * sy);
           break;
         case 31:
           ctx.globalCompositeOperation = comps[(o.co ?? 1) - 1];
@@ -2435,6 +2486,18 @@ struct CanvasView {
           ctx.shadowBlur = o.r ?? 0;
           break;
         case 37: {
+          if (o.recording !== undefined) {
+            const rec = canvasRecordings.get(o.recording);
+            if (rec !== undefined) {
+              const pixels = this.recording(rec);
+              if (pixels !== undefined) {
+                this.drawImage(ctx, pixels, o, rec.data);
+              } else {
+                waiting = true;
+              }
+            }
+            break;
+          }
           const uri = o.img ?? '';
           const data = o.imgd ?? '';
           const key = data !== '' ? data : uri;
@@ -2444,6 +2507,7 @@ struct CanvasView {
           const pm = this.images.get(key);
           if (pm === undefined) {
             this.loadImage(key, uri, data);
+            waiting = waiting || this.loading.has(key);
             break;
           }
           this.drawImage(ctx, pm, o);
@@ -2451,6 +2515,7 @@ struct CanvasView {
         }
       }
     }
+    return !waiting;
   }
 
   build() {

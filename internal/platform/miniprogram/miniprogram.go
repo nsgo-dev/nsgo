@@ -49,8 +49,9 @@ type surface struct {
 	started time.Time
 	// canvas is the offscreen canvas drawings are drawn on, one at a
 	// time, and images what they draw, by source.
-	canvas js.Value
-	images map[string]*canvasImage
+	canvas     js.Value
+	images     map[string]*canvasImage
+	recordings map[string]*canvasImage
 	// files are images of bytes written for <image> to load, by key.
 	files map[string]string
 	// appearance is the one the app forces, AppearanceSystem for none.
@@ -316,6 +317,9 @@ type canvasImage struct {
 // canvasImage returns src's image, loading it the first time; the
 // canvases waiting for it paint again once it loads.
 func (s *surface) canvasImage(src driver.ImageSource, id driver.NodeID) *canvasImage {
+	if src.Recording != nil {
+		return s.recordedCanvasImage(src, id)
+	}
 	key := src.Key()
 	if im := s.images[key]; im != nil {
 		return im

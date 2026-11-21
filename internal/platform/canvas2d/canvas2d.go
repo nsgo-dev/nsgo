@@ -25,7 +25,8 @@ type Player struct {
 	Ctx js.Value
 	// Ratio is the canvas's pixels per point, and Size its diagonal in
 	// points, which repeating gradients cover.
-	Ratio, Size float64
+	Ratio, Size  float64
+	baseX, baseY float64
 	// Font is the context's font shorthand of a font.
 	Font func(driver.Font) string
 	// Image returns the loaded image an op draws and its pixels per
@@ -43,7 +44,7 @@ type Player struct {
 // NewPlayer returns a player into ctx, whose canvas has ratio pixels per
 // point and a diagonal of size points.
 func NewPlayer(ctx js.Value, ratio, size float64) *Player {
-	return &Player{Ctx: ctx, Ratio: ratio, Size: size, width: 1}
+	return &Player{Ctx: ctx, Ratio: ratio, Size: size, baseX: ratio, baseY: ratio, width: 1}
 }
 
 // Play plays op.
@@ -72,8 +73,8 @@ func (p *Player) Play(op *driver.DrawOp) {
 	case driver.DrawTransform:
 		ctx.Call("transform", f(op.X1), f(op.Y1), f(op.X2), f(op.Y2), f(op.X), f(op.Y))
 	case driver.DrawSetTransform:
-		r := p.Ratio
-		ctx.Call("setTransform", r*f(op.X1), r*f(op.Y1), r*f(op.X2), r*f(op.Y2), r*f(op.X), r*f(op.Y))
+		sx, sy := p.baseX, p.baseY
+		ctx.Call("setTransform", sx*f(op.X1), sy*f(op.Y1), sx*f(op.X2), sy*f(op.Y2), sx*f(op.X), sy*f(op.Y))
 	case driver.DrawBeginPath:
 		ctx.Call("beginPath")
 	case driver.DrawMoveTo:
@@ -295,16 +296,19 @@ func (p *Player) image(op *driver.DrawOp) {
 	if nw <= 0 || nh <= 0 {
 		return
 	}
+	sx, sy := density, density
+	if r := op.Image.Recording; r != nil {
+		sx, sy = nw/float64(r.Size.Width), nh/float64(r.Size.Height)
+	}
 	w, h := f(op.W), f(op.H)
 	if w == 0 && h == 0 {
-		w, h = nw/density, nh/density
+		w, h = nw/sx, nh/sy
 	}
 	if op.X2 == 0 && op.Y2 == 0 {
 		p.Ctx.Call("drawImage", img, f(op.X), f(op.Y), w, h)
 		return
 	}
-	k := density
-	p.Ctx.Call("drawImage", img, f(op.X1)*k, f(op.Y1)*k, f(op.X2)*k, f(op.Y2)*k, f(op.X), f(op.Y), w, h)
+	p.Ctx.Call("drawImage", img, f(op.X1)*sx, f(op.Y1)*sy, f(op.X2)*sx, f(op.Y2)*sy, f(op.X), f(op.Y), w, h)
 }
 
 // drawText draws op's text at x, y with ctx's method. A canvas has no

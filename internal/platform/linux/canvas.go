@@ -131,13 +131,14 @@ type canvasState struct {
 // canvasPlayer replays a drawing into a Cairo context, as the web's 2D
 // context does.
 type canvasPlayer struct {
-	w     *window
-	v     *view
-	cr    uintptr
-	base  cairoMatrix // the canvas's own coordinates
-	size  rect
-	st    canvasState
-	stack []canvasState
+	w      *window
+	v      *view
+	cr     uintptr
+	base   cairoMatrix // the canvas's own coordinates
+	size   rect
+	st     canvasState
+	stack  []canvasState
+	waited bool
 }
 
 // changedNatives hands components the animated props that changed.
@@ -158,7 +159,7 @@ func (w *window) playCanvas(v *view, cr uintptr, r rect) {
 // playCanvasFrom replays ops into cr at r, leaving out what split skips
 // (raster.go) and calling before, when set, with each op's index first.
 func (w *window) playCanvasFrom(v *view, cr uintptr, r rect, ops []driver.DrawOp, split driver.CanvasSplit,
-	before func(at int)) {
+	before func(at int)) bool {
 	cairoSave(cr)
 	cairoRectangle(cr, r.x, r.y, r.w, r.h)
 	cairoClip(cr)
@@ -180,6 +181,7 @@ func (w *window) playCanvasFrom(v *view, cr uintptr, r rect, ops []driver.DrawOp
 		cairoRestore(cr)
 	}
 	cairoRestore(cr)
+	return p.waited
 }
 
 func (p *canvasPlayer) play(op *driver.DrawOp) {
@@ -630,6 +632,7 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 	}
 	s := p.w.canvasImage(*op.Image, p.v)
 	if s == nil || s.pic == nil {
+		p.waited = p.waited || s == nil || s.load != nil
 		return
 	}
 	surf := s.surfaceOf(0)
@@ -661,7 +664,11 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 		cairoTranslate(cr, -sx, -sy)
 		// The picture's pixels in the image's points.
 		k := float64(nat.Width) / float64(s.pic.width)
-		cairoScale(cr, k, k)
+		ky := k
+		if op.Image.Recording != nil {
+			ky = float64(nat.Height) / float64(s.pic.height)
+		}
+		cairoScale(cr, k, ky)
 		cairoSetSourceSurface(cr, surf, 0, 0)
 		cairoPaintWithAlpha(cr, p.st.alpha)
 		cairoRestore(cr)
@@ -676,6 +683,9 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 func (w *window) canvasImage(src driver.ImageSource, v *view) *imageSlot {
 	if w.canvasClosed {
 		return nil
+	}
+	if src.Recording != nil {
+		return w.recordedCanvasImage(src, v)
 	}
 	if src.Pixels != nil {
 		return w.canvasFrame(src)
@@ -773,6 +783,10 @@ func (w *window) endCanvasPass() {
 
 func (w *window) closeCanvasImages() {
 	w.canvasClosed = true
+	for key, s := range w.canvasRecordings {
+		s.reset(driver.ImageSource{})
+		delete(w.canvasRecordings, key)
+	}
 	for _, s := range w.canvasFrames {
 		s.reset(driver.ImageSource{})
 	}

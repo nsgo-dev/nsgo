@@ -5,6 +5,7 @@ package harmonyos
 import (
 	"encoding/base64"
 	"encoding/json"
+	"weak"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/webstyle"
@@ -43,7 +44,8 @@ type canvasOp struct {
 	D    []float32 `json:"d,omitempty"`
 	Img  string    `json:"img,omitempty"`
 	// ImgData is the image's bytes, base64, when the drawing embeds them.
-	ImgData string `json:"imgd,omitempty"`
+	ImgData   string `json:"imgd,omitempty"`
+	Recording string `json:"recording,omitempty"`
 }
 
 // gradient is a canvas gradient as the host builds one: radial or linear,
@@ -91,6 +93,9 @@ func canvasJSON(ops []driver.DrawOp) string {
 			}
 		case driver.DrawImage:
 			if o.Image != nil {
+				if o.Image.Recording != nil {
+					c.Recording = o.Image.Key()
+				}
 				c.Img = o.Image.URI
 				if len(o.Image.Data) > 0 {
 					c.ImgData = base64.StdEncoding.EncodeToString(o.Image.Data)
@@ -116,4 +121,46 @@ func gradientOf(g *driver.CanvasGradient) *gradient {
 		out.Stops = append(out.Stops, stop{O: s.Offset, C: webstyle.Color(s.Color)})
 	}
 	return out
+}
+
+type canvasRecording struct {
+	Width      driver.Points   `json:"w"`
+	Height     driver.Points   `json:"h"`
+	PixelsWide int             `json:"pw"`
+	PixelsHigh int             `json:"ph"`
+	Ops        json.RawMessage `json:"ops"`
+}
+
+func (m *mounter) canvasDrawing(id driver.NodeID, ops []driver.DrawOp) {
+	m.sendCanvasSources(ops)
+	m.o.op("cv", id).str(canvasJSON(ops))
+}
+
+func (m *mounter) sendCanvasSources(ops []driver.DrawOp) {
+	for _, op := range ops {
+		if op.Image == nil || op.Image.Recording == nil {
+			continue
+		}
+		key, r := op.Image.Key(), op.Image.Recording
+		if _, ok := m.recordings[key]; ok {
+			continue
+		}
+		if m.recordings == nil {
+			m.recordings = map[string]weak.Pointer[driver.CanvasRecording]{}
+		}
+		m.recordings[key] = weak.Make(r)
+		m.sendCanvasSources(r.Ops)
+		data, _ := json.Marshal(canvasRecording{Width: r.Size.Width, Height: r.Size.Height, PixelsWide: r.PixelWidth,
+			PixelsHigh: r.PixelHeight, Ops: json.RawMessage(canvasJSON(r.Ops))})
+		m.o.op("cr", 0).str(key).str(string(data))
+	}
+}
+
+func (m *mounter) collectCanvasSources() {
+	for key, r := range m.recordings {
+		if r.Value() == nil {
+			m.o.op("cd", 0).str(key)
+			delete(m.recordings, key)
+		}
+	}
 }

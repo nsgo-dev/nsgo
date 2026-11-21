@@ -54,10 +54,27 @@ func (c *canvasRequests) update(surface uint32, b *driver.MountBatch) {
 			continue
 		}
 		var sources []driver.ImageSource
+		seen := map[string]bool{}
+		var add func(driver.ImageSource)
+		add = func(src driver.ImageSource) {
+			key := src.Key()
+			if key == "" || seen[key] {
+				return
+			}
+			seen[key] = true
+			sources = append(sources, src)
+			if src.Recording != nil {
+				for _, op := range src.Recording.Ops {
+					if op.Image != nil {
+						add(*op.Image)
+					}
+				}
+			}
+		}
 		if it.Kind == driver.ItemCanvas && it.Drawing != nil {
 			for _, op := range it.Drawing.Ops {
-				if op.Kind == driver.DrawImage && op.Image != nil {
-					sources = append(sources, *op.Image)
+				if op.Image != nil {
+					add(*op.Image)
 				}
 			}
 		}
@@ -65,7 +82,7 @@ func (c *canvasRequests) update(surface uint32, b *driver.MountBatch) {
 			// Pixels go with the item, never through Java's requests.
 			for _, src := range it.Shader.Images {
 				if src.Pixels == nil {
-					sources = append(sources, src)
+					add(src)
 				}
 			}
 		}

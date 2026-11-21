@@ -161,15 +161,18 @@ func (s *surface) refreshCanvasScale(root js.Value) {
 
 // canvasImage is an image canvases draw, loaded once for the surface.
 type canvasImage struct {
-	img     js.Value
-	density float64
-	loaded  bool
-	waiting map[*view]bool
+	img            js.Value
+	density        float64
+	loaded, failed bool
+	waiting        map[*view]bool
 }
 
 // loadImage returns src's image, loading it the first time, and has v
 // draw again once it loads: a canvas plays again, a shader draws.
 func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
+	if src.Recording != nil {
+		return s.recordedCanvasImage(src, v)
+	}
 	if src.Pixels != nil {
 		return s.canvasFrame(src)
 	}
@@ -182,10 +185,13 @@ func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
 		im = &canvasImage{img: js.Global().Get("Image").New(), density: float64(src.Density()),
 			waiting: map[*view]bool{}}
 		s.canvasImages[key] = im
-		var onload js.Func
-		onload = js.FuncOf(func(js.Value, []js.Value) any {
+		var onload, onerror js.Func
+		done := func(ok bool) {
+			im.img.Call("removeEventListener", "load", onload)
+			im.img.Call("removeEventListener", "error", onerror)
 			onload.Release()
-			im.loaded = true
+			onerror.Release()
+			im.loaded, im.failed = ok, !ok
 			for v := range im.waiting {
 				switch {
 				case s.view(v.id) != v:
@@ -196,9 +202,11 @@ func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
 				}
 			}
 			im.waiting = nil
-			return nil
-		})
+		}
+		onload = js.FuncOf(func(js.Value, []js.Value) any { done(true); return nil })
+		onerror = js.FuncOf(func(js.Value, []js.Value) any { done(false); return nil })
 		im.img.Call("addEventListener", "load", onload)
+		im.img.Call("addEventListener", "error", onerror)
 		url, _ := imageURL(src)
 		im.img.Set("src", url)
 	}

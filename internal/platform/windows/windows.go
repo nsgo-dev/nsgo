@@ -468,8 +468,9 @@ type window struct {
 	animator *driver.Animator
 	epoch    time.Time
 	// canvasImages are the images canvases draw, by ImageSource.Key.
-	canvasImages   map[string]*imageSlot
-	canvasImageUse uint64
+	canvasImages     map[string]*imageSlot
+	canvasRecordings map[string]*imageSlot
+	canvasImageUse   uint64
 	// canvasPass is canvasImageUse when the last paint ended: images used since then are the current paint's, which eviction keeps; canvasPassPosted says an endCanvasPass is posted.
 	canvasPass       uint64
 	canvasPassPosted bool

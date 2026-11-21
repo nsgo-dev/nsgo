@@ -1648,6 +1648,12 @@ func (s *surface) canvasRequest(r *reader) {
 		}
 		return
 	}
+	if src.Recording != nil {
+		if s.canvasRequests.finish(surface, key, load) {
+			s.sendCanvasRecording(surface, key, request, src.Recording)
+		}
+		return
+	}
 	if src.Pixels != nil {
 		// Android's canvases draw no pixels yet: a failed entry, with no log line for each version.
 		s.canvasRequests.finish(surface, key, load)

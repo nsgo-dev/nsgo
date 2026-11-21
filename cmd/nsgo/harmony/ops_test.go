@@ -19,7 +19,7 @@ var (
 // silently, so a new element's view goes missing with no error anywhere.
 func TestOpsMatchHost(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
-	written := names(t, filepath.Join(root, "internal", "platform", "harmonyos", "mount.go"), goWriteOp)
+	written := rendererOps(t, root)
 	read := names(t, filepath.Join(root, "cmd", "nsgo", "harmony", "templates", "entry", "src", "main", "ets", "pages", "Index.ets"), hostReads)
 	if len(written) == 0 || len(read) == 0 {
 		t.Fatalf("found %d operations and %d branches: the patterns no longer match", len(written), len(read))
@@ -40,7 +40,7 @@ func TestOpsMatchHost(t *testing.T) {
 // for an operation Go never writes is dead code in the host.
 func TestHostReadsNothingTheRendererNeverWrites(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
-	written := names(t, filepath.Join(root, "internal", "platform", "harmonyos", "mount.go"), goWriteOp)
+	written := rendererOps(t, root)
 	read := names(t, filepath.Join(root, "cmd", "nsgo", "harmony", "templates", "entry", "src", "main", "ets", "pages", "Index.ets"), hostReads)
 	var dead []string
 	for op := range read {
@@ -52,6 +52,18 @@ func TestHostReadsNothingTheRendererNeverWrites(t *testing.T) {
 		sort.Strings(dead)
 		t.Errorf("branches for operations the renderer never writes: %s", strings.Join(dead, ", "))
 	}
+}
+
+func rendererOps(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	dir := filepath.Join(root, "internal", "platform", "harmonyos")
+	for _, file := range []string{"mount.go", "canvas.go"} {
+		for name := range names(t, filepath.Join(dir, file), goWriteOp) {
+			out[name] = true
+		}
+	}
+	return out
 }
 
 func names(t *testing.T, path string, re *regexp.Regexp) map[string]bool {

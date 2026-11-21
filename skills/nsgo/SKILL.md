@@ -64,6 +64,8 @@ func main() { nsgo.Run(Root) }
 - Native functions calling each other (built-in getters, `toString`/`valueOf`, `RegExp` `exec` dispatch, `Reflect.apply`/`construct`, bound-function and proxy chains) count against `Limits.Stack` and throw a catchable `RangeError`, and exporting a plugin value nested deeper fails with a `RangeError`, through NSGo's goja fork `github.com/nsgo-dev/goja`, which apps get with NSGo without a `replace` of their own.
 - Register a getter's nonzero default with `tsx.Default("Max", float64(100))` so forwarded undefined props keep that default as they change.
 
+- Use `core.RecordCanvasImage` for [static canvas layers](https://nsgo.dev/docs/canvas/#cache-an-offscreen-drawing) that will be drawn in later frames.
+
 ## Layout and styles
 
 - Layout is flexbox with React Native's defaults (a column, children keep their size) plus CSS grid. Sizes take `core.Pt` or `core.Pct`; text shrinks and wraps in a row only with `FlexShrink: 1`, an unset minimum being 0 already (`core.AutoMinimum` is CSS's automatic minimum).

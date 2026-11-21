@@ -186,9 +186,10 @@ type window struct {
 	animator             *driver.Animator
 	// canvasImages are the images canvases draw, and canvasWaiting the
 	// canvases to draw again when one loads.
-	canvasImages   canvasImages
-	canvasWaiting  map[string][]*view
-	canvasImageUse uint64
+	canvasImages     canvasImages
+	canvasRecordings map[string]*imageSlot
+	canvasWaiting    map[string][]*view
+	canvasImageUse   uint64
 	// canvasPass is canvasImageUse when the last frame ended: images used since then are the current frame's, which eviction keeps; canvasPassPosted says an endCanvasPass is posted.
 	canvasPass       uint64
 	canvasPassPosted bool

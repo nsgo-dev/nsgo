@@ -1183,6 +1183,8 @@ type ImageSource struct {
 	Data []byte
 	// Pixels, when set, is the image itself, premultiplied as image.RGBA is: nothing loads or decodes, and the view fires no load events and fades nothing in. The core copies it when the commit that carries a new Pixels or Version runs, so the app may write the next frame into the same buffer from then on, from its next RequestAnimationFrame callback for one. Without Size it measures its pixels in points. An Image's Source, a canvas's images and a Shader's Images take pixels; a Placeholder, which shows while a source loads, ignores them.
 	Pixels *image.RGBA
+	// Recording is an offscreen Canvas image.
+	Recording *CanvasRecording
 	// Version tells frames written into the same Pixels apart: the same Pixels with another Version is shown again in place, the previous frame staying until the new one is drawn.
 	Version uint64
 	// Size is the image's size in points, when known up front.
@@ -1219,6 +1221,9 @@ func (s ImageSource) Density() float32 {
 
 // Key returns a string naming the image s loads, for caches: its URI, a digest of its bytes, or where its pixels are and their version. Bytes are named by what they hold, not where: a collected buffer's address can come back in a new buffer of the same length, which must not be handed the image cached for the old one (#738).
 func (s ImageSource) Key() string {
+	if s.Recording != nil {
+		return s.Recording.key
+	}
 	if s.Pixels != nil {
 		return fmt.Sprintf("pixels:%p:%d", s.Pixels, s.Version)
 	}
@@ -1231,11 +1236,13 @@ func (s ImageSource) Key() string {
 // Same reports whether s and o load the same image: inline data must be the same bytes, not equal ones, and pixels the same buffer at the same Version.
 func (s ImageSource) Same(o ImageSource) bool {
 	return s.URI == o.URI && s.Size == o.Size && s.Scales == o.Scales && len(s.Data) == len(o.Data) &&
-		(len(s.Data) == 0 || &s.Data[0] == &o.Data[0]) && s.Pixels == o.Pixels && s.Version == o.Version
+		(len(s.Data) == 0 || &s.Data[0] == &o.Data[0]) && s.Pixels == o.Pixels && s.Version == o.Version && s.Recording == o.Recording
 }
 
 // Empty reports whether s names no image.
-func (s ImageSource) Empty() bool { return s.URI == "" && len(s.Data) == 0 && s.Pixels == nil }
+func (s ImageSource) Empty() bool {
+	return s.URI == "" && len(s.Data) == 0 && s.Pixels == nil && s.Recording == nil
+}
 
 // CopyPixels returns a copy of img's pixels in a buffer of its own, at the origin with rows of 4 bytes a pixel, as the core hands them to a platform; nil for nil.
 func CopyPixels(img *image.RGBA) *image.RGBA {
