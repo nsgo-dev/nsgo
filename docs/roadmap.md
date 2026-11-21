@@ -46,6 +46,7 @@ What NSH added between 0.4.0 and 0.5.0 that NSGo has not, in the order to build 
 | Packaged Apple apps' logs | `macos.md` (Packaged apps' logs), #1655 | A macOS or iOS app opened from Finder, the Dock or the Home screen writes its warnings and errors to the unified log under its bundle ID, reached through purego, where its stderr goes nowhere now |
 | Package settings | #1654, #1548, #1460 | `nsgo.yaml` raises an Apple package's minimum system version, never below the runtime's, gives Windows, Linux and Android icons of their own, and lets an Android app load plain HTTP |
 | Store uploads | `tooling.md` (Releases), #1052, #1054 | A command uploads the store packages `build -channel store` makes to TestFlight and Play's internal track, named apart from `nsgo publish`, which signs TSX packages |
+| Store asset packs | #1232 | Read Play fast-follow packs through the Play Asset Delivery SDK and verify an iOS app downloads and opens an Apple-hosted pack on a signed device |
 
 ## Remote push
 

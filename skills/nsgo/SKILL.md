@@ -105,6 +105,8 @@ Test an app as a user uses it with `nsgotest`, finding views by text, role, labe
 
 `go tool nsgo build` packages every target `nsgo.yaml` lists into `dist/`, installers and store packages into `dist/releases`. Read [references/shipping.md](references/shipping.md) before editing `nsgo.yaml`, icons, signing, updates or embedding.
 
+Declare independently delivered files in `mobile.asset_packs`. Use `mobile.AssetPackReady` and `mobile.OpenAssetPackFile` for files in available packs. [Store asset packs](https://nsgo.dev/docs/building.md#store-asset-packs)
+
 ## Reusable components
 
 A library of components follows NSGo's own split between behavior in an unstyled form and a look over it. Read [references/authoring.md](references/authoring.md) before writing components for other apps.

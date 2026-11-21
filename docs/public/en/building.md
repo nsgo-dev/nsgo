@@ -162,6 +162,23 @@ Every Apple bundle `build` writes, the app, its widget extension, App Clip and A
 
 The Info.plist of each iOS, tvOS and watchOS bundle `build` writes for devices, the app's, its widget extension's and App Clip's, carries the SDK and Xcode `DT` keys App Store Connect checks, read from the Xcode that builds it, and `UIRequiredDeviceCapabilities: [arm64]`; simulator bundles leave them out, and a key `apple.info` sets keeps its value. `apple.multiple_scenes: true` sets `UIApplicationSupportsMultipleScenes` in an iOS app's scene manifest, which is false by default: on an iPad the user can then open more than one window of the app, and each shows the app's main view anew, with state of its own and the app's shared signals and storage, until the user closes it.
 
+## Store asset packs
+
+Declare large asset directories in `mobile.asset_packs`. Files within those directories are delivered separately from the base Android App Bundle and iOS app. Pack names start with a lowercase letter and can contain lowercase letters, digits and underscores.
+
+```yaml
+mobile:
+  asset_packs:
+    - {name: levels, dir: resources/levels, delivery: install-time}
+    - {name: voices, dir: large-assets/voices, delivery: fast-follow}
+```
+
+Build Android packs with `go tool nsgo build -channel store -target android_arm64`. Use `bundletool build-apks --local-testing` and `bundletool install-apks` to test the bundle on a device. NSGo opens installed `install-time` packs. The `fast-follow` modules are included for Play delivery, and reading those packs from the Play Asset Delivery SDK is still pending.
+
+On iOS, `go tool nsgo build -target ios` maps `install-time` to Apple's essential policy and `fast-follow` to prefetch, both on first install and updates. Xcode 26 or later builds the Background Assets downloader. Use a shared `apple.app_group` or the default `group.<id>`. The app's `sign.profile` and the `<id>.assetdownloader` extension's `sign.asset_packs_profile` both need that group. Upload the `.aar` files from `dist/releases` alongside the IPA using App Store Connect's asset-pack upload workflow. [Creating managed asset packs](https://developer.apple.com/documentation/backgroundassets/creating-managed-asset-packs)
+
+From a goroutine, call `mobile.AssetPackReady(ctx, "levels")` to check readiness and `mobile.OpenAssetPackFile("levels", "intro.map")` to open a file relative to the declared directory. Close the returned reader after use. [Testing Apple asset packs locally](https://developer.apple.com/documentation/backgroundassets/testing-asset-packs-locally)
+
 ## Steam depots
 
 ```sh

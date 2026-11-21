@@ -52,19 +52,26 @@ func copyWalked(p *project, root string, walk func(*project, func(string, []byte
 // walkMobileResources is walkResources without what nsgo.yaml's
 // mobile.exclude_resources leaves out of phones' packages.
 func walkMobileResources(p *project, f func(rel string, data []byte) error) error {
-	return walkResources(p, func(rel string, data []byte) error {
+	return walkResourcesFiltered(p, func(rel string) bool {
+		if p.inAssetPack(filepath.Join(p.Dir, resourcesDir, filepath.FromSlash(rel))) {
+			return true
+		}
 		for _, out := range p.Mobile.ExcludeResources {
 			if out = strings.Trim(out, "/"); rel == out || strings.HasPrefix(rel, out+"/") {
-				return nil
+				return true
 			}
 		}
-		return f(rel, data)
-	})
+		return false
+	}, f)
 }
 
 // walkResources calls f with each file under the app's resources
 // directory, by its slash-separated path inside it.
 func walkResources(p *project, f func(rel string, data []byte) error) error {
+	return walkResourcesFiltered(p, nil, f)
+}
+
+func walkResourcesFiltered(p *project, excluded func(string) bool, f func(string, []byte) error) error {
 	src := filepath.Join(p.Dir, resourcesDir)
 	if _, err := os.Stat(src); os.IsNotExist(err) {
 		return nil
@@ -77,10 +84,14 @@ func walkResources(p *project, f func(rel string, data []byte) error) error {
 		if err != nil {
 			return err
 		}
+		rel = filepath.ToSlash(rel)
+		if excluded != nil && excluded(rel) {
+			return nil
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		return f(filepath.ToSlash(rel), data)
+		return f(rel, data)
 	})
 }
