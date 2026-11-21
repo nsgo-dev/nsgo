@@ -269,6 +269,12 @@ core.View{
 }
 ```
 
+## Audio playback
+
+Load short effects with `audio.LoadSound` and play them with `sound.Play(audio.Voice{})`. Repeated calls can overlap. On macOS and iOS the returned `audio.Playback` can set its own volume and rate or stop independently. `Ended()` is reactive and becomes true when that playback finishes, stops, is displaced by the voice limit, or cannot start. Backends without individual controls return an ended handle.
+
+Use `audio.Voice{Muted: true}` to start an effect silently and `playback.SetVolume(0)` to silence an active effect. For long audio, `audio.NewPlayer` streams a source and `player.SetMuted(true)` silences the output while playback continues. Unmuting restores the player's configured volume. `Voice.Volume` and `Player.SetVolume` use zero for default full volume.
+
 ## Speaking text
 
 `cx.Speak` reads text aloud in the system's voice for a language where `cx.Env().CanSpeak()` says the platform speaks: macOS, iOS, tvOS, Android, Windows, the web and Linux with speech-dispatcher. One utterance speaks at a time: another `Speak` cuts the one speaking, and so do `cx.StopSpeaking` and the end of the scope that spoke it. `done` hears once how it ended: finished, stopped, or failed with a `core.SpeakError`, such as `core.SpeakLanguageUnavailable` when no voice installed speaks the language.

@@ -277,6 +277,7 @@ jobs:
           go tool nsgo test -target ios_simulator -device "$ipad" -timeout 1m -run '^(TestScenesShowTreesOfTheirOwn|TestSceneDisconnectsWhileTheOtherRuns|TestSceneStatusBarAndOrientationsArePerScene)$' ./internal/platform/ios
           go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
           go tool nsgo test -target ios_simulator -timeout 1m -run '^TestIOSCaptureIsSRGB$' ./internal/testhost/testdata/capture
+          go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/audio
           go tool nsgo test -target watchos_simulator -timeout 1m ./internal/platform/watchos
 
   windows:

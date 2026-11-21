@@ -82,6 +82,7 @@ func Secrets(values map[string]string) Option {
 
 // Environment starts the app in env from its first frame, as a platform reports it before the app mounts: screens have the system header where env has HeaderHeight. Under `nsgo test -target` it pins only the appearance, reduced motion, increased contrast, the login launch reason, the application in front and whether the platform follows it, camera and code scanner availability, and, when set, the locale, text size, device name and device model; the OS, the idiom, the safe area and the header heights stay the platform's, so a test of another OS's layout runs headless or on that OS's target.
 func Environment(env driver.Environment) Option {
+	env.AudioPlaybackControls = env.Audio
 	return func(a *App) { a.env = &env }
 }
 
@@ -356,6 +357,7 @@ type App struct {
 	AudioDurations map[string]time.Duration
 	RefusePlayback bool
 	Sounds         []*Sound
+	audioPlaybacks []*AudioPlayback
 	Players        []*AudioPlayer
 	// OnAlert answers each alert the app shows with the index of the
 	// button the user presses, or -1 to dismiss it, once the step that
@@ -967,6 +969,7 @@ func (a *App) SetEnvironment(env driver.Environment) {
 		a.target.setEnvironment(env)
 		return
 	}
+	env.AudioPlaybackControls = env.Audio
 	if a.appTree != nil {
 		// Every window shares the app's environment, and those it opens later start from it.
 		a.env = &env

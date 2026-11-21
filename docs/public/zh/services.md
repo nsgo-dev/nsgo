@@ -382,6 +382,12 @@ cx.Purchase("com.example.pro.monthly", core.PurchaseOptions{AccountToken: userUU
 
 在应用启动时注册 `OnPurchaseUpdate`：在任何处理函数之前到达的更新会留给第一个注册的。`cx.CurrentEntitlements` 回答用户当前拥有的内容，供启动时解锁；「恢复购买」按钮调用 `cx.SyncPurchases`，它可能要求用户登录。`AccountToken` 是应用自己的 UUID，交易和 App Store 发给服务器的通知都会带上它。macOS 只有 Mac App Store 构建能销售，App Clip 不销售任何东西；Android、watchOS、Windows、Linux、Web 和小程序目前回答 `PurchasesUnavailable`。用 `nsgotest` 测试购买，它的 `Products`、`PurchaseAnswer`、`UpdatePurchase` 和 `UnfinishedTransactions` 代替商店。在 TSX 中，`Purchases` 模块需要 `purchases` 能力：`purchase` 解析为 `{ status: "purchased", transaction }`、`"pending"` 或 `"cancelled"`，`on("update", listener)` 接收更新。
 
+## 音频播放
+
+用 `audio.LoadSound` 加载短音效，再用 `sound.Play(audio.Voice{})` 播放。多次调用可以重叠播放。在 macOS 和 iOS 上，可以用返回的 `audio.Playback` 单独调整音量和倍速，或停止本次播放。播放结束、停止、超过并发上限被淘汰，或无法启动时，响应式的 `Ended()` 变为 true。无法单独控制每次播放的后端会返回一个已结束的句柄。
+
+用 `audio.Voice{Muted: true}` 静音启动音效，也可用 `playback.SetVolume(0)` 将正在播放的音效静音。长音频用 `audio.NewPlayer` 流式播放，`player.SetMuted(true)` 可在保持播放进度的同时静音。取消静音会恢复播放器设定的音量。`Voice.Volume` 和 `Player.SetVolume` 以零表示默认满音量。
+
 ## 朗读文本
 
 `cx.Speak` 在 `cx.Env().CanSpeak()` 为真时用系统中某种语言的语音朗读文本：macOS、iOS、tvOS、Android、Windows、Web，以及装有 speech-dispatcher 的 Linux。同一时间只朗读一段：新的 `Speak` 会打断正在朗读的那段，`cx.StopSpeaking` 和发起朗读的作用域结束也会停止它。`done` 只会收到一次结束方式：读完、被停止，或因 `core.SpeakError` 失败，例如没有安装该语言的语音时返回 `core.SpeakLanguageUnavailable`。

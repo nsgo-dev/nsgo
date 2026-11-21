@@ -13,11 +13,23 @@ type Sound struct {
 	// Source is what it decoded and Duration how long it plays.
 	Source   core.AudioSource
 	Duration time.Duration
-	// Plays are its playbacks, oldest first, Stops how often the app stopped them, and Unloaded whether the app let it go.
-	Plays    []core.SoundVoice
-	Stops    int
-	Unloaded bool
-	id       uint32
+	// Plays records effective initial volume and rate, Playbacks the individual plays oldest first, Stops how often the app stopped all plays, and Unloaded whether the app let it go.
+	Plays     []core.SoundVoice
+	Playbacks []*AudioPlayback
+	Stops     int
+	Unloaded  bool
+	id        uint32
+	tree      *core.Tree
+}
+
+// AudioPlayback is one play of a Sound in the headless audio model.
+type AudioPlayback struct {
+	// Volume and Rate are its current settings. Ended reports all ways it stopped.
+	Volume, Rate float32
+	Ended        bool
+	id           uint32
+	sound        *Sound
+	remaining    time.Duration
 }
 
 // AudioPlayer is a player the app opened.
@@ -65,10 +77,10 @@ func (a *App) audio(id uint32, r driver.AudioRequest) {
 		if cut {
 			d = r.MaxDuration
 		}
-		a.Sounds = append(a.Sounds, &Sound{Source: core.AudioSource{URI: r.Source.URI, Data: r.Source.Data}, Duration: d, id: id})
+		a.Sounds = append(a.Sounds, &Sound{Source: core.AudioSource{URI: r.Source.URI, Data: r.Source.Data}, Duration: d, id: id, tree: a.responseTree})
 		report(driver.AudioEvent{Phase: driver.AudioLoaded, Duration: d, Bytes: int64(d.Seconds() * decodedRate), Cut: cut})
 		return
-	case driver.AudioPlay, driver.AudioStop, driver.AudioUnload:
+	case driver.AudioPlay, driver.AudioStop, driver.AudioUnload, driver.AudioPlaybackSet, driver.AudioPlaybackStop:
 		i := slices.IndexFunc(a.Sounds, func(s *Sound) bool { return s.id == id })
 		if i < 0 {
 			return
@@ -77,10 +89,24 @@ func (a *App) audio(id uint32, r driver.AudioRequest) {
 		switch r.Command {
 		case driver.AudioPlay:
 			s.Plays = append(s.Plays, core.SoundVoice{Volume: r.Volume, Rate: r.Rate})
+			if r.Playback != 0 {
+				a.startPlayback(s, r)
+			}
 		case driver.AudioStop:
 			s.Stops++
-		default:
+			a.stopPlaybacks(s, 0)
+		case driver.AudioUnload:
 			s.Unloaded = true
+			a.stopPlaybacks(s, 0)
+		case driver.AudioPlaybackSet:
+			for _, p := range a.audioPlaybacks {
+				if p.id == r.Playback && p.sound == s {
+					p.Volume, p.Rate = r.Volume, r.Rate
+					break
+				}
+			}
+		case driver.AudioPlaybackStop:
+			a.stopPlaybacks(s, r.Playback)
 		}
 		return
 	case driver.AudioOpen:
@@ -149,6 +175,41 @@ func (a *App) audio(id uint32, r driver.AudioRequest) {
 	}
 }
 
+func (a *App) startPlayback(s *Sound, r driver.AudioRequest) {
+	oldest, active := -1, 0
+	for i, p := range a.audioPlaybacks {
+		if p.sound.tree == s.tree {
+			if oldest < 0 {
+				oldest = i
+			}
+			active++
+		}
+	}
+	if active >= driver.MaxSoundVoices {
+		a.endPlayback(a.audioPlaybacks[oldest])
+		a.audioPlaybacks = slices.Delete(a.audioPlaybacks, oldest, oldest+1)
+	}
+	p := &AudioPlayback{Volume: r.Volume, Rate: r.Rate, id: r.Playback, sound: s, remaining: s.Duration}
+	s.Playbacks = append(s.Playbacks, p)
+	a.audioPlaybacks = append(a.audioPlaybacks, p)
+}
+
+func (a *App) endPlayback(p *AudioPlayback) {
+	p.Ended = true
+	a.postTo(p.sound.tree, driver.Event{Kind: driver.EventAudio, Count: p.sound.id,
+		Data: &driver.AudioEvent{Phase: driver.AudioPlaybackEnded, Playback: p.id}})
+}
+
+func (a *App) stopPlaybacks(s *Sound, id uint32) {
+	a.audioPlaybacks = slices.DeleteFunc(a.audioPlaybacks, func(p *AudioPlayback) bool {
+		if p.sound != s || id != 0 && p.id != id {
+			return false
+		}
+		a.endPlayback(p)
+		return true
+	})
+}
+
 // audioDuration is what AudioDurations says src lasts.
 func (a *App) audioDuration(src core.AudioSource) (time.Duration, bool) {
 	key := src.URI
@@ -161,6 +222,14 @@ func (a *App) audioDuration(src core.AudioSource) (time.Duration, bool) {
 
 // playAudio moves the players playing on by d of the clock's time, reporting their progress and ends.
 func (a *App) playAudio(d time.Duration) {
+	a.audioPlaybacks = slices.DeleteFunc(a.audioPlaybacks, func(p *AudioPlayback) bool {
+		p.remaining -= time.Duration(float64(d) * float64(p.Rate))
+		if p.remaining > 0 {
+			return false
+		}
+		a.endPlayback(p)
+		return true
+	})
 	for _, p := range a.Players {
 		if !p.Playing {
 			continue
