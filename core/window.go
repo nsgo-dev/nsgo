@@ -267,7 +267,7 @@ func (w *Window) gone() {
 }
 
 // command sends c to the window's platform.
-func (w *Window) command(c WindowCommand) {
+func (w *Window) command(c driver.WindowCommand) {
 	t := w.t
 	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemWindow, Window: &c})
 	t.changed = true
@@ -279,7 +279,7 @@ func (w *Window) Show() {
 		return
 	}
 	w.visible.Set(true)
-	w.command(WindowCommand{Action: driver.WindowShow, AnchorBounds: w.anchorBounds, Placement: w.placement})
+	w.command(driver.WindowCommand{Action: driver.WindowShow, AnchorBounds: w.anchorBounds, Placement: w.placement})
 }
 
 // showAt shows a panel under tray icon id, forgetting where ShowAt placed it.
@@ -289,7 +289,7 @@ func (w *Window) showAt(tray uint32) {
 	}
 	w.visible.Set(true)
 	w.anchorBounds, w.placement = Bounds{}, driver.WindowPlaceDefault
-	w.command(WindowCommand{Action: driver.WindowShow, Anchor: tray})
+	w.command(driver.WindowCommand{Action: driver.WindowShow, Anchor: tray})
 }
 
 // ShowAt shows a panel beside anchor, a rectangle in the desktop's screen coordinates (those of Env.Displays and SetWindowFrame) such as a text caret's, on placement's side of it, below for PlaceDefault: it flips to the opposite side when only that one fits on the display that holds anchor's center, and is clamped into that display's visible frame when neither does. A zero-sized anchor is a point, such as the pointer's. Show, Focus and Toggle keep the placement until a tray icon shows the panel under itself. It returns an unavailable error for a window that is not a panel; a platform that cannot place it, Linux on Wayland, reports so to OnPlacementError and leaves it hidden.
@@ -302,7 +302,7 @@ func (w *Window) ShowAt(anchor Bounds, placement Placement) error {
 	}
 	w.anchorBounds, w.placement = anchor, windowPlacement(placement)
 	w.visible.Set(true)
-	w.command(WindowCommand{Action: driver.WindowShow, AnchorBounds: w.anchorBounds, Placement: w.placement})
+	w.command(driver.WindowCommand{Action: driver.WindowShow, AnchorBounds: w.anchorBounds, Placement: w.placement})
 	return nil
 }
 
@@ -315,7 +315,7 @@ func (w *Window) MoveTo(anchor Bounds, placement Placement) error {
 		return Unavailable("only a panel can be placed beside a screen rectangle")
 	}
 	w.anchorBounds, w.placement = anchor, windowPlacement(placement)
-	w.command(WindowCommand{Action: driver.WindowSetAnchor, AnchorBounds: w.anchorBounds, Placement: w.placement})
+	w.command(driver.WindowCommand{Action: driver.WindowSetAnchor, AnchorBounds: w.anchorBounds, Placement: w.placement})
 	return nil
 }
 
@@ -351,7 +351,7 @@ func (w *Window) Hide() {
 		return
 	}
 	w.visible.Set(false)
-	w.command(WindowCommand{Action: driver.WindowHide})
+	w.command(driver.WindowCommand{Action: driver.WindowHide})
 }
 
 // Toggle hides the window if it shows, else shows and focuses it.
@@ -372,7 +372,7 @@ func (w *Window) Focus() {
 		return
 	}
 	w.visible.Set(true)
-	w.command(WindowCommand{Action: driver.WindowOrderFront})
+	w.command(driver.WindowCommand{Action: driver.WindowOrderFront})
 }
 
 // Close closes the window for good, as its owner going does, without

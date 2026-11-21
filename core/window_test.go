@@ -772,12 +772,12 @@ func TestWindowWorkspaces(t *testing.T) {
 	cx.SetWindowWorkspaces(WindowWorkspacesCurrent)
 	cx.SetWindowLevel(WindowLevelFloating)
 	w.commit()
-	var got []WindowCommand
+	var got []driver.WindowCommand
 	for _, it := range w.take(opened[0].Surface.ID, driver.ItemWindow) {
 		got = append(got, *it.Window)
 	}
-	want := []WindowCommand{{Action: WindowSetWorkspaces, Workspaces: WindowWorkspacesCurrent},
-		{Action: WindowSetLevel, Level: WindowLevelFloating}}
+	want := []driver.WindowCommand{{Action: driver.WindowSetWorkspaces, Workspaces: WindowWorkspacesCurrent},
+		{Action: driver.WindowSetLevel, Level: WindowLevelFloating}}
 	if !slices.Equal(got, want) {
 		t.Fatalf("the window was sent %+v; want %+v", got, want)
 	}
@@ -853,11 +853,11 @@ func TestWindowLook(t *testing.T) {
 	cx.SetWindowShadow(true)
 	cx.SetSkipTaskbar(false)
 	w.commit()
-	var sent []WindowCommand
+	var sent []driver.WindowCommand
 	for _, it := range w.take(opened[0].Surface.ID, driver.ItemWindow) {
 		sent = append(sent, *it.Window)
 	}
-	want := []WindowCommand{{Action: driver.WindowSetTransparent}, {Action: driver.WindowSetShadow, On: true}, {Action: driver.WindowSetSkipTaskbar}}
+	want := []driver.WindowCommand{{Action: driver.WindowSetTransparent}, {Action: driver.WindowSetShadow, On: true}, {Action: driver.WindowSetSkipTaskbar}}
 	if !slices.Equal(sent, want) {
 		t.Fatalf("the window was sent %+v; want %+v", sent, want)
 	}
