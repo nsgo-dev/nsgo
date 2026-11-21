@@ -502,6 +502,26 @@ func (t *testSurface) Back() error {
 	return nil
 }
 
+func (t *testSurface) SelectTab(id driver.NodeID, index int) error {
+	var err error
+	onMainSync(func() {
+		v := t.s.views[id]
+		if v == nil {
+			err = fmt.Errorf("no view has ID %d", id)
+			return
+		}
+		bar, ok := v.component.(*tabBar)
+		if !ok || index < 0 || index >= len(bar.items) {
+			err = fmt.Errorf("view %d has no tab at index %d", id, index)
+			return
+		}
+		item := bar.items[index]
+		bar.bar.Send(sel("setSelectedItem:"), item)
+		bar.bar.Send(sel("delegate")).Send(sel("tabBar:didSelectItem:"), bar.bar, item)
+	})
+	return err
+}
+
 // Answer taps the alert's button with the action's title.
 func (t *testSurface) Answer(id uint32, index int) error {
 	var label string
