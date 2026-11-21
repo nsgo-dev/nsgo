@@ -25,6 +25,7 @@ type Env struct {
 	contrast                *Signal[bool]
 	screenColor, speech     *Signal[bool]
 	audio, speak            *Signal[bool]
+	clipboardItems          *Signal[bool]
 	camera                  *Signal[bool]
 	scanCode                *Signal[bool]
 	canSendInput            *Signal[bool]
@@ -101,6 +102,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		reader:           NewSignal(cx, false),
 		screenColor:      NewSignal(cx, false),
 		speech:           NewSignal(cx, false),
+		clipboardItems:   NewSignal(cx, false),
 		audio:            NewSignal(cx, false),
 		speak:            NewSignal(cx, false),
 		camera:           NewSignal(cx, false),
@@ -220,6 +222,7 @@ func (e *Env) set(v Environment) {
 	e.screenColor.Set(v.ScreenColor)
 	e.speech.Set(v.Speech)
 	e.audio.Set(v.Audio)
+	e.clipboardItems.Set(v.ClipboardItems)
 	e.speak.Set(v.Speak)
 	e.camera.Set(v.Camera)
 	e.scanCode.Set(v.ScanCode)

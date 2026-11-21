@@ -90,6 +90,7 @@ func (w *window) environment() driver.Environment {
 		LocaleSettings:   localeSettings(),
 		Displays:         w.displays(),
 		OS:               driver.OSWindows,
+		ClipboardItems:   true,
 		HasWebView:       true,
 		OSVersion:        osVersion(),
 		Idiom:            driver.IdiomDesktop,

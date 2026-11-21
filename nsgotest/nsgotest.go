@@ -223,7 +223,11 @@ type App struct {
 	Clipboard      string
 	ClipboardImage []byte
 	ClipboardFiles []string
-	Announced      []string
+	// ClipboardItems and ClipboardChangeCount track representation writes
+	// and the changes made to the test's clipboard.
+	ClipboardItems       []core.ClipboardItem
+	ClipboardChangeCount int64
+	Announced            []string
 	// InputSource is the keyboard input source the app selected, as a
 	// test sees it; inputSourceWas the one that selection replaced.
 	InputSource    string
@@ -616,9 +620,12 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 	// Steps reach every view, not only those in sight.
 	a.tree.SetViewPacing(false)
 	a.tree.Resize(a.size, driver.Geometry{})
+	env := driver.Environment{}
 	if a.env != nil {
-		a.tree.SetEnvironment(*a.env)
+		env = *a.env
 	}
+	env.ClipboardItems = true
+	a.tree.SetEnvironment(env)
 	if desktop {
 		// The app's own surface runs the app's function, as on a desktop; a root view is one showing it as the main view, as nsgo.Run makes it.
 		a.appTree = a.tree
@@ -930,6 +937,7 @@ func (a *App) WaitUntil(timeout time.Duration, cond func() bool) {
 
 // surfaceEnv is the app's environment env as the platform reports it to surface: a window or a panel that is transparent reports it, as on a compositing desktop, and a window SetWindowEnvironment changed reports its own state.
 func (a *App) surfaceEnv(surface *core.Tree, env driver.Environment) driver.Environment {
+	env.ClipboardItems = true
 	env.WindowTransparent = a.clear[surface.ID()]
 	for _, change := range a.own[surface.ID()] {
 		change(&env)
@@ -967,6 +975,7 @@ func (a *App) SetEnvironment(env driver.Environment) {
 		a.target.setEnvironment(env)
 		return
 	}
+	env.ClipboardItems = true
 	if a.appTree != nil {
 		// Every window shares the app's environment, and those it opens later start from it.
 		a.env = &env

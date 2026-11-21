@@ -1137,6 +1137,7 @@ func (s *surface) environment() driver.Environment {
 		Speech:           apple.SpeechAvailable(),
 		Speak:            apple.SpeakAvailable(),
 		Audio:            apple.AudioAvailable(),
+		ClipboardItems:   true,
 		CanSendInput:     true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
@@ -1754,9 +1755,14 @@ func (s *surface) apply(b *driver.MountBatch) {
 			s.audio.Handle(it.Count, it.Audio)
 			continue
 		case driver.ItemSetClipboard:
-			pb := objc.ID(apple.Class("NSPasteboard")).Send(sel("generalPasteboard"))
-			pb.Send(sel("clearContents"))
-			pb.Send(sel("setString:forType:"), apple.NSString(it.Value), apple.NSString(pasteboardText))
+			setClipboardText(generalPasteboard(), it.Value)
+			continue
+		case driver.ItemSetClipboardItems:
+			items, _ := it.Data.([]driver.ClipboardItem)
+			err := writeClipboardItems(generalPasteboard(), items)
+			if it.Count != 0 {
+				s.engine.Dispatch(driver.Event{Kind: driver.EventClipboard, Count: it.Count, Data: driver.ClipboardResult{Err: err}})
+			}
 			continue
 		case driver.ItemReadClipboard:
 			s.readClipboard(it)
