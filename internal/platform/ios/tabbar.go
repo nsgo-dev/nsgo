@@ -126,8 +126,7 @@ func (t *tabBar) SetProp(name string, value any) {
 	}
 }
 
-// showBadges updates the existing items. A space lets UIKit draw its
-// native badge without visible text for a dot.
+// showBadges updates the existing items. A space lets UIKit draw its native badge without visible text for a dot.
 func (t *tabBar) showBadges() {
 	messages := locales.In(t.badges.Language)
 	for i, item := range t.items {
