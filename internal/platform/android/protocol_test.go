@@ -313,3 +313,28 @@ func TestDirectionSaysTheWordsInTheAppsLanguage(t *testing.T) {
 		}
 	}
 }
+
+func TestReadEnvironmentSetsCanRequestReview(t *testing.T) {
+	var w writer
+	// SafeArea (4 points), KeyboardHeight (1 point), FontScale, PixelRatio
+	for range 7 {
+		w.float(1)
+	}
+	w.byte(0) // flags
+	w.byte(0) // more
+	w.byte(byte(driver.IdiomPhone))
+	w.str("en-US")
+	w.str("Pixel")
+	w.str("Google Pixel 9")
+	w.float(56) // HeaderHeight
+	w.float(96) // LargeHeaderHeight
+	w.u32(35)   // API level
+
+	env := readEnvironment(&reader{w.buf})
+	if !env.CanRequestReview {
+		t.Fatal("readEnvironment().CanRequestReview = false, want true")
+	}
+	if env.OS != driver.OSAndroid {
+		t.Fatalf("readEnvironment().OS = %q, want android", env.OS)
+	}
+}

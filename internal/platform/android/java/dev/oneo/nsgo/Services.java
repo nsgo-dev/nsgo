@@ -29,6 +29,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -719,5 +721,63 @@ final class Services {
         } catch (IOException | RuntimeException e) {
             return false;
         }
+    }
+
+    /**
+     * Asks Google Play In-App Review to show a rating prompt for activity when
+     * the Play Review library is on the classpath, through reflection so the
+     * runtime links none of Google Play. Returns silently when activity is gone
+     * or the library is absent.
+     */
+    static void requestReview(Activity activity) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+        try {
+            Class<?> factoryClass = Class.forName("com.google.android.play.core.review.ReviewManagerFactory");
+            Method create = factoryClass.getMethod("create", Context.class);
+            Object manager = create.invoke(null, activity);
+            if (manager == null) return;
+            Object task = manager.getClass().getMethod("requestReviewFlow").invoke(manager);
+            if (task == null) return;
+            Method addListener = null;
+            for (Method m : task.getClass().getMethods()) {
+                if ("addOnCompleteListener".equals(m.getName()) && m.getParameterCount() == 1
+                        && m.getParameterTypes()[0].isInterface()) {
+                    addListener = m;
+                    break;
+                }
+            }
+            if (addListener == null) return;
+            Class<?> listenerType = addListener.getParameterTypes()[0];
+            Class<?> reviewInfoClass = Class.forName("com.google.android.play.core.review.ReviewInfo");
+            Method launch = manager.getClass().getMethod("launchReviewFlow", Activity.class, reviewInfoClass);
+            Object listener = Proxy.newProxyInstance(listenerType.getClassLoader(), new Class<?>[] {listenerType},
+                    (proxy, method, args) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            switch (method.getName()) {
+                                case "hashCode":
+                                    return System.identityHashCode(proxy);
+                                case "equals":
+                                    return args != null && args.length > 0 && proxy == args[0];
+                                case "toString":
+                                    return "NsgoReviewListener";
+                            }
+                        }
+                        if (!"onComplete".equals(method.getName()) || args == null || args.length == 0 || args[0] == null) {
+                            return null;
+                        }
+                        try {
+                            if (activity.isFinishing() || activity.isDestroyed()) return null;
+                            Object completed = args[0];
+                            Object ok = completed.getClass().getMethod("isSuccessful").invoke(completed);
+                            if (!Boolean.TRUE.equals(ok)) return null;
+                            Object info = completed.getClass().getMethod("getResult").invoke(completed);
+                            if (info != null) {
+                                launch.invoke(manager, activity, info);
+                            }
+                        } catch (Throwable ignored) {}
+                        return null;
+                    });
+            addListener.invoke(task, listener);
+        } catch (Throwable ignored) {}
     }
 }

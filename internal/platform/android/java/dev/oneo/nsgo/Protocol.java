@@ -254,6 +254,7 @@ final class Protocol {
     static final int ITEM_OVERLAY_PERMISSION = 89;
     static final int ITEM_SPEAK = 102;
     static final int ITEM_SENSOR = 103;
+    static final int ITEM_REQUEST_REVIEW = 111;
 
     // What EVENT_OVERLAY_PERMISSION answers ITEM_OVERLAY_PERMISSION with, and why an overlay ends, as the driver's.
     static final int OVERLAY_DENIED = 0;

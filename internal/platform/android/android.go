@@ -223,7 +223,7 @@ func connect(opts Options) *surface {
 		lines:    make(chan []driver.TextLine, 1),
 		carets:   make(chan driver.CaretLayout, 1),
 		started:  make(chan struct{}),
-		env:      driver.Environment{OS: driver.OSAndroid, HasWebView: true, ScheduledNotifications: true},
+		env:      driver.Environment{OS: driver.OSAndroid, HasWebView: true, ScheduledNotifications: true, CanRequestReview: true},
 		main:     treeView{images: map[driver.NodeID]*imageView{}},
 		overlays: map[uint32]*overlay{},
 
@@ -1370,6 +1370,8 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.str(it.Value)
 		case driver.ItemHaptic, driver.ItemBadge:
 			w.u32(it.Count)
+		case driver.ItemRequestReview:
+			// No payload fields beyond kind and view ID.
 		case driver.ItemSpeak:
 			r := it.Speak
 			w.u32(it.Count)

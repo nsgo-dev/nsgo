@@ -429,6 +429,16 @@ cx.BiometricAvailability(func(kind core.BiometricKind) {
 
 使用面容 ID 的应用要在 `apple.info` 下声明 `NSFaceIDUsageDescription`；Android 应用要在 `android.permissions` 中列出 `USE_BIOMETRIC`。
 
+## 应用内评分
+
+`cx.RequestReview()` 在 `cx.Env().CanRequestReview()` 为真时请求平台商店显示应用内评分弹窗：macOS（`SKStoreReviewController.requestReview`）、iOS（对当前活跃窗口场景调用 `SKStoreReviewController.requestReviewInScene:`，无活跃场景时回退到 `requestReview`）和 Android（存在 Play Review 库时调用 Google Play In-App Review）。商店自行决定是否显示以及何时显示，不返回结果；在 Windows、Linux、Web 等不支持应用内评分的平台上，`CanRequestReview()` 为假，`RequestReview()` 静默不执行任何操作。测试中，在 `nsgotest.Environment` 设置了 `CanRequestReview` 时，`nsgotest.App.ReviewRequests` 记录每次请求。
+
+```go
+if cx.Env().CanRequestReview() {
+	cx.RequestReview()
+}
+```
+
 ## Android 上的悬浮窗
 
 `mobile.OpenOverlay` 在 Android 上把应用的一个视图显示在其他应用之上：它是一棵独立的树，与应用共享信号，显示期间由前台服务让应用保持运行。应用要在 `android.permissions` 中列出 `SYSTEM_ALERT_WINDOW`，并由用户在系统设置中授权，`mobile.RequestOverlayPermission` 会打开这个设置；没有授权时悬浮窗立即结束，`OnEnd` 会得知原因。它接收触摸，但按键和窗口以外的触摸仍交给前台应用，除非设为 `Focusable` 或 `Passive`；在内容里用 `desktop.SetWindowFrame` 移动它。其他平台不会打开悬浮窗。

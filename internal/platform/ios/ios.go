@@ -797,6 +797,7 @@ func (s *surface) environment() driver.Environment {
 		HasWebView:       idiom != driver.IdiomTV,
 		SignInWithApple:  apple.AppleSignInAvailable(),
 		Purchases:        apple.PurchasesAvailable(),
+		CanRequestReview: idiom != driver.IdiomTV && apple.ReviewAvailable(),
 		VerticalBarEdge:  verticalBarEdge(traits),
 		Lifecycle:        appLifecycle(),
 		AppClip:          appClip(),
@@ -890,6 +891,37 @@ func (s *surface) observe() {
 
 // uiWindow is the window the surface shows in, 0 while it is in none.
 func (s *surface) uiWindow() objc.ID { return s.native.Send(sel("window")) }
+
+// activeWindowScene returns the foreground-active UIWindowScene for this
+// surface's window, or the first foreground-active UIWindowScene among the
+// app's connectedScenes, or 0 when none is active.
+func (s *surface) activeWindowScene() objc.ID {
+	const foregroundActive = 0 // UISceneActivationStateForegroundActive
+	windowSceneClass := apple.Class("UIWindowScene")
+	if windowSceneClass == 0 {
+		return 0
+	}
+	if w := s.uiWindow(); w != 0 {
+		if scene := w.Send(sel("windowScene")); scene != 0 &&
+			objc.Send[bool](scene, sel("isKindOfClass:"), windowSceneClass) &&
+			objc.Send[int](scene, sel("activationState")) == foregroundActive {
+			return scene
+		}
+	}
+	app := objc.ID(apple.Class("UIApplication")).Send(sel("sharedApplication"))
+	if app == 0 || !objc.Send[bool](app, sel("respondsToSelector:"), sel("connectedScenes")) {
+		return 0
+	}
+	var found objc.ID
+	apple.ForEach(app.Send(sel("connectedScenes")), func(scene objc.ID) {
+		if found == 0 &&
+			objc.Send[bool](scene, sel("isKindOfClass:"), windowSceneClass) &&
+			objc.Send[int](scene, sel("activationState")) == foregroundActive {
+			found = scene
+		}
+	})
+	return found
+}
 
 // viewController is the view controller the surface's view belongs to:
 // a standalone app's own, or the host's nearest above an embedded view.
@@ -1180,6 +1212,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemPurchase:
 			apple.HandlePurchase(it, s.engine.Dispatch)
+			continue
+		case driver.ItemRequestReview:
+			apple.RequestReview(s.activeWindowScene())
 			continue
 		case driver.ItemCheckForUpdates:
 			s.checkForUpdates(it.Count)

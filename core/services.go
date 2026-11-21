@@ -360,6 +360,24 @@ func (cx *Scope) QuickLook(paths []string, index int) bool {
 	return true
 }
 
+// RequestReview asks the platform's store to show an in-app rating prompt where
+// Env.CanRequestReview is true: StoreKit's SKStoreReviewController on macOS and
+// iOS, and Google Play In-App Review on Android. The store decides whether to
+// show the prompt and reports no result. Elsewhere (Windows, Linux, the web,
+// watchOS, tvOS and mini programs) it is a no-op. Under a confined owner it
+// acts only as Scope.Confine allows.
+func (cx *Scope) RequestReview() {
+	t := cx.tree()
+	if t == nil || !Untracked(cx, cx.Env().CanRequestReview) {
+		return
+	}
+	if !t.confinedMay(cx.current(), refusedPresent, askedToPresent) {
+		return
+	}
+	t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemRequestReview})
+	t.changed = true
+}
+
 // PickOptions say how PickImages picks and prepares images.
 type PickOptions struct {
 	// Multiple lets the user pick several images, at most Limit (0: up

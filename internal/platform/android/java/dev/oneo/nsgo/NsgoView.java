@@ -2696,6 +2696,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             case Protocol.ITEM_HAPTIC:
                 haptic(in.readInt());
                 break;
+            case Protocol.ITEM_REQUEST_REVIEW:
+                Services.requestReview(activity());
+                break;
             case Protocol.ITEM_SENSOR: {
                 if (sensors == null) sensors = new Sensors(getContext(), this::activity, engine, this::keeperEnded);
                 sensors.handle(in);
