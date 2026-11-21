@@ -78,7 +78,7 @@ if desktop.CanQuickLook(cx) {
 
 `cx.PickImages` 显示系统照片选择器，返回 `core.PickedFile`，其中包含字节、名称、类型和像素尺寸。`cx.TakePhoto` 在平台有相机时打开相机；`cx.Env().CanTakePhoto` 说明是否有。`cx.ScanCode` 全屏打开相机，返回读到的第一个码，默认只读二维码，`ScanOptions.Kinds` 可以指定其他种类；用户关闭时返回 nil。`cx.Env().CanScanCode` 说明平台是否能扫码，目前是 iOS 和 Android 真机。在 iOS 上它和 `TakePhoto` 一样需要 `NSCameraUsageDescription`；在 Android 上需要在 `android.permissions` 里加 `CAMERA`，除 PDF417 外都能识别。码里的文本是不可信的输入。
 
-测试中，`nsgotest.App.PickImages`、`nsgotest.App.TakePhoto` 和 `nsgotest.App.ScanCode` 代替系统选择器、相机和扫码器回答请求，在无头测试以及 `nsgo test -target` 上都有效；target 没有相机时，用 `nsgotest.Environment(core.Environment{Camera: true, ScanCode: true})` 启动即可得到。
+测试中，`nsgotest.App.PickImages`、`nsgotest.App.TakePhoto` 和 `nsgotest.App.ScanCode` 接收照片选择或拍摄记录 `nsgotest.ImagePick`，或扫码记录 `nsgotest.CodeScan`，并代替系统界面回答。它们可用于无头测试和支持这些钩子的 `nsgo test -target` 宿主。目标没有相机时，用 `nsgotest.Environment(core.Environment{Camera: true, ScanCode: true})` 启动即可得到。
 
 ```go
 cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.PickedFile) {
@@ -89,6 +89,8 @@ cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.
 ```
 
 `cx.PickFiles` 选择任意类型的文件，`cx.PickDirectories` 把文件夹选成 `fs.FS`，`cx.SaveFile` 通过系统保存对话框保存文件或字节。两种选择器都可以设置 `Title`（标题）、`Button`（按钮文字）和 `Start`（起始文件夹），`PickFilesOptions.TypesName` 还能命名类型菜单，便于用应用自己的语言显示；这些只是提示，macOS、Windows 和 Linux 会遵循，iOS 只支持 `Start`，Android 和 Web 都会忽略。`cx.PickScreenColor` 在平台允许时从屏幕任意位置取色。
+
+在无头测试中，`App.PickFiles`、`App.PickDirectories` 和 `App.SaveFile` 分别接收 `nsgotest.FilePick`、`nsgotest.DirectoryPick` 和 `nsgotest.FileSave` 记录。`app.FilePicks`、`app.DirectoryPicks` 和 `app.Saves` 保存这些记录。
 
 ## 存储
 
