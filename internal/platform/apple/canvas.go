@@ -757,10 +757,16 @@ func (p *player) image(op *driver.DrawOp) {
 		w, h = float64(img.points.Width), float64(img.points.Height)
 	}
 	src := img.image
+	if op.Tinted && op.Color != 0xffffffff {
+		src = img.tinted(op.Color)
+		if src == 0 {
+			return
+		}
+	}
 	if op.X2 != 0 || op.Y2 != 0 {
 		// The part named in points of the image, in its pixels.
 		k := img.width / max(float64(img.points.Width), 1e-9)
-		src = cgImageCreateWithImageInRect(img.image, Rect(f(op.X1)*k, f(op.Y1)*k, f(op.X2)*k, f(op.Y2)*k))
+		src = cgImageCreateWithImageInRect(src, Rect(f(op.X1)*k, f(op.Y1)*k, f(op.X2)*k, f(op.Y2)*k))
 		if src == 0 {
 			return
 		}
@@ -782,13 +788,43 @@ var canvasImages = map[string]*loadedImage{}
 
 // loadedImage is an image canvases draw, or one loading.
 type loadedImage struct {
-	image         uintptr
-	width, height float64 // pixels
-	points        driver.Size
-	failed        bool
-	waiting       map[any]func()
-	used          uint64
-	cancel        context.CancelFunc
+	canvasTint      uintptr
+	canvasTintColor driver.Color
+	image           uintptr
+	width, height   float64 // pixels
+	points          driver.Size
+	failed          bool
+	waiting         map[any]func()
+	used            uint64
+	cancel          context.CancelFunc
+}
+
+// tinted keeps one premultiplied sRGB copy of the image.
+func (img *loadedImage) tinted(tint driver.Color) uintptr {
+	if img.canvasTint != 0 && img.canvasTintColor == tint {
+		return img.canvasTint
+	}
+	Release(img.canvasTint)
+	img.canvasTint, img.canvasTintColor = 0, tint
+	w, h := cgImageGetWidth(img.image), cgImageGetHeight(img.image)
+	bitmapsLoaded.Do(loadBitmaps)
+	const premultipliedLast = 1
+	ctx := cgBitmapContextCreate(0, uintptr(w), uintptr(h), 8, uintptr(w*4), srgb, premultipliedLast)
+	if ctx == 0 {
+		return 0
+	}
+	defer Release(ctx)
+	cgContextDrawImage(ctx, Rect(0, 0, float64(w), float64(h)), img.image)
+	data := cgBitmapContextGetData(ctx)
+	pix := unsafe.Slice((*byte)(*(*unsafe.Pointer)(unsafe.Pointer(&data))), w*h*4)
+	driver.TintImagePixels(pix, pix, tint, false, true)
+	img.canvasTint = rgbaImage(pix, w, h)
+	return img.canvasTint
+}
+
+func (img *loadedImage) release() {
+	Release(img.image)
+	Release(img.canvasTint)
 }
 
 // canvasImageUse counts the images drawn; canvasPass is its value when the last pass of drawing ended, so images used since are the current pass's, which eviction keeps; canvasPassPosted says an endCanvasPass is posted.
@@ -840,7 +876,7 @@ func canvasImage(src driver.ImageSource, host CanvasHost) *loadedImage {
 			// Every image loaded was drawn by the pass under way, or none has loaded: evicting one would load it again at the next pass, forever.
 			break
 		}
-		Release(canvasImages[oldest].image)
+		canvasImages[oldest].release()
 		canvasImages[oldest].image = 0
 		delete(canvasImages, oldest)
 	}
@@ -917,7 +953,7 @@ func canvasFrame(src driver.ImageSource) *loadedImage {
 	}
 	for len(canvasFrames) > 0 && (len(canvasFrames) >= maxCanvasFrames || canvasFramePixels+pixelCount(src.Pixels) > maxCanvasFramePixels) {
 		canvasFramePixels -= pixelCount(canvasFrames[0].pixels)
-		Release(canvasFrames[0].image.image)
+		canvasFrames[0].image.release()
 		canvasFrames = slices.Delete(canvasFrames, 0, 1)
 	}
 	canvasFramePixels += pixelCount(src.Pixels)

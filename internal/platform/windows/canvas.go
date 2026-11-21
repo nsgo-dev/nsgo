@@ -980,7 +980,7 @@ func (c *canvasPlayer) image(op *driver.DrawOp) {
 	if s == nil || s.pic == nil {
 		return
 	}
-	bmp := s.bitmapOf(c.p.dc, 0)
+	bmp := s.canvasBitmap(c.p.dc, op)
 	if bmp == nil {
 		return
 	}
@@ -1001,6 +1001,24 @@ func (c *canvasPlayer) image(op *driver.DrawOp) {
 		dc.callF(rtDrawBitmap, 0b100, bmp.ptr(), uintptr(unsafe.Pointer(&dst)), f32(alpha), d2dInterpolationLinear,
 			uintptr(unsafe.Pointer(&src)))
 	})
+}
+
+// canvasBitmap keeps one tinted copy beside the original. A retained command
+// list may still reference an older copy, so its pixels stay immutable.
+func (s *imageSlot) canvasBitmap(dc *comObject, op *driver.DrawOp) *comObject {
+	if !op.Tinted || op.Color == 0xffffffff {
+		return s.bitmapOf(dc, 0)
+	}
+	if s.canvasTint != nil && s.canvasTintColor == op.Color && s.canvasTintGeneration == gfxGeneration {
+		return s.canvasTint
+	}
+	releaseAll(&s.canvasTint)
+	src := s.pic.frames[0].Pix
+	pix := make([]byte, len(src))
+	driver.TintImagePixels(pix, src, op.Color, true, true)
+	s.canvasTint = pictureBitmap(dc, s.pic, pix)
+	s.canvasTintColor, s.canvasTintGeneration = op.Color, gfxGeneration
+	return s.canvasTint
 }
 
 // canvasImage returns src's slot, loading it the first time and painting
@@ -1123,7 +1141,7 @@ func (w *window) canvasFrame(src driver.ImageSource) *imageSlot {
 	s.showPixels(src)
 	for len(w.canvasFrames) > 0 && (len(w.canvasFrames) >= maxCanvasFrames || w.canvasFramePixels+pixelCount(src.Pixels) > maxCanvasFramePixels) {
 		w.canvasFramePixels -= pixelCount(w.canvasFrames[0].src.Pixels)
-		releaseAll(&w.canvasFrames[0].bitmap)
+		w.canvasFrames[0].reset(driver.ImageSource{})
 		w.canvasFrames = slices.Delete(w.canvasFrames, 0, 1)
 	}
 	w.canvasFramePixels += pixelCount(src.Pixels)

@@ -5,6 +5,8 @@ import android.graphics.Bitmap;
 import android.graphics.BlendMode;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.DashPathEffect;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
@@ -795,6 +797,8 @@ final class CanvasNode extends View {
             b.getFloat(); // the density its name gives, which the picture carries
             float x = b.getFloat(), y = b.getFloat(), w = b.getFloat(), h = b.getFloat();
             float sx = b.getFloat(), sy = b.getFloat(), sw = b.getFloat(), sh = b.getFloat();
+            boolean tinted = b.get() != 0;
+            int tint = tinted ? Text.argb(b.getInt()) : 0;
             if (pictures == null) return;
             CanvasImages<Picture>.Lease lease = pictures.acquire(key);
             if (lease == null) return;
@@ -814,6 +818,12 @@ final class CanvasNode extends View {
                 paint.setAntiAlias(true);
                 paint.setFilterBitmap(true);
                 paint.setAlpha(Math.round(255 * state.alpha));
+                if (tinted) {
+                    ColorMatrix matrix = new ColorMatrix();
+                    matrix.setScale(Color.red(tint) / 255f, Color.green(tint) / 255f,
+                            Color.blue(tint) / 255f, Color.alpha(tint) / 255f);
+                    paint.setColorFilter(new ColorMatrixColorFilter(matrix));
+                }
                 RectF dst = new RectF(x, y, x + w, y + h);
                 Rect from = src;
                 canvas.save();

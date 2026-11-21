@@ -144,6 +144,13 @@ jobs:
         run: go tool nsgo test -target web ./internal/testhost/testdata/keys
       - name: Test browser backend
         run: go tool nsgo test -target web ./internal/platform/web
+      - name: Test canvas image tint on Linux and the web
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: |
+          xvfb-run -a go tool nsgo test -target linux -run '^TestCanvasImageTint$' ./internal/testhost/testdata/capture
+          go tool nsgo test -target web -run '^TestCanvasImageTint$' ./internal/testhost/testdata/capture
       - name: Test browser relational selectors from TSX
         run: go tool nsgo test -target web -run '^TestRelationalClassesFromTSX$' ./tsx
       - name: Test browser radio and tab focus
@@ -185,6 +192,7 @@ jobs:
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run 'ListTouchStopsMomentum$' ./internal/platform/android || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestIME|^TestHardwareEnter' ./internal/platform/android || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
             go tool nsgo test -target android -device emulator-5554 -timeout 2m ./internal/testhost/testdata/websource || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
+            go tool nsgo test -target android -device emulator-5554 -timeout 2m -run '^TestCanvasImageTint$' ./internal/testhost/testdata/capture || { adb logcat -d -v brief -s nsgo:V AndroidRuntime:E libc:F DEBUG:F; exit 1; }
 
   apple:
     # AVPlayer plays nothing on Depot's macOS runners, so the desktop backend stays on GitHub's; use its Intel pool while hosted arm64 capacity leaves jobs unallocated.
@@ -276,6 +284,7 @@ jobs:
           ipad=$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries[] | select(.key | contains("iOS"))] | sort_by(.key | split("-") | .[1:] | map(tonumber)) | reverse | map(.value[] | select(.deviceTypeIdentifier | contains("iPad"))) | first | .udid')
           go tool nsgo test -target ios_simulator -device "$ipad" -timeout 1m -run '^(TestScenesShowTreesOfTheirOwn|TestSceneDisconnectsWhileTheOtherRuns|TestSceneStatusBarAndOrientationsArePerScene)$' ./internal/platform/ios
           go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
+          go tool nsgo test -target ios_simulator -timeout 1m -run '^TestCanvasImageTint$' ./internal/testhost/testdata/capture
           go tool nsgo test -target watchos_simulator -timeout 1m ./internal/platform/watchos
 
   windows:
@@ -300,6 +309,8 @@ jobs:
         run: go tool nsgo test -target windows ./internal/testhost/testdata/keys
       - name: Test native empty web sources
         run: go tool nsgo test -target windows ./internal/testhost/testdata/websource
+      - name: Test native canvas image tint
+        run: go tool nsgo test -run '^TestCanvasImageTint$' ./internal/platform/windows
       - name: Test native photo pick answers
         run: go tool nsgo test -target windows ./internal/testhost/testdata/pick
       - name: Test native focus, styles, activation and label relationships

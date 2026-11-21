@@ -60,6 +60,33 @@ func TestCanvasSamples(t *testing.T) {
 	}
 }
 
+func TestCanvasImageTint(t *testing.T) {
+	g, err := devices()
+	if err != nil {
+		t.Skip(err)
+	}
+	src, err := canvastest.TintSource()
+	if err != nil {
+		t.Fatal(err)
+	}
+	pic, err := decode(context.Background(), src.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := &window{scale: canvastest.Scale, animator: driver.NewAnimator(nil)}
+	w.canvasImages = map[string]*imageSlot{src.Key(): {src: src, pic: pic}}
+	defer w.closeCanvasImages()
+	const width, height = canvastest.TintWidth, canvastest.TintHeight
+	d := driver.NewDrawing(w)
+	canvastest.DrawTintSample(d, src, width, height)
+	img := drawImage(t, g, width, height, func(p *painter) {
+		p.canvas(&view{drawing: d}, width, height)
+	}, w)
+	for _, f := range canvastest.CheckTintSample(img, driver.Point{}, canvastest.Scale) {
+		t.Error(f)
+	}
+}
+
 // drawImage draws with draw into a Direct2D bitmap width by height points
 // at canvastest.Scale, cleared white, and reads its pixels back.
 func drawImage(t *testing.T, g *gfx, width, height int, draw func(p *painter), w *window) *image.RGBA {

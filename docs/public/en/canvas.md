@@ -35,6 +35,8 @@ d.SetFillGradient(core.CanvasLinear(0, 0, float32(size.Width), 0,
 
 `MeasureText`, `TextMetrics` and `SetTextAlign` lay text out on the platform's text engine, so labels use the same fonts as the rest of the app. `DrawImage`, `DrawImageIn` and `DrawImageFrom` draw pictures, and `OnPress` can test the last drawing with `IsPointInPath` and `IsPointInStroke`.
 
+`DrawTintedImage`, `DrawTintedImageIn` and `DrawTintedImageFrom` multiply an image's sRGB and alpha channels by a color before compositing. With the default source-over mode, transparent pixels leave the backdrop visible. Use `drawTintedImage(image, tint, ...args)` in TSX with the same coordinate forms as `drawImage`. A cross-origin source on the web must permit anonymous CORS requests for its pixels to be tinted. HarmonyOS tinting requires a host compiled from the current templates with the SDK.
+
 `Drawing.Node` names a part of a drawing, such as a chart's bar or a map's region, with bounds, a role, a label and a selected state. Assistive technology reads those parts as the canvas's children, and tests find them by label, text or test ID; a press on one is a press at its center.
 
 ```go

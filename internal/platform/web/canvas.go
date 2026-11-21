@@ -5,6 +5,7 @@ package web
 import (
 	"math"
 	"strconv"
+	"strings"
 	"syscall/js"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -56,8 +57,14 @@ func (s *surface) paint(v *view) {
 	ctx.Call("scale", ratio, ratio)
 	p := canvas2d.NewPlayer(ctx, ratio, math.Hypot(w, h))
 	p.Font = fontCSS
-	p.Image = func(src driver.ImageSource) (js.Value, float64, bool) {
-		im := s.loadImage(src, v)
+	p.NewCanvas = func(width, height int) js.Value {
+		c := s.doc.Call("createElement", "canvas")
+		c.Set("width", width)
+		c.Set("height", height)
+		return c
+	}
+	p.Image = func(src driver.ImageSource, readable bool) (js.Value, float64, bool) {
+		im := s.loadCanvasImage(src, v, readable)
 		return im.img, im.density, im.loaded
 	}
 	ops := s.animator.CanvasOps(v.id, v.drawing)
@@ -170,10 +177,21 @@ type canvasImage struct {
 // loadImage returns src's image, loading it the first time, and has v
 // draw again once it loads: a canvas plays again, a shader draws.
 func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
+	return s.loadCanvasImage(src, v, false)
+}
+
+func (s *surface) loadCanvasImage(src driver.ImageSource, v *view, readable bool) *canvasImage {
 	if src.Pixels != nil {
 		return s.canvasFrame(src)
 	}
 	key := src.Key()
+	// A cross-origin image can draw without CORS. Tinting needs access to
+	// its pixels, so the anonymous request has a separate cache entry.
+	cors := readable && len(src.Data) == 0 && (strings.HasPrefix(src.URI, "https:") ||
+		strings.HasPrefix(src.URI, "http:") || strings.HasPrefix(src.URI, "//"))
+	if cors {
+		key = "cors:" + key
+	}
 	im := s.canvasImages[key]
 	if im == nil {
 		if s.canvasImages == nil {
@@ -182,11 +200,18 @@ func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
 		im = &canvasImage{img: js.Global().Get("Image").New(), density: float64(src.Density()),
 			waiting: map[*view]bool{}}
 		s.canvasImages[key] = im
-		var onload js.Func
-		onload = js.FuncOf(func(js.Value, []js.Value) any {
-			onload.Release()
+		var done js.Func
+		done = js.FuncOf(func(_ js.Value, args []js.Value) any {
+			im.img.Set("onload", js.Null())
+			im.img.Set("onerror", js.Null())
+			done.Release()
+			waiting := im.waiting
+			im.waiting = nil
+			if args[0].Get("type").String() != "load" {
+				return nil
+			}
 			im.loaded = true
-			for v := range im.waiting {
+			for v := range waiting {
 				switch {
 				case s.view(v.id) != v:
 				case v.kind == driver.KindShader:
@@ -195,10 +220,13 @@ func (s *surface) loadImage(src driver.ImageSource, v *view) *canvasImage {
 					s.paint(v)
 				}
 			}
-			im.waiting = nil
 			return nil
 		})
-		im.img.Call("addEventListener", "load", onload)
+		im.img.Set("onload", done)
+		im.img.Set("onerror", done)
+		if cors {
+			im.img.Set("crossOrigin", "anonymous")
+		}
 		url, _ := imageURL(src)
 		im.img.Set("src", url)
 	}

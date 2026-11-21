@@ -632,7 +632,7 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 	if s == nil || s.pic == nil {
 		return
 	}
-	surf := s.surfaceOf(0)
+	surf := s.canvasSurface(op)
 	if surf == 0 {
 		return
 	}
@@ -669,6 +669,21 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 	cairoNewPath(cr)
 	cairoAppendPath(cr, saved)
 	cairoPathDestroy(saved)
+}
+
+func (s *imageSlot) canvasSurface(op *driver.DrawOp) uintptr {
+	if !op.Tinted || op.Color == 0xffffffff {
+		return s.surfaceOf(0)
+	}
+	if s.canvasTint != 0 && s.canvasTintColor == op.Color {
+		return s.canvasTint
+	}
+	if s.canvasTint != 0 {
+		cairoSurfaceDestroy(s.canvasTint)
+	}
+	s.canvasTint = s.pic.makeSurface(op.Color, true)
+	s.canvasTintColor = op.Color
+	return s.canvasTint
 }
 
 // canvasImage returns src's picture slot, loading it the first time and
@@ -805,10 +820,7 @@ func (w *window) canvasFrame(src driver.ImageSource) *imageSlot {
 	s.showPixels(src)
 	for len(w.canvasFrames) > 0 && (len(w.canvasFrames) >= maxCanvasFrames || w.canvasFramePixels+pixelCount(src.Pixels) > maxCanvasFramePixels) {
 		w.canvasFramePixels -= pixelCount(w.canvasFrames[0].src.Pixels)
-		if old := w.canvasFrames[0]; old.surface != 0 {
-			cairoSurfaceDestroy(old.surface)
-			old.surface = 0
-		}
+		w.canvasFrames[0].reset(driver.ImageSource{})
 		w.canvasFrames = slices.Delete(w.canvasFrames, 0, 1)
 	}
 	w.canvasFramePixels += pixelCount(src.Pixels)

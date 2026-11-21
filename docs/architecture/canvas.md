@@ -12,7 +12,7 @@
 - `FillPath`, `StrokePath` and `ClipPath` use a `Path` without touching the current path; `FillEvenOdd` and `ClipEvenOdd` take the even-odd rule.
 - Paints: colors, and `CanvasLinear`, `CanvasRadial` and `CanvasConic` gradients.
 - Text: `FillText` and `StrokeText` in a `Font`.
-- Images: `DrawImage` at the natural size, `DrawImageIn` into a rectangle and `DrawImageFrom` from a part of the image.
+- Images: `DrawImage` at the natural size, `DrawImageIn` into a rectangle and `DrawImageFrom` from a part of the image. The corresponding `DrawTintedImage`, `DrawTintedImageIn` and `DrawTintedImageFrom` multiply the source's sRGB and alpha channels by a color before applying the canvas's composition state. The tint can bind to `ArgColor`.
 
 A canvas has no size of its own unless `Em` gives it one in ems of the font size it inherits, scaled by the user's text size as text is, as `base/formula`'s formulas size themselves: in a text's attachment its baseline, `Em.Descent` ems above its bottom, sits on the line's ([text](text.md)). `EmFunc` and `LabelFunc` follow what they read, laying it out again and naming it anew.
 
