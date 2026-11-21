@@ -320,6 +320,8 @@ func (p *canvasPlayer) play(op *driver.DrawOp) {
 		p.text(op)
 	case driver.DrawImage:
 		p.image(op)
+	case driver.DrawVertices:
+		p.vertices(op)
 	case driver.DrawClear:
 		path := cairoCopyPath(cr)
 		cairoSave(cr)
@@ -632,6 +634,10 @@ func (p *canvasPlayer) image(op *driver.DrawOp) {
 	if s == nil || s.pic == nil {
 		return
 	}
+	p.drawImage(op, s)
+}
+
+func (p *canvasPlayer) drawImage(op *driver.DrawOp, s *imageSlot) {
 	surf := s.surfaceOf(0)
 	if surf == 0 {
 		return

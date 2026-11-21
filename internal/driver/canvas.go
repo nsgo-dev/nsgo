@@ -120,6 +120,8 @@ const (
 	// them, so players skip these.
 	DrawTextAlign
 	DrawTextBaseline
+	// DrawVertices draws Image through Mesh, with its bounds in X, Y, W, H.
+	DrawVertices
 )
 
 // UsesPath reports whether an op of kind k builds on the current path or
@@ -146,6 +148,7 @@ type DrawOp struct {
 	Composite CompositeOp
 	Dash      *LineDash
 	Image     *ImageSource
+	Mesh      *CanvasMesh
 	// TextAlign and TextBaseline are what a text op was placed with.
 	TextAlign    TextAlign
 	TextBaseline TextBaseline
@@ -945,7 +948,7 @@ func (d *Drawing) DrawImageFrom(img ImageSource, sx, sy, sw, sh, x, y, w, h floa
 // value of node, every frame it changes, in place of the one recorded.
 // The queries and the text placement read the recorded value.
 func (d *Drawing) Bind(arg DrawArg, node AnimatedArg) *Drawing {
-	if node == nil || len(d.Ops) == 0 {
+	if node == nil || len(d.Ops) == 0 || d.Ops[len(d.Ops)-1].Kind == DrawVertices {
 		return d
 	}
 	if id := node.AnimatedNodeID(); id != 0 {

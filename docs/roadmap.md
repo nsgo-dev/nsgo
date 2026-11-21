@@ -188,6 +188,8 @@ The [games plan (#1047)](https://github.com/nsgo-dev/nsgo/issues/1047) targets m
 | Audio | [#1050](https://github.com/nsgo-dev/nsgo/issues/1050) | `audio.Sound` and `audio.Player` play on Windows, Linux, Android and the web as they do on macOS and iOS |
 | Pixel buffers | [#1051](https://github.com/nsgo-dev/nsgo/issues/1051) | A buffer rewritten at 60 fps draws without blank frames on Android and the web, and Android canvases draw the same buffers |
 | Batched sprites | [#1053](https://github.com/nsgo-dev/nsgo/issues/1053) | `Drawing.DrawAtlas` matches the equivalent individual draws by pixel comparison, with timings before and after batching |
+| Textured meshes on HarmonyOS and mini programs | [#1211](https://github.com/nsgo-dev/nsgo/issues/1211) | Play the same `Drawing.DrawVertices` triangle lists as the game targets |
+| Deforming mesh throughput | [#1211](https://github.com/nsgo-dev/nsgo/issues/1211) | Sustain 60 fps for 1,000 triangles in the [canvas workload](https://github.com/nsgo-dev/nsgo/issues/1102) |
 | Pointer lock and relative motion | [#1054](https://github.com/nsgo-dev/nsgo/issues/1054) | Games can lock the pointer and read relative mouse motion on desktops and the web |
 | Android native view classes | [#1055](https://github.com/nsgo-dev/nsgo/issues/1055) | An app ships a prebuilt `View` class and shows it through `core.Native` without requiring a JDK or Android SDK on the build machine |
 | Desktop multi-touch | [#1056](https://github.com/nsgo-dev/nsgo/issues/1056) | Windows and Linux touchscreens report separate fingers to `OnTouch` |

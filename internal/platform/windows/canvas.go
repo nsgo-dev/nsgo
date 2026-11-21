@@ -333,6 +333,8 @@ func (c *canvasPlayer) play(op *driver.DrawOp) {
 		c.text(op)
 	case driver.DrawImage:
 		c.image(op)
+	case driver.DrawVertices:
+		c.vertices(op)
 	case driver.DrawClear:
 		c.clear(op)
 	}
@@ -980,6 +982,10 @@ func (c *canvasPlayer) image(op *driver.DrawOp) {
 	if s == nil || s.pic == nil {
 		return
 	}
+	c.drawImage(op, s)
+}
+
+func (c *canvasPlayer) drawImage(op *driver.DrawOp, s *imageSlot) {
 	bmp := s.bitmapOf(c.p.dc, 0)
 	if bmp == nil {
 		return

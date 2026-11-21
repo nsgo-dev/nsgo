@@ -525,6 +525,8 @@ func (p *player) play(at int) {
 		p.text(op)
 	case driver.DrawImage:
 		p.image(op)
+	case driver.DrawVertices:
+		p.vertices(op)
 	}
 }
 
@@ -766,10 +768,14 @@ func (p *player) image(op *driver.DrawOp) {
 		}
 		defer Release(src)
 	}
+	p.drawImage(src, f(op.X), f(op.Y), w, h)
+}
+
+func (p *player) drawImage(src uintptr, x, y, w, h float64) {
 	p.layered(false, func() {
 		cgContextSaveGState(p.ctx)
 		// Images draw bottom up: flip them into the top-down space.
-		cgContextTranslateCTM(p.ctx, f(op.X), f(op.Y)+h)
+		cgContextTranslateCTM(p.ctx, x, y+h)
 		cgContextScaleCTM(p.ctx, 1, -1)
 		cgContextDrawImage(p.ctx, Rect(0, 0, w, h), src)
 		cgContextRestoreGState(p.ctx)
@@ -785,6 +791,7 @@ type loadedImage struct {
 	image         uintptr
 	width, height float64 // pixels
 	points        driver.Size
+	meshPixels    []byte // BGRA, fetched only when a mesh uses the image
 	failed        bool
 	waiting       map[any]func()
 	used          uint64

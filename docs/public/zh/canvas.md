@@ -33,6 +33,8 @@ d.SetFillGradient(core.CanvasLinear(0, 0, float32(size.Width), 0,
 
 `MeasureText`、`TextMetrics` 和 `SetTextAlign` 用平台的文本引擎排版，因此标签与应用其余部分使用相同的字体。`DrawImage`、`DrawImageIn` 和 `DrawImageFrom` 绘制图片，`OnPress` 可以用 `IsPointInPath` 和 `IsPointInStroke` 测试最后一次绘制。
 
+`d.DrawVertices(image, vertices)` 绘制带纹理的网格。每三个连续的 `core.CanvasVertex` 构成一个三角形。`Position` 以画布点为单位，`TexCoord` 与 `DrawImageFrom` 一样以图像点为单位。每个顶点的 `Color` 会在三角形内插值后乘到纹理颜色上，零值保留纹理原色。修改顶点并重新记录绘图即可使网格变形。Web 绘制任意网格时使用内联或同源图像。
+
 `Drawing.Node` 给绘图的一部分命名，例如图表的柱或地图的区域，带边界、角色、标签和选中状态。辅助技术把这些部分当作画布的子元素，测试可以按标签、文本或 test ID 找到它们；按下其中一个就是按下它的中心。
 
 ```go

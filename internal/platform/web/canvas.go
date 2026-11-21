@@ -9,6 +9,7 @@ import (
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/canvas2d"
+	"github.com/nsgo-dev/nsgo/internal/platform/canvasmesh"
 	"github.com/nsgo-dev/nsgo/internal/platform/webstyle"
 )
 
@@ -59,6 +60,23 @@ func (s *surface) paint(v *view) {
 	p.Image = func(src driver.ImageSource) (js.Value, float64, bool) {
 		im := s.loadImage(src, v)
 		return im.img, im.density, im.loaded
+	}
+	p.MeshCanvas = func() js.Value {
+		if !s.meshCanvas.Truthy() {
+			s.meshCanvas = s.doc.Call("createElement", "canvas")
+		}
+		return s.meshCanvas
+	}
+	p.Texture = func(src driver.ImageSource) canvasmesh.Texture {
+		if src.Pixels != nil {
+			return canvasmesh.RGBA(src.Pixels, src.Size)
+		}
+		im := s.loadImage(src, v)
+		if im.loaded && !im.readTexture {
+			im.texture = canvas2d.ReadTexture(p.MeshCanvas(), im.img, im.density)
+			im.readTexture = true
+		}
+		return im.texture
 	}
 	ops := s.animator.CanvasOps(v.id, v.drawing)
 	for i := range ops {
@@ -161,10 +179,12 @@ func (s *surface) refreshCanvasScale(root js.Value) {
 
 // canvasImage is an image canvases draw, loaded once for the surface.
 type canvasImage struct {
-	img     js.Value
-	density float64
-	loaded  bool
-	waiting map[*view]bool
+	img         js.Value
+	density     float64
+	loaded      bool
+	waiting     map[*view]bool
+	texture     canvasmesh.Texture
+	readTexture bool
 }
 
 // loadImage returns src's image, loading it the first time, and has v

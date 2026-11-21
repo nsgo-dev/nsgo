@@ -50,6 +50,11 @@ func writeDrawing(w *writer, d *driver.Drawing) {
 		if op.Kind == driver.DrawTextAlign || op.Kind == driver.DrawTextBaseline {
 			continue
 		}
+		if op.Kind == driver.DrawVertices {
+			if draw, ok := op.ImageRect(); ok {
+				op = &draw
+			}
+		}
 		w.byte(byte(op.Kind))
 		switch op.Kind {
 		case driver.DrawTranslate, driver.DrawScale, driver.DrawMoveTo, driver.DrawLineTo:
@@ -151,6 +156,24 @@ func writeDrawing(w *writer, d *driver.Drawing) {
 			arg(driver.ArgY1, op.Y1)
 			arg(driver.ArgX2, op.X2)
 			arg(driver.ArgY2, op.Y2)
+		case driver.DrawVertices:
+			var key string
+			if op.Image != nil {
+				key = op.Image.Key()
+			}
+			w.str(key)
+			var vertices []driver.CanvasVertex
+			if op.Mesh != nil {
+				vertices = op.Mesh.Vertices
+			}
+			w.u32(uint32(len(vertices)))
+			for _, v := range vertices {
+				w.points(v.Position.X)
+				w.points(v.Position.Y)
+				w.points(v.TexCoord.X)
+				w.points(v.TexCoord.Y)
+				w.u32(uint32(v.Color))
+			}
 		}
 	}
 	binary.BigEndian.PutUint32(w.buf[at:], uint32(len(w.buf)-start))
