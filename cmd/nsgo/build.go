@@ -1249,9 +1249,10 @@ type webApp struct {
 	// programs, and Scripts the app's bundles: the loader runs them in the
 	// realm before the app starts, so a Content-Security-Policy needs no
 	// 'unsafe-eval' (docs/architecture/tsx.md).
-	Runtime   string            `json:"runtime,omitempty"`
-	Scripts   []string          `json:"scripts,omitempty"`
-	Resources map[string]string `json:"resources,omitempty"`
+	Runtime string   `json:"runtime,omitempty"`
+	Scripts []string `json:"scripts,omitempty"`
+	// A published site lists its assets even when empty. A dev build serves names directly.
+	Resources map[string]string `json:"resources,omitzero"`
 }
 
 // loaderJS is nsgo.js, which runs an app in a page.

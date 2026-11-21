@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"context"
 	"log"
 	"net/url"
 	"os"
@@ -150,6 +151,8 @@ type Options struct {
 	Storage *core.Store
 	// Secrets is the platform's secure store (core.Scope.Secrets); nil where it has none.
 	Secrets driver.SecretStore
+	// ReadAsset supplies core's bundled file reader.
+	ReadAsset func(context.Context, string) ([]byte, error)
 	// DataDir, CacheDir and LogsDir are the app's directories, made when the engine starts; "" where the target has none.
 	DataDir, CacheDir, LogsDir string
 	// Appearance is the appearance the app starts in, forced as
@@ -489,6 +492,7 @@ func (e *Engine) run(p Platform, app App, opts Options, tokens Tokens) {
 		RequestFrame: requestFrame,
 		Storage:      opts.Storage,
 		Secrets:      opts.Secrets,
+		ReadAsset:    opts.ReadAsset,
 		DataDir:      opts.DataDir,
 		CacheDir:     opts.CacheDir,
 		LogsDir:      opts.LogsDir,

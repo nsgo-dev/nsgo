@@ -49,6 +49,7 @@ func (host) Open(app func(cx *core.Scope) core.Node, o testhost.Options) (testho
 		s.size0 = o.Size
 	}
 	s.engine = engine.Start(s, app, engine.Options{
+		ReadAsset:    readAsset,
 		CheckCommits: o.CheckCommits,
 		Size:         s.size0, Environment: env, Clock: o.Clock, Storage: o.Storage,
 		Observe: o.Observe, Event: o.Event,
