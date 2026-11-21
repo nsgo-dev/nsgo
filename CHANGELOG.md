@@ -19,6 +19,7 @@
 - Add `Scope.RequestOrientation`, which shows an iOS or Android phone's interface in the given orientations while the scope lives, the newest live request winning and the app's own policy coming back once none is left, and `nsgotest.App.Orientation`, which reports the mask in effect (#1136 by @houko).
 - Update web image views with each pixel buffer version in place (#1099 by @houko).
 - Add pixel buffers to WeChat mini program images and mini program canvas drawings (#1101 by @houko).
+- Report what each text of a selection area has selected in `TextSelection.Ranges`: the text's `Ref` and the UTF-16 offsets of its content, so an app can tell a selection of repeated text apart from the same words elsewhere, on macOS, Linux and Windows and in `nsgotest`, where `App.SelectTextRange` injects a precise selection by offsets; `TextSelection` is no longer comparable with `==` (#1173 by @shuuul).
 - Add `apple.multiple_scenes`, which writes `UIApplicationSupportsMultipleScenes`, and show each further scene an iPad connects for it, as the user opens another window of the app, in a window of its own: a tree of the app's one engine showing the main view, with its own size, safe area, status bar and orientations, kept while UIKit disconnects the scene and ended as the system discards it (#49 by @houko).
 - Acknowledge macOS logout, restart and shutdown after app cleanup and expose those requests through `desktop.QuitRequest.Forced()` (#1081 by @houko).
 - Add `Style` and `StyleFunc` to `ui.Sheet` for surface backgrounds, corners and padding (#1036 by @houko).
