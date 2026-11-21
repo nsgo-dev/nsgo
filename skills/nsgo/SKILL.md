@@ -30,6 +30,8 @@ go tool nsgo doctor        # which targets this machine builds and runs, and wha
 
 Go 1.27.3 or later builds every target from a Mac, with Xcode for Apple's; nothing else (no NDK, Android SDK, JDK or GTK) is needed to build. Never hand-write C or add cgo to reach a platform: use NSGo's services first, then purego or `syscall`.
 
+On `ios_simulator`, Go-only dev rebuilds of the main app replace the installed executable and relaunch. Changes to the app's resources, icon or `nsgo.yaml` reinstall it. [Running and debugging](https://nsgo.dev/docs/debugging.md)
+
 ## Writing an app
 
 ```go
