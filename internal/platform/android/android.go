@@ -957,6 +957,7 @@ func answerKey(surface, count uint32) uint64 { return uint64(surface)<<32 | uint
 // current request and how to stop loading them.
 type imageView struct {
 	source, placeholder driver.ImageSource
+	sampling            driver.ImageSampling
 	events              driver.EventMask
 	request             uint32
 	cancel              context.CancelFunc
@@ -1035,13 +1036,15 @@ func (s *surface) trackImages(tv *treeView, b *driver.MountBatch) ([]uint32, []i
 			// Java shows pixels as a PNG made once for each version the core copied.
 			it.Image = v.asPNG(it.Image)
 			c := it.Image
-			if v.request == 0 || !sameSource(v.source, c.Source) || !sameSource(v.placeholder, c.Placeholder) {
+			if v.request == 0 || !sameSource(v.source, c.Source) || !sameSource(v.placeholder, c.Placeholder) ||
+				(v.sampling != c.Sampling && c.Sampling == driver.ImageSamplingNearest) {
 				v.stop()
 				s.requests++
 				ctx, cancel := context.WithCancel(context.Background())
 				v.source, v.placeholder, v.request, v.cancel = c.Source, c.Placeholder, s.requests, cancel
 				loads = append(loads, imageLoad{ctx, tv.id, it.ID, v.request, c.Source, c.Placeholder, v.events, v.size})
 			}
+			v.sampling = c.Sampling
 			requests = append(requests, v.request)
 		}
 	}
@@ -1295,6 +1298,7 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.byte(byte(c.ResizeMode - driver.Cover)) // Java's are 0-based
 			w.points(c.BlurRadius)
 			w.u32(uint32(max(c.FadeDuration.Milliseconds(), 0))) // 0: the platform's
+			w.flags(c.Sampling == driver.ImageSamplingNearest)
 			// Each axis of the position as a fraction of the free space
 			// plus points, which is what any position resolves to.
 			for _, a := range [...]driver.PositionAxis{c.Position.X, c.Position.Y} {

@@ -33,6 +33,7 @@ final class ImageNode extends FrameLayout {
     private final ImageView placeholder, source;
     /** The request whose bitmaps the node shows. */
     int request;
+    boolean nearest;
     /** Whether the request's source is shown, which the placeholder then stays under. */
     private boolean loaded;
     private int fade = DEFAULT_FADE;
@@ -71,7 +72,9 @@ final class ImageNode extends FrameLayout {
      * the fade in milliseconds, 0 for the default. A new request clears the
      * node until its bitmaps arrive.
      */
-    void configure(int request, int mode, float blur, int fadeMillis) {
+    void configure(int request, int mode, float blur, int fadeMillis, boolean nearest) {
+        boolean samplingChanged = this.nearest != nearest;
+        this.nearest = nearest;
         this.mode = mode;
         fade = fadeMillis > 0 ? fadeMillis : DEFAULT_FADE;
         // Blurring a view needs API 31; before it fit blurs the bitmaps.
@@ -84,6 +87,12 @@ final class ImageNode extends FrameLayout {
         }
         fit(placeholder);
         fit(source);
+        if (samplingChanged) {
+            setSampling(placeholderSharp.image);
+            setSampling(sourceSharp.image);
+            setSampling(placeholder.getDrawable());
+            setSampling(source.getDrawable());
+        }
         if (request == this.request) return;
         this.request = request;
         loaded = false;
@@ -172,7 +181,7 @@ final class ImageNode extends FrameLayout {
                 ? Bitmap.createScaledBitmap(bitmap, Math.max(1, Math.round(bw * shrink)), Math.max(1, Math.round(bh * shrink)), true)
                 : bitmap;
         Bitmap blurred = Blur.blurred(small, Blur.stackRadius(blur * shrink / drawn));
-        view.setImageDrawable(new BitmapDrawable(getResources(), blurred) {
+        BitmapDrawable drawable = new BitmapDrawable(getResources(), blurred) {
             @Override
             public int getIntrinsicWidth() {
                 return iw;
@@ -182,7 +191,16 @@ final class ImageNode extends FrameLayout {
             public int getIntrinsicHeight() {
                 return ih;
             }
-        });
+        };
+        if (nearest) setSampling(drawable);
+        view.setImageDrawable(drawable);
+    }
+
+    private void setSampling(Drawable image) {
+        if (image instanceof BitmapDrawable || image instanceof AnimatedImageDrawable) {
+            image.setFilterBitmap(!nearest);
+            image.invalidateSelf();
+        }
     }
 
     /** Recolors the opaque pixels with argb, or keeps their colors for 0. */
@@ -210,6 +228,7 @@ final class ImageNode extends FrameLayout {
         if (old instanceof AnimatedImageDrawable && old != image) ((AnimatedImageDrawable) old).stop();
         (view == placeholder ? placeholderSharp : sourceSharp).image = image;
         (view == placeholder ? placeholderSharp : sourceSharp).radius = 0;
+        if (nearest) setSampling(image);
         view.setImageDrawable(image);
         fit(view);
         if (image instanceof AnimatedImageDrawable) ((AnimatedImageDrawable) image).start();

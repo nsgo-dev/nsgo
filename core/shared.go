@@ -176,6 +176,8 @@ type (
 	ImageScales = driver.ImageScales
 	// ImageSource is where an image comes from: a URI (https, file path, file:, data:), bytes, such as a file embedded with go:embed, or pixels the app draws (Pixels and Version).
 	ImageSource = driver.ImageSource
+	// ImageSampling selects the filter used when scaling raster images.
+	ImageSampling = driver.ImageSampling
 	// Interpolation maps a node through piecewise-linear ranges.
 	Interpolation = driver.Interpolation
 	// KeyboardAppearance is the look of iOS's keyboard; the default follows the

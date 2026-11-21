@@ -795,6 +795,7 @@ final class CanvasNode extends View {
             b.getFloat(); // the density its name gives, which the picture carries
             float x = b.getFloat(), y = b.getFloat(), w = b.getFloat(), h = b.getFloat();
             float sx = b.getFloat(), sy = b.getFloat(), sw = b.getFloat(), sh = b.getFloat();
+            boolean nearest = b.get() != 0;
             if (pictures == null) return;
             CanvasImages<Picture>.Lease lease = pictures.acquire(key);
             if (lease == null) return;
@@ -812,7 +813,7 @@ final class CanvasNode extends View {
                 }
                 paint.reset();
                 paint.setAntiAlias(true);
-                paint.setFilterBitmap(true);
+                paint.setFilterBitmap(!nearest);
                 paint.setAlpha(Math.round(255 * state.alpha));
                 RectF dst = new RectF(x, y, x + w, y + h);
                 Rect from = src;

@@ -24,6 +24,7 @@ Use `ui`'s component whenever one exists: it is `base`'s control with NSGo's loo
 ## Using them well
 
 - `core.Canvas.Draw` runs again when a signal it reads, its size or the available fonts change; `cx.RegisterFont` updates its glyphs and `Drawing.TextMetrics` once the font loads, including asynchronously on the web ([canvas](https://nsgo.dev/docs/canvas.md)).
+- Keep scaled pixel art sharp with `Drawing.SetImageSmoothing(false)` on Canvas or `Sampling: core.ImageSamplingNearest` on Image. In TSX set `ctx.imageSmoothingEnabled = false` or `sampling="nearest"` ([canvas](https://nsgo.dev/docs/canvas.md), [images](https://nsgo.dev/docs/images.md)).
 - Show frames the app decodes or renders (video, emulators, previews) in a `core.Image` with `ImageSource{Pixels: frame, Version: n}`, bumping `Version` after writing each frame into the same `*image.RGBA`, and filter such a frame on the GPU by passing the same source in a `core.Shader`'s `Images`; never encode a PNG per frame ([images](https://nsgo.dev/docs/images.md)).
 - Drive a native `core.WebView` through its `core.Ref` (`Reload`, `GoBack`, `GoForward`); app-owned history entries keep their `core.AccessWebSchemes` exemption, while new page-created navigations remain restricted.
 - Set `core.WebView.Mobile` (TSX `mobile`) to show a site's phone layout on Windows, macOS and Linux, with mouse drags and wheel or trackpad swipes reaching the page as touches; phones and the web ignore it ([Components](https://nsgo.dev/docs/components.md)).

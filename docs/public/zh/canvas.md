@@ -33,6 +33,8 @@ d.SetFillGradient(core.CanvasLinear(0, 0, float32(size.Width), 0,
 
 `MeasureText`、`TextMetrics` 和 `SetTextAlign` 用平台的文本引擎排版，因此标签与应用其余部分使用相同的字体。`DrawImage`、`DrawImageIn` 和 `DrawImageFrom` 绘制图片，`OnPress` 可以用 `IsPointInPath` 和 `IsPointInStroke` 测试最后一次绘制。
 
+位图缩放默认使用平滑采样。绘制像素画时，先调用 `d.SetImageSmoothing(false)`，或在 TSX 中设置 `ctx.imageSmoothingEnabled = false`。`Save` 和 `Restore` 会与其余绘图状态一起保存和恢复此设置。Apple 平台、Windows、Linux、Android 和 Web 支持最近邻采样。
+
 `Drawing.Node` 给绘图的一部分命名，例如图表的柱或地图的区域，带边界、角色、标签和选中状态。辅助技术把这些部分当作画布的子元素，测试可以按标签、文本或 test ID 找到它们；按下其中一个就是按下它的中心。
 
 ```go

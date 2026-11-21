@@ -16,6 +16,7 @@
 - Keep an iOS app's engine, state and screens when UIKit disconnects its scene and connects a new one while the process lives, showing the running app in the new window rather than starting a second engine over it (#1030 by @houko).
 - Let a `core.Shader`'s `Images` take an `ImageSource` with `Pixels`, copied once per `Version` and written into a texture each backend keeps, with no upload while the version stays, so a shader can filter a frame the app writes (#1052 by @houko).
 - Report every finger of a Windows or Linux touchscreen to `View.OnTouch` and the touch responder with an ID from 1 that stays while it is down, on X11 and Wayland too, as on iOS, Android and the web; the mouse stays finger 0, and a touch no longer also reports it (#1056 by @houko).
+- Let Canvas and Image opt into nearest-neighbor sampling for pixel art on Apple platforms, Windows, Linux, Android and the web (#1209 by @houko).
 - Add `WebView.UserAgentSuffix`, and `userAgentSuffix` in TSX, to append to the platform's own user agent or to `UserAgent` on macOS, iOS, Android, Windows and Linux (#114 by @houko).
 - Show a WebView placeholder with an AppArmor diagnostic on Linux when bubblewrap cannot start WebKitGTK's sandbox (#1029 by @houko).
 - Honor every family in a Windows `FontFamily` list when DirectWrite falls back for missing characters (#668 by @houko).

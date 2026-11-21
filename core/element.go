@@ -781,6 +781,7 @@ type Image struct {
 	SourceFunc   func() ImageSource
 	Placeholder  ImageSource
 	ResizeMode   ResizeMode
+	Sampling     ImageSampling
 	BlurRadius   Points
 	FadeDuration time.Duration // 0 is the platform's
 	Style        Style

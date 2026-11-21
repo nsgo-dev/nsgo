@@ -217,9 +217,16 @@ func (p *picture) look(im *image, box driver.Size) map[string]string {
 	style := map[string]string{
 		"background-image": "none", "background-color": "transparent",
 		"mask-image": "none", "-webkit-mask-image": "none", "filter": "none",
+		"image-rendering": "auto",
 	}
 	if !p.loaded || p.url == "" {
 		return style
+	}
+	if im.config.Sampling == driver.ImageSamplingNearest {
+		style["image-rendering"] = "pixelated"
+		if js.Global().Get("CSS").Call("supports", "image-rendering", "crisp-edges").Bool() {
+			style["image-rendering"] = "crisp-edges"
+		}
 	}
 	url := cssURL(p.url)
 	b := im.config.ResizeMode.Fit(p.natural(), box, im.config.Position)
