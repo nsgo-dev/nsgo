@@ -38,7 +38,7 @@ var unsupportedItems = map[string]string{
 	"desktop only": `ItemDock ItemMenu ItemPopupMenu ItemLaunchAtLogin
 		ItemSetLaunchAtLogin ItemOpenSurface ItemQuit ItemTray ItemTrayMenu
 		ItemWindow ItemHotKeys ItemQuitResponse ItemDockMenu ItemRecentFile
-		ItemQuickLook`,
+		ItemQuickLook ItemCursorPoint`,
 	"Apple only": `ItemAppleCredentialState ItemSignInWithApple`,
 	// Services main added after this target, which no HarmonyOS kit answers here yet.
 	"services added since": `ItemAuthSession ItemPurchase ItemSensor ItemSpeak
@@ -68,7 +68,7 @@ var unsupportedEvents = map[string]string{
 	"notifications and input modality": `EventNotificationPress EventInputModality
 		EventWindowEnded`,
 	"system and desktop": `EventTray EventHotKey EventLaunchAtLogin EventSpeech
-		EventQuitRequest EventDockMenu EventHotKeyState EventWindowPlacementFailed`,
+		EventQuitRequest EventDockMenu EventHotKeyState EventWindowPlacementFailed EventCursorPoint`,
 	"Apple only": `EventSignInWithApple EventOpenScene`,
 	// Services main added after this target, which no HarmonyOS kit answers here yet.
 	"services added since": `EventAuthSession EventOpenLinks EventPurchase
