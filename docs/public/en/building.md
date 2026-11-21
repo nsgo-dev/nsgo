@@ -95,6 +95,12 @@ On Android, `icon.android` makes the launcher icon adaptive, so launchers mask i
 
 Every build also takes NSGo's own flags as it starts, such as `--nsgo-fps` ([Running and debugging](debugging.md#flags-of-every-build)). In `nsgo dev`, Command/Control+R reloads from every open window and remains available after the main view closes when another window keeps an app function running.
 
+## Games
+
+Set `game: true` in `nsgo.yaml` for a game. Android classifies the app as a game and uses the system's Game Mode optimizations. macOS and iOS opt into Game Mode, macOS defaults to the Games category, and Linux adds `Game` to the desktop entry. An explicit `macos.category` or Game Mode key in `apple.info` takes precedence.
+
+Set `gamepad: true` when your app handles a hardware gamepad. Android declares both gamepad and touchscreen optional. macOS, iOS and tvOS declare the Extended Gamepad profile, with controller keys in `apple.info` taking precedence.
+
 ## Installers
 
 For the desktop targets, `build` writes what users install the app from into `dist/releases`, each with a `.sha256` checksum:
