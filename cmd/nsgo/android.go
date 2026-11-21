@@ -158,6 +158,7 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 		Adaptive:          adaptive,
 		Theme:             androidThemes[p.Appearance],
 		Debuggable:        p.testBinary,
+		CrashReportBuild:  crashReportBuild(p),
 		Permissions:       p.androidPermissions(),
 		TargetSDK:         p.Android.TargetSDK,
 		LoopbackCleartext: p.Android.LoopbackCleartext,
@@ -170,6 +171,13 @@ func buildAndroidPackage(ctx context.Context, p *project, dir, goarch, ext strin
 		return "", err
 	}
 	return path, f.Close()
+}
+
+func crashReportBuild(p *project) string {
+	if p.Release {
+		return p.BundleVersion()
+	}
+	return ""
 }
 
 // windowExtensions is the device's library of its folds and hinges, which the runtime reads by reflection (Folds.java).

@@ -106,6 +106,10 @@ store.SetItem("tab", "library")
 
 `store.Keys()` 列出键，`RemoveItem` 删除一个，`Clear` 清空存储。`cx.DataDir()` 和 `cx.CacheDir()` 给出应用存放键值存储放不下的文件的目录；`cx.LogsDir()` 给出平台存放日志的目录；`Scope.ProvideStorage` 给子树一个独立分区。
 
+### 崩溃报告
+
+原生发布构建将 Go 崩溃堆栈保存在 `cx.LogsDir()/crashes` 下。Apple 平台记录未捕获的 Objective-C 异常，Android 记录未捕获的 Java 异常，Windows 记录到达顶层过滤器的 SEH 异常。下次启动时调用 `cx.CrashReports()` 列出待处理报告。报告含崩溃应用的版本、构建号和平台。调用 `Open()` 读取诊断文本并关闭读取器，处理完成后调用 `Acknowledge()` 删除报告。在 goroutine 中执行这些文件操作。
+
 ## 机密
 
 `cx.Secrets()` 是应用的安全存储，用来保存刷新令牌、API 密钥和密码：按账户 `Get`、`Set`、`Delete` 一个字符串，由平台保护。不存在的账户读出 `("", false, nil)`；平台没有安全存储时（例如 Web），每次调用都返回 `core.ErrSecretsUnavailable`，NSGo 不会退回明文存储。系统可能让调用等待，例如钥匙串向用户请求授权，所以请在引擎的 goroutine 之外调用，再用 `cx.Post` 把结果交回。

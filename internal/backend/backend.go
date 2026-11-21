@@ -53,6 +53,7 @@ type Options struct {
 // Run runs root, a root view, or app, the app's function, and the platform's event loop, under the launch flags and nsgo dev's client, then starts the app again if it asked to restart (desktop.Restart).
 func Run(root engine.App, app func(*core.Scope), o Options) {
 	restart.Await()
+	defer startCrashReports()()
 	launch.apply(&o)
 	o.Constraints = o.Constraints.Normalized()
 	if o.Frame.Width > 0 && o.Frame.Height > 0 {
