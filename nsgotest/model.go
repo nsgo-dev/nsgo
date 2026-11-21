@@ -775,6 +775,8 @@ func (a *App) apply(b *driver.MountBatch) {
 		case driver.ItemShare:
 			a.Shares = append(a.Shares, *it.Share)
 			a.post(driver.Event{Kind: driver.EventFiles, Count: it.Count, Finished: true})
+		case driver.ItemCursorPoint:
+			a.post(driver.Event{Kind: driver.EventCursorPoint, Count: it.Count})
 		case driver.ItemAppearance:
 			a.Appearance = it.Appearance
 		case driver.ItemQuit:

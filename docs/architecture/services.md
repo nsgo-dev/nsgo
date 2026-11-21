@@ -362,6 +362,8 @@ On Windows and Linux, a firmware placeholder such as `To Be Filled By O.E.M.` or
 | Linux | GDK's monitor model; X11 work areas, the whole monitor on Wayland, which reports none | the session's locale categories and GTK settings |
 | iOS, Android, Web | no desktop displays | platform or browser locale settings where available |
 
+`desktop.Monitors` reads `Env.Displays`. `desktop.CursorPoint` sends `ItemCursorPoint` to the desktop backend and receives one `EventCursorPoint` with the location in the same coordinates as the displays. macOS converts AppKit's `NSEvent.mouseLocation` from its primary screen's lower left. Windows converts `GetCursorPos` using the monitor under the pointer. Linux divides X11 root pixels by GDK's X11 scale. Wayland exposes surface-local positions, so the query reports unavailable, including in an app running under Xwayland. Hosts can withhold `core.AccessCursorPoint` from restricted scopes.
+
 `LocaleSettings` reports `FirstDayOfWeek`, `HourCycle` and `MeasurementSystem` independently of `Env.Locale`, so a localized app can follow the user's calendar, clock and measurement choices. A zero field means the platform did not report that choice.
 
 ## The application in front

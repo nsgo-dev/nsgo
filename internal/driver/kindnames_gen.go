@@ -115,6 +115,7 @@ var itemKindNames = map[ItemKind]string{
 	ItemPictureInPictureCommand: "ItemPictureInPictureCommand",
 	ItemScanCode:                "ItemScanCode",
 	ItemQuickLook:               "ItemQuickLook",
+	ItemCursorPoint:             "ItemCursorPoint",
 }
 
 // String returns the kind's name, as a log or an event prints it.
@@ -221,6 +222,7 @@ var eventKindNames = map[EventKind]string{
 	EventPurchaseUpdate:        "EventPurchaseUpdate",
 	EventWebCookies:            "EventWebCookies",
 	EventOpenScene:             "EventOpenScene",
+	EventCursorPoint:           "EventCursorPoint",
 }
 
 // String returns the kind's name, as a log or an event prints it.
