@@ -289,7 +289,22 @@ go tool nsgo build -target harmonyos -run
 
 To compile the ArkTS host from the templates and use the app's `id` as the bundle name, put `hvigorw` on `PATH` and set `OHOS_BASE_SDK_HOME` to an OpenHarmony SDK with API 26 (`26.0.0`), the templates' compile and target SDK version. `build.harmonyos_bundles` picks `auto`, the default, `exact`, which requires the SDK, or `padded`, which pads the id to the committed host's fixed length and needs no SDK. `harmonyos.permissions` lists the `ohos.permission` names the app asks for, such as `MICROPHONE` and `CAMERA`, and `widget.title` is what its home-screen card shows.
 
-HarmonyOS is a preview. Emulators install the HAP as it is, but a phone takes only a HAP signed with an AppGallery Connect certificate and a debug profile whose bundle name is exactly the app's, so build with `exact` and sign the HAP with the SDK's `hap-sign-tool` before installing it. ArkUI draws a first set of views: tab bars, paging scroll views, inline HTML in web views, single-side borders and shadows are not drawn yet; [the architecture notes](https://github.com/nsgo-dev/nsgo/blob/main/docs/architecture/harmonyos.md) list what runs.
+HarmonyOS is a preview. Emulators can install unsigned HAPs. [The architecture notes](https://github.com/nsgo-dev/nsgo/blob/main/docs/architecture/harmonyos.md) list the ArkUI features the preview draws.
+
+### Signed HAPs
+
+Set `harmonyos.signing` to sign a HAP with your AppGallery Connect materials. A direct install on a Huawei phone needs a debug certificate and profile for that device. Use the release materials for distribution. [Huawei signing guide](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V2/command-line-building-app-hap-hvigor-0000001553061909-V2/)
+
+```yaml
+harmonyos:
+  signing:
+    keystore: signing/app.p12
+    key_alias: app
+    certificate: signing/app.cer
+    profile: signing/app.p7b
+```
+
+Paths are relative to `nsgo.yaml`. Set `NSGO_HARMONY_KEYSTORE_PASSWORD` and `NSGO_HARMONY_KEY_PASSWORD` in the environment. Signing uses the SDK's `hap-sign-tool.jar` and Java from `JAVA_HOME` or `PATH`. The build keeps the app's exact `id` to match the profile, so signing needs the SDK and `hvigorw` even in `auto` mode. `go tool nsgo doctor`, run in the app directory, checks the signing configuration and profile bundle name without passwords. `build -run` gives `hdc` the signed HAP.
 
 ## Sign
 

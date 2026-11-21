@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Sign HarmonyOS HAPs with an AppGallery Connect certificate and profile from `harmonyos.signing` (#479 by @houko).
 - Add `apple.multiple_scenes`, which writes `UIApplicationSupportsMultipleScenes`, and show each further scene an iPad connects for it, as the user opens another window of the app, in a window of its own: a tree of the app's one engine showing the main view, with its own size, safe area, status bar and orientations, kept while UIKit disconnects the scene and ended as the system discards it (#49 by @houko).
 - Acknowledge macOS logout, restart and shutdown after app cleanup and expose those requests through `desktop.QuitRequest.Forced()` (#1081 by @houko).
 - Add `Style` and `StyleFunc` to `ui.Sheet` for surface backgrounds, corners and padding (#1036 by @houko).

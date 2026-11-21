@@ -30,6 +30,8 @@ go tool nsgo doctor        # which targets this machine builds and runs, and wha
 
 Go 1.27.3 or later builds every target from a Mac, with Xcode for Apple's; nothing else (no NDK, Android SDK, JDK or GTK) is needed to build. Never hand-write C or add cgo to reach a platform: use NSGo's services first, then purego or `syscall`.
 
+For a signed HarmonyOS HAP, configure `harmonyos.signing` and use the SDK, Java and environment passwords described in [Building](https://nsgo.dev/docs/building/#harmonyos).
+
 ## Writing an app
 
 ```go
