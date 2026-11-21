@@ -102,6 +102,10 @@ What 0.5.0 changed in how the keyboard's focus, popups and assistive technology 
 | Native Select on phone targets | NSGo's [#772](https://github.com/nsgo-dev/nsgo/issues/772), [#1353](https://github.com/nsgo-dev/nsgo/issues/1353) | `app.Select` under `-target` on Android, iOS and HarmonyOS moves the native field's selection, as it does on the desktops and the web through their editing keys, so a test that selects a range and types, copies or pastes acts on it there; it moves only the test's model now, and skips a test whose field has `OnSelectionChange` |
 | Mobile test editing keys | NSGo's [#414](https://github.com/nsgo-dev/nsgo/issues/414), [#415](https://github.com/nsgo-dev/nsgo/issues/415), [#1354](https://github.com/nsgo-dev/nsgo/issues/1354) | iOS's test host routes Return and Backspace through the software keyboard and select-all directly, and Android's test agent offers Control shortcuts to the editor before the root keymap; align their native editing paths with `KeyAlways` and run the shared `internal/testhost/testdata/keys` regressions there, as on desktops |
 
+## Native development restarts
+
+[#658](https://github.com/nsgo-dev/nsgo/issues/658) tracks keeping window and application state on Go rebuilds. macOS restores the main window's last regular frame within a dev session. Secondary windows, Windows and Linux restoration, a seamless handoff, window arrangements tied to native window identity and navigation state are open.
+
 ## From NSGo's issues
 
 What NSGo's own issues ask for beyond NSH's releases, each issue where its design is discussed.
