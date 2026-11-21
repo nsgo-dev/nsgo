@@ -12,6 +12,7 @@
 - Let underline tabs set their indicator color and fit it to the selected tab's content, with `indicatorColor` and `indicatorFit` in TSX (#1037 by @houko).
 - Use Material navigation app bars on Android `ui.NavPage` screens, including a collapsing large-title bar (#485 by @houko).
 - Add a Windows system caption button style for hidden title bars, preserving Snap Layout hit testing (#679 by @houko).
+- Add `android.loopback_cleartext` to allow plain HTTP to loopback in Android APKs and App Bundles (#1061 by @houko).
 - Keep an iOS app's engine, state and screens when UIKit disconnects its scene and connects a new one while the process lives, showing the running app in the new window rather than starting a second engine over it (#1030 by @houko).
 - Let a `core.Shader`'s `Images` take an `ImageSource` with `Pixels`, copied once per `Version` and written into a texture each backend keeps, with no upload while the version stays, so a shader can filter a frame the app writes (#1052 by @houko).
 - Report every finger of a Windows or Linux touchscreen to `View.OnTouch` and the touch responder with an ID from 1 that stays while it is down, on X11 and Wayland too, as on iOS, Android and the web; the mouse stays finger 0, and a touch no longer also reports it (#1056 by @houko).
