@@ -69,6 +69,8 @@ Under `-target` on macOS, Windows, Linux and the web, `app.Select(selector, star
 
 `nsgotest.LiveActivities(true)` records starts, updates, alerts and ends. `app.LiveActivities()` returns the activities in start order, with their content changes and any final content. Use `nsgotest.LiveActivities(false)` to make starts return `widget.ErrActivitiesDisabled`. These options take over the corresponding process-wide service for the test, including on a native target. Run tests that call these services sequentially.
 
+`app.FindMounted("id:tab-bar").TabBadge(index)` returns a native tab's text or dot badge in headless and target tests. On a drawn `ui.TabShell` tab, `Props.Value.Text` is the value announced for the badge.
+
 ## Run the tests
 
 ```sh
