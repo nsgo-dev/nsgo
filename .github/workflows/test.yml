@@ -245,6 +245,8 @@ jobs:
         run: go tool nsgo test -target macos -run '^TestMacOSTestSurfaceKeepsRequestedSize$' ./nsgotest
       - name: Test composited captures
         run: go tool nsgo test -target macos ./internal/testhost/testdata/capture
+      - name: Test pull PCM audio
+        run: go tool nsgo test -target macos ./internal/testhost/testdata/audiooutput
       - name: Print crash reports
         if: failure()
         run: |
@@ -278,6 +280,7 @@ jobs:
           go tool nsgo test -target ios_simulator -device "$ipad" -timeout 1m -run '^(TestScenesShowTreesOfTheirOwn|TestSceneDisconnectsWhileTheOtherRuns|TestSceneStatusBarAndOrientationsArePerScene|TestSceneKeyboardInsetFollowsFocus)$' ./internal/platform/ios
           go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/websource
           go tool nsgo test -target ios_simulator -timeout 1m -run '^TestIOSCaptureIsSRGB$' ./internal/testhost/testdata/capture
+          go tool nsgo test -target ios_simulator -timeout 1m ./internal/testhost/testdata/audiooutput
           go tool nsgo test -target watchos_simulator -timeout 1m ./internal/platform/watchos
 
   windows:

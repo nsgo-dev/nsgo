@@ -90,6 +90,12 @@ cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.
 
 `cx.PickFiles` picks files of any type, `cx.PickDirectories` picks folders as an `fs.FS`, and `cx.SaveFile` saves a file or bytes through the system's save dialog. Both pickers take a `Title`, a `Button` label and a `Start` folder, and `PickFilesOptions.TypesName` names the type menu, so an app can show them in its own language; these are hints, which macOS, Windows and Linux follow, iOS only for `Start`, and Android and the web not at all. `cx.PickScreenColor` picks a color anywhere on the screen where the platform allows it.
 
+## Pull PCM audio
+
+Use `audio.NewOutput(cx, audio.OutputConfig{SampleRate: 48000, Channels: 2, Render: render})` to play interleaved Float32 PCM your app decodes or synthesizes. `Start` begins pulling samples, `Pause` stops the pulls and the owning scope closes the output as it goes. macOS and iOS support this stream. Other targets return `audio.ErrUnsupported`.
+
+`Render` returns the number of frames it filled. It runs on the audio thread and must avoid blocking, allocation and graph access. A short fill plays silence for the remainder and increments `Underruns`. `Position` returns the monotonic frame count and the host time at that frame. Use `Flush` to discard pending frames and `Latency` to read the buffer latency. Route changes and interruptions pause output and call `OnInterrupt` on the engine. The app can resume it with `Start`.
+
 ## Storage
 
 `cx.Storage()` is the app's key-value storage, kept on the device and shared by every graph of the app. Reads are synchronous and read inside a computation subscribe it to changes; `SetItem` returns a `core.StorageFullError` past the quota (`core.StorageQuota`, 5 MiB by default). It is a plain file any program of the user's can read, so keep tokens and passwords in [secrets](#secrets) instead.
