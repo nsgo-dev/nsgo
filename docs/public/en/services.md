@@ -502,6 +502,8 @@ loop = func(time.Time) {
 cx.RequestAnimationFrame(loop)
 ```
 
+Call `gamepad.EnableFocusNavigation(cx)` to opt into navigating native focus stops with a controller (D-pad and left stick move focus, `ButtonSouth` activates the focused control and `ButtonEast` triggers back). Active gameplay views call `gamepad.CaptureInput(cx)` to pause focus navigation while they are mounted. In TSX, `nsgo/gamepad` exposes `supported()`, `pads()`, `state(id)`, `Button` and `Axis`, gated by the `gamepad` package capability.
+
 ## Next
 
 - [Notifications](notifications.md): permission, badges and presses.
