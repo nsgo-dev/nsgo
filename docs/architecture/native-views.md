@@ -47,6 +47,8 @@ On Linux, initialization checks whether the system bubblewrap can start WebKitGT
 | Android | `android.webkit.WebView` with a JavaScript interface under the bridge; URL loads use `Headers`, `PinchZoom` turns on the built-in zoom, `Incognito` disables cache, form saving and DOM storage, and the bridge and scripts meant for the document's start run when the page starts, as android.webkit has no earlier hook |
 | Web | An `<iframe>`. HTML loads as `srcdoc` in a sandbox with an origin of its own and hands the app the bridge's `MessageChannel` port, its messages reporting the source's origin; a URL gets only `PostMessage` and load events, as the browser hides the page |
 
+On Windows, WebView2's `SourceChanged`, `HistoryChanged` and `DocumentTitleChanged` queue a fresh `WebNavigation` snapshot on the window thread. `OnNavigationStateChange` reports same-document URL, history and title updates when the snapshot changes. The navigation handlers report each full load at its start and finish.
+
 | Target | `SetWebCookies` | `WebCookies` | `ClearWebsiteData` |
 | --- | --- | --- | --- |
 | Apple | `setCookie:completionHandler:` on `WKWebsiteDataStore.defaultDataStore`'s `httpCookieStore`, each an `NSHTTPCookie` whose HttpOnly goes under CFNetwork's `HttpOnly` key, which Foundation exports no constant for | `getAllCookies:`, every field; Foundation has no SameSite None, which reads as the default | `removeDataOfTypes:modifiedSince:completionHandler:` with `allWebsiteDataTypes` since `distantPast` |
