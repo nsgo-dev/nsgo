@@ -1,12 +1,6 @@
 package updater
 
-import (
-	"errors"
-
-	"github.com/nsgo-dev/nsgo/core"
-)
-
-var errInstallerNotStarted = errors.New("updater: platform has no self-installer")
+import "github.com/nsgo-dev/nsgo/core"
 
 // Install downloads' verified package through the platform's installer.
 // Linux asks its package manager for elevation; Android opens the package
