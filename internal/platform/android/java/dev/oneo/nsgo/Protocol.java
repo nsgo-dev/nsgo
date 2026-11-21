@@ -29,7 +29,7 @@ final class Protocol {
     static Message readMessage(DataInputStream in) throws IOException {
         int kind = in.read();
         if (kind == -1) return null;
-        if (kind < BATCH || kind > PIXEL_FRAME) throw invalidMessage("unexpected message kind " + kind);
+        if (kind < BATCH || kind > GAMEPAD_RUMBLE) throw invalidMessage("unexpected message kind " + kind);
         int length;
         try {
             length = in.readInt();
@@ -82,6 +82,8 @@ final class Protocol {
     static final int SCAN = 21;
     /** A bitmap of the next batch: item index, key, width, height and premultiplied RGBA bytes. */
     static final int PIXEL_FRAME = 22;
+    /** Starts or stops rumble on a game controller: device id, lowFreq, highFreq, durationMs (gamepad.go, Gamepads). */
+    static final int GAMEPAD_RUMBLE = 23;
 
     // Java to Go.
     static final int START = 1;
