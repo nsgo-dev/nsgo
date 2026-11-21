@@ -177,7 +177,7 @@ function renderOwners() {
   const has = (s) => s && s.toLowerCase().includes(q);
   // A computation that holds nothing, such as an element's binding, counts on its owner's row rather than taking one.
   // A memo keeps its row, for its value.
-  const leaf = (o) => (o.computations || []).length > 0 && !(o.values || []).length && !(o.children || []).length && o.computations.every((c) => c.value === undefined);
+  const leaf = (o) => (o.computations || []).length > 0 && !(o.values || []).length && !(o.children || []).length && o.computations.every((c) => c.value === undefined && !c.label);
   const walk = (o, depth) => {
     // A value NSGo made for itself names NSGo's function rather than a file: hidden unless asked for.
     const values = (o.values || []).filter((v) => (own || isPath(v.site)) && (!q || has(v.site) || has(v.type) || has(v.text) || has(o.name)));
@@ -196,7 +196,8 @@ function renderOwners() {
     const comps = o.computations || [];
     const head = el("div", { class: "row", style: `padding-left:${8 + depth * 14}px` },
       el("span", { class: "kind" }, o.name), siteLink(o.site),
-      comps.map((c) => [c.value !== undefined ? el("span", { class: "dim" }, " = " + c.value) : null,
+      comps.map((c) => [c.label ? el("span", { class: "chip region" }, c.label) : null,
+        c.value !== undefined ? el("span", { class: "dim" }, " = " + c.value) : null,
         el("span", { class: "chip" }, `ran ${c.runs}×`), c.readers ? el("span", { class: "chip" }, `read by ${c.readers}`) : null]),
       leaves.length ? el("span", { class: "chip", title: "The computations it owns that hold nothing, such as its elements' bindings" }, `${counted}, ran ${runs}×`) : null);
     const vals = values.map((v) => el("div", { class: "row value", style: `padding-left:${22 + depth * 14}px` },
@@ -220,6 +221,28 @@ function valueField(v) {
 
 const ms = (ns) => (ns / 1e6).toFixed(2);
 
+function renderTriggersTable(triggers) {
+  return [
+    el("div", { class: "causal-heading" }, "Signal changes → triggered computations & regions"),
+    el("table", { class: "causal-table" },
+      el("tr", {}, el("th", {}, "signal"), el("th", {}, "written at"), el("th", {}, "triggered")),
+      triggers.map((t) => el("tr", {},
+        el("td", {},
+          t.SignalID ? el("span", { class: "kind" }, `#${t.SignalID} `) : null,
+          t.SignalType ? el("span", { class: "dim" }, t.SignalType) : null,
+          siteLink(t.SignalSite),
+          t.Value ? el("span", { class: "dim" }, " = " + t.Value) : null),
+        el("td", {}, siteLink(t.WriteSite) || el("span", { class: "dim" }, "—")),
+        el("td", {}, (t.Targets || []).map((tg) => el("div", { class: "causal-item" },
+          el("span", { class: "arrow" }, "→"),
+          tg.Label ? el("span", { class: "chip region" }, tg.Label) : el("span", {}, tg.Kind),
+          siteLink(tg.Site),
+          tg.Via ? [el("span", { class: "dim" }, " via "), siteLink(tg.Via)] : null,
+          tg.Runs > 1 ? el("span", { class: "chip" }, `×${tg.Runs}`) : null,
+          tg.Took ? el("span", { class: "dim" }, ` ${ms(tg.Took)} ms`) : null)))))),
+  ];
+}
+
 function renderCommits() {
   const list = $("commits");
   const total = (c) => c.ms + (c.causes ? c.causes.App / 1e6 : 0) + (c.platform || 0);
@@ -229,9 +252,11 @@ function renderCommits() {
     const k = c.causes || {};
     const writes = k.Writes || [];
     const ran = k.Ran || [];
+    const triggers = k.Triggers || [];
+    const hasDetails = ran.length || triggers.length;
     const open = state.openCommit === c.n;
-    rows.push(el("tr", { onclick: () => { state.openCommit = open ? 0 : c.n; renderCommits(); }, title: "Show what this commit ran" },
-      el("td", { class: "num" }, (ran.length ? (open ? "▾ " : "▸ ") : "") + c.n),
+    rows.push(el("tr", { onclick: () => { state.openCommit = open ? 0 : c.n; renderCommits(); }, title: "Show causal chain and computations for this commit" },
+      el("td", { class: "num" }, (hasDetails ? (open ? "▾ " : "▸ ") : "") + c.n),
       el("td", { class: "num" }, total(c).toFixed(2)),
       el("td", { style: "width:80px" }, el("div", { class: "bar", style: `width:${(80 * total(c)) / max}px` })),
       el("td", { class: "num dim" }, k.App !== undefined ? ms(k.App) : ""),
@@ -241,9 +266,20 @@ function renderCommits() {
       el("td", { class: "num" }, c.items),
       el("td", {}, writes.slice(0, 3).map((w) => el("div", {}, w.Site + (w.Count > 1 ? ` ×${w.Count}` : ""))), writes.length > 3 ? el("div", { class: "dim" }, `and ${writes.length - 3} more`) : null),
       el("td", { class: "dim" }, `${k.Renders || 0} bindings, ${k.Effects || 0} effects, ${k.Memos || 0} memos`)));
-    if (open) rows.push(el("tr", {}, el("td", {}), el("td", { colspan: 9 }, el("table", {},
-      el("tr", {}, el("th", {}, "ms"), el("th", {}, "runs"), el("th", {}, "kind"), el("th", {}, "made at")),
-      ran.map((r) => el("tr", {}, el("td", { class: "num" }, ms(r.Took)), el("td", { class: "num" }, r.Runs), el("td", {}, r.Kind), el("td", {}, siteLink(r.Site) || el("span", { class: "dim" }, "—"))))))));
+    if (open && hasDetails) {
+      const details = [];
+      if (triggers.length) details.push(...renderTriggersTable(triggers));
+      if (ran.length) {
+        details.push(el("div", { class: "causal-heading" }, "Computations"), el("table", { class: "causal-table" },
+          el("tr", {}, el("th", {}, "ms"), el("th", {}, "runs"), el("th", {}, "kind"), el("th", {}, "made at")),
+          ran.map((r) => el("tr", {},
+            el("td", { class: "num" }, ms(r.Took)),
+            el("td", { class: "num" }, r.Runs),
+            el("td", {}, r.Kind, r.Label ? el("span", { class: "chip region" }, r.Label) : null),
+            el("td", {}, siteLink(r.Site) || el("span", { class: "dim" }, "—"))))));
+      }
+      rows.push(el("tr", {}, el("td", {}), el("td", { colspan: 9 }, details)));
+    }
   }
   list.replaceChildren(el("table", {},
     el("tr", {}, el("th", {}, "#"), el("th", {}, "ms"), el("th", {}), el("th", { title: "The app's code before the commit: handlers, timers, effects" }, "app"),
@@ -256,7 +292,11 @@ function renderCommits() {
 function renderHot(hot) {
   $("hot").replaceChildren(el("table", {},
     el("tr", {}, el("th", {}, "ms"), el("th", {}, "runs"), el("th", {}, "kind"), el("th", {}, "made at")),
-    (hot || []).map((c) => el("tr", {}, el("td", { class: "num" }, ms(c.took || 0)), el("td", { class: "num" }, c.runs), el("td", {}, c.kind), el("td", {}, siteLink(c.site) || el("span", { class: "dim" }, "—"))))));
+    (hot || []).map((c) => el("tr", {},
+      el("td", { class: "num" }, ms(c.took || 0)),
+      el("td", { class: "num" }, c.runs),
+      el("td", {}, c.kind, c.label ? el("span", { class: "chip region" }, c.label) : null),
+      el("td", {}, siteLink(c.site) || el("span", { class: "dim" }, "—"))))));
 }
 
 // Recorder.

@@ -58,3 +58,9 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .box.content { background: rgba(111, 168, 220, 0.35); border-style: solid; padding: 8px; }
 #commits td, #hot td { white-space: nowrap; }
 #commits { overflow-x: auto; }
+.causal-heading { font-size: 11px; color: var(--muted); font-weight: 600; margin: 6px 0 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+.causal-table { margin-bottom: 6px; }
+.causal-table td { white-space: normal; }
+.causal-item { margin: 1px 0; }
+.chip.region { color: var(--accent); border-color: var(--accent); }
+.arrow { color: var(--muted); margin: 0 4px; }

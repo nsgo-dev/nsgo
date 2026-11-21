@@ -48,7 +48,7 @@ func (t *Tree) mountSuspense(cx *Scope, parent *node, s Suspense) {
 	content := cx.Child()
 	suspenseKey.Provide(content, b)
 	t.within(content, func() { t.mount(content, b.content, s.Content(content)) })
-	cx.renderEffect(func() {
+	c := cx.renderEffect(func() {
 		on := b.waiting.Get()
 		if on {
 			t.suspended[b.content] = true
@@ -62,6 +62,7 @@ func (t *Tree) mountSuspense(cx *Scope, parent *node, s Suspense) {
 			}
 		}
 	})
+	t.rt.labelComp(c, "Suspense", s.Content)
 	if s.Fallback != nil {
 		t.mount(cx, parent, Show{When: b.waiting.Get, Then: s.Fallback})
 	}

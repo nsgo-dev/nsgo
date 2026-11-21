@@ -129,9 +129,10 @@ type Value struct {
 
 // Computation is a memo, a binding or an effect: where it was made and how often it ran.
 type Computation struct {
-	Kind string `json:"kind"`
-	Site string `json:"site,omitempty"`
-	Runs int    `json:"runs"`
+	Kind  string `json:"kind"`
+	Label string `json:"label,omitempty"`
+	Site  string `json:"site,omitempty"`
+	Runs  int    `json:"runs"`
 	// Took is the time its runs took, in nanoseconds, not counting what their writes ran next.
 	Took int64 `json:"took,omitempty"`
 	// Value is a memo's value as text, and Readers the computations that read it.

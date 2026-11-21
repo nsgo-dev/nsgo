@@ -719,7 +719,13 @@ func (c *computation) unlink() {
 }
 
 func (c *computation) mark(s compState) {
-	if c.state >= s || c.disposed {
+	if c.disposed {
+		return
+	}
+	if s == dirty {
+		c.noteMarkedDirty()
+	}
+	if c.state >= s {
 		return
 	}
 	wasClean := c.state == clean
@@ -785,6 +791,7 @@ func (c *computation) run() {
 	if driver.TraceCauses {
 		c.rt.noteRun(c.kind)
 	}
+	runTriggers := c.beginRunCausal()
 	var began time.Time
 	if c.rt.dev != nil {
 		began = time.Now()
@@ -807,14 +814,18 @@ func (c *computation) run() {
 	})
 	// Its own time: what its writes run next, in maybeFlush, is theirs.
 	if rt.dev != nil {
-		rt.dev.ran(c, time.Since(began))
+		took := time.Since(began)
+		rt.dev.ran(c, took)
+		c.endRunCausal(runTriggers, took)
 	}
 	rt.batch--
 	rt.owner, rt.observer = prevOwner, prevObs
 	if changed && c.subs != nil {
+		c.beginMemoPropagate(runTriggers)
 		for _, r := range c.subs.list {
 			r.c.mark(dirty)
 		}
+		c.endMemoPropagate()
 	}
 	rt.maybeFlush()
 }
@@ -966,6 +977,7 @@ type Signal[T any] struct {
 	value T
 	equal func(a, b T) bool
 	subs  subscribers
+	devSignalID
 }
 
 // NewSignal returns a signal holding v. Setting an equal value does
@@ -1010,11 +1022,13 @@ func (s *Signal[T]) Set(v T) {
 	if driver.TraceCauses {
 		rt.noteWrite()
 	}
+	prevWrite := noteSignalWriteStart(s, v)
 	rt.batch++
 	for _, r := range s.subs.list {
 		r.c.mark(dirty)
 	}
 	rt.batch--
+	noteSignalWriteEnd(rt, prevWrite)
 	rt.maybeFlush()
 }
 

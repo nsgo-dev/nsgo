@@ -40,6 +40,23 @@ func TestTraceNamesWhatACommitFollowedFrom(t *testing.T) {
 	if strings.Contains(b.String(), "after") || strings.Contains(b.String(), "ran") {
 		t.Errorf("a batch without causes names some: %q", b.String())
 	}
+
+	b.Reset()
+	WriteTrace(&b, "commit 5", &MountBatch{Causes: &Causes{
+		Ran: []Ran{{Kind: "binding", Label: "Show", Site: "app/page.go:30", Runs: 1, Took: 500 * time.Microsecond}},
+		Triggers: []Trigger{{
+			SignalID: 3, SignalType: "bool", SignalSite: "/repo/app/page.go:12", WriteSite: "/repo/app/page.go:42", Value: "false",
+			Targets: []TriggerTarget{{Kind: "binding", Label: "Show", Site: "/repo/app/page.go:30", Via: "/repo/app/page.go:18", Runs: 1, Took: 500 * time.Microsecond}},
+		}},
+	}}, 0)
+	for _, want := range []string{
+		"   longest Show app/page.go:30 ×1 0.50 ms\n",
+		"   trigger signal#3 (bool app/page.go:12) @ app/page.go:42 = false → Show app/page.go:30 (via app/page.go:18) 0.50 ms\n",
+	} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("trace =\n%s\nwant substring %q", b.String(), want)
+		}
+	}
 }
 
 func TestApplyReportsThePlatformsTimeOnlyWhenAsked(t *testing.T) {

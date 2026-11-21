@@ -91,7 +91,7 @@ func (e *each[T, K]) mount(t *Tree, region *node, owner *Scope) {
 	}
 	rows := map[K]*eachRow[T]{}
 	var extra []*eachRow[T] // rows of duplicate keys, built again each run
-	owner.renderEffect(func() {
+	c := owner.renderEffect(func() {
 		items := e.items()
 		owner.Untrack(func() {
 			next := make(map[K]*eachRow[T], len(items))
@@ -138,6 +138,7 @@ func (e *each[T, K]) mount(t *Tree, region *node, owner *Scope) {
 			t.setChildren(region, order)
 		})
 	})
+	t.rt.labelComp(c, "Each", e.row)
 }
 
 // plainValue reports whether values of t are all of what they hold, so ==

@@ -436,6 +436,7 @@ func (t *Tree) mountList(cx *Scope, parent *node, l List) {
 		})
 	}
 	ln.guard = newComputation(cx.current(), renderEffect, nil)
+	t.rt.labelComp(ln.guard, "List", l.Row)
 	ln.guard.effect = func() {
 		n := max(l.Count(), 0)
 		if l.Key != nil {

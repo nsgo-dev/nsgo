@@ -3,6 +3,7 @@ package driver
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -34,17 +35,46 @@ type Causes struct {
 	App, Layout time.Duration
 	// Ran are the computations that ran, by kind and the line that made them, the longest first; they are named only while DevTools record sites (devtools.Enabled).
 	Ran []Ran
+	// Triggers link each signal change to the computations and region rebuilds it caused to run; populated in dev and test builds while DevTools record.
+	Triggers []Trigger `json:",omitempty"`
 }
 
 // Ran is the runs of the computations of one kind made at one line, and their time.
 type Ran struct {
 	Kind, Site string
-	Runs       int
-	Took       time.Duration
+	// Label names a region's computation, such as "Show", "Each", "Dynamic", "Catch", "List", "Presence" or "Suspense".
+	Label string `json:",omitempty"`
+	Runs  int
+	Took  time.Duration
+}
+
+// Trigger links a signal write to the computations and region rebuilds it caused to run.
+type Trigger struct {
+	SignalID   uint64 `json:",omitempty"`
+	SignalSite string `json:",omitempty"`
+	SignalType string `json:",omitempty"`
+	WriteSite  string
+	Value      string          `json:",omitempty"`
+	Targets    []TriggerTarget `json:",omitempty"`
+}
+
+// TriggerTarget is a computation or region rebuild triggered by a signal change.
+type TriggerTarget struct {
+	Kind  string
+	Label string `json:",omitempty"`
+	Site  string `json:",omitempty"`
+	// Via is the site of the memo through which the signal change reached this target, when indirect.
+	Via  string `json:",omitempty"`
+	Runs int
+	Took time.Duration
 }
 
 // traceRan is how many of a commit's computations a trace names.
-const traceRan = 5
+const (
+	traceRan            = 5
+	traceTriggers       = 8
+	traceTriggerTargets = 5
+)
 
 // Write is the signal writes one line made: the app's line, as dir/file.go:line, or for writes NSGo made of its own, as an animation's, NSGo's function that made them.
 type Write struct {
@@ -82,10 +112,84 @@ func (c *Causes) write(s *strings.Builder) {
 			if i > 0 {
 				s.WriteString(",")
 			}
-			fmt.Fprintf(s, " %s %s ×%d %.2f ms", r.Kind, r.Site, r.Runs, ms(r.Took))
+			name := r.Kind
+			if r.Label != "" {
+				name = r.Label
+			}
+			fmt.Fprintf(s, " %s %s ×%d %.2f ms", name, r.Site, r.Runs, ms(r.Took))
 		}
 		s.WriteString("\n")
 	}
+	for _, tr := range c.Triggers[:min(len(c.Triggers), traceTriggers)] {
+		s.WriteString("   trigger ")
+		if tr.SignalID > 0 {
+			fmt.Fprintf(s, "signal#%d", tr.SignalID)
+			if tr.SignalType != "" || tr.SignalSite != "" {
+				s.WriteString(" (")
+				if tr.SignalType != "" {
+					s.WriteString(tr.SignalType)
+					if tr.SignalSite != "" {
+						s.WriteByte(' ')
+					}
+				}
+				if tr.SignalSite != "" {
+					s.WriteString(shortSite(tr.SignalSite))
+				}
+				s.WriteByte(')')
+			}
+		} else {
+			s.WriteString("signal")
+		}
+		if tr.WriteSite != "" {
+			fmt.Fprintf(s, " @ %s", shortSite(tr.WriteSite))
+		}
+		if tr.Value != "" {
+			fmt.Fprintf(s, " = %s", tr.Value)
+		}
+		s.WriteString(" → ")
+		for i, tg := range tr.Targets[:min(len(tr.Targets), traceTriggerTargets)] {
+			if i > 0 {
+				s.WriteString(", ")
+			}
+			name := tg.Kind
+			if tg.Label != "" {
+				name = tg.Label
+			}
+			s.WriteString(name)
+			if tg.Site != "" {
+				fmt.Fprintf(s, " %s", shortSite(tg.Site))
+			}
+			if tg.Via != "" {
+				fmt.Fprintf(s, " (via %s)", shortSite(tg.Via))
+			}
+			if tg.Runs > 1 {
+				fmt.Fprintf(s, " ×%d", tg.Runs)
+			}
+			if tg.Took > 0 {
+				fmt.Fprintf(s, " %.2f ms", ms(tg.Took))
+			}
+		}
+		if more := len(tr.Targets) - traceTriggerTargets; more > 0 {
+			fmt.Fprintf(s, " and %d more", more)
+		}
+		s.WriteString("\n")
+	}
+	if more := len(c.Triggers) - traceTriggers; more > 0 {
+		fmt.Fprintf(s, "   and %d more signal triggers\n", more)
+	}
+}
+
+// shortSite shortens an absolute file:line site to dir/file.go:line for terminal traces.
+func shortSite(site string) string {
+	i := strings.LastIndexByte(site, ':')
+	if i <= 0 {
+		return site
+	}
+	file, line := site[:i], site[i+1:]
+	if !filepath.IsAbs(file) {
+		return site
+	}
+	return filepath.Base(filepath.Dir(file)) + "/" + filepath.Base(file) + ":" + line
 }
 
 func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }

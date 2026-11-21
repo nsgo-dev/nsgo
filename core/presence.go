@@ -171,7 +171,7 @@ func mountPresence(t *Tree, region *node, owner *Scope, key func() any, content 
 		}
 	}
 	first := true
-	owner.renderEffect(func() {
+	c := owner.renderEffect(func() {
 		value := when.Get()
 		owner.Untrack(func() {
 			if first {
@@ -193,4 +193,5 @@ func mountPresence(t *Tree, region *node, owner *Scope, key func() any, content 
 			order()
 		})
 	})
+	t.rt.labelComp(c, "Presence", content)
 }

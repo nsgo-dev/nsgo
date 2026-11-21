@@ -2183,7 +2183,7 @@ func (t *Tree) branch(owner *Scope, region *node, fn func(cx *Scope) Node) *Scop
 func (t *Tree) mountDynamic(cx *Scope, parent *node, d Dynamic) {
 	region := t.newRegion(parent, cx)
 	var b *Scope
-	cx.renderEffect(func() {
+	c := cx.renderEffect(func() {
 		if b != nil {
 			t.clear(region)
 		}
@@ -2198,13 +2198,14 @@ func (t *Tree) mountDynamic(cx *Scope, parent *node, d Dynamic) {
 		rt.owner = prevOwner
 		t.within(b, func() { t.mount(b, region, el) })
 	})
+	t.rt.labelComp(c, "Dynamic", d)
 }
 
 func (t *Tree) mountShow(cx *Scope, parent *node, s Show) {
 	region := t.newRegion(parent, cx)
 	when := NewMemo(cx, s.When)
 	var b *Scope
-	cx.renderEffect(func() {
+	c := cx.renderEffect(func() {
 		on := when.Get()
 		if b != nil {
 			t.clear(region)
@@ -2215,6 +2216,11 @@ func (t *Tree) mountShow(cx *Scope, parent *node, s Show) {
 			b = t.branch(cx.current(), region, s.Else)
 		}
 	})
+	fn := any(s.Then)
+	if s.Then == nil {
+		fn = s.When
+	}
+	t.rt.labelComp(c, "Show", fn)
 }
 
 func (t *Tree) mountCatch(cx *Scope, parent *node, c Catch) {
@@ -2222,7 +2228,7 @@ func (t *Tree) mountCatch(cx *Scope, parent *node, c Catch) {
 	failure := NewSignalFunc[error](cx, nil, nil)
 	reset := func() { failure.Set(nil) }
 	var b *Scope
-	cx.renderEffect(func() {
+	comp := cx.renderEffect(func() {
 		err := failure.Get()
 		if b != nil {
 			t.clear(region)
@@ -2236,6 +2242,7 @@ func (t *Tree) mountCatch(cx *Scope, parent *node, c Catch) {
 			t.within(b, func() { t.mount(b, region, c.Fallback(b, err, reset)) })
 		}
 	})
+	t.rt.labelComp(comp, "Catch", c.Try)
 }
 
 // Events.

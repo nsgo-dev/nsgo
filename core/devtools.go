@@ -30,12 +30,13 @@ type devState struct {
 	commit map[ranKey]*driver.Ran
 	// graph numbers the graph within the process (devtools.Surface.Graph).
 	graph int
+	devTriggers
 }
 
 // graphs counts the graphs made while devtools.Enabled.
 var graphs atomic.Int64
 
-type ranKey struct{ kind, site string }
+type ranKey struct{ kind, label, site string }
 
 type devComponent struct{ name, site string }
 
@@ -60,8 +61,10 @@ type devComp struct {
 }
 
 func newDevState() *devState {
-	return &devState{components: map[*Scope]devComponent{}, values: map[*Scope][]*devValue{}, byID: map[uint64]*devValue{}, comps: map[*computation]*devComp{},
+	d := &devState{components: map[*Scope]devComponent{}, values: map[*Scope][]*devValue{}, byID: map[uint64]*devValue{}, comps: map[*computation]*devComp{},
 		sweepAt: minSweep, commit: map[ranKey]*driver.Ran{}, graph: int(graphs.Add(1))}
+	d.initTriggers()
+	return d
 }
 
 // minSweep is the fewest signals devSignal lets byID hold before it sweeps.
@@ -82,6 +85,7 @@ func (cx *Scope) devOwner() *Scope {
 func devSignal[T any](owner *Scope, s *Signal[T]) {
 	d := s.rt.dev
 	d.next++
+	s.setDevID(d.next)
 	w := weak.Make(s)
 	v := &devValue{id: d.next, site: callerSite(3), typ: reflect.TypeFor[T]().String(),
 		get: func() string {
@@ -218,10 +222,10 @@ func (d *devState) ran(c *computation, took time.Duration) {
 	dc.runs++
 	dc.since++
 	dc.took += took
-	k := ranKey{compKindName(c.kind), d.siteOf(c, dc)}
+	k := ranKey{compKindName(c.kind), d.compLabel(c), d.siteOf(c, dc)}
 	r := d.commit[k]
 	if r == nil {
-		r = &driver.Ran{Kind: k.kind, Site: k.site}
+		r = &driver.Ran{Kind: k.kind, Label: k.label, Site: k.site}
 		d.commit[k] = r
 	}
 	r.Runs++
@@ -264,6 +268,7 @@ func (d *devState) forget(s *Scope) {
 	if s.comp != nil {
 		delete(d.comps, s.comp)
 	}
+	d.forgetTriggers(s)
 }
 
 // callerSite is the site of the first caller outside core and NSGo's internal packages, skip frames up, as a whole path.
@@ -374,10 +379,10 @@ func (s *devSurface) Hot(n int) []devtools.Computation {
 			continue
 		}
 		if !s.ownedByDevTools(&c.Scope) {
-			k := ranKey{compKindName(c.kind), s.t.rt.dev.siteOf(c, dc)}
+			k := ranKey{compKindName(c.kind), s.t.rt.dev.compLabel(c), s.t.rt.dev.siteOf(c, dc)}
 			r := runs[k]
 			if r == nil {
-				r = &devtools.Computation{Kind: k.kind, Site: k.site}
+				r = &devtools.Computation{Kind: k.kind, Label: k.label, Site: k.site}
 				runs[k] = r
 			}
 			r.Runs += dc.since
@@ -554,10 +559,14 @@ func (s *devSurface) Owners() devtools.Owner {
 		}
 		if o.comp != nil {
 			kind := compKindName(o.comp.kind)
+			label := d.compLabel(o.comp)
 			out.Name = kind
+			if label != "" {
+				out.Name = label
+			}
 			if dc := d.comps[o.comp]; dc != nil {
 				out.Site = d.siteOf(o.comp, dc)
-				c := devtools.Computation{Kind: kind, Site: out.Site, Runs: dc.runs}
+				c := devtools.Computation{Kind: kind, Label: label, Site: out.Site, Runs: dc.runs}
 				if dc.value != nil {
 					c.Value = clip(dc.value())
 					if o.comp.subs != nil {
