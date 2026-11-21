@@ -39,24 +39,25 @@ type Tree struct {
 	window *Window
 	closed bool
 	// menuOrder is the sequence in which this tree last sent an application menu, including a nil menu that restores the default.
-	menuOrder uint64
-	rt        *runtime
-	text      driver.TextEngine
-	nodes     []*node // index is NodeID; 0 is unused
-	free      []NodeID
-	view      *node // the surface's root view
-	touches   touchState
-	size      Size
-	changed   bool
-	deleted   []NodeID // retired nodes kept for command cancellation, created or not
-	commands  []driver.MountItem
-	moves     []move
-	items     []driver.MountItem
-	laidOut   []*node
-	transits  []*node // nodes whose next frame their layout transition moves
-	ending    []*node // nodes with OnTransitionEnd restyled since the last commit
-	reports   []report
-	stacks    []*node
+	menuOrder    uint64
+	rt           *runtime
+	text         driver.TextEngine
+	nodes        []*node // index is NodeID; 0 is unused
+	free         []NodeID
+	view         *node // the surface's root view
+	touches      touchState
+	size         Size
+	changed      bool
+	deleted      []NodeID // retired nodes kept for command cancellation, created or not
+	commands     []driver.MountItem
+	hapticActive bool
+	moves        []move
+	items        []driver.MountItem
+	laidOut      []*node
+	transits     []*node // nodes whose next frame their layout transition moves
+	ending       []*node // nodes with OnTransitionEnd restyled since the last commit
+	reports      []report
+	stacks       []*node
 
 	// fit is the largest size of a panel that takes its content's (PanelOptions.FitContent), zero for a surface of the platform's size; reportedSize is the size its platform last reported, which a fitted size differing from is sent (driver.WindowFitSize), and refit says the environment has yet to hear t.size.
 	fit, reportedSize Size
@@ -871,6 +872,9 @@ func (t *Tree) reportFit() {
 func (t *Tree) SetEnvironment(env Environment) {
 	previous := t.reported
 	t.reported = env
+	if t.hapticActive && (env.Lifecycle == LifecycleBackground || !env.HapticPatterns) {
+		t.setHapticPattern(nil)
+	}
 	e := t.root.Env()
 	safe, headers := e.safe.GetUntracked(), e.headers
 	// In one batch, so what reads the environment sees all of it new.
@@ -891,6 +895,7 @@ func environmentNeedsFullRound(previous, env Environment) bool {
 	previous.Maximized = env.Maximized
 	previous.Lifecycle = env.Lifecycle
 	previous.TitleBar = env.TitleBar
+	previous.HapticPatterns = env.HapticPatterns
 	return !previous.Equal(env)
 }
 

@@ -786,6 +786,7 @@ func (s *surface) environment() driver.Environment {
 		Audio:            idiom != driver.IdiomTV && apple.AudioAvailable(), // none on tvOS in the first stages (docs/architecture/audio.md)
 		Camera:           cameraAvailable(),
 		ScanCode:         cameraAvailable() && idiom != driver.IdiomTV,
+		HapticPatterns:   idiom != driver.IdiomTV && hapticPatternsAvailable(),
 		CanSendInput:     false,
 		HasWebView:       idiom != driver.IdiomTV,
 		SignInWithApple:  apple.AppleSignInAvailable(),
@@ -865,6 +866,9 @@ func (s *surface) observe() {
 	for name, state := range lifecycleNote {
 		on(apple.Global(uikitPath, name), func(objc.ID) {
 			lifecycleNow = state
+			if state == driver.LifecycleBackground {
+				s.stopHapticPattern()
+			}
 			// Players pause as the app leaves the foreground, as NSH's do.
 			if state == driver.LifecycleBackground && s.audio != nil {
 				s.audio.PausePlayers()
@@ -1171,6 +1175,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemHaptic:
 			haptic(it.Count)
+			continue
+		case driver.ItemHapticPattern:
+			s.playHapticPattern(it.HapticPattern)
 			continue
 		case driver.ItemKeepAwake:
 			if it.Awake != nil && !s.closed {

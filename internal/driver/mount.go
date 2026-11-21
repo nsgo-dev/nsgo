@@ -371,6 +371,8 @@ const (
 	ItemScanCode
 	// ItemQuickLook shows the system's file preview panel on QuickLook's Paths, starting at its Index. Sent only where the environment says CanQuickLook.
 	ItemQuickLook
+	// ItemHapticPattern replaces the current haptic pattern, or stops it when empty.
+	ItemHapticPattern
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -559,6 +561,8 @@ type MountItem struct {
 	Sensor *SensorRequest
 	Speech *SpeechRequest
 	Audio  *AudioRequest
+	// HapticPattern is the timed feedback ItemHapticPattern plays.
+	HapticPattern *HapticPattern
 	// Auth is an ItemAuthSession's request.
 	Auth *AuthRequest
 	// Cookies is an ItemWebCookies' request.

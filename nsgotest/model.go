@@ -630,6 +630,12 @@ func (a *App) apply(b *driver.MountBatch) {
 			}
 		case driver.ItemBadge:
 			a.Badge = int(it.Count)
+		case driver.ItemHapticPattern:
+			var pattern core.HapticPattern
+			if it.HapticPattern != nil {
+				pattern = slices.Clone(*it.HapticPattern)
+			}
+			a.HapticPatterns = append(a.HapticPatterns, pattern)
 		case driver.ItemKeepAwake:
 			if it.Awake != nil {
 				hold := AwakeHold{ID: it.Count, KeepAwake: *it.Awake}

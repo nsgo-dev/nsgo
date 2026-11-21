@@ -188,6 +188,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     // The environment, on the UI thread: the insets in pixels and what was last sent.
     private final AccessibilityManager accessibility;
     private final UiModeManager uiMode;
+    private final HapticPatterns hapticPatterns;
     private final AccessibilityManager.TouchExplorationStateChangeListener screenReader = on -> environment();
     /** The UiModeManager.ContrastChangeListener on API 34 and later: an Object, so older Androids, which have no such class, never resolve it. */
     private Object contrast;
@@ -343,6 +344,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         ime = context.getSystemService(InputMethodManager.class);
         accessibility = context.getSystemService(AccessibilityManager.class);
         uiMode = context.getSystemService(UiModeManager.class);
+        hapticPatterns = new HapticPatterns(context);
         gestures = new Gestures(context);
         setOnApplyWindowInsetsListener((v, insets) -> {
             insets(insets);
@@ -466,12 +468,14 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
+        if (visibility != View.VISIBLE && hapticPatterns != null) hapticPatterns.stop();
         environment();
         if (primary != null) primary.overlays.visibility(this, visibility);
     }
 
     @Override
     protected void onDetachedFromWindow() {
+        hapticPatterns.stop();
         releaseEnvironment();
         // An app waiting for the folds starts as the view leaves its window, as it would have without them.
         releaseStart();
@@ -707,6 +711,7 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * Ends the app's process and destroys its native components. On a view showing a host-owned engine it only detaches the view, as NsgoEngine.destroy ends that engine.
      */
     public void stop() {
+        hapticPatterns.stop();
         if (engine != null && !ownsEngine) {
             detachFromEngine();
             return;
@@ -970,7 +975,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                     | (increaseContrast ? 128 : 0)
                     | (inactive ? 16 : 0) | (background ? 32 : 0) | (Services.hasCamera(getContext()) ? 64 : 0));
             // The first byte's eight bits are taken: what else the device can do follows in a second.
-            d.writeByte((Speaker.available(getContext()) ? 1 : 0) | (Scanner.available(getContext()) ? 2 : 0));
+            d.writeByte((Speaker.available(getContext()) ? 1 : 0) | (Scanner.available(getContext()) ? 2 : 0)
+                    | (hapticPatterns.available ? 4 : 0));
             int idiom = config.smallestScreenWidthDp >= 600 ? Protocol.IDIOM_TABLET : Protocol.IDIOM_PHONE;
             if ((config.uiMode & Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION) {
                 idiom = Protocol.IDIOM_TV;
@@ -2695,6 +2701,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
             case Protocol.ITEM_HAPTIC:
                 haptic(in.readInt());
+                break;
+            case Protocol.ITEM_HAPTIC_PATTERN:
+                hapticPatterns.apply(in, getWindowVisibility() == View.VISIBLE);
                 break;
             case Protocol.ITEM_SENSOR: {
                 if (sensors == null) sensors = new Sensors(getContext(), this::activity, engine, this::keeperEnded);
