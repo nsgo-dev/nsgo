@@ -196,8 +196,9 @@ func TestLayering(t *testing.T) {
 		check(target[0], target[1], "nsgodev")
 	}
 	check("js", "wasm", "nsgodev,nsgominiprogram,nsgo_noshader")
-	// nsgo dev -automation runs on macOS alone.
+	// nsgo dev -automation links the agent and the platform surfaces it drives.
 	check("darwin", "arm64", "nsgodev,nsgoautomation")
+	check("linux", "amd64", "nsgodev,nsgoautomation")
 }
 
 type listedPackage struct {

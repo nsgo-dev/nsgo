@@ -105,7 +105,7 @@ The Linux backend's own native tests (`internal/platform/linux`, `startTestWindo
 - Alerts stay pending for the tool to answer, and one the user or the app answered leaves the model with its `EventAlert`. Each surface numbers its alerts and menu items itself, so an alert is named by its window and ID when another window's has the same ID, and `alert` lists the app's own as window 0.
 - A batch a model cannot apply fails the request taking it and leaves that window's model lost, queueing nothing more, rather than ending the app or answering later requests from a model half applied (`target.applyLive`).
 - On macOS the app's own surface shows no view but holds the application menu and the alerts its function shows, so the agent models it too: `menu` looks in the window's menu, then the app's, and chooses through the surface whose menu has the item, which fails while the menu bar shows another surface's; with `dock` it chooses in the app icon's menu through the surface that set it last, as the platform shows that one alone, whichever window the request names; and the own surface's modal alerts are answered at their buttons or dismissed with `abortModal`.
-- Only macOS has live surfaces so far: its `testSurface` (`testsurface.go`) builds with `nsgoautomation` as well as `nsgotest`, and a live one makes its window key, without activating the app, before keyboard input ([roadmap](../roadmap.md#automation)).
+- On macOS and Linux, `testSurface` builds with `nsgoautomation` as well as `nsgotest`. macOS makes a window key before keyboard input. Linux registers each live window by surface ID and drives the same GTK input paths as a target test, including menu and alert actions and offscreen screenshots ([roadmap](../roadmap.md#automation)).
 
 ## TSX tests
 

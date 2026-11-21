@@ -46,6 +46,8 @@ type followed struct {
 	g   *agent
 	id  uint32
 	app *App
+	// listed reports whether the initial surface displays views of its own.
+	listed bool
 	// opened is set for a window, a panel or a tray icon's view the app opened, of kind and title.
 	opened bool
 	kind   driver.SurfaceKind
@@ -110,7 +112,7 @@ func (g *agent) serve(id uint32, a *App, title string) {
 func (g *agent) close() { close(g.stop) }
 
 // Registered implements devtools.Agent: the agent follows each surface of its graph, from before the surface's first batch.
-func (g *agent) Registered(s devtools.Surface) {
+func (g *agent) Registered(s devtools.Surface, listed bool) {
 	g.mu.Lock()
 	if g.graph == 0 {
 		g.graph = s.Graph()
@@ -118,6 +120,7 @@ func (g *agent) Registered(s devtools.Surface) {
 	var f *followed
 	if s.Graph() == g.graph {
 		f = g.follow(uint32(s.ID()))
+		f.listed = listed
 	}
 	g.mu.Unlock()
 	if f != nil {
@@ -353,7 +356,7 @@ func (g *agent) windows() []automation.Window {
 			kind = "window"
 		case f.opened && f.kind == driver.SurfacePanel:
 			kind = "panel"
-		case !f.opened && size.Width > 0 && size.Height > 0:
+		case !f.opened && f.listed && size.Width > 0 && size.Height > 0:
 			// Where the platform opens no windows of the app's, the app's own surface shows its views.
 			kind = "app"
 		default:

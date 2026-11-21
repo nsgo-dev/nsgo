@@ -98,7 +98,7 @@ type testOpen struct {
 // window is one GTK window and the tree it shows. The engine's goroutine
 // reaches its main-thread half only through Mount and post.
 type window struct {
-	testID  uint32  // the opened test surface, 0 for a regular window
+	id      uint32  // the surface ID, 0 for the app's own window
 	batch   uint64  // batches applied
 	win     uintptr // GtkWindow, 0 for an embedded surface
 	surface uintptr // the NsgoView holding the root view
@@ -356,6 +356,7 @@ func Run(app engine.App, opts Options) {
 	if links := engine.LaunchLinks(); len(links) > 0 {
 		w.engine.Dispatch(driver.Event{Kind: driver.EventOpenLinks, Data: links})
 	}
+	registerLiveWindow(w)
 	w.run()
 	w.stop()
 }
@@ -491,7 +492,7 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 	if w.opener != nil {
 		child.opener = w.opener
 	}
-	child.kind, child.hideOnBlur, child.noActivate, child.opts = cfg.Kind, cfg.HideOnBlur, cfg.NoActivate, opts
+	child.id, child.kind, child.hideOnBlur, child.noActivate, child.opts = cfg.ID, cfg.Kind, cfg.HideOnBlur, cfg.NoActivate, opts
 	// Applied as the window maps (windowMappedCallback).
 	child.workspaces = cfg.Workspaces
 	child.createWindow(opts)
@@ -519,9 +520,9 @@ func (w *window) openSurface(cfg driver.SurfaceConfig) {
 		if opts.test.windows == nil {
 			opts.test.windows = map[uint32]*window{}
 		}
-		child.testID = cfg.ID
 		opts.test.windows[cfg.ID] = child
 	}
+	registerLiveWindow(child)
 	size := driver.Size{Width: opts.Width, Height: opts.Height}
 	child.engine.Resize(size, driver.Geometry{})
 	child.engine.SetEnvironment(child.env)
@@ -830,6 +831,7 @@ func (w *window) close() {
 		return
 	}
 	w.closing = true
+	unregisterLiveWindow(w)
 	w.closeCanvasImages()
 	w.closeHotKeys()
 	if w.loop != 0 {
@@ -859,8 +861,8 @@ func (w *window) close() {
 
 // destroy ends an opened surface once its tree is gone (WindowDestroy): its views, its window and the handle its callbacks find it by go with it.
 func (w *window) destroy() {
-	if w.testID != 0 {
-		delete(w.opts.test.windows, w.testID)
+	if w.id != 0 && w.opts.test != nil {
+		delete(w.opts.test.windows, w.id)
 	}
 	if w.primary || w.embedded || w.win == 0 {
 		return

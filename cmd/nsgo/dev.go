@@ -67,8 +67,8 @@ func dev(ctx context.Context, p *project, opts devOptions) error {
 		switch {
 		case opts.release:
 			return errors.New("-automation drives dev builds; -release builds what users run")
-		case p.Dev.Target != "native" || runtime.GOOS != "darwin":
-			return errors.New("-automation drives macOS apps so far: run it on a Mac with -target native (docs/roadmap.md, Automation)")
+		case p.Dev.Target != "native" || (runtime.GOOS != "darwin" && runtime.GOOS != "linux"):
+			return errors.New("-automation supports -target native on macOS and Linux (docs/roadmap.md, Automation)")
 		}
 	}
 	p.prepareDev(opts)

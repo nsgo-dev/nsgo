@@ -352,8 +352,8 @@ func TestDevAutomationRefusesWhatItCannotDrive(t *testing.T) {
 	if err := dev(context.Background(), p, devOptions{automation: true, release: true}); err == nil || !strings.Contains(err.Error(), "-release") {
 		t.Errorf("-automation -release: %v", err)
 	}
-	p.Dev.Target = "web"
-	if err := dev(context.Background(), p, devOptions{automation: true}); err == nil || !strings.Contains(err.Error(), "macOS apps so far") {
-		t.Errorf("-automation -target web: %v", err)
+	p.Dev.Target = "android"
+	if err := dev(context.Background(), p, devOptions{automation: true}); err == nil || !strings.Contains(err.Error(), "-target native") {
+		t.Errorf("-automation -target android: %v", err)
 	}
 }

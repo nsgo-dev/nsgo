@@ -15,6 +15,7 @@
 - Let `richeditor.View.NodeViews` draw inline leaves in the text, where a press selects the node and an edit can replace it whole (#1172 by @shuuul).
 - Keep an image with its surrounding text when the rich editor's schema defines `inlineImage`, and keep the image's title and link when writing Markdown (#1174 by @shuuul).
 - Slide the title of `ui.SidebarShell`'s content with the content until it meets the sidebar's toggle, where it jumped as the sidebar hid or showed, and add `examples/shell` of the inset shell.
+- Drive Linux apps with `nsgo dev -automation` and `nsgo mcp` (#1286 by @houko).
 - Keep desktop frame callbacks running by choosing a visible driving window deterministically (#1159 by @houko).
 - Add `Scope.RequestOrientation`, which shows an iOS or Android phone's interface in the given orientations while the scope lives, the newest live request winning and the app's own policy coming back once none is left, and `nsgotest.App.Orientation`, which reports the mask in effect (#1136 by @houko).
 - Update web image views with each pixel buffer version in place (#1099 by @houko).

@@ -394,11 +394,10 @@ What NSGo's own [#57](https://github.com/nsgo-dev/nsgo/issues/57) asks for, whic
 
 ## Automation
 
-What `nsgo dev -automation` and `nsgo mcp` lack beyond macOS ([tool](architecture/tool.md#automation)). NSH has no counterpart; MyGo's `plugins/automation` is the reference.
+What `nsgo dev -automation` and `nsgo mcp` still lack ([tool](architecture/tool.md#automation)). NSH has no counterpart; MyGo's `plugins/automation` is the reference.
 
 | Item | Reference | Done when |
 | --- | --- | --- |
-| Linux | `linux/testhost.go`, [#1425](https://github.com/nsgo-dev/nsgo/issues/1425) | Its `testSurface` builds with `nsgoautomation` too and a live surface wraps the app's window as surface 0, and the end-to-end test passes under xvfb in a `go tool nsgo test` run someone starts by hand or dispatches |
 | Windows | `windows/testhost.go`, [#1426](https://github.com/nsgo-dev/nsgo/issues/1426) | The same split around the app's `*window`, with posted messages and `PrintWindow`, and the end-to-end test passes on a Windows machine |
 | The iOS, tvOS and watchOS simulators | `ios/testhost.go`, `watchos/testhost.go`, [#1427](https://github.com/nsgo-dev/nsgo/issues/1427) | A live surface wraps the scene's surface, the private HID and keyboard lookups link under `nsgoautomation` alone, and the token reaches the app through `SIMCTL_CHILD_` |
 | Apple devices | `devicectl`, [#1428](https://github.com/nsgo-dev/nsgo/issues/1428) | An iPhone, an Apple TV and an Apple Watch take presses through accessibility actions or the engine's hit testing, as the simulator's HID path is not a device's, with the token through `-X` as `devServer` is |
