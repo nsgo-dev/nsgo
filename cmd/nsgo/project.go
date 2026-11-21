@@ -231,6 +231,7 @@ type project struct {
 	} `yaml:"release"`
 	// Updates has the app update the way its platform does (updates.go).
 	Updates updatesConfig `yaml:"updates"`
+	Steam   steamConfig   `yaml:"steam"`
 	// Mobile is the iOS and Android targets': ExcludeResources are paths in
 	// resources/ their packages leave out, such as what only desktops run.
 	Mobile struct {
@@ -314,7 +315,7 @@ func (p *project) openOutput() bool {
 // installers reports whether nsgo build packages desktop targets for
 // users to install, unless build.installers turns it off.
 func (p *project) installers() bool {
-	return p.Build.Installers == nil || *p.Build.Installers
+	return p.channel() != channelSteam && (p.Build.Installers == nil || *p.Build.Installers)
 }
 
 // hotReload reports whether nsgo dev rebuilds the app on changes, unless

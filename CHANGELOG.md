@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Add `nsgo build -channel steam` for desktop depots with development-only `steam_appid.txt` support (#1227 by @houko).
 - Add `ui/editor`, `base/editor`'s code editor in ui's colors and code type, following the theme, with the app's styles merged over it part by part.
 - Highlight every row of a soft-wrapped line in `base/editor`'s selections and matches, whose rows before the last showed nothing.
 - Draw `ui.Button`'s primary, secondary and ghost variants without a rim, and fill the secondary one with the text's color at a low opacity instead of an opaque gray.

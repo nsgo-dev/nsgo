@@ -635,6 +635,15 @@ func register(name string, super objc.Class, protocols []*objc.Protocol, methods
 	return apple.RegisterClass(name, super, protocols, methods)
 }
 
+// sparkle is the app's SPUStandardUpdaterController, which startSparkle
+// makes when the bundle carries Sparkle.framework and its Info.plist names
+// an appcast (SUFeedURL), as nsgo build makes them from nsgo.yaml's
+// updates. Sparkle takes the public key (SUPublicEDKey) and its schedule
+// (SUEnableAutomaticChecks) from Info.plist too, checks on its own and
+// shows its windows. Installing, it quits the app as Quit does and starts
+// the new version once this one has exited.
+var sparkle objc.ID
+
 // Run runs app and the event loop until the app ends, by its shutdown
 // mode or by quitting. The app opens its windows, panels and tray icons
 // itself (core.RootOptions.Windows); opts' size, title and material are
@@ -648,7 +657,7 @@ func Run(app engine.App, opts Options) {
 		s = startOwn(app, opts)
 	})
 	startSparkle()
-	if sparkle != 0 {
+	if sparkleEnabled && sparkle != 0 {
 		// The default menu was made before Sparkle ran, without Check for Updates….
 		rebuildDefaultMenu(defaultLanguage)
 	}
@@ -1073,7 +1082,7 @@ func mainMenu(lang string) objc.ID {
 	bar := menu("")
 	app := menu("")
 	item(app, msgs.AboutApp(name), "orderFrontStandardAboutPanel:", "")
-	if sparkle != 0 {
+	if sparkleEnabled && sparkle != 0 {
 		separator(app)
 		// SPUStandardUpdaterController answers checkForUpdates: and enables the item while no check runs.
 		item(app, msgs.CheckForUpdates(), "checkForUpdates:", "").Send(sel("setTarget:"), sparkle)

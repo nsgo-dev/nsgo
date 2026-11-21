@@ -16,7 +16,14 @@ const resourcesDir = "resources"
 // package's resource root, where "asset:" images resolve. An executable
 // stays executable, for programs the app ships and starts.
 func copyResources(p *project, root string) error {
-	return copyWalked(p, root, walkResources)
+	return copyWalked(p, root, func(p *project, write func(string, []byte) error) error {
+		return walkResources(p, func(rel string, data []byte) error {
+			if (p.channel() == channelSteam || p.steamDevelopment()) && strings.EqualFold(filepath.Base(rel), steamAppIDFile) {
+				return nil
+			}
+			return write(rel, data)
+		})
+	})
 }
 
 // copyMobileResources is copyResources for a phone's package.

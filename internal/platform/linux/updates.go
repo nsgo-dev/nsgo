@@ -1,4 +1,4 @@
-//go:build linux && !android
+//go:build linux && !android && !nsgo_steam
 
 package linux
 
@@ -15,9 +15,6 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/driver"
 	"github.com/nsgo-dev/nsgo/internal/platform/updates"
 )
-
-// updateConfig is how the app Run runs updates. Linux has no updater of its own: a check reads the app's appcast, and package updater hands a verified package to the package manager that installed the app, or offers the release's page where none did (selfUpdatable).
-var updateConfig updates.Config
 
 func init() { driver.UpdateInstall = installUpdate }
 
@@ -61,20 +58,6 @@ func selfUpdatable(ctx context.Context, download string) bool {
 		return false
 	}
 	return cmd.Run() == nil
-}
-
-// InstalledBy names the sandbox whose store installed the app and updates
-// it, Flatpak or Snap, as they mark their apps' environments; "" for any
-// other install, a package manager's included, which nsgo.yaml's
-// updates.channel tells apart.
-func InstalledBy() string {
-	if _, err := os.Stat("/.flatpak-info"); err == nil {
-		return "Flatpak"
-	}
-	if os.Getenv("SNAP") != "" {
-		return "Snap"
-	}
-	return ""
 }
 
 // checkForUpdates reads the appcast off the main thread and answers with

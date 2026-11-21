@@ -244,7 +244,7 @@ func bindBuildFlags(fs *flag.FlagSet) *buildFlags {
 	f.open = boolFlag(fs, "open", "open the output directory (default: nsgo.yaml's build.open)")
 	f.install = boolFlag(fs, "installers", "package macOS, Windows and Linux targets for users to install: a disk image, an NSIS installer, Debian and Arch packages (default: nsgo.yaml's build.installers, else true)")
 	f.jobs = intFlag(fs, "jobs", "how many targets build at once, sharing compile workers across them (default: nsgo.yaml's build.jobs, else half the CPUs)")
-	f.channel = stringFlag(fs, "channel", "the `channel` the packages are handed out through, which decides how they update: direct, store or none (default: nsgo.yaml's updates.channel)")
+	f.channel = stringFlag(fs, "channel", "the `channel` the packages are handed out through, which decides how they update: direct, store, steam or none (default: nsgo.yaml's updates.channel)")
 	fs.StringVar(&f.notes, "release-notes", "", "a Markdown `file` of the release's notes, which the appcasts carry for the update prompts to show")
 	fs.BoolVar(&f.run, "run", false, "start the package built for this machine: the app, the iPhone's, simulator's or Android device's, or the site served")
 	fs.StringVar(&f.device, "device", "", "the `device` -run starts the package on: an iPhone's name, UDID, serial or ECID, a simulator's name or UDID, or an adb serial or emulator's AVD name (default: the only one connected, or the booted simulator)")

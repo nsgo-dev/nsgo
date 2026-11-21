@@ -380,19 +380,21 @@ func TestDefaultMenu(t *testing.T) {
 			t.Error("Quit lost ⌘Q")
 		}
 
-		sparkle = objc.ID(apple.Class("NSObject")).Send(selNew)
-		defer sparkle.Send(selRelease)
-		withUpdates := mainMenu("zh-Hans")
-		defer withUpdates.Send(selRelease)
-		check := withUpdates.Send(selItemAtIndex, 0).Send(sel("submenu")).Send(selItemAtIndex, 2)
-		if title := apple.GoString(check.Send(sel("title"))); title != "检查更新…" || check.Send(sel("target")) != sparkle || objc.Send[objc.SEL](check, sel("action")) != sel("checkForUpdates:") {
-			t.Errorf("Check for Updates… is %q, target %v, want Sparkle's checkForUpdates:", title, check.Send(sel("target")))
+		if sparkleEnabled {
+			sparkle = objc.ID(apple.Class("NSObject")).Send(selNew)
+			defer sparkle.Send(selRelease)
+			bar := mainMenu("zh-Hans")
+			defer bar.Send(selRelease)
+			check := bar.Send(selItemAtIndex, 0).Send(sel("submenu")).Send(selItemAtIndex, 2)
+			if title := apple.GoString(check.Send(sel("title"))); title != "检查更新…" || check.Send(sel("target")) != sparkle || objc.Send[objc.SEL](check, sel("action")) != sel("checkForUpdates:") {
+				t.Errorf("Check for Updates… is %q, target %v, want Sparkle's checkForUpdates:", title, check.Send(sel("target")))
+			}
 		}
 
-		defaultMenu = withUpdates
+		defaultMenu = bar
 		showDefaultMenu()
 		nsApp := objc.ID(apple.Class("NSApplication")).Send(sel("sharedApplication"))
-		if nsApp.Send(sel("windowsMenu")) != withUpdates.Send(selItemAtIndex, 2).Send(sel("submenu")) {
+		if nsApp.Send(sel("windowsMenu")) != bar.Send(selItemAtIndex, 2).Send(sel("submenu")) {
 			t.Error("the default Window menu is not AppKit's windowsMenu")
 		}
 		defaultMenu = wasMenu

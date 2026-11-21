@@ -271,7 +271,7 @@ func nsisCompilerVersion(makensis string) (major, minor int) {
 // Windows packages cannot do: two ways of signing at once, a certificate
 // without a password where one is needed, or a build target it cannot
 // sign.
-func (p *project) checkSigningWindows() error {
+func (p *project) checkSigningWindows(targets []string) error {
 	if !p.signingWindows() {
 		return nil
 	}
@@ -281,15 +281,10 @@ func (p *project) checkSigningWindows() error {
 	if p.Sign.Certificate != "" && !p.Release {
 		return errors.New("sign.certificate signs release builds alone; nsgo build signs it")
 	}
-	if !p.buildsWindows() {
+	if !slices.ContainsFunc(targets, func(t string) bool { return strings.HasPrefix(t, "windows_") }) {
 		return errors.New("sign.certificate and sign.sign_command sign Windows packages: add a windows target to build.targets, or leave them out")
 	}
 	return nil
-}
-
-// buildsWindows reports whether the build makes a Windows package.
-func (p *project) buildsWindows() bool {
-	return slices.ContainsFunc(p.Build.Targets, func(t string) bool { return strings.HasPrefix(t, "windows_") })
 }
 
 // isWindows reports whether the tool runs on Windows.

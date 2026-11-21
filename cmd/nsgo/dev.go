@@ -753,12 +753,9 @@ func macSession(opts devOptions) session {
 			return run(ctx, "pluginkit", "-a", macWidgetsAppex(app))
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
-			bin := filepath.Join(p.cache("dev", "macos"), p.Name+".app", "Contents", "MacOS", p.Name)
-			stop, wait, err := startProcessEnv(devEnv(opts), bin, opts.appFlags()...)
-			if err != nil {
-				return app{}, err
-			}
-			return app{stop: stop, wait: wait}, nil
+			dir := p.cache("dev", "macos")
+			bin := filepath.Join(dir, p.Name+".app", "Contents", "MacOS", p.Name)
+			return startDesktopDev(p, opts, dir, bin)
 		},
 	}
 }
@@ -776,12 +773,9 @@ func windowsSession(opts devOptions) session {
 			return buildWindows(ctx, p, dir, runtime.GOARCH)
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
-			bin := filepath.Join(p.cache("dev", "windows"), p.Name+".exe")
-			stop, wait, err := startProcessEnv(devEnv(opts), bin, opts.appFlags()...)
-			if err != nil {
-				return app{}, err
-			}
-			return app{stop: stop, wait: wait}, nil
+			dir := p.cache("dev", "windows")
+			bin := filepath.Join(dir, p.Name+".exe")
+			return startDesktopDev(p, opts, dir, bin)
 		},
 	}
 }
@@ -799,12 +793,9 @@ func linuxSession(opts devOptions) session {
 			return buildLinux(ctx, p, dir, runtime.GOARCH)
 		},
 		start: func(ctx context.Context, p *project) (app, error) {
-			bin := filepath.Join(p.cache("dev", "linux"), p.Name)
-			stop, wait, err := startProcessEnv(devEnv(opts), bin, opts.appFlags()...)
-			if err != nil {
-				return app{}, err
-			}
-			return app{stop: stop, wait: wait}, nil
+			dir := p.cache("dev", "linux")
+			bin := filepath.Join(dir, p.Name)
+			return startDesktopDev(p, opts, dir, bin)
 		},
 	}
 }
@@ -861,7 +852,12 @@ func startProcess(name string, args ...string) (stop func(), wait func(context.C
 
 // startProcessEnv is startProcess with env added to this process's.
 func startProcessEnv(env []string, name string, args ...string) (stop func(), wait func(context.Context) error, err error) {
+	return startProcessIn("", env, name, args...)
+}
+
+func startProcessIn(dir string, env []string, name string, args ...string) (stop func(), wait func(context.Context) error, err error) {
 	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
 	cmd.Stdout, cmd.Stderr = &appConsole, &appConsole
 	if env != nil {
 		cmd.Env = append(os.Environ(), env...)

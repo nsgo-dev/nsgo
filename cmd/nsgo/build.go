@@ -34,6 +34,9 @@ func buildAll(ctx context.Context, p *project) error {
 	if err != nil {
 		return err
 	}
+	if err := p.checkSteamTargets(buildTargets); err != nil {
+		return err
+	}
 	if p.Build.embed {
 		if buildTargets, err = embedOnly(buildTargets); err != nil {
 			return err
@@ -65,14 +68,16 @@ func buildAll(ctx context.Context, p *project) error {
 	if err := p.checkNotarizing(); err != nil {
 		return err
 	}
-	if err := p.checkSigningWindows(); err != nil {
+	if err := p.checkSigningWindows(buildTargets); err != nil {
 		return err
 	}
 	if err := p.prepareCatalogs(ctx, ".", false); err != nil {
 		return err
 	}
-	if err := p.cleanReleaseDir(); err != nil {
-		return err
+	if p.channel() != channelSteam {
+		if err := p.cleanReleaseDir(); err != nil {
+			return err
+		}
 	}
 	total, err := buildPackages(ctx, p, buildTargets, jobs)
 	if err != nil {
@@ -366,7 +371,7 @@ func buildTarget(ctx context.Context, p *project, target, dir string) error {
 	switch target {
 	case "macos_universal":
 		if p.channel() == channelStore {
-			return errors.New("macos_universal is available on the direct channel only")
+			return errors.New("macos_universal cannot build a Mac App Store package")
 		}
 		return buildMacUniversal(ctx, p, dir)
 	case "macos_arm64", "macos_x64":
@@ -398,14 +403,21 @@ func buildTarget(ctx context.Context, p *project, target, dir string) error {
 		}
 		return p.releaseInstaller(target, dmg)
 	case "windows_arm64", "windows_x64":
-		if err := buildWindows(ctx, p, dir, goArch(arch)); err != nil || !p.installers() {
+		if err := buildWindows(ctx, p, dir, goArch(arch)); err != nil {
 			return err
+		}
+		install := p.installers()
+		if !install && p.channel() != channelSteam {
+			return nil
 		}
 		signer := windowsSignerOf(p)
 		if signer != nil {
 			if err := signer.signWindowsPackage(ctx, p, dir); err != nil {
 				return err
 			}
+		}
+		if !install {
+			return nil
 		}
 		if p.channel() == channelStore {
 			msix, err := buildMSIX(ctx, p, dir, goArch(arch))
@@ -524,7 +536,7 @@ func buildTarget(ctx context.Context, p *project, target, dir string) error {
 	return fmt.Errorf("unknown target %q; use all or one of %s", target, strings.Join(targets, ", "))
 }
 
-// buildMacUniversal joins the two direct-channel macOS app builds before the bundle is signed and packaged. Each architecture is built through the normal pipeline first, so resources, widgets and optional libraries keep the same inputs as their single-architecture counterparts.
+// buildMacUniversal joins the two macOS app builds before the bundle is signed and packaged. Each architecture is built through the normal pipeline first, so resources, widgets and optional libraries keep the same inputs as their single-architecture counterparts.
 func buildMacUniversal(ctx context.Context, p *project, dir string) error {
 	work, err := os.MkdirTemp(dir, ".universal-")
 	if err != nil {
@@ -547,8 +559,10 @@ func buildMacUniversal(ctx context.Context, p *project, dir string) error {
 	if err := lipoMacBinaries(ctx, app, x64); err != nil {
 		return err
 	}
-	if err := rewriteUniversalFeed(p, app); err != nil {
-		return err
+	if p.updates() {
+		if err := rewriteUniversalFeed(p, app); err != nil {
+			return err
+		}
 	}
 	if p.Sign.Identity != "" {
 		if err := signMacApp(ctx, p, app); err != nil {

@@ -79,7 +79,7 @@ build:
 # miniprogram: { appid: { wechat: wx0123456789abcdef, alipay: "2021000000000000" }, custom_navigation: false }  # 小程序的设置
 ```
 
-只写操作系统名的目标表示它的全部架构（`windows` 即 `windows_arm64` 和 `windows_x64`；`android` 仅表示 `android_arm64`，因 x86_64 构建需要 NDK），可用于 `targets`、`nsgo build -target` 和 `nsgo check -target`。`macos_universal` 不在 `macos` 和 `all` 之内：它构建 macOS 的两种架构并合成一个应用（库和小组件也一并合成），生成一个磁盘映像和一个 Sparkle feed，只用于直接分发渠道。`nsgo test -target` 也接受测试实际运行的那个架构的名字：桌面系统是本机的架构，Android 是 `arm64`。所以在 x64 的 Windows 机器上 `windows_x64` 即 `windows` 目标；目标不在其上运行的架构会被拒绝，并提示应使用的名字。
+只写操作系统名的目标表示它的全部架构（`windows` 即 `windows_arm64` 和 `windows_x64`；`android` 仅表示 `android_arm64`，因 x86_64 构建需要 NDK），可用于 `targets`、`nsgo build -target` 和 `nsgo check -target`。`macos_universal` 不在 `macos` 和 `all` 之内：它构建 macOS 的两种架构并合成一个应用（库和小组件也一并合成）。Steam 渠道使用合成后的应用包。安装器构建会生成一个磁盘映像，直接分发渠道还会生成一份 Sparkle feed。`nsgo test -target` 也接受测试实际运行的那个架构的名字：桌面系统是本机的架构，Android 是 `arm64`。所以在 x64 的 Windows 机器上 `windows_x64` 即 `windows` 目标；目标不在其上运行的架构会被拒绝，并提示应使用的名字。
 
 命令行参数会替换同名的值，例如 `-target`、`-version` 或 `-output`；`-h` 列出全部参数。
 
@@ -162,6 +162,16 @@ sign:
 
 iOS、tvOS 和 watchOS 的设备构建会在应用及其扩展中写入 App Store Connect 检查的 SDK 与 Xcode 元数据，并加入 `UIRequiredDeviceCapabilities: [arm64]`。模拟器构建不会写入这些仅设备条目；`apple.info` 中显式设置的值优先。`apple.multiple_scenes: true` 会在 iOS 应用的场景清单中将 `UIApplicationSupportsMultipleScenes` 设为 true，默认值为 false：此后用户可以在 iPad 上打开 App 的多个窗口，每个窗口都重新显示 App 的主视图，拥有各自的状态，同时共享 App 的信号和存储，直到用户关闭该窗口。
 
+## Steam depot
+
+```sh
+go tool nsgo build -channel steam -target macos_universal,windows_x64,linux_x64
+```
+
+可设定 `updates.channel: steam` 作为默认渠道。请选择 macOS、Windows 和 Linux 目标。将各个 `dist/<name>-<version>-<target>` 目录分别上传到对应的 Steam depot，并将 macOS 的应用包或 Windows、Linux 的可执行文件设为启动选项。Steam 负责更新。产物不包含安装器、自更新程序或 `steam_appid.txt`。
+
+要在 Steam 客户端之外本地测试，在 `nsgo.yaml` 中设定 `steam: {app_id: 480}`，将 480 换成你的 Steamworks App ID。`go tool nsgo dev` 会将 ID 写入原生构建目录内的 `steam_appid.txt`，并从该目录启动应用。[Steamworks API](https://partner.steamgames.com/doc/api/steam_api)、[SteamPipe](https://partner.steamgames.com/doc/sdk/uploading)。
+
 ## 发布到 GitHub
 
 构建包含 macOS、Windows 或 Linux 目标时，`dist/releases` 还会包含 `install.sh` 和 `install.ps1`，它们从 `release.github` 指定的 GitHub 仓库的 Releases 安装应用；未指定时取应用 Git 远程 `origin` 所在的仓库，两者都没有时 `build` 不写脚本并给出提示。把其中顶层的文件（不含 `miniprogram/`）上传到标签为 `v<version>` 的 Release：
@@ -189,7 +199,7 @@ irm https://github.com/me/hello/releases/latest/download/install.ps1 | iex      
 ```yaml
 updates:
   key: zE0hx2FZwwHy6X7LbEP3GjTTE3KWfCAp5gsaBysC+vg=  # nsgo keygen 打印的公钥
-  # channel: store                    # direct、store 或 none；有 key 时默认 direct，没有时为 none
+  # channel: store                    # direct、store、steam 或 none；有 key 时默认 direct，没有时为 none
   # feed: https://example.com/hello/  # appcast 和安装程序所在的地址；默认为 GitHub 上最新的 Release
   # automatic: false                  # 只在要求时检查；默认为 true
 ```
@@ -213,13 +223,14 @@ updates:
 | --- | --- | --- |
 | `direct` | GitHub、网站，以及直接安装 Release 文件的 Homebrew cask 和 winget | 按上表自行更新 |
 | `store` | App Store、Mac App Store、Microsoft Store、Google Play、Flathub 和其他应用商店 | 即[商店包](#商店包)，不带更新组件；iOS 查询 App Store，不需要 key |
+| `steam` | Steam | 生成由 Steam 更新的 [depot 目录](#steam-depot) |
 | `none` | Linux 发行版，以及重新打包应用的人 | 不检查更新 |
 
 应用商店会拒绝自行更新的应用，所以上传 `store` 构建，不要上传 direct 构建。direct 应用的 Homebrew cask 应写 `auto_updates true`。凡是系统能说明应用由谁安装的地方，应用也会检查：从 Google Play 或其他商店安装的 Android 应用、Flatpak 或 Snap，以及 TestFlight 构建都不检查，由各自的商店更新。
 
 ### 在应用中检查
 
-`updater.Check(cx)` 如同“检查更新…”菜单项，检查并显示结果；`updater.CheckInBackground(cx)` 只在有新版本时提示，`updater.CheckDaily(cx)` 也是如此，但每天至多检查一次。`automatic` 开启时，Linux、Android 和 iOS 上的应用在启动时和用户回到应用时这样检查；检查失败（例如离线）时，一小时后再试。开发构建从不更新。
+`updater.Check(cx)` 如同“检查更新…”菜单项，检查并显示结果；`updater.CheckInBackground(cx)` 只在有新版本时提示，`updater.CheckDaily(cx)` 也是如此，但每天至多检查一次。`automatic` 开启时，Linux、Android 和 iOS 上的应用在启动时和用户回到应用时这样检查；检查失败（例如离线）时，一小时后再试。开发构建从不更新。 在 Steam 构建中，这三个函数不会触发更新检查。
 
 ## 文件类型
 

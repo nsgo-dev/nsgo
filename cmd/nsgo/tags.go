@@ -15,6 +15,9 @@ func goTags(ctx context.Context, p *project, env []string, extra ...string) ([]s
 		return nil, err
 	}
 	tags := append(goFlagTags(flags), p.Build.Tags...)
+	if p.steamBuild(envTarget(env)) {
+		tags = append(tags, steamBuildTag)
+	}
 	tags = append(tags, extra...)
 	return uniqueTags(tags), nil
 }

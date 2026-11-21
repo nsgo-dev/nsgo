@@ -1,3 +1,5 @@
+//go:build !nsgo_steam
+
 package backend
 
 import (

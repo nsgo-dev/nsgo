@@ -41,7 +41,7 @@ func TestUpdatesConfig(t *testing.T) {
 		{"updates: {feed: https://example.com/hello}", "key holds no public key"},
 		{"updates: {automatic: false}", "key holds no public key"},
 		{"updates: {key: updates.pub}", "updates: key"},
-		{"updates: {channel: brew}", "is not direct, store or none"},
+		{"updates: {channel: brew}", "is not direct, store, steam or none"},
 	} {
 		dir := t.TempDir()
 		writeFiles(t, dir, map[string]string{"nsgo.yaml": "name: app\nid: dev.example.app\n" + c.yaml + "\n"})

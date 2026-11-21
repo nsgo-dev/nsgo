@@ -32,14 +32,15 @@ import (
 // installer, signed with the updates key. macOS packages carry
 // Sparkle.framework and Windows ones WinSparkle.dll, which read that feed
 // and install; Linux and Android read it themselves. iOS asks the App
-// Store on every channel but none.
+// Store on the direct and store channels.
 
 // The channels updates.channel names: the app's own downloads, which
 // update themselves; a store, or a package manager, that updates them;
-// and none, which checks nothing.
+// Steam, which updates depot builds; and none, which checks nothing.
 const (
 	channelDirect = "direct"
 	channelStore  = "store"
+	channelSteam  = "steam"
 	channelNone   = "none"
 )
 
@@ -56,7 +57,7 @@ type updatesConfig struct {
 	// The user's choice in Sparkle's and WinSparkle's settings wins.
 	Automatic *bool `yaml:"automatic"`
 	// Channel is what the builds are handed out through, which build's
-	// -channel replaces: direct, store or none; by default direct with a
+	// -channel replaces: direct, store, steam or none; by default direct with a
 	// key and none without.
 	Channel string `yaml:"channel"`
 
@@ -121,10 +122,10 @@ func (p *project) validateUpdates() error {
 // checkChannel refuses a channel updates.channel or -channel cannot name.
 func checkChannel(channel string) error {
 	switch channel {
-	case "", channelDirect, channelStore, channelNone:
+	case "", channelDirect, channelStore, channelSteam, channelNone:
 		return nil
 	}
-	return fmt.Errorf("updates: channel %q is not direct, store or none", channel)
+	return fmt.Errorf("updates: channel %q is not direct, store, steam or none", channel)
 }
 
 // channel is the channel the builds are handed out through.
@@ -138,9 +139,11 @@ func (p *project) channel() string {
 	return channelNone
 }
 
-// updatesOn reports whether the app's builds check for updates: on a
-// channel other than none, and no development build, which never does.
-func (p *project) updatesOn() bool { return p.channel() != channelNone && !p.Dev.Client }
+// updatesOn reports whether the app's release builds check for updates.
+func (p *project) updatesOn() bool {
+	channel := p.channel()
+	return !p.Dev.Client && (channel == channelDirect || channel == channelStore)
+}
 
 // updates reports whether the app's builds update themselves, on the
 // direct channel: Sparkle and WinSparkle, and the appcasts.

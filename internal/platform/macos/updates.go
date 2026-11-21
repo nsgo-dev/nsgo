@@ -1,4 +1,4 @@
-//go:build darwin && !ios
+//go:build darwin && !ios && !nsgo_steam
 
 package macos
 
@@ -11,14 +11,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// sparkle is the app's SPUStandardUpdaterController, which startSparkle
-// makes when the bundle carries Sparkle.framework and its Info.plist names
-// an appcast (SUFeedURL), as nsgo build makes them from nsgo.yaml's
-// updates. Sparkle takes the public key (SUPublicEDKey) and its schedule
-// (SUEnableAutomaticChecks) from Info.plist too, checks on its own and
-// shows its windows. Installing, it quits the app as Quit does and starts
-// the new version once this one has exited.
-var sparkle objc.ID
+const sparkleEnabled = true
 
 // startSparkle starts the app's updater as the app launches.
 func startSparkle() {

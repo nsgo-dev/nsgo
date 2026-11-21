@@ -30,8 +30,9 @@ Linux, Android and iOS have no such schedule, so `nsgo.Run` calls `updater.Check
 
 One platform reaches users through several channels, and the channel, not the platform, decides who updates the app. `updates.channel`, or `nsgo build -channel`, names it per build:
 
-- `direct`, the default with a key: the app's own downloads update themselves. macOS and Windows packages carry Sparkle and WinSparkle, and each release writes signed appcasts. The `macos_universal` target, direct only, joins the two macOS architectures into one app with one DMG and feed.
+- `direct`, the default with a key: the app's own downloads update themselves. macOS and Windows packages carry Sparkle and WinSparkle, and each release writes signed appcasts. On this channel the `macos_universal` target joins the two macOS architectures into one app with one DMG and feed.
 - `store`: a store or package manager updates the app. Packages carry no updater and no appcast; iOS still asks the App Store, which needs no key.
+- `steam`: Steam updates the depot. The desktop build uses `nsgo_steam` to omit the platform self-updater, the Linux package installer and downloader hook, and the automatic schedule. The public update checks compile as no-ops.
 - `none`: nothing checks, for packagers who repackage the app.
 
 A store bans an app that carries a self-updater or sends its users to other downloads, so a store's build must be a separate one, never a direct build uploaded as it is. Downloads that a package manager fetches unchanged from the release, as Homebrew casks and winget manifests do, stay direct: Sparkle and WinSparkle update them, the cask says `auto_updates true`, and winget compares the `DisplayVersion` the installer writes.

@@ -304,6 +304,23 @@ type menuBuild struct {
 	refs   map[uintptr]menuRef
 }
 
+// updateConfig is how the app Run runs updates. Linux has no updater of its own: a check reads the app's appcast, and package updater hands a verified package to the package manager that installed the app, or offers the release's page where none did (selfUpdatable).
+var updateConfig updates.Config
+
+// InstalledBy names the sandbox whose store installed the app and updates
+// it, Flatpak or Snap, as they mark their apps' environments; "" for any
+// other install, a package manager's included, which nsgo.yaml's
+// updates.channel tells apart.
+func InstalledBy() string {
+	if _, err := os.Stat("/.flatpak-info"); err == nil {
+		return "Flatpak"
+	}
+	if os.Getenv("SNAP") != "" {
+		return "Snap"
+	}
+	return ""
+}
+
 // Run opens a window showing app and runs GTK's main loop. Call it from
 // main; it returns when the window closes.
 func Run(app engine.App, opts Options) {

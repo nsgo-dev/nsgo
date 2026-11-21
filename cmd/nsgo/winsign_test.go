@@ -215,14 +215,14 @@ func TestSigningWindowsIsChecked(t *testing.T) {
 		p.Sign.Certificate = "release.p12"
 		p.Build.Targets = []string{"windows_x64"}
 		c.mutate(p)
-		err := p.checkSigningWindows()
+		err := p.checkSigningWindows(p.Build.Targets)
 		if err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want %q", c.name, err, c.want)
 		}
 	}
 	p := &project{Dir: t.TempDir(), Name: "App", Release: true}
 	p.Build.Targets = []string{"windows_x64"}
-	if err := p.checkSigningWindows(); err != nil {
+	if err := p.checkSigningWindows(p.Build.Targets); err != nil {
 		t.Errorf("a project that signs nothing: %v", err)
 	}
 }

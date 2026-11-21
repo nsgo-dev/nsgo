@@ -1,3 +1,5 @@
+//go:build !nsgo_steam
+
 // Package updater keeps an app up to date the way its platform does. On
 // macOS and Windows, Sparkle and WinSparkle, which nsgo build bundles when
 // nsgo.yaml configures updates, read the app's appcast on their own

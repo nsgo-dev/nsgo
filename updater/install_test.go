@@ -1,3 +1,5 @@
+//go:build !nsgo_steam
+
 package updater_test
 
 import (

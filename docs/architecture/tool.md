@@ -118,6 +118,10 @@ A `store` build (`-channel store`) makes each desktop and Android target's packa
 - Linux (`flatpak.go`): `<slug>-<version>-linux-<arch>.tar.gz`, the package with its AppStream metadata, and once the targets are built `flatpak/<id>.yml`, a manifest on GNOME's runtime (`linux.flatpak_runtime`, 51 by default) that installs each architecture's archive from the release, or from beside it without a GitHub repository or feed, for Flathub or flatpak-builder to build. A `.flatpak` bundle is an OSTree commit, which no Mac writes.
 - Android (`apk/bundle.go`): `<slug>-<version>-android-<arch>.aab`, the base module's manifest and resource table as aapt2's protocol buffers, from the same manifest and table the APK's binary XML encodes, `BundleConfig.pb` keeping native libraries compressed, which the runtime needs extracted, and a JAR signature with `sign.keystore` (`apk/jar.go`), Play's upload key. The manifest targets the API level Play requires, 36, which `android.target_sdk` replaces; a release build warns when it is below that level (`androidTargetWarning`).
 
+### Steam depots
+
+`steam.go` limits the Steam channel to desktop targets, including `macos_universal`. The tool writes the ordinary signed bundle or executable directory and skips installers, store archives and the releases directory. Native `dev` with `steam.app_id` writes `steam_appid.txt` into its build directory and launches the app there, which is where Steamworks reads the file. Steam release and development packages filter copies of that file out of app resources.
+
 ### Updates
 
 `updates.go` builds each package for the channel `updates.channel` or `-channel` names, as [updates](updates.md#channels) describes; development builds never update. Only the direct channel adds anything to a package beyond `-X` flags giving `nsgo.Run` `updates.automatic`; every build, development ones too, gets the app's identity, version and build number in `core` (`core.App`).

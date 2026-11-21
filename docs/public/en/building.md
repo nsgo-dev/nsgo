@@ -79,7 +79,7 @@ build:
 # miniprogram: { appid: { wechat: wx0123456789abcdef, alipay: "2021000000000000" }, custom_navigation: false }  # the mini programs'
 ```
 
-A bare OS name in `targets` — or in `nsgo build -target` and `nsgo check -target` — means its architectures (`windows` is `windows_arm64` and `windows_x64`; `android` is `android_arm64` only, as the x86_64 build needs an NDK). `macos_universal`, which `macos` and `all` leave out, builds both macOS architectures and joins them into one app, its libraries and widgets included, with one disk image and one Sparkle feed; it builds for the direct channel only. `nsgo test -target` also takes the name of the architecture its tests run for: a desktop OS's on this machine's architecture and Android's on `arm64`, so `windows_x64` runs the `windows` target on an x64 Windows machine, while an architecture the target does not run for is refused with the name to use.
+A bare OS name in `targets` — or in `nsgo build -target` and `nsgo check -target` — means its architectures (`windows` is `windows_arm64` and `windows_x64`; `android` is `android_arm64` only, as the x86_64 build needs an NDK). `macos_universal`, which `macos` and `all` leave out, builds both macOS architectures and joins them into one app, its libraries and widgets included. The Steam channel uses the universal app bundle. Installer builds wrap it in one disk image, with one Sparkle feed on the direct channel. `nsgo test -target` also takes the name of the architecture its tests run for: a desktop OS's on this machine's architecture and Android's on `arm64`, so `windows_x64` runs the `windows` target on an x64 Windows machine, while an architecture the target does not run for is refused with the name to use.
 
 Flags replace the values they name, such as `-target`, `-version` or `-output`; `-h` lists them all.
 
@@ -162,6 +162,16 @@ Every Apple bundle `build` writes, the app, its widget extension, App Clip and A
 
 The Info.plist of each iOS, tvOS and watchOS bundle `build` writes for devices, the app's, its widget extension's and App Clip's, carries the SDK and Xcode `DT` keys App Store Connect checks, read from the Xcode that builds it, and `UIRequiredDeviceCapabilities: [arm64]`; simulator bundles leave them out, and a key `apple.info` sets keeps its value. `apple.multiple_scenes: true` sets `UIApplicationSupportsMultipleScenes` in an iOS app's scene manifest, which is false by default: on an iPad the user can then open more than one window of the app, and each shows the app's main view anew, with state of its own and the app's shared signals and storage, until the user closes it.
 
+## Steam depots
+
+```sh
+go tool nsgo build -channel steam -target macos_universal,windows_x64,linux_x64
+```
+
+Set `updates.channel: steam` to use the channel by default. Select macOS, Windows and Linux targets. Upload each `dist/<name>-<version>-<target>` directory to its Steam depot, using the app bundle on macOS and the executable on Windows and Linux as the launch option. Steam handles updates. The directories contain no installers, self-updater or `steam_appid.txt`.
+
+For local testing outside the Steam client, set `steam: {app_id: 480}` in `nsgo.yaml`, replacing 480 with your Steamworks App ID. `go tool nsgo dev` writes the ID to `steam_appid.txt` in its native build directory and launches the app with that directory as its working directory. [Steamworks API](https://partner.steamgames.com/doc/api/steam_api), [SteamPipe](https://partner.steamgames.com/doc/sdk/uploading).
+
 ## Publish on GitHub
 
 When the build has a macOS, Windows or Linux target, `dist/releases` also holds `install.sh` and `install.ps1`, which install the app from the releases of the GitHub repository `release.github` names, else the one the app's Git remote `origin` is on; without either `build` writes none and says so. Upload its files, the top level without `miniprogram/`, to the release tagged `v<version>`:
@@ -189,7 +199,7 @@ On macOS the script copies the app from the disk image into `/Applications`, or 
 ```yaml
 updates:
   key: zE0hx2FZwwHy6X7LbEP3GjTTE3KWfCAp5gsaBysC+vg=  # the public key nsgo keygen prints
-  # channel: store                    # direct, store or none; direct by default with a key, none without
+  # channel: store                    # direct, store, steam or none; direct by default with a key, none without
   # feed: https://example.com/hello/  # where the appcasts and installers are; by default the latest GitHub release
   # automatic: false                  # check only when asked; true by default
 ```
@@ -213,13 +223,14 @@ The channel decides who updates the app. `-channel` replaces `updates.channel` f
 | --- | --- | --- |
 | `direct` | GitHub, a website, Homebrew casks and winget, which install the release's own files | Update themselves as above |
 | `store` | The App Store, the Mac App Store, the Microsoft Store, Google Play, Flathub and other stores | Are the [store packages](#store-packages) and carry no updater; iOS asks the App Store, which needs no key |
+| `steam` | Steam | Produce [depot directories](#steam-depots) that Steam updates |
 | `none` | Linux distributions and anyone who repackages the app | Check nothing |
 
 Stores reject apps that update themselves, so upload a `store` build, never a direct one. A Homebrew cask for a direct app says `auto_updates true`. Wherever the system tells who installed the app, the app checks that too: an Android app from Google Play or another store, a Flatpak or Snap, and a TestFlight build check nothing, as their store updates them.
 
 ### Checking from the app
 
-`updater.Check(cx)` checks as a *Check for Updates…* menu item does, and shows what it finds; `updater.CheckInBackground(cx)` shows only a newer version, and `updater.CheckDaily(cx)` does that at most once a day. While `automatic` is on, the app checks that way on Linux, Android and iOS as it starts and whenever the user comes back to it; a check that fails, as one offline does, is tried again an hour later. Development builds never update.
+`updater.Check(cx)` checks as a *Check for Updates…* menu item does, and shows what it finds; `updater.CheckInBackground(cx)` shows only a newer version, and `updater.CheckDaily(cx)` does that at most once a day. While `automatic` is on, the app checks that way on Linux, Android and iOS as it starts and whenever the user comes back to it; a check that fails, as one offline does, is tried again an hour later. Development builds never update. In Steam builds, these three functions do nothing.
 
 ## File types
 

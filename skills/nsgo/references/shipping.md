@@ -35,6 +35,7 @@ build:
 # apple: { info: { NSCameraUsageDescription: Scans receipts. } }
 # release: { github: me/hello }
 # updates: { key: <public key from nsgo keygen> }
+# steam: { app_id: 480 }      # use your Steamworks App ID for native dev
 ```
 
 A flag replaces the value it names (`-target`, `-version`, `-output`, or the signing profiles `-profile`, `-widgets-profile` and `-clip-profile`); `go tool nsgo build -h` lists them. Read the version-matched [Building and shipping](https://nsgo.dev/docs/building.md) page for the rest: installers, store packages, signing, notarizing, GitHub releases, updates, file types, App Clips, widgets and mini programs.
@@ -46,10 +47,13 @@ go tool nsgo build                       # every target nsgo.yaml lists
 go tool nsgo build -target web           # or all, macos, windows, macos_arm64, ios, android_arm64, miniprogram_wechat, ...
 go tool nsgo build -run -device "iPhone" # build and start or install it
 go tool nsgo build -channel store        # store packages instead of installers and self-updates
+go tool nsgo build -channel steam -target macos_universal,windows_x64,linux_x64
 go tool nsgo build -release-notes notes.md  # the release's notes, which the update prompts show
 ```
 
 Packages land in `dist/<name>-<version>-<target>`, and everything to hand out in `dist/releases`, each file named `<name>-<version>-<system>-<arch>` with its `.sha256`. Builds are release builds; `go tool nsgo dev -release` runs one with hot reload for measuring.
+
+For Steam, upload the desktop target directories directly. Native dev with `steam.app_id` writes `steam_appid.txt` into its build and starts there. The depot output excludes that file, installers and self-updaters.
 
 ## Documents
 

@@ -16,8 +16,6 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/imageload"
 )
 
-func init() { driver.UpdateDownload = Download }
-
 // Download fetches and verifies an appcast package before exposing it in dir.
 func Download(ctx context.Context, update driver.Update, dir string, progress func(driver.UpdateDownloadProgress)) (string, error) {
 	if update.Version == "" || update.Download == "" {
