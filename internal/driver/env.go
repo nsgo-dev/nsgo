@@ -77,6 +77,8 @@ type Environment struct {
 	SignInWithApple bool
 	// Purchases says ItemPurchase reaches the platform's store here.
 	Purchases bool
+	// CanUseGameServices says package gameservices reaches a platform game service here: Game Center on macOS, iOS and tvOS where GameKit loads, and Google Play Games Services on Android where available; false on watchOS, Windows, Linux, the web and mini programs.
+	CanUseGameServices bool
 	// ScheduledNotifications says ItemShowNotification schedules a notification for a later At, which the system shows with the app's process ended.
 	ScheduledNotifications bool
 	// CanMakeWindowsTransparent says SurfaceConfig.Transparent and WindowSetTransparent show what is behind the surface's window wherever the app draws nothing, and CanSkipTaskbar that SurfaceConfig.SkipTaskbar and WindowSetSkipTaskbar keep it off the taskbar; both false without a desktop window of the surface's own (an embedded view, the app's own hidden surface, a panel, a tray icon), and where the platform or session has no way (see desktop.CanMakeWindowsTransparent and desktop.CanSkipTaskbar).

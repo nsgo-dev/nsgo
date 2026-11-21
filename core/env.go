@@ -35,6 +35,7 @@ type Env struct {
 	hasWebView              *Signal[bool]
 	appleSignIn             *Signal[bool]
 	purchases               *Signal[bool]
+	gameServices            *Signal[bool]
 	scheduled               *Signal[bool]
 	transparent, taskbar    *Signal[bool]
 	fontScale, ratio        *Signal[float32]
@@ -115,6 +116,7 @@ func newEnv(cx *Scope, app *Env) *Env {
 		hasWebView:       NewSignal(cx, false),
 		appleSignIn:      NewSignal(cx, false),
 		purchases:        NewSignal(cx, false),
+		gameServices:     NewSignal(cx, false),
 		scheduled:        NewSignal(cx, false),
 		transparent:      NewSignal(cx, false),
 		taskbar:          NewSignal(cx, false),
@@ -234,6 +236,7 @@ func (e *Env) set(v Environment) {
 	e.hasWebView.Set(v.HasWebView)
 	e.appleSignIn.Set(v.SignInWithApple)
 	e.purchases.Set(v.Purchases)
+	e.gameServices.Set(v.CanUseGameServices)
 	e.scheduled.Set(v.ScheduledNotifications)
 	e.transparent.Set(v.CanMakeWindowsTransparent)
 	e.taskbar.Set(v.CanSkipTaskbar)
@@ -398,6 +401,9 @@ func (e *Env) CanSignInWithApple() bool { return e.appleSignIn.Get() }
 
 // CanPurchase reports whether Scope.Products, Purchase and the other in-app purchase services reach a store here: the App Store on macOS, iOS and tvOS, in a build nsgo.yaml's apple.purchases gives StoreKit.
 func (e *Env) CanPurchase() bool { return e.purchases.Get() }
+
+// CanUseGameServices reports whether package gameservices reaches a platform game service here: Game Center on macOS, iOS and tvOS where GameKit loads, and Google Play Games Services on Android where available. Elsewhere gameservices calls answer ErrUnsupported without asking the platform.
+func (e *Env) CanUseGameServices() bool { return e.gameServices.Get() }
 
 // CanScheduleNotifications reports whether a Notification with a later At or a Repeat is scheduled here, for the system to show with the app's process ended: on macOS and iOS in an app bundle, Android, and Windows for one without a Repeat. Elsewhere ShowNotification answers false for one without asking the platform.
 func (e *Env) CanScheduleNotifications() bool { return e.scheduled.Get() }

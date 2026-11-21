@@ -240,6 +240,8 @@ type App struct {
 	// microphone is MicrophoneInput's fake recorder.
 	microphone *Microphone
 	widgets    *widgetServices
+	// gameServices is this app's isolated in-memory fake for package gameservices.
+	gameServices *fakeGameServices
 	// OpenedURLs are the URLs the app opened, oldest first. OpenURL
 	// answers whether each opens; every one does when it is nil.
 	OpenedURLs []string
@@ -524,6 +526,7 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		Permissions:       map[core.Permission]core.PermissionStatus{},
 		PermissionAnswers: map[core.Permission]core.PermissionStatus{},
 		Secrets:           &core.MemorySecrets{},
+		gameServices:      newFakeGameServices(),
 	}
 	for _, o := range opts {
 		o(a)
@@ -611,10 +614,11 @@ func start(t testing.TB, view func(cx *core.Scope) core.Node, fn func(app *core.
 		},
 		Storage: a.store,
 		DataDir: data, CacheDir: cache, LogsDir: logs,
-		Secrets: a.Secrets,
-		Host:    a.host,
-		HotKeys: true,
-		Windows: windows,
+		Secrets:      a.Secrets,
+		GameServices: a.gameServices,
+		Host:         a.host,
+		HotKeys:      true,
+		Windows:      windows,
 	})
 	t.Cleanup(func() {
 		// Keys KeyDown still holds go with the app; on a target they come up through the platform (target.releaseHeld).

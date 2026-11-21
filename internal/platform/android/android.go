@@ -87,6 +87,9 @@ const (
 	msgScan = 21
 	// msgPixelFrame carries a bitmap for an item of the next batch on its surface.
 	msgPixelFrame = 22
+	// msgGameServices sends a JSON command for package gameservices to the
+	// runtime's Play Games Services reflection hook (driver.SendGameServices).
+	msgGameServices = 23
 
 	// Java to Go.
 	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
@@ -122,6 +125,8 @@ const (
 	msgCanvasRequest = 22
 	// msgScanReport is what the code scanner reports: a frame of the camera, its close or its failure (scan.go).
 	msgScanReport = 23
+	// msgGameServicesReport is what the runtime's Play Games Services hook reports, JSON (driver.ReportGameServices).
+	msgGameServicesReport = 24
 )
 
 // The parts of an image view's request msgImage carries.
@@ -240,6 +245,9 @@ func connect(opts Options) *surface {
 	})
 	driver.ConnectRecordings(func(msg []byte) {
 		s.send(msgRecording, func(w *writer) { w.buf = append(w.buf, msg...) })
+	})
+	driver.ConnectGameServices(func(msg []byte) {
+		s.send(msgGameServices, func(w *writer) { w.buf = append(w.buf, msg...) })
 	})
 	return s
 }
@@ -441,6 +449,8 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			s.webCookiesSet(&r)
 		case msgScanReport:
 			s.scanReport(&r)
+		case msgGameServicesReport:
+			driver.ReportGameServices(slices.Clone(payload))
 		case msgDNS:
 			servers := make([]string, r.u32())
 			for i := range servers {
