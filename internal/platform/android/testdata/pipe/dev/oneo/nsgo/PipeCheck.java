@@ -92,7 +92,7 @@ public final class PipeCheck {
         for (String text : new String[]{"=== RUN   TestA\n", "--- FAIL: TestA\n", "    target.go:151: TestMain\n", "PASS\n", "FAIL\n"}) {
             refused(text.getBytes(StandardCharsets.UTF_8), "unexpected message kind");
         }
-        for (int kind : new int[]{0, Protocol.PIXEL_FRAME + 1, 255}) refused(frame(kind, 0, new byte[0]), "unexpected message kind");
+        for (int kind : new int[]{0, Protocol.DOWNLOAD + 1, 255}) refused(frame(kind, 0, new byte[0]), "unexpected message kind");
         for (int length : new int[]{64 * 1024 * 1024 + 1, Integer.MAX_VALUE, -1, Integer.MIN_VALUE}) {
             refused(frame(1, length, new byte[0]), "message length");
         }

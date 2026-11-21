@@ -200,6 +200,25 @@ core.Suspense{
 
 The content stays mounted but hidden while it waits, so it shows at once when the values arrive. A refetch keeps it shown with the last value.
 
+## Background downloads on Android
+
+Enable `android.background_downloads: true` in `nsgo.yaml`. Start a download from a user action while the app is visible. Use an absolute destination with an existing parent directory the app can write.
+
+```go
+mobile.OnDownloadUpdate(cx, func(p mobile.DownloadProgress) {
+    progress.Set(p)
+})
+task, err := mobile.Download(cx, mobile.DownloadRequest{URL: url}, path, mobile.DownloadOptions{
+    CertificatePEM: serverCertificate,
+})
+```
+
+The transfer uses GET and accepts optional request headers. It uses the normal HTTPS trust store unless `CertificatePEM` pins the server's leaf certificate. The pin also requires a matching hostname and a valid certificate. Use the final URL as the service requires a successful response from that URL.
+
+The Android foreground service continues after the activity leaves the screen. It posts a progress notification, subject to Android's notification permission. Progress uses byte counts and sets `Total` to -1 until known. Success atomically replaces the destination. `task.Pause()` keeps the partial file, `task.Resume()` uses an HTTP range when the server supplies a validator, and `task.Cancel()` removes the partial file.
+
+Register `OnDownloadUpdate` again when the app starts to see active tasks and saved results. Use `p.Task.Forget()` after handling a final result. Android can stop the service, for example when its foreground transfer time expires. The app then receives `DownloadInterrupted`. On other targets `Download` returns `ErrDownloadUnavailable`.
+
 ## Speech and the lifecycle
 
 `cx.StartSpeech` recognizes speech with the system's recognizer where `cx.Env().CanRecognizeSpeech()` says it exists, and answers with the transcript as it changes.

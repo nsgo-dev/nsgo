@@ -200,6 +200,25 @@ core.Suspense{
 
 等待期间内容保持挂载但处于隐藏状态，值一到就能立即显示。重新加载时会继续显示上一次的值。
 
+## Android 后台下载
+
+在 `nsgo.yaml` 中启用 `android.background_downloads: true`。应用可见时，通过用户操作启动下载。目标路径必须是绝对路径，且父目录已存在并可由应用写入。
+
+```go
+mobile.OnDownloadUpdate(cx, func(p mobile.DownloadProgress) {
+    progress.Set(p)
+})
+task, err := mobile.Download(cx, mobile.DownloadRequest{URL: url}, path, mobile.DownloadOptions{
+    CertificatePEM: serverCertificate,
+})
+```
+
+下载使用 GET，可附加请求头。HTTPS 默认信任系统证书。填写 `CertificatePEM` 可以固定服务端的叶证书，并继续检查主机名和证书有效期。请传入最终 URL，以便直接取得成功响应。
+
+Android 前台服务在界面退出前台后继续下载，并在获得通知权限时显示进度。进度以字节计，未知总长度时 `Total` 为 -1。下载成功后原子替换目标文件。`task.Pause()` 保留分片文件，服务器提供校验标识时 `task.Resume()` 使用 HTTP Range 续传，`task.Cancel()` 删除分片文件。
+
+启动应用后重新注册 `OnDownloadUpdate`，即可查看活动任务和保存的结果。处理完终态后调用 `p.Task.Forget()`。Android 停止下载服务时（例如前台传输超时），任务报告 `DownloadInterrupted`。其他目标上的 `Download` 返回 `ErrDownloadUnavailable`。
+
 ## 语音与生命周期
 
 `cx.StartSpeech` 在 `cx.Env().CanRecognizeSpeech()` 为真时用系统识别器识别语音，并随着转写结果变化返回文本。

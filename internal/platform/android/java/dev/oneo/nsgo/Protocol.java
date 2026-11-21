@@ -29,7 +29,7 @@ final class Protocol {
     static Message readMessage(DataInputStream in) throws IOException {
         int kind = in.read();
         if (kind == -1) return null;
-        if (kind < BATCH || kind > PIXEL_FRAME) throw invalidMessage("unexpected message kind " + kind);
+        if (kind < BATCH || kind > DOWNLOAD) throw invalidMessage("unexpected message kind " + kind);
         int length;
         try {
             length = in.readInt();
@@ -82,6 +82,7 @@ final class Protocol {
     static final int SCAN = 21;
     /** A bitmap of the next batch: item index, key, width, height and premultiplied RGBA bytes. */
     static final int PIXEL_FRAME = 22;
+    static final int DOWNLOAD = 23;
 
     // Java to Go.
     static final int START = 1;
@@ -117,6 +118,7 @@ final class Protocol {
     static final int CANVAS_REQUEST = 22;
     /** What the code scanner reports: the surface, the request's count and a SCAN_FRAME with the frame's width, height and luminance, a SCAN_CLOSED, or a SCAN_FAILED with why (scan.go). */
     static final int SCAN_REPORT = 23;
+    static final int DOWNLOAD_REPORT = 24;
 
     /** Writes a message's part after its head. */
     interface Body {

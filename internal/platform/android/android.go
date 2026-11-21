@@ -87,6 +87,8 @@ const (
 	msgScan = 21
 	// msgPixelFrame carries a bitmap for an item of the next batch on its surface.
 	msgPixelFrame = 22
+	// msgDownload carries a process-wide background download command.
+	msgDownload = 23
 
 	// Java to Go.
 	msgStart       = 1 // the view's size and the folds measured at it (readSize), as msgResize
@@ -121,7 +123,8 @@ const (
 	// msgCanvasRequest requests or cancels a canvas image: surface, key, request, cancel.
 	msgCanvasRequest = 22
 	// msgScanReport is what the code scanner reports: a frame of the camera, its close or its failure (scan.go).
-	msgScanReport = 23
+	msgScanReport     = 23
+	msgDownloadReport = 24
 )
 
 // The parts of an image view's request msgImage carries.
@@ -240,6 +243,10 @@ func connect(opts Options) *surface {
 	})
 	driver.ConnectRecordings(func(msg []byte) {
 		s.send(msgRecording, func(w *writer) { w.buf = append(w.buf, msg...) })
+	})
+	driver.ConnectDownloads(func(command driver.DownloadCommand) error {
+		msg, _ := json.Marshal(command)
+		return s.send(msgDownload, func(w *writer) { w.buf = append(w.buf, msg...) })
 	})
 	return s
 }
@@ -435,6 +442,11 @@ func (s *surface) serve(app engine.App, opts Options, test *testOpen) {
 			time.Local = readTimeZone(&r)
 		case msgRecordingReport:
 			driver.ReportRecording(slices.Clone(payload))
+		case msgDownloadReport:
+			var progress driver.DownloadProgress
+			if err := json.Unmarshal(payload, &progress); err == nil {
+				driver.ReportDownload(progress)
+			}
 		case msgCanvasRequest:
 			s.canvasRequest(&r)
 		case msgCookiesSet:

@@ -68,6 +68,7 @@ build:
 # apple: { info: { UIBackgroundModes: [audio] } }  # background playback for iOS Picture in Picture
 # android: { permissions: [REQUEST_INSTALL_PACKAGES] }  # manifest permissions beyond the runtime's
 # android: { recording: true }  # the microphone service microphone.RecordWAV records in, with RECORD_AUDIO, the foreground-service permissions and POST_NOTIFICATIONS, which RecordWAV asks for so its notification shows from Android 13; a refusal still records
+# android: { background_downloads: true }  # dataSync foreground service for mobile.Download
 # android: { loopback_cleartext: true }  # allow plain HTTP to loopback in the APK and App Bundle
 # windows: { command_line: true }  # add <name>.com, a console companion that forwards arguments and streams to <name>.exe; not in store builds
 # windows: { publisher: Example Ltd }  # the company the Windows executable's details, its installer and the uninstall entry name; else windows.store.publisher_name

@@ -174,6 +174,8 @@ type project struct {
 		Permissions []string `yaml:"permissions"`
 		TargetSDK   int      `yaml:"target_sdk"`
 		Recording   bool     `yaml:"recording"`
+		// BackgroundDownloads declares the runtime's dataSync download service.
+		BackgroundDownloads bool `yaml:"background_downloads"`
 		// LoopbackCleartext allows HTTP to loopback in standalone packages.
 		LoopbackCleartext bool `yaml:"loopback_cleartext"`
 	} `yaml:"android"`

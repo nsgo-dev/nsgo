@@ -112,6 +112,14 @@ Both pickers take hints a platform without the setting ignores, each empty for t
 | Linux | `GtkFileDialog`, filtering by MIME type and suffix; its title, accept label, initial folder and named filter | `GtkFileDialog`'s folder selection, the same hints applying | `GtkFileDialog`'s save |
 | Web | `<input type=file>` | One folder: `showDirectoryPicker`, whose handles read it as the app opens it, else `<input webkitdirectory>`, which lists it whole and leaves out the folders holding no files | `showSaveFilePicker`, whose writable commits whole or not at all; a download where the browser has none or the press's user activation is gone, which counts as saved |
 
+## Background downloads
+
+`mobile.Download` hands GET requests and their destination to the platform transfer host on a process channel. Each task has a stable ID. Progress notifications cross the pipe as snapshots, with callbacks posted to the scope's graph goroutine. The platform owns the transfer after an initiating scope goes away.
+
+The APK and App Bundle declare the private `BackgroundDownloadService` with `dataSync` and the foreground-service permissions when `android.background_downloads` is set. An Android embedding host declares the same service and permissions in its own manifest. The service owns the requests, progress notification, partial files and terminal journal independently of `NsgoView` and `NsgoEngine`. Each task writes beside its destination and publishes with an atomic rename. A paused transfer keeps its partial file and uses `Range` with `If-Range` when it has a server validator. The service keeps request credentials in memory and journals only the task's path, byte counts and state. It reconciles interrupted files and reports journaled results to the next engine until the app acknowledges them.
+
+An optional exact leaf certificate pin supplies trust for one HTTPS request. The HTTPS connection still checks the hostname and the certificate's validity. The iOS and desktop backends are tracked in the [roadmap](../roadmap.md#from-nsgos-issues).
+
 ## Opening and sharing files
 
 `OpenFile` opens a file the app has in the app the system associates with its type. `RevealFile` opens the system file manager with a file or folder selected, and `TrashFile` moves it to the user's recoverable Trash or Recycle Bin; it never deletes permanently and returns `ErrNoTrash` when the volume has no trash or its trash would not keep the item. `Share` shows the system's share sheet for files, text or both. Each `SharedFile` is a path, with the name the other app sees and its type, which the file's name and extension say by default. Files go by path or content URI, so their size costs the bridge nothing.

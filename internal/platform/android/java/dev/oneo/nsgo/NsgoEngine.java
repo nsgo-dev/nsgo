@@ -159,6 +159,7 @@ public final class NsgoEngine {
         Listener idle;
         // Its recording's file is finished, for the next process to hear of.
         RecordingService.ownerEnded(this);
+        BackgroundDownloadService.ownerEnded(this);
         synchronized (this) {
             if (closed) return;
             closed = true;
@@ -183,6 +184,10 @@ public final class NsgoEngine {
         IOException failure = null;
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(running.getInputStream()))) {
             for (Protocol.Message message; (message = Protocol.readMessage(in)) != null; ) {
+                if (message.kind == Protocol.DOWNLOAD) {
+                    BackgroundDownloadService.message(application, this, message.payload);
+                    continue;
+                }
                 Listener current;
                 synchronized (this) {
                     current = listener;
@@ -196,6 +201,7 @@ public final class NsgoEngine {
         // A corrupt pipe cannot be resynchronized; do not leave its writer running.
         if (failure != null) destroy();
         RecordingService.ownerEnded(this);
+        BackgroundDownloadService.ownerEnded(this);
         Listener current;
         synchronized (this) {
             current = listener;
