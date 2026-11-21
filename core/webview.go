@@ -61,8 +61,9 @@ type WebView struct {
 
 	// OnLoadStart, OnLoad and OnNavigationStateChange receive the page's
 	// state as it starts loading, finishes and navigates.
-	OnLoadStart             func(WebNavigation)
-	OnLoad                  func(WebNavigation)
+	OnLoadStart func(WebNavigation)
+	OnLoad      func(WebNavigation)
+	// OnNavigationStateChange also reports same-document history and title changes on macOS, iOS and Linux.
 	OnNavigationStateChange func(WebNavigation)
 	// OnError receives a *WebError. A load cut short, by StopLoading, a new source, another navigation or a download it turned into, is no error.
 	OnError func(err error)
