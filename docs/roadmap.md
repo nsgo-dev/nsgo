@@ -47,6 +47,10 @@ What NSH added between 0.4.0 and 0.5.0 that NSGo has not, in the order to build 
 | Package settings | #1654, #1548, #1460, [#1349](https://github.com/nsgo-dev/nsgo/issues/1349) | `nsgo.yaml` raises an Apple package's minimum system version, never below the runtime's, gives Windows, Linux and Android icons of their own, and lets an Android app load plain HTTP |
 | Store uploads | `tooling.md` (Releases), #1052, #1054 | A command uploads the store packages `build -channel store` makes to TestFlight and Play's internal track, named apart from `nsgo publish`, which signs TSX packages |
 
+## Now Playing
+
+The [core contract](architecture/services.md#now-playing) starts on macOS ([#1084](https://github.com/nsgo-dev/nsgo/issues/1084)). The remaining implementations are Windows through SMTC, Linux through MPRIS, iOS through MediaPlayer and a playback audio session, Android through a MediaSession and media playback service, and the web through Media Session. Each needs its own end-to-end test of publication, commands and clearing.
+
 ## Remote push
 
 NSGo's own, beyond NSH's notifications: a server reaching the app ([remote push](architecture/remote-push.md), [#59](https://github.com/nsgo-dev/nsgo/issues/59)), waiting on its [open question](../ARCHITECTURE.md#open-questions).

@@ -63,6 +63,8 @@ func TestMain(m *testing.M) {
 
 `app.Orientation` 保存当前生效的 `Scope.RequestOrientation` 方向集合。使用应用原有的方向策略时，该值为零。
 
+`app.NowPlaying()` 返回应用最后一次发布的系统媒体信息，清除后返回 nil。`app.MediaCommand(core.MediaCommand{Kind: core.MediaSeek, Position: 30 * time.Second})` 向当前发布发送命令，由仍然有效的处理函数接收。无界面测试用 `nsgotest.Environment(core.Environment{NowPlaying: true})` 启用此能力，也可以在 macOS 目标上测试。
+
 ## 小组件和实时活动
 
 `nsgotest.Widgets(true)` 记录应用通过 `widget.Update` 发布的内容。用 `app.Widgets()` 读取每类小组件的最新时间线。条目没有指定日期时，使用应用的墙钟时间。`nsgotest.Widgets(false)` 让 `widget.Available()` 返回 false，并让更新返回 `widget.ErrNoWidgets`。

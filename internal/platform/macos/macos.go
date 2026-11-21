@@ -964,6 +964,7 @@ func (s *surface) close() {
 		return
 	}
 	s.closed = true
+	s.clearNowPlaying()
 	if dockMenu.target == s {
 		clearDockMenu()
 	}
@@ -1150,6 +1151,7 @@ func (s *surface) environment() driver.Environment {
 		Speech:           apple.SpeechAvailable(),
 		Speak:            apple.SpeakAvailable(),
 		Audio:            apple.AudioAvailable(),
+		NowPlaying:       true,
 		CanSendInput:     true,
 		HasWebView:       true,
 		SignInWithApple:  apple.AppleSignInAvailable(),
@@ -1835,6 +1837,9 @@ func (s *surface) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemWebCookies:
 			apple.WebCookies(it.Count, *it.Cookies, s.engine.Dispatch)
+			continue
+		case driver.ItemNowPlaying:
+			s.setNowPlaying(it.Count, it.NowPlaying)
 			continue
 		case driver.ItemAudio:
 			if s.audio == nil {

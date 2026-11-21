@@ -41,6 +41,7 @@ var gated = map[string]service{
 	"CallHost":                      serviceHost,
 	"CallHostTimeout":               serviceHost,
 	"PostHost":                      serviceHost,
+	"SetNowPlaying":                 serviceImage,
 	"ImageSize":                     serviceImage,
 	"PrefetchImage":                 serviceImage,
 	"SetClipboard":                  serviceClipboard,
@@ -101,6 +102,7 @@ var exempt = map[string][]string{
 		"SetLaunchAtLogin", "OnOpenFiles", "OnOpenLinks", "CheckForUpdates", "InstallPackage", "CanInstallPackages",
 		"OpenInstallSettings", "Store", "DataDir", "CacheDir", "LogsDir", "OpenFile", "Share", "RevealFile", "TrashFile", "KeepAwake",
 		"SetTaskProgress", "SetDockMenu", "AddRecentFile", "ClearRecentFiles", "LookUp", "QuickLook"},
+	"app media controls outside a view":                                   {"ClearNowPlaying", "OnMediaCommand"},
 	"stopping what the code's own requests started, which asked the gate": {"StopSpeaking"},
 }
 

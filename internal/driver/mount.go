@@ -372,6 +372,8 @@ const (
 	ItemQuickLook
 	// ItemOrientation asks the app to use the Orientation mask in Count, or the platform default when zero.
 	ItemOrientation
+	// ItemNowPlaying replaces the app's publication (NowPlaying), or clears it when nil.
+	ItemNowPlaying
 )
 
 // AppleSignInRequest is an ItemSignInWithApple's request, as core.AppleSignInOptions: the scopes it asks for and Nonce, which the core hashes as the request carries it, "" for none.
@@ -562,6 +564,8 @@ type MountItem struct {
 	Sensor *SensorRequest
 	Speech *SpeechRequest
 	Audio  *AudioRequest
+	// NowPlaying is the app's publication (ItemNowPlaying).
+	NowPlaying *NowPlayingUpdate
 	// Auth is an ItemAuthSession's request.
 	Auth *AuthRequest
 	// Cookies is an ItemWebCookies' request.

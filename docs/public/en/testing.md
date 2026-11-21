@@ -63,6 +63,8 @@ Under `-target` on macOS, Windows, Linux and the web, `app.Select(selector, star
 
 `app.Orientation` holds the active `Scope.RequestOrientation` mask. It is zero when the app uses its usual orientation policy.
 
+`app.NowPlaying()` returns the app's last system media publication, or nil after it is cleared. `app.MediaCommand(core.MediaCommand{Kind: core.MediaSeek, Position: 30 * time.Second})` sends a command through the publication to its live handler. Use `nsgotest.Environment(core.Environment{NowPlaying: true})` headless, or run on the macOS target.
+
 ## Widgets and Live Activities
 
 `nsgotest.Widgets(true)` records what the app publishes with `widget.Update`. Read the latest timeline for each kind with `app.Widgets()`. An entry with no date gets the app's wall time. Use `nsgotest.Widgets(false)` to make `widget.Available()` false and have updates return `widget.ErrNoWidgets`.

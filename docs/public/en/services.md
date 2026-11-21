@@ -200,6 +200,12 @@ core.Suspense{
 
 The content stays mounted but hidden while it waits, so it shows at once when the values arrive. A refetch keeps it shown with the last value.
 
+## Now Playing
+
+Use `cx.SetNowPlaying(core.NowPlaying{...})` to show the app's current media in macOS's Control Center and menu bar. Supply `Title`, `Artist`, `Album` and optional `Artwork` as a `*core.ImageSource`. A zero `Duration` means a live stream. Give the current `Position` and playback `Rate` (zero while paused, one at normal speed). Publish again when the track, position or rate changes. The system advances the position between calls.
+
+List the supported transport controls in `Commands`, such as `core.MediaPlay`, `core.MediaPause`, `core.MediaTogglePlayPause` and `core.MediaSeek`. Handle requests with `cx.OnMediaCommand`. The callback receives the command's `Kind` and, for a seek, the requested `Position`. The newest live handler takes commands. Call `cx.ClearNowPlaying()` when the app is done playing. While the app publishes manually, controlled videos on macOS suspend their own publication. Check `cx.Env().CanShowNowPlaying()` for platform support.
+
 ## Speech and the lifecycle
 
 `cx.StartSpeech` recognizes speech with the system's recognizer where `cx.Env().CanRecognizeSpeech()` says it exists, and answers with the transcript as it changes.

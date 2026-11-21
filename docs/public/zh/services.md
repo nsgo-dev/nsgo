@@ -200,6 +200,12 @@ core.Suspense{
 
 等待期间内容保持挂载但处于隐藏状态，值一到就能立即显示。重新加载时会继续显示上一次的值。
 
+## 正在播放
+
+用 `cx.SetNowPlaying(core.NowPlaying{...})` 在 macOS 的控制中心和菜单栏显示应用正在播放的媒体。可提供 `Title`、`Artist`、`Album` 和 `*core.ImageSource` 类型的可选封面 `Artwork`。`Duration` 为零表示直播。填写当前的 `Position` 和播放速率 `Rate`，暂停时填零，正常速度填一。曲目、位置或速率变化时再次发布，两次调用之间由系统推进播放位置。
+
+用 `Commands` 列出支持的控制项，例如 `core.MediaPlay`、`core.MediaPause`、`core.MediaTogglePlayPause` 和 `core.MediaSeek`。用 `cx.OnMediaCommand` 处理请求，回调会收到命令的 `Kind`，跳转时还会收到目标 `Position`。仍然有效的处理函数中，最后注册的接收命令。应用结束播放时调用 `cx.ClearNowPlaying()`。应用主动发布期间，macOS 上带控制条的视频会暂停自动发布。用 `cx.Env().CanShowNowPlaying()` 查看平台是否支持。
+
 ## 语音与生命周期
 
 `cx.StartSpeech` 在 `cx.Env().CanRecognizeSpeech()` 为真时用系统识别器识别语音，并随着转写结果变化返回文本。
