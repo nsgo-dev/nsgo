@@ -336,6 +336,12 @@ A playing `Video` keeps the display on only on iOS, where `AVPlayer`'s `prevents
 
 `core.App`, NSH's `appInfo()` and TSX's too, is the app's ID, name, version and build number as `nsgo.yaml` gives them, which the tool builds into `core` with `-X`, and whether it is a development build: any but `nsgo build`'s. It is the binary's, not an engine's, so every view a host embeds reads the host build's.
 
+## Network state
+
+`Env.Network` shares one connectivity signal across the engine's surfaces. `Scope.OnNetworkChange` follows the signal without an initial event or duplicate values. Test environments can replace it. Targets without a source report online and unmetered.
+
+Apple reads the default path with Network.framework. Windows reads Network List Manager's connectivity and cost, wakes on interface changes, and rechecks validation and cost while observed. Linux follows GIO's default-route availability and metered properties. The web follows `navigator.onLine` and the browser's online and offline events. These observers start on the app's first read and stop when its graph ends. Android carries its validated route and metered state in the environment through its existing default network callback, which also sends DNS settings. No backend probes the app's servers.
+
 ## The device
 
 `Env.DeviceName` is the name the user gave the device, as the system's settings show it, and `Env.DeviceModel` its hardware model, so an app that pairs devices can tell two of a kind apart. Each is empty where the platform does not give it, and `nsgotest.Environment` sets both, also under `nsgo test -target`. The name is read with the rest of the environment, so a rename reaches the app at its next refresh; the model is read once.

@@ -156,6 +156,9 @@ func Pin(env driver.Environment, pin *driver.Environment) driver.Environment {
 	env.Dark, env.ReduceMotion, env.IncreaseContrast = pin.Dark, pin.ReduceMotion, pin.IncreaseContrast
 	env.Camera, env.ScanCode = pin.Camera, pin.ScanCode
 	env.LaunchedAtLogin, env.FrontmostApp, env.CanReadFrontmostApp = pin.LaunchedAtLogin, pin.FrontmostApp, pin.CanReadFrontmostApp
+	if pin.Network != nil {
+		env.Network = pin.Network
+	}
 	if pin.Locale != "" {
 		env.Locale = pin.Locale
 	}

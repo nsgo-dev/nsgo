@@ -874,23 +874,32 @@ func (t *Tree) SetEnvironment(env Environment) {
 	e := t.root.Env()
 	safe, headers := e.safe.GetUntracked(), e.headers
 	// In one batch, so what reads the environment sees all of it new.
-	t.root.Batch(func() { e.set(env) })
+	t.root.Batch(func() {
+		e.set(env)
+		if t == t.rt.tree {
+			e.network.setEnvironment(env.Network)
+		}
+	})
 	// Modals and system headers are placed by the safe area.
 	if e.safe.GetUntracked() != safe || e.headers != headers {
 		t.markLayout(t.view)
 	}
-	// Images pick their scales, screens their headers from the rest of it, which resolving and emitting read; the window's frame, maximized state, lifecycle and title bar reach only what reads their signals.
+	// The window's frame, maximized state, lifecycle, title bar and network
+	// reach only what reads their signals. Resolving and emitting can also
+	// read the rest of the environment directly.
 	if environmentNeedsFullRound(previous, env) {
 		t.markAll()
 	}
 }
 
-// environmentNeedsFullRound reports whether env changes from previous in a field that resolving or emitting the tree reads directly: any but WindowFrame, Maximized, Lifecycle and TitleBar, which only their Env signals carry (#178).
+// environmentNeedsFullRound reports whether env changes from previous in
+// a field that resolving or emitting the tree can read directly (#178).
 func environmentNeedsFullRound(previous, env Environment) bool {
 	previous.WindowFrame = env.WindowFrame
 	previous.Maximized = env.Maximized
 	previous.Lifecycle = env.Lifecycle
 	previous.TitleBar = env.TitleBar
+	previous.Network = env.Network
 	return !previous.Equal(env)
 }
 

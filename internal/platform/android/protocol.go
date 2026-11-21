@@ -449,6 +449,9 @@ func readEnvironment(r *reader) driver.Environment {
 	env.Speak = more&1 != 0
 	// A camera the app may read frames of: one the device has, and CAMERA in the app's manifest.
 	env.ScanCode = more&2 != 0
+	if more&4 != 0 {
+		env.Network = &driver.Network{Online: more&8 != 0, Expensive: more&16 != 0}
+	}
 	env.Idiom = driver.Idiom(r.byte())
 	env.Locale = r.str()
 	env.DeviceName = r.str()
