@@ -227,6 +227,9 @@ var (
 	gdkToplevelLower           func(uintptr) int32
 	gdkToplevelShowWindowMenu  func(uintptr, uintptr) int32
 	gtkGestureGetDevice        func(uintptr) uintptr
+
+	gdkDisplayGetMonitorAtSurface func(uintptr, uintptr) uintptr
+	gdkMonitorGetRefreshRate      func(uintptr) int32
 	// Optional GDK functions, nil where GTK lacks them: the fractional monitor scale (GTK 4.14), and the work area GTK 4 has only for X11 monitors, where GTK was built with X11.
 	gdkMonitorGetScale       func(uintptr) float64
 	gdkX11MonitorGetType     func() uintptr
@@ -584,6 +587,8 @@ func bind() {
 	purego.RegisterLibFunc(&gdkFrameClockGetFrameTime, gtkLib, "gdk_frame_clock_get_frame_time")
 	purego.RegisterLibFunc(&gdkDisplayGetDefault, gtkLib, "gdk_display_get_default")
 	purego.RegisterLibFunc(&gdkDisplayGetMonitors, gtkLib, "gdk_display_get_monitors")
+	purego.RegisterLibFunc(&gdkDisplayGetMonitorAtSurface, gtkLib, "gdk_display_get_monitor_at_surface")
+	purego.RegisterLibFunc(&gdkMonitorGetRefreshRate, gtkLib, "gdk_monitor_get_refresh_rate")
 	purego.RegisterLibFunc(&gdkDisplayGetClipboard, gtkLib, "gdk_display_get_clipboard")
 	purego.RegisterLibFunc(&gdkClipboardSetText, gtkLib, "gdk_clipboard_set_text")
 	purego.RegisterLibFunc(&gdkClipboardReadTextAsync, gtkLib, "gdk_clipboard_read_text_async")

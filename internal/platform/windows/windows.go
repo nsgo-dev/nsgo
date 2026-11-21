@@ -2357,6 +2357,7 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		// Theme ("ImmersiveColorSet"), locale and accessibility changes.
 		w.updateEnvironment()
 	case wmDisplayChange:
+		resetDisplayModes()
 		for _, other := range windows {
 			if other.engine != nil {
 				other.updateEnvironment()
@@ -2696,9 +2697,13 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		for wv := range w.webs {
 			wv.moved()
 		}
-		if f := w.windowFrame(); w.engine != nil && f != w.env.WindowFrame {
-			w.env.WindowFrame = f
-			w.engine.SetEnvironment(w.env)
+		if w.engine != nil {
+			if w.currentDisplayID() != w.env.DisplayID {
+				w.updateEnvironment()
+			} else if f := w.windowFrame(); f != w.env.WindowFrame {
+				w.env.WindowFrame = f
+				w.engine.SetEnvironment(w.env)
+			}
 		}
 	}
 	r, _, _ := defWindowProcW.Call(hwnd, uintptr(message), wParam, lParam)

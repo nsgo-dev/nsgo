@@ -6,6 +6,7 @@ import (
 	"image"
 	"math"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/nsgo-dev/nsgo/desktop/locales"
@@ -457,6 +458,13 @@ func readEnvironment(r *reader) driver.Environment {
 	// The toolbar's heights, without and with a large title.
 	env.HeaderHeight, env.LargeHeaderHeight = r.points(), r.points()
 	env.OSVersion.Major = int(r.u32()) // the API level
+	if len(r.buf) > 0 && r.byte() != 0 && len(r.buf) >= 20 {
+		id := r.u32()
+		frame := driver.Bounds{Size: driver.Size{Width: r.points(), Height: r.points()}}
+		env.DisplayID = strconv.FormatUint(uint64(id), 10)
+		env.Displays = []driver.DisplayInfo{{ID: env.DisplayID, Frame: frame, VisibleFrame: frame,
+			Scale: env.PixelRatio, Main: id == 0, RefreshRate: float64(r.float()), MaxRefreshRate: float64(r.float())}}
+	}
 	return env
 }
 

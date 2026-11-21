@@ -286,6 +286,10 @@ loop = func(time.Time) {
 cx.RequestAnimationFrame(loop)
 ```
 
+## Displays
+
+`cx.Env().Display()` returns the window's current `core.DisplayInfo` and updates bindings when the window moves to another display. `cx.Env().Displays()` lists the displays the platform reports. `RefreshRate` and `MaxRefreshRate` are in Hz, with zero for an unavailable rate. iOS reports the panel's maximum. The web reports the current screen and marks its frame callback measurement with `RefreshRateEstimated`. In tests, set `Displays` and `DisplayID` through `nsgotest.Environment`.
+
 ## Speaking text
 
 `cx.Speak` reads text aloud in the system's voice for a language where `cx.Env().CanSpeak()` says the platform speaks: macOS, iOS, tvOS, Android, Windows, the web and Linux with speech-dispatcher. One utterance speaks at a time: another `Speak` cuts the one speaking, and so do `cx.StopSpeaking` and the end of the scope that spoke it. `done` hears once how it ended: finished, stopped, or failed with a `core.SpeakError`, such as `core.SpeakLanguageUnavailable` when no voice installed speaks the language.

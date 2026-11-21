@@ -1,6 +1,7 @@
 package testhost
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -15,5 +16,16 @@ func TestPinSetsTheTestsDisplaySettings(t *testing.T) {
 	got = Pin(driver.Environment{OS: driver.OSMacOS}, &driver.Environment{Dark: true, ReduceMotion: true, IncreaseContrast: true, Camera: true, ScanCode: true, LaunchedAtLogin: true, FrontmostApp: driver.FrontmostAppInfo{ID: "editor", FullScreen: true}, CanReadFrontmostApp: true, DeviceName: "Test phone", DeviceModel: "Pixel 8"})
 	if !got.Dark || !got.ReduceMotion || !got.IncreaseContrast || !got.Camera || !got.ScanCode || !got.LaunchedAtLogin || got.FrontmostApp != (driver.FrontmostAppInfo{ID: "editor", FullScreen: true}) || !got.CanReadFrontmostApp || got.DeviceName != "Test phone" || got.DeviceModel != "Pixel 8" {
 		t.Errorf("pinned on: %+v", got)
+	}
+}
+
+func TestPinDisplay(t *testing.T) {
+	platform := driver.Environment{Displays: []driver.DisplayInfo{{ID: "platform", RefreshRate: 60}}, DisplayID: "platform"}
+	pin := driver.Environment{Displays: []driver.DisplayInfo{{ID: "test", RefreshRate: 120}}, DisplayID: "test"}
+	if got := Pin(platform, &pin); got.DisplayID != pin.DisplayID || !slices.Equal(got.Displays, pin.Displays) {
+		t.Errorf("pinned display = %q in %+v", got.DisplayID, got.Displays)
+	}
+	if got := Pin(platform, &driver.Environment{}); got.DisplayID != platform.DisplayID || !slices.Equal(got.Displays, platform.Displays) {
+		t.Errorf("platform display = %q in %+v", got.DisplayID, got.Displays)
 	}
 }

@@ -26,6 +26,7 @@ import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.hardware.biometrics.BiometricPrompt;
 import android.hardware.biometrics.BiometricManager;
+import android.hardware.display.DisplayManager;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
@@ -43,6 +44,7 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.Choreographer;
+import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.Gravity;
 import android.view.InputDevice;
@@ -199,6 +201,15 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     };
     private int safeTop, safeRight, safeBottom, safeLeft, keyboard;
     private byte[] environment;
+    private DisplayManager displayManager;
+    private final DisplayManager.DisplayListener displayListener = new DisplayManager.DisplayListener() {
+        @Override public void onDisplayAdded(int id) {}
+        @Override public void onDisplayRemoved(int id) {}
+        @Override public void onDisplayChanged(int id) {
+            Display display = getDisplay();
+            if (display != null && display.getDisplayId() == id) environment();
+        }
+    };
     /** Whether new insets wait for the layout of their traversal, which sends them with a new size if they bring one (sendSize), else alone as the frame draws. */
     private boolean environmentHeld;
     private final ViewTreeObserver.OnPreDrawListener heldEnvironment = new ViewTreeObserver.OnPreDrawListener() {
@@ -434,6 +445,8 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        displayManager = getContext().getSystemService(DisplayManager.class);
+        if (displayManager != null) displayManager.registerDisplayListener(displayListener, ui);
         // Embedded hosts may already have a focused sibling; keep it there.
         if (getRootView().findFocus() == null) requestFocus();
         accessibility.addTouchExplorationStateChangeListener(screenReader);
@@ -472,6 +485,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     @Override
     protected void onDetachedFromWindow() {
+        if (displayManager != null) {
+            displayManager.unregisterDisplayListener(displayListener);
+            displayManager = null;
+        }
         releaseEnvironment();
         // An app waiting for the folds starts as the view leaves its window, as it would have without them.
         releaseStart();
@@ -993,10 +1010,31 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             d.writeFloat(Header.BAR);
             d.writeFloat(Header.LARGE_BAR);
             d.writeInt(Build.VERSION.SDK_INT);
+            writeDisplay(d);
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
         }
         return bytes.toByteArray();
+    }
+
+    private void writeDisplay(DataOutputStream d) throws IOException {
+        Display display = getDisplay();
+        d.writeBoolean(display != null);
+        if (display == null) return;
+        Display.Mode current = display.getMode();
+        float rate = current.getRefreshRate(), maximum = rate;
+        for (Display.Mode mode : display.getSupportedModes()) {
+            if (mode.getPhysicalWidth() == current.getPhysicalWidth() && mode.getPhysicalHeight() == current.getPhysicalHeight()) {
+                maximum = Math.max(maximum, mode.getRefreshRate());
+            }
+        }
+        android.graphics.Point size = new android.graphics.Point();
+        display.getRealSize(size);
+        d.writeInt(display.getDisplayId());
+        d.writeFloat(size.x / density);
+        d.writeFloat(size.y / density);
+        d.writeFloat(rate);
+        d.writeFloat(maximum);
     }
 
     /** The appearance the app forces, as driver.Appearance; 0 follows the system's. */

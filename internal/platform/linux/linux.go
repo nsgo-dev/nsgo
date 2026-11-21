@@ -98,10 +98,11 @@ type testOpen struct {
 // window is one GTK window and the tree it shows. The engine's goroutine
 // reaches its main-thread half only through Mount and post.
 type window struct {
-	testID  uint32  // the opened test surface, 0 for a regular window
-	batch   uint64  // batches applied
-	win     uintptr // GtkWindow, 0 for an embedded surface
-	surface uintptr // the NsgoView holding the root view
+	testID         uint32  // the opened test surface, 0 for a regular window
+	batch          uint64  // batches applied
+	win            uintptr // GtkWindow, 0 for an embedded surface
+	surface        uintptr // the NsgoView holding the root view
+	monitorSurface uintptr // the GdkSurface whose monitor signals are connected
 	// primary is the backend's own surface. Opened surfaces share the GTK main loop, but closing one must not end the app.
 	primary bool
 	// opener is the app's own window for a surface the app opened, which goes when that window stops (stop).

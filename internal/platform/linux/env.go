@@ -95,6 +95,7 @@ func (w *window) environment() driver.Environment {
 		Locale:           locale,
 		LocaleSettings:   localeSettings(),
 		Displays:         displays(),
+		DisplayID:        w.currentDisplayID(),
 		OS:               driver.OSLinux,
 		HasWebView:       true,
 		OSVersion:        osVersion(),
@@ -218,18 +219,51 @@ func displays() []driver.DisplayInfo {
 		point := func(r gdkMonitorRectangle) driver.Bounds {
 			return driver.Bounds{Origin: driver.Point{X: driver.Points(float32(r.X)), Y: driver.Points(float32(r.Y))}, Size: driver.Size{Width: driver.Points(float32(r.Width)), Height: driver.Points(float32(r.Height))}}
 		}
-		// The connector, as DP-1 or HDMI-A-1, names the display across runs; the object's address only while it is connected.
-		id := ""
-		if c := gdkMonitorGetConnector(monitor); c != 0 {
-			id = goString(c)
-		}
-		if id == "" {
-			id = fmt.Sprintf("%x", monitor)
-		}
-		out = append(out, driver.DisplayInfo{ID: id, Frame: point(frame), VisibleFrame: point(visible), Scale: scale, Main: i == 0})
+		out = append(out, driver.DisplayInfo{ID: monitorDisplayID(monitor), Frame: point(frame), VisibleFrame: point(visible), Scale: scale, Main: i == 0,
+			RefreshRate: float64(max(0, gdkMonitorGetRefreshRate(monitor))) / 1000})
 		gObjectUnref(monitor)
 	}
 	return out
+}
+
+// The connector names the display across runs. Only a connected monitor
+// keeps its object address as a fallback ID.
+func monitorDisplayID(monitor uintptr) string {
+	if connector := gdkMonitorGetConnector(monitor); connector != 0 {
+		if id := goString(connector); id != "" {
+			return id
+		}
+	}
+	return fmt.Sprintf("%x", monitor)
+}
+
+func (w *window) currentDisplayID() string {
+	if w.surface == 0 || w.primary && w.opts.Hidden || w.kind == driver.SurfaceTrayIcon {
+		return ""
+	}
+	display, native := gdkDisplayGetDefault(), gtkWidgetGetNative(w.surface)
+	if display == 0 || native == 0 {
+		return ""
+	}
+	surface := gtkNativeGetSurface(native)
+	if surface == 0 {
+		return ""
+	}
+	if w.monitorSurface != surface {
+		w.monitorSurface = surface
+		gSignalConnect(surface, "enter-monitor", cbCurrentDisplayChanged, w.handle)
+		gSignalConnect(surface, "leave-monitor", cbCurrentDisplayChanged, w.handle)
+	}
+	if monitor := gdkDisplayGetMonitorAtSurface(display, surface); monitor != 0 {
+		return monitorDisplayID(monitor)
+	}
+	return ""
+}
+
+func currentDisplayChangedCallback(_, _, data uintptr) {
+	if w := windowOf(data); w != nil && !w.closing {
+		w.updateEnvironment()
+	}
 }
 
 var watchedDisplays uintptr
@@ -249,7 +283,7 @@ func watchMonitor(monitor uintptr) {
 		return
 	}
 	gObjectSetData(monitor, key, 1)
-	for _, signal := range []string{"notify::geometry", "notify::scale", "notify::scale-factor", "invalidate"} {
+	for _, signal := range []string{"notify::geometry", "notify::scale", "notify::scale-factor", "notify::refresh-rate", "invalidate"} {
 		gSignalConnect(monitor, signal, cbDisplaysChanged, 0)
 	}
 }

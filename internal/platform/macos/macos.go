@@ -1128,6 +1128,7 @@ func (s *surface) environment() driver.Environment {
 	deviceName, deviceModel := deviceIdentity()
 	locale, rtl := apple.Locale()
 	appearance := apple.GoString(s.native.Send(sel("effectiveAppearance")).Send(sel("name")))
+	displays, displayID := displaySnapshot(s.window.Send(sel("screen")))
 	return driver.Environment{
 		DeviceName:       deviceName,
 		DeviceModel:      deviceModel,
@@ -1148,7 +1149,8 @@ func (s *surface) environment() driver.Environment {
 		PixelRatio:       s.backingScale(),
 		Locale:           locale,
 		LocaleSettings:   apple.LocaleSettings(),
-		Displays:         displays(),
+		Displays:         displays,
+		DisplayID:        displayID,
 		OS:               driver.OSMacOS,
 		Idiom:            driver.IdiomDesktop,
 		OSVersion:        osVersion(),
@@ -1264,6 +1266,7 @@ func (s *surface) observe() {
 	})
 	center := objc.ID(apple.Class("NSNotificationCenter")).Send(sel("defaultCenter"))
 	for _, name := range []string{"NSWindowDidResizeNotification", "NSWindowDidMoveNotification",
+		"NSWindowDidChangeScreenNotification",
 		"NSWindowDidEnterFullScreenNotification", "NSWindowDidExitFullScreenNotification",
 		"NSWindowDidMiniaturizeNotification", "NSWindowDidDeminiaturizeNotification",
 		"NSWindowDidChangeOcclusionStateNotification"} {
