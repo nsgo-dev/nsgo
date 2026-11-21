@@ -485,6 +485,26 @@ android:
 
 iOS and watchOS give location and motion, macOS location, tvOS one fix at a time and Android both through the framework's own providers, without Google Play services. The web, Windows, Linux and mini programs answer unavailable. In TSX, `Sensors` has `permission`, `requestPermission`, `locate`, `watchLocation` and `watchMotion`, under the package capabilities `location`, `backgroundLocation` and `motion`, in milliseconds.
 
+## Game services
+
+Package `gameservices` provides a provider-neutral API for player sign-in, achievements, leaderboards and native Game Center / Play Games overlays where `cx.Env().CanUseGameServices()` is true. Every callback runs on the engine goroutine so it may set signals directly without blocking frames.
+
+```go
+if cx.Env().CanUseGameServices() {
+	gameservices.Authenticate(cx, func(p gameservices.Player, err error) {
+		if err == nil && p.Authenticated {
+			playerName.Set(p.DisplayName)
+			gameservices.ReportAchievement(cx, "first-run", 100, nil)
+			gameservices.SubmitScore(cx, "high-scores", 1250, nil)
+		}
+	})
+}
+```
+
+`gameservices.ReportAchievement` clamps progress to `0..100` (`100` unlocks the achievement). `gameservices.LoadScores` reads ranked `gameservices.ScoreEntry` rows for `Global` or `Friends` over `AllTime`, `Week` or `Today`, and `gameservices.ShowAchievements` and `gameservices.ShowLeaderboard` open the platform's native overlays. macOS, iOS and tvOS reach GameKit via purego; Android uses a Play Games Services runtime bridge hook; Windows, Linux, the web, watchOS and mini programs report `CanUseGameServices() == false` and answer `gameservices.ErrUnsupported`.
+
+In tests, enable game services with `nsgotest.Environment(core.Environment{CanUseGameServices: true})` and drive each app's isolated fake with `App.SetGameServicesPlayer`, `App.SetGameServicesFriends`, `App.SeedLeaderboardScores`, `App.SetGameServicesError`, `App.GameServicesAchievements`, `App.GameServicesScores`, `App.GameServicesShownAchievements` and `App.GameServicesShownLeaderboards`.
+
 ## Next
 
 - [Notifications](notifications.md): permission, badges and presses.

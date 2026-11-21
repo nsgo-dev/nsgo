@@ -192,6 +192,7 @@ The [games plan (#1047)](https://github.com/nsgo-dev/nsgo/issues/1047) targets m
 | Android native view classes | [#1055](https://github.com/nsgo-dev/nsgo/issues/1055) | An app ships a prebuilt `View` class and shows it through `core.Native` without requiring a JDK or Android SDK on the build machine |
 | GPU view for 3D | [#1059](https://github.com/nsgo-dev/nsgo/issues/1059), [open design decisions (#1104)](https://github.com/nsgo-dev/nsgo/issues/1104) | A depth-tested mesh draws with textures and lighting on the six targets after the API and backend choices are settled |
 | Additional targets | [#1117](https://github.com/nsgo-dev/nsgo/issues/1117) | HarmonyOS, mini programs, watchOS and tvOS each have a documented scope for game input, drawing, audio and frame timing |
+| Platform game services | [#1129](https://github.com/nsgo-dev/nsgo/issues/1129), [game services](architecture/gameservices.md) | `gameservices` authenticates players, reports achievements, submits and loads leaderboard scores and shows native Game Center UI on signed macOS, iOS and tvOS devices and Play Games Services on Android devices once its Java reflection hook is packaged with `classes.dex`; so far the package, `core.Env.CanUseGameServices`, Apple purego bindings, Android bridge hook and per-app `nsgotest` fake are built and tested headless |
 
 ## Diagrams
 
