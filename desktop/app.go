@@ -37,8 +37,10 @@ const (
 	ShutdownOnExplicit        = core.ShutdownOnExplicit
 )
 
-// OpenWindow opens a window showing content, which belongs to the
-// current owner and closes when that owner goes. A window with
+// OpenWindow opens a window showing content, which belongs to cx itself
+// rather than the running owner, so opening a window with the app's scope
+// from a button or menu handler keeps it open after that handler's scope
+// goes, closing only when cx goes or Close is called. A window with
 // opts.Key already open shows and takes the focus instead:
 //
 //	settings := desktop.OpenWindow(cx, desktop.WindowOptions{Title: "Settings", Key: "settings"}, Settings)
@@ -46,7 +48,7 @@ func OpenWindow(cx *core.Scope, opts WindowOptions, content func(cx *core.Scope)
 	return cx.OpenWindow(opts, content)
 }
 
-// OpenPanel opens a hidden panel showing content: a borderless window above the others, which takes the keyboard without activating the app, for Window.Toggle, a global shortcut or a tray icon to show, as a launcher or a tray icon's panel does. With PanelOptions.NoActivate it never takes the keyboard, for Window.ShowAt to place beside another app's text caret, as an input method's candidate window does:
+// OpenPanel opens a hidden panel showing content: a borderless window above the others, which takes the keyboard without activating the app, for Window.Toggle, a global shortcut or a tray icon to show, as a launcher or a tray icon's panel does. Like OpenWindow, the panel belongs to cx itself rather than the running owner. With PanelOptions.NoActivate it never takes the keyboard, for Window.ShowAt to place beside another app's text caret, as an input method's candidate window does:
 //
 //	candidates := desktop.OpenPanel(cx, desktop.PanelOptions{Width: 320, Height: 40, NoActivate: true}, Candidates)
 //	candidates.ShowAt(caret, core.PlaceBottom)
@@ -100,9 +102,9 @@ func OnOpenFiles(cx *core.Scope, fn func(paths []string)) { cx.OnOpenFiles(fn) }
 // OnOpenLinks runs fn with links of the app's own URL schemes, which nsgo.yaml's url_schemes declares and the macOS, Windows and Linux packages register, that the system asks the app to open: clicked in a browser or another app, or opened with open, start or xdg-open. They reach the running app, on Windows and Linux through its one-instance claim, which brings its window to the front if it shows and does not run OnReopen; the link the app launched to open waits for the first handler. On Windows and Linux any link the app is started with arrives, as a development build registers no scheme, so check the scheme; on Windows a launch that names a link opens no files with it, as the shell does not escape a link's quotes. A link carries whatever the page that made it chose, so treat its contents as untrusted input and confirm with the user before acting on it.
 func OnOpenLinks(cx *core.Scope, fn func(links []string)) { cx.OnOpenLinks(fn) }
 
-// NewTray adds a tray icon, which the current owner keeps: an image, or a
-// view that draws it and may change, a panel its primary click shows
-// under it, and a menu its secondary click shows.
+// NewTray adds a tray icon, which belongs to cx itself rather than the
+// running owner: an image, or a view that draws it and may change, a panel
+// its primary click shows under it, and a menu its secondary click shows.
 func NewTray(cx *core.Scope, opts TrayOptions) *Tray { return cx.NewTray(opts) }
 
 // HotKeyState is what the platform answered a global shortcut's registration.
