@@ -667,7 +667,7 @@ func (a *App) apply(b *driver.MountBatch) {
 			a.Badge = int(it.Count)
 		case driver.ItemKeepAwake:
 			if it.Awake != nil {
-				hold := AwakeHold{ID: it.Count, KeepAwake: *it.Awake}
+				hold := AwakeHold{ID: it.Count, Reason: it.Awake.Reason, Display: it.Awake.Display}
 				a.AwakeHolds = append(a.AwakeHolds, hold)
 				a.Awake = append(a.Awake, hold)
 			}
@@ -967,7 +967,7 @@ func (a *App) speech(id uint32, r driver.SpeechRequest) {
 	report := func(e driver.SpeechEvent) { a.post(driver.Event{Kind: driver.EventSpeech, Count: id, Data: &e}) }
 	switch r.Command {
 	case driver.SpeechStart:
-		a.Speech, a.speechID, a.speechText = &r, id, ""
+		a.Speech, a.speechID, a.speechText = &SpeechSession{Lang: r.Lang, Interim: r.Interim}, id, ""
 		report(driver.SpeechEvent{Phase: driver.SpeechStarted})
 	case driver.SpeechStop:
 		if a.speechID == id {
@@ -1028,7 +1028,7 @@ func (a *App) authSession(id uint32, r driver.AuthRequest) {
 
 // signInWithApple records an ItemSignInWithApple and answers it as AppleSignIn says, cancelled without it.
 func (a *App) signInWithApple(it *driver.MountItem) {
-	r := *it.AppleSignIn
+	r := AppleSignInRequest{FullName: it.AppleSignIn.FullName, Email: it.AppleSignIn.Email, Nonce: it.AppleSignIn.Nonce}
 	a.AppleSignIns = append(a.AppleSignIns, r)
 	ev := driver.Event{Kind: driver.EventSignInWithApple, Count: it.Count, Text: driver.AppleSignInCancelled}
 	if a.AppleSignIn != nil {
