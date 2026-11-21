@@ -878,7 +878,7 @@ func (s *surface) Mount(b *driver.MountBatch) {
 
 // mount sends the batch of v's tree to Java, which names its surface, and loads the image sources it changed.
 func (s *surface) mount(v *treeView, b *driver.MountBatch) {
-	b = s.withoutScans(v.id, s.withoutWebCookies(v.id, s.withoutAuthSessions(v.id, s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutDesktopItems(withoutEffects(b)))))))
+	b = s.withoutScans(v.id, s.withoutWebCookies(v.id, s.withoutAuthSessions(v.id, s.withoutPermissions(v.id, s.withoutUpdateChecks(v.id, withoutDesktopItems(b))))))
 	// Android has no file manager an app can reveal in or trash through. The batch may be the engine's own, which a test's observer holds, so the items are filtered from a copy.
 	fileManager := func(it driver.MountItem) bool {
 		return it.Kind == driver.ItemRevealFile || it.Kind == driver.ItemTrashFile
@@ -1352,10 +1352,6 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 				shaders = shaders[1:]
 			} else {
 				w.u32(0) // no program
-				w.flags(false)
-				w.u32(0)
-				w.u32(0)
-				w.u32(0)
 			}
 		case driver.ItemSetClipboard, driver.ItemAnnounce, driver.ItemTitle, driver.ItemAccessibilityLabel:
 			w.str(it.Value)

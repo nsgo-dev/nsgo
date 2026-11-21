@@ -23,6 +23,7 @@
 - Add a Windows system caption button style for hidden title bars, preserving Snap Layout hit testing (#679 by @houko).
 - Add `android.loopback_cleartext` to allow plain HTTP to loopback in Android APKs and App Bundles (#1061 by @houko).
 - Send deferred shader pixels on Android without waiting for another app update (#1112 by @houko).
+- Draw view and screen shader effects and transitions on Android 10 and later (#1220 by @houko).
 - Give Android tab bars their own palette roles and use the accent for selected tabs by default (#1071 by @houko).
 - Add `View.OnKeyUp`, `core.KeysDown` and `core.KeyHeld`, and `KeyDown`/`KeyUp` steps in nsgotest, on macOS, Windows, Linux, the web and tvOS, and `core.KeysDown` and `core.KeyHeld` on iPhone and iPad with a hardware keyboard (#1046 by @houko).
 - Localize Apple widget names and descriptions from the app's catalogs, including the extension's placeholder (#744 by @houko).
