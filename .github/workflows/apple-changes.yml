@@ -50,7 +50,7 @@ jobs:
                 apple=true ;;
               # Code that only other platforms run, Android's Java and runtime included, and the docs. The untagged Go in these directories still compiles for macOS in check.yml's Build and vet job.
               internal/platform/android/* | internal/platform/windows/* | internal/platform/linux/* | internal/platform/web/* | internal/platform/harmonyos/* | internal/platform/miniprogram/* | \
-                docs/* | changelog.d/* | website/* | *.md)
+                docs/* | changelog.d/* | website/* | *.md | .github/*)
                 ;;
               *)
                 apple=true ;;
