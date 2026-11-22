@@ -965,7 +965,7 @@ func (w *window) view(id driver.NodeID) *view {
 // apply applies one commit's items.
 func (w *window) apply(b *driver.MountBatch) {
 	w.batch++
-	var rescroll, loads, labels []*view
+	var rescroll, loads, labels, removed []*view
 	type focusChange struct {
 		v     *view
 		focus bool
@@ -1231,6 +1231,7 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemRemove:
 			v.detach()
 			w.unparentWidget(v.widget)
+			removed = append(removed, v)
 		case driver.ItemDelete:
 			w.animator.Forget(v.id)
 			switch {
@@ -1378,7 +1379,11 @@ func (w *window) apply(b *driver.MountBatch) {
 			}
 		}
 	}
+	oldRoot := w.view(w.root)
 	w.setRoot(b.Root)
+	if oldRoot != nil && oldRoot != w.view(w.root) {
+		removed = append(removed, oldRoot)
+	}
 	for _, v := range labels {
 		w.updateLabelRelation(v)
 	}
@@ -1400,6 +1405,7 @@ func (w *window) apply(b *driver.MountBatch) {
 		}
 	}
 	w.coverFocus()
+	w.syncFocusable(removed)
 	for _, f := range focus {
 		switch {
 		case f.v == nil:
