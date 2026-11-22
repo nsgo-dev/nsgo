@@ -357,6 +357,7 @@ type surface struct {
 	pan             *panTrack
 	pinch, rotation *gestureTrack
 	selecting       *selection
+	selHelper       objc.ID // hidden non-editable NSTextView backing the selection's secondary-click menu
 
 	// The performance monitor and the panel that shows it.
 	perf *engine.PerfMonitor
@@ -446,6 +447,8 @@ func loadAppKit() {
 		{Cmd: sel("magnifyWithEvent:"), Fn: magnify},
 		{Cmd: sel("rotateWithEvent:"), Fn: rotate},
 		{Cmd: sel("rightMouseDown:"), Fn: rightMouseDown},
+		{Cmd: sel("menuForEvent:"), Fn: menuForEvent},
+		{Cmd: sel("quickLookWithEvent:"), Fn: quickLookWithEvent},
 		{Cmd: sel("mouseEntered:"), Fn: mouseEntered},
 		{Cmd: sel("mouseMoved:"), Fn: mouseMoved},
 		{Cmd: sel("mouseExited:"), Fn: mouseExited},
@@ -545,6 +548,9 @@ func loadAppKit() {
 		}},
 		objc.MethodDef{Cmd: sel("copy:"), Fn: surfaceCopy},
 		objc.MethodDef{Cmd: sel("selectAll:"), Fn: surfaceSelectAll},
+		objc.MethodDef{Cmd: sel("validateMenuItem:"), Fn: surfaceValidateMenuItem},
+		objc.MethodDef{Cmd: sel("validRequestorForSendType:returnType:"), Fn: surfaceValidRequestor},
+		objc.MethodDef{Cmd: sel("writeSelectionToPasteboard:types:"), Fn: surfaceWriteSelection},
 		objc.MethodDef{Cmd: selTick, Fn: surfaceTick},
 		objc.MethodDef{Cmd: selWatch, Fn: surfaceWatch},
 		objc.MethodDef{Cmd: selStallTick, Fn: surfaceStallTick},
@@ -591,6 +597,7 @@ func loadAppKit() {
 		objc.MethodDef{Cmd: sel("layout"), Fn: inputLayout},
 	))
 	registerInput()
+	registerSelection()
 	registerContent()
 	registerCanvasNodes()
 	registerQuickLook()
@@ -795,6 +802,7 @@ func startApp(opts Options, ready func(login bool)) objc.ID {
 		policy = policyAccessory
 	}
 	nsApp.Send(sel("setActivationPolicy:"), policy)
+	registerServicesMenuSendTypes(nsApp)
 	defaultLanguage, _ = apple.Locale()
 	defaultMenu = mainMenu(defaultLanguage)
 	showDefaultMenu()
@@ -1037,6 +1045,11 @@ func (s *surface) close() {
 	}
 	s.releaseGhosts()
 	s.closePopup()
+	if s.selHelper != 0 {
+		s.selHelper.Send(selRemoveFromSuperview)
+		s.selHelper.Send(selRelease)
+		s.selHelper = 0
+	}
 	// Its native objects go with it, and their addresses come back.
 	for id, v := range views {
 		if v.surface == s && id != s.native {
@@ -2965,9 +2978,15 @@ func mouseDown(self objc.ID, cmd objc.SEL, event objc.ID) {
 	v := views[self]
 	// Control-click is a secondary click.
 	const control = 1 << 18
-	if v != nil && objc.Send[uint](event, sel("modifierFlags"))&control != 0 && v.surface.contextView(event) != nil {
-		rightMouseDown(self, cmd, event)
-		return
+	if v != nil && objc.Send[uint](event, sel("modifierFlags"))&control != 0 {
+		if v.surface.contextView(event) != nil {
+			rightMouseDown(self, cmd, event)
+			return
+		}
+		if v.surface.selectionMenuAt(event) {
+			apple.Super(self, cmd, event)
+			return
+		}
 	}
 	if v != nil {
 		v.surface.touch(event, func(s *surface, p driver.Point) (driver.Event, bool) {
