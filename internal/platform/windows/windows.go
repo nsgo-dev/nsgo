@@ -53,6 +53,7 @@ import (
 func init() {
 	// The window belongs to the thread that creates it: main's.
 	runtime.LockOSThread()
+	seedTimeZone()
 }
 
 // Options configure the window.
@@ -635,6 +636,7 @@ func (w *window) launched(args launch) {
 // main; it does not return until the window closes.
 func Run(app engine.App, opts Options) {
 	comApartment()
+	refreshTimeZone()
 	if opts.test == nil {
 		opts.LaunchedAtLogin = opts.LaunchedAtLogin || packagedLoginLaunch()
 		setProcessAppUserModelID(opts.ID)
@@ -1125,6 +1127,7 @@ func NewView(app engine.App, opts Options) (*View, error) {
 	if opts.Parent == 0 {
 		return nil, errors.New("a view on Windows is a child window: give the HWND of its parent")
 	}
+	refreshTimeZone()
 	registerFonts(opts.Fonts)
 	if opts.Host.Settings == nil {
 		opts.Host.Settings = &engine.HostSettings{}
@@ -2607,8 +2610,13 @@ func wndProc(hwnd uintptr, message uint32, wParam, lParam uintptr) uintptr {
 		}
 		w.menuLoop(message == wmEnterMenuLoop, wParam != 0)
 	case wmSettingChange:
-		// Theme ("ImmersiveColorSet"), locale and accessibility changes.
+		// Theme ("ImmersiveColorSet"), locale, time zone ("intl") and accessibility changes.
+		if isTimeZoneSettingChange(lParam) {
+			refreshTimeZone()
+		}
 		w.updateEnvironment()
+	case wmTimeChange:
+		refreshTimeZone()
 	case wmPowerBroadcast:
 		if w.powerChanged(wParam, lParam) {
 			return 1
