@@ -49,3 +49,4 @@ On HarmonyOS, use Go’s standard file APIs under `cx.DataDir()`, `cx.CacheDir()
 
 - Test with `nsgotest` by role and text, in both appearances (`nsgotest.Environment`), look at it under `go tool nsgo dev -lang en-XA` for cut and untranslated words, and run `go tool nsgo check -target all` to vet every available Go/Xcode target. It lists unavailable Apple SDKs it skips; explicitly naming an Apple target keeps it required. In NSGo's repository target checks include the `nsgotest` hosts; name `harmonyos` explicitly to include its preview backend.
 - Register Go components for TSX in an `init` function with `tsx.Register("example.com/chips", ...)`.
+- For TSX Mermaid diagrams, import `tsx/diagram` for its effect in Go, then `Diagram` from `nsgo/base`. A `TextView` from `nsgo/base` or `nsgo/ui` takes `renderDiagram={(code) => <Diagram source={code.code} errorClass="font-mono" />}`. [TSX apps](https://nsgo.dev/docs/tsx.md)
