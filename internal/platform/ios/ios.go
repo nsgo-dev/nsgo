@@ -708,6 +708,7 @@ func (s *surface) watch() {
 	watcher.Send(selRelease)
 	s.addTracker()
 	s.watchHinge()
+	s.watchVerticalBarEdge()
 	s.headers = headerHeights()
 }
 
