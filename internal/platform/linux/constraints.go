@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"unsafe"
 
 	"github.com/ebitengine/purego"
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -47,11 +48,15 @@ var (
 	})
 	cbLimitsMapped            uintptr
 	cbDecorationLayoutChanged uintptr
+	cbLimitsXEvent            uintptr
+	// limitsXEvents is whether the X11 display's events are watched for the size hints GDK writes (watchSizeHints).
+	limitsXEvents bool
 )
 
 func init() {
 	cbLimitsMapped = newCallback(limitsMapped)
 	cbDecorationLayoutChanged = newCallback(decorationLayoutChanged)
+	cbLimitsXEvent = newCallback(limitsXEvent)
 }
 
 // decorationLayout keeps the session's button placement while removing controls the window does not allow.
@@ -81,6 +86,7 @@ func (w *window) updateWindowLimits() {
 	bindWindowLimits()
 	if !w.limits.watched {
 		w.limits.watched = true
+		watchSizeHints()
 		gSignalConnect(w.win, "map", cbLimitsMapped, w.handle)
 		if settings := gtkSettingsGetDefault(); settings != 0 {
 			w.settingsHandlers = append(w.settingsHandlers, gSignalConnect(settings, "notify::gtk-decoration-layout", cbDecorationLayoutChanged, w.handle))
@@ -149,6 +155,50 @@ func limitsMapped(_, data uintptr) {
 		w.updateDecorationLayout()
 		w.applyMaximumHints()
 	}
+}
+
+// watchSizeHints watches the X11 display's events for the size hints GDK writes again from GTK's geometry, which has no maximum, as it lays a window out or presents it, whenever and however often it does: limitsXEvent puts the maximum back.
+func watchSizeHints() {
+	if limitsXEvents {
+		return
+	}
+	if bindX11Panels(); !x11PanelsReady {
+		return
+	}
+	gdk := gdkDisplayGetDefault()
+	if gdk == 0 || gTypeIsA(gdk, gdkX11DisplayGetType()) == 0 {
+		return
+	}
+	limitsXEvents = true
+	gSignalConnect(gdk, "xevent", cbLimitsXEvent, 0)
+}
+
+// x11WMNormalHints is XA_WM_NORMAL_HINTS.
+const x11WMNormalHints = 40
+
+// limitsXEvent is GdkX11Display's xevent: a change of a window's WM_NORMAL_HINTS has applyMaximumHints put its maximum back, which changes them only when GDK took it out. GDK goes on to handle the event.
+func limitsXEvent(_, xevent, _ uintptr) int32 {
+	if xevent == 0 {
+		return 0
+	}
+	ev := cPointer(xevent)
+	if *(*int32)(ev) != x11PropertyNotify || *(*uintptr)(unsafe.Add(ev, x11PropertyEventAtom)) != x11WMNormalHints {
+		return 0
+	}
+	target := *(*uintptr)(unsafe.Add(ev, x11PropertyEventWindow))
+	windowHandles.Range(func(_, value any) bool {
+		w := value.(*window)
+		c := w.chrome.constraints
+		if w.closing || !w.limits.watched || c.MaxWidth <= 0 && c.MaxHeight <= 0 && !w.limits.maximum || gtkWidgetGetRealized(w.win) == 0 {
+			return true
+		}
+		if _, xid, ok := w.x11Window(); ok && xid == target {
+			w.applyMaximumHints()
+			return false
+		}
+		return true
+	})
+	return 0
 }
 
 func decorationLayoutChanged(_, _, data uintptr) {
