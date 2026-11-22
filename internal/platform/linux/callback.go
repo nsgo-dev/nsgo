@@ -35,11 +35,12 @@ var (
 	cbModifiers        uintptr
 	cbPinchTimeout     uintptr
 
-	cbEntryChanged  uintptr
-	cbEntryActivate uintptr
-	cbEntryFocus    uintptr
-	cbControlFocus  uintptr
-	cbAlertChosen   uintptr
+	cbEntryChanged    uintptr
+	cbEntryActivate   uintptr
+	cbEntryFocusEnter uintptr
+	cbEntryFocusLeave uintptr
+	cbControlFocus    uintptr
+	cbAlertChosen     uintptr
 
 	cbWebLoadChanged         uintptr
 	cbWebLoadFailed          uintptr
@@ -134,7 +135,8 @@ func init() {
 
 	cbEntryChanged = newCallback(entryChangedCallback)
 	cbEntryActivate = newCallback(entryActivateCallback)
-	cbEntryFocus = newCallback(entryFocusCallback)
+	cbEntryFocusEnter = newCallback(entryFocusEnterCallback)
+	cbEntryFocusLeave = newCallback(entryFocusLeaveCallback)
 	cbControlFocus = newCallback(controlFocusCallback)
 	cbAlertChosen = newCallback(alertChosenCallback)
 
