@@ -1351,6 +1351,8 @@ func (w *window) apply(b *driver.MountBatch) {
 			removed = append(removed, v)
 		case driver.ItemDelete:
 			w.animator.Forget(v.id)
+			isModal := v.kind == driver.KindModal
+			id := v.id
 			switch {
 			case v.parent != nil && v.parent.dying:
 				w.retireInner(v)
@@ -1358,6 +1360,9 @@ func (w *window) apply(b *driver.MountBatch) {
 				w.retire(v, lb)
 			default:
 				w.delete(v)
+			}
+			if isModal && w.engine != nil {
+				w.engine.Dispatch(driver.Event{Kind: driver.EventModalDismissed, ID: id})
 			}
 		case driver.ItemOverflow:
 			v.overflow, v.transformedKids = it.Frame, it.Transformed
