@@ -258,10 +258,9 @@ func TestAlertDialogRoleAndActions(t *testing.T) {
 				if alert.Props.Label != "Delete the note?" || alert.Props.Description != "This cannot be undone." {
 					t.Fatalf("alert accessibility = %+v", alert.Props)
 				}
-				// A phone gives the keyboard focus to text fields alone, as its platform does.
-				desktop := e.Idiom == core.IdiomDesktop
-				if app.Find("id:delete").Focused != desktop {
-					t.Fatalf("the default action's focus is %v as the alert opens, want %v", !desktop, desktop)
+				// The default action takes the focus as the alert opens, on phones too, where a hardware keyboard reaches it.
+				if !app.Find("id:delete").Focused {
+					t.Fatal("the default action is not focused as the alert opens")
 				}
 				wantAction, wantReason := "delete", base.ReasonSelect
 				switch how {
@@ -297,8 +296,8 @@ func TestAlertDialogRoleAndActions(t *testing.T) {
 				}
 				app.Post(func() { open.Set(true) })
 				app.WaitFor("id:delete", time.Second)
-				if app.Find("id:delete").Focused != desktop {
-					t.Fatalf("the default action's focus is %v as the alert opens again, want %v", !desktop, desktop)
+				if !app.Find("id:delete").Focused {
+					t.Fatal("the default action is not focused as the alert opens again")
 				}
 			})
 		}
