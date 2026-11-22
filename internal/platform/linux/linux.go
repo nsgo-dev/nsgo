@@ -916,6 +916,7 @@ func (w *window) shutdown(forced bool) {
 
 	w.cancelColorPick()
 	w.closeShares()
+	w.closeQuickLook()
 
 	w.closePermissions()
 	w.closeSaveDialogs()
@@ -1126,6 +1127,9 @@ func (w *window) apply(b *driver.MountBatch) {
 			continue
 		case driver.ItemTrashFile:
 			w.trashFile(*it.Open, it.Count)
+			continue
+		case driver.ItemQuickLook:
+			w.quickLook(it.QuickLook)
 			continue
 		case driver.ItemShare:
 			w.share(*it.Share, it.Count)
