@@ -554,7 +554,8 @@ func selectionDemo() core.Node {
 		value := core.NewSignal(cx, tr.FormSelectPartOfThisText())
 		rng := core.NewSignal(cx, core.TextRange{})
 		keys := core.NewSignalFunc(cx, []string(nil), slices.Equal)
-		sel := core.NewSignal(cx, core.TextRange{})
+		// Every Set selects again, even the range set last.
+		sel := core.NewSignalFunc[core.TextRange](cx, core.TextRange{}, nil)
 		input := &core.Ref{}
 		selected := func() string {
 			// The range is in UTF-16 units; the demo's text is ASCII
@@ -597,8 +598,14 @@ func selectionDemo() core.Node {
 				}),
 			}},
 			pair(
-				ui.Button{Text: tr.FormSelectAll(), OnPress: func() { sel.Set(core.TextRange{Start: 0, End: core.UTF16Len(value.GetUntracked())}) }},
-				ui.Button{Text: tr.FormCaretToStart(), Variant: ui.ButtonSecondary, OnPress: func() { input.SetSelection(0, 0) }},
+				ui.Button{Text: tr.FormSelectAll(), OnPress: func() {
+					input.Focus()
+					sel.Set(core.TextRange{Start: 0, End: core.UTF16Len(value.GetUntracked())})
+				}},
+				ui.Button{Text: tr.FormCaretToStart(), Variant: ui.ButtonSecondary, OnPress: func() {
+					input.Focus()
+					input.SetSelection(0, 0)
+				}},
 			),
 			formField(fieldProps{label: tr.FormOneTimeCode(), api: "AutoCompleteOneTimeCode"},
 				base.Input{KeyboardType: core.KeyboardNumber, AutoComplete: core.AutoCompleteOneTimeCode, MaxLength: 6, Placeholder: "123456"}),
