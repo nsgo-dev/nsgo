@@ -102,7 +102,7 @@ Windowless rendering and font registration currently support macOS. Other target
 
 `app.Find(selector).Kind` is a `nsgotest.ViewKind`; compare it with constants such as `nsgotest.KindText`, `KindInput`, `KindCanvas` or `KindGPU` when a test needs to inspect the mounted view form.
 
-Headless GPU tests can use `app.Surface("title:Inspector").GPUReadPixels("id:viewport")` for a window's software GPU pixels. `Surface.TriggerGPUDeviceLost` and `Surface.RestoreGPUDevice` simulate loss and recovery in that window, using its pixel ratio. Devices and readback callbacks stay separate even when view IDs repeat across windows; `app.GPUFrames()` records submissions across the whole app. These helpers operate on the headless software GPU model.
+Headless GPU tests can use `app.Surface("title:Inspector").GPUReadPixels("id:viewport")` for a window's software GPU pixels. `Surface.TriggerGPUDeviceLost` and `Surface.RestoreGPUDevice` simulate loss and recovery in that window, using its pixel ratio. Devices and readback callbacks stay separate even when view IDs repeat across windows; `app.GPUFrames()` records submissions across the whole app. With `-- -tags=nsgotest`, `app.GPUDebugEvents("id:viewport")` includes `pass_marker` events for rejected render bindings and skipped draws.
 
 `nsgotest.UpdaterState(core.UpdaterState{...})` seeds updater capability and preferences before the first render, headless and on native targets. Set `app.Update` to supply each check result; preference changes are modeled without contacting an update feed.
 

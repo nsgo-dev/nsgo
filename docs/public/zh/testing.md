@@ -94,7 +94,7 @@ func TestMain(m *testing.M) {
 
 `app.Find(selector).Kind` 的类型是 `nsgotest.ViewKind`。需要检查挂载视图的形式时，可将它与 `nsgotest.KindText`、`KindInput`、`KindCanvas` 或 `KindGPU` 等常量比较。
 
-无头 GPU 测试可用 `app.Surface("title:Inspector").GPUReadPixels("id:viewport")` 读取对应窗口的软件 GPU 像素。`Surface.TriggerGPUDeviceLost` 和 `Surface.RestoreGPUDevice` 模拟该窗口的设备丢失与恢复，并使用该窗口的像素比例。即使不同窗口中的视图 ID 相同，设备和回读回调也各自独立；`app.GPUFrames()` 记录整个应用的提交。这些辅助方法作用于无头软件 GPU 模型。
+无头 GPU 测试可用 `app.Surface("title:Inspector").GPUReadPixels("id:viewport")` 读取对应窗口的软件 GPU 像素。`Surface.TriggerGPUDeviceLost` 和 `Surface.RestoreGPUDevice` 模拟该窗口的设备丢失与恢复，并使用该窗口的像素比例。即使不同窗口中的视图 ID 相同，设备和回读回调也各自独立；`app.GPUFrames()` 记录整个应用的提交。传入 `-- -tags=nsgotest` 后，`app.GPUDebugEvents("id:viewport")` 中的 `pass_marker` 事件会记录被拒绝的渲染绑定和被跳过的绘制。
 
 `nsgotest.UpdaterState(core.UpdaterState{...})` 可在第一次渲染前设置更新器的能力和偏好，适用于无窗口测试及原生目标。通过 `app.Update` 提供每次检查的结果；偏好变更由测试模型处理，不访问更新源。
 

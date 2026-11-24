@@ -19,4 +19,7 @@ func (*RenderPass) pushDebugGroup(string)    {}
 func (*RenderPass) popDebugGroup()           {}
 func (*RenderPass) insertDebugMarker(string) {}
 
+func (*RenderPass) debugRejectedBind(string, uint32) {}
+func (*RenderPass) debugSkippedDraw(string, string, uint32) {}
+
 func appendFrameDebugOps(*driver.GPUFrame, []driver.GPUDebugOp, int) {}

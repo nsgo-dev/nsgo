@@ -294,6 +294,24 @@ func (a *App) GPUReadPixels(selector string) (*image.RGBA, error) {
 	return st.soft.SurfaceImage(), nil
 }
 
+// GPUDebugEvent is a label, group, or marker observed by a headless GPU view.
+type GPUDebugEvent = driver.GPUDebugEvent
+
+// GPUDebugEvents returns a snapshot of the current headless GPU view's debug
+// events, including rejected binds and skipped draws when built with nsgodev
+// or nsgotest. It returns nil if the view has no active software device.
+func (a *App) GPUDebugEvents(selector string) []GPUDebugEvent {
+	a.t.Helper()
+	v := a.Find(selector)
+	if v == nil || v.Kind != KindGPU {
+		return nil
+	}
+	if st := a.gpuViews[v.ID]; st != nil && st.soft != nil {
+		return st.soft.DebugEvents()
+	}
+	return nil
+}
+
 // TriggerGPUDeviceLost simulates a GPU device/context loss on the KindGPU view
 // matching selector and settles the app.
 func (a *App) TriggerGPUDeviceLost(selector string, reason GPUDeviceLostReason, message string) {

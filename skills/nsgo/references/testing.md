@@ -81,7 +81,7 @@ For a headless platform report no step provides, `app.Report` takes an owned `ns
 
 For native headless canvas pixels on macOS, use `nsgotest.Render` on a recorded `Drawing`. Pass `nsgotest.TextEngine(nsgotest.PlatformTextEngine())` to match CoreText metrics, and call `nsgotest.RegisterFont` before starting the app. Rendering waits for images, returns errors and requires resolved view paints and animation slots; other targets return `nsgotest.ErrNoPlayer`. [Windowless drawings](https://nsgo.dev/docs/testing.md#drawings-without-a-window)
 
-For headless GPU checks in another window, use `Surface.GPUReadPixels`, `Surface.TriggerGPUDeviceLost` and `Surface.RestoreGPUDevice`; devices, readbacks and recovery follow that window, including its pixel ratio. `App.GPUFrames` records every window's submissions.
+For headless GPU checks in another window, use `Surface.GPUReadPixels`, `Surface.TriggerGPUDeviceLost` and `Surface.RestoreGPUDevice`; devices, readbacks and recovery follow that window, including its pixel ratio. `App.GPUFrames` records every window's submissions. With `-- -tags=nsgotest`, `App.GPUDebugEvents` records markers for rejected render bindings and skipped draws.
 
 Read mounted image, input, modal, screen, scroll, video and Picture in Picture settings through `nsgotest` records. `View.Sticky` contains `nsgotest.StickyCell` values. Image variant maps and scroll lists are snapshots.
 
