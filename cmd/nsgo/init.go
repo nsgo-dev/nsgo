@@ -34,6 +34,15 @@ func initApp(ctx context.Context, dir, name, module, kind string) error {
 	if _, err := os.Stat(filepath.Join(dir, "nsgo.yaml")); err == nil {
 		return fmt.Errorf("init: %s already has an nsgo.yaml", rel(dir))
 	}
+	if module != "" {
+		standard, err := initModuleCollision(ctx, module)
+		if err != nil {
+			return err
+		}
+		if standard != "" {
+			return fmt.Errorf("init: -module %q conflicts with Go standard library package %q; choose a different -module, such as %q", module, standard, "example.com/"+module)
+		}
+	}
 	id := "dev.nsgo." + strings.ToLower(regexp.MustCompile(`[^A-Za-z0-9]+`).ReplaceAllString(name, ""))
 	slug := strings.Trim(strings.ToLower(regexp.MustCompile(`[^A-Za-z0-9]+`).ReplaceAllString(name, "-")), "-")
 	data := initData{name, id, module, slug}

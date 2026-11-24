@@ -53,6 +53,38 @@ func TestInitModuleTemplate(t *testing.T) {
 		t.Errorf("go.mod.tmpl was copied: %v", err)
 	}
 
+	for _, app := range []struct{ name, slug, id, module string }{
+		{"Time", "time", "dev.nsgo.time", "example.com/time"},
+		{"My Game", "my-game", "dev.nsgo.mygame", "my-game"},
+	} {
+		t.Run(app.name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "app")
+			if err := initApp(t.Context(), dir, app.name, "", module+"@v1.0.0"); err != nil {
+				t.Fatal(err)
+			}
+			for name, want := range map[string]string{
+				"go.mod":    "module " + app.module + "\n\ngo 1.27.3\n",
+				"main.go":   fmt.Sprintf("package main\nfunc main() { println(%q) }\n", app.slug),
+				"nsgo.yaml": fmt.Sprintf("name: %q\nid: %s\nversion: 0.1.0\n", app.name, app.id),
+			} {
+				got, err := os.ReadFile(filepath.Join(dir, name))
+				if err != nil || string(got) != want {
+					t.Errorf("%s = %q, %v; want %q", name, got, err, want)
+				}
+			}
+		})
+	}
+
+	t.Run("inferred module without go.mod.tmpl", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "app")
+		if err := initApp(t.Context(), dir, "Time", "", module+"@v1.1.0"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); !os.IsNotExist(err) {
+			t.Errorf("inferred module wrote go.mod: %v", err)
+		}
+	})
+
 	dir = filepath.Join(t.TempDir(), "mygame")
 	if err := initApp(t.Context(), dir, "", "example.com/latestgame", module); err != nil {
 		t.Fatal(err)
@@ -85,6 +117,20 @@ func TestInitModuleTemplate(t *testing.T) {
 	t.Setenv("GOPROXY", "direct")
 	if _, err := downloadInitModule(t.Context(), module+"@v1.2.0"); err == nil || !strings.Contains(err.Error(), "GOPROXY=off") {
 		t.Errorf("proxy disabled: %v", err)
+	}
+}
+
+func TestInitModuleTemplateRejectsStandardLibraryModule(t *testing.T) {
+	t.Setenv("GOPROXY", "off")
+	t.Setenv("GOMODCACHE", t.TempDir())
+	dir := filepath.Join(t.TempDir(), "app")
+	err := initApp(t.Context(), dir, "My Game", "time", "example.com/template@v1.0.0")
+	if err == nil || !strings.Contains(err.Error(), `-module "time" conflicts with Go standard library package "time"`) ||
+		!strings.Contains(err.Error(), "choose a different -module") {
+		t.Errorf("init with -module time and an unavailable template: %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("init created the destination: %v", err)
 	}
 }
 

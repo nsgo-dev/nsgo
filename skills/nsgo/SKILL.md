@@ -31,6 +31,7 @@ go tool nsgo doctor        # which targets this machine builds and runs, and wha
 ```
 
 Use `-template <module>[@version]` to scaffold from a module's published [template directory](https://nsgo.dev/docs/getting-started.md#templates-from-go-modules).
+For module templates, `.Module` defaults to the app slug, prefixed with `example.com/` if it conflicts with the Go standard library. With any template, choose a `-module` that neither matches a standard library import path nor is a slash-separated prefix of one.
 
 With hot reload, saving a file embedded in a Go-only app rebuilds and restarts it; saving only TSX bundle inputs updates the running app in place. [Running and debugging](https://nsgo.dev/docs/debugging.md#run)
 

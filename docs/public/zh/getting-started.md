@@ -36,6 +36,8 @@ go tool nsgo init
 
 `go tool nsgo init -template tsx` 会生成 TSX 应用，`-template mixed` 则生成一个入口用 TSX、内部使用 Go 组件的应用。
 
+无论使用哪种模板，如果 `-module` 与 Go 标准库的导入路径相同，或是以 `/` 为分隔符的路径前缀（如 `archive/tar` 的 `archive`），`init` 都会拒绝该值。请选择其他路径，例如 `example.com/hello`。
+
 ### 来自 Go 模块的模板
 
 传入模板的模块路径，可以附带版本。省略版本时，使用 Go 模块代理能找到的最新版本。
@@ -46,7 +48,9 @@ go tool nsgo init -template example.com/my-template@v1.2.0 -module example.com/h
 
 把起始项目放在模块的 `template/` 目录里发布，其中要有 `nsgo.yaml` 和 `main.go`。工具用 Go 的 `text/template` 渲染这两个文件以及所有以 `.tmpl` 结尾的文件，并去掉输出文件名里的 `.tmpl`；其他文件（包括二进制资源）原样复制。
 
-模板可以使用 `.Name`（应用的显示名称）、`.ID`（生成的应用 id）、`.Slug`（小写、以连字符连接的名称）和 `.Module`（`-module` 的值，未指定时为 slug）。Go 下载模块时会排除含有 `go.mod` 的子目录，所以要用 `go.mod.tmpl` 声明生成的应用的模块和依赖。没有它时，`-module` 会像内置模板一样写出一个最简的 `go.mod`。
+模板可以使用 `.Name`（应用的显示名称）、`.ID`（生成的应用 id）、`.Slug`（小写、以连字符连接的名称）和 `.Module`。指定 `-module` 时，`.Module` 使用该值；否则使用 slug。如果 slug 与标准库冲突，就在前面加上 `example.com/`。例如，名为 `Time` 的应用会得到 `example.com/time`，但 slug 和应用 id 不变。
+
+Go 下载模块时会排除含有 `go.mod` 的子目录，所以要用 `go.mod.tmpl` 声明生成的应用的模块和依赖。没有它时，`-module` 会像内置模板一样写出一个最简的 `go.mod`。
 
 ## 运行应用
 

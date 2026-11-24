@@ -15,6 +15,38 @@ import (
 	"text/template"
 )
 
+// A module can shadow a standard-library package at its root or beneath it.
+func initModuleCollision(ctx context.Context, module string) (string, error) {
+	first, _, _ := strings.Cut(module, "/")
+	if strings.Contains(first, ".") {
+		return "", nil
+	}
+	args := []string{"list", "-find", "-e", "-f", "{{if .Standard}}{{.ImportPath}}{{end}}", "--", "std"}
+	// Listing a literal candidate too detects packages that std omits on this
+	// host (such as syscall/js). -e allows an absent candidate.
+	if module != "all" && module != "cmd" && module != "std" &&
+		fs.ValidPath(module) && !strings.ContainsAny(module, `\:`) && !strings.Contains(module, "...") {
+		args = append(args, module)
+	}
+	cmd := exec.CommandContext(ctx, "go", args...)
+	// The caller's module, workspace and build flags must not affect the list.
+	cmd.Env = append(os.Environ(), "GO111MODULE=off", "GOENV=off", "GOFLAGS=", "GOTOOLCHAIN=local", "GOWORK=off")
+	out, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) != 0 {
+			return "", fmt.Errorf("init: list Go standard library packages: %w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
+		return "", fmt.Errorf("init: list Go standard library packages: %w", err)
+	}
+	for path := range strings.FieldsSeq(string(out)) {
+		if suffix, ok := strings.CutPrefix(path, module); ok && (suffix == "" || suffix[0] == '/') {
+			return path, nil
+		}
+	}
+	return "", nil
+}
+
 func initModuleTemplate(ctx context.Context, dir, kind string, data initData) error {
 	module, version, hasVersion := strings.Cut(kind, "@")
 	domain, _, _ := strings.Cut(module, "/")
@@ -23,6 +55,17 @@ func initModuleTemplate(ctx context.Context, dir, kind string, data initData) er
 	}
 	if !hasVersion {
 		version = "latest"
+	}
+	explicitModule := data.Module != ""
+	if !explicitModule {
+		data.Module = data.Slug
+		standard, err := initModuleCollision(ctx, data.Module)
+		if err != nil {
+			return err
+		}
+		if standard != "" {
+			data.Module = "example.com/" + data.Slug
+		}
 	}
 	moduleDir, err := downloadInitModule(ctx, module+"@"+version)
 	if err != nil {
@@ -34,7 +77,7 @@ func initModuleTemplate(ctx context.Context, dir, kind string, data initData) er
 	}
 	defer src.Close()
 
-	files, err := moduleTemplateFiles(src.FS(), data)
+	files, err := moduleTemplateFiles(src.FS(), data, explicitModule)
 	if err != nil {
 		return fmt.Errorf("init: template %s: %w", kind, err)
 	}
@@ -113,11 +156,7 @@ type moduleTemplateFile struct {
 }
 
 // Read and render every template before opening any destination file.
-func moduleTemplateFiles(src fs.FS, data initData) ([]moduleTemplateFile, error) {
-	moduleFlag := data.Module != ""
-	if !moduleFlag {
-		data.Module = data.Slug
-	}
+func moduleTemplateFiles(src fs.FS, data initData, explicitModule bool) ([]moduleTemplateFile, error) {
 	var files []moduleTemplateFile
 	seen := make(map[string]bool)
 	err := fs.WalkDir(src, ".", func(name string, entry fs.DirEntry, err error) error {
@@ -164,7 +203,7 @@ func moduleTemplateFiles(src fs.FS, data initData) ([]moduleTemplateFile, error)
 	if hasModuleEntry && !hasModuleFile {
 		return nil, fmt.Errorf("go.mod is a directory")
 	}
-	if moduleFlag && !hasModuleEntry {
+	if explicitModule && !hasModuleEntry {
 		var content bytes.Buffer
 		if err := initMod.Execute(&content, data); err != nil {
 			return nil, err

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -56,6 +57,35 @@ func TestInitTemplates(t *testing.T) {
 			}
 			run("test", ".")
 		})
+	}
+}
+
+func TestInitBuiltinRejectsStandardLibraryModule(t *testing.T) {
+	t.Setenv("GOFLAGS", "-mod=vendor")
+	for _, module := range []string{"time", "archive", "syscall/js"} {
+		t.Run(module, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "app")
+			err := initApp(t.Context(), dir, "My App", module, "go")
+			if err == nil || !strings.Contains(err.Error(), `-module "`+module+`" conflicts with Go standard library package`) ||
+				!strings.Contains(err.Error(), "choose a different -module") {
+				t.Errorf("init with -module %s: %v", module, err)
+			}
+			if _, err := os.Stat(dir); !os.IsNotExist(err) {
+				t.Errorf("init created the destination: %v", err)
+			}
+		})
+	}
+}
+
+func TestInitBuiltinAllowsNonconflictingModule(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "app")
+	const module = "time/clock"
+	if err := initApp(t.Context(), dir, "My App", module, "go"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil || !strings.HasPrefix(string(got), "module "+module+"\n") {
+		t.Errorf("go.mod = %q, %v; want module %s", got, err, module)
 	}
 }
 
