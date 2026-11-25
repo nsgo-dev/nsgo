@@ -295,7 +295,13 @@ func (a *App) GPUReadPixels(selector string) (*image.RGBA, error) {
 }
 
 // GPUDebugEvent is a label, group, or marker observed by a headless GPU view.
-type GPUDebugEvent = driver.GPUDebugEvent
+// It is owned by nsgotest so callers do not depend on the internal driver
+// protocol used by the software device.
+type GPUDebugEvent struct {
+	Kind  string
+	Label string
+	Depth int
+}
 
 // GPUDebugEvents returns a snapshot of the current headless GPU view's debug
 // events, including rejected binds and skipped draws when built with nsgodev
@@ -307,7 +313,12 @@ func (a *App) GPUDebugEvents(selector string) []GPUDebugEvent {
 		return nil
 	}
 	if st := a.gpuViews[v.ID]; st != nil && st.soft != nil {
-		return st.soft.DebugEvents()
+		events := st.soft.DebugEvents()
+		out := make([]GPUDebugEvent, len(events))
+		for i, event := range events {
+			out[i] = GPUDebugEvent{Kind: event.Kind, Label: event.Label, Depth: event.Depth}
+		}
+		return out
 	}
 	return nil
 }
