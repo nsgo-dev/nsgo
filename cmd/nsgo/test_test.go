@@ -1082,3 +1082,67 @@ func TestToolFailureIsTheMessage(t *testing.T) {
 		}
 	}
 }
+
+// TestFailureOutputPreservesIndentation checks that testRun.print keeps
+// indentation in unindented failure output such as Example got/want blocks
+// while still stripping go test's four-space padding from t.Log/t.Error
+// messages and subtests.
+func TestFailureOutputPreservesIndentation(t *testing.T) {
+	var out bytes.Buffer
+	r := &testRun{running: map[string]*testResult{}, packages: map[string]*testResult{}, out: &out}
+	r.read(strings.NewReader(`{"Action":"run","Package":"p","Test":"ExampleIndent"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"=== RUN   ExampleIndent\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"--- FAIL: ExampleIndent (0.00s)\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"got:\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"a:\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"    b: 1\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"        c: 2\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"    d: 3\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"want:\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"a:\n"}
+{"Action":"output","Package":"p","Test":"ExampleIndent","Output":"    b: 2\n"}
+{"Action":"fail","Package":"p","Test":"ExampleIndent","Elapsed":0}
+{"Action":"run","Package":"p","Test":"TestLog"}
+{"Action":"output","Package":"p","Test":"TestLog","Output":"=== RUN   TestLog\n"}
+{"Action":"output","Package":"p","Test":"TestLog","Output":"    log_test.go:10: multi\n"}
+{"Action":"output","Package":"p","Test":"TestLog","Output":"            indented\n"}
+{"Action":"output","Package":"p","Test":"TestLog","Output":"        after\n"}
+{"Action":"output","Package":"p","Test":"TestLog","Output":"    log_test.go:11: failed\n"}
+{"Action":"output","Package":"p","Test":"TestLog","Output":"--- FAIL: TestLog (0.00s)\n"}
+{"Action":"run","Package":"p","Test":"TestLog/sub"}
+{"Action":"output","Package":"p","Test":"TestLog/sub","Output":"=== RUN   TestLog/sub\n"}
+{"Action":"output","Package":"p","Test":"TestLog/sub","Output":"    log_test.go:13: sub error\n"}
+{"Action":"output","Package":"p","Test":"TestLog/sub","Output":"        line2\n"}
+{"Action":"output","Package":"p","Test":"TestLog/sub","Output":"--- FAIL: TestLog/sub (0.00s)\n"}
+{"Action":"fail","Package":"p","Test":"TestLog/sub","Elapsed":0}
+{"Action":"fail","Package":"p","Test":"TestLog","Elapsed":0}
+{"Action":"fail","Package":"p","Elapsed":0.1}
+`))
+	err := r.finish(testOptions{}, nil)
+	if err == nil || err.Error() != "2 tests failed" {
+		t.Fatalf("finish = %v, want 2 tests failed", err)
+	}
+	want := margin + "✗ ExampleIndent (0s)\n" +
+		margin + "    got:\n" +
+		margin + "    a:\n" +
+		margin + "        b: 1\n" +
+		margin + "            c: 2\n" +
+		margin + "    \n" +
+		margin + "        d: 3\n" +
+		margin + "    want:\n" +
+		margin + "    a:\n" +
+		margin + "        b: 2\n" +
+		margin + "✗ TestLog/sub (0s)\n" +
+		margin + "    log_test.go:13: sub error\n" +
+		margin + "        line2\n" +
+		margin + "✗ TestLog (0s)\n" +
+		margin + "    log_test.go:10: multi\n" +
+		margin + "            indented\n" +
+		margin + "        after\n" +
+		margin + "    log_test.go:11: failed\n" +
+		margin + "0 passed, 2 failed, 0 skipped\n"
+	if out.String() != want {
+		t.Fatalf("output:\n%s\nwant:\n%s", out.String(), want)
+	}
+}

@@ -647,13 +647,34 @@ func (r *testRun) benchmark(t *testResult) {
 func (r *testRun) print(t *testResult) {
 	mark := map[string]string{"pass": "✓", "fail": "✗", "skip": "-"}[t.Status]
 	fmt.Fprintf(r.out, "%s%s %s (%s)\n", margin, mark, t.Name, t.Elapsed.Round(time.Millisecond))
-	if t.Status == "fail" {
-		for _, line := range strings.Split(strings.TrimRight(t.Output, "\n"), "\n") {
-			if goTestLine(line) {
-				continue
-			}
-			fmt.Fprintf(r.out, "%s    %s\n", margin, strings.TrimPrefix(line, "    "))
+	if t.Status != "fail" {
+		return
+	}
+	// Strip only the space indentation common to every non-empty output line
+	// (the padding go test adds to t.Log / t.Error), so unindented Example
+	// got/want blocks and raw stdout keep their relative indentation.
+	var lines []string
+	common := -1
+	for _, line := range strings.Split(strings.TrimRight(t.Output, "\n"), "\n") {
+		if goTestLine(line) {
+			continue
 		}
+		lines = append(lines, line)
+		if line != "" {
+			n := len(line) - len(strings.TrimLeft(line, " "))
+			if common < 0 || n < common {
+				common = n
+			}
+		}
+	}
+	if common < 0 {
+		common = 0
+	}
+	for _, line := range lines {
+		if line != "" {
+			line = line[common:]
+		}
+		fmt.Fprintf(r.out, "%s    %s\n", margin, line)
 	}
 }
 
