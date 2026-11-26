@@ -51,7 +51,7 @@ if err := core.CheckURL(url); err == nil {
 }
 ```
 
-`cx.OpenFile` 用系统关联的应用打开应用持有的文件，`cx.Share` 在 macOS、iOS、Android、Windows、Linux（通过桌面门户或文件管理器）与 Web（`navigator.share`）上显示系统分享面板，可以分享文件、文本或两者。`core.SharedFile` 是磁盘上的路径——在 Web 上或应用持有内存字节时也可以直接通过 `Data` 传入——以及另一个应用看到的名称和类型。在桌面上，`desktop.RevealFile` 在访达、资源管理器或文件管理器中选中显示一个文件或文件夹，`desktop.TrashFile` 把它移到废纸篓或回收站；它从不永久删除，卷没有废纸篓或废纸篓容不下该项目（例如比回收站还大的文件）时回答 `core.ErrNoTrash`，项目留在原处。
+`cx.OpenFile` 用系统关联的应用打开应用持有的文件，`cx.Share` 在 macOS、iOS、Android、Windows、Linux（通过桌面门户或文件管理器）与 Web（`navigator.share`）上显示系统分享面板，可以分享文件、文本或两者。磁盘上的文件使用 `core.SharedFile.Path`；`Share` 也可以通过 `Data` 传入内存中的字节。在桌面上，`desktop.RevealFile` 在访达、资源管理器或文件管理器中选中显示一个文件或文件夹，`desktop.TrashFile` 把它移到废纸篓或回收站；它从不永久删除，卷没有废纸篓或废纸篓容不下该项目（例如比回收站还大的文件）时回答 `core.ErrNoTrash`，项目留在原处。
 
 ```go
 cx.Share(core.ShareOptions{
@@ -59,6 +59,10 @@ cx.Share(core.ShareOptions{
 	Text:  "来自 NSGo 的笔记",
 }, func(shown bool, err error) {})
 ```
+
+在 Android 上，这两个服务也接受 `core.SharedFile{URI: documentURI}`，用于传递应用已经有权读取的 `content://` URI，例如启用 `Preflight` 的 `cx.SaveFile` 保存成功后返回的 URI。该文件的 `Path` 和 `Data` 必须留空。一次分享可以同时包含 URI、路径和内存字节三种来源的文件。未指定 `MIME` 时，Android 会向内容提供者查询，查不到则使用 `application/octet-stream`；`Name` 可以作为分享标签，但不会改变内容提供者中的文件名。
+
+接收应用只获得临时读取权限，不会复制文件。缺少读取权限、权限已撤销，或在其他平台使用 `URI` 都会返回错误。Android 上的 `Path` 仍必须位于应用自己的存储目录内；对于其他内容提供者的文档，请使用 `URI`，而不是 `file:` URL。
 
 `mobile.OnShared(cx, func(items []mobile.SharedItem) { ... })` 接收 [`android.share_types`](building.md#接收-android-分享) 或 [`apple.share_types`](building.md#接收-ios-分享) 声明的文本和文件。Android 分享可以启动应用；iOS 将批次保存在 App Group 中，等应用处于活动状态或用户下次正常打开。待处理的分享会等到第一个处理函数注册。iOS 在回调返回之前保留批次；跨进程退出时按至少一次语义交付。文本放在 `Text`，文件会复制到缓存，并带有 `Path`、`Name` 和 `MIME`。如需长期保留文件，请移到或复制到持久存储。
 

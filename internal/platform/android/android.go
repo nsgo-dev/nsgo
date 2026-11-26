@@ -781,7 +781,7 @@ func (s *surface) stage(id uint32, b *driver.MountBatch) {
 			r := *it.Share
 			var files []driver.SharedFile
 			for j, f := range r.Files {
-				if f.Path != "" {
+				if f.Path != "" || f.URI != "" {
 					continue
 				}
 				if files == nil {
@@ -1906,11 +1906,9 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.flags(it.On)
 			w.str(it.Value)
 		case driver.ItemOpenFile:
-			// The file, the name the app opening it sees and its type.
+			// The source, the name the app opening it sees and its type.
 			w.u32(it.Count)
-			w.str(it.Open.Path)
-			w.str(it.Open.Name)
-			w.str(it.Open.MIME)
+			writeSharedFile(w, it.Open)
 		case driver.ItemInstallPackage:
 			// The APK, under its name.
 			w.u32(it.Count)
@@ -1926,10 +1924,8 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			w.u32(it.Count)
 			w.str(it.Share.Text)
 			w.u32(uint32(len(it.Share.Files)))
-			for _, f := range it.Share.Files {
-				w.str(f.Path)
-				w.str(f.Name)
-				w.str(f.MIME)
+			for i := range it.Share.Files {
+				writeSharedFile(w, &it.Share.Files[i])
 			}
 		case driver.ItemAppearance:
 			w.byte(byte(it.Appearance))
@@ -2008,6 +2004,21 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 		}
 	}
 	writeBatchFooter(w, b)
+}
+
+// writeSharedFile keeps the original path/name/MIME layout. A NUL before a
+// content URI distinguishes it from disk paths; old runtimes reject it as an
+// invalid file path without misreading any subsequent items.
+func writeSharedFile(w *writer, f *driver.SharedFile) {
+	if f.URI != "" {
+		w.u32(uint32(len(f.URI) + 1))
+		w.byte(0)
+		w.buf = append(w.buf, f.URI...)
+	} else {
+		w.str(f.Path)
+	}
+	w.str(f.Name)
+	w.str(f.MIME)
 }
 
 // sendFonts tells Java the app's font files, paths in the APK's assets,

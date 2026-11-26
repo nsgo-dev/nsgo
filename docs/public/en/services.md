@@ -51,7 +51,7 @@ if err := core.CheckURL(url); err == nil {
 }
 ```
 
-`cx.OpenFile` opens a file the app has in the app associated with its type, and `cx.Share` shows the system's share sheet for files, text or both across macOS, iOS, Android, Windows, Linux (through the desktop portal or file manager) and the web (`navigator.share`). A `core.SharedFile` is a path on disk — or, for `Share` on the web and anywhere a file is held in memory, its `Data` bytes — with the name and type the other app sees. On desktops, `desktop.RevealFile` shows a file or folder selected in Finder, Explorer or the file manager, and `desktop.TrashFile` moves it to the Trash or Recycle Bin; it never deletes permanently, answering `core.ErrNoTrash` and leaving the item in place where the volume has no trash or the trash would not keep it, such as a file larger than the Recycle Bin.
+`cx.OpenFile` opens a file the app has in the app associated with its type, and `cx.Share` shows the system's share sheet for files, text or both across macOS, iOS, Android, Windows, Linux (through the desktop portal or file manager) and the web (`navigator.share`). Pass a disk path as `core.SharedFile.Path`, or in-memory `Data` for `Share`. On desktops, `desktop.RevealFile` shows a file or folder selected in Finder, Explorer or the file manager, and `desktop.TrashFile` moves it to the Trash or Recycle Bin; it never deletes permanently, answering `core.ErrNoTrash` and leaving the item in place where the volume has no trash or the trash would not keep it, such as a file larger than the Recycle Bin.
 
 ```go
 cx.Share(core.ShareOptions{
@@ -59,6 +59,10 @@ cx.Share(core.ShareOptions{
 	Text:  "A note from NSGo",
 }, func(shown bool, err error) {})
 ```
+
+On Android, either service also accepts `core.SharedFile{URI: documentURI}` for a `content://` URI the app already has permission to read, for example the one returned by `cx.SaveFile` after a successful save with `Preflight`. Leave `Path` and `Data` unset for that file. `Share` can include URI-backed files alongside path- or byte-backed files. Without `MIME`, Android asks the provider, then falls back to `application/octet-stream`; `Name` can label the share but cannot rename the provider's file.
+
+The receiving app gets temporary read access without copying the file. A missing or revoked grant is an error, as is using `URI` on another platform. Android paths still have to be inside the app's own storage; use `URI`, not a `file:` URL, for a document from another provider.
 
 `mobile.OnShared(cx, func(items []mobile.SharedItem) { ... })` receives text and files for [`android.share_types`](building.md#incoming-shares-on-android) or [`apple.share_types`](building.md#incoming-shares-on-ios). Android shares can start the app; iOS queues them in an App Group until the app is active or the user next opens it. Pending shares wait for the first handler. iOS retains the inbox batch until the callback returns; delivery is at least once across a process exit. Text arrives in `Text`, and files arrive as readable cache copies with `Path`, `Name` and `MIME`. Move or copy a file to persistent storage if it needs to outlive the cache.
 

@@ -6,10 +6,12 @@ import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
+import android.content.ContentProviderClient;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -17,10 +19,13 @@ import android.graphics.ImageDecoder;
 import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Process;
+import android.os.RemoteException;
 import android.os.ext.SdkExtensions;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.text.TextUtils;
 import android.util.Base64;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -188,45 +193,71 @@ final class Services {
         }
     }
 
-    /**
-     * Opens the file at path in the app the system associates with mime,
-     * which reads it as name through a URI granted to it; false when no
-     * app opens it. error says what failed otherwise.
-     */
-    static boolean openFile(Context context, String path, String name, String mime, String[] error) {
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        try {
-            intent.setDataAndType(FileProvider.uri(context, new File(path), name, mime), mime);
-        } catch (IOException e) {
-            error[0] = e.getMessage();
-            return false;
+    /** A content URI is tagged with NUL, which old runtimes reject as an invalid path. */
+    static boolean isContentSource(String source) {
+        return !source.isEmpty() && source.charAt(0) == 0;
+    }
+
+    private static Uri contentSource(Context context, String source) throws IOException {
+        Uri uri = Uri.parse(source.substring(1));
+        if (!ContentResolver.SCHEME_CONTENT.equals(uri.getScheme()) || TextUtils.isEmpty(uri.getAuthority())) {
+            throw new IOException("a shared file URI must use content:// with an authority");
         }
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            context.startActivity(intent);
-            return true;
-        } catch (ActivityNotFoundException e) {
-            return false;
-        } catch (RuntimeException e) {
-            error[0] = String.valueOf(e.getMessage());
-            return false;
+        // The chooser may itself be allowed to read the URI. Check the sender's
+        // access before showing it: a type lookup is not proof of read access.
+        int pid = Process.myPid(), uid = Process.myUid(), read = Intent.FLAG_GRANT_READ_URI_PERMISSION;
+        if (Build.VERSION.SDK_INT >= 35) {
+            if (context.checkContentUriPermissionFull(uri, pid, uid, read) != PackageManager.PERMISSION_GRANTED) {
+                throw new SecurityException("the app has no read permission for " + uri);
+            }
+        } else if (context.checkUriPermission(uri, pid, uid, read) != PackageManager.PERMISSION_GRANTED) {
+            // Before API 35 the check only knows explicit grants, not ordinary
+            // provider permissions. Verify those by opening and closing, without reading bytes.
+            try (AssetFileDescriptor file = context.getContentResolver().openAssetFileDescriptor(uri, "r")) {
+                if (file == null) throw new IOException("the provider cannot open " + uri);
+            }
+        }
+        return uri;
+    }
+
+    private static String contentType(Context context, Uri uri, String mime) throws RemoteException {
+        if (!mime.isEmpty()) return mime;
+        // ContentResolver.getType can hide a provider's SecurityException as
+        // a null result. Query the provider directly to report its refusal.
+        try (ContentProviderClient provider = context.getContentResolver().acquireUnstableContentProviderClient(uri)) {
+            String type = provider != null ? provider.getType(uri) : null;
+            return TextUtils.isEmpty(type) ? "application/octet-stream" : type;
         }
     }
 
-    /**
-     * Shows the system's share sheet for text and the files at paths,
-     * which the app chosen reads under names through URIs granted to it;
-     * it returns what failed, "" once the sheet shows.
-     */
-    static String share(Context context, String text, String[] paths, String[] names, String[] mimes) {
-        ArrayList<Uri> uris = new ArrayList<>();
-        try {
-            for (int i = 0; i < paths.length; i++) {
-                uris.add(FileProvider.uri(context, new File(paths[i]), names[i], mimes[i]));
+    /** The view intent for a path in app storage or a readable content URI. */
+    static Intent openFileIntent(Context context, String source, String name, String mime)
+            throws IOException, RemoteException {
+        Uri uri;
+        if (isContentSource(source)) {
+            uri = contentSource(context, source);
+            mime = contentType(context, uri, mime);
+        } else {
+            uri = FileProvider.uri(context, new File(source), name, mime);
+        }
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, mime);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return intent;
+    }
+
+    /** The share chooser for text, paths in app storage and readable content URIs. */
+    static Intent shareIntent(Context context, String text, String[] sources, String[] names, String[] mimes)
+            throws IOException, RemoteException {
+        ArrayList<Uri> uris = new ArrayList<>(sources.length);
+        for (int i = 0; i < sources.length; i++) {
+            if (isContentSource(sources[i])) {
+                Uri uri = contentSource(context, sources[i]);
+                mimes[i] = contentType(context, uri, mimes[i]);
+                uris.add(uri);
+            } else {
+                uris.add(FileProvider.uri(context, new File(sources[i]), names[i], mimes[i]));
             }
-        } catch (IOException e) {
-            return e.getMessage();
         }
         Intent intent = new Intent(uris.size() > 1 ? Intent.ACTION_SEND_MULTIPLE : Intent.ACTION_SEND);
         intent.setType(uris.isEmpty() ? "text/plain" : commonType(mimes));
@@ -241,14 +272,7 @@ final class Services {
             intent.setClipData(clip);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         }
-        Intent chooser = Intent.createChooser(intent, null);
-        if (!(context instanceof Activity)) chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            context.startActivity(chooser);
-            return "";
-        } catch (RuntimeException e) {
-            return String.valueOf(e.getMessage());
-        }
+        return Intent.createChooser(intent, null);
     }
 
     /** The permission an app installing packages asks for in its manifest. */

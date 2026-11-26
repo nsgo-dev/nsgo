@@ -4,6 +4,7 @@ import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.UiModeManager;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -46,6 +47,7 @@ import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.RemoteException;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.InputType;
@@ -2035,6 +2037,59 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     /** Answers a file pick with its files' lines, or a save with whether it saved; error says what failed. */
     private void answerDocuments(Services.Documents d, String files, String error, boolean saved) {
         event(Protocol.EVENT_FILES, 0, d.count, 0, 0, error, 0, 0, 0, 0, 0, 0, 0, null, 0, 0, false, files, saved);
+    }
+
+    @FunctionalInterface
+    private interface FileIntent {
+        Intent prepare(Context context) throws IOException, RemoteException;
+    }
+
+    /** Provider calls may block; build URI intents off the UI thread and launch them on it. */
+    private void presentFileIntent(long count, boolean sharing, boolean content, FileIntent prepare) {
+        Activity activity = activity();
+        Context context = activity != null ? activity : getContext();
+        long generation = attachment.token();
+        Runnable work = () -> {
+            Intent intent;
+            try {
+                intent = prepare.prepare(context);
+            } catch (IOException | RemoteException | RuntimeException e) {
+                answerFileIntent(count, e, false);
+                return;
+            }
+            if (content) {
+                ui.post(() -> {
+                    if (files.isShutdown()) return;
+                    if (attachment.token() != generation) {
+                        answerFileIntent(count, new IOException("the file request's view detached"), false);
+                        return;
+                    }
+                    launchFileIntent(context, count, sharing, intent);
+                });
+            } else {
+                launchFileIntent(context, count, sharing, intent);
+            }
+        };
+        if (content) files.execute(work);
+        else work.run();
+    }
+
+    private void launchFileIntent(Context context, long count, boolean sharing, Intent intent) {
+        if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            context.startActivity(intent);
+            answerFileIntent(count, null, true);
+        } catch (ActivityNotFoundException e) {
+            answerFileIntent(count, sharing ? e : null, false);
+        } catch (RuntimeException e) {
+            answerFileIntent(count, e, false);
+        }
+    }
+
+    private void answerFileIntent(long count, Exception failure, boolean finished) {
+        String error = failure == null ? "" : failure.getMessage();
+        if (failure != null && TextUtils.isEmpty(error)) error = failure.toString();
+        event(Protocol.EVENT_FILES, 0, count, 0, 0, error, 0, 0, 0, 0, 0, 0, 0, null, 0, 0, false, "", finished);
     }
 
     private void checkSaveDestination(Services.Documents d, android.net.Uri tree) {
@@ -4096,11 +4151,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
             }
             case Protocol.ITEM_OPEN_FILE: {
                 long count = in.readInt() & 0xffffffffL;
-                String path = Protocol.readString(in), name = Protocol.readString(in), mime = Protocol.readString(in);
-                Context context = activity() != null ? activity() : getContext();
-                String[] error = {""};
-                boolean opened = Services.openFile(context, path, name, mime, error);
-                event(Protocol.EVENT_FILES, 0, count, 0, 0, error[0], 0, 0, 0, 0, 0, 0, 0, null, 0, 0, false, "", opened);
+                String source = Protocol.readString(in), name = Protocol.readString(in), mime = Protocol.readString(in);
+                presentFileIntent(count, false, Services.isContentSource(source),
+                        context -> Services.openFileIntent(context, source, name, mime));
                 break;
             }
             case Protocol.ITEM_INSTALL_PACKAGE: {
@@ -4135,16 +4188,15 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 long count = in.readInt() & 0xffffffffL;
                 String text = Protocol.readString(in);
                 int files = in.readInt();
-                String[] paths = new String[files], names = new String[files], mimes = new String[files];
+                String[] sources = new String[files], names = new String[files], mimes = new String[files];
+                boolean content = false;
                 for (int i = 0; i < files; i++) {
-                    paths[i] = Protocol.readString(in);
+                    sources[i] = Protocol.readString(in);
+                    content |= Services.isContentSource(sources[i]);
                     names[i] = Protocol.readString(in);
                     mimes[i] = Protocol.readString(in);
                 }
-                Context context = activity() != null ? activity() : getContext();
-                String error = Services.share(context, text, paths, names, mimes);
-                event(Protocol.EVENT_FILES, 0, count, 0, 0, error, 0, 0, 0, 0, 0, 0, 0, null, 0, 0, false, "",
-                        error.isEmpty());
+                presentFileIntent(count, true, content, context -> Services.shareIntent(context, text, sources, names, mimes));
                 break;
             }
             case Protocol.ITEM_APPEARANCE:

@@ -422,10 +422,9 @@ type (
 	// Directory is a folder the user picked, read as an fs.FS: its name,
 	// and where it is on disk where it has a path.
 	Directory = driver.Directory
-	// SharedFile is a file the app hands another app, with OpenFile or
-	// Share: its path on disk (or, for Share, its bytes in Data), and the
-	// name the other app sees and its type, which Path's name and
-	// extension say when empty.
+	// SharedFile is a file the app hands another app with OpenFile or
+	// Share: a Path on disk, Data bytes (Share only), or an Android
+	// content URI. Leave Path and Data unset when using URI.
 	SharedFile = driver.SharedFile
 	// WindowPlacement is the side of a screen rectangle where a panel goes.
 	WindowPlacement = driver.WindowPlacement

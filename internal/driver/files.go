@@ -213,11 +213,15 @@ type SharedFile struct {
 	// Data holds the file's bytes for Share when it is not on disk, such as
 	// on the web; Path takes precedence when set.
 	Data []byte
-	// Name is the file name the other app sees, Path's own unless the app
-	// gave another; the core fills it in.
+	// Name is the file name the other app sees for Path or Data. For URI it
+	// labels the share, but does not change the provider's file name.
 	Name string
-	// MIME is its media type, which the core fills in from Name.
+	// MIME is its media type. Path and Data default to the type of Name;
+	// URI defaults to the provider's type or application/octet-stream.
 	MIME string
+	// URI is an Android content:// URI the app already has read access to.
+	// It is only for OpenFile and Share; leave Path and Data unset.
+	URI string
 }
 
 // ShareRequest is a share as the platform carries it out: files, text,

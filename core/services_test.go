@@ -699,6 +699,114 @@ func TestShare(t *testing.T) {
 	}
 }
 
+func TestOpenShareContentURI(t *testing.T) {
+	var cx *Scope
+	h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node { cx = c; return View{} })
+	h.commit()
+	h.tree.SetEnvironment(Environment{OS: OSAndroid})
+	h.commit()
+	const uri = "content://10@com.android.externalstorage.documents/tree/primary%3ADownload/document/primary%3ADownload%2Freport.pdf?keep=%2f"
+	const denied = "the app has no read permission for the document"
+	path := filepath.Join(t.TempDir(), "local.txt")
+	if err := os.WriteFile(path, []byte("local"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	finished, calls := false, 0
+	var received error
+	done := func(ok bool, err error) { finished, received = ok, err; calls++ }
+
+	// Even a recognizable Name must not set MIME: the provider decides it.
+	cx.OpenFile(SharedFile{URI: uri, Name: "../report.pdf"}, done)
+	it := command(h.commit(), driver.ItemOpenFile)
+	if want := (driver.SharedFile{URI: uri, Name: "report.pdf"}); it == nil || !reflect.DeepEqual(*it.Open, want) {
+		t.Fatalf("open = %+v, want %+v", it, want)
+	}
+	if calls != 0 {
+		t.Fatal("open answered before the platform")
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventFiles, Count: it.Count, Text: denied})
+	if calls != 1 || finished || received == nil || received.Error() != denied {
+		t.Fatalf("denied open = %v, %v (%d callbacks)", finished, received, calls)
+	}
+
+	share := ShareOptions{
+		Files: []SharedFile{
+			{Path: path, Data: []byte("path still takes precedence")},
+			{URI: uri, MIME: "application/pdf"},
+			{Data: []byte("bytes")},
+		},
+		Text: "Documents",
+	}
+	cx.Share(share, done)
+	it = command(h.commit(), driver.ItemShare)
+	want := []driver.SharedFile{
+		{Path: path, Name: "local.txt", MIME: "text/plain"},
+		{URI: uri, Name: "file", MIME: "application/pdf"},
+		{Data: []byte("bytes"), Name: "file", MIME: "application/octet-stream"},
+	}
+	if it == nil || it.Share.Text != share.Text || !reflect.DeepEqual(it.Share.Files, want) {
+		t.Fatalf("mixed share = %+v, want %+v", it, want)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventFiles, Count: it.Count, Finished: true})
+	if calls != 2 || !finished || received != nil {
+		t.Fatalf("shared = %v, %v (%d callbacks)", finished, received, calls)
+	}
+
+	cx.Share(ShareOptions{Files: []SharedFile{{URI: uri}}}, done)
+	it = command(h.commit(), driver.ItemShare)
+	if want := []driver.SharedFile{{URI: uri, Name: "file"}}; it == nil || !reflect.DeepEqual(it.Share.Files, want) {
+		t.Fatalf("content share = %+v, want %+v", it, want)
+	}
+	h.tree.Dispatch(driver.Event{Kind: driver.EventFiles, Count: it.Count, Text: denied})
+	if calls != 3 || finished || received == nil || received.Error() != denied {
+		t.Fatalf("denied share = %v, %v (%d callbacks)", finished, received, calls)
+	}
+}
+
+func TestOpenShareRejectContentURI(t *testing.T) {
+	const uri = "content://provider/document/42"
+	for _, tt := range []struct {
+		name string
+		env  Environment
+		file SharedFile
+		want string
+		code string
+	}{
+		{"file scheme", Environment{OS: OSAndroid}, SharedFile{URI: "file:///sdcard/file"}, "must use content://", ""},
+		{"other scheme", Environment{OS: OSAndroid}, SharedFile{URI: "https://provider/document/42"}, "must use content://", ""},
+		{"opaque", Environment{OS: OSAndroid}, SharedFile{URI: "content:document"}, "must use content://", ""},
+		{"no authority", Environment{OS: OSAndroid}, SharedFile{URI: "content:///document/42"}, "with an authority", ""},
+		{"malformed", Environment{OS: OSAndroid}, SharedFile{URI: "content://provider/document/%"}, "valid content://", ""},
+		{"with path", Environment{OS: OSAndroid}, SharedFile{URI: uri, Path: "/disk/file"}, "cannot be used with Path or Data", ""},
+		{"with bytes", Environment{OS: OSAndroid}, SharedFile{URI: uri, Data: []byte{}}, "cannot be used with Path or Data", ""},
+		{"desktop", Environment{OS: OSMacOS}, SharedFile{URI: uri}, "only supported on Android", CodeUnavailable},
+		{"simulated Android", Environment{OS: OSAndroid, Simulated: true}, SharedFile{URI: uri}, "only supported on Android", CodeUnavailable},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var cx *Scope
+			h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node { cx = c; return View{} })
+			h.commit()
+			h.tree.SetEnvironment(tt.env)
+			h.commit()
+			calls := 0
+			done := func(ok bool, err error) {
+				calls++
+				if ok || err == nil || !strings.Contains(err.Error(), tt.want) || ErrorCode(err) != tt.code {
+					t.Errorf("result = %v, %v; want error containing %q (code %q)", ok, err, tt.want, tt.code)
+				}
+			}
+			cx.OpenFile(tt.file, done)
+			if calls != 1 || command(h.commit(), driver.ItemOpenFile) != nil {
+				t.Fatal("invalid open reached the platform or failed to answer")
+			}
+			cx.Share(ShareOptions{Files: []SharedFile{{Data: []byte("valid first item")}, tt.file}}, done)
+			if calls != 2 || command(h.commit(), driver.ItemShare) != nil {
+				t.Fatal("invalid share reached the platform or failed to answer")
+			}
+		})
+	}
+}
+
 func TestInstallPackage(t *testing.T) {
 	var cx *Scope
 	h := newHost(t, Size{Width: 100, Height: 100}, func(c *Scope) Node { cx = c; return View{} })

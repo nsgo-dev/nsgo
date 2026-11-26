@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -710,10 +711,12 @@ func (cx *Scope) SaveFile(o SaveOptions, done func(saved bool, path string, err 
 	}
 }
 
-// resolveShared returns f as the platform hands it on, with an absolute
-// path or its bytes, a name and a type, or why it cannot be: a file with
-// neither path nor data, one that is not there, or not a regular file.
-func resolveShared(f SharedFile) (driver.SharedFile, error) {
+// resolveShared prepares a path, in-memory file or provider URI for the
+// share sheet.
+func resolveShared(f SharedFile, host OS) (driver.SharedFile, error) {
+	if f.URI != "" {
+		return resolveSharedURI(f, host)
+	}
 	if f.Path != "" {
 		return resolveOpened(f, false)
 	}
@@ -733,8 +736,32 @@ func resolveShared(f SharedFile) (driver.SharedFile, error) {
 	return r, nil
 }
 
-// resolveOpened is resolveShared, taking a folder too when folders is
-// set.
+// resolveSharedURI checks the URI's shape without changing its spelling or
+// inferring a type from the name. Android checks the read grant and type.
+func resolveSharedURI(f SharedFile, host OS) (driver.SharedFile, error) {
+	if f.Path != "" || f.Data != nil {
+		return driver.SharedFile{}, errors.New("core: a shared file URI cannot be used with Path or Data")
+	}
+	if !strings.HasPrefix(f.URI, "content://") {
+		return driver.SharedFile{}, errors.New("core: a shared file URI must use content://")
+	}
+	u, err := url.Parse(f.URI)
+	if err != nil || u.Hostname() == "" {
+		return driver.SharedFile{}, errors.New("core: a shared file URI must be a valid content:// URI with an authority")
+	}
+	if host != OSAndroid {
+		return driver.SharedFile{}, Unavailable("core: shared file content URIs are only supported on Android")
+	}
+	if i := strings.LastIndexAny(f.Name, `/\`); i >= 0 {
+		f.Name = f.Name[i+1:]
+	}
+	if f.Name == "" || f.Name == "." || f.Name == ".." {
+		f.Name = "file"
+	}
+	return f, nil
+}
+
+// resolveOpened prepares a local path, also accepting a folder when folders is set.
 func resolveOpened(f SharedFile, folders bool) (driver.SharedFile, error) {
 	if f.Path == "" {
 		return driver.SharedFile{}, errors.New("core: a shared file has a path")
@@ -774,10 +801,10 @@ func resolveOpened(f SharedFile, folders bool) (driver.SharedFile, error) {
 // manager; phones have none to open it in, and answer an error. done,
 // when not nil, learns whether an app opened it: false with no error
 // when none opens its type, and the error when the file is missing or
-// the platform failed. On Android the file is in the app's own storage,
-// such as DataDir and CacheDir, and the app opening it reads it through
-// a content URI the runtime grants it, until its activity finishes; the
-// file stays the app's to keep there that long and to delete. The web
+// the platform failed. Android accepts a Path in the app's storage or a
+// content URI the app can already read, without making a copy. The
+// receiving app gets a temporary read grant; keep a path-backed file
+// in place while it is in use. Other platforms reject URI, and the web
 // opens no files.
 func (cx *Scope) OpenFile(f SharedFile, done func(opened bool, err error)) {
 	answer := func(opened bool, err error) {
@@ -789,8 +816,14 @@ func (cx *Scope) OpenFile(f SharedFile, done func(opened bool, err error)) {
 	if t == nil {
 		return
 	}
-	os := cx.Env().hostUntracked()
-	r, err := resolveOpened(f, os == OSMacOS || os == OSWindows || os == OSLinux)
+	host := cx.Env().hostUntracked()
+	var r driver.SharedFile
+	var err error
+	if f.URI != "" {
+		r, err = resolveSharedURI(f, host)
+	} else {
+		r, err = resolveOpened(f, host == OSMacOS || host == OSWindows || host == OSLinux)
+	}
 	if err != nil {
 		answer(false, err)
 		return
@@ -910,11 +943,10 @@ type ShareOptions struct {
 // the web and Linux portal, completed rather than being cancelled), with
 // the error when it did not: a missing file, or a platform or browser
 // without a share sheet. That it showed says nothing of what the app the
-// user chose did with what it received. On Android the files are in the
-// app's own storage, such as DataDir and CacheDir, and the app chosen
-// reads them through content URIs the runtime grants it, until its
-// activity finishes; the files stay the app's to keep there that long
-// and to delete.
+// user chose did with what it received. On Android, Path and Data are
+// served from the app's storage; SharedFile.URI can instead pass a
+// content URI the app can already read, without copying. The recipient
+// gets a temporary read grant. Other platforms reject URI.
 func (cx *Scope) Share(o ShareOptions, done func(shown bool, err error)) {
 	answer := func(shown bool, err error) {
 		if done != nil {
@@ -926,8 +958,9 @@ func (cx *Scope) Share(o ShareOptions, done func(shown bool, err error)) {
 		return
 	}
 	r := driver.ShareRequest{Text: o.Text}
+	host := cx.Env().hostUntracked()
 	for _, f := range o.Files {
-		sf, err := resolveShared(f)
+		sf, err := resolveShared(f, host)
 		if err != nil {
 			answer(false, err)
 			return
