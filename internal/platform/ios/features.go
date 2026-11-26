@@ -249,8 +249,8 @@ func switchViewOf(c driver.NativeComponent) objc.ID {
 	return 0
 }
 
-func (*surface) EnableGPU() {
-	if gpus.Load() != nil {
+func (s *surface) EnableGPU() {
+	if !s.env.GPU || gpus.Load() != nil {
 		return
 	}
 	gpus.Store(&gpuOps{
