@@ -143,6 +143,10 @@ type project struct {
 	I18n struct {
 		Dir    string `yaml:"dir"`
 		Source string `yaml:"source"`
+		// Coverage is what build warns about the app's languages that a
+		// catalog does not have: warn, the default, or off for an app that
+		// leaves them to the source knowingly.
+		Coverage string `yaml:"coverage"`
 	} `yaml:"i18n"`
 	// Web is the web target's: Host is a JS module, relative to
 	// nsgo.yaml and inside its directory, whose createHost(player) gives
@@ -477,6 +481,11 @@ func load(dir string) (*project, error) {
 	case "", "light", "dark":
 	default:
 		return nil, fmt.Errorf("nsgo.yaml: appearance is %q; use light, dark or leave it out", p.Appearance)
+	}
+	switch p.I18n.Coverage {
+	case "", "warn", "off":
+	default:
+		return nil, fmt.Errorf("nsgo.yaml: i18n.coverage is %q; use warn or off", p.I18n.Coverage)
 	}
 	if err := p.validateLaunchScreen(); err != nil {
 		return nil, fmt.Errorf("nsgo.yaml: %w", err)

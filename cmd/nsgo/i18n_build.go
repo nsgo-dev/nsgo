@@ -188,18 +188,27 @@ func (cs *catalogSet) checkSupply(f *catalogFile, s *supply) {
 	}
 }
 
-// checkCoverage warns of catalogs without a language the app shows,
-// whose messages show in another language there.
+// checkCoverage warns of catalogs that lack messages in a language the app
+// shows, which then say their source language there. A language counts as
+// covered per key, so a supplied message covers its key alone.
 func (cs *catalogSet) checkCoverage(app *catalog) {
 	if app == nil {
 		return
 	}
-	supplied := map[*catalog][]string{}
+	supplied := map[*catalog]map[string][]string{}
 	for _, c := range cs.order {
 		for _, f := range c.files {
 			for _, s := range f.supplies {
-				if s.target != nil {
-					supplied[s.target] = append(supplied[s.target], f.lang)
+				if s.target == nil {
+					continue
+				}
+				keys := supplied[s.target]
+				if keys == nil {
+					keys = map[string][]string{}
+					supplied[s.target] = keys
+				}
+				for key := range s.msgs {
+					keys[key] = append(keys[key], f.lang)
 				}
 			}
 		}
@@ -208,18 +217,52 @@ func (cs *catalogSet) checkCoverage(app *catalog) {
 		if c == app {
 			continue
 		}
-		have := append(c.languages(), supplied[c]...)
 		var lacking []string
 		for _, lang := range app.languages() {
-			if !matches(lang, have) {
-				lacking = append(lacking, lang)
+			var keys []string
+			for _, key := range c.keys {
+				if matches(lang, append(c.languagesOf(key), supplied[c][key]...)) {
+					continue
+				}
+				keys = append(keys, key)
+			}
+			if len(keys) > 0 {
+				lacking = append(lacking, lackingKeys(lang, keys, len(c.keys)))
 			}
 		}
 		if len(lacking) > 0 {
-			cs.ds.warnf(c.dir, 0, "has no %s, so says %s there; the app's catalogs can supply it under the key %s",
+			cs.ds.warnf(c.dir, 0, "has no %s, so says %s there; the app's catalogs can supply them under the key %s",
 				strings.Join(lacking, ", "), c.source, c.importPath)
 		}
 	}
+}
+
+// lackingKeys says how many of a catalog's keys a language lacks, with the
+// first few of them.
+func lackingKeys(lang string, keys []string, total int) string {
+	if len(keys) == total {
+		return fmt.Sprintf("%s for all %d keys", lang, total)
+	}
+	shown := keys
+	if len(shown) > 3 {
+		shown = shown[:3]
+	}
+	list := strings.Join(shown, ", ")
+	if len(keys) > len(shown) {
+		list += fmt.Sprintf(" and %d more", len(keys)-len(shown))
+	}
+	return fmt.Sprintf("%s for %d of %d keys (%s)", lang, len(keys), total, list)
+}
+
+// languagesOf returns the languages whose file has key.
+func (c *catalog) languagesOf(key string) []string {
+	var langs []string
+	for lang, f := range c.files {
+		if f.msgs[key] != nil {
+			langs = append(langs, lang)
+		}
+	}
+	return langs
 }
 
 // matches reports whether one of langs suits lang, as matching does.
@@ -309,7 +352,9 @@ func (p *project) writeCatalogs(ctx context.Context, pkgs []goPackage, check boo
 		return false, nil
 	}
 	cs.resolve()
-	cs.checkCoverage(app)
+	if p.I18n.Coverage != "off" {
+		cs.checkCoverage(app)
+	}
 	cs.ds.printWarnings()
 	return cs.write(check)
 }
