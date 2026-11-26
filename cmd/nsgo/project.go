@@ -439,8 +439,8 @@ func load(dir string) (*project, error) {
 		return nil, err
 	}
 	p := &project{Dir: abs}
-	if err := yaml.Unmarshal(data, p); err != nil {
-		return nil, fmt.Errorf("nsgo.yaml: %w", err)
+	if err := decodeProject(data, p); err != nil {
+		return nil, err
 	}
 	if p.Name == "" {
 		return nil, fmt.Errorf("nsgo.yaml: name is required")

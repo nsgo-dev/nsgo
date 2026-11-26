@@ -142,6 +142,16 @@ func TestLoadRefusesWindow(t *testing.T) {
 	}
 }
 
+func TestLoadRefusesFPS(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: App\nbuild:\n  fps: 30\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := load(dir); err == nil || !strings.Contains(err.Error(), "nsgo.yaml: fps is gone") {
+		t.Errorf("fps in nsgo.yaml: %v", err)
+	}
+}
+
 func TestDevFlagsApply(t *testing.T) {
 	fs := flag.NewFlagSet("dev", flag.ContinueOnError)
 	f := bindDevFlags(fs)
