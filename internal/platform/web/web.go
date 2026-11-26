@@ -1786,7 +1786,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 				v.gl.release()
 			}
 			if v.gpu != nil {
-				v.gpu.release()
+				if g := gpus.Load(); g != nil {
+					g.release(v.gpu)
+				}
 				v.gpu = nil
 			}
 			if v.web != nil {
@@ -1841,7 +1843,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 					}
 				}
 				if v.kind == driver.KindGPU && v.gpu != nil {
-					s.resizeGPU(v)
+					if g := gpus.Load(); g != nil {
+						g.resize(s, v)
+					}
 				}
 				if v.kind == driver.KindScroll {
 					v.placeContent() // centering and snap points follow the size
@@ -1924,7 +1928,9 @@ func (s *surface) mount(b *driver.MountBatch) {
 			}
 		case driver.ItemGPU:
 			if v.gpu != nil && it.GPU != nil {
-				s.configureGPU(v, *it.GPU)
+				if g := gpus.Load(); g != nil {
+					g.configure(s, v, *it.GPU)
+				}
 			}
 		case driver.ItemScrollTo:
 			if v.kind == driver.KindScroll {
