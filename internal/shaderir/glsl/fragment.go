@@ -8,6 +8,14 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/shaderir"
 )
 
+// FragmentHeader330 and FragmentHeaderES300 are the GLSL 3.30 core and
+// GLSL ES 3.00 version and precision headers platforms prepend before
+// Fragment's library output.
+const (
+	FragmentHeader330   = "#version 330 core\n"
+	FragmentHeaderES300 = "#version 300 es\nprecision highp float;\nprecision highp int;\n"
+)
+
 // Options are how Fragment writes a program for a renderer.
 type Options struct {
 	// FlipY is a boolean expression of the renderer's, true where GL's

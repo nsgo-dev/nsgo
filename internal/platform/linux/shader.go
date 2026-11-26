@@ -509,9 +509,9 @@ func (g *glShaderView) link(p *driver.ShaderProgram) bool {
 	g.deleteGL()
 	g.program, g.failed = p, true
 	ir := p.IR
-	head := "#version 330 core\n"
+	head := glsl.FragmentHeader330
 	if g.es {
-		head = "#version 300 es\nprecision highp float;\nprecision highp int;\n"
+		head = glsl.FragmentHeaderES300
 	}
 	src := head + "\n" + glsl.Fragment(ir, "nsgoShader", glsl.Options{FlipY: "true", Block: "NsgoUniforms"}) +
 		glMainSource

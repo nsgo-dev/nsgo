@@ -304,7 +304,7 @@ func (g *glShader) link(p *driver.ShaderProgram) bool {
 		g.prog = js.Undefined()
 	}
 	ir := p.IR
-	src := "#version 300 es\nprecision highp float;\nprecision highp int;\n\n" +
+	src := glsl.FragmentHeaderES300 + "\n" +
 		glsl.Fragment(ir, "nsgoShader", glsl.Options{FlipY: "true", Block: "NsgoUniforms"}) + glMain
 	compile := func(kind, src string) js.Value {
 		sh := gl.Call("createShader", gl.Get(kind))

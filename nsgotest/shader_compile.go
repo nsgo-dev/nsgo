@@ -13,10 +13,11 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/shaderir/msl"
 )
 
-// TranslateShader translates p into the GPU shader source each fragment backend
-// compiles (MSL, HLSL, GLSL 3.30, and GLSL ES 3.00) using the same options as
-// the platform backends, recovering any translator panic into an error naming
-// the backend.
+// TranslateShader translates p into each fragment backend's nsgoShader library
+// function (MSL, HLSL, GLSL 3.30, and GLSL ES 3.00) using the same options as
+// the platform backends, prepending the GLSL 3.30 core / GLSL ES 3.00 version
+// and precision headers without the platform host stage wrapper, and recovering
+// any translator panic into an error naming the backend.
 func TranslateShader(p *core.ShaderProgram) (ShaderSources, error) {
 	dp := core.DriverShaderProgram(p)
 	if dp == nil || dp.IR == nil {
@@ -53,7 +54,11 @@ func translateFragmentIR(ir *shaderir.Program) (ShaderSources, error) {
 	glslOpts := glsl.Options{FlipY: "true", Block: "NsgoUniforms"}
 	glslSrc, err := runFragmentBackend("GLSL", func() string {
 		_, _ = glsl.UniformLanes(ir)
-		return glsl.Fragment(ir, "nsgoShader", glslOpts)
+		body := glsl.Fragment(ir, "nsgoShader", glslOpts)
+		if body == "" {
+			return ""
+		}
+		return glsl.FragmentHeader330 + "\n" + body
 	})
 	src.GLSL = glslSrc
 	if err != nil {
@@ -62,7 +67,11 @@ func translateFragmentIR(ir *shaderir.Program) (ShaderSources, error) {
 
 	glesSrc, err := runFragmentBackend("GLES", func() string {
 		_, _ = glsl.UniformLanes(ir)
-		return glsl.Fragment(ir, "nsgoShader", glslOpts)
+		body := glsl.Fragment(ir, "nsgoShader", glslOpts)
+		if body == "" {
+			return ""
+		}
+		return glsl.FragmentHeaderES300 + "\n" + body
 	})
 	src.GLES = glesSrc
 	if err != nil {

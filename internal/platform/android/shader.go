@@ -184,7 +184,7 @@ func translate(prog *driver.ShaderProgram) *glProgram {
 		return p
 	}
 	ir := prog.IR
-	p.source = "#version 300 es\nprecision highp float;\nprecision highp int;\n\n" +
+	p.source = glsl.FragmentHeaderES300 + "\n" +
 		glsl.Fragment(ir, "nsgoShader", glsl.Options{FlipY: "true", Block: "NsgoUniforms"}) + glMain
 	p.lanes, p.size = glsl.UniformLanes(ir)
 	for _, t := range ir.LaneTypes() {

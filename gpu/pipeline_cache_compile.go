@@ -50,7 +50,7 @@ func compilePipelineArtifacts(dd driver.GPUPipelineDesc) (*driver.GPUPipelineArt
 		return nil, Error{Code: ErrShaderCompile, Message: "missing shader IR for pipeline compilation"}
 	}
 	art, ps := translatePipelineIR(prog)
-	if ps.MSL == "" && ps.HLSL() == "" && ps.GLSL() == "" && ps.GLES() == "" && ps.WGSL == "" {
+	if ps.empty() {
 		if err := ps.Err(); err != nil {
 			return nil, Error{Code: ErrShaderCompile, Message: err.Error(), Cause: err}
 		}

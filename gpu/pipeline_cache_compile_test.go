@@ -3,6 +3,7 @@
 package gpu
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -148,5 +149,99 @@ func Fragment(dst vec4, pos vec2) vec4 {
 		if bErr == nil || !strings.Contains(bErr.Error(), name) || !strings.Contains(bErr.Error(), "panic:") {
 			t.Errorf("%s panic error = %v, want recovered panic naming %s", name, bErr, name)
 		}
+	}
+
+	// Compute shader succeeds on MSL, HLSL, WGSL and reports GLSL/GLES errors.
+	computeMod := MustCompileWGSL(`
+@group(0) @binding(0) var<storage, read_write> data: array<f32>;
+
+@compute @workgroup_size(4)
+fn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {
+	data[gid.x] = data[gid.x] * 2.0;
+}
+`)
+	cPS, err := TranslateShaderModule(computeMod)
+	if err == nil {
+		t.Fatal("TranslateShaderModule(compute) = nil, want GLSL/GLES errors")
+	}
+	if cPS.MSL == "" || cPS.HLSLCompute == "" || cPS.WGSL == "" {
+		t.Errorf("expected MSL, HLSLCompute, WGSL sources for compute shader, got %+v", cPS)
+	}
+	if cPS.GLSLCompute != "" || cPS.GLESCompute != "" {
+		t.Errorf("expected empty GLSLCompute/GLESCompute for compute shader, got GLSL=%q GLES=%q", cPS.GLSLCompute, cPS.GLESCompute)
+	}
+	if cPS.MSLError != nil || cPS.HLSLError != nil || cPS.WGSLError != nil {
+		t.Errorf("unexpected compute errors on MSL/HLSL/WGSL: msl=%v hlsl=%v wgsl=%v", cPS.MSLError, cPS.HLSLError, cPS.WGSLError)
+	}
+	if cPS.GLSLError == nil || !strings.Contains(cPS.GLSLError.Error(), "GLSL") {
+		t.Errorf("expected GLSLError naming GLSL, got %v", cPS.GLSLError)
+	}
+	if cPS.GLESError == nil || !strings.Contains(cPS.GLESError.Error(), "GLES") {
+		t.Errorf("expected GLESError naming GLES, got %v", cPS.GLESError)
+	}
+}
+
+func TestCreatePipelineAsyncAndCacheReportCompileErrors(t *testing.T) {
+	panicIR := &shaderir.Program{
+		Bindings: []shaderir.Binding{{
+			Kind: shaderir.BindingUniformBuffer,
+			Type: shaderir.Type{Main: shaderir.Array},
+		}},
+		VertexFunc: shaderir.VertexFunc{Block: &shaderir.Block{}},
+	}
+	badMod := &ShaderModule{
+		ir:            panicIR,
+		vertexEntries: []string{"vs_main"},
+	}
+
+	sr := NewSoftwareRenderer(32, 32, FormatUndefined)
+	dev := sr.Device()
+
+	var readyPipe *Pipeline
+	var readyErr error
+	pipe := dev.CreatePipelineAsync(nil, PipelineDesc{
+		Label:   "bad-async",
+		Vertex:  ShaderStage{Module: badMod, EntryPoint: "vs_main"},
+		Targets: []ColorTargetState{{Format: dev.SurfaceFormat()}},
+	}, func(p *Pipeline, err error) {
+		readyPipe = p
+		readyErr = err
+	})
+	if pipe == nil {
+		t.Fatal("CreatePipelineAsync returned nil *Pipeline")
+	}
+	<-pipe.Done()
+
+	if readyPipe != nil {
+		t.Errorf("onReady pipeline = %v, want nil", readyPipe)
+	}
+	if readyErr == nil {
+		t.Fatal("onReady err = nil, want ErrShaderCompile")
+	}
+	var gerr Error
+	if !errors.As(readyErr, &gerr) || gerr.Code != ErrShaderCompile {
+		t.Errorf("onReady err = %v, want Error{Code: ErrShaderCompile}", readyErr)
+	}
+	if !strings.Contains(readyErr.Error(), "panic:") {
+		t.Errorf("onReady err = %q, want recovered panic details", readyErr.Error())
+	}
+	if pipe.Err() == nil {
+		t.Error("pipe.Err() = nil, want compile error")
+	}
+	if pipe.Ready() {
+		t.Error("pipe.Ready() = true after compile failure, want false")
+	}
+
+	cache, err := NewPipelineCache(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewPipelineCache: %v", err)
+	}
+	dev.SetPipelineCache(cache)
+	if _, err := dev.CreatePipeline(nil, PipelineDesc{
+		Label:   "bad-cached",
+		Vertex:  ShaderStage{Module: badMod, EntryPoint: "vs_main"},
+		Targets: []ColorTargetState{{Format: dev.SurfaceFormat()}},
+	}); !errors.As(err, &gerr) || gerr.Code != ErrShaderCompile {
+		t.Errorf("CreatePipeline with PipelineCache err = %v, want Error{Code: ErrShaderCompile}", err)
 	}
 }
