@@ -8,6 +8,7 @@
     "preview": "astro preview",
     "gallery": "bun scripts/build-gallery.mjs",
     "live": "bun scripts/build-live.mjs",
+    "test": "bun test scripts/gallery-download.test.js",
     "typecheck": "astro check",
     "screenshots": "bun scripts/screenshots.mjs",
     "share-cards": "nsgo-website-share-cards"

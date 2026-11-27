@@ -6,11 +6,23 @@
 // leaves the other groups' demos out.
 //
 // public/gallery/ is generated: do not edit it.
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { buildWeb, website } from './web-build.mjs';
 
 const galleryDir = path.join(website, 'public', 'gallery');
+
+// emitModule copies a loader module beside the group pages under its content
+// hash. A cached app.html then never pairs with a newer module.
+function emitModule(name) {
+  const source = readFileSync(path.join(website, 'scripts', name), 'utf8');
+  const hash = createHash('sha256').update(source).digest('hex').slice(0, 10);
+  const file = name.replace(/\.js$/, `-${hash}.js`);
+  mkdirSync(galleryDir, { recursive: true });
+  writeFileSync(path.join(galleryDir, file), source);
+  return `../${file}`;
+}
 
 // The groups, in the gallery's order, named as its index names them.
 export const groups = [
@@ -31,6 +43,9 @@ export const groups = [
 ];
 
 rmSync(galleryDir, { recursive: true, force: true });
+
+const downloader = emitModule('gallery-download.js');
+const store = emitModule('gallery-store.js');
 
 const index = { groups: [] };
 let icon = '';
@@ -53,6 +68,8 @@ for (const group of groups) {
       .replaceAll('__GZIP__', app.gzip)
       .replaceAll('__RESOURCES__', JSON.stringify(app.resources ?? {}))
       .replaceAll('__GZIP_SIZE__', String(app.gzipSize))
+      .replaceAll('__DOWNLOAD__', downloader)
+      .replaceAll('__STORE__', store)
       .replaceAll('__ICON__', icon),
   );
   rmSync(path.join(galleryDir, group.id, 'index.html'));

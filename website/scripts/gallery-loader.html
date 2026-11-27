@@ -149,7 +149,10 @@
     </div>
 
     <script src="__EXEC__"></script>
-    <script>
+    <script type="module">
+      import { download, PausedError } from '__DOWNLOAD__';
+      import { openStore } from '__STORE__';
+
       (function () {
         'use strict';
 
@@ -240,36 +243,6 @@
           if (event.data && event.data.type === 'nsgo-gallery-theme') applyTheme(event.data.theme);
         });
 
-        function readWithProgress(response, total, onProgress) {
-          if (!response.body) {
-            return response.arrayBuffer().then(function (buffer) {
-              onProgress(buffer.byteLength);
-              return buffer;
-            });
-          }
-          var reader = response.body.getReader();
-          var chunks = [];
-          var loaded = 0;
-          function pump() {
-            return reader.read().then(function (result) {
-              if (result.done) {
-                var bytes = new Uint8Array(loaded);
-                var offset = 0;
-                for (var i = 0; i < chunks.length; i++) {
-                  bytes.set(chunks[i], offset);
-                  offset += chunks[i].length;
-                }
-                return bytes.buffer;
-              }
-              chunks.push(result.value);
-              loaded += result.value.length;
-              onProgress(loaded);
-              return pump();
-            });
-          }
-          return pump();
-        }
-
         function decompress(buffer) {
           var head = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
           // A host may already have decoded the file. Decompress only when
@@ -313,34 +286,92 @@
 
           setProgress('prepare', 2, 0, expected, 'Preparing WebAssembly…');
 
-          return fetch(url, { cache: 'force-cache' })
-            .then(function (response) {
-              if (!response.ok) throw new Error('The WebAssembly download failed (' + response.status + ').');
-              // Content-Length can be missing on a streamed response; the
-              // build knows the size either way.
-              var total = Number(response.headers.get('Content-Length')) || expected;
-              return readWithProgress(response, total, function (loaded) {
+          var store = openStore();
+          var controller = null;
+          var progress = { loaded: 0, total: expected };
+
+          // An abort keeps the received bytes in the store, so the next
+          // attempt asks the server for the rest.
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden' && controller) controller.abort();
+          });
+
+          function whenVisible() {
+            return new Promise(function (resolve) {
+              function check() {
+                if (document.visibilityState !== 'hidden') {
+                  document.removeEventListener('visibilitychange', check);
+                  window.removeEventListener('online', check);
+                  resolve();
+                }
+              }
+              document.addEventListener('visibilitychange', check);
+              window.addEventListener('online', check);
+              check();
+            });
+          }
+
+          function fetchApp() {
+            controller = new AbortController();
+            return download({
+              url: url,
+              expected: expected,
+              store: store,
+              signal: controller.signal,
+              isHidden: function () {
+                return document.visibilityState === 'hidden';
+              },
+              onProgress: function (loaded, total) {
+                progress = { loaded: loaded, total: total };
                 var percent = 2 + 63 * Math.min(1, loaded / total);
                 var detail =
                   loaded <= total
                     ? formatBytes(loaded) + ' of ' + formatBytes(total) + ' downloaded'
                     : formatBytes(loaded) + ' downloaded';
                 setProgress('download', percent, loaded, total, detail);
-              }).then(function (buffer) {
-                return { buffer: buffer, total: total };
+              },
+            }).finally(function () {
+              controller = null;
+            });
+          }
+
+          function downloadWithResume() {
+            if (store) store.pruneExcept(url).catch(function () {});
+            function attempt() {
+              return fetchApp().catch(function (error) {
+                if (!(error instanceof PausedError)) throw error;
+                var percent = 2 + 63 * Math.min(1, progress.loaded / progress.total);
+                setProgress(
+                  'paused',
+                  percent,
+                  progress.loaded,
+                  progress.total,
+                  'Paused. The download continues when you return.',
+                );
+                return whenVisible().then(function () {
+                  setProgress('download', percent, progress.loaded, progress.total, 'Resuming the download…');
+                  return attempt();
+                });
               });
+            }
+            return attempt();
+          }
+
+          return downloadWithResume()
+            .then(function (bytes) {
+              return { buffer: bytes.buffer, total: expected };
             })
-            .then(function (download) {
-              setProgress('decompress', 67, download.total, download.total, 'Decompressing the engine…');
-              return decompress(download.buffer).then(function (raw) {
+            .then(function (fetched) {
+              setProgress('decompress', 67, fetched.total, fetched.total, 'Decompressing the engine…');
+              return decompress(fetched.buffer).then(function (raw) {
                 setProgress(
                   'decompress',
                   77,
-                  download.total,
-                  download.total,
+                  fetched.total,
+                  fetched.total,
                   'Decompressed ' + formatBytes(raw.byteLength),
                 );
-                return { buffer: raw, total: download.total };
+                return { buffer: raw, total: fetched.total };
               });
             })
             .then(function (engine) {

@@ -656,6 +656,8 @@
         var group = 'apps';
         var frame = null;
         var settle = function () {};
+        var lastMessage = 0;
+        var watch = 0;
 
         // The platforms and the app URL's debugging flags are constants: the URL an iframe
         // loads is built from them, never from the page's own text.
@@ -754,6 +756,8 @@
               return 'Compiling WebAssembly…';
             case 'start':
               return 'Starting the gallery…';
+            case 'paused':
+              return 'Paused. The download continues when you return.';
             default:
               return 'Preparing WebAssembly…';
           }
@@ -785,18 +789,27 @@
           next.setAttribute('data-nsgo-history', '');
           next.src = appURL();
           var answered = false;
+          lastMessage = Date.now();
+          clearInterval(watch);
           settle = function (ok) {
             answered = ok;
-            clearTimeout(watch);
+            clearInterval(watch);
           };
-          var watch = setTimeout(function () {
-            if (!answered && frame === next) {
-              bootTitle.textContent = 'The gallery could not start';
-              meta.className = 'boot__meta boot__meta--error';
-              meta.textContent = 'The demo group did not load. Check the connection and try again.';
-              retry.hidden = false;
+          // A hidden page is not a stalled load: the loader keeps its bytes
+          // and continues when the page is visible.
+          watch = setInterval(function () {
+            if (answered || frame !== next) return;
+            if (document.visibilityState === 'hidden') {
+              lastMessage = Date.now();
+              return;
             }
-          }, 45000);
+            if (Date.now() - lastMessage < 45000) return;
+            clearInterval(watch);
+            bootTitle.textContent = 'The gallery could not start';
+            meta.className = 'boot__meta boot__meta--error';
+            meta.textContent = 'The demo group did not load. Check the connection and try again.';
+            retry.hidden = false;
+          }, 5000);
           next.addEventListener('error', function () {
             settle(false);
             bootTitle.textContent = 'The gallery could not start';
@@ -923,11 +936,18 @@
 
         retry.addEventListener('click', load);
 
+        // Returning to the page restarts the stall timer; the loader resumes
+        // on its own.
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState !== 'hidden') lastMessage = Date.now();
+        });
+
         // The loader in the frame reports its progress (gallery-loader.html, embedded); messages of a frame already replaced are dropped.
         window.addEventListener('message', function (event) {
           if (event.origin !== location.origin || !frame || event.source !== frame.contentWindow) return;
           var data = event.data;
           if (!data || data.type !== 'nsgo-gallery') return;
+          lastMessage = Date.now();
           if (data.event === 'ready' || data.event === 'error') settle(true);
           if (data.event === 'progress') {
             showProgress(data.percent, progressText(data));
