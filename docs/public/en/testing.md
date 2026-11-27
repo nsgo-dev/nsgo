@@ -66,6 +66,8 @@ After the app locks the pointer, `app.PointerDelta(dx, dy)` sends relative motio
 
 A press can name a text field directly. Headless and on every target, read `app.Find("id:field").Focused` immediately after the press, including when the pressed view's handler focuses the field.
 
+Typing reports where the caret moves, placed as the headless model's approximate text engine lays the text out. `nsgotest.NoCaretMoves()` keeps typing from reporting it, for a test that reports the caret itself through `app.Report`.
+
 `app.SelectTab("id:tabs", 1)` selects the second item of a mounted `mobile.TabBar`. It works headless with an iOS or Android `Environment` and uses the native tab bar on iOS and Android targets. The index starts at zero and must match an existing item. Use this for phone navigation; `Emit` reports model events and runs headless only.
 
 `app.Focus(selector)` reaches a field as a tap does and, in a desktop or web `Environment` or on those targets, a pressable or `Focusable` view through Tab, so a following `app.Key("Return")` presses it. A `Ref.Focus()` the app calls also focuses enabled pressable or `Focusable` views on Android, iPhone and iPad, without showing a software keyboard; use `app.Post(ref.Focus)` and wait for the focus in a native mobile test. On mobile targets focus assertions follow native focus reports, so a refused request cannot pass through the headless model. The `app.Focus` step still uses Tab for ordinary views on desktop and web targets. A pressable view has any of `OnPress`, `OnPressDown`, `OnPressUp` or `OnLongPress`, as on the platforms; Return or Space on it sends the down, up and press events it handles, so a view with only `OnLongPress` takes the focus but no key presses it.
@@ -105,6 +107,8 @@ Windowless rendering and font registration currently support macOS. Other target
 `app.Find(selector).Kind` is a `nsgotest.ViewKind`; compare it with constants such as `nsgotest.KindText`, `KindInput`, `KindCanvas` or `KindGPU` when a test needs to inspect the mounted view form.
 
 Headless GPU tests can use `app.Surface("title:Inspector").GPUReadPixels("id:viewport")` for a window's software GPU pixels. `Surface.TriggerGPUDeviceLost` and `Surface.RestoreGPUDevice` simulate loss and recovery in that window, using its pixel ratio. Devices and readback callbacks stay separate even when view IDs repeat across windows; `app.GPUFrames()` records submissions across the whole app. These helpers operate on the headless software GPU model.
+
+`nsgotest.NoGPU()` makes `Env.SupportsGPU()` false, so a test checks the app's fallback where a target has no GPU surfaces. `nsgotest.NoGPUCompute()` turns off compute shaders, storage buffers and storage textures, as WebGL 2 and OpenGL ES 3.0 targets do, so a test checks a pipeline that cannot reach them.
 
 To check shader backend code generation without opening a GPU device, call `nsgotest.TranslateShader` on a `*core.ShaderProgram` (from `core.CompileShader` or `core.CompileWGSL`) or `gpu.TranslateShaderModule` on a `*gpu.ShaderModule` (from `gpu.CompileWGSL` or `gpu.CompileKage`). The fragment helper returns `nsgotest.ShaderSources` with MSL, HLSL, GLSL and GLES sources. The pipeline helper returns `gpu.PipelineSources` with per-stage MSL, HLSL, GLSL, GLES and WGSL sources plus individual backend errors. Both report translation errors, including recovered translator panics, naming each failing backend.
 
