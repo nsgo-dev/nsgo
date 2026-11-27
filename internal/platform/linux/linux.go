@@ -891,6 +891,7 @@ func settingsToWatch(colorScheme bool) []string {
 // Mount implements engine.Platform: it queues the batch and wakes the
 // main loop once.
 func (w *window) Mount(b *driver.MountBatch) {
+	driver.RetainBatchDrawings(b)
 	if w.batches.Push(b) {
 		gIdleApply(cbApply, w.handle)
 	}
@@ -1429,6 +1430,9 @@ func (w *window) apply(b *driver.MountBatch) {
 		}
 		v := w.view(it.ID)
 		if v == nil {
+			if it.Kind == driver.ItemCanvas {
+				it.Drawing.Release()
+			}
 			continue
 		}
 		switch it.Kind {
@@ -1569,6 +1573,8 @@ func (w *window) apply(b *driver.MountBatch) {
 		case driver.ItemCanvas:
 			if ch := canvases.Load(); ch != nil {
 				ch.setCanvas(w, v, it.Drawing)
+			} else {
+				it.Drawing.Release()
 			}
 		case driver.ItemShader:
 			if sh := shaders.Load(); sh != nil {
@@ -1762,6 +1768,8 @@ func (w *window) delete(v *view) {
 		v.text.Release()
 		v.text = nil
 	}
+	v.drawing.Release()
+	v.drawing = nil
 	w.releaseEditor(v)
 	if wh := webViews.Load(); wh != nil {
 		wh.close(w, v)
