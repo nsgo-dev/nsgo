@@ -10,7 +10,7 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
-// TestMaxRefreshRateReadsEveryMode checks that each display's maximum comes from its modes at the current pixel size, not NSScreen's ceiling for the selected mode, which a 120 Hz panel set to 60 Hz reports as 60.
+// TestMaxRefreshRateReadsEveryMode checks that each display's maximum comes from its modes at the current pixel size, not NSScreen's ceiling for the selected mode, which a 120 Hz panel set to 60 Hz reports as 60. A mode can report no rate, as scaled modes on Apple silicon do, so the check compares only the rates it has.
 func TestMaxRefreshRateReadsEveryMode(t *testing.T) {
 	onMain(func() {
 		loadAppKit()
@@ -36,11 +36,11 @@ func TestMaxRefreshRateReadsEveryMode(t *testing.T) {
 			current := cgDisplayModeRate(mode)
 			apple.Release(mode)
 			fastest := fastestDisplayMode(key)
-			if fastest < current {
+			if fastest > 0 && fastest < current {
 				t.Errorf("display %d: fastest mode %g Hz is below the current mode's %g Hz", number, fastest, current)
 			}
 			rate, maximum := displayRates(screen, number)
-			if maximum < fastest || maximum < rate {
+			if maximum < rate || (fastest > 0 && maximum < fastest) {
 				t.Errorf("display %d reports %g Hz at most, below its fastest mode %g Hz or its rate %g Hz", number, maximum, fastest, rate)
 			}
 			t.Logf("display %d: %g Hz now, %g Hz at most (%dx%d)", number, rate, maximum, key.width, key.height)
