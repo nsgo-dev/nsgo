@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -10,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -24,6 +26,7 @@ import (
 	"time"
 
 	"github.com/nsgo-dev/nsgo/cmd/nsgo/apk"
+	androidruntime "github.com/nsgo-dev/nsgo/internal/platform/android/runtime"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -34,6 +37,7 @@ const (
 	testPlayEdit   = testPlayEdits + "/edit1"
 	testPlayUpload = "/upload" + testPlayEdit + "/bundles?uploadType=media"
 	testPlayTrack  = testPlayEdit + "/tracks/internal"
+	testPlayProd   = testPlayEdit + "/tracks/production"
 )
 
 func TestPlayPublishCommitsTheRequestedTrack(t *testing.T) {
@@ -58,7 +62,7 @@ func TestPlayPublishCommitsTheRequestedTrack(t *testing.T) {
 			)
 			c := mockPlay(t, steps)
 			app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-			if err := uploadGooglePlayBundle(t.Context(), c, tc.flag, app, strings.NewReader(bundle), int64(len(bundle))); err != nil {
+			if err := uploadGooglePlayBundle(t.Context(), c, app, strings.NewReader(bundle), int64(len(bundle)), playPublishOptions{track: tc.flag}, nil); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -96,7 +100,7 @@ func TestPlayPublishDiscardsFailedEdits(t *testing.T) {
 			steps = append(steps, playExchange{http.MethodDelete, testPlayEdit, "", "", http.StatusNoContent})
 			c := mockPlay(t, steps)
 			app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 20}
-			err := uploadGooglePlayBundle(t.Context(), c, "internal", app, strings.NewReader(bundle), int64(len(bundle)))
+			err := uploadGooglePlayBundle(t.Context(), c, app, strings.NewReader(bundle), int64(len(bundle)), playPublishOptions{track: "internal"}, nil)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("upload returned %v, want %q", err, tc.want)
 			}
@@ -292,7 +296,7 @@ func TestPlayAuthPrecedence(t *testing.T) {
 				client.baseURL = playSrv.URL
 				client.uploadBaseURL = playSrv.URL
 				app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-				if err := uploadGooglePlayBundle(t.Context(), client, "internal", app, strings.NewReader("aab"), 3); err != nil {
+				if err := uploadGooglePlayBundle(t.Context(), client, app, strings.NewReader("aab"), 3, playPublishOptions{track: "internal"}, nil); err != nil {
 					t.Fatal(err)
 				}
 				if tokenCalls.Load() != 1 {
@@ -380,7 +384,7 @@ func TestPlayAuthADCCredentialTypes(t *testing.T) {
 		client.baseURL = playSrv.URL
 		client.uploadBaseURL = playSrv.URL
 		app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-		if err := uploadGooglePlayBundle(t.Context(), client, "internal", app, strings.NewReader("aab"), 3); err != nil {
+		if err := uploadGooglePlayBundle(t.Context(), client, app, strings.NewReader("aab"), 3, playPublishOptions{track: "internal"}, nil); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -460,7 +464,7 @@ func TestPlayAuthADCCredentialTypes(t *testing.T) {
 				client.baseURL = playSrv.URL
 				client.uploadBaseURL = playSrv.URL
 				app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-				if err := uploadGooglePlayBundle(t.Context(), client, "internal", app, strings.NewReader("aab"), 3); err != nil {
+				if err := uploadGooglePlayBundle(t.Context(), client, app, strings.NewReader("aab"), 3, playPublishOptions{track: "internal"}, nil); err != nil {
 					t.Fatal(err)
 				}
 			})
@@ -554,7 +558,7 @@ func TestPlayAuthADCCredentialTypes(t *testing.T) {
 		client.baseURL = playSrv.URL
 		client.uploadBaseURL = playSrv.URL
 		app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-		if err := uploadGooglePlayBundle(t.Context(), client, "internal", app, strings.NewReader("aab"), 3); err != nil {
+		if err := uploadGooglePlayBundle(t.Context(), client, app, strings.NewReader("aab"), 3, playPublishOptions{track: "internal"}, nil); err != nil {
 			t.Fatal(err)
 		}
 		if !sawSourceRefresh.Load() || !sawImpersonate.Load() {
@@ -643,7 +647,7 @@ func TestPlayAuthADCCredentialTypes(t *testing.T) {
 		client.baseURL = playSrv.URL
 		client.uploadBaseURL = playSrv.URL
 		app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-		if err := uploadGooglePlayBundle(t.Context(), client, "internal", app, strings.NewReader("aab"), 3); err != nil {
+		if err := uploadGooglePlayBundle(t.Context(), client, app, strings.NewReader("aab"), 3, playPublishOptions{track: "internal"}, nil); err != nil {
 			t.Fatal(err)
 		}
 		if !sawSTS.Load() || !sawImpersonate.Load() {
@@ -713,7 +717,7 @@ func TestPlayAuthADCCredentialTypes(t *testing.T) {
 		client.baseURL = playSrv.URL
 		client.uploadBaseURL = playSrv.URL
 		app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-		if err := uploadGooglePlayBundle(t.Context(), client, "internal", app, strings.NewReader("aab"), 3); err != nil {
+		if err := uploadGooglePlayBundle(t.Context(), client, app, strings.NewReader("aab"), 3, playPublishOptions{track: "internal"}, nil); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -751,7 +755,7 @@ func TestPlayAuthADCMetadataServer(t *testing.T) {
 		client.baseURL = playSrv.URL
 		client.uploadBaseURL = playSrv.URL
 		app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
-		if err := uploadGooglePlayBundle(t.Context(), client, "internal", app, strings.NewReader("aab"), 3); err != nil {
+		if err := uploadGooglePlayBundle(t.Context(), client, app, strings.NewReader("aab"), 3, playPublishOptions{track: "internal"}, nil); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -1040,9 +1044,9 @@ func TestPlayFindsTheProjectsStoreBundle(t *testing.T) {
 	if err := os.WriteFile(want, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	path, id, err := playBundlePath(dir)
-	if err != nil || path != want || id != testPlayApp {
-		t.Fatalf("bundle = %q, app = %q, err = %v; want %q", path, id, err, want)
+	path, project, err := playBundlePath(dir)
+	if err != nil || path != want || project.ID != testPlayApp {
+		t.Fatalf("bundle = %q, project = %v, err = %v; want %q", path, project, err, want)
 	}
 	if _, _, err := playBundlePath(filepath.Join(dir, "example.apk")); err == nil {
 		t.Fatal("publish accepted an APK")
@@ -1066,8 +1070,16 @@ func TestPlayPublishCommand(t *testing.T) {
 	}{
 		{[]string{"-target", "android", "--track", "internal", "missing.aab"}, "open the App Bundle"},
 		{[]string{"-target", "android"}, "requires -track"},
-		{[]string{"-target", "android", "-track", "internal", "-cert", "package.cert"}, "-target android takes only -track"},
-		{[]string{"-target", "android", "-track", "internal", "-store", "play"}, "-target android takes only -track"},
+		{[]string{"-target", "android", "-track", "internal", "-cert", "package.cert"}, "-target android takes -track"},
+		{[]string{"-target", "android", "-track", "internal", "-store", "play"}, "-target android takes -track"},
+		{[]string{"-target", "android", "-track", "production", "-rollout", "NaN", "missing.aab"}, "strictly between 0 and 1"},
+		{[]string{"-target", "android", "-track", "production", "-rollout-action", "increase"}, "increase requires -rollout"},
+		{[]string{"-target", "android", "-track", "production", "-rollout-action", "complete", "-rollout", "0.5"}, "only rollout increase takes -rollout"},
+		{[]string{"-target", "android", "-track", "production", "-rollout-action", "resume", "-release-name", "Next"}, "apply only to bundle uploads"},
+		{[]string{"-target", "android", "-track", "production", "-in-app-update-priority", "6", "missing.aab"}, "priority must be between 0 and 5"},
+		{[]string{"-store", "play", "-track", "production", "-rollout", "0.1"}, "require -target android"},
+		{[]string{"-store", "play", "-version-code", "0"}, "version code must be a positive integer"},
+		{[]string{"-store", "appstore", "-changes-not-sent-for-review"}, "require Google Play"},
 		{[]string{"-target", "ios", "-track", "internal"}, "unknown target"},
 		{nil, "-cert is required"},
 	} {
@@ -1078,5 +1090,214 @@ func TestPlayPublishCommand(t *testing.T) {
 		if err == nil || !strings.Contains(string(out), tc.want) {
 			t.Errorf("publish %v exited with %v and %s, want %q", tc.args, err, out, tc.want)
 		}
+	}
+}
+
+func TestPlayPublishProductionRollout(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"nsgo.yaml":                   "name: Example App\nid: " + testPlayApp + "\nversion: 1.2.3\nstore:\n  dir: listings\n",
+		"listings/listing.yaml":       "version: 1\n",
+		"listings/en-US/listing.yaml": "version: 1\nrelease_notes: Improved search.\n",
+		"listings/zh-Hans/listing.yaml": `version: 1
+google_play:
+  release_notes: 优化搜索。
+`,
+	})
+	key, err := apk.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bundle bytes.Buffer
+	m := apk.Manifest{Package: testPlayApp, Label: "Example App", VersionName: "1.2.3", VersionCode: 19}
+	if err := apk.WriteBundle(&bundle, androidruntime.Manifest, m, nil, key); err != nil {
+		t.Fatal(err)
+	}
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(p.releaseDir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bundlePath := filepath.Join(p.releaseDir(), p.releaseName("android_universal", ".aab"))
+	if err := os.WriteFile(bundlePath, bundle.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const previous = `{"versionCodes":["18"],"status":"completed","name":"Previous","releaseNotes":[{"language":"en-US","text":"Old notes"}],"inAppUpdatePriority":0}`
+	const notes = `[{"language":"en-US","text":"Improved search."},{"language":"zh-CN","text":"优化搜索。"}]`
+	const prefix = `{"track":"production","releases":[`
+	fraction, priority := 0.1, 4
+	for _, tc := range []struct {
+		name, path, body, commitQuery, output string
+		o                                     playPublishOptions
+	}{
+		{"staged project upload", dir, prefix + previous + `,{"versionCodes":["19"],"status":"inProgress","name":"Next","userFraction":0.1,"releaseNotes":` + notes + `,"inAppUpdatePriority":4}]}`, "?changesNotSentForReview=true", "staged rollout at 0.1", playPublishOptions{fraction: &fraction, priority: &priority, name: "Next", changesNotSentForReview: true}},
+		{"full standalone upload", bundlePath, prefix + `{"versionCodes":["19"],"status":"completed","releaseNotes":` + notes + `}]}`, "", "full rollout, 100%", playPublishOptions{listings: filepath.Join(dir, "listings")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := tc.o
+			o.track = "production"
+			o.client = mockPlay(t, []playExchange{
+				{http.MethodPost, testPlayEdits, `{}`, `{"id":"edit1"}`, 0},
+				{http.MethodGet, testPlayProd, "", prefix + previous + `]}`, 0},
+				{http.MethodPost, testPlayUpload, bundle.String(), `{"versionCode":19}`, 0},
+				{http.MethodPut, testPlayProd, tc.body, `{}`, 0},
+				{http.MethodPost, testPlayEdit + ":commit" + tc.commitQuery, "", `{"id":"edit1"}`, 0},
+			})
+			var err error
+			out := captureStderr(t, func() { err = publishPlay(t.Context(), o, tc.path) })
+			if err != nil || !strings.Contains(out, tc.output) {
+				t.Fatalf("publish = %v, output %q; want %q", err, out, tc.output)
+			}
+		})
+	}
+}
+
+func TestPlayRolloutActions(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"nsgo.yaml": "name: Example App\nid: " + testPlayApp + "\nversion: 1.2.3\n",
+	})
+	const previous = `{"versionCodes":["18"],"status":"completed","name":"Previous","inAppUpdatePriority":0}`
+	const prefix = `{"track":"production","releases":[` + previous + `,{"versionCodes":["19"],"status":"`
+	const suffix = `,"releaseNotes":[{"language":"en-US","text":"New notes"}],"inAppUpdatePriority":4}]}`
+	const active = prefix + `inProgress","name":"Current","userFraction":0.1` + suffix
+	const halted = prefix + `halted","name":"Current","userFraction":0.1` + suffix
+	fraction := 0.3
+	for _, tc := range []struct {
+		action, before, after string
+		fraction              *float64
+	}{
+		{"increase", active, strings.Replace(active, `"userFraction":0.1`, `"userFraction":0.3`, 1), &fraction},
+		{"halt", active, halted, nil},
+		{"resume", halted, active, nil},
+		{"complete", active, prefix + `completed","name":"Current"` + suffix, nil},
+	} {
+		t.Run(tc.action, func(t *testing.T) {
+			c := mockPlay(t, []playExchange{
+				{http.MethodPost, testPlayEdits, `{}`, `{"id":"edit1"}`, 0},
+				{http.MethodGet, testPlayProd, "", tc.before, 0},
+				{http.MethodPut, testPlayProd, tc.after, `{}`, 0},
+				{http.MethodPost, testPlayEdit + ":commit?changesNotSentForReview=true", "", `{"id":"edit1"}`, 0},
+			})
+			o := playPublishOptions{track: "production", action: tc.action, fraction: tc.fraction, changesNotSentForReview: true, client: c}
+			if err := publishPlay(t.Context(), o, dir); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestPlayRolloutRejectsInvalidInputBeforeRequests(t *testing.T) {
+	c := mockPlay(t, nil)
+	app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 19}
+	for _, f := range []float64{-0.1, 0, 1, 1.1, math.NaN(), math.Inf(1)} {
+		o := playPublishOptions{track: "production", fraction: &f}
+		if err := uploadGooglePlayBundle(t.Context(), c, app, strings.NewReader("aab"), 3, o, nil); err == nil || !strings.Contains(err.Error(), "strictly between 0 and 1") {
+			t.Errorf("upload fraction %g: %v", f, err)
+		}
+		o.action = "increase"
+		if err := updateGooglePlayRollout(t.Context(), c, testPlayApp, o); err == nil || !strings.Contains(err.Error(), "strictly between 0 and 1") {
+			t.Errorf("increase fraction %g: %v", f, err)
+		}
+	}
+}
+
+func TestPlayRolloutDiscardsRejectedEdits(t *testing.T) {
+	const active = `{"versionCodes":["19"],"status":"inProgress","userFraction":0.3}`
+	const halted = `{"versionCodes":["19"],"status":"halted","userFraction":0.3}`
+	less, equal := 0.1, 0.3
+	for _, tc := range []struct {
+		name, action, releases, want string
+		fraction                     *float64
+	}{
+		{"no staged release", "halt", `{"versionCodes":["19"],"status":"completed"}`, "no staged release", nil},
+		{"halted full release", "resume", `{"versionCodes":["19"],"status":"halted"}`, "no staged release", nil},
+		{"multiple staged releases", "halt", active + "," + halted, "multiple staged releases", nil},
+		{"no live fraction", "halt", `{"versionCodes":["19"],"status":"inProgress"}`, "without a valid user fraction", nil},
+		{"decrease", "increase", active, "must exceed the current fraction", &less},
+		{"no progression", "increase", active, "must exceed the current fraction", &equal},
+		{"resume an active rollout", "resume", active, "only a halted staged rollout", nil},
+		{"complete while halted", "complete", halted, "resume it first", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := mockPlay(t, []playExchange{
+				{http.MethodPost, testPlayEdits, `{}`, `{"id":"edit1"}`, 0},
+				{http.MethodGet, testPlayProd, "", `{"track":"production","releases":[` + tc.releases + `]}`, 0},
+				{http.MethodDelete, testPlayEdit, "", "", http.StatusNoContent},
+			})
+			o := playPublishOptions{track: "production", action: tc.action, fraction: tc.fraction}
+			if err := updateGooglePlayRollout(t.Context(), c, testPlayApp, o); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("rollout returned %v, want %q", err, tc.want)
+			}
+		})
+	}
+	t.Run("track update failed", func(t *testing.T) {
+		c := mockPlay(t, []playExchange{
+			{http.MethodPost, testPlayEdits, `{}`, `{"id":"edit1"}`, 0},
+			{http.MethodGet, testPlayProd, "", `{"track":"production","releases":[` + active + `]}`, 0},
+			{http.MethodPut, testPlayProd, `{"track":"production","releases":[` + halted + `]}`, `{"error":{"message":"track update failed"}}`, http.StatusConflict},
+			{http.MethodDelete, testPlayEdit, "", "", http.StatusNoContent},
+		})
+		o := playPublishOptions{track: "production", action: "halt"}
+		if err := updateGooglePlayRollout(t.Context(), c, testPlayApp, o); err == nil || !strings.Contains(err.Error(), "track update failed") {
+			t.Fatalf("rollout returned %v, want track update failure", err)
+		}
+	})
+	t.Run("already staged on upload", func(t *testing.T) {
+		c := mockPlay(t, []playExchange{
+			{http.MethodPost, testPlayEdits, `{}`, `{"id":"edit1"}`, 0},
+			{http.MethodGet, testPlayProd, "", `{"track":"production","releases":[` + active + `]}`, 0},
+			{http.MethodDelete, testPlayEdit, "", "", http.StatusNoContent},
+		})
+		app := apk.BundleIdentity{Package: testPlayApp, VersionCode: 20}
+		o := playPublishOptions{track: "production", fraction: &less}
+		if err := uploadGooglePlayBundle(t.Context(), c, app, strings.NewReader("aab"), 3, o, nil); err == nil || !strings.Contains(err.Error(), "already has a staged release") {
+			t.Fatalf("upload returned %v, want staged release failure", err)
+		}
+	})
+}
+
+func TestPlayListingNotesSelectReleaseByVersion(t *testing.T) {
+	const previous = `{"versionCodes":["18"],"status":"completed","releaseNotes":[{"language":"en-US","text":"Previous notes"}]}`
+	const staged = `{"versionCodes":["19","20"],"status":"inProgress","userFraction":0.1}`
+	const stagedWithNotes = `{"versionCodes":["19","20"],"status":"inProgress","userFraction":0.1,"releaseNotes":[{"language":"en-US","text":"New notes"}]}`
+	const prefix = `{"track":"production","releases":[`
+	for _, tc := range []struct{ name, code, before, after, want string }{
+		{"match non-first release and secondary version", "20", previous + "," + staged, previous + "," + stagedWithNotes, ""},
+		{"one release with no selector", "", staged, stagedWithNotes, ""},
+		{"no releases with no selector", "", "", `{"status":"draft","releaseNotes":[{"language":"en-US","text":"New notes"}]}`, ""},
+		{"multiple releases with no selector", "", previous + "," + staged, "", "use -version-code"},
+		{"missing version", "21", previous + "," + staged, "", "no release with version code 21"},
+		{"empty track with explicit version", "21", "", "", "no release with version code 21"},
+		{"duplicate version", "19", staged + "," + staged, "", "multiple releases with version code 19"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			steps := []playExchange{
+				{http.MethodPost, testPlayEdits, `{}`, `{"id":"edit1"}`, 0},
+				{http.MethodGet, testPlayProd, "", prefix + tc.before + `]}`, 0},
+			}
+			if tc.want == "" {
+				steps = append(steps,
+					playExchange{http.MethodPut, testPlayEdit + "/listings/en-US", `{"fullDescription":"Description","language":"en-US","shortDescription":"Short","title":"Example"}`, `{}`, 0},
+					playExchange{http.MethodPut, testPlayProd, prefix + tc.after + `]}`, `{}`, 0},
+					playExchange{http.MethodPost, testPlayEdit + ":validate", "", `{}`, 0},
+					playExchange{http.MethodPost, testPlayEdit + ":commit?changesNotSentForReview=true", "", `{}`, 0},
+				)
+			} else {
+				steps = append(steps, playExchange{http.MethodDelete, testPlayEdit, "", "", http.StatusNoContent})
+			}
+			l := &storeListings{
+				Manifest: storeManifest{GooglePlay: googlePlayManifestConfig{PackageName: testPlayApp, Track: "production"}},
+				Locales: []resolvedLocaleListing{{GooglePlay: googlePlayLocaleData{
+					Locale: "en-US", Title: "Example", ShortDescription: "Short", Description: "Description", ReleaseNotes: "New notes",
+				}}},
+			}
+			err := uploadGooglePlayListings(t.Context(), l, mockPlay(t, steps), playListingReleaseOptions{versionCode: tc.code, changesNotSentForReview: true})
+			if tc.want == "" && err != nil || tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)) {
+				t.Fatalf("listings upload returned %v, want %q", err, tc.want)
+			}
+		})
 	}
 }

@@ -391,6 +391,26 @@ nsgo publish -target android -track internal
 
 命令在 `build.output/releases` 中查找当前项目版本的 App Bundle。有多个构建时，在参数后传入 `.aab` 路径以选定文件。轨道填写 `internal`、`production` 或封闭测试的轨道 ID。命令从包中读取包名和版本代码，确认版本代码高于该轨道上的所有版本后，再上传包并提交发布。
 
+不传 `-rollout` 时，新版本会面向该轨道的所有用户发布；生产轨道会明确提示这是 100% 全量发布。要先向 10% 的用户发布，并让其余用户继续使用上一已完成发布的版本：
+
+```sh
+nsgo publish -target android -track production -rollout 0.1 \
+  -release-name "1.4" -in-app-update-priority 3
+```
+
+发布名称和 Play 应用内更新优先级（0 至 5 的整数）均可省略。如果项目有[商店列表](#商店列表)，命令会在同一次编辑中将各语言的 Play 更新说明附到新上传的版本。直接传入 `.aab` 文件时，用 `-listings DIR` 指定更新说明的来源。命令不会上传其他商店列表元数据。
+
+在项目目录中管理分阶段发布，无需再次上传 App Bundle：
+
+```sh
+nsgo publish -target android -track production -rollout-action increase -rollout 0.25
+nsgo publish -target android -track production -rollout-action halt
+nsgo publish -target android -track production -rollout-action resume
+nsgo publish -target android -track production -rollout-action complete
+```
+
+发布比例必须大于 0 且小于 1。`increase` 只能提高当前比例，不能降低。`halt` 停止向新用户分发，`resume` 按此前的比例恢复分发，`complete` 将正在进行的发布扩展到 100%。已暂停的发布须先恢复，再提高比例或完成。这些操作要求轨道上恰好有一个分阶段发布。此前的更新被拒绝后，如果 Play 要求暂缓送审，请传入 `-changes-not-sent-for-review`，再到 Play Console › 发布概览中将已提交的更改送审。
+
 ## 商店列表
 
 商店元数据（标题、副标题、简介、完整描述、关键词、更新说明、链接、截图和预览视频）以纯文本 YAML 和 Markdown 存放在仓库的 `store/` 目录中（可在 `nsgo.yaml` 中用 `store.dir` 修改）：
@@ -416,8 +436,10 @@ store/
 ```sh
 nsgo publish -store all -dry-run                  # 仅校验字数限制、语言与媒体文件，不上传
 nsgo publish -store appstore,play                 # 校验并上传至 App Store Connect 与 Google Play
-nsgo publish -store play -track production        # 同时更新指定 Google Play 轨道的发布说明
+nsgo publish -store play -track production -version-code 10400
 ```
+
+仅上传商店列表时，`-track`（或 `google_play.track`）还会更新该轨道的 Play 更新说明。如果轨道上有多个发布，必须用 `-version-code` 唯一指定目标。不指定版本代码时，轨道上只有一个发布就更新该发布；空轨道只会生成一份带更新说明的草稿，不会直接发布。用 `-changes-not-sent-for-review` 提交 Play 列表编辑而不送审。
 
 校验会在读取凭据或发起任何 HTTP 请求之前完成，检查必填项、语言代码、URL 协议、媒体文件及数量（App Store 每种显示类型最多 10 张截图、3 段预览；Google Play 每种图片类型最多 8 张截图）以及字符上限（App Store：标题 30、副标题 30、关键词 100、宣传文本 170、描述 4000、更新说明 4000；Google Play：标题 30、简短描述 80、完整描述 4000、更新说明 500）。
 

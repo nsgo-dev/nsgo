@@ -83,12 +83,13 @@ type publishOptions struct {
 	cert, entry, minRuntime, out, extra string
 
 	// Store listing upload options.
-	store    string
-	listings string
-	dryRun   bool
-	platform string
-	version  string
-	track    string
+	store       string
+	listings    string
+	dryRun      bool
+	platform    string
+	version     string
+	track       string
+	playRelease playListingReleaseOptions
 
 	// Injectable API clients for testing store uploads.
 	appStoreClient   *appStoreClient
@@ -96,7 +97,7 @@ type publishOptions struct {
 }
 
 func (o publishOptions) isStoreListingPublish() bool {
-	return o.store != "" || o.listings != "" || o.dryRun || o.platform != "" || o.version != "" || o.track != ""
+	return o.store != "" || o.listings != "" || o.dryRun || o.platform != "" || o.version != "" || o.track != "" || o.playRelease != (playListingReleaseOptions{})
 }
 
 // publish compiles the app in dir and signs it with NSGO_RELEASE_KEY's
@@ -109,7 +110,7 @@ func publish(o publishOptions, path string) error {
 func publishWithContext(ctx context.Context, o publishOptions, path string) error {
 	if o.isStoreListingPublish() {
 		if o.cert != "" || o.entry != "" || o.minRuntime != "" || o.out != "" || o.extra != "" {
-			return errors.New("publish: store listing flags (-store, -listings, -dry-run, -platform, -version, -track) cannot be combined with TSX package flags (-cert, -entry, -min-runtime, -extra, -out)")
+			return errors.New("publish: store listing flags cannot be combined with TSX package flags (-cert, -entry, -min-runtime, -extra, -out)")
 		}
 		targets, err := parseStoreTargets(o.store)
 		if err != nil {
@@ -122,6 +123,7 @@ func publishWithContext(ctx context.Context, o publishOptions, path string) erro
 			platform:         o.platform,
 			version:          o.version,
 			track:            o.track,
+			playRelease:      o.playRelease,
 			appStoreClient:   o.appStoreClient,
 			googlePlayClient: o.googlePlayClient,
 		}, path)

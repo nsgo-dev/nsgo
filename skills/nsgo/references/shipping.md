@@ -77,6 +77,8 @@ Android store builds require API 36 or higher. Record outstanding store question
 
 For Google Play, build with `-target android -channel store`, then use `nsgo publish -target android -track internal`. Authenticate with `NSGO_PLAY_SERVICE_ACCOUNT` (service account JSON key or file path, taking precedence) or Google Application Default Credentials (`gcloud auth application-default login --impersonate-service-account=…`, `GOOGLE_APPLICATION_CREDENTIALS`, or Workload Identity Federation such as `google-github-actions/auth`). [Google Play publishing](https://nsgo.dev/docs/building.md#publish-to-google-play)
 
+For production, `nsgo publish -target android -track production -rollout 0.1` starts at 10% and keeps the previous release; omitting `-rollout` means 100%. Bundle uploads send the project's localized Play release notes in the same edit (`-listings DIR` for an explicit `.aab`). Manage the rollout without a bundle using `-rollout-action increase -rollout 0.25`, `-rollout-action halt`, `-rollout-action resume` or `-rollout-action complete` on the same track. Play commits take `-changes-not-sent-for-review` if you need to send the changes for review manually.
+
 For Steam, upload the desktop target directories directly. Use `steam-launch.sh` for Linux x64 and upload `nsgo-gtk/` with it. Native dev with `steam.app_id` writes `steam_appid.txt` into its build and starts there. The depot output excludes that file, installers and self-updaters.
 
 Set `web.offline: true` in `nsgo.yaml` to cache a published web build and its packaged resources for offline launch. Serve the site over HTTPS or preview it with `nsgo build -target web -run`. See [Offline web packages](https://nsgo.dev/docs/building.md#offline-web-packages).
@@ -99,6 +101,8 @@ nsgo publish -store appstore,play                 # validate and upload to App S
 ```
 
 Validation runs before reading credentials or sending HTTP requests. Canonical locale directories like `zh-Hans` map to `zh-Hans` on App Store Connect and `zh-CN` on Google Play unless overridden.
+
+To update only store metadata and target Play release notes on a track with multiple releases, add `-track TRACK -version-code N` to `nsgo publish -store play`.
 
 Publish built web and desktop packages with `nsgo publish itch -target web,macos_arm64`. Set `itch.project` in `nsgo.yaml` and pass `BUTLER_API_KEY` as a CI secret ([itch.io publishing](https://nsgo.dev/docs/building.md#publish-on-itchio)).
 

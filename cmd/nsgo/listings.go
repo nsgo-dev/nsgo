@@ -200,6 +200,7 @@ type storePublishOptions struct {
 	platform    string
 	version     string
 	track       string
+	playRelease playListingReleaseOptions
 
 	// Injectable API clients for testing.
 	appStoreClient   *appStoreClient
@@ -210,6 +211,9 @@ type storePublishOptions struct {
 // to App Store Connect and/or Google Play. Validation always completes before
 // credentials are read or any upload HTTP request is sent.
 func publishStoreListings(ctx context.Context, o storePublishOptions, path string) error {
+	if o.playRelease != (playListingReleaseOptions{}) && !slices.Contains(o.stores, storeTargetPlay) {
+		return errors.New("publish: -version-code and -changes-not-sent-for-review require Google Play")
+	}
 	var p *project
 	baseDir := path
 	if baseDir == "" {
@@ -222,27 +226,7 @@ func publishStoreListings(ctx context.Context, o storePublishOptions, path strin
 		return err
 	}
 
-	listingsDir := o.listingsDir
-	if listingsDir != "" {
-		if !filepath.IsAbs(listingsDir) && p != nil {
-			candidate := p.resolve(listingsDir)
-			if _, statErr := os.Stat(candidate); statErr == nil {
-				listingsDir = candidate
-			} else if _, cwdErr := os.Stat(listingsDir); cwdErr != nil {
-				listingsDir = candidate
-			}
-		}
-	} else if p != nil && p.Store.Dir != "" {
-		listingsDir = p.Store.Dir
-	} else if p != nil {
-		listingsDir = p.resolve(defaultStoreListingsDir)
-	} else {
-		if _, err := os.Stat(filepath.Join(baseDir, "listing.yaml")); err == nil {
-			listingsDir = baseDir
-		} else {
-			listingsDir = filepath.Join(baseDir, defaultStoreListingsDir)
-		}
-	}
+	listingsDir := resolveStoreListingsDir(o.listingsDir, baseDir, p)
 
 	listings, err := loadStoreListings(listingsDir, p)
 	if err != nil {
@@ -256,6 +240,14 @@ func publishStoreListings(ctx context.Context, o storePublishOptions, path strin
 	}
 	if o.track != "" {
 		listings.Manifest.GooglePlay.Track = o.track
+	}
+	if o.playRelease.versionCode != "" {
+		hasNotes := slices.ContainsFunc(listings.Locales, func(loc resolvedLocaleListing) bool {
+			return loc.GooglePlay.ReleaseNotes != ""
+		})
+		if strings.TrimSpace(listings.Manifest.GooglePlay.Track) == "" || !hasNotes {
+			return errors.New("publish: -version-code requires a Google Play track and localized release notes")
+		}
 	}
 
 	if err := listings.validate(o.stores); err != nil {
@@ -275,13 +267,39 @@ func publishStoreListings(ctx context.Context, o storePublishOptions, path strin
 			}
 			done("uploaded %d locale(s) to App Store Connect (%s %s)", len(listings.Locales), listings.Manifest.AppStore.BundleID, listings.Manifest.AppStore.Version)
 		case storeTargetPlay:
-			if err := uploadGooglePlayListings(ctx, listings, o.googlePlayClient); err != nil {
+			if err := uploadGooglePlayListings(ctx, listings, o.googlePlayClient, o.playRelease); err != nil {
 				return err
 			}
 			done("uploaded %d locale(s) to Google Play (%s)", len(listings.Locales), listings.Manifest.GooglePlay.PackageName)
+			reportPlayReview(o.playRelease.changesNotSentForReview)
 		}
 	}
 	return nil
+}
+
+func resolveStoreListingsDir(dir, baseDir string, p *project) string {
+	if dir != "" {
+		if !filepath.IsAbs(dir) && p != nil {
+			candidate := p.resolve(dir)
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate
+			}
+			if _, err := os.Stat(dir); err != nil {
+				return candidate
+			}
+		}
+		return dir
+	}
+	if p != nil {
+		if p.Store.Dir != "" {
+			return p.Store.Dir
+		}
+		return p.resolve(defaultStoreListingsDir)
+	}
+	if _, err := os.Stat(filepath.Join(baseDir, "listing.yaml")); err == nil {
+		return baseDir
+	}
+	return filepath.Join(baseDir, defaultStoreListingsDir)
 }
 
 // parseStoreTargets parses -store ("appstore", "play", "all", or comma-separated).

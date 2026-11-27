@@ -450,6 +450,26 @@ nsgo publish -target android -track internal
 
 The command finds the App Bundle for the project's version in `build.output/releases`. Pass a `.aab` path after the flags to select a file when there are multiple builds. Use `internal`, `production`, or the track ID of a closed test. The command reads the package and version code from the bundle, requires a code higher than every release on that track, then uploads the bundle and commits the release.
 
+Omitting `-rollout` releases to everyone on the track; on production the command explicitly reports a full (100%) rollout. To start at 10% instead, retaining the previous completed release for everyone else:
+
+```sh
+nsgo publish -target android -track production -rollout 0.1 \
+  -release-name "1.4" -in-app-update-priority 3
+```
+
+The name and the Play in-app update priority (an integer from 0 to 5) are optional. If the project has [store listings](#store-listings), their localized Play release notes go on the uploaded bundle's version in the same edit. For a standalone `.aab`, pass `-listings DIR` to attach notes. The command does not upload the rest of the listing metadata.
+
+Manage a staged release from the project directory without uploading another bundle:
+
+```sh
+nsgo publish -target android -track production -rollout-action increase -rollout 0.25
+nsgo publish -target android -track production -rollout-action halt
+nsgo publish -target android -track production -rollout-action resume
+nsgo publish -target android -track production -rollout-action complete
+```
+
+A fraction must be greater than 0 and less than 1. `increase` requires a fraction above the current one; it cannot reduce the rollout. `halt` stops distribution to new users, `resume` restores the previous fraction, and `complete` rolls an active release out to 100%. Resume a halted release before increasing or completing it. Each action requires exactly one staged release on the track. After a rejection, use `-changes-not-sent-for-review` when Play requires it, then send the committed changes for review in Play Console › Publishing overview.
+
 ## Store listings
 
 Store metadata (titles, subtitles, descriptions, keywords, release notes, URLs, screenshots and previews) lives in the repository as plain-text YAML and Markdown under `store/` (or `store.dir` in `nsgo.yaml`):
@@ -475,8 +495,10 @@ Both `listing.yaml` files require `version: 1` and refuse unknown keys. Canonica
 ```sh
 nsgo publish -store all -dry-run                  # validate lengths, locales and media without uploading
 nsgo publish -store appstore,play                 # validate and upload to App Store Connect and Google Play
-nsgo publish -store play -track production        # also update release notes on the named Play track
+nsgo publish -store play -track production -version-code 10400
 ```
+
+When uploading listings alone, `-track` (or `google_play.track`) also updates the Play release notes on that track. If it has multiple releases, `-version-code` must identify exactly one release. With no version code specified, a track with one release uses that release; an empty track gets a notes-only draft, not a published release. Use `-changes-not-sent-for-review` to commit the Play listing edit without sending it for review.
 
 Validation runs before reading credentials or making any HTTP request, checking required fields, locale codes, URL schemes, media files and counts (up to 10 screenshots and 3 previews per App Store display type; up to 8 screenshots per Google Play image type), and character limits (App Store: title 30, subtitle 30, keywords 100, promotional text 170, description 4000, release notes 4000; Google Play: title 30, short description 80, description 4000, release notes 500).
 

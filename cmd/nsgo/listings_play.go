@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -625,9 +626,8 @@ func imageMIMEType(path string) string {
 
 // uploadGooglePlayListings creates an edit, uploads all localized listings,
 // screenshots, graphics and optional track release notes, validates, and commits.
-func uploadGooglePlayListings(ctx context.Context, listings *storeListings, client *googlePlayClient) error {
+func uploadGooglePlayListings(ctx context.Context, listings *storeListings, client *googlePlayClient, o playListingReleaseOptions) (err error) {
 	if client == nil {
-		var err error
 		client, err = newGooglePlayClientFromEnv(ctx)
 		if err != nil {
 			return err
@@ -637,21 +637,27 @@ func uploadGooglePlayListings(ctx context.Context, listings *storeListings, clie
 		note("Google Play auth: %s", cred)
 	}
 	pkg := listings.Manifest.GooglePlay.PackageName
-	pkgEsc := url.PathEscape(pkg)
-
-	// 1. Open edit.
-	var edit struct {
-		ID string `json:"id"`
-	}
-	if err := client.doJSON(ctx, http.MethodPost, fmt.Sprintf("/androidpublisher/v3/applications/%s/edits", pkgEsc), map[string]any{}, &edit); err != nil {
+	editID, editBase, err := client.openEdit(ctx, pkg)
+	if err != nil {
 		return err
 	}
-	if edit.ID == "" {
-		return errors.New("Google Play: edits.insert returned an empty edit id")
-	}
-	editBase := fmt.Sprintf("/androidpublisher/v3/applications/%s/edits/%s", pkgEsc, url.PathEscape(edit.ID))
+	defer client.discardFailedEdit(ctx, editBase, &err)
 
-	// 2. Update app details if configured.
+	var notesTrack *playTrack
+	if track := strings.TrimSpace(listings.Manifest.GooglePlay.Track); track != "" {
+		if notes := listings.playReleaseNotes(); len(notes) != 0 {
+			current, err := readGooglePlayTrack(ctx, client, editBase, track)
+			if err != nil {
+				return err
+			}
+			if err := current.setReleaseNotes(o.versionCode, notes); err != nil {
+				return err
+			}
+			notesTrack = &current
+		}
+	}
+
+	// Update app details if configured.
 	details := map[string]any{}
 	defaultLang := strings.TrimSpace(listings.Manifest.GooglePlay.DefaultLanguage)
 	if defaultLang == "" && listings.Manifest.DefaultLocale != "" {
@@ -685,13 +691,7 @@ func uploadGooglePlayListings(ctx context.Context, listings *storeListings, clie
 		}
 	}
 
-	// 3. Update localized store listings and upload images.
-	type playReleaseNote struct {
-		Language string `json:"language"`
-		Text     string `json:"text"`
-	}
-	var releaseNotes []playReleaseNote
-
+	// Update localized store listings and upload images.
 	for _, loc := range listings.Locales {
 		g := loc.GooglePlay
 		langEsc := url.PathEscape(g.Locale)
@@ -718,7 +718,7 @@ func uploadGooglePlayListings(ctx context.Context, listings *storeListings, clie
 				return err
 			}
 			for _, f := range files {
-				if err := client.uploadImage(ctx, pkg, edit.ID, g.Locale, imgType, f); err != nil {
+				if err := client.uploadImage(ctx, pkg, editID, g.Locale, imgType, f); err != nil {
 					return err
 				}
 			}
@@ -727,7 +727,7 @@ func uploadGooglePlayListings(ctx context.Context, listings *storeListings, clie
 			if err := client.doJSON(ctx, http.MethodDelete, fmt.Sprintf("%s/listings/%s/featureGraphic", editBase, langEsc), nil, nil); err != nil {
 				return err
 			}
-			if err := client.uploadImage(ctx, pkg, edit.ID, g.Locale, "featureGraphic", g.FeatureGraphic); err != nil {
+			if err := client.uploadImage(ctx, pkg, editID, g.Locale, "featureGraphic", g.FeatureGraphic); err != nil {
 				return err
 			}
 		}
@@ -735,43 +735,67 @@ func uploadGooglePlayListings(ctx context.Context, listings *storeListings, clie
 			if err := client.doJSON(ctx, http.MethodDelete, fmt.Sprintf("%s/listings/%s/icon", editBase, langEsc), nil, nil); err != nil {
 				return err
 			}
-			if err := client.uploadImage(ctx, pkg, edit.ID, g.Locale, "icon", g.Icon); err != nil {
+			if err := client.uploadImage(ctx, pkg, editID, g.Locale, "icon", g.Icon); err != nil {
 				return err
 			}
 		}
-		if g.ReleaseNotes != "" {
-			releaseNotes = append(releaseNotes, playReleaseNote{
-				Language: g.Locale,
-				Text:     g.ReleaseNotes,
-			})
-		}
 	}
 
-	// 4. Update track release notes when a track is named and notes are present.
-	if track := strings.TrimSpace(listings.Manifest.GooglePlay.Track); track != "" && len(releaseNotes) > 0 {
-		trackPath := editBase + "/tracks/" + url.PathEscape(track)
-		var trackResp struct {
-			Track    string           `json:"track"`
-			Releases []map[string]any `json:"releases"`
-		}
-		if err := client.doJSON(ctx, http.MethodGet, trackPath, nil, &trackResp); err != nil {
-			return err
-		}
-		if trackResp.Track == "" {
-			trackResp.Track = track
-		}
-		if len(trackResp.Releases) == 0 {
-			trackResp.Releases = []map[string]any{{"status": "draft"}}
-		}
-		trackResp.Releases[0]["releaseNotes"] = releaseNotes
-		if err := client.doJSON(ctx, http.MethodPut, trackPath, trackResp, nil); err != nil {
+	if notesTrack != nil {
+		if err := client.writeTrack(ctx, editBase, *notesTrack); err != nil {
 			return err
 		}
 	}
 
-	// 5. Validate and commit edit.
+	// Validate and commit the edit.
 	if err := client.doJSON(ctx, http.MethodPost, editBase+":validate", nil, nil); err != nil {
 		return err
 	}
-	return client.doJSON(ctx, http.MethodPost, editBase+":commit", nil, nil)
+	return client.commitEdit(ctx, editBase, o.changesNotSentForReview)
+}
+
+type playListingReleaseOptions struct {
+	versionCode             string
+	changesNotSentForReview bool
+}
+
+func (l *storeListings) playReleaseNotes() []playReleaseNote {
+	var notes []playReleaseNote
+	for _, loc := range l.Locales {
+		g := loc.GooglePlay
+		if g.ReleaseNotes != "" {
+			notes = append(notes, playReleaseNote{Language: g.Locale, Text: g.ReleaseNotes})
+		}
+	}
+	return notes
+}
+
+func (track *playTrack) setReleaseNotes(versionCode string, notes []playReleaseNote) error {
+	if versionCode == "" {
+		switch len(track.Releases) {
+		case 0:
+			// Keep a notes-only release a draft; this does not assign a bundle.
+			track.Releases = []playRelease{{Status: "draft", ReleaseNotes: notes}}
+		case 1:
+			track.Releases[0].ReleaseNotes = notes
+		default:
+			return fmt.Errorf("Google Play track %q has multiple releases; use -version-code to select the release for the notes", track.ID)
+		}
+		return nil
+	}
+	var release *playRelease
+	for i := range track.Releases {
+		r := &track.Releases[i]
+		if slices.Contains(r.VersionCodes, versionCode) {
+			if release != nil {
+				return fmt.Errorf("Google Play track %q has multiple releases with version code %s", track.ID, versionCode)
+			}
+			release = r
+		}
+	}
+	if release == nil {
+		return fmt.Errorf("Google Play track %q has no release with version code %s", track.ID, versionCode)
+	}
+	release.ReleaseNotes = notes
+	return nil
 }

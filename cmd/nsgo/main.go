@@ -34,10 +34,12 @@
 //	                                                      compile a TSX app into a signed package, or sign one again
 //	nsgo publish ios|macos <file>
 //	                                                      upload a signed IPA or PKG to App Store Connect
-//	nsgo publish -store appstore|play|all [-listings DIR] [-dry-run] [-platform P] [-version V] [-track T] [dir]
+//	nsgo publish -store appstore|play|all [-listings DIR] [-dry-run] [-platform P] [-version V] [-track T] [-version-code N] [dir]
 //	                                                      validate and upload store listings from YAML and Markdown files
-//	nsgo publish -target android -track TRACK [dir | bundle.aab]
+//	nsgo publish -target android -track TRACK [-rollout FRACTION] [-release-name NAME] [-in-app-update-priority N] [-listings DIR] [dir | bundle.aab]
 //	                                                      upload an Android App Bundle and commit a Play track release
+//	nsgo publish -target android -track TRACK -rollout-action increase|halt|resume|complete [-rollout FRACTION] [dir]
+//	                                                      change a staged release without uploading
 //	nsgo verify  [-root P,... [-revocations F,...]] package
 //	                                                      check a package and print what it holds
 //	nsgo revoke  -sequence N [-days N] [-keys IDs] [-packages H,...] -out F
@@ -68,6 +70,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
@@ -306,20 +309,53 @@ func main() {
 		fs.BoolVar(&o.dryRun, "dry-run", false, "parse and validate store listings without uploading")
 		fs.StringVar(&o.platform, "platform", "", "the App Store Connect `platform`: ios, macos, tvos or visionos (default: listing.yaml's app_store.platform, else ios)")
 		fs.StringVar(&o.version, "version", "", "the App Store Connect app `version` string (default: listing.yaml's app_store.version, else nsgo.yaml's version)")
-		fs.StringVar(&o.track, "track", "", "the Google Play `track`: with -target android, the one to release the App Bundle to, such as internal, production or a closed track's ID; with -store, the one to update release notes on (default: listing.yaml's google_play.track)")
+		var play playPublishOptions
+		fs.StringVar(&o.track, "track", "", "the Google Play `track`: with -target android, the track to publish to or manage; with -store, the track to update release notes on (default: listing.yaml's google_play.track)")
+		fs.Func("rollout", "staged rollout `fraction`, strictly between 0 and 1 (e.g. 0.1); required for rollout increase", func(s string) error {
+			f, err := strconv.ParseFloat(s, 64)
+			if err == nil {
+				play.fraction = &f
+			}
+			return err
+		})
+		fs.StringVar(&play.action, "rollout-action", "", "change the track's staged release: `increase|halt|resume|complete` (no bundle upload)")
+		fs.StringVar(&play.name, "release-name", "", "Google Play release `name` for a new bundle")
+		fs.Func("in-app-update-priority", "Google Play in-app update `priority` for a new bundle, 0–5", func(s string) error {
+			n, err := strconv.Atoi(s)
+			if err == nil {
+				play.priority = &n
+			}
+			return err
+		})
+		fs.Func("version-code", "Google Play release `version code` to update notes on with -store play; required when the track has multiple releases", func(s string) error {
+			n, err := strconv.ParseInt(s, 10, 64)
+			if err != nil || n <= 0 {
+				return errors.New("version code must be a positive integer")
+			}
+			o.playRelease.versionCode = strconv.FormatInt(n, 10)
+			return nil
+		})
+		fs.BoolVar(&o.playRelease.changesNotSentForReview, "changes-not-sent-for-review", false, "commit Google Play changes without submitting them for review")
 		if err = parseCommand(fs, args, 1); err != nil {
 			break
 		}
 		switch *target {
 		case "android":
 			rest := o
-			rest.track = ""
+			rest.track, rest.listings = "", ""
+			rest.playRelease.changesNotSentForReview = false
 			if rest != (publishOptions{}) {
-				err = errors.New("publish: -target android takes only -track and an App Bundle or project directory")
+				err = errors.New("publish: -target android takes -track, Google Play release flags and an App Bundle or project directory")
 				break
 			}
-			err = publishPlay(ctx, o.track, fs.Arg(0))
+			play.track, play.listings = o.track, o.listings
+			play.changesNotSentForReview = o.playRelease.changesNotSentForReview
+			err = publishPlay(ctx, play, fs.Arg(0))
 		case "":
+			if play != (playPublishOptions{}) {
+				err = errors.New("publish: -rollout, -rollout-action, -release-name and -in-app-update-priority require -target android")
+				break
+			}
 			err = publishWithContext(ctx, o, fs.Arg(0))
 		default:
 			err = fmt.Errorf("publish: unknown target %q", *target)
@@ -383,9 +419,11 @@ func usage() {
   nsgo certify -key P -apps A [-days N] [-out F]
   nsgo publish itch -target web,macos_arm64 [dir]
   nsgo publish -cert C [-entry E] [-min-runtime V] [-extra F] [-out F] [dir | package]
-  nsgo publish -store appstore|play|all [-listings DIR] [-dry-run] [-platform P] [-version V] [-track T] [dir]
+  nsgo publish -store appstore|play|all [-listings DIR] [-dry-run] [-platform P] [-version V] [-track T] [-version-code N] [dir]
   nsgo publish ios|macos <file>
-  nsgo publish -target android -track TRACK [dir | bundle.aab]
+  nsgo publish -target android -track TRACK [-rollout FRACTION] [-release-name NAME] [-in-app-update-priority N] [-listings DIR] [dir | bundle.aab]
+  nsgo publish -target android -track TRACK -rollout-action increase|halt|resume|complete [-rollout FRACTION] [dir]
+  Google Play commits also take -changes-not-sent-for-review.
   nsgo verify  [-root P,... [-revocations F,...]] package
   nsgo revoke  -sequence N [-days N] [-keys IDs] [-packages H,...] -out F
 
