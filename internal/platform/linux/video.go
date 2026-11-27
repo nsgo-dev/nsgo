@@ -200,9 +200,12 @@ func (w *window) showVideo(v *view) {
 	var child uintptr
 	if controls {
 		child = gtkVideoNew()
-		bindLook()
-		addLookCSS()
-		gtkWidgetAddCSSClass(child, cstr("nsgo-video"))
+		// GtkVideo's frame is black until a frame arrives, which is what a video without alpha shows there, before its first frame and when the stream cannot play at all. A clip that declares alpha must show what is behind it instead, so only that video clears the frame.
+		if videoalpha.Source(vd.config.Source, imageload.ResourceRoot) != videoalpha.None {
+			bindLook()
+			addLookCSS()
+			gtkWidgetAddCSSClass(child, cstr("nsgo-video"))
+		}
 		// The app drives playback (Paused), not the widget.
 		gtkVideoSetAutoplay(child, 0)
 	} else {
