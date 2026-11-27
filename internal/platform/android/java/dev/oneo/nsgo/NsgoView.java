@@ -1069,6 +1069,9 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
 
     private void start() {
         if (hostSocket != null) {
+            if (automation) {
+                agent = new TestAgent(this);
+            }
             try {
                 engine.start(hostSocket);
             } catch (IOException error) {
