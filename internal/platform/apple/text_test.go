@@ -3,11 +3,13 @@
 package apple
 
 import (
+	"fmt"
 	"image"
 	"image/png"
 	"os"
 	"strings"
 	"testing"
+	"unicode/utf16"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
@@ -495,4 +497,77 @@ func TestHiddenSpansSkipped(t *testing.T) {
 	if d, r := inked(imgMix, image.Rect(int(hideStart.Origin.X), 0, 220, 48)); d != 0 || r != 0 {
 		t.Errorf("hidden span with underline and shadow drew %d dark and %d red pixels", d, r)
 	}
+}
+
+// TestEmptyLineAfterHangingPunctuation lays out a paragraph whose last character, a CJK full stop, CoreText hangs past the frame's edge, then an empty line: the framesetter takes both breaks into the hanging line unless the empty line holds a character. At the paragraph's own width, as a text sized to its content is laid, and at the widths around it, the empty line stays a line of its own that the caret reaches, and spans and selections across it keep the text's offsets.
+func TestEmptyLineAfterHangingPunctuation(t *testing.T) {
+	const first = "今天天气很好，我们在公园里散步，还顺路去街角书店买了几本新书。"
+	const second = "晚上回家以后泡了一壶热茶，坐在窗边慢慢翻看。"
+	style := driver.TextStyle{Font: driver.Font{Size: 14.5}, LineHeight: 23.2, Color: driver.RGB(0)}
+	p := TextEngine{}.Prepare(&driver.AttributedText{Text: first, Style: style})
+	fits := p.Measure(driver.Auto).Width
+	p.Release()
+	units := len(utf16.Encode([]rune(first)))
+	for _, sep := range []string{"\n", "\r\n", "\u2029"} {
+		sepUnits := len(utf16.Encode([]rune(sep)))
+		for _, extra := range []driver.Points{0, 0.5, 3, 7, 20} {
+			text := first + sep + sep + second
+			p := TextEngine{}.Prepare(&driver.AttributedText{Text: text, Style: style})
+			size := p.Measure(fits + extra)
+			// A box sized to its content gets no wider than the width it had.
+			l := p.Layout(driver.Size{Width: min(size.Width, fits+extra), Height: size.Height}).(*Layout)
+			lines := l.TextLines()
+			blank := -1
+			for i, line := range lines {
+				if text[line.Start:line.End] == sep {
+					blank = i
+				}
+			}
+			name := fmt.Sprintf("%q at %v+%v points", sep, fits, extra)
+			if blank != 1 || lines[len(lines)-1].End != len(text) {
+				t.Errorf("%s: lines %+v of %d bytes, want the empty line second and the text to its end", name, lines, len(text))
+			} else if want := driver.Points(23.2 * float64(len(lines))); size.Height < want-1 {
+				t.Errorf("%s: %d lines measure %v points tall, want %v", name, len(lines), size.Height, want)
+			} else {
+				b := lines[1].Bounds
+				// The empty line's break is at the text's UTF-16 offset past the paragraph and its break.
+				if c := l.HitTest(driver.Point{X: b.Origin.X + 40, Y: b.Origin.Y + b.Size.Height/2}); c.Offset != units+sepUnits {
+					t.Errorf("%s: a press on the empty line puts the caret at %+v, want offset %d", name, c, units+sepUnits)
+				}
+				// A selection crossing the empty line covers all three lines with the text's UTF-16 offsets.
+				rects := l.RangeRects(units-1, units+2*sepUnits+1, nil)
+				if len(rects) < 3 || rects[len(rects)-1].Origin.Y < lines[2].Bounds.Origin.Y-1 || rects[len(rects)-1].Size.Width <= 0 {
+					t.Errorf("%s: selection across the empty line gave rects %+v, want rects covering line 2 at y=%v", name, rects, lines[2].Bounds.Origin.Y)
+				}
+			}
+			l.Release()
+			p.Release()
+		}
+	}
+	// A span crossing the empty line maps its byte offsets past the pad onto the second paragraph.
+	text := first + "\n\n" + second
+	p = TextEngine{}.Prepare(&driver.AttributedText{
+		Text:  text,
+		Style: style,
+		Spans: []driver.TextSpan{{
+			Start:      len(first) - len("。"),
+			End:        len(first) + 2 + len("晚"),
+			Style:      style,
+			Background: driver.TextBackground{Color: driver.RGB(0xeeeeee)},
+		}},
+	})
+	size := p.Measure(fits)
+	l := p.Layout(driver.Size{Width: min(size.Width, fits), Height: size.Height}).(*Layout)
+	lines := l.TextLines()
+	var onSecond bool
+	for _, u := range l.under {
+		if len(lines) >= 3 && u.rect.Origin.Y >= float64(lines[2].Bounds.Origin.Y)-1 && u.rect.Size.Width > 0 {
+			onSecond = true
+		}
+	}
+	if !onSecond {
+		t.Errorf("span across the empty line placed no background on line 2 (lines=%d, under=%+v)", len(lines), l.under)
+	}
+	l.Release()
+	p.Release()
 }

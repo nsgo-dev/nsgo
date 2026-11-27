@@ -483,13 +483,50 @@ func runAttributes(st driver.TextStyle, keys, values []uintptr, noUnderline bool
 	return attrs
 }
 
-// utf16Offsets maps text's UTF-8 byte offsets to UTF-16 offsets, and
-// back: toUTF16 has an entry per byte and one past the end, toUTF8 one
-// per UTF-16 unit and one past the end.
-func utf16Offsets(text string) (toUTF16, toUTF8 []int) {
+// emptyLinePad opens each empty line between two line breaks in the string
+// CoreText lays out. A framesetter that hangs a line's last punctuation
+// past the frame's edge, as it does a CJK full stop, takes the break after
+// it and the next one into that line, and the empty line between them is
+// gone; a character on the empty line keeps it. It is zero-width and
+// default-ignorable, so the line draws as it did.
+const emptyLinePad = '\u200b'
+
+// isLineBreak reports whether r ends a line.
+func isLineBreak(r rune) bool {
+	switch r {
+	case '\n', '\r', '\v', '\f', '\u0085', '\u2028', '\u2029':
+		return true
+	}
+	return false
+}
+
+// utf16Offsets returns text as CoreText lays it out, with emptyLinePad
+// opening each empty line, and maps text's UTF-8 byte offsets to that
+// string's UTF-16 offsets and back: toUTF16 has an entry per byte and one
+// past the end, toUTF8 one per UTF-16 unit and one past the end, a pad's
+// the byte offset of the break after it. pads holds the pads' UTF-16
+// offsets, in order.
+func utf16Offsets(text string) (laid string, toUTF16, toUTF8, pads []int) {
 	toUTF16 = make([]int, len(text)+1)
 	n := 0
+	var b strings.Builder
+	prev := rune(-1)
 	for i, r := range text {
+		if isLineBreak(r) && isLineBreak(prev) && (prev != '\r' || r != '\n') {
+			if pads == nil {
+				b.Grow(len(text) + 3)
+				b.WriteString(text[:i])
+			}
+			b.WriteRune(emptyLinePad)
+			toUTF8 = append(toUTF8, i)
+			pads = append(pads, n)
+			n++
+		}
+		if pads != nil {
+			_, w := utf8.DecodeRuneInString(text[i:])
+			b.WriteString(text[i : i+w])
+		}
+		prev = r
 		size := utf8.RuneLen(r)
 		if size < 0 {
 			size = 1
@@ -508,7 +545,18 @@ func utf16Offsets(text string) (toUTF16, toUTF8 []int) {
 	}
 	toUTF16[len(text)] = n
 	toUTF8 = append(toUTF8, len(text))
-	return toUTF16, toUTF8
+	if pads == nil {
+		return text, toUTF16, toUTF8, nil
+	}
+	return b.String(), toUTF16, toUTF8, pads
+}
+
+// textOffset returns the text's UTF-16 offset of i, a UTF-16 offset of
+// the string CoreText lays out: pads before it left out, a pad at the
+// offset of the break after it.
+func textOffset(pads []int, i int) int {
+	k, _ := slices.BinarySearch(pads, i)
+	return i - k
 }
 
 // attrsKey is everything buildAttributes reads: the style, whether the
@@ -607,12 +655,13 @@ func buildAttributes(k attrsKey) uintptr {
 	return attrs
 }
 
-// attributed returns a new CFAttributedString of t, its spans styled over
-// its style. The caller releases it.
-func attributed(t *driver.AttributedText, toUTF16 []int, fonts []driver.FontExtent) uintptr {
+// attributed returns a new CFAttributedString of laid, t's text as
+// utf16Offsets lays it out, its spans styled over its style. The caller
+// releases it.
+func attributed(t *driver.AttributedText, laid string, toUTF16 []int, fonts []driver.FontExtent) uintptr {
 	hasHidden := t.HasHidden()
 	attrs := attributes(attrsKey{st: t.Style, withAttachments: len(t.Attachments) > 0, paragraph: true, noUnderline: hasHidden})
-	str := CFString(t.Text)
+	str := CFString(laid)
 	out := cfAttributedStringCreate(0, str, attrs)
 	Release(str)
 	Release(attrs)
@@ -668,12 +717,12 @@ type TextEngine struct{}
 
 // Prepare implements core.TextEngine. It is safe off the main thread.
 func (TextEngine) Prepare(t *driver.AttributedText) driver.PreparedText {
-	toUTF16, toUTF8 := utf16Offsets(t.Text)
+	laid, toUTF16, toUTF8, pads := utf16Offsets(t.Text)
 	fonts := make([]driver.FontExtent, len(t.Attachments))
 	for i, at := range t.Attachments {
 		fonts[i] = fontExtent(placeholderStyle(t, at.Offset))
 	}
-	str := attributed(t, toUTF16, fonts)
+	str := attributed(t, laid, toUTF16, fonts)
 	f := Font(t.Style.Font)
 	strut := strutSpec{
 		ascent:  ctFontGetAscent(f),
@@ -689,7 +738,7 @@ func (TextEngine) Prepare(t *driver.AttributedText) driver.PreparedText {
 	}
 	p := &prepared{str: str, style: t.Style, maxLines: t.MaxLines, ellipsize: t.Ellipsize,
 		shadow: t.Shadow, strut: strut, hasHidden: t.HasHidden(), text: t.Text, toUTF8: toUTF8,
-		toUTF16: toUTF16, decos: decorations(t, toUTF16), atts: t.Attachments, fonts: fonts}
+		toUTF16: toUTF16, pads: pads, decos: decorations(t, toUTF16), atts: t.Attachments, fonts: fonts}
 	p.oneLine = oneLineFast && isASCIILine(t.Text) && len(t.Attachments) == 0 && len(p.decos) == 0 && t.Style.LineHeight == 0 &&
 		!strings.ContainsAny(t.Text, "\n\r\t\v\f\u0085\u2028\u2029")
 	if p.oneLine || p.maxLines > 0 && p.ellipsize != driver.EllipsizeClip {
@@ -728,6 +777,7 @@ type prepared struct {
 	text        string
 	toUTF8      []int // byte offsets of UTF-16 offsets
 	toUTF16     []int
+	pads        []int // utf16Offsets'
 	decos       []decoration
 	atts        []driver.TextAttachment
 	fonts       []driver.FontExtent // the attachments'
@@ -925,7 +975,7 @@ func (p *prepared) Layout(size driver.Size) driver.TextLayout {
 }
 
 func (p *prepared) layout(size driver.Size) *Layout {
-	l := &Layout{height: float64(size.Height), text: p.text, toUTF8: p.toUTF8, shadow: p.shadow, strut: p.strut, hasHidden: p.hasHidden}
+	l := &Layout{height: float64(size.Height), text: p.text, toUTF8: p.toUTF8, pads: p.pads, shadow: p.shadow, strut: p.strut, hasHidden: p.hasHidden}
 	if p.emptyHeight > 0 {
 		return l
 	}
@@ -1055,6 +1105,7 @@ type Layout struct {
 
 	text   string
 	toUTF8 []int
+	pads   []int // utf16Offsets'
 
 	// under are span backgrounds, over strikethroughs, both from the
 	// box's top left.
@@ -1142,6 +1193,13 @@ func (l *Layout) caretLines() driver.CaretLayout {
 		}
 		for n := len(cl.Clusters); n > 0 && l.breaksAt(cl.Clusters[n-1].Start); n-- {
 			cl.Clusters = cl.Clusters[:n-1]
+		}
+		if l.pads != nil {
+			cl.Start, cl.End = textOffset(l.pads, cl.Start), textOffset(l.pads, cl.End)
+			for k := range cl.Clusters {
+				c := &cl.Clusters[k]
+				c.Start, c.End = textOffset(l.pads, c.Start), textOffset(l.pads, c.End)
+			}
 		}
 		cl.RTL = len(cl.Clusters) > 0 && cl.Clusters[0].RTL
 		out = append(out, cl)

@@ -734,7 +734,8 @@ func (p *player) text(op *driver.DrawOp) {
 	if stroke {
 		color, grad = st.stroke, st.strokeGrad
 	}
-	str := attributed(&driver.AttributedText{Text: op.Text, Style: driver.TextStyle{Font: op.Font, Color: color}}, nil, nil)
+	t := driver.AttributedText{Text: op.Text, Style: driver.TextStyle{Font: op.Font, Color: color}}
+	str := attributed(&t, t.Text, nil, nil)
 	line := ctLineCreateWithAttrString(str)
 	Release(str)
 	defer Release(line)

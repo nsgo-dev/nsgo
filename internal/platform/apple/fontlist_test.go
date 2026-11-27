@@ -161,7 +161,7 @@ func TestKoreanBreaksBetweenWords(t *testing.T) {
 
 // runFaces returns the PostScript names of the faces text's runs are set in.
 func runFaces(st driver.TextStyle, text string) []string {
-	str := attributed(&driver.AttributedText{Text: text, Style: st}, nil, nil)
+	str := attributed(&driver.AttributedText{Text: text, Style: st}, text, nil, nil)
 	defer Release(str)
 	line := ctLineCreateWithAttrString(str)
 	defer Release(line)
