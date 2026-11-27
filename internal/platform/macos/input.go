@@ -677,8 +677,8 @@ func fallbackCaretScreenRect(self objc.ID, in *input, w objc.ID) (apple.CGRect, 
 		if local.Size.Height <= 0 {
 			return apple.CGRect{}, false
 		}
-		if lm, font := self.Send(sel("layoutManager")), self.Send(sel("font")); lm != 0 && font != 0 {
-			if lh := objc.Send[float64](lm, sel("defaultLineHeightForFont:"), font); lh > 0 && local.Size.Height > lh {
+		if font := self.Send(sel("font")); font != 0 {
+			if lh := defaultLineHeight(self, font); lh > 0 && local.Size.Height > lh {
 				if !objc.Send[bool](anchor, sel("isFlipped")) {
 					local.Origin.Y += local.Size.Height - lh
 				}
@@ -701,6 +701,54 @@ func fallbackCaretScreenRect(self objc.ID, in *input, w objc.ID) (apple.CGRect, 
 	winRect := objc.Send[apple.CGRect](anchor, sel("convertRect:toView:"), local, objc.ID(0))
 	screen := objc.Send[apple.CGRect](w, sel("convertRectToScreen:"), winRect)
 	return screen, screen.Size.Height > 0
+}
+
+// textKit2 returns tv's TextKit 2 layout manager, or 0 for a text view on
+// TextKit 1. A TextKit 2 text view asked for its layoutManager turns to
+// TextKit 1 for good, its text then laid out under the line style
+// setLineStyle gave it for TextKit 2: the text view's code asks this
+// first, and its layoutManager only without one.
+func textKit2(tv objc.ID) objc.ID {
+	manager := sel("textLayoutManager")
+	if !objc.Send[bool](tv, sel("respondsToSelector:"), manager) {
+		return 0
+	}
+	return tv.Send(manager)
+}
+
+// defaultLineHeight is the height of a line of font in tv, which a caret
+// takes where no text places it.
+func defaultLineHeight(tv, font objc.ID) float64 {
+	if textKit2(tv) != 0 {
+		return objc.Send[float64](font, sel("ascender")) - objc.Send[float64](font, sel("descender")) + objc.Send[float64](font, sel("leading"))
+	}
+	if lm := tv.Send(sel("layoutManager")); lm != 0 {
+		return objc.Send[float64](lm, sel("defaultLineHeightForFont:"), font)
+	}
+	return 0
+}
+
+// ensureTextLayout lays out all of tv's text.
+func ensureTextLayout(tv objc.ID) {
+	if tlm := textKit2(tv); tlm != 0 {
+		tlm.Send(sel("ensureLayoutForRange:"), tlm.Send(sel("documentRange")))
+		return
+	}
+	if lm, tc := tv.Send(sel("layoutManager")), tv.Send(sel("textContainer")); lm != 0 && tc != 0 {
+		lm.Send(sel("ensureLayoutForTextContainer:"), tc)
+	}
+}
+
+// usedTextHeight is the height tv's text laid out so far takes in its
+// container.
+func usedTextHeight(tv objc.ID) float64 {
+	if tlm := textKit2(tv); tlm != 0 {
+		return objc.Send[apple.CGRect](tlm, sel("usageBoundsForTextContainer")).Size.Height
+	}
+	if lm, tc := tv.Send(sel("layoutManager")), tv.Send(sel("textContainer")); lm != 0 && tc != 0 {
+		return objc.Send[apple.CGRect](lm, sel("usedRectForTextContainer:"), tc).Size.Height
+	}
+	return 0
 }
 
 // selectionChanged reports the user's selection.
@@ -1170,8 +1218,7 @@ func (in *input) setLineStyle(font, color objc.ID, lineHeight driver.Points, ali
 		in.editorLift = in.lift
 		// TextKit 2 uses the line box for editing geometry. Put surplus
 		// height below that box and move the origin to keep the baselines.
-		manager := sel("textLayoutManager")
-		if in.lift > 0 && objc.Send[bool](tv, sel("respondsToSelector:"), manager) && tv.Send(manager) != 0 {
+		if in.lift > 0 && textKit2(tv) != 0 {
 			height = driver.Points(natural)
 			in.editorLift = -in.lift
 		}
@@ -1384,11 +1431,8 @@ func (in *input) scrollMetrics() (offset driver.Point, maxY driver.Points) {
 	}
 	docFrame := objc.Send[apple.CGRect](in.field, selFrame)
 	docH := docFrame.Size.Height
-	if lm, tc := in.field.Send(sel("layoutManager")), in.field.Send(sel("textContainer")); lm != 0 && tc != 0 {
-		used := objc.Send[apple.CGRect](lm, sel("usedRectForTextContainer:"), tc)
-		inset := objc.Send[apple.CGSize](in.field, sel("textContainerInset"))
-		docH = max(docH, used.Size.Height+2*inset.Height)
-	}
+	inset := objc.Send[apple.CGSize](in.field, sel("textContainerInset"))
+	docH = max(docH, usedTextHeight(in.field)+2*inset.Height)
 	maxY = driver.Points(max(docH-clipBounds.Size.Height, 0))
 	return offset, maxY
 }
@@ -1432,9 +1476,7 @@ func (v *view) scrollInputTo(p driver.Point, animated bool) {
 	}
 	in.scrollApplied++
 	v.native.Send(sel("layoutSubtreeIfNeeded"))
-	if lm, tc := in.field.Send(sel("layoutManager")), in.field.Send(sel("textContainer")); lm != 0 && tc != 0 {
-		lm.Send(sel("ensureLayoutForTextContainer:"), tc)
-	}
+	ensureTextLayout(in.field)
 	_, maxY := in.scrollMetrics()
 	clip := in.host.Send(sel("contentView"))
 	if clip == 0 {

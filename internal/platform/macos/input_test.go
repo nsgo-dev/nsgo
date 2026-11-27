@@ -252,6 +252,54 @@ func TestMultilineInputEditingGeometryFitsTheFont(t *testing.T) {
 	})
 }
 
+// TestMultilineInputStaysOnTextKit2 checks that measuring, scrolling and placing an input method's window over a multiline input leave its text view on TextKit 2: asking it for its layoutManager would turn it to TextKit 1 under setLineStyle's TextKit 2 line style, which grows its caret to the line box and moves where a press below the text lands.
+func TestMultilineInputStaysOnTextKit2(t *testing.T) {
+	onMain(func() {
+		loadAppKit()
+		window := objc.ID(multilineGeometryWindow()).Send(selAlloc).Send(sel("initWithContentRect:styleMask:backing:defer:"),
+			apple.Rect(0, 0, 300, 60), uint(0), uint(2), false)
+		window.Send(sel("setReleasedWhenClosed:"), false)
+		defer window.Send(selRelease)
+		s := &surface{views: make([]*view, 2), animator: driver.NewAnimator(func(driver.Event) {})}
+		v := s.create(driver.KindInput, 1)
+		s.views[v.id] = v
+		defer s.delete(v, false)
+		config := driver.InputConfig{
+			Multiline: true,
+			Style:     driver.TextStyle{Font: driver.Font{Size: 14.5, Weight: 400}, LineHeight: 22, Color: driver.RGB(0)},
+			Padding:   driver.Edges{Top: 5, Right: 10, Bottom: 5, Left: 10},
+			Content:   driver.Bounds{Origin: driver.Point{X: 10, Y: 5}, Size: driver.Size{Width: 280, Height: 44}},
+		}
+		v.configure(&config)
+		editor := v.input.field
+		if textKit2(editor) == 0 {
+			t.Skip("requires a TextKit 2 editor")
+		}
+		window.Send(sel("contentView")).Send(selAddSubview, v.native)
+		v.native.Send(selSetFrame, apple.Rect(0, 0, 300, 54))
+		v.input.replaceText("HHHH\n")
+		window.Send(sel("makeFirstResponder:"), editor)
+		v.input.reportScroll(true)
+		v.scrollInputTo(driver.Point{}, false)
+		fallbackCaretScreenRect(editor, v.input, window)
+		v.configure(&config)
+		if textKit2(editor) == 0 {
+			t.Fatal("the editor turned to TextKit 1")
+		}
+		editor.Send(selSetSelRange, apple.NSRange{Location: 0})
+		v.native.Send(sel("layoutSubtreeIfNeeded"))
+		font := editor.Send(sel("font"))
+		natural := objc.Send[float64](font, sel("ascender")) - objc.Send[float64](font, sel("descender"))
+		for _, sub := range apple.Subviews(editor) {
+			if objc.Send[bool](sub, sel("isKindOfClass:"), apple.Class("NSTextInsertionIndicator")) {
+				if h := objc.Send[apple.CGRect](sub, sel("frame")).Size.Height; math.Abs(h-natural) > 1 {
+					t.Errorf("the caret is %.2f pt tall, want the font's %.2f pt", h, natural)
+				}
+			}
+		}
+	})
+}
+
 // baselines returns the baselines of the lines of dark ink v draws in a w by h box, from its top: the bottom of each band of rows with ink, which is where capitals stand.
 func baselines(v objc.ID, w, h float64) []float64 {
 	rep := v.Send(sel("bitmapImageRepForCachingDisplayInRect:"), apple.Rect(0, 0, w, h))
