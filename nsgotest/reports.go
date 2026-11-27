@@ -468,7 +468,7 @@ func (a *App) CloseEditMenu() {
 	a.Settle()
 }
 
-// CloseWindow asks the main window to close, as its close button does, and reports whether it closed: its OnClosing handlers run newest first, and Windows and Linux also ask OnQuitRequest if the close would end the app. It needs a main window open, which a macOS environment, or StartApp with a Windows or Linux one, opens, and runs headless only.
+// CloseWindow asks the main window to close, as its close button does, and reports whether it closed: its OnClosing handlers run newest first, then OnQuitRequest handlers if the close would end the desktop app. It needs a main window open, which a macOS environment, or StartApp with a Windows or Linux one, opens, and runs headless only.
 func (a *App) CloseWindow() bool {
 	a.t.Helper()
 	if a.target == nil && (a.appTree == nil || a.tree == a.appTree) {

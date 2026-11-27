@@ -1035,7 +1035,7 @@ func TestDesktopLastWindowKeepsItsViewDuringAQuitRequest(t *testing.T) {
 	if Target() != "" {
 		t.Skip("checks the headless window model")
 	}
-	for _, os := range []core.OS{core.OSWindows, core.OSLinux} {
+	for _, os := range []core.OS{core.OSMacOS, core.OSWindows, core.OSLinux} {
 		var closing, requested int
 		var answer func(bool)
 		var main, other *desktop.Window

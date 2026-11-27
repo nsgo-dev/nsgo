@@ -85,7 +85,7 @@ func MainWindow(cx *core.Scope) *Window { return cx.MainWindow() }
 // handler the main window shows and takes the focus.
 func OnReopen(cx *core.Scope, fn func()) { cx.OnReopen(fn) }
 
-// OnQuitRequest runs fn when the user chooses Quit from a desktop menu, or the system ends the session. On Windows and Linux, closing a window also asks when its close would end the app. Handlers run newest first and may cancel or defer a user quit. Check QuitRequest.Forced before asking the user for a decision. core.Scope.Quit and Restart quit without asking.
+// OnQuitRequest runs fn when the user chooses Quit, when closing a window would end the desktop app (after OnClosing), or when the system ends the session. Handlers run newest first and may cancel or defer a user quit. Check QuitRequest.Forced before asking the user for a decision. core.Scope.Quit and Restart quit without asking.
 //
 //	desktop.OnQuitRequest(cx, func(q *desktop.QuitRequest) {
 //		if q.Forced() || !dirty.Get() {

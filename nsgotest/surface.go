@@ -111,7 +111,8 @@ func (s *Surface) checkOpen() *App {
 }
 
 // Close asks the surface to close as its close button does, and reports
-// whether it closed. Its OnClosing handlers can cancel the request.
+// whether it closed. OnClosing can cancel the close; OnQuitRequest can
+// cancel or defer it if the close would end the desktop app.
 func (s *Surface) Close() bool {
 	s.app.t.Helper()
 	m := s.open()

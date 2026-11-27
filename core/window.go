@@ -465,8 +465,8 @@ func (w *Window) OnClosing(cx *Scope, fn func(*WindowClosing)) {
 	h.owner.addCleanup(func() { w.closing = slices.DeleteFunc(w.closing, func(o *closingHandler) bool { return o == h }) })
 }
 
-// requestClose asks the OnClosing handlers, then closes the window
-// unless one canceled.
+// requestClose asks the OnClosing handlers, then asks OnQuitRequest if
+// this user close would end a desktop app. A refusal keeps the window open.
 func (w *Window) requestClose() {
 	c := &WindowClosing{}
 	for i := len(w.closing) - 1; i >= 0; i-- {
@@ -479,7 +479,7 @@ func (w *Window) requestClose() {
 	t := w.t
 	rt := t.rt
 	switch t.reported.OS {
-	case OSWindows, OSLinux:
+	case OSMacOS, OSWindows, OSLinux:
 		if w.endsApp(rt.main == w) {
 			rt.requestQuit(false, func(approved bool) {
 				if approved {

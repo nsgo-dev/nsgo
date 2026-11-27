@@ -19,18 +19,26 @@ import (
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
 )
 
+// Run registers AppKit classes once per process, so each run (-count included) needs its own process.
+func inQuitTestProcess(t *testing.T) bool {
+	t.Helper()
+	if os.Getenv("NSGO_TEST_QUIT_PROCESS") == t.Name() {
+		t.Setenv("HOME", t.TempDir())
+		return true
+	}
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
+	cmd.Env = append(os.Environ(), "NSGO_TEST_QUIT_PROCESS="+t.Name(), "GOTRACEBACK=all")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	return false
+}
+
 // TestTerminateAsksTheAppAndReturnsFromRun sends AppKit's terminate: as Cmd+Q, the Dock and a tray menu do, each from a block on the main queue as a tray menu's Quit is: the first request is canceled, the second deferred while a third terminate: comes and then approved, and Run returns with OnQuit run.
 func TestTerminateAsksTheAppAndReturnsFromRun(t *testing.T) {
-	// Run registers the app's AppKit classes once a process, so each run of the test, -count's included, gets a process of its own.
-	if os.Getenv("NSGO_TEST_QUIT_PROCESS") != t.Name() {
-		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^"+t.Name()+"$", "-test.v")
-		cmd.Env = append(os.Environ(), "NSGO_TEST_QUIT_PROCESS="+t.Name(), "GOTRACEBACK=all")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("%v\n%s", err, out)
-		}
+	if !inQuitTestProcess(t) {
 		return
 	}
-	t.Setenv("HOME", t.TempDir())
 	var terminate func()
 	terminate = func() {
 		apple.OnMain(func() {
@@ -69,6 +77,77 @@ func TestTerminateAsksTheAppAndReturnsFromRun(t *testing.T) {
 	onMain(func() { Run(app, Options{Title: "Quit", Width: 200, Height: 100}) })
 	if got := requests.Load(); got != 2 {
 		t.Errorf("the app heard %d quit requests, want 2", got)
+	}
+	if got := quits.Load(); got != 1 {
+		t.Errorf("OnQuit ran %d times, want 1", got)
+	}
+}
+
+func TestMacOSLastWindowAsksBeforeQuitting(t *testing.T) {
+	if testing.Short() {
+		t.Skip("opens a window")
+	}
+	if !inQuitTestProcess(t) {
+		return
+	}
+	visibleWindow := func() objc.ID {
+		for s := range surfaces {
+			if s.id != 0 && !s.closed && s.window != 0 && objc.Send[bool](s.window, sel("isVisible")) {
+				return s.window
+			}
+		}
+		return 0
+	}
+	var requestClose func()
+	requestClose = func() {
+		apple.OnMain(func() {
+			if w := visibleWindow(); w != 0 {
+				w.Send(sel("performClose:"), objc.ID(0))
+				return
+			}
+			time.AfterFunc(5*time.Millisecond, requestClose)
+		})
+	}
+	var closing, requested, quits atomic.Int32
+	app := core.AppRoot(func(cx *core.Scope) {
+		w := cx.OpenWindow(core.WindowOptions{Title: "Last window", Width: 200, Height: 100}, func(*core.Scope) core.Node {
+			return core.Text{Content: "Last window"}
+		})
+		w.OnClosing(cx, func(c *core.WindowClosing) {
+			if closing.Add(1) == 1 {
+				c.Cancel()
+				requestClose()
+			}
+		})
+		cx.OnQuitRequest(func(q *core.QuitRequest) {
+			n := requested.Add(1)
+			if q.Forced() || closing.Load() != n+1 || w.Closed() {
+				t.Error("quit request did not follow an approved close on an open window")
+			}
+			if n == 1 {
+				q.Cancel()
+				requestClose()
+				return
+			}
+			done := q.Defer()
+			apple.OnMain(func() {
+				if visibleWindow() == 0 {
+					t.Error("window disappeared before the deferred answer")
+				}
+				done(true)
+			})
+		})
+		cx.OnQuit(func(context.Context) { quits.Add(1) })
+		requestClose()
+	})
+	watchdog := time.AfterFunc(10*time.Second, func() { panic("Run did not return after approving the last window's close") })
+	defer watchdog.Stop()
+	onMain(func() { Run(app, Options{Title: "Last window quit", HideDock: true}) })
+	if got := closing.Load(); got != 3 {
+		t.Errorf("OnClosing ran %d times, want 3", got)
+	}
+	if got := requested.Load(); got != 2 {
+		t.Errorf("OnQuitRequest ran %d times, want 2", got)
 	}
 	if got := quits.Load(); got != 1 {
 		t.Errorf("OnQuit ran %d times, want 1", got)
