@@ -24,6 +24,8 @@ cx.ShowAlert(core.AlertConfig{
 })
 ```
 
+A test answers an alert as a user does; see [Testing](testing.md).
+
 `SetClipboard` writes text and `SetClipboardImage` an image. `ReadClipboard`, `ReadClipboardImage` and `ReadClipboardFiles` answer asynchronously, and `HasClipboardText` and `HasClipboardImage` read what the clipboard holds without a paste notice. `core.FileFromURL` opens the URLs `ReadClipboardFiles` and `View.OnFileDrop` give as a `core.File`: `file:` URLs, and on the web `blob:` URLs.
 
 tvOS has no public pasteboard. Clipboard writes are ignored, reads return no content, and presence checks return false.

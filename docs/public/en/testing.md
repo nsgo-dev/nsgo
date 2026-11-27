@@ -124,6 +124,12 @@ Headless tests simulate game controllers with `app.ConnectGamepad(id, name)`, `a
 
 `app.FindMounted("id:tab-bar").TabBadge(index)` returns a native tab's text or dot badge in headless and target tests. On a drawn `ui.TabShell` tab, `Props.Value.Text` is the value announced for the badge.
 
+## Alerts
+
+A headless test sees an alert the app shows with `cx.ShowAlert` as a user sees it. `app.Alerts()` lists the alerts shown and not yet answered, oldest first, each with its title, message and the actions it offers; `app.Answer(index)` presses the action at that index of the oldest alert, or dismisses it with -1, and returns once what the answer starts has run.
+
+An alert still unanswered when the next step starts gets its default answer: its cancel action, else a dismissal when the alert can be closed without one, else the step fails. `nsgotest.PendingAlerts()` leaves the alerts unanswered between steps, so a test reads them in `app.Alerts()` and answers them itself. `app.OnAlert` answers each alert as soon as the step that showed it ends, with the index of the action the user presses, or -1 to dismiss it; an answer that brings its alert back again fails the step.
+
 ## Run the tests
 
 ```sh
