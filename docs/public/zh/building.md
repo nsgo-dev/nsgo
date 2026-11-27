@@ -31,6 +31,17 @@ nsgo build
 
 比原始模块更小时，网站会包含 `.wasm.br` 和 `.wasm.gz`。在支持预压缩的服务器上启用它，从原有的 `.wasm` URL 提供压缩模块，并设置 `Content-Type: application/wasm`、相应的 `Content-Encoding` 和 `Vary: Accept-Encoding`。原始模块可以部署到任何静态服务器。
 
+### Web 存储
+
+浏览器默认使用 `localStorage`，应用配额仍为 5 MiB。在 `nsgo.yaml` 中将 `web.storage` 设为 `indexeddb` 可将应用配额提高到 64 MiB，但仍受浏览器自身配额和存储策略限制。此配置对独立页面及通过 Web 加载器嵌入的应用均生效。
+
+```yaml
+web:
+  storage: indexeddb
+```
+
+数据与页面的来源和应用 ID 绑定。切换后端不会迁移数据，旧后端仍保留原条目。如何处理读写错误，参见[存储](services.md#存储)。
+
 ## Terminal
 
 在交互式终端中执行 `nsgo dev -target tui`，即可运行应用。`nsgo test -target tui` 通过 `nsgotest.Main` 在终端中运行测试，每个测试进程只打开一个应用。终端决定视口大小，每格对应 8×16 个布局点。应用显式选择自己的样式，组件保留通常的形态和尺寸。`examples/tui` 演示了输入框、按钮、快捷键和尺寸变化。

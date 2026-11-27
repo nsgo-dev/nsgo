@@ -37,6 +37,21 @@ func TestLoadMissingFile(t *testing.T) {
 	}
 }
 
+func TestLoadWebStorage(t *testing.T) {
+	dir := t.TempDir()
+	for _, storage := range []string{"localstorage", "indexeddb", "invalid"} {
+		writeYAML(t, dir, "name: My Game\nweb:\n  storage: "+storage+"\n")
+		cfg, err := project.Load(dir)
+		if storage == "invalid" {
+			if err == nil || !strings.Contains(err.Error(), "web.storage") {
+				t.Fatalf("invalid storage: %v", err)
+			}
+		} else if err != nil || cfg.Web.Storage != storage {
+			t.Fatalf("web.storage %q: config = %v, error = %v", storage, cfg, err)
+		}
+	}
+}
+
 func TestLoadDefaults(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "name: My Game\n")

@@ -31,6 +31,17 @@ Each file is named `<name>-<version>-<system>-<arch>`, such as `hello-1.2.0-wind
 
 The web site includes `.wasm.br` and `.wasm.gz` when they are smaller than the original module. Enable precompressed files on hosts that support them. Serve them at the original `.wasm` URL with `Content-Type: application/wasm`, the matching `Content-Encoding`, and `Vary: Accept-Encoding`. The original module works on any static host. [Publishing on the web](web.md) covers semantic headings, browser links, per-page metadata and CDN loading.
 
+### Web storage
+
+The default browser backend is `localStorage`, with the existing 5 MiB app quota. Set `web.storage` to `indexeddb` in `nsgo.yaml` to raise the app quota to 64 MiB, subject to the browser's own quota and storage policy. The setting applies to the standalone page and the web loader's embedded mounts.
+
+```yaml
+web:
+  storage: indexeddb
+```
+
+Data is tied to the page's origin and app ID. Switching backends does not migrate data; the former backend still holds its entries. See [Storage](services.md#storage) for handling read and write errors.
+
 ### Offline web packages
 
 Set `web.offline: true` in `nsgo.yaml` to cache a web release on its first online launch.

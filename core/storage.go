@@ -49,11 +49,19 @@ type StorageChange struct {
 // StorageBackend keeps a host's entries for NewStore.
 type StorageBackend interface {
 	// Load returns the entries kept, read once when the store is first used.
-	// An error starts the store empty and is logged.
+	// An error leaves the store unreadable and prevents changes to it.
 	Load() (map[string]string, error)
 	// Write keeps change. Calls are serialized in change order, on the
-	// goroutine that made each change. A backend that blocks writes elsewhere.
+	// goroutine that made each change. Legacy backends may queue writes.
 	Write(change StorageChange)
+}
+
+// StorageBackendWithErrors optionally replaces Write with a checked write.
+// WriteErr must keep the change before it returns nil. A failed change
+// is not applied to the store or reported to its watchers.
+type StorageBackendWithErrors interface {
+	StorageBackend
+	WriteErr(change StorageChange) error
 }
 
 // Store holds an app's entries in memory, loaded from its backend on first
@@ -65,12 +73,38 @@ type Store struct {
 	backend  StorageBackend
 	entries  map[string]string
 	bytes    int
+	quota    int
+	loadErr  error
+	writeErr error
 	watchers []*storageWatch
 }
 
 // NewStore returns a store kept by backend, or only in memory when backend
 // is nil.
 func NewStore(backend StorageBackend) *Store { return &Store{backend: backend} }
+
+// NewStoreWithQuota configures a store's quota in UTF-8 bytes of its keys
+// and values. A nonpositive quota uses StorageQuota.
+func NewStoreWithQuota(backend StorageBackend, quota int) *Store {
+	return &Store{backend: backend, quota: quota}
+}
+
+func (s *Store) limit() int {
+	if s.quota > 0 {
+		return s.quota
+	}
+	return StorageQuota
+}
+
+func (s *Store) err() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.load()
+	if s.loadErr != nil {
+		return s.loadErr
+	}
+	return s.writeErr
+}
 
 // load reads the backend's entries once. The caller holds mu.
 func (s *Store) load() {
@@ -83,6 +117,7 @@ func (s *Store) load() {
 	}
 	entries, err := s.backend.Load()
 	if err != nil {
+		s.loadErr = err
 		log.Printf("nsgo: the app's storage could not be read: %v", err)
 		return
 	}
@@ -128,28 +163,32 @@ func (s *Store) partitionBytes(prefix string) int {
 	return n
 }
 
-// change applies c, hands it to the backend and tells the graphs watching,
-// all under mu so every graph and the backend see changes in one order. It
-// reports whether anything changed.
-func (s *Store) change(c StorageChange, from *runtime, part partition) (bool, error) {
+// change persists c, applies it and tells the graphs watching, all under
+// mu so every graph and the backend see changes in one order.
+func (s *Store) change(c StorageChange, from *runtime, part partition) (bool, []string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.load()
+	if s.loadErr != nil {
+		return false, nil, s.loadErr
+	}
+	s.writeErr = nil
 	if c.Op == StorageClear && (part.prefix != "" || s.partitioned()) {
-		return s.clearPart(part.prefix, from), nil
+		removed, err := s.clearPart(part.prefix, from)
+		return len(removed) != 0, removed, err
 	}
 	switch c.Op {
 	case StorageSet:
 		old, had := s.entries[c.Key]
 		if had && old == c.Value {
-			return false, nil
+			return false, nil, nil
 		}
 		n := s.bytes + len(c.Key) + len(c.Value)
 		if had {
 			n -= len(c.Key) + len(old)
 		}
-		if n > StorageQuota {
-			return false, &StorageFullError{Bytes: n, Quota: StorageQuota}
+		if quota := s.limit(); n > quota {
+			return false, nil, &StorageFullError{Bytes: n, Quota: quota}
 		}
 		if part.prefix != "" && part.quota > 0 {
 			p := s.partitionBytes(part.prefix) + len(c.Key) - len(part.prefix) + len(c.Value)
@@ -157,34 +196,51 @@ func (s *Store) change(c StorageChange, from *runtime, part partition) (bool, er
 				p -= len(c.Key) - len(part.prefix) + len(old)
 			}
 			if p > part.quota {
-				return false, &StorageFullError{Bytes: p, Quota: part.quota}
+				return false, nil, &StorageFullError{Bytes: p, Quota: part.quota}
 			}
+		}
+		if err := s.persist(c); err != nil {
+			return false, nil, err
 		}
 		s.entries[c.Key], s.bytes = c.Value, n
 	case StorageRemove:
 		old, had := s.entries[c.Key]
 		if !had {
-			return false, nil
+			return false, nil, nil
+		}
+		if err := s.persist(c); err != nil {
+			return false, nil, err
 		}
 		delete(s.entries, c.Key)
 		s.bytes -= len(c.Key) + len(old)
 	case StorageClear:
 		if len(s.entries) == 0 {
-			return false, nil
+			return false, nil, nil
+		}
+		if err := s.persist(c); err != nil {
+			return false, nil, err
 		}
 		clear(s.entries)
 		s.bytes = 0
 	}
 	s.tell(c, from)
-	return true, nil
+	return true, nil, nil
 }
 
-// tell hands c to the backend and the graphs watching but from. The
-// caller holds mu.
-func (s *Store) tell(c StorageChange, from *runtime) {
+// persist hands c to the backend. The caller holds mu.
+func (s *Store) persist(c StorageChange) error {
+	if backend, ok := s.backend.(StorageBackendWithErrors); ok {
+		s.writeErr = backend.WriteErr(c)
+		return s.writeErr
+	}
 	if s.backend != nil {
 		s.backend.Write(c)
 	}
+	return nil
+}
+
+// tell reports c to the other graphs watching. The caller holds mu.
+func (s *Store) tell(c StorageChange, from *runtime) {
 	for _, w := range s.watchers {
 		if w.rt != from {
 			w.post(c)
@@ -204,8 +260,9 @@ func (s *Store) partitioned() bool {
 }
 
 // clearPart removes the entries of the partition prefix names, the app's
-// own when "", one by one, so the others stay. The caller holds mu.
-func (s *Store) clearPart(prefix string, from *runtime) bool {
+// own when "", one by one, returning the keys committed so far. The
+// caller holds mu.
+func (s *Store) clearPart(prefix string, from *runtime) ([]string, error) {
 	var gone []string
 	for k := range s.entries {
 		if strings.HasPrefix(k, prefix) && (prefix != "" || !strings.HasPrefix(k, partitionMark)) {
@@ -213,12 +270,16 @@ func (s *Store) clearPart(prefix string, from *runtime) bool {
 		}
 	}
 	slices.Sort(gone)
-	for _, k := range gone {
+	for i, k := range gone {
+		c := StorageChange{Op: StorageRemove, Key: k}
+		if err := s.persist(c); err != nil {
+			return gone[:i], err
+		}
 		s.bytes -= len(k) + len(s.entries[k])
 		delete(s.entries, k)
-		s.tell(StorageChange{Op: StorageRemove, Key: k}, from)
+		s.tell(c, from)
 	}
-	return len(gone) > 0
+	return gone, nil
 }
 
 func (s *Store) watch(w *storageWatch) {
@@ -265,11 +326,23 @@ func (w *storageWatch) changed(c StorageChange) {
 	})
 }
 
+// removed bumps only the keys cleared from a partition, and the key set.
+func (w *storageWatch) removed(keys []string) {
+	w.rt.root.Batch(func() {
+		w.all.Update(func(n uint64) uint64 { return n + 1 })
+		for _, k := range keys {
+			if sig := w.keys[k]; sig != nil {
+				sig.Update(func(n uint64) uint64 { return n + 1 })
+			}
+		}
+	})
+}
+
 // Storage is the app's key-value storage: strings by string key, kept on
-// the device and shared by every graph of the app. Reads are synchronous,
-// as the entries are in memory, and reading in a computation subscribes it
-// to changes, the app's own and other graphs'. Use it where the app's code
-// runs: components, handlers, effects and posted functions.
+// the device and shared by every graph of the app. Reads are served from
+// memory after the first use loads the store. Reading in a computation
+// subscribes it to changes. Use Storage where the app's code runs:
+// components, handlers, effects and posted functions.
 type Storage struct {
 	store *Store
 	watch *storageWatch
@@ -290,7 +363,7 @@ type storageKey struct{}
 // the app's storage, name's, in place of the whole: its keys are only
 // theirs, the app's own Storage neither lists nor clears them, and they
 // hold at most quota bytes, 0 for no quota of their own; they count
-// against the app's StorageQuota too. A host app gives code it did not
+// against the app store's quota too. A host app gives code it did not
 // write a partition of its own this way (tsx.View).
 func (cx *Scope) ProvideStorage(name string, quota int) {
 	o := cx.current()
@@ -349,13 +422,19 @@ func (s Storage) GetItem(key string) (string, bool) {
 	return s.store.get(key)
 }
 
-// SetItem sets key to value. It fails with a *StorageFullError when the
-// storage would grow past StorageQuota, keeping what it held.
+// Err loads storage if necessary and reports a load failure or the
+// persistence error from the most recent mutation. A load failure lasts
+// for the life of the store and prevents all mutations.
+func (s Storage) Err() error { return s.store.err() }
+
+// SetItem sets key to value. It fails if storage could not be loaded or
+// written, or with a *StorageFullError if it would grow past the quota.
+// On failure it leaves the previous value intact.
 func (s Storage) SetItem(key, value string) error {
 	return s.apply(StorageChange{Op: StorageSet, Key: s.part.prefix + key, Value: value})
 }
 
-// RemoveItem removes key.
+// RemoveItem removes key. Check Err immediately after it for a failure.
 func (s Storage) RemoveItem(key string) {
 	s.apply(StorageChange{Op: StorageRemove, Key: s.part.prefix + key})
 }
@@ -366,18 +445,18 @@ func (s Storage) Keys() []string {
 	return s.store.keys(s.part.prefix)
 }
 
-// Clear removes every entry.
+// Clear removes every entry in this storage. Check Err immediately after
+// it for a failure. A clear that removes keys individually stops at the
+// first failed removal, keeping that key and those not yet removed.
 func (s Storage) Clear() {
 	s.apply(StorageChange{Op: StorageClear})
 }
 
 func (s Storage) apply(c StorageChange) error {
-	changed, err := s.store.change(c, s.watch.rt, s.part)
-	if changed {
-		if c.Op == StorageClear {
-			// A part cleared bumps every key's signal, as a clear does.
-			c = StorageChange{Op: StorageClear}
-		}
+	changed, removed, err := s.store.change(c, s.watch.rt, s.part)
+	if len(removed) != 0 {
+		s.watch.removed(removed)
+	} else if changed {
 		s.watch.changed(c)
 	}
 	return err

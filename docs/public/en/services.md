@@ -142,21 +142,25 @@ Use `audio.NewOutput(cx, audio.OutputConfig{SampleRate: 48000, Channels: 2, Rend
 
 ## Storage
 
-`cx.Storage()` is the app's key-value storage, kept on the device and shared by every graph of the app. Reads are synchronous and read inside a computation subscribe it to changes; `SetItem` returns a `core.StorageFullError` past the quota (`core.StorageQuota`, 5 MiB by default). It is a plain file any program of the user's can read, so keep tokens and passwords in [secrets](#secrets) instead.
+`cx.Storage()` is the app's string key-value store. The first use loads the entries; subsequent reads are served from memory, and reads in a computation subscribe it to changes. `Storage.Err()` reports a failed load (for example, in a sandboxed iframe); that store will refuse all mutations. `SetItem` returns `*core.StorageFullError` above the app's quota (`core.StorageQuota`, 5 MiB by default), or an error if the browser refuses the write. A failed set keeps the previous value.
 
 `cx.Store()` returns the underlying store, for a host that creates another root with `core.RootOptions.Storage`, such as one running a plugin on a goroutine of its own: both roots then share the app's entries and what is kept on the device. It is the whole store, not the partition `cx.ProvideStorage` gives code the app did not write.
 
-A host supplying its own persistence calls `core.NewStore(backend)` with a `core.StorageBackend`: `Load() (map[string]string, error)` loads once, and `Write(core.StorageChange)` receives changes in order. Switch on `change.Op` (`core.StorageSet`, `core.StorageRemove`, `core.StorageClear`) and use `change.Key` and `change.Value`. Pass `nil` for storage held only in memory.
+A host supplying its own persistence calls `core.NewStore(backend)` with a `core.StorageBackend`: `Load() (map[string]string, error)` loads once, and `Write(core.StorageChange)` receives changes in order. Optionally implement `core.StorageBackendWithErrors` to run `WriteErr(core.StorageChange) error` instead of `Write`, returning success only once the change is kept. Switch on `change.Op` (`core.StorageSet`, `core.StorageRemove`, `core.StorageClear`) and use `change.Key` and `change.Value`. Pass `nil` for storage held only in memory.
 
 ```go
 store := cx.Storage()
 if tab, ok := store.GetItem("tab"); ok {
 	selected.Set(tab)
 }
-store.SetItem("tab", "library")
+if err := store.SetItem("tab", "library"); err != nil {
+	log.Printf("settings could not be saved: %v", err)
+}
 ```
 
-`store.Keys()` lists the keys, `RemoveItem` deletes one and `Clear` empties the storage. `cx.DataDir()` and `cx.CacheDir()` give the app's folders for files the key-value storage is too small for; `cx.LogsDir()` gives the platform's directory for log files, and a `Scope.ProvideStorage` gives a subtree a partition of its own.
+`store.Keys()` lists the keys, `RemoveItem` deletes one and `Clear` empties the storage. Call `store.Err()` immediately after either of those two mutators to check for a persistence failure. A clear that removes keys individually stops if a removal fails. `cx.DataDir()` and `cx.CacheDir()` give the app's folders for files the key-value storage is too small for; `cx.LogsDir()` gives the platform's directory for log files, and `Scope.ProvideStorage` gives a subtree a partition of its own.
+
+On the web, the default backend is `localStorage`. For larger saves, set [`web.storage: indexeddb`](building.md#web-storage). IndexedDB writes return only after the transaction commits; save before navigation rather than relying on a page-close handler. Neither backend encrypts its data: keep tokens and passwords in [secrets](#secrets) on targets that support them.
 
 An iOS App Clip and its full app share these data and storage locations when `app_clip` and explicit `apple.app_group` are configured; their caches stay separate. Enabling the group does not migrate existing sandbox data. [App Clip storage](building.md#app-clips) covers configuration and signing.
 

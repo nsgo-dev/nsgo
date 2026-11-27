@@ -5,6 +5,7 @@ package web
 import (
 	"fmt"
 	"log"
+	"strings"
 	"syscall/js"
 
 	"github.com/nsgo-dev/nsgo/internal/driver"
@@ -17,23 +18,52 @@ type localStorage struct {
 	prefix string
 }
 
-func newLocalStorage(id string) *localStorage {
+func storageAppID(id string) string {
 	if id == "" {
-		id = "default"
+		return "default"
 	}
-	return &localStorage{prefix: "nsgo:" + id + ":"}
+	return id
+}
+
+func newLocalStorage(id string) *localStorage {
+	return &localStorage{prefix: "nsgo:" + storageAppID(id) + ":"}
+}
+
+// Value.Get does not catch JavaScript exceptions. In an opaque-origin
+// frame, even reading window.localStorage (or indexedDB) can throw.
+func storageGlobal(name string) js.Value {
+	return js.Global().Get("Reflect").Call("get", js.Global(), name)
+}
+
+func storageException(op string, err *error) {
+	if r := recover(); r != nil {
+		if e, ok := r.(js.Error); ok {
+			*err = fmt.Errorf("%s: %s", op, e.Value.Call("toString").String())
+			return
+		}
+		panic(r)
+	}
+}
+
+func localStorageValue() (js.Value, error) {
+	ls := storageGlobal("localStorage")
+	if !ls.Truthy() {
+		return ls, fmt.Errorf("localStorage is unavailable")
+	}
+	return ls, nil
 }
 
 func (l *localStorage) Load() (entries map[string]string, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("localStorage: %v", r)
-		}
-	}()
-	ls := js.Global().Get("localStorage")
+	defer storageException("localStorage load", &err)
+	ls, err := localStorageValue()
+	if err != nil {
+		return nil, err
+	}
 	entries = map[string]string{}
 	for _, k := range l.keys(ls) {
-		entries[k[len(l.prefix):]] = ls.Call("getItem", k).String()
+		if v := ls.Call("getItem", k); !v.IsNull() {
+			entries[k[len(l.prefix):]] = v.String()
+		}
 	}
 	return entries, nil
 }
@@ -43,7 +73,7 @@ func (l *localStorage) keys(ls js.Value) []string {
 	var keys []string
 	for i, n := 0, ls.Get("length").Int(); i < n; i++ {
 		k := ls.Call("key", i).String()
-		if len(k) >= len(l.prefix) && k[:len(l.prefix)] == l.prefix {
+		if strings.HasPrefix(k, l.prefix) {
 			keys = append(keys, k)
 		}
 	}
@@ -51,14 +81,17 @@ func (l *localStorage) keys(ls js.Value) []string {
 }
 
 func (l *localStorage) Write(c driver.StorageChange) {
-	defer func() {
-		// The browser refuses writes past its own quota or in some
-		// private modes; the entries stay in memory.
-		if r := recover(); r != nil {
-			log.Printf("nsgo: the app's storage could not be written: %v", r)
-		}
-	}()
-	ls := js.Global().Get("localStorage")
+	if err := l.WriteErr(c); err != nil {
+		log.Printf("nsgo: the app's storage could not be written: %v", err)
+	}
+}
+
+func (l *localStorage) WriteErr(c driver.StorageChange) (err error) {
+	defer storageException("localStorage write", &err)
+	ls, err := localStorageValue()
+	if err != nil {
+		return err
+	}
 	switch c.Op {
 	case driver.StorageSet:
 		ls.Call("setItem", l.prefix+c.Key, c.Value)
@@ -69,4 +102,5 @@ func (l *localStorage) Write(c driver.StorageChange) {
 			ls.Call("removeItem", k)
 		}
 	}
+	return nil
 }

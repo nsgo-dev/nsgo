@@ -138,21 +138,25 @@ cx.PickImages(core.PickOptions{Limit: 1, MaxDimension: 2048}, func(files []core.
 
 ## 存储
 
-`cx.Storage()` 是应用的键值存储，保存在设备上，应用的每个响应式图共享它。读取是同步的，在计算中读取会让它订阅变化；超过配额时 `SetItem` 返回 `core.StorageFullError`（默认 `core.StorageQuota` 为 5 MiB）。它是一个用户的任何程序都能读取的明文文件，令牌和密码请放进[机密](#机密)。
+`cx.Storage()` 是应用的字符串键值存储。首次使用时加载条目，之后从内存读取；在计算中读取也会订阅变化。`Storage.Err()` 会报告加载失败（例如沙盒 iframe 禁用了存储），此时该存储拒绝所有修改。超出应用配额（默认为 `core.StorageQuota`，即 5 MiB）时，`SetItem` 返回 `*core.StorageFullError`；如果浏览器拒绝写入，也会返回错误。设置失败时保留原值。
 
 需要创建另一个 root 的宿主（例如在独立 goroutine 上运行插件）可以用 `cx.Store()` 获取底层 store，并将它传给 `core.RootOptions.Storage`，两个 root 会共享应用的条目和保存在设备上的数据。它是整个 store，而不是 `cx.ProvideStorage` 分给非应用自身代码的分区。
 
-宿主可用 `core.NewStore(backend)` 接入自己的持久化，实现 `core.StorageBackend`：`Load() (map[string]string, error)` 只加载一次，`Write(core.StorageChange)` 按顺序接收变更。根据 `change.Op`（`core.StorageSet`、`core.StorageRemove`、`core.StorageClear`）处理 `change.Key` 和 `change.Value`；传入 `nil` 则只保存在内存中。
+宿主可用 `core.NewStore(backend)` 接入自己的持久化，实现 `core.StorageBackend`：`Load() (map[string]string, error)` 只加载一次，`Write(core.StorageChange)` 按顺序接收变更。也可以实现 `core.StorageBackendWithErrors`，以 `WriteErr(core.StorageChange) error` 替代 `Write`，仅在变更持久化后报告成功。根据 `change.Op`（`core.StorageSet`、`core.StorageRemove`、`core.StorageClear`）处理 `change.Key` 和 `change.Value`；传入 `nil` 则只保存在内存中。
 
 ```go
 store := cx.Storage()
 if tab, ok := store.GetItem("tab"); ok {
 	selected.Set(tab)
 }
-store.SetItem("tab", "library")
+if err := store.SetItem("tab", "library"); err != nil {
+	log.Printf("settings could not be saved: %v", err)
+}
 ```
 
-`store.Keys()` 列出键，`RemoveItem` 删除一个，`Clear` 清空存储。`cx.DataDir()` 和 `cx.CacheDir()` 给出应用存放键值存储放不下的文件的目录；`cx.LogsDir()` 给出平台存放日志的目录；`Scope.ProvideStorage` 给子树一个独立分区。
+`store.Keys()` 列出键，`RemoveItem` 删除一个，`Clear` 清空存储。调用 `RemoveItem` 或 `Clear` 后立即检查 `store.Err()`，即可得知持久化是否失败。逐键清理时，若删除某个键失败则停止。`cx.DataDir()` 和 `cx.CacheDir()` 给出应用存放键值存储放不下的文件的目录；`cx.LogsDir()` 给出平台存放日志的目录；`Scope.ProvideStorage` 给子树一个独立分区。
+
+Web 端默认使用 `localStorage`。需要存储较大的数据时，可配置 [`web.storage: indexeddb`](building.md#web-存储)。IndexedDB 写入仅在事务提交后返回成功，应在页面跳转前保存，不要依赖页面关闭时的回调。两种后端都不加密数据；在支持的目标平台上，请将令牌与密码存入[机密](#机密)。
 
 配置 `app_clip` 和显式的 `apple.app_group` 后，iOS 轻 App 与完整应用共享这些数据目录和存储，缓存仍各自独立。启用应用组不会迁移已有沙盒数据。[轻 App 存储](building.md#轻-appapp-clip)介绍配置与签名。
 

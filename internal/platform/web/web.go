@@ -38,8 +38,10 @@ type Options struct {
 	// Mount is the CSS selector of the element the app fills; the body
 	// when empty.
 	Mount string
-	// ID names the app's entries in localStorage.
+	// ID names the app's browser storage.
 	ID string
+	// Storage selects the browser backend: localstorage (default) or indexeddb.
+	Storage string
 	// Components are the native components Native elements name.
 	Components driver.NativeComponents
 	// Fonts are font files under the app's resources, registered before
@@ -115,6 +117,9 @@ type surface struct {
 	notifications *webNotificationScheduler
 	doc           js.Value
 	host          js.Value
+
+	indexedStorage *indexedStorage
+
 	// envPin turns the page's environment into the app's, a test's pinned one under a test host; nil outside one.
 	envPin func(driver.Environment) driver.Environment
 	// simulate is the OS the page runs as (Options.OS).
@@ -462,7 +467,12 @@ func open(app engine.App, opts Options, test *testOpen) *surface {
 		Updater:   s.initUpdates(opts),
 		ReadAsset: readAsset,
 		Size:      s.size(), Environment: s.env, NetworkWatcher: networkWatcher{}, Appearance: opts.Appearance,
-		Storage: engine.NewStorage(newLocalStorage(opts.ID)),
+	}
+	if opts.Storage == "indexeddb" {
+		s.indexedStorage = newIndexedStorage(opts.ID)
+		eopts.Storage = engine.NewStorageWithQuota(s.indexedStorage, indexedStorageQuota)
+	} else {
+		eopts.Storage = engine.NewStorage(newLocalStorage(opts.ID))
 	}
 	if opts.Perf || (test != nil && test.options.FPS) {
 		s.perf = engine.NewPerfMonitor()

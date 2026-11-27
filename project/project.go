@@ -264,6 +264,8 @@ type WebConfig struct {
 	Offline bool   `yaml:"offline"`
 	// Base fixes assets to an absolute deployment path for deep links.
 	Base string `yaml:"base"`
+	// Storage is localstorage (default) or indexeddb.
+	Storage string `yaml:"storage"`
 }
 
 // MiniProgramConfig is nsgo.yaml's miniprogram section.
@@ -625,6 +627,11 @@ func (c *Config) Validate() error {
 	case "", "light", "dark":
 	default:
 		return fmt.Errorf("nsgo.yaml: appearance is %q; use light, dark or leave it out", c.Appearance)
+	}
+	switch c.Web.Storage {
+	case "", "localstorage", "indexeddb":
+	default:
+		return fmt.Errorf("nsgo.yaml: web.storage is %q; use localstorage or indexeddb", c.Web.Storage)
 	}
 	if err := c.validateLaunchScreen(); err != nil {
 		return fmt.Errorf("nsgo.yaml: %w", err)

@@ -187,7 +187,21 @@ func (s *surface) focusKeyDown(e js.Value) bool {
 		s.engine.Dispatch(ev)
 		return false
 	}
-	if !s.engine.DispatchKeyDown(ev) || modifier {
+	// The browser normally needs the handler's answer in this callback.
+	// If the engine needs IndexedDB, it cannot answer until we return
+	// to the event loop. In that case give the focused view the key.
+	var waiting <-chan struct{}
+	if s.indexedStorage != nil {
+		waiting = s.indexedStorage.waiting()
+	}
+	select {
+	case consumed := <-s.engine.DispatchKeyDownAsync(ev):
+		if !consumed {
+			return false
+		}
+	case <-waiting:
+	}
+	if modifier {
 		return false
 	}
 	e.Call("preventDefault")

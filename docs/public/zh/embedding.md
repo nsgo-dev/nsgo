@@ -163,6 +163,8 @@ player.hostEvent("message", { text: "来自页面的问候" });
 
 没有 `host` 选项时，加载器导入 `nsgo.yaml` 中 `web.host` 指定的模块。如果模块导出了 `createHost(player)`，加载器会等待它返回。元素或框架中的应用把浏览器的历史记录和标题交给页面管理。
 
+嵌入式应用采用打包时的 [`web.storage`](building.md#web-存储) 配置，并将数据保存在运行页面的来源下，而不是提供 WebAssembly 的来源。若沙盒 iframe 无法访问浏览器存储，`cx.Storage().Err()` 会报告错误。
+
 `appearance`（`"light"`、`"dark"` 或 `"system"`）、`locale` 和 `fontScale` 代替浏览器的设置，与原生宿主的设置相同；之后可以用 player 的 `setAppearance`、`setLocale` 和 `setFontScale` 修改。`module` 是编译好的 `WebAssembly.Module` 或它的 promise，让多次挂载同一应用的页面只下载和编译一次。
 
 加载器在应用启动前显示 `progress.nsgo-load-progress` 元素。可以用 CSS 设置样式，在挂载选项中传入 `onProgress`，也可以为应用自己的页面从 `web.host` 导出 `onProgress`。回调替换默认进度条，接收解码后的字节数 `{ loaded, total }`，总大小未知时 `total` 为 `null`。启动结束时，加载器以 `null` 调用回调，以便清除界面。传入已编译的 `module` 会跳过下载进度。

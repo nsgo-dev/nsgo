@@ -90,10 +90,15 @@ func appDirName(id string) string {
 // NewStorage returns a store kept by backend, for platforms that keep the
 // app's entries themselves, such as in the browser's localStorage.
 func NewStorage(backend driver.StorageBackend) *core.Store {
+	return NewStorageWithQuota(backend, 0)
+}
+
+// NewStorageWithQuota is NewStorage with an app quota in bytes.
+func NewStorageWithQuota(backend driver.StorageBackend, quota int) *core.Store {
 	if backend == nil {
-		return core.NewStore(nil)
+		return core.NewStoreWithQuota(nil, quota)
 	}
-	return core.NewStore(storageBackend{backend})
+	return core.NewStoreWithQuota(storageBackend{backend}, quota)
 }
 
 // storageBackend adapts the platform's private persistence messages to the
@@ -103,6 +108,10 @@ type storageBackend struct {
 }
 
 func (b storageBackend) Write(c core.StorageChange) {
+	_ = b.WriteErr(c)
+}
+
+func (b storageBackend) WriteErr(c core.StorageChange) error {
 	var op driver.StorageOp
 	switch c.Op {
 	case core.StorageSet:
@@ -112,9 +121,14 @@ func (b storageBackend) Write(c core.StorageChange) {
 	case core.StorageClear:
 		op = driver.StorageClear
 	default:
-		return
+		return nil
 	}
-	b.StorageBackend.Write(driver.StorageChange{Op: op, Key: c.Key, Value: c.Value})
+	change := driver.StorageChange{Op: op, Key: c.Key, Value: c.Value}
+	if checked, ok := b.StorageBackend.(driver.StorageBackendWithErrors); ok {
+		return checked.WriteErr(change)
+	}
+	b.StorageBackend.Write(change)
+	return nil
 }
 
 // OpenFileStorage returns the store kept in dir/storage.json: the one
@@ -168,42 +182,41 @@ type fileStorage struct {
 	dirty   bool
 	writing bool
 	idle    *sync.Cond // signaled when writing stops
-	// inMemory is set when the file could not be read: changes stay in
-	// memory and never replace what it holds.
-	inMemory bool
 }
 
 func (f *fileStorage) Load() (map[string]string, error) {
 	entries, err := f.read()
+	if err != nil {
+		return nil, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.entries = maps.Clone(entries)
 	if f.entries == nil {
 		f.entries = map[string]string{}
 	}
-	return entries, err
+	return entries, nil
 }
 
 // read returns the file's entries. A file that reads but does not parse is
 // set aside as storage.json.corrupt rather than left for the next write to
-// replace; one that cannot be read keeps the changes in memory.
+// replace. Only a successfully quarantined file can start an empty store.
 func (f *fileStorage) read() (map[string]string, error) {
 	data, err := os.ReadFile(f.path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		f.inMemory = true
-		return nil, fmt.Errorf("%w; changes are kept in memory", err)
+		return nil, err
 	}
 	var entries map[string]string
 	if err := json.Unmarshal(data, &entries); err != nil {
 		aside := f.path + ".corrupt"
 		if rerr := os.Rename(f.path, aside); rerr != nil {
-			f.inMemory = true
-			return nil, fmt.Errorf("%s: %w; it could not be set aside (%v), so changes are kept in memory", f.path, err, rerr)
+			return nil, fmt.Errorf("%s: %w; it could not be set aside (%v)", f.path, err, rerr)
 		}
-		return nil, fmt.Errorf("%s: %w; it was set aside as %s", f.path, err, aside)
+		log.Printf("nsgo: the app's storage could not be parsed: %v; it was set aside as %s", err, aside)
+		return nil, nil
 	}
 	return entries, nil
 }
@@ -218,9 +231,6 @@ func (f *fileStorage) Write(c driver.StorageChange) {
 		delete(f.entries, c.Key)
 	case driver.StorageClear:
 		clear(f.entries)
-	}
-	if f.inMemory {
-		return
 	}
 	f.dirty = true
 	if !f.writing {

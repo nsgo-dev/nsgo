@@ -24,6 +24,19 @@ func (r *recorder) Write(c StorageChange) {
 	r.mu.Unlock()
 }
 
+type checkedRecorder struct {
+	recorder
+	refuse func(StorageChange) error
+}
+
+func (r *checkedRecorder) WriteErr(c StorageChange) error {
+	if err := r.refuse(c); err != nil {
+		return err
+	}
+	r.recorder.Write(c)
+	return nil
+}
+
 // graph is a root whose posts run when drained.
 type graph struct {
 	root  *Scope
@@ -94,14 +107,110 @@ func TestStorageQuota(t *testing.T) {
 	}
 }
 
-func TestStorageFailedLoadStartsEmpty(t *testing.T) {
-	s := newGraph(NewStore(&recorder{err: errors.New("unreadable")})).root.Storage()
+func TestStorageFailedLoadBlocksChanges(t *testing.T) {
+	readErr := errors.New("unreadable")
+	b := &recorder{kept: map[string]string{"partial": "ignored"}, err: readErr}
+	s := newGraph(NewStore(b)).root.Storage()
+	if err := s.Err(); !errors.Is(err, readErr) {
+		t.Fatalf("Err = %v, want %v", err, readErr)
+	}
+	b.err = nil // A failed load is not retried for this Store.
 	if _, ok := s.GetItem("a"); ok {
 		t.Fatal("a has a value")
 	}
-	s.SetItem("a", "1")
-	if v, _ := s.GetItem("a"); v != "1" {
-		t.Fatalf("a = %q", v)
+	if err := s.SetItem("a", "1"); !errors.Is(err, readErr) {
+		t.Fatalf("SetItem = %v, want %v", err, readErr)
+	}
+	s.RemoveItem("partial")
+	s.Clear()
+	if err := s.Err(); !errors.Is(err, readErr) || len(s.Keys()) != 0 || len(b.changes) != 0 {
+		t.Fatalf("failed load: Err = %v, keys = %v, writes = %v", err, s.Keys(), b.changes)
+	}
+}
+
+func TestStorageFailedWritesKeepEntriesAndWatchers(t *testing.T) {
+	writeErr := errors.New("refused")
+	refuse := true
+	b := &checkedRecorder{
+		recorder: recorder{kept: map[string]string{"a": "old"}},
+		refuse: func(StorageChange) error {
+			if refuse {
+				return writeErr
+			}
+			return nil
+		},
+	}
+	store := NewStore(b)
+	a, other := newGraph(store), newGraph(store)
+	s := a.root.Storage()
+	var reads int
+	a.root.Effect(func() { s.GetItem("a"); s.Keys(); reads++ })
+	other.root.Storage()
+
+	if err := s.SetItem("a", "new"); !errors.Is(err, writeErr) {
+		t.Fatalf("SetItem = %v, want %v", err, writeErr)
+	}
+	s.RemoveItem("a")
+	if err := s.Err(); !errors.Is(err, writeErr) {
+		t.Fatalf("RemoveItem's Err = %v", err)
+	}
+	s.Clear()
+	if err := s.Err(); !errors.Is(err, writeErr) {
+		t.Fatalf("Clear's Err = %v", err)
+	}
+	if v, ok := s.GetItem("a"); v != "old" || !ok || reads != 1 || len(other.posts) != 0 || len(b.changes) != 0 {
+		t.Fatalf("failed writes: a = %q, %v, reads = %d, posts = %d, writes = %v", v, ok, reads, len(other.posts), b.changes)
+	}
+	refuse = false
+	if err := s.SetItem("a", "new"); err != nil || s.Err() != nil || reads != 2 || len(other.posts) != 1 || len(b.changes) != 1 {
+		t.Fatalf("successful retry: SetItem = %v, Err = %v, reads = %d, posts = %d, writes = %v", err, s.Err(), reads, len(other.posts), b.changes)
+	}
+}
+
+func TestStoragePartitionClearKeepsRefusedKeys(t *testing.T) {
+	writeErr := errors.New("refused")
+	b := &checkedRecorder{refuse: func(c StorageChange) error {
+		if c.Op == StorageRemove && strings.HasSuffix(c.Key, "b") {
+			return writeErr
+		}
+		return nil
+	}}
+	root := newGraph(NewStore(b)).root
+	app := root.Storage()
+	part := root.Child()
+	part.ProvideStorage("part", 100)
+	s := part.Storage()
+	for _, key := range []string{"a", "b"} {
+		if err := s.SetItem(key, key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := app.SetItem("a", "app"); err != nil {
+		t.Fatal(err)
+	}
+	aReads, bReads := 0, 0
+	part.Effect(func() { s.GetItem("a"); aReads++ })
+	part.Effect(func() { s.GetItem("b"); bReads++ })
+	s.Clear()
+	if err := s.Err(); !errors.Is(err, writeErr) {
+		t.Fatalf("Err = %v", err)
+	}
+	if keys := s.Keys(); !slices.Equal(keys, []string{"b"}) || aReads != 2 || bReads != 1 {
+		t.Fatalf("partition keys = %v, reads = %d, %d", keys, aReads, bReads)
+	}
+	if v, _ := app.GetItem("a"); v != "app" {
+		t.Fatalf("app's key changed to %q", v)
+	}
+}
+
+func TestStorageCustomQuota(t *testing.T) {
+	s := newGraph(NewStoreWithQuota(nil, 10)).root.Storage()
+	if err := s.SetItem("k", "123456789"); err != nil {
+		t.Fatal(err)
+	}
+	var full *StorageFullError
+	if err := s.SetItem("a", "b"); !errors.As(err, &full) || full.Quota != 10 {
+		t.Fatalf("SetItem = %v, want StorageFullError with quota 10", err)
 	}
 }
 

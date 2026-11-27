@@ -138,7 +138,7 @@ func (s *surface) watchChanges() {
 		s.releaseMouseButtons()
 		s.stopHapticPattern()
 		if args[0].Get("persisted").Bool() {
-			s.engine.Hide()
+			s.quit(s.engine.Hide)
 		} else {
 			if w.tzTimer.Truthy() {
 				g.Call("clearInterval", w.tzTimer)
@@ -146,7 +146,7 @@ func (s *surface) watchChanges() {
 				w.tzTick.Release()
 			}
 			s.clearDisplayHolds()
-			s.engine.Close()
+			s.quit(s.engine.Close)
 		}
 		return nil
 	}))
@@ -157,6 +157,16 @@ func (s *surface) watchChanges() {
 	// The probe's box follows the safe area and the root font size.
 	ro := g.Get("ResizeObserver").New(w.changed)
 	ro.Call("observe", w.probe, map[string]any{"box": "border-box"})
+}
+
+// A pagehide callback cannot wait for IndexedDB, including a save started
+// by OnQuit. Keep the direct wait for the synchronous storage backend.
+func (s *surface) quit(fn func()) {
+	if s.indexedStorage != nil {
+		go fn()
+	} else {
+		fn()
+	}
 }
 
 // watchRatio follows the pixel ratio from ratio on, as a resolution

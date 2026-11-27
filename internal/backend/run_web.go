@@ -18,6 +18,7 @@ func webOptions(o Options) web.Options {
 		Name:         name,
 		UpdateConfig: os.Getenv("NSGO_WEB_CONFIG"),
 		ID:           id,
+		Storage:      os.Getenv("NSGO_WEB_STORAGE"),
 		Components:   o.Components,
 		Fonts:        o.Fonts,
 		Appearance:   o.Appearance,

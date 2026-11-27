@@ -88,6 +88,26 @@ func TestFileStorage(t *testing.T) {
 	}
 }
 
+func TestFileStorageReadFailureBlocksWrites(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "storage.json")
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := graphOn(OpenFileStorage(dir))
+	readErr := s.Err()
+	if readErr == nil {
+		t.Fatal("reading a directory as storage succeeded")
+	}
+	if err := s.SetItem("key", "value"); err != readErr {
+		t.Fatalf("SetItem = %v, want %v", err, readErr)
+	}
+	SyncStorage()
+	if stat, err := os.Stat(path); err != nil || !stat.IsDir() {
+		t.Fatalf("unreadable storage was overwritten: %v, %v", stat, err)
+	}
+}
+
 func TestAppGroupStorageHandoff(t *testing.T) {
 	container := t.TempDir()
 	clip, clipCache, clipLogs := AppGroupDirs("dev.example.cafe.Clip", container)

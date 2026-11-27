@@ -849,11 +849,17 @@ type StorageChange struct {
 // the app's data directory, the browser's localStorage.
 type StorageBackend interface {
 	// Load returns the entries kept, read once when the app first uses
-	// its storage. An error leaves the app with none, logged.
+	// its storage. An error blocks subsequent changes.
 	Load() (map[string]string, error)
 	// Write keeps change. It is called in order, on the goroutine of the
 	// graph that made the change; a backend that blocks writes elsewhere.
 	Write(change StorageChange)
+}
+
+// StorageBackendWithErrors acknowledges a change only after it is kept.
+type StorageBackendWithErrors interface {
+	StorageBackend
+	WriteErr(change StorageChange) error
 }
 
 // MemoryClipboard is a clipboard of a test's own: it takes the clipboard

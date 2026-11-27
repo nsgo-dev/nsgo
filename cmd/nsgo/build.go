@@ -1409,7 +1409,7 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 	if err != nil {
 		return err
 	}
-	app := webApp{Version: p.Version, Release: !dev, UpdateChannel: p.Updates.Channel, Wasm: "app.wasm", WasmSize: info.Size(), Base: base}
+	app := webApp{Version: p.Version, Release: !dev, UpdateChannel: p.Updates.Channel, Wasm: "app.wasm", WasmSize: info.Size(), Base: base, Storage: p.Web.Storage}
 	// write puts data in dir, by its content's name in a release, and
 	// returns the name.
 	write := func(name string, data []byte) (string, error) {
@@ -1567,6 +1567,7 @@ type webApp struct {
 	Worker        string `json:"worker,omitempty"`
 	Loader        string `json:"loader"`
 	Host          string `json:"host,omitempty"`
+	Storage       string `json:"storage,omitempty"`
 	// Runtime is the script that gives the page's realm the runtime's
 	// programs, and Scripts the app's bundles: the loader runs them in the
 	// realm before the app starts, so a Content-Security-Policy needs no
