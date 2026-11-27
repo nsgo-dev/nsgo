@@ -1335,6 +1335,11 @@ func (w *window) placeIME() {
 	if in == nil || w.hwnd == 0 {
 		return
 	}
+	// RichEdit positions its own IME. Reapplying IMM placement from its
+	// caret callbacks scrolls the caret into view and undoes user scrolling.
+	if in.re != nil {
+		return
+	}
 	x, y, h, ok := in.caretRect()
 	if !ok {
 		return
