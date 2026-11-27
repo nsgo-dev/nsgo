@@ -225,11 +225,11 @@ func TestReleaseTagsSelectCompiledFiles(t *testing.T) {
 	}
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
-		"nsgo.yaml": "name: Tags\nbuild:\n  tags: [project_tag]\n  release_tags: [release]\n",
-		"go.mod": "module releasefixture\n\ngo 1.26\n",
-		"main.go": "//go:build project_tag && from_env\n\npackage main\nfunc main() { println(flavor) }\n",
-		"local.go": "//go:build !release\n\npackage main\nconst flavor = \"local\"\n",
-		"release.go": "//go:build release\n\npackage main\nconst flavor = \"release\"\n",
+		"nsgo.yaml":    "name: Tags\nbuild:\n  tags: [project_tag]\n  release_tags: [release]\n",
+		"go.mod":       "module releasefixture\n\ngo 1.26\n",
+		"main.go":      "//go:build project_tag && from_env\n\npackage main\nfunc main() { println(flavor) }\n",
+		"local.go":     "//go:build !release\n\npackage main\nconst flavor = \"local\"\n",
+		"release.go":   "//go:build release\n\npackage main\nconst flavor = \"release\"\n",
 		"main_test.go": "package main\nimport \"testing\"\nfunc TestLocal(t *testing.T) { if flavor != \"local\" { t.Fatal(flavor) } }\n",
 	})
 	p, err := load(dir)
@@ -245,7 +245,7 @@ func TestReleaseTagsSelectCompiledFiles(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name, want string
-		args []string
+		args       []string
 	}{
 		{name: "plain", want: "local"},
 		{name: "release", want: "release", args: []string{"-release"}},
@@ -283,9 +283,9 @@ func TestReleaseTagsVetBothVariants(t *testing.T) {
 	t.Setenv("GOFLAGS", "-tags=from_env -mod=mod")
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
-		"nsgo.yaml": "name: Tags\nbuild:\n  tags: [project_tag]\n  release_tags: [release]\n",
-		"go.mod": "module releasefixture\n\ngo 1.26\n",
-		"main.go": "package main\nfunc main() {}\n",
+		"nsgo.yaml":  "name: Tags\nbuild:\n  tags: [project_tag]\n  release_tags: [release]\n",
+		"go.mod":     "module releasefixture\n\ngo 1.26\n",
+		"main.go":    "package main\nfunc main() {}\n",
 		"release.go": "//go:build release && from_env && project_tag && (!js || nsgoharmony)\n\npackage main\nimport \"fmt\"\nfunc bad() { fmt.Printf(\"%d\", \"not an integer\") }\n",
 	})
 	p, err := load(dir)
@@ -309,9 +309,9 @@ func TestReleaseTagsSelectTSXEntries(t *testing.T) {
 	t.Setenv("GOFLAGS", "")
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
-		"go.mod": "module releasefixture\n\ngo 1.26\n",
-		"local.go": "//go:build !release\n\npackage main\ninvalid syntax that a release build should never parse\n",
-		"release.go": "//go:build release\n\npackage main\nimport \"" + compilerPath + "\"\nvar _ = compiler.App(src, \"Release.tsx\")\n",
+		"go.mod":      "module releasefixture\n\ngo 1.26\n",
+		"local.go":    "//go:build !release\n\npackage main\ninvalid syntax that a release build should never parse\n",
+		"release.go":  "//go:build release\n\npackage main\nimport \"" + compilerPath + "\"\nvar _ = compiler.App(src, \"Release.tsx\")\n",
 		"Release.tsx": "import { mount, Text } from 'nsgo'; mount(() => <Text>Release</Text>);\n",
 	})
 	p := &project{Config: projectcfg.Config{Dir: dir}, buildReleaseTags: true, buildEmbed: true}
