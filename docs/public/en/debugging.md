@@ -203,6 +203,8 @@ nsgo dev -release -fps
 
 `-fps` shows the performance monitor over the app on macOS, iOS, Windows, Linux, Android and the web. It measures frames and commits, and Android also shows native text round-trip time. Dev builds carry the dev client; measure with `-release`, which builds as `nsgo build` does.
 
+To measure cold startup, read `core.ProcessStart()` even before `nsgo.Run`, and subtract it from the wall-clock time of a milestone such as the first interactive frame. The reading stays fixed: it is the OS process launch on macOS, iOS, Windows and Linux, the Java host launch on Android, and the page's time origin on the web, before WebAssembly loads. Check `IsZero()` before measuring: unsupported targets or an unavailable launch timestamp return zero.
+
 ## Languages and appearance
 
 ```sh

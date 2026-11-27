@@ -38,6 +38,7 @@ var layers = []struct {
 	{"internal/woff", nil},
 	{"internal/mimeinfo", nil},
 	{"internal/appstartup", nil},
+	{"internal/processstart", nil},
 	{"internal/cldr/", nil},
 	{"internal/cldr", nil},
 	{"internal/driver", []string{"internal/mimeinfo", "internal/shaderir"}},
@@ -47,7 +48,7 @@ var layers = []struct {
 	{"internal/shaderir/", []string{"internal/shaderir"}},
 	{"internal/shader", []string{"internal/shaderir"}},
 	{"internal/shader/wgsl", []string{"internal/shaderir"}},
-	{"core", []string{"internal/crashreport", "internal/devtools", "internal/driver", "internal/layout", "internal/shader", "internal/shader/wgsl", "internal/shaderir"}},
+	{"core", []string{"internal/crashreport", "internal/devtools", "internal/driver", "internal/layout", "internal/processstart", "internal/shader", "internal/shader/wgsl", "internal/shaderir"}},
 	{"automation", []string{"core"}},
 	{"internal/engine", []string{"core", "internal/driver", "internal/testhost"}},
 	{"internal/testhost", []string{"core", "internal/driver"}},
@@ -89,7 +90,7 @@ var layers = []struct {
 	{"internal/platform/webstyle", []string{"internal/driver"}},
 	{"internal/platform/", append([]string{"internal/driver", "internal/engine", "internal/testhost", "desktop/locales", "mobile/locales"}, platformShared...)},
 	// Headless browser tests reuse the browser asset reader. Windowless rendering and text measurement reuse the host's native canvas and text player without starting a platform host; core still imports no backend.
-	{"nsgotest", []string{"core", "gamepad", "internal/automation", "internal/devtools", "internal/driver", "internal/platform/apple", "internal/platform/imageload", "internal/platform/linux", "internal/platform/windows", "internal/shaderir/", "internal/testhost", "widget"}},
+	{"nsgotest", []string{"core", "gamepad", "internal/automation", "internal/devtools", "internal/driver", "internal/platform/apple", "internal/platform/imageload", "internal/platform/linux", "internal/platform/windows", "internal/processstart", "internal/shaderir/", "internal/testhost", "widget"}},
 	{"", []string{"core", "internal/backend", "internal/dev", "internal/engine"}},
 	// The backend runs the app on the platform build tags pick, with the launch flags, the dev client, restarts and, where the platform's updater keeps no schedule, update checks.
 	{"internal/backend", []string{"core", "internal/crashreport", "internal/dev", "internal/engine", "internal/platform/", "internal/restart", "updater"}},

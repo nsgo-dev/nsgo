@@ -11,8 +11,14 @@ import (
 	"github.com/nsgo-dev/nsgo/nsgotest"
 )
 
+var testMainEntered, testMainProcessStart time.Time
+
 // TestMain hands the main thread to the platform under nsgo test -target.
-func TestMain(m *testing.M) { nsgotest.Main(m) }
+func TestMain(m *testing.M) {
+	testMainEntered = time.Now()
+	testMainProcessStart = core.ProcessStart()
+	nsgotest.Main(m)
+}
 
 func TestGreets(t *testing.T) {
 	app := nsgotest.Start(t, Root, nsgotest.Size(420, 320))

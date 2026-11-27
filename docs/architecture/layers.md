@@ -99,6 +99,7 @@ nsgo
 │   ├── internal/automation              Requests the nsgo tool sends a running dev build's agent
 │   ├── internal/crashreport             Crash output and pending report files
 │   ├── internal/appstartup              Packaged startup identities shared by the tool and runtime
+│   ├── internal/processstart            Process launch timestamp, with no backend dependency
 │   ├── internal/mimeinfo                Fixed extension/MIME table shared by the tool and runtime
 │   ├── internal/woff                    WOFF and WOFF2 fonts unpacked, for the bundler
 │   ├── internal/driver                  Mount items, events, TextEngine, shared values

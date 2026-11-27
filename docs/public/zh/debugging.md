@@ -203,6 +203,8 @@ nsgo dev -release -fps
 
 `-fps` 在 macOS、iOS、Windows、Linux、Android 和 Web 上于应用上方显示性能监视器。它测量帧和提交的开销，Android 还显示原生文本请求的往返耗时。开发构建带有开发客户端；测量时请加 `-release`，它与 `nsgo build` 的构建方式相同。
 
+要测量冷启动，可在 `nsgo.Run` 之前调用 `core.ProcessStart()`，再用首个可交互帧等里程碑的墙钟时间减去它。该值在整个进程生命周期内不变：在 macOS、iOS、Windows 和 Linux 上是操作系统启动进程的时间，在 Android 上是 Java 宿主启动的时间，在 Web 上是加载 WebAssembly 前的页面时间原点。测量前先检查 `IsZero()`：目标不支持或无法读取启动时间时，返回零值。
+
 ## 语言与外观
 
 ```sh

@@ -2,6 +2,10 @@
 
 The performance monitor measures what a surface's frames and commits cost while it runs, for a panel over the app (`--nsgo-fps`). It follows NSH's `nsh_engine::perf` and macOS HUD. Read this before changing `internal/engine/perf.go`, a backend's `perf.go`, its frame clock or anything that runs every frame.
 
+## Cold starts
+
+`core.ProcessStart()` is available before `nsgo.Run`. It looks up the wall-clock timestamp once: `kern.proc.pid` on Apple, `GetProcessTimes` on Windows, `/proc/self/stat` field 22 relative to `CLOCK_BOOTTIME` on Linux, and `performance.timeOrigin` on the web. The Android runtime converts the Java host's `Process.getStartElapsedRealtime` to wall time before starting Go and passes it in the child's environment. With an older runtime, Go uses the Java parent's `/proc` timestamp if it can read it; it never substitutes the later Go child's start. `nsgotest.PinProcessStart` overrides this reading for a test without changing the app's clock.
+
 ## Measuring
 
 `engine.PerfMonitor` is shared by the two threads of a surface:

@@ -46,6 +46,7 @@ import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.InputType;
@@ -1131,6 +1132,16 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         String installer = installer();
         if (installer != null) builder.environment().put("NSGO_INSTALLER", installer);
         prepareAgent(builder);
+        // Pass the Java host's launch time before Go can enter main.
+        if (Build.VERSION.SDK_INT >= 24) {
+            long start = android.os.Process.getStartElapsedRealtime();
+            if (start > 0) {
+                long elapsed = SystemClock.elapsedRealtime();
+                long wall = System.currentTimeMillis();
+                elapsed += (SystemClock.elapsedRealtime() - elapsed) / 2;
+                builder.environment().put("NSGO_PROCESS_START_MS", Long.toString(wall - (elapsed - start)));
+            }
+        }
         try {
             engine.start(builder);
         } catch (IOException e) {
