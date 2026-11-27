@@ -86,6 +86,7 @@ dev:
 build:
   output: dist
   tags: []              # Go build tags every build, test and check of the app takes, such as timetzdata
+  release_tags: [release]  # additional Go build tags for release builds
   ldflags: []           # the app's own linker flags, such as -X main.releaseDate=2026-11-17
   open: false           # true opens the output directory after building
   installers: true      # false leaves out the disk image, the Windows installer and the Linux packages
@@ -130,6 +131,10 @@ Flags replace the values they name, such as `-target`, `-version` or `-output`; 
 `build.ldflags` holds the app's own linker flags, each written as go build's `-ldflags` takes it, such as `-X main.releaseDate=2026-11-17` or `-X 'main.channel=beta builds'`. Every build that links the app takes them: `dev` and its reloads, `build` with `-embed` too and `test` with `-target` too, on every target. `-ldflags` on `build` and `test` adds to them rather than replacing them, repeated for more. They come before the tool's own `-X` flags, and the linker keeps a variable's last, so the name, ID and version in `core.App` stay those of `nsgo.yaml`. The tool passes go its own `-ldflags`, which replaces one in `GOFLAGS`, so linker flags belong here; a headless `test`'s `-ldflags` after the directory is go test's and replaces them all.
 
 Every go command the tool runs for the app takes `build.tags`, in `dev` and its reloads, `build` with `-embed` too, `test` with `-target` too and `check`, on every target. NSGo's own tags, such as `nsgodev` in `dev` or `nsgotest` in target tests, are added to them, as are the tags of `-tags` in `GOFLAGS`, which would otherwise be replaced; the rest of `GOFLAGS` applies as it is.
+
+`build.release_tags` adds tags to `build.tags` for `nsgo build -release` (including with `-embed`) and builds using the `store` or `steam` channel, whether chosen by `-channel` or `updates.channel`. Plain builds without either channel, `nsgo dev` (even with `-release`) and `nsgo test` do not add them. `nsgo check` runs `go vet` with and without the extra tags for the host or each requested target. Both lists take one Go build tag per item.
+
+Publishing Go app artifacts does not rebuild them. Build first with `nsgo build -release` for direct distribution, or with the appropriate store channel. Signed TSX packages built by `nsgo publish` do not compile Go.
 
 `apple.info.LSMinimumSystemVersion` raises the macOS package's minimum, and `apple.info.MinimumOSVersion` raises the selected iOS, tvOS or watchOS package's. Write quoted version strings, such as `"14.2"` or `"18.0"`, with one to three numeric parts. The runtime floors are macOS 13.0 (Go 1.27), iOS 15.0, tvOS 17.0 and watchOS 26.0; lower or malformed values fail. The mobile key must meet every selected mobile target's floor. App Clips keep their own `app_clip.minimum`. The values reach package metadata, asset compilation, signing projects and the app's linker; embedded iOS frameworks use them too, with Mac Catalyst at least 16.0 for Go's macOS 13 runtime.
 

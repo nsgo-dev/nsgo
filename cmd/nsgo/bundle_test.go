@@ -42,7 +42,7 @@ mount(() => <Text>Hi</Text>);
 		t.Fatalf("entries %q, %v", entries, err)
 	}
 	p := &project{Config: projectcfg.Config{Dir: dir}}
-	file, err := p.bundleFile()
+	file, err := p.bundleFile(t.Context(), nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ mount(() => <Text>Hi</Text>);
 		t.Errorf("the overlay %s", o)
 	}
 	none := &project{Config: projectcfg.Config{Dir: t.TempDir()}}
-	if f, err := none.bundleFile(); f != "" || err != nil {
+	if f, err := none.bundleFile(t.Context(), nil, nil, nil); f != "" || err != nil {
 		t.Errorf("an app without TSX has a bundle %q, %v", f, err)
 	}
 }

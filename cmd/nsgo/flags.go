@@ -243,6 +243,7 @@ type buildFlags struct {
 	notes   string
 	run     bool
 	embed   bool
+	release bool
 	dynamic bool
 	device  string
 	team    string
@@ -270,6 +271,7 @@ func bindBuildFlags(fs *flag.FlagSet) *buildFlags {
 	fs.StringVar(&f.device, "device", "", "the `device` -run starts the package on: an iPhone's name, UDID, serial or ECID, a simulator's name or UDID, or an adb serial or emulator's AVD name (default: the only one connected, or the booted simulator)")
 	fs.StringVar(&f.team, "team", "", "the Apple developer `team` -run signs the iPhone's package with (default: the team Xcode last used)")
 	fs.BoolVar(&f.embed, "embed", false, "package the app for iOS, tvOS and Android apps of their own to embed: an XCFramework and an AAR")
+	fs.BoolVar(&f.release, "release", false, "add nsgo.yaml's build.release_tags (also added for store and steam builds)")
 	fs.BoolVar(&f.dynamic, "dynamic", false, "with -embed, make the XCFramework of dynamic frameworks, which the host embeds, in place of static libraries")
 	f.sign.bind(fs)
 	return f
@@ -298,6 +300,7 @@ func (f *buildFlags) apply(p *project) {
 	}
 	p.Build.LDFlags = append(p.Build.LDFlags, (*f.ldflags)...)
 	p.buildRun, p.buildEmbed, p.buildDynamic = f.run, f.embed, f.dynamic
+	p.buildReleaseTags = f.release
 	p.buildDevice, p.buildTeam = f.device, f.team
 	f.sign.apply(p)
 }

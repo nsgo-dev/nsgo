@@ -78,6 +78,8 @@ type project struct {
 	// on buildDevice (-device), an iPhone signed for buildTeam (-team);
 	// buildEmbed packages the app for host apps of their own (-embed).
 	buildRun, buildEmbed bool
+	// buildReleaseTags selects the release source variant, independently of Release's packaging settings.
+	buildReleaseTags bool
 	// buildAll records that the targets were given as all.
 	buildAll               bool
 	buildDynamic           bool

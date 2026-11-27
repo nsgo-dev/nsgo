@@ -55,6 +55,7 @@ Set `launch_screen.background` to a quoted `"#RRGGBB"` color and/or `launch_scre
 ```sh
 nsgo build                       # every target nsgo.yaml lists
 nsgo build -target web           # or all, macos, windows, macos_arm64, ios, android_arm64, miniprogram_wechat, ...
+nsgo build -release              # add build.release_tags to build.tags
 nsgo build -run -device "iPhone" # build and start or install it
 nsgo build -channel store        # store packages instead of installers and self-updates
 nsgo build -channel steam -target macos_universal,windows_x64,linux_x64
@@ -62,6 +63,8 @@ nsgo build -release-notes notes.md  # the release's notes, which the update prom
 ```
 
 Packages land in `dist/<name>-<version>-<target>`, and everything to hand out in `dist/releases`, each file named `<name>-<version>-<system>-<arch>` with its `.sha256`. Direct releases with macOS or Windows installers also write a Homebrew cask (`dist/releases/homebrew/<slug>.rb`, with `auto_updates true`) and a winget multi-file manifest (`dist/releases/winget/`). Builds are release builds; `nsgo dev -release` runs one with hot reload for measuring.
+
+Set `build.release_tags: [release]` to select Go files guarded by `//go:build release` only for `build -release` (including `-embed`) or the store and Steam channels. Plain builds, dev and tests do not add these tags; `nsgo check` vets both variants. Build Go artifacts with the appropriate flags before publishing; publish does not rebuild them.
 
 On a headless Mac, set `build.skip_installers: [macos]` or pass `-skip-installers=macos` to keep the signed `.app` and build the other desktop installers without mounting a DMG. [Installers](https://nsgo.dev/docs/building.md#installers)
 

@@ -65,7 +65,7 @@ func check(ctx context.Context, p *project, target string, jobs int) error {
 // checkHost vets p for the host and, in NSGo's own repository, the dev client.
 func checkHost(ctx context.Context, p *project, jobs int) error {
 	s := begin("vetting")
-	if err := goToolWithTags(ctx, p, nil, nil, vetArgs(jobs, "./...")...); err != nil {
+	if err := vetVariants(ctx, p, nil, nil, jobs); err != nil {
 		s.fail()
 		return err
 	}
@@ -121,6 +121,40 @@ func vetArgs(jobs int, patterns ...string) []string {
 		args = append(args, "-p", strconv.Itoa(jobs))
 	}
 	return append(args, patterns...)
+}
+
+// vetVariants checks the app as a local build and, if configured, as a release
+// build. A variant with no packages is a skip only when neither has packages.
+func vetVariants(ctx context.Context, p *project, env, extra []string, jobs int) error {
+	args := vetArgs(jobs, "./...")
+	base := goToolWithTags(ctx, p, env, extra, args...)
+	if len(p.Build.ReleaseTags) == 0 || ctx.Err() != nil {
+		return base
+	}
+	release := *p
+	release.buildReleaseTags = true
+	tagged := goToolWithTags(ctx, &release, env, extra, args...)
+	if ctx.Err() == nil {
+		baseEmpty := base != nil && base.Error() == emptyVetError
+		taggedEmpty := tagged != nil && tagged.Error() == emptyVetError
+		if baseEmpty && taggedEmpty {
+			return base
+		}
+		if baseEmpty {
+			base = nil
+		}
+		if taggedEmpty {
+			tagged = nil
+		}
+	}
+	if tagged == nil {
+		return base
+	}
+	tagged = fmt.Errorf("release tags: %w", tagged)
+	if base == nil {
+		return tagged
+	}
+	return errors.Join(base, tagged)
 }
 
 const emptyVetReason = "no packages match ./... under the build constraints"
@@ -182,7 +216,7 @@ func checkTargets(ctx context.Context, p *project, target string, jobs int) erro
 			}
 			s := begin("vetting for %s", name)
 			if err == nil {
-				err = goToolWithTags(ctx, p, env, targetTags(name), vetArgs(jobs, "./...")...)
+				err = vetVariants(ctx, p, env, targetTags(name), jobs)
 				if err != nil && ctx.Err() == nil && err.Error() == emptyVetError {
 					s.fail()
 					outcomes[i].why = emptyVetReason

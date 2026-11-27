@@ -9,13 +9,16 @@ import (
 	projectcfg "github.com/nsgo-dev/nsgo/project"
 )
 
-// goTags returns the tags a Go command for p takes: those in GOFLAGS, which a -tags on the command line would otherwise replace, then the app's build.tags, then extra, the tool's own, each once.
+// goTags merges GOFLAGS, project tags (including release_tags for the release variant), and the tool's tags.
 func goTags(ctx context.Context, p *project, env []string, extra ...string) ([]string, error) {
 	flags, err := goFlags(ctx, p.Dir, env)
 	if err != nil {
 		return nil, err
 	}
 	tags := append(goFlagTags(flags), p.Build.Tags...)
+	if p.buildReleaseTags && !p.devClient && !p.testBinary {
+		tags = append(tags, p.Build.ReleaseTags...)
+	}
 	if p.steamBuild(envTarget(env)) {
 		tags = append(tags, steamBuildTag)
 	}

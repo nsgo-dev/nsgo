@@ -30,6 +30,7 @@ import (
 // buildAll writes one directory per target: <output>/<name>-<version>-<target>.
 func buildAll(ctx context.Context, p *project) error {
 	p.Release = true
+	p.buildReleaseTags = p.buildReleaseTags || p.channel() == channelStore || p.channel() == channelSteam
 	p.packageLicenses = !p.buildEmbed
 	if err := p.readReleaseNotes(); err != nil {
 		return err
@@ -765,7 +766,7 @@ func goBuildCommand(ctx context.Context, p *project, out string, env []string, e
 		// rather than compiling as it starts, which a phone or a page
 		// takes seconds for; the tests still link the compiler for their
 		// own files.
-		bundle, err := p.bundleFile()
+		bundle, err := p.bundleFile(ctx, env, tags, extra.flags)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -773,7 +774,7 @@ func goBuildCommand(ctx context.Context, p *project, out string, env []string, e
 			files["zz_nsgo_bundle.go"] = bundle
 		}
 	} else {
-		bundle, err := p.bundleFile()
+		bundle, err := p.bundleFile(ctx, env, tags, extra.flags)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1354,6 +1355,7 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 		return err
 	}
 	wasm := filepath.Join(dir, "app.wasm")
+	env := []string{"GOOS=js", "GOARCH=wasm"}
 	offline := !dev && p.Web.Offline
 	var published []string
 	publish := func(name string) {
@@ -1366,7 +1368,18 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 		// import() names when the import runs. Its files hold the scripts
 		// the page's realm runs, wrapped so the runtime finds them by name.
 		stage(ctx, "compiling TSX")
-		split, err := compileSplit(p.Dir, func(file, name string, data []byte) (string, error) {
+		var tags []string
+		if len(p.Build.ReleaseTags) > 0 {
+			tags, err = goTags(ctx, p, env)
+			if err != nil {
+				return err
+			}
+		}
+		entries, err := p.buildTSXEntries(ctx, env, tags, nil)
+		if err != nil {
+			return err
+		}
+		split, err := compileSplit(p.Dir, entries, func(file, name string, data []byte) (string, error) {
 			data = []byte(websrc.Bundle(name, string(data)))
 			file = hashedName(file, data)
 			publish(file)
@@ -1386,7 +1399,7 @@ func buildWeb(ctx context.Context, p *project, dir string, dev bool) error {
 		p.split = split
 		defer func() { p.split = nil }()
 	}
-	if err := goBuild(ctx, p, wasm, []string{"GOOS=js", "GOARCH=wasm"}); err != nil {
+	if err := goBuild(ctx, p, wasm, env); err != nil {
 		return err
 	}
 	stage(ctx, "writing the site")

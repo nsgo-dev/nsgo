@@ -552,6 +552,7 @@ type BuildConfig struct {
 	Targets          []string `yaml:"targets"`
 	LDFlags          []string `yaml:"ldflags"`
 	Tags             []string `yaml:"tags"`
+	ReleaseTags      []string `yaml:"release_tags"`
 	Open             *bool    `yaml:"open"`
 	FPS              any      `yaml:"fps"`
 	Installers       *bool    `yaml:"installers"`
@@ -653,9 +654,14 @@ func (c *Config) Validate() error {
 		}
 		c.MiniProgram.WeChatSpeechPlugin = v
 	}
-	for _, tag := range c.Build.Tags {
-		if !ValidTag(tag) {
-			return fmt.Errorf("nsgo.yaml: build.tags has %q; a build tag is letters, digits, underscores and dots, one to an item", tag)
+	for _, field := range []struct {
+		name string
+		tags []string
+	}{{"build.tags", c.Build.Tags}, {"build.release_tags", c.Build.ReleaseTags}} {
+		for _, tag := range field.tags {
+			if !ValidTag(tag) {
+				return fmt.Errorf("nsgo.yaml: %s has %q; a build tag is letters, digits, underscores and dots, one to an item", field.name, tag)
+			}
 		}
 	}
 	if c.Dev.Target == "" {

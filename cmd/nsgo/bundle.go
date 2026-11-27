@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"go/token"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -29,8 +31,12 @@ const compilerPath = "github.com/nsgo-dev/nsgo/tsx/compiler"
 // tsxEntries are the entries the main package in dir passes to
 // compiler.App as string literals, relative to dir.
 func tsxEntries(dir string) ([]string, error) {
-	fset := token.NewFileSet()
 	matches, _ := filepath.Glob(filepath.Join(dir, "*.go"))
+	return tsxEntriesIn(matches)
+}
+
+func tsxEntriesIn(matches []string) ([]string, error) {
+	fset := token.NewFileSet()
 	seen := map[string]bool{}
 	var out []string
 	for _, file := range matches {
@@ -78,6 +84,34 @@ func tsxEntries(dir string) ([]string, error) {
 	return out, nil
 }
 
+// buildTSXEntries follows the same file selection as Go for builds with
+// release variants. The inactive variant may name unshipped scripts.
+func (p *project) buildTSXEntries(ctx context.Context, env, tags, flags []string) ([]string, error) {
+	if len(p.Build.ReleaseTags) == 0 || p.devClient || p.testBinary {
+		return tsxEntries(p.Dir)
+	}
+	args := append([]string{"list", "-e", "-f", `{{range .GoFiles}}{{println .}}{{end}}{{range .CgoFiles}}{{println .}}{{end}}`}, flags...)
+	args = append(args, tagsArgs(tags)...)
+	cmd := exec.CommandContext(ctx, "go", append(args, ".")...)
+	cmd.Dir = p.Dir
+	cmd.Env = append(os.Environ(), env...)
+	out, err := cmd.Output()
+	if err != nil {
+		if exit, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("listing Go files for TSX: %w\n%s", err, exit.Stderr)
+		}
+		return nil, fmt.Errorf("listing Go files for TSX: %w", err)
+	}
+	files := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(files) == 1 && files[0] == "" {
+		return nil, nil
+	}
+	for i, file := range files {
+		files[i] = filepath.Join(p.Dir, file)
+	}
+	return tsxEntriesIn(files)
+}
+
 // compileBundles compiles the app's TSX entries, by entry; hot ones for
 // nsgo dev, which updates them in place (bundler.CompileHot).
 func compileBundles(dir string, hot bool) (map[string]string, error) {
@@ -85,6 +119,10 @@ func compileBundles(dir string, hot bool) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return compileTSXEntries(dir, hot, entries)
+}
+
+func compileTSXEntries(dir string, hot bool, entries []string) (map[string]string, error) {
 	out := map[string]string{}
 	for _, e := range entries {
 		compile := bundler.Compile
@@ -113,11 +151,7 @@ type splitBundles struct {
 // compileSplit compiles the app's TSX entries split, giving each chunk to
 // write, which gets the name the runtime runs it by and returns its URL
 // relative to the page.
-func compileSplit(dir string, write func(file, name string, data []byte) (string, error)) (*splitBundles, error) {
-	entries, err := tsxEntries(dir)
-	if err != nil {
-		return nil, err
-	}
+func compileSplit(dir string, entries []string, write func(file, name string, data []byte) (string, error)) (*splitBundles, error) {
 	s := &splitBundles{main: map[string]string{}, chunks: map[string]map[string]string{}}
 	for _, e := range entries {
 		main, chunks, err := bundler.CompileSplit(os.DirFS(dir), e)
@@ -140,14 +174,19 @@ func compileSplit(dir string, write func(file, name string, data []byte) (string
 // bundleFile compiles the app's TSX and writes the file that gives its
 // bundles to compiler.App, returning its path; "" for an app without
 // TSX. A web release's are split.
-func (p *project) bundleFile() (string, error) {
+func (p *project) bundleFile(ctx context.Context, env, tags, flags []string) (string, error) {
 	var bundles map[string]string
 	var chunks map[string]map[string]string
 	var err error
 	if p.split != nil {
 		bundles, chunks = p.split.main, p.split.chunks
 	} else {
-		bundles, err = compileBundles(p.Dir, p.devClient && !p.Release)
+		var entries []string
+		entries, err = p.buildTSXEntries(ctx, env, tags, flags)
+		if err != nil {
+			return "", err
+		}
+		bundles, err = compileTSXEntries(p.Dir, p.devClient && !p.Release, entries)
 	}
 	if err != nil || len(bundles) == 0 {
 		return "", err

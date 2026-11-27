@@ -1,10 +1,12 @@
 package main
 
 import (
+	"flag"
 	projectcfg "github.com/nsgo-dev/nsgo/project"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -104,20 +106,25 @@ func TestTargetTags(t *testing.T) {
 }
 
 func TestBuildTagsRejectsInvalid(t *testing.T) {
-	for _, tags := range []string{"[a,b]", "[\"a,b\"]", "[\"a b\"]", "[\"\"]", "[\"-x\"]"} {
-		dir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(dir, "nsgo.yaml"), []byte("name: Test\nbuild:\n  tags: "+tags+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		_, err := load(dir)
-		if tags == "[a,b]" {
-			if err != nil {
-				t.Errorf("tags %s: %v", tags, err)
+	for _, key := range []string{"tags", "release_tags", "release_tag"} {
+		for _, tags := range []string{"[a,b]", "[\"a,b\"]", "[\"a b\"]", "[\"\"]", "[\"-x\"]"} {
+			dir := t.TempDir()
+			writeFiles(t, dir, map[string]string{"nsgo.yaml": "name: Test\nbuild:\n  " + key + ": " + tags + "\n"})
+			_, err := load(dir)
+			switch {
+			case key == "release_tag":
+				if err == nil || !strings.Contains(err.Error(), "field release_tag not found") {
+					t.Errorf("unknown field %s: %v", key, err)
+				}
+			case tags == "[a,b]":
+				if err != nil {
+					t.Errorf("%s %s: %v", key, tags, err)
+				}
+			default:
+				if err == nil || !strings.Contains(err.Error(), "build."+key) {
+					t.Errorf("%s %s: err = %v, want a build.%s error", key, tags, err, key)
+				}
 			}
-			continue
-		}
-		if err == nil || !strings.Contains(err.Error(), "build.tags") {
-			t.Errorf("tags %s: err = %v, want a build.tags error", tags, err)
 		}
 	}
 }
@@ -207,5 +214,118 @@ func TestBuildTagsReachEveryGoCommand(t *testing.T) {
 	p.Build.Tags = nil
 	if err := goToolWithTags(ctx, p, nil, nil, "vet", "."); err == nil {
 		t.Error("vet without the tag passed; the fixture does not depend on it")
+	}
+}
+
+func TestReleaseTagsSelectCompiledFiles(t *testing.T) {
+	t.Setenv("GOFLAGS", "-mod=mod -tags=from_env")
+	target := tuiTarget(runtime.GOOS, runtime.GOARCH)
+	if target == "" {
+		t.Skip("needs a native TUI target")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"nsgo.yaml": "name: Tags\nbuild:\n  tags: [project_tag]\n  release_tags: [release]\n",
+		"go.mod": "module releasefixture\n\ngo 1.26\n",
+		"main.go": "//go:build project_tag && from_env\n\npackage main\nfunc main() { println(flavor) }\n",
+		"local.go": "//go:build !release\n\npackage main\nconst flavor = \"local\"\n",
+		"release.go": "//go:build release\n\npackage main\nconst flavor = \"release\"\n",
+		"main_test.go": "package main\nimport \"testing\"\nfunc TestLocal(t *testing.T) { if flavor != \"local\" { t.Fatal(flavor) } }\n",
+	})
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkBinary := func(t *testing.T, bin, want string) {
+		t.Helper()
+		out, err := exec.CommandContext(t.Context(), bin).CombinedOutput()
+		if err != nil || strings.TrimSpace(string(out)) != want {
+			t.Fatalf("run %s = %q, %v; want %q", bin, out, err, want)
+		}
+	}
+	for _, tc := range []struct {
+		name, want string
+		args []string
+	}{
+		{name: "plain", want: "local"},
+		{name: "release", want: "release", args: []string{"-release"}},
+		{name: "store", want: "release", args: []string{"-channel", "store"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q := *p
+			fs := flag.NewFlagSet("build", flag.ContinueOnError)
+			f := bindBuildFlags(fs)
+			if err := fs.Parse(append([]string{"-target", target}, tc.args...)); err != nil {
+				t.Fatal(err)
+			}
+			f.apply(&q)
+			if err := buildAll(t.Context(), &q); err != nil {
+				t.Fatal(err)
+			}
+			checkBinary(t, tuiBinary(&q, q.packageDir(target), target), tc.want)
+		})
+	}
+	// Even a store app's dev -release compiles the local source variant.
+	p.Updates.Channel = "store"
+	q := *p
+	q.Release, q.devClient = true, true
+	devDir := t.TempDir()
+	if err := buildTUI(t.Context(), &q, devDir, target); err != nil {
+		t.Fatal(err)
+	}
+	checkBinary(t, tuiBinary(&q, devDir, target), "local")
+	if err := runTests(t.Context(), p, testOptions{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestReleaseTagsVetBothVariants(t *testing.T) {
+	t.Setenv("GOFLAGS", "-tags=from_env -mod=mod")
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"nsgo.yaml": "name: Tags\nbuild:\n  tags: [project_tag]\n  release_tags: [release]\n",
+		"go.mod": "module releasefixture\n\ngo 1.26\n",
+		"main.go": "package main\nfunc main() {}\n",
+		"release.go": "//go:build release && from_env && project_tag && (!js || nsgoharmony)\n\npackage main\nimport \"fmt\"\nfunc bad() { fmt.Printf(\"%d\", \"not an integer\") }\n",
+	})
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"", "harmonyos"} {
+		if err := check(t.Context(), p, target, 0); err == nil ||
+			!strings.Contains(err.Error(), "release tags: go vet failed") ||
+			!strings.Contains(err.Error(), "fmt.Printf format %d") {
+			t.Errorf("checking %q got %v; want the release-only vet diagnostic", target, err)
+		}
+	}
+	p.Build.ReleaseTags = nil
+	if err := check(t.Context(), p, "", 0); err != nil {
+		t.Fatalf("default variant: %v", err)
+	}
+}
+
+func TestReleaseTagsSelectTSXEntries(t *testing.T) {
+	t.Setenv("GOFLAGS", "")
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod": "module releasefixture\n\ngo 1.26\n",
+		"local.go": "//go:build !release\n\npackage main\ninvalid syntax that a release build should never parse\n",
+		"release.go": "//go:build release\n\npackage main\nimport \"" + compilerPath + "\"\nvar _ = compiler.App(src, \"Release.tsx\")\n",
+		"Release.tsx": "import { mount, Text } from 'nsgo'; mount(() => <Text>Release</Text>);\n",
+	})
+	p := &project{Config: projectcfg.Config{Dir: dir}, buildReleaseTags: true, buildEmbed: true}
+	p.Build.ReleaseTags = []string{"release"}
+	tags, err := goTags(t.Context(), p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := p.bundleFile(t.Context(), nil, tags, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := os.ReadFile(bundle)
+	if err != nil || !strings.Contains(string(source), `compiler.Bundled("Release.tsx", `) {
+		t.Fatalf("generated bundle = %s, %v", source, err)
 	}
 }

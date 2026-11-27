@@ -75,6 +75,7 @@ dev:
 build:
   output: dist
   tags: []              # 应用每次构建、测试和检查都使用的 Go 构建标签，例如 timetzdata
+  release_tags: [release]  # 发布构建额外使用的 Go 构建标签
   ldflags: []           # 应用自己的链接器参数，例如 -X main.releaseDate=2026-11-17
   open: false           # true 时构建后打开输出目录
   installers: true      # false 时不生成磁盘映像、Windows 安装程序和 Linux 软件包
@@ -113,6 +114,10 @@ build:
 `build.ldflags` 是应用自己的链接器参数，每一项按 go build 的 `-ldflags` 的写法书写，例如 `-X main.releaseDate=2026-11-17` 或 `-X 'main.channel=beta builds'`。链接应用的每次构建都会使用它们：`dev` 及其每次重新加载、`build`（包括 `-embed`）和 `test`（包括 `-target`），覆盖所有目标。`build` 和 `test` 的 `-ldflags` 会追加到其后而不是替换它们，需要多个值时可以重复使用。它们排在工具自己的 `-X` 参数之前，而链接器以同一变量的最后一个值为准，因此 `core.App` 中的名称、ID 和版本始终取自 `nsgo.yaml`。工具会给 go 传入自己的 `-ldflags`，它会替换 `GOFLAGS` 中的 `-ldflags`，所以链接器参数应写在这里；无窗口 `test` 中写在目录之后的 `-ldflags` 属于 go test，会替换它们全部。
 
 工具为应用运行的每个 go 命令都使用 `build.tags`：`dev` 及其每次重新加载、`build`（包括 `-embed`）、`test`（包括 `-target`）和 `check`，覆盖所有目标。NSGo 自己的标签（例如 `dev` 中的 `nsgodev`、目标测试中的 `nsgotest`）会加在它们之后，`GOFLAGS` 中 `-tags` 的标签也会合并进来，而不是被替换；`GOFLAGS` 的其余选项照常生效。
+
+`build.release_tags` 在 `nsgo build -release`（也可同时使用 `-embed`）以及 `store` 或 `steam` 渠道构建时追加到 `build.tags`；渠道可通过 `-channel` 或 `updates.channel` 指定。不使用这些渠道的普通构建、`nsgo dev`（即使指定 `-release`）和 `nsgo test` 都不会追加这些标签。`nsgo check` 会针对本机或每个指定目标分别运行两次 `go vet`，一次使用额外标签，一次不使用。两个列表都要求每项只写一个 Go 构建标签。
+
+发布 Go 应用产物时不会重新构建。直接分发请先运行 `nsgo build -release`；商店分发请先使用相应渠道构建。`nsgo publish` 生成签名 TSX 包时不编译 Go。
 
 `apple.info.LSMinimumSystemVersion` 提高 macOS 包的最低系统版本，`apple.info.MinimumOSVersion` 则提高所选 iOS、tvOS 或 watchOS 包的最低版本。用带引号的版本字符串，如 `"14.2"`、`"18.0"`，包含一到三个数字部分。运行时最低要求是 macOS 13.0（Go 1.27）、iOS 15.0、tvOS 17.0、watchOS 26.0；低于要求或格式错误会报错。移动平台共用的键必须满足每个所选目标，轻 App 仍用自己的 `app_clip.minimum`。这些值用于包元数据、图标编译、签名项目和应用链接；嵌入式 iOS 框架也采用它们，Mac Catalyst 至少为 16.0，以满足 Go 的 macOS 13 要求。
 
