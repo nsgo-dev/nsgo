@@ -221,7 +221,7 @@ func TestReleaseLeavesCurrentRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertRuntime(t, root, committedDex, committedJar)
-	if got := read(t, filepath.Join(root, changelogFile)); !strings.Contains(got, "## [0.3.0] - 2026-12-01\n\n- Add new.\n") {
+	if got := read(t, filepath.Join(root, changelogFile)); !strings.Contains(got, "\n#### Features\n\n- Add new.\n") {
 		t.Errorf("changelog:\n%s", got)
 	}
 }
@@ -251,7 +251,7 @@ func TestReleaseRebuildsStaleRuntime(t *testing.T) {
 		t.Errorf("slept %v, want 6s: two polls for the run to appear, one while it is queued and three while it runs", slept)
 	}
 	assertRuntime(t, root, builtDex, builtJar)
-	if got := read(t, filepath.Join(root, changelogFile)); !strings.Contains(got, "## [0.3.0] - 2026-12-01\n\n- Add new.\n") {
+	if got := read(t, filepath.Join(root, changelogFile)); !strings.Contains(got, "\n#### Features\n\n- Add new.\n") {
 		t.Errorf("changelog:\n%s", got)
 	}
 }

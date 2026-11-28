@@ -168,8 +168,19 @@ func TestRelease(t *testing.T) {
 
 ## [0.3.0] - 2026-12-01
 
+### Highlights
+
+### Features
+
+<details>
+<summary>More changes</summary>
+
+#### Features
+
 - Add new.
 - Keep an older line.
+
+</details>
 
 ## [0.2.0] - 2026-11-19
 
@@ -183,12 +194,60 @@ func TestRelease(t *testing.T) {
 	}
 }
 
+// A release groups its bullets for its notes: an empty Highlights, the folded groups' headings, Security in full, and the folded bullets in one closing block.
+func TestReleaseGroupsNotes(t *testing.T) {
+	root := repo(t, "# Changelog\n\n## [Unreleased]\n\n## [0.2.0] - 2026-11-19\n\n- Add x.\n", map[string]string{
+		"a.md": "### Fixed\n- Fix a.\n\n### Security\n- Escape a.\n",
+		"b.md": "### Removed\n- Remove b.\n\n### Added\n- Add b.\n",
+	})
+	if err := run(root, []string{"release", "-no-runtime", "-date", "2026-12-01", "0.3.0"}, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	want := `# Changelog
+
+## [Unreleased]
+
+## [0.3.0] - 2026-12-01
+
+### Highlights
+
+### Features
+
+### Bug fixes
+
+### Security
+
+- Escape a.
+
+<details>
+<summary>More changes</summary>
+
+#### Features
+
+- Add b.
+- Remove b.
+
+#### Bug fixes
+
+- Fix a.
+
+</details>
+
+## [0.2.0] - 2026-11-19
+
+- Add x.
+`
+	if got := read(t, filepath.Join(root, changelogFile)); got != want {
+		t.Errorf("changelog:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestReleaseDefaultsToToday(t *testing.T) {
 	root := repo(t, sample, nil)
 	if err := run(root, []string{"release", "-no-runtime", "0.3.0-rc.1"}, time.Date(2026, 12, 2, 23, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatal(err)
 	}
-	if got := read(t, filepath.Join(root, changelogFile)); !strings.Contains(got, "\n## [0.3.0-rc.1] - 2026-12-02\n\n- Keep an older line.\n") {
+	if got := read(t, filepath.Join(root, changelogFile)); !strings.Contains(got, "\n## [0.3.0-rc.1] - 2026-12-02\n\n### Highlights\n\n### Features\n\n<details>\n<summary>More changes</summary>\n\n#### Features\n\n- Keep an older line.\n\n</details>\n") {
 		t.Errorf("changelog:\n%s", got)
 	}
 }
