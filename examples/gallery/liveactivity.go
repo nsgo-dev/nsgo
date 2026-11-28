@@ -163,7 +163,7 @@ func liveActivityCard(cx *core.Scope, steps, goal *core.Signal[float64], accent 
 			}
 			return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6}, Children: []core.Node{
 				ui.Icon(lucide.CircleAlert, 14, colors.Danger),
-				core.Text{ContentFunc: status.Get, TestID: "activity-status", Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 12}, StyleFunc: ui.Colored(colors.Muted)},
+				core.Text{ContentFunc: status.Get, TestID: "activity-status", Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 12}, StyleFunc: ui.Colored(colors.Muted)},
 			}}
 		}),
 		ui.Text(tr.WidgetsLiveActivityHow(), 12, ui.Regular, colors.Faint),

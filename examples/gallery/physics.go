@@ -143,7 +143,7 @@ func physicsDemo(cx *core.Scope) core.Node {
 			if short {
 				st.Height = core.Pt(shortStage)
 			} else {
-				st.FlexGrow, st.FlexShrink, st.MinHeight = 1, 1, core.Pt(0)
+				st.FlexGrow, st.FlexShrink, st.MinHeight = 1, core.Shrink(1), core.Pt(0)
 			}
 			return st
 		}
@@ -156,7 +156,7 @@ func physicsDemo(cx *core.Scope) core.Node {
 		return core.View{Style: outer, StyleFunc: page, Children: []core.Node{
 			Appear{Children: []core.Node{core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12}, Children: []core.Node{
 				IconTile{Icon: lucide.Atom, Size: 40},
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 					ui.Text(tr.PhysicsDragAndRelease(), 15, ui.Semibold, colors.Text),
 					core.Text{Content: Hint(cx, tr.PhysicsTapToPulseLongPress(), tr.PhysicsClickToPulsePressAnd()), MaxLines: 1, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 				}},
@@ -221,7 +221,7 @@ func physicsDemo(cx *core.Scope) core.Node {
 							return tr.PhysicsSpringsToTheCornerThe()
 						}
 						return tr.PhysicsSpringsHomeWithTheRelease()
-					}, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+					}, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 					core.Text{ContentFunc: func() string {
 						if mode.Get() == "coast" {
 							return tr.PhysicsDecay()

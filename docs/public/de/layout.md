@@ -7,7 +7,7 @@ order: 51
 
 ## Boxen
 
-Jedes Element ist eine Box, die von der Engine angeordnet wird. Die Standardwerte stammen aus React Native: eine Flexbox in Spaltenrichtung, Kinder, die ihre Größe behalten, sofern sie nicht wachsen oder schrumpfen, Elemente, die entlang der Querachse gestreckt werden, und Größen, die Padding und Rahmen einschließen.
+Jedes Element ist eine Box, die von der Engine angeordnet wird. Die Standardwerte stammen größtenteils aus React Native: eine Flexbox in Spaltenrichtung, Kinder, die ihre Größe behalten, sofern sie nicht wachsen oder schrumpfen, Elemente, die entlang der Querachse gestreckt werden, keine automatischen Mindestgrößen und Größen, die Padding und Rahmen einschließen. Anders als in React Native schrumpft eine Box, die wächst, auch, ebenso Scroll-Views und die Boxen um sie herum.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Größen
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` und `FlexBasis` nehmen `core.Pt` für Punkte oder `core.Pct` für einen Prozentsatz des Elternelements. `FlexGrow` verteilt den freien Platz, und `FlexShrink` erlaubt einer Box, etwas davon abzugeben; eine Box ohne beides behält ihre Größe. `AspectRatio` ist die Breite geteilt durch die Höhe. `AutoMargin` nimmt den freien Platz auf den genannten Seiten ein, sodass eine Seite eine Box an die andere schiebt.
+`Width`, `Height`, `MinWidth`, `MaxWidth` und `FlexBasis` nehmen `core.Pt` für Punkte oder `core.Pct` für einen Prozentsatz des Elternelements. `FlexGrow` verteilt den freien Platz, und `FlexShrink` gibt etwas davon ab, wenn zu wenig da ist. Ohne Angabe ist `FlexShrink` 1 für eine Box, die wächst, für ein `core.Scroll` oder eine `core.List` entlang ihrer Scrollachse und für jede Box um sie herum, die auf dieser Achse keine Größe setzt, und 0 für alle übrigen, den Inhalt eines `core.Scroll` eingeschlossen; `core.Shrink(n)` setzt einen Faktor, und `core.NoShrink` hält eine Box bei ihrer Größe. `AspectRatio` ist die Breite geteilt durch die Höhe. `AutoMargin` nimmt den freien Platz auf den genannten Seiten ein, sodass eine Seite eine Box an die andere schiebt.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-Der Inhalt einer Box bestimmt ihre Größe, bis eine Breite oder Höhe etwas anderes vorgibt. `core.MinContent`, `core.MaxContent` und `core.FitContent` nehmen die Größen an, die CSS so benennt: Die Min-Content-Breite eines Textes ist sein breitestes Wort. Ein Text in einer Zeile schrumpft und bricht nur mit `FlexShrink: 1` um; fügen Sie `FlexGrow: 1` hinzu, wenn er den restlichen Platz einnehmen soll. Ein nicht gesetztes Minimum ist bereits 0, wie in React Native, daher ändert `MinWidth: core.Pt(0)` nichts, und ein schrumpfender Text bricht seine Wörter, wenn die Zeile schmaler als sein breitestes Wort ist. `MinWidth: core.AutoMinimum` hält ihn bei seinem breitesten Wort an, wie es das automatische Minimum von CSS tut.
+Der Inhalt einer Box bestimmt ihre Größe, bis eine Breite oder Höhe etwas anderes vorgibt. `core.MinContent`, `core.MaxContent` und `core.FitContent` nehmen die Größen an, die CSS so benennt: Die Min-Content-Breite eines Textes ist sein breitestes Wort. Ein Text in einer Zeile schrumpft und bricht um, wenn er `FlexGrow: 1` oder `FlexShrink: core.Shrink(1)` setzt; ein nicht gesetztes Minimum ist bereits 0, wie in React Native, daher ändert `MinWidth: core.Pt(0)` nichts, und ein schrumpfender Text bricht seine Wörter, wenn die Zeile schmaler als sein breitestes Wort ist. `MinWidth: core.AutoMinimum` hält ihn bei seinem breitesten Wort an, wie es das automatische Minimum von CSS tut.
 
-Ein Bildschirm, der das Fenster füllt, erhält `FlexGrow: 1` und `FlexShrink: 1`, ebenso jede Box zwischen ihm und einer Liste oder Scroll-View, die scrollen soll. Mit `FlexGrow` allein wächst eine Box auf die Größe ihres Inhalts, sodass eine lange Liste sie über das Fenster hinaus dehnt, statt zu scrollen.
+Daher scrollt eine Liste oder Scroll-View, wie tief sie auch liegt, ohne dass an den Boxen um sie herum etwas zu setzen ist, während Kopfzeilen, Tabs und Werkzeugleisten neben ihr ihre Größe behalten. Ein Bildschirm, der das Fenster füllt, erhält `FlexGrow: 1`.
 
 ## Grid
 

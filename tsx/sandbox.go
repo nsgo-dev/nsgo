@@ -259,7 +259,7 @@ func (r *runtime) renderExport(name string, props map[string]any) {
 }
 
 // sandboxFrame is the style of the view a sandboxed bundle shows in, which the host's scope owns and the bundle cannot restyle.
-var sandboxFrame = core.Style{FlexGrow: 1, FlexShrink: 1, Overflow: core.Hidden}
+var sandboxFrame = core.Style{FlexGrow: 1, Overflow: core.Hidden}
 
 // start runs src in a new runtime under cx, panicking with what it throws as it loads, with ErrUnsupported on unsupported targets, or with ErrUnisolated where it cannot be isolated.
 func (s Sandbox) start(cx *core.Scope, name, src string) *runtime {

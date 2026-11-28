@@ -66,7 +66,7 @@ func (v ScrollView) Render(cx *core.Scope) core.Node {
 		inner.Direction = core.Row
 	}
 	scroll := core.Scroll{Horizontal: v.Horizontal, OffsetValues: values, Ref: v.Ref, TestID: v.TestID, OnScroll: v.OnScroll,
-		Style:    core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), MinWidth: core.Pt(0)},
+		Style:    core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), MinWidth: core.Pt(0)},
 		OnLayout: func(b core.Bounds) { viewport.Set(along(b.Size)) },
 		Children: []core.Node{core.View{Style: inner.Merge(v.ContentStyle), Children: v.Children,
 			OnLayout: func(b core.Bounds) { content.Set(along(b.Size)) }}}}
@@ -121,6 +121,6 @@ func (v ScrollView) Render(cx *core.Scope) core.Node {
 	if bars && v.BottomBar != nil {
 		children = append(children, float(v.BottomBar, v.BottomBarLabel, true))
 	}
-	return core.View{Style: core.Style{FlexShrink: 1, MinHeight: core.Pt(0), MinWidth: core.Pt(0), Overflow: core.Hidden}.Merge(v.Style),
+	return core.View{Style: core.Style{FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), MinWidth: core.Pt(0), Overflow: core.Hidden}.Merge(v.Style),
 		Children: children}
 }

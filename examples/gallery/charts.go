@@ -294,7 +294,7 @@ func headline(cx *core.Scope, text func() string, color func() core.Color) core.
 
 // note is a quieter line beside or under a headline, in color.
 func note(cx *core.Scope, text func() string, color func() core.Color) core.Node {
-	t := core.Text{ContentFunc: text, Style: core.Style{FontSize: 12, FlexShrink: 1, FontVariant: core.FontTabularNums},
+	t := core.Text{ContentFunc: text, Style: core.Style{FontSize: 12, FlexShrink: core.Shrink(1), FontVariant: core.FontTabularNums},
 		StyleFunc: func() core.Style { return core.Style{Color: color()} }}
 	return t
 }

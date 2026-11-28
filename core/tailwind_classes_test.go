@@ -79,7 +79,7 @@ func TestSpacingAndLayout(t *testing.T) {
 	want(t, "height", s.Height, Pt(48))
 	want(t, "flex-[2]", styled(t, "flex-[2]").FlexGrow, 2)
 	s = styled(t, "flex-[3_0_50%]")
-	want(t, "flex-[3_0_50%]", [3]any{s.FlexGrow, s.FlexShrink, s.FlexBasis}, [3]any{float32(3), float32(0), Pct(50)})
+	want(t, "flex-[3_0_50%]", [3]any{s.FlexGrow, s.FlexShrink, s.FlexBasis}, [3]any{float32(3), NoShrink, Pct(50)})
 	s = styled(t, "p-[13px] m-auto inset-0 absolute size-10 basis-1/3 flex-1")
 	want(t, "p-[13px]", s.Padding.Left, 13)
 	want(t, "m-auto", s.AutoMargin, SideTop|SideRight|SideBottom|SideLeft)

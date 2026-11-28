@@ -276,7 +276,7 @@ func site(cx *core.Scope) core.Node {
 				}
 				return core.Style{Width: core.Pt(7), Height: core.Pt(7), CornerRadius: 3.5, Background: c()}
 			}},
-			core.Text{ContentFunc: host, MaxLines: 1, EllipsizeMode: core.EllipsizeMiddle, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+			core.Text{ContentFunc: host, MaxLines: 1, EllipsizeMode: core.EllipsizeMiddle, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 		}},
 		core.WebView{Ref: ref, SourceFunc: func() core.WebSource { return core.WebSrc(docsHome(cx)) }, TestID: "site", StyleFunc: func() core.Style { return mediaFrame(cx, 340, colors.Inset()) }, OnNavigationStateChange: state.Set},
 		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10}, Children: []core.Node{
@@ -327,8 +327,8 @@ func cookieStore(cx *core.Scope) core.Node {
 	}
 	row := func(cx *core.Scope, c func() core.WebCookie, _ func() int) core.Node {
 		return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{
-			core.Text{ContentFunc: func() string { return c().Name + "=" + c().Value }, MaxLines: 1, EllipsizeMode: core.EllipsizeMiddle, Style: core.Style{FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
-			core.Text{ContentFunc: func() string { return c().Domain + c().CookiePath() }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+			core.Text{ContentFunc: func() string { return c().Name + "=" + c().Value }, MaxLines: 1, EllipsizeMode: core.EllipsizeMiddle, Style: core.Style{FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
+			core.Text{ContentFunc: func() string { return c().Domain + c().CookiePath() }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 			core.Show{When: func() bool { return c().HTTPOnly }, Then: func(*core.Scope) core.Node { return ui.Badge{Text: "HttpOnly"} }},
 		}}
 	}
@@ -393,7 +393,7 @@ func player(cx *core.Scope) core.Node {
 					}
 					return ui.IconButton{Variant: ui.IconButtonPrimary, Icon: lucide.Pause, Label: tr.MediaPause(), OnPress: func() { paused.Set(true) }}
 				}),
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 8}, Children: []core.Node{
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 8}, Children: []core.Node{
 					ui.Meter{Value: func() float64 {
 						if d := dur.Get(); d > 0 {
 							return float64(pos.Get()) / float64(d)

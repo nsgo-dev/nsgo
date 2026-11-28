@@ -63,7 +63,7 @@ func separator(cx *core.Scope, s diff.Separator, ref *diff.Ref) core.Node {
 	place := core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, FlexGrow: 1, AlignSelf: core.AlignStretch, Padding: core.Symmetric(0, 8)}
 	if s.Lines == 0 {
 		return core.View{Style: place, Children: []core.Node{core.Text{Content: s.Header, MaxLines: 1,
-			Style: core.Style{FontFamily: ui.Mono, FontSize: 11, FlexShrink: 1}, StyleFunc: ui.Colored(colors.Muted)}}}
+			Style: core.Style{FontFamily: ui.Mono, FontSize: 11, FlexShrink: core.Shrink(1)}, StyleFunc: ui.Colored(colors.Muted)}}}
 	}
 	icon := lucide.ChevronsUpDown
 	switch {

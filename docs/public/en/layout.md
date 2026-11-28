@@ -7,7 +7,7 @@ order: 51
 
 ## Boxes
 
-Every element is a box laid out by the engine. The defaults are React Native's: a column flexbox, children that keep their size unless they grow or shrink, items stretched across the cross axis, and sizes that include padding and borders.
+Every element is a box laid out by the engine. The defaults are mostly React Native's: a column flexbox, children that keep their size unless they grow or shrink, items stretched across the cross axis, no automatic minimum sizes, and sizes that include padding and borders. Unlike React Native, a box that grows also shrinks, as do scroll views and the boxes around them.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Sizes
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` and `FlexBasis` take `core.Pt` for points or `core.Pct` for a percentage of the parent. `FlexGrow` shares the free space and `FlexShrink` lets a box give some back; a box with neither keeps its size. `AspectRatio` is width divided by height. `AutoMargin` takes the free space on the sides it names, so one side pushes a box to the other.
+`Width`, `Height`, `MinWidth`, `MaxWidth` and `FlexBasis` take `core.Pt` for points or `core.Pct` for a percentage of the parent. `FlexGrow` shares the free space and `FlexShrink` gives some back when there is too little. Unset, `FlexShrink` is 1 for a box that grows, for a `core.Scroll` or `core.List` along its scroll axis and for each box around one that sets no size on that axis, and 0 for the rest, a `core.Scroll`'s content included; `core.Shrink(n)` sets a factor and `core.NoShrink` keeps a box at its size. `AspectRatio` is width divided by height. `AutoMargin` takes the free space on the sides it names, so one side pushes a box to the other.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-A box's content gives it its size until a width or height says otherwise. `core.MinContent`, `core.MaxContent` and `core.FitContent` take the sizes CSS names: a text's min-content width is its widest word. A text inside a row shrinks and wraps only with `FlexShrink: 1`; add `FlexGrow: 1` when it should take the remaining space. An unset minimum is already 0, as in React Native, so `MinWidth: core.Pt(0)` changes nothing and a shrinking text breaks its words when the row is narrower than its widest word. `MinWidth: core.AutoMinimum` stops it at its widest word, as CSS's automatic minimum does.
+A box's content gives it its size until a width or height says otherwise. `core.MinContent`, `core.MaxContent` and `core.FitContent` take the sizes CSS names: a text's min-content width is its widest word. A text inside a row shrinks and wraps when it sets `FlexGrow: 1` or `FlexShrink: core.Shrink(1)`; an unset minimum is already 0, as in React Native, so `MinWidth: core.Pt(0)` changes nothing and a shrinking text breaks its words when the row is narrower than its widest word. `MinWidth: core.AutoMinimum` stops it at its widest word, as CSS's automatic minimum does.
 
-A screen that fills the window takes `FlexGrow: 1` and `FlexShrink: 1`, as does each box between it and a list or scroll view that should scroll. With `FlexGrow` alone, a box grows to its content, so a long list stretches it past the window instead of scrolling.
+So a list or scroll view scrolls however deep it sits, with nothing to set on the boxes around it, while headers, tabs and toolbars beside it keep their size. A screen that fills the window takes `FlexGrow: 1`.
 
 ## Grid
 

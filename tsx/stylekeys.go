@@ -108,7 +108,7 @@ func (r *runtime) styleKey(s *core.Style, key string, v js.Value) {
 	case "flexGrow":
 		s.FlexGrow = float32(finite(v))
 	case "flexShrink":
-		s.FlexShrink = float32(finite(v))
+		s.FlexShrink = core.Shrink(float32(finite(v)))
 	case "flexBasis":
 		s.FlexBasis = r.length(key, v)
 	case "justifyContent":
@@ -855,19 +855,19 @@ func (r *runtime) flex(s *core.Style, key string, v js.Value) {
 		f := float32(finite(v))
 		r.check(key, v, f >= 0)
 		if f >= 0 {
-			s.FlexGrow, s.FlexShrink, s.FlexBasis = f, 1, core.Pt(0)
+			s.FlexGrow, s.FlexShrink, s.FlexBasis = f, core.Shrink(1), core.Pt(0)
 		}
 		return
 	}
 	switch text = strings.TrimSpace(text); text {
 	case "none":
-		s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, 0, core.Length{}
+		s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, core.NoShrink, core.Length{}
 		return
 	case "auto":
-		s.FlexGrow, s.FlexShrink, s.FlexBasis = 1, 1, core.Length{}
+		s.FlexGrow, s.FlexShrink, s.FlexBasis = 1, core.Shrink(1), core.Length{}
 		return
 	case "initial":
-		s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, 1, core.Length{}
+		s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, core.Shrink(1), core.Length{}
 		return
 	}
 	fields := strings.Fields(text)
@@ -894,7 +894,7 @@ func (r *runtime) flex(s *core.Style, key string, v js.Value) {
 		}
 		basis = l
 	}
-	s.FlexGrow, s.FlexShrink, s.FlexBasis = grow, shrink, basis
+	s.FlexGrow, s.FlexShrink, s.FlexBasis = grow, core.Shrink(shrink), basis
 }
 
 // flexBasis reads a word of flex that is its basis.

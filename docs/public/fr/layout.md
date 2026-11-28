@@ -7,7 +7,7 @@ order: 51
 
 ## Boîtes
 
-Chaque élément est une boîte disposée par le moteur. Les valeurs par défaut sont celles de React Native : une flexbox en colonne, des enfants qui conservent leur taille à moins de s’agrandir ou de rétrécir, des éléments étirés sur l’axe transversal et des dimensions qui incluent les marges internes et les bordures.
+Chaque élément est une boîte disposée par le moteur. Les valeurs par défaut sont pour l’essentiel celles de React Native : une flexbox en colonne, des enfants qui conservent leur taille à moins de s’agrandir ou de rétrécir, des éléments étirés sur l’axe transversal, aucune taille minimale automatique et des dimensions qui incluent les marges internes et les bordures. Contrairement à React Native, une boîte qui s’agrandit rétrécit aussi, tout comme les vues défilantes et les boîtes qui les entourent.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Dimensions
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` et `FlexBasis` prennent `core.Pt` pour des points ou `core.Pct` pour un pourcentage du parent. `FlexGrow` répartit l’espace disponible et `FlexShrink` permet à une boîte d’en céder une partie ; une boîte sans aucun des deux conserve sa taille. `AspectRatio` correspond à la largeur divisée par la hauteur. `AutoMargin` absorbe l’espace disponible sur les côtés qu’il nomme, si bien qu’un côté pousse la boîte vers l’autre.
+`Width`, `Height`, `MinWidth`, `MaxWidth` et `FlexBasis` prennent `core.Pt` pour des points ou `core.Pct` pour un pourcentage du parent. `FlexGrow` répartit l’espace disponible et `FlexShrink` en rend une partie quand il en manque. Non défini, `FlexShrink` vaut 1 pour une boîte qui s’agrandit, pour un `core.Scroll` ou une `core.List` le long de son axe de défilement et pour chaque boîte qui l’entoure sans fixer de taille sur cet axe, et 0 pour les autres, contenu d’un `core.Scroll` compris ; `core.Shrink(n)` fixe un facteur et `core.NoShrink` garde une boîte à sa taille. `AspectRatio` correspond à la largeur divisée par la hauteur. `AutoMargin` absorbe l’espace disponible sur les côtés qu’il nomme, si bien qu’un côté pousse la boîte vers l’autre.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-Le contenu d’une boîte lui donne sa taille tant qu’une largeur ou une hauteur n’indique pas le contraire. `core.MinContent`, `core.MaxContent` et `core.FitContent` adoptent les dimensions nommées par CSS : la largeur min-content d’un texte est celle de son mot le plus large. Un texte à l’intérieur d’une ligne ne rétrécit et ne passe à la ligne qu’avec `FlexShrink: 1` ; ajoutez `FlexGrow: 1` lorsqu’il doit occuper l’espace restant. Un minimum non défini vaut déjà 0, comme dans React Native, donc `MinWidth: core.Pt(0)` ne change rien et un texte qui rétrécit coupe ses mots lorsque la ligne est plus étroite que son mot le plus large. `MinWidth: core.AutoMinimum` l’arrête à son mot le plus large, comme le fait le minimum automatique de CSS.
+Le contenu d’une boîte lui donne sa taille tant qu’une largeur ou une hauteur n’indique pas le contraire. `core.MinContent`, `core.MaxContent` et `core.FitContent` adoptent les dimensions nommées par CSS : la largeur min-content d’un texte est celle de son mot le plus large. Un texte à l’intérieur d’une ligne rétrécit et passe à la ligne lorsqu’il définit `FlexGrow: 1` ou `FlexShrink: core.Shrink(1)` ; un minimum non défini vaut déjà 0, comme dans React Native, donc `MinWidth: core.Pt(0)` ne change rien et un texte qui rétrécit coupe ses mots lorsque la ligne est plus étroite que son mot le plus large. `MinWidth: core.AutoMinimum` l’arrête à son mot le plus large, comme le fait le minimum automatique de CSS.
 
-Un écran qui remplit la fenêtre prend `FlexGrow: 1` et `FlexShrink: 1`, tout comme chaque boîte située entre lui et une liste ou une vue défilante devant défiler. Avec `FlexGrow` seul, une boîte s’agrandit jusqu’à la taille de son contenu, de sorte qu’une longue liste l’étire au-delà de la fenêtre au lieu de défiler.
+Ainsi, une liste ou une vue défilante défile quelle que soit sa profondeur, sans rien à définir sur les boîtes qui l’entourent, tandis que les en-têtes, onglets et barres d’outils à côté d’elle conservent leur taille. Un écran qui remplit la fenêtre prend `FlexGrow: 1`.
 
 ## Grille
 

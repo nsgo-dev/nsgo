@@ -33,7 +33,7 @@ const (
 // Shared styles.
 var (
 	row  = core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10}
-	fill = core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}
+	fill = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}
 )
 
 // columnsFor is how many columns at least min pt wide fit in width, with
@@ -172,7 +172,7 @@ func demoPage(cx *core.Scope, p pageProps, cards ...cardFunc) core.Node {
 							nodes = append(nodes, h.Place())
 						}
 					}
-					cols = append(cols, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0), MinWidth: core.Pt(0), Gap: 20}, Children: nodes})
+					cols = append(cols, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0), MinWidth: core.Pt(0), Gap: 20}, Children: nodes})
 				}
 				return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignStart, Gap: 12,
 					Padding: core.Edges{Top: 16, Right: 16, Bottom: 32, Left: 16}, Width: core.Pct(100),
@@ -180,7 +180,7 @@ func demoPage(cx *core.Scope, p pageProps, cards ...cardFunc) core.Node {
 			})
 		})
 	}
-	return core.Scroll{Ref: p.ref, TestID: "demo-scroll", Behavior: p.behavior, BehaviorFunc: p.behaviorFunc, Style: core.Style{FlexGrow: 1, FlexShrink: 1},
+	return core.Scroll{Ref: p.ref, TestID: "demo-scroll", Behavior: p.behavior, BehaviorFunc: p.behaviorFunc, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)},
 		StyleFunc: func() core.Style { return core.Style{Background: colors.Background()} },
 		Children:  append([]core.Node{body}, p.after...)}
 }
@@ -256,7 +256,7 @@ func pageHeader(cx *core.Scope, p pageHeaderProps) core.Node {
 	center := p.center
 	if center == nil {
 		title := ui.Text(p.title, 15, ui.Semibold, colors.Text)
-		title.MaxLines, title.Role, title.Style.FlexGrow, title.Style.FlexShrink = 1, core.RoleHeader, 1, 1
+		title.MaxLines, title.Role, title.Style.FlexGrow, title.Style.FlexShrink = 1, core.RoleHeader, 1, core.Shrink(1)
 		center = title
 	}
 	children = append(children, core.View{StyleFunc: func() core.Style {
@@ -264,7 +264,7 @@ func pageHeader(cx *core.Scope, p pageHeaderProps) core.Node {
 		if back() || p.left != nil {
 			pad = 0
 		}
-		return core.Style{FlexGrow: 1, FlexShrink: 1, Direction: core.Row, AlignItems: core.AlignCenter, Padding: core.Symmetric(0, pad)}
+		return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Direction: core.Row, AlignItems: core.AlignCenter, Padding: core.Symmetric(0, pad)}
 	}, Children: []core.Node{center}})
 	if p.right != nil {
 		children = append(children, p.right)
@@ -354,7 +354,7 @@ var transparent = core.RGBA(0xffffff, 0)
 // fillPage fills what is left of its parent along both axes and shrinks
 // to it: a page whose scroll views scroll within it instead of growing it
 // past the window (React Native's flex items do not shrink by default).
-var fillPage = core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), MinWidth: core.Pt(0)}
+var fillPage = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), MinWidth: core.Pt(0)}
 
 // clearSides keeps children clear of the left and right safe area (core.EnvSafeArea), such as the vertical status bar beside a foldable's outer display or an iPhone's camera in landscape. It takes both insets away from what the children keep clear of (core.Insets), so a page that pads by the safe area itself does not pad twice. Its own padding shows the background of the page around it. The desktop layout's ui.SidebarShell does the same for its panes itself.
 func clearSides(children ...core.Node) core.Node {

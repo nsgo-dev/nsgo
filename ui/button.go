@@ -175,11 +175,11 @@ func (b Button) parts(cx *core.Scope) (core.Style, func() core.Style, core.Node)
 			minWidth, shape.Width = shape.Width, core.Length{}
 		}
 	}
-	style := core.Style{Group: "button", FlexGrow: b.Flex, FlexShrink: b.Flex, CornerRadius: RadiusControl,
+	style := core.Style{Group: "button", FlexGrow: b.Flex, FlexShrink: core.Shrink(b.Flex), CornerRadius: RadiusControl,
 		Height: shape.Height, Width: shape.Width, MinWidth: minWidth, Disabled: &core.Style{Opacity: core.Alpha(0.4)}}.Merge(b.Style)
 	// Only the pressable takes the app's layout style: repeating a percentage width, margin or padding on the face would size or space it twice. The face's corners follow the pressable's, so the focus ring and the fill agree.
 	shape.Height, shape.Width = core.Length{}, core.Length{}
-	shape.FlexGrow, shape.FlexShrink, shape.MinHeight = 1, 1, core.Pt(0)
+	shape.FlexGrow, shape.FlexShrink, shape.MinHeight = 1, core.Shrink(1), core.Pt(0)
 	face := func() core.Style {
 		rest, hover, pressed := fill()
 		s := core.Style{CornerRadius: style.CornerRadius, BorderCurve: core.BorderCurveContinuous,
@@ -203,7 +203,7 @@ func (b Button) busyLabel() string {
 }
 
 func (b Button) busyContent(children []core.Node, textStyle core.Style, labelStyle func() core.Style, withLabel bool) []core.Node {
-	row := core.Style{Direction: core.Row, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Gap: 6, FlexShrink: 1}
+	row := core.Style{Direction: core.Row, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Gap: 6, FlexShrink: core.Shrink(1)}
 	content := core.View{Style: row, Children: children, AccessibilityElementsHidden: b.Busy,
 		StyleFunc: func() core.Style {
 			if b.Busy() {
@@ -231,5 +231,5 @@ func (b Button) busyContent(children []core.Node, textStyle core.Style, labelSty
 		}}
 	}}
 	return []core.Node{core.View{Style: core.Style{Display: core.DisplayGrid, GridTemplateColumns: "auto", AlignItems: core.AlignCenter,
-		JustifyItems: core.AlignCenter, FlexShrink: 1}, Children: []core.Node{content, busy}}}
+		JustifyItems: core.AlignCenter, FlexShrink: core.Shrink(1)}, Children: []core.Node{content, busy}}}
 }

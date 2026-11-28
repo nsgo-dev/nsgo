@@ -202,7 +202,7 @@ func revenueCard(cx *core.Scope) core.Node {
 				return s
 			}, Children: []core.Node{
 				core.View{Style: core.Style{Width: core.Pt(8), Height: core.Pt(8), CornerRadius: 2}, StyleFunc: ui.Filled(chartSeriesColor(cx, i))},
-				core.Text{Content: r.name, Style: core.Style{NumberOfLines: 1, FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
+				core.Text{Content: r.name, Style: core.Style{NumberOfLines: 1, FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 				core.Text{Content: money(r.revenue), Style: core.Style{FontSize: 13, FontVariant: core.FontTabularNums, TextAlign: core.TextAlignEnd}, StyleFunc: ui.Colored(colors.Text)},
 				core.Text{Content: portion(r.revenue), Style: core.Style{Width: core.Pt(48), FontSize: 13, FontVariant: core.FontTabularNums, TextAlign: core.TextAlignEnd}, StyleFunc: ui.Colored(colors.Muted)},
 			}})

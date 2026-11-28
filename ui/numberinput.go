@@ -132,7 +132,7 @@ func (n NumberInput) Render(cx *core.Scope) core.Node {
 // own takes, a scrub handle it brings included.
 func (n NumberInput) look(cx *core.Scope, in base.NumberInput) base.NumberInput {
 	colors := ColorsOf(cx)
-	in.InputStyle = TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(32), Padding: core.Symmetric(0, 10)})
+	in.InputStyle = TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(32), Padding: core.Symmetric(0, 10)})
 	in.InputStyleFunc = func() core.Style {
 		return core.Style{Color: colors.Text(), PlaceholderColor: colors.Faint(), SelectionColor: colors.Now().Selection, CaretColor: colors.Accent()}
 	}

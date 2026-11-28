@@ -241,15 +241,15 @@ func (g ResizablePanelGroup) Render(cx *core.Scope) core.Node {
 			var s core.Style
 			if w, ok := wanted(i); ok {
 				w = min(max(w, lo), hi)
-				s.FlexBasis, s.FlexGrow, s.FlexShrink = core.Pt(w), 0, float32(w)
+				s.FlexBasis, s.FlexGrow, s.FlexShrink = core.Pt(w), 0, core.Shrink(float32(w))
 				if all {
 					s.FlexGrow = float32(w)
 				}
 				if g.Panels[i].Fixed {
-					s.FlexShrink = 0
+					s.FlexShrink = core.NoShrink
 				}
 			} else {
-				s.FlexBasis, s.FlexGrow, s.FlexShrink = core.Pt(0), 1, 1
+				s.FlexBasis, s.FlexGrow, s.FlexShrink = core.Pt(0), 1, core.Shrink(1)
 			}
 			if horizontal {
 				s.MinWidth, s.MaxWidth = core.Pt(lo), maxLength(hi)

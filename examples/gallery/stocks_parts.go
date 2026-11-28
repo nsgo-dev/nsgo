@@ -169,7 +169,7 @@ func block(cx *core.Scope, title string, noteFn func() string, right core.Node, 
 	}
 	var nodes []core.Node
 	if title != "" {
-		head := []core.Node{core.Text{Content: title, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13, FontWeight: ui.Semibold}, StyleFunc: ui.Colored(colors.Text)}}
+		head := []core.Node{core.Text{Content: title, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13, FontWeight: ui.Semibold}, StyleFunc: ui.Colored(colors.Text)}}
 		if noteFn != nil {
 			head = append(head, ui.Textf(noteFn, 12, ui.Regular, colors.Faint))
 		}
@@ -185,7 +185,7 @@ func block(cx *core.Scope, title string, noteFn func() string, right core.Node, 
 // head is a quiet header for columns: SYMBOL, LAST.
 func head(cx *core.Scope, label string, width core.Points, grow float32, align core.TextAlign) core.Node {
 	colors := ui.ColorsOf(cx)
-	s := core.Style{FlexGrow: grow, FlexShrink: grow, TextAlign: align, FontSize: 11, LetterSpacing: 0.6}
+	s := core.Style{FlexGrow: grow, FlexShrink: core.Shrink(grow), TextAlign: align, FontSize: 11, LetterSpacing: 0.6}
 	if width > 0 {
 		s.Width = core.Pt(width)
 	}

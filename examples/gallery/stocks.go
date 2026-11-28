@@ -19,7 +19,7 @@ func sectorBar(cx *core.Scope, lbl string, change func() float64, scale func() f
 	share := func() float64 { return math.Min(1, math.Abs(change())/scale()) }
 	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10, Height: core.Pt(22)}, Children: []core.Node{
 		core.Text{Content: lbl, MaxLines: 1, Style: core.Style{Width: core.Pt(84), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
-		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Direction: core.Row, AlignItems: core.AlignCenter}, Children: []core.Node{
+		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Direction: core.Row, AlignItems: core.AlignCenter}, Children: []core.Node{
 			core.View{Style: fill, Children: []core.Node{springBar(func() float64 {
 				if change() < 0 {
 					return share()
@@ -111,7 +111,7 @@ func marketStrip(cx *core.Scope, m *market) core.Node {
 	return core.View{Children: []core.Node{
 		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, Padding: core.Symmetric(0, 16), Height: core.Pt(56)}, Children: []core.Node{
 			core.View{OnPress: func(core.PressEvent) { toggle() }, Role: core.RoleButton, Label: tr.StocksBreadth(), Expanded: opened.Get,
-				Style: core.Style{FlexGrow: 1, FlexShrink: 1, Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, Height: core.Pt(56)}, Children: []core.Node{
+				Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, Height: core.Pt(56)}, Children: []core.Node{
 					core.Text{Content: tr.StocksComposite(), MaxLines: 1, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 					core.Text{ContentFunc: func() string { return grouped(m.composite.Get(), 2) }, MaxLines: 1, Style: core.Style{FontSize: 13, FontWeight: ui.Semibold, FontVariant: core.FontTabularNums}, StyleFunc: ui.Colored(colors.Text)},
 					core.Text{ContentFunc: func() string { return signed(change(), 2) + "%" }, StyleFunc: func() core.Style {
@@ -266,7 +266,7 @@ func stockRow(cx *core.Scope, s *stock, first func() bool, onPress func(), wide 
 	return core.View{OnPress: func(core.PressEvent) { onPress() }, Role: core.RoleButton, Label: s.name, Selected: active, TestID: "stock-" + s.code,
 		Style: st, StyleFunc: states, Children: []core.Node{
 			divider,
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 3}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 3}, Children: []core.Node{
 				core.Text{Content: s.code, MaxLines: 1, Style: core.Style{FontSize: 16, FontWeight: ui.Semibold}, StyleFunc: ui.Colored(colors.Text)},
 				core.Text{Content: s.name, MaxLines: 1, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 			}},
@@ -397,7 +397,7 @@ func stocksDemo(cx *core.Scope) core.Node {
 		core.View{StyleFunc: func() core.Style {
 			return core.Style{Width: core.Pt(watchlistWidth), Borders: core.Edges{Right: 1}, BorderColors: core.EdgeColors{Right: colors.Line()}}
 		}, Children: []core.Node{watchlist}},
-		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}, Children: []core.Node{core.Dynamic(func(cx *core.Scope) core.Node {
+		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, Children: []core.Node{core.Dynamic(func(cx *core.Scope) core.Node {
 			st := shown.Get()
 			return core.Func(func(cx *core.Scope) core.Node { return stockView(cx, m, st, true, split.Get) })
 		})}},

@@ -64,7 +64,7 @@ func (p ImageCompare) Render(cx *core.Scope) core.Node {
 	} else {
 		edge.Top, edge.Bottom, edge.Width, edge.Margin = core.Pt(0), core.Pt(0), core.Pt(2), core.Edges{Left: -1}
 	}
-	knobView := core.View{Style: core.Style{Width: core.Pt(knob), Height: core.Pt(knob), FlexShrink: 0, CornerRadius: knob / 2,
+	knobView := core.View{Style: core.Style{Width: core.Pt(knob), Height: core.Pt(knob), FlexShrink: core.NoShrink, CornerRadius: knob / 2,
 		Background: white, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
 		Shadows: []core.BoxShadow{{Offset: core.Point{Y: 1}, Blur: 4, Color: Black(0.3)}}},
 		Children: []core.Node{Icon(chevrons, knob/2, Fixed(core.RGB(0x262626)))}}

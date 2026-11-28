@@ -75,7 +75,7 @@ func TextViewStyles(cx *core.Scope) textview.Styles {
 			BorderColor: c.FieldBorder, Background: c.Field, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
 			Color: c.OnAccent, FontSize: TypeCaption.FontSize, LineHeight: TypeCaption.FontSize},
 		textview.PartTaskMarkerChecked: {Background: c.AccentFill, BorderColor: c.AccentFill},
-		textview.PartListItemContent:   {Gap: 4, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)},
+		textview.PartListItemContent:   {Gap: 4, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)},
 		textview.PartTaskDone:          {Color: c.Muted, TextDecoration: core.TextDecorationLineThrough},
 
 		textview.PartCodeBlock:       {Background: c.Inset, CornerRadius: RadiusInset, BorderWidth: 1, BorderColor: c.Line},

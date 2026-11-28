@@ -100,7 +100,7 @@ func commitGraphDemo(cx *core.Scope) core.Node {
 	selection := ui.NewSelection(cx, false)
 	return stagePage(cx,
 		core.View{StyleFunc: func() core.Style {
-			return fin.Card().Over(core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), CornerRadius: ui.RadiusInset,
+			return fin.Card().Over(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), CornerRadius: ui.RadiusInset,
 				BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Surface(), Overflow: core.Hidden})
 		}, Children: []core.Node{uigraph.View{Label: tr.CommitGraphHistory(), TestID: "commits", Selection: selection,
 			Commits:    func() []uigraph.Commit { return commits },

@@ -388,7 +388,7 @@ func (d Area) Render(cx *core.Scope) core.Node {
 		if a.zoomedIn(Center) {
 			return core.Style{Display: core.DisplayNone}
 		}
-		return core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0), MinWidth: core.Pt(0), MinHeight: core.Pt(0)}
+		return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0), MinWidth: core.Pt(0), MinHeight: core.Pt(0)}
 	}
 	full := func() bool { return !a.compact() }
 	return core.View{Ref: a.ref, Class: d.Class, Style: d.Style, StyleFunc: root, TestID: d.TestID, Tooltip: d.Tooltip,
@@ -989,7 +989,7 @@ func (a *dockArea) group(cx *core.Scope, region Placement, id uint64) core.Node 
 			return a.tab(cx, g, id, key(), index)
 		}))
 	content := core.View{Ref: g.content, Class: a.p.ContentClass,
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0), MinWidth: core.Pt(0), MinHeight: core.Pt(0),
+		Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0), MinWidth: core.Pt(0), MinHeight: core.Pt(0),
 			Overflow: core.Hidden}.Merge(a.p.ContentStyle),
 		StyleFunc: a.p.ContentStyleFunc,
 		Children: []core.Node{core.Each(panels.Get, func(k string) string { return k },
@@ -1428,7 +1428,7 @@ func (a *dockArea) dock(cx *core.Scope, p Placement) core.Node {
 			if r == nil || r.Closed || a.zoomedIn(p) {
 				return core.Style{Display: core.DisplayNone}
 			}
-			s := core.Style{Overflow: core.Hidden, FlexShrink: 1, MinWidth: core.Pt(0), MinHeight: core.Pt(0)}
+			s := core.Style{Overflow: core.Hidden, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), MinHeight: core.Pt(0)}
 			if a.zoom.Get() != 0 {
 				// Zoomed into this dock: it takes the area.
 				s.FlexGrow, s.FlexBasis = 1, core.Pt(0)

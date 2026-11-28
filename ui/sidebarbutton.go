@@ -42,7 +42,7 @@ func (b SidebarButton) Render(cx *core.Scope) core.Node {
 		ink = colors.Muted
 	}
 	label := Text(b.Text, 13, Regular, ink)
-	label.MaxLines, label.Style.FlexGrow, label.Style.FlexShrink = 1, 1, 1
+	label.MaxLines, label.Style.FlexGrow, label.Style.FlexShrink = 1, 1, core.Shrink(1)
 	var children []core.Node
 	if b.Icon != nil {
 		children = append(children, Icon(b.Icon, 16, colors.Muted))
@@ -50,7 +50,7 @@ func (b SidebarButton) Render(cx *core.Scope) core.Node {
 	children = append(children, label)
 	if b.Shortcut != "" && !Touch(cx) {
 		children = append(children, core.Text{Content: cx.KeyLabel(b.Shortcut), MaxLines: 1,
-			Style: TypeCaption.Merge(core.Style{FlexShrink: 0}), StyleFunc: Colored(colors.Muted)})
+			Style: TypeCaption.Merge(core.Style{FlexShrink: core.NoShrink}), StyleFunc: Colored(colors.Muted)})
 	}
 	return base.Button{Label: b.Text, Selected: b.Selected, TestID: b.TestID,
 		OnPress: func(core.PressEvent) {
@@ -58,7 +58,7 @@ func (b SidebarButton) Render(cx *core.Scope) core.Node {
 				b.OnPress()
 			}
 		},
-		Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, MinHeight: core.Pt(32), MinWidth: core.Pt(0), FlexShrink: 0,
+		Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, MinHeight: core.Pt(32), MinWidth: core.Pt(0), FlexShrink: core.NoShrink,
 			Padding: core.Symmetric(0, 8), CornerRadius: 8, Cursor: core.CursorDefault},
 		StyleFunc: func() core.Style {
 			s := core.Style{Selected: &core.Style{Background: Alpha(colors.Text(), 0.1)}, FocusVisible: FocusRing(cx, -2)}

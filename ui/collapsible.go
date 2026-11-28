@@ -39,7 +39,7 @@ func (c Collapsible) Render(cx *core.Scope) core.Node {
 	colors := ColorsOf(cx)
 	title := c.Trigger
 	if title == nil {
-		title = []core.Node{line(c.Text, TypeBody.Merge(core.Style{FlexShrink: 1}), 1)}
+		title = []core.Node{line(c.Text, TypeBody.Merge(core.Style{FlexShrink: core.Shrink(1)}), 1)}
 	}
 	turn := disclosureArrow(cx, func() bool { return is(c.Open) })
 	children := append(append([]core.Node(nil), title...), turn)
@@ -72,7 +72,7 @@ func disclosureArrow(cx *core.Scope, open func() bool) core.Node {
 		}
 		return lucide.ChevronRight()
 	}, iconSize, ColorsOf(cx).Muted)
-	s := core.Style{FlexShrink: 0}
+	s := core.Style{FlexShrink: core.NoShrink}
 	if !ReduceMotion(cx) {
 		s.Transition = core.Transition{Duration: 200 * time.Millisecond, Easing: core.EaseOut, Properties: core.TransitionTransform}
 	}

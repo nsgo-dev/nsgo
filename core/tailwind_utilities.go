@@ -231,11 +231,11 @@ var keywords = map[string]func(s *Style){
 	"flex-wrap":             func(s *Style) { s.Wrap = Wrap },
 	"flex-wrap-reverse":     func(s *Style) { s.Wrap = WrapReverse },
 	"flex-nowrap":           func(s *Style) { s.Wrap = NoWrap },
-	"flex-auto":             func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = 1, 1, Length{} },
-	"flex-initial":          func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, 1, Length{} },
-	"flex-none":             func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, 0, Length{} },
+	"flex-auto":             func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = 1, Shrink(1), Length{} },
+	"flex-initial":          func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, Shrink(1), Length{} },
+	"flex-none":             func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = 0, NoShrink, Length{} },
 	"grow":                  func(s *Style) { s.FlexGrow = 1 },
-	"shrink":                func(s *Style) { s.FlexShrink = 1 },
+	"shrink":                func(s *Style) { s.FlexShrink = Shrink(1) },
 	"justify-start":         func(s *Style) { s.JustifyContent = JustifyStart },
 	"justify-normal":        func(s *Style) { s.JustifyContent = 0 },
 	"justify-end":           func(s *Style) { s.JustifyContent = JustifyEnd },
@@ -601,16 +601,16 @@ func init() {
 				if !ok1 || !ok2 || !ok3 {
 					return nil, false
 				}
-				return set1(func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = float32(grow), float32(shrink), basis }), false
+				return set1(func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = float32(grow), Shrink(float32(shrink)), basis }), false
 			}
 			n, ok := number(v)
 			if !ok {
 				return nil, false
 			}
-			return set1(func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = n, 1, Pct(0) }), false
+			return set1(func(s *Style) { s.FlexGrow, s.FlexShrink, s.FlexBasis = n, Shrink(1), Pct(0) }), false
 		}},
 		{"grow-", false, numeric(func(s *Style, n float32) { s.FlexGrow = n })},
-		{"shrink-", false, numeric(func(s *Style, n float32) { s.FlexShrink = n })},
+		{"shrink-", false, numeric(func(s *Style, n float32) { s.FlexShrink = Shrink(n) })},
 		{"grid-cols-", false, tracks(func(s *Style, g GridTracks) { s.GridTemplateColumns = g })},
 		{"grid-rows-", false, tracks(func(s *Style, g GridTracks) { s.GridTemplateRows = g })},
 		{"auto-cols-", false, arbitraryTracks(func(s *Style, g GridTracks) { s.GridAutoColumns = g })},

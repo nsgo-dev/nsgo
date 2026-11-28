@@ -107,9 +107,9 @@ func (m Composer) Render(cx *core.Scope) core.Node {
 	if m.Accessory != nil {
 		accessory = append(accessory, core.Func(m.Accessory))
 	}
-	row = append(row, core.View{Style: core.Style{Direction: core.Row, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), AlignItems: core.AlignCenter, Gap: 4}, Children: accessory})
+	row = append(row, core.View{Style: core.Style{Direction: core.Row, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), AlignItems: core.AlignCenter, Gap: 4}, Children: accessory})
 	if m.Trailing != nil {
-		row = append(row, core.View{Style: core.Style{Direction: core.Row, FlexShrink: 0, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{core.Func(m.Trailing)}})
+		row = append(row, core.View{Style: core.Style{Direction: core.Row, FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{core.Func(m.Trailing)}})
 	}
 	row = append(row, core.Dynamic(func(cx *core.Scope) core.Node {
 		if running() && empty() {
@@ -164,7 +164,7 @@ func (m Composer) Render(cx *core.Scope) core.Node {
 			OnOpen: func() { listed.Set(true) }, OnClose: func() { listed.Set(false) }})
 	}
 	body = append(body, core.View{Style: core.Style{Direction: core.Row, MinWidth: core.Pt(0), Margin: core.Edges{Top: 8}, Padding: core.Symmetric(0, 10), AlignItems: core.AlignCenter, Gap: 8}, Children: row})
-	card := core.View{Style: core.Style{MinWidth: core.Pt(0), Padding: core.Symmetric(10, 0), CornerRadius: 13, BorderWidth: 1, FlexShrink: 0},
+	card := core.View{Style: core.Style{MinWidth: core.Pt(0), Padding: core.Symmetric(10, 0), CornerRadius: 13, BorderWidth: 1, FlexShrink: core.NoShrink},
 		StyleFunc: func() core.Style {
 			surface := colors.Surface()
 			if dragging.Get() {
@@ -216,7 +216,7 @@ func (m Composer) Render(cx *core.Scope) core.Node {
 				Children: []core.Node{core.Func(m.Footer)}}
 		}})
 	}
-	return core.View{TestID: m.TestID, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: 0}, Children: children}
+	return core.View{TestID: m.TestID, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: core.NoShrink}, Children: children}
 }
 
 // FooterHeight is the height of a composer's Footer.
@@ -240,7 +240,7 @@ func (p chatPill) Render(cx *core.Scope) core.Node {
 			p.OnPress()
 		}
 	},
-		Style: core.Style{Height: core.Pt(26), Padding: core.Symmetric(0, 12), FlexShrink: 0, CornerRadius: 13, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
+		Style: core.Style{Height: core.Pt(26), Padding: core.Symmetric(0, 12), FlexShrink: core.NoShrink, CornerRadius: 13, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
 			Disabled: &core.Style{Cursor: core.CursorDefault}},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: p.Background(), Hover: &core.Style{Opacity: core.Alpha(0.9)}, Active: &core.Style{Opacity: core.Alpha(0.8)}, FocusVisible: ui.FocusRing(cx, 2)}
@@ -281,7 +281,7 @@ func (a IconAction) Render(cx *core.Scope) core.Node {
 			a.OnPress()
 		}
 	},
-		Style: core.Style{Group: "chat-action", Width: core.Pt(26), Height: core.Pt(26), FlexShrink: 0, CornerRadius: 6, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
+		Style: core.Style{Group: "chat-action", Width: core.Pt(26), Height: core.Pt(26), FlexShrink: core.NoShrink, CornerRadius: 6, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
 			Disabled: ui.Dimmed()},
 		StyleFunc: func() core.Style {
 			return core.Style{Hover: &core.Style{Background: colors.chatOverlay()}, FocusVisible: ui.FocusRing(cx, 2)}

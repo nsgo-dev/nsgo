@@ -21,13 +21,13 @@ func (f FormField) Render(cx *core.Scope) core.Node {
 	if in.Label == "" {
 		in.Label = f.Title
 	}
-	in.Style = core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Height: core.Pt(ButtonHeight), FontSize: 13,
+	in.Style = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Height: core.Pt(ButtonHeight), FontSize: 13,
 		TextAlign: core.TextAlignEnd, Disabled: Dimmed()}.Merge(in.Style)
 	in.StyleFunc = func() core.Style {
 		return core.Style{Color: colors.Text(), PlaceholderColor: colors.Faint(), SelectionColor: cx.Palette().Selection, CaretColor: colors.Accent()}
 	}
 	title := Text(f.Title, 13, Regular, colors.Text)
-	title.Style.FlexShrink = 0
+	title.Style.FlexShrink = core.NoShrink
 	return core.View{TestID: f.TestID, Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: formRowGap,
 		MinHeight: core.Pt(formRowHeightFor(cx)), Padding: core.Symmetric(6, formRowPad)},
 		Children: []core.Node{title, in}}

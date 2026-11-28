@@ -194,7 +194,7 @@ func richEditorDemo(cx *core.Scope) core.Node {
 				Children: []core.Node{core.Icon{SVG: lucide.GripVertical(), Style: core.Style{Width: core.Pt(14), Height: core.Pt(14)}, StyleFunc: ui.Colored(colors.Muted)}}}}}
 	}}
 	source := core.Show{When: func() bool { return mode.Get() == "markdown" }, Then: func(*core.Scope) core.Node {
-		return core.Scroll{Style: core.Style{FlexBasis: core.Pt(180), FlexShrink: 0, BorderWidth: 1}, StyleFunc: func() core.Style {
+		return core.Scroll{Style: core.Style{FlexBasis: core.Pt(180), FlexShrink: core.NoShrink, BorderWidth: 1}, StyleFunc: func() core.Style {
 			return core.Style{BorderColor: colors.Border(), CornerRadius: ui.RadiusControl}
 		}, Children: []core.Node{core.Text{Selectable: core.SelectableOn, Style: ui.TypeCode.Merge(core.Style{Padding: core.All(12)}),
 			StyleFunc: ui.Colored(colors.Text), ContentFunc: func() string { rev.Get(); return session.Markdown() }}}}
@@ -206,7 +206,7 @@ func richEditorDemo(cx *core.Scope) core.Node {
 	return stagePage(cx, core.View{Style: core.Style{FlexGrow: 1, MinHeight: core.Pt(0), Gap: 8}, Children: []core.Node{
 		bar,
 		core.View{StyleFunc: func() core.Style {
-			return core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), CornerRadius: ui.RadiusInset, BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Surface(), Overflow: core.Hidden}
+			return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), CornerRadius: ui.RadiusInset, BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Surface(), Overflow: core.Hidden}
 		}, Children: []core.Node{editor}},
 		mentions, handle, source,
 		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, JustifyContent: core.JustifySpaceBetween}, Children: []core.Node{

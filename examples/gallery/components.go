@@ -108,7 +108,7 @@ func pressableSheet(cx *core.Scope) core.Node {
 // pressTile is a tile to press, with the style it shows.
 func pressTile(cx *core.Scope, title func() string, noteText string, right core.Node) core.Node {
 	colors := ui.ColorsOf(cx)
-	children := []core.Node{core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+	children := []core.Node{core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 		ui.Textf(title, 13, ui.Regular, colors.Text),
 		API{Text: noteText},
 	}}}
@@ -280,7 +280,7 @@ func platformInfo(cx *core.Scope) core.Node {
 			var nodes []core.Node
 			for i, r := range rows() {
 				nodes = append(nodes, Row{First: i == 0, Children: []core.Node{
-					core.Text{Content: r[0], MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Muted)},
+					core.Text{Content: r[0], MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Muted)},
 					core.Text{Content: r[1], MaxLines: 1, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 				}})
 			}

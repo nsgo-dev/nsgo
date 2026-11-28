@@ -24,7 +24,7 @@ func (s Submenu) Render(cx *core.Scope) core.Node {
 	style, look := menuRow(cx, base.OnSheet(cx))
 	chevron := menuIconSize(cx) - 2
 	trigger := append(menuLeading(cx, s.Icon, nil),
-		core.Text{Content: s.Text, MaxLines: 1, Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: 1}), StyleFunc: Colored(colors.Text)},
+		core.Text{Content: s.Text, MaxLines: 1, Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}), StyleFunc: Colored(colors.Text)},
 		Icon(lucide.ChevronRight, chevron, colors.Muted))
 	return base.Submenu{Disabled: s.Disabled, Style: style, StyleFunc: look, Trigger: core.Group(trigger),
 		Back: core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8},

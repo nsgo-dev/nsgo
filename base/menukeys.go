@@ -222,7 +222,7 @@ func heldToRoom(o core.Overlay, popup part, l *menuLevel) (core.Overlay, part) {
 		}
 	}
 	o.HoldToRoom = true
-	o.Children = []core.Node{core.Scroll{Ref: l.scroll, Style: core.Style{FlexShrink: 1, MinHeight: core.Pt(0)},
+	o.Children = []core.Node{core.Scroll{Ref: l.scroll, Style: core.Style{FlexShrink: core.Shrink(1), MinHeight: core.Pt(0)},
 		Children: []core.Node{core.View{StyleFunc: inner, Children: o.Children}}}}
 	return o, parts.Part(outer)
 }

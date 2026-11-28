@@ -380,7 +380,7 @@ func (t *Tree) mountList(cx *Scope, parent *node, l List) {
 	} else {
 		v = t.newNode(driver.KindScroll, parent, cx)
 		t.setClasses(v, l.Class)
-		t.bindStyle(cx, v, scrollDefaults.Merge(l.Style), l.StyleFunc)
+		t.bindStyle(cx, v, l.Style, l.StyleFunc)
 	}
 	ln.view = v
 	v.ownExtra().list = ln
@@ -413,7 +413,7 @@ func (t *Tree) mountList(cx *Scope, parent *node, l List) {
 
 	ln.count = NewSignal(cx, 0)
 	ln.spacer = t.newNode(driver.KindView, v, cx)
-	*ln.spacer.ownBase() = Style{FlexShrink: 0}
+	*ln.spacer.ownBase() = Style{FlexShrink: NoShrink}
 	t.restyle(ln.spacer)
 	extra := func(kind int, content Node) {
 		c := t.newNode(driver.KindView, v, cx)

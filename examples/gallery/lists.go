@@ -76,7 +76,7 @@ func listGrid(cx *core.Scope) core.Node {
 				return ui.CardStyle(cx).Merge(core.Style{Padding: core.All(16), Gap: 12, Margin: core.Edges{Bottom: 4}})
 			}, Children: []core.Node{
 				core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignEnd, Gap: 8}, Children: []core.Node{
-					core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+					core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 						ui.Text(tr.ListsViewableItemsAtLeastHalf(), 13, ui.Regular, colors.Muted),
 						core.Text{Spans: []core.Span{
 							{ContentFunc: func() string {
@@ -215,7 +215,7 @@ func listContacts(cx *core.Scope) core.Node {
 								return core.Style{FontSize: 13, FontWeight: ui.Semibold, Color: row().tone.Color(cx)}
 							}}}},
 							core.View{StyleFunc: func() core.Style {
-								s := core.Style{FlexGrow: 1, FlexShrink: 1, AlignSelf: core.AlignStretch, JustifyContent: core.JustifyCenter, Gap: 2, Padding: core.Edges{Right: 16}}
+								s := core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), AlignSelf: core.AlignStretch, JustifyContent: core.JustifyCenter, Gap: 2, Padding: core.Edges{Right: 16}}
 								if !row().end {
 									s.Borders, s.BorderColors = core.Edges{Bottom: 1}, core.EdgeColors{Bottom: colors.Line()}
 								}
@@ -342,7 +342,7 @@ func listChat(cx *core.Scope) core.Node {
 			base.Input{Value: draft.Get, OnChange: draft.Set, OnSubmit: func(string) { send() }, SubmitBehavior: core.SubmitBehaviorSubmit, Placeholder: tr.ListsMessage(),
 				ReturnKeyType: core.ReturnKeySend, TestID: "chat-draft",
 				StyleFunc: func() core.Style {
-					return fin.Field().Over(core.Style{PlaceholderColor: colors.Faint(), SelectionColor: colors.Accent(), FlexGrow: 1, FlexShrink: 1, Height: core.Pt(44), FontSize: 13,
+					return fin.Field().Over(core.Style{PlaceholderColor: colors.Faint(), SelectionColor: colors.Accent(), FlexGrow: 1, FlexShrink: core.Shrink(1), Height: core.Pt(44), FontSize: 13,
 						Color: colors.Text(), Background: colors.Field(), BorderWidth: 1, BorderColor: colors.FieldBorder(), CornerRadius: 22, Padding: core.Symmetric(0, 16)})
 				}},
 			ui.IconButton{Variant: ui.IconButtonPrimary, Icon: lucide.ArrowUp, Label: tr.ListsSend(), OnPress: send},
@@ -422,7 +422,7 @@ func listMore(cx *core.Scope) core.Node {
 				}
 				return IconTile{Icon: lucide.ArrowDown, Size: 40}
 			}),
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 				ui.Textf(func() string {
 					if refreshing.Get() {
 						return tr.ListsRefreshing()

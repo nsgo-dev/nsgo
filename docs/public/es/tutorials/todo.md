@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Guarda el archivo y la aplicación se reinicia. Escribe una tarea, presiona **Ad
 
 **Las actualizaciones reemplazan el slice.** `items.Update` devuelve un nuevo slice, por lo que la identidad de la lista y las claves de fila deciden qué permanece en pantalla. `nextID` da a cada tarea un ID, y `Key` de `core.List` lo usa; sin una clave estable, las filas reutilizarían sus celdas para otros elementos.
 
-**La pantalla es un árbol de cajas.** `Root` devuelve una `core.View` con relleno, una separación y los márgenes del área segura. `FlexGrow: 1` y `FlexShrink: 1` hacen que llene la ventana y nada más, de modo que una lista larga se desplace dentro de ella en lugar de estirarla más allá del borde de la ventana. La fila de entrada establece `Direction: core.Row`; todo lo demás es la columna predeterminada.
+**La pantalla es un árbol de cajas.** `Root` devuelve una `core.View` con relleno, una separación y los márgenes del área segura. `FlexGrow: 1` y `FlexShrink: core.Shrink(1)` hacen que llene la ventana y nada más, de modo que una lista larga se desplace dentro de ella en lugar de estirarla más allá del borde de la ventana. La fila de entrada establece `Direction: core.Row`; todo lo demás es la columna predeterminada.
 
 **La entrada está controlada.** `draft.Get` es el valor del campo y `draft.Set` recibe cada cambio. `OnSubmit` agrega una tarea al presionar Intro, y `add` limpia el borrador, de modo que el campo se vacía solo.
 

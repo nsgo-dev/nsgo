@@ -407,13 +407,13 @@ func (s Scrollbar) Render(cx *core.Scope) core.Node {
 	}
 	horizontal := s.Horizontal
 	thickness := core.NewAnimatedValue(cx, 0)
-	thumb := core.View{NoFocus: true, Class: s.ThumbClass, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0)}.Merge(s.ThumbStyle), StyleFunc: s.ThumbStyleFunc,
+	thumb := core.View{NoFocus: true, Class: s.ThumbClass, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0)}.Merge(s.ThumbStyle), StyleFunc: s.ThumbStyleFunc,
 		OnMouseEnter: func(core.MouseEvent) { c.overThumb.Set(true) },
 		OnMouseLeave: func(core.MouseEvent) { c.overThumb.Set(false) },
 		Responder:    c.responder(c.pressThumb)}
 	// The thumb's place and length, on a view of the bar's own, which the
 	// app's transitions on the thumb never reach.
-	holder := core.View{Style: core.Style{FlexShrink: 0},
+	holder := core.View{Style: core.Style{FlexShrink: core.NoShrink},
 		StyleFunc: func() core.Style {
 			out := core.Style{PointerEvents: inner()}
 			if horizontal {
@@ -432,7 +432,7 @@ func (s Scrollbar) Render(cx *core.Scope) core.Node {
 	if horizontal {
 		railAnimated = &core.AnimatedStyle{TranslateY: slide}
 	}
-	rail := core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0), Animated: railAnimated},
+	rail := core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0), Animated: railAnimated},
 		StyleFunc: func() core.Style {
 			out := core.Style{PointerEvents: inner()}
 			if horizontal {

@@ -48,7 +48,7 @@ func (b Breadcrumbs) Render(cx *core.Scope) core.Node {
 	}
 	crumb := func(i int) core.Node {
 		return base.Button{Role: core.RoleLink, Label: b.Items[i], OnPress: func(core.PressEvent) { choose(i) },
-			Style: core.Style{Padding: core.Symmetric(2, breadcrumbInset), CornerRadius: RadiusSmall, MinWidth: core.Pt(min(b.itemWidth(cx, i), breadcrumbMinWidth)), FlexShrink: 1},
+			Style: core.Style{Padding: core.Symmetric(2, breadcrumbInset), CornerRadius: RadiusSmall, MinWidth: core.Pt(min(b.itemWidth(cx, i), breadcrumbMinWidth)), FlexShrink: core.Shrink(1)},
 			StyleFunc: func() core.Style {
 				return core.Style{Color: colors.Muted(), Hover: &core.Style{Color: colors.Text(), Background: colors.Hover()}, FocusVisible: FocusRing(cx, 0)}
 			},
@@ -58,7 +58,7 @@ func (b Breadcrumbs) Render(cx *core.Scope) core.Node {
 	width := core.NewSignal(cx, core.Points(0))
 	collapsed := core.NewMemo(cx, func() int { return b.hidden(cx, width.Get()) })
 	return core.View{TestID: b.TestID, OnLayout: func(f core.Bounds) { width.Set(f.Size.Width) },
-		Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: breadcrumbGap, Width: core.Pct(100), MinWidth: core.Pt(0), FlexShrink: 1}.Merge(b.Style),
+		Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: breadcrumbGap, Width: core.Pct(100), MinWidth: core.Pt(0), FlexShrink: core.Shrink(1)}.Merge(b.Style),
 		Children: []core.Node{core.Dynamic(func(*core.Scope) core.Node {
 			hidden := collapsed.Get()
 			var out []core.Node
@@ -79,7 +79,7 @@ func (b Breadcrumbs) Render(cx *core.Scope) core.Node {
 				}
 				if i == len(b.Items)-1 {
 					out = append(out, core.Text{Content: b.Items[i], MaxLines: 1,
-						Style: TypeLabel.Merge(core.Style{FlexShrink: 1, Padding: core.Symmetric(2, breadcrumbInset)}), StyleFunc: Colored(colors.Text)})
+						Style: TypeLabel.Merge(core.Style{FlexShrink: core.Shrink(1), Padding: core.Symmetric(2, breadcrumbInset)}), StyleFunc: Colored(colors.Text)})
 					continue
 				}
 				out = append(out, crumb(i))

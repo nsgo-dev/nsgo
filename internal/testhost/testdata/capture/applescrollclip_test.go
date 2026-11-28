@@ -31,7 +31,7 @@ func TestAppleScrollClipKeepsOuterDecoration(t *testing.T) {
 		for _, kind := range []string{"vertical", "horizontal"} {
 			var bands []core.Node
 			for index, c := range []uint32{0xffff00, 0x00ffff, 0xff00ff} {
-				bands = append(bands, core.View{TestID: fmt.Sprintf("%s-%d", kind, index), Style: core.Style{Width: core.Pt(120), Height: core.Pt(80), FlexShrink: 0, Background: core.RGB(c)}, OnPress: func(core.PressEvent) { lastPress = index }})
+				bands = append(bands, core.View{TestID: fmt.Sprintf("%s-%d", kind, index), Style: core.Style{Width: core.Pt(120), Height: core.Pt(80), FlexShrink: core.NoShrink, Background: core.RGB(c)}, OnPress: func(core.PressEvent) { lastPress = index }})
 			}
 			direction := core.Column
 			if kind == "horizontal" {

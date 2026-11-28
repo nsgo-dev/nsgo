@@ -65,7 +65,7 @@ func (c Carousel) Render(cx *core.Scope) core.Node {
 	for i := range n {
 		slides = append(slides, base.CarouselItem{Label: label(i, n), Children: []core.Node{c.Slide(cx, i)}, StyleFunc: func() core.Style {
 			w := width.Get()
-			s := core.Style{Width: core.Pt(slideWidth(w)), FlexShrink: 0}
+			s := core.Style{Width: core.Pt(slideWidth(w)), FlexShrink: core.NoShrink}
 			if w == 0 {
 				return s
 			}

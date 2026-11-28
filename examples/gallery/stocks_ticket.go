@@ -66,7 +66,7 @@ func newBanner(cx *core.Scope) banner {
 			}
 			return core.Style{Width: core.Pt(34), Height: core.Pt(34), CornerRadius: 17, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Background: c()}
 		}, Children: []core.Node{ui.Icon(lucide.Check, 18, check)}},
-		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 			ui.Textf(func() string { return message.Get().title }, 13, ui.Semibold, colors.OnLight),
 			core.Text{ContentFunc: func() string { return message.Get().detail }, MaxLines: 1, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(detailColor)},
 		}},
@@ -247,7 +247,7 @@ func ticket(cx *core.Scope, open func() bool, s *stock, sd *core.Signal[side], o
 					}},
 					core.View{Style: core.Style{Direction: core.Row, Gap: 10}, Children: []core.Node{
 						ui.Button{Text: tr.StocksEdit(), Variant: ui.ButtonSecondary, Flex: 1, OnPress: func() { expand(false) }},
-						core.View{Style: core.Style{FlexGrow: 2, FlexShrink: 2, FlexBasis: core.Pt(0)}, Children: []core.Node{core.Dynamic(func(*core.Scope) core.Node {
+						core.View{Style: core.Style{FlexGrow: 2, FlexShrink: core.Shrink(2), FlexBasis: core.Pt(0)}, Children: []core.Node{core.Dynamic(func(*core.Scope) core.Node {
 							v := verb()
 							return ui.Button{Text: tr.StocksPlace() + lower(v) + tr.StocksOrder(), OnPress: func() {
 								onPlaced(v+tr.StocksOrderPlaced(), tr.StocksPlacedDetail(grouped(quantity.GetUntracked(), 0), s.code, p(limit.GetUntracked())), sd.GetUntracked())

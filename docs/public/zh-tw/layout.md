@@ -7,7 +7,7 @@ order: 51
 
 ## 方盒
 
-每個元素都是由引擎負責排版配置的方盒。預設行為與 React Native 相同：直欄（column）flexbox、子元素除非主動伸展或收縮否則維持原本尺寸、項目沿交叉軸拉滿，且尺寸包含內距（padding）與邊框（border）。
+每個元素都是由引擎負責排版配置的方盒。預設行為大致與 React Native 相同：直欄（column）flexbox、子元素除非主動伸展或收縮否則維持原本尺寸、項目沿交叉軸拉滿、沒有自動最小尺寸，且尺寸包含內距（padding）與邊框（border）。與 React Native 不同的是，會伸展的方盒也會收縮，捲動視圖及包住它的方盒也是如此。
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## 尺寸
 
-`Width`、`Height`、`MinWidth`、`MaxWidth` 與 `FlexBasis` 接受代表點數（point）的 `core.Pt` 或代表父元素百分比的 `core.Pct`。`FlexGrow` 用於分配剩餘空間，而 `FlexShrink` 讓方盒在空間不足時讓出部分空間；兩者皆未設定的方盒會保持原本尺寸。`AspectRatio` 為寬度除以高度的比例。`AutoMargin` 會佔滿指定側邊的剩餘空間，因此指定其中一側會將方盒推向另一側。
+`Width`、`Height`、`MinWidth`、`MaxWidth` 與 `FlexBasis` 接受代表點數（point）的 `core.Pt` 或代表父元素百分比的 `core.Pct`。`FlexGrow` 用於分配剩餘空間，而 `FlexShrink` 會在空間不足時讓出部分空間。未設定時，會伸展的方盒、沿捲動軸的 `core.Scroll` 或 `core.List`，以及包住它們且未在該軸設定尺寸的每一層方盒，其 `FlexShrink` 為 1，其餘則為 0，包括 `core.Scroll` 的內容；`core.Shrink(n)` 設定係數，`core.NoShrink` 讓方盒維持原本尺寸。`AspectRatio` 為寬度除以高度的比例。`AutoMargin` 會佔滿指定側邊的剩餘空間，因此指定其中一側會將方盒推向另一側。
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-在未指定寬度或高度之前，方盒的大小由其內容決定。`core.MinContent`、`core.MaxContent` 與 `core.FitContent` 對應 CSS 所定義的尺寸概念：例如文字的 min-content 寬度就是其最寬單字的寬度。位於橫列（row）中的文字必須設定 `FlexShrink: 1` 才會收縮並換行；若要讓它佔滿剩餘空間，請加上 `FlexGrow: 1`。未設定的最小寬度預設即為 0（與 React Native 相同），因此 `MinWidth: core.Pt(0)` 不會改變任何行為，且當橫列比最寬單字更窄時，正在收縮的文字會在單字內部斷行。`MinWidth: core.AutoMinimum` 則會將其最小寬度限制在最寬單字的寬度，如同 CSS 的自動最小值（automatic minimum）。
+在未指定寬度或高度之前，方盒的大小由其內容決定。`core.MinContent`、`core.MaxContent` 與 `core.FitContent` 對應 CSS 所定義的尺寸概念：例如文字的 min-content 寬度就是其最寬單字的寬度。位於橫列（row）中的文字設定 `FlexGrow: 1` 或 `FlexShrink: core.Shrink(1)` 時會收縮並換行；未設定的最小寬度預設即為 0（與 React Native 相同），因此 `MinWidth: core.Pt(0)` 不會改變任何行為，且當橫列比最寬單字更窄時，正在收縮的文字會在單字內部斷行。`MinWidth: core.AutoMinimum` 則會將其最小寬度限制在最寬單字的寬度，如同 CSS 的自動最小值（automatic minimum）。
 
-填滿視窗的畫面需要設定 `FlexGrow: 1` 與 `FlexShrink: 1`，位於它與應該可捲動的清單或捲動視圖之間的每一層方盒也是如此。若僅設定 `FlexGrow`，方盒會隨內容高度一同擴張，導致長清單將方盒撐出視窗範圍，而不是在內部捲動。
+因此清單或捲動視圖無論位於多深的層級都能捲動，外層方盒不需任何設定，而旁邊的標頭、分頁與工具列會維持原本尺寸。填滿視窗的畫面需要設定 `FlexGrow: 1`。
 
 ## 網格
 

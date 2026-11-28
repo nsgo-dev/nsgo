@@ -382,6 +382,7 @@ type node struct {
 	ownPointer PointerEvents
 	pace       uint8 // paceWaiting or paceNow, until its view is made
 	flags      nodeFlags
+	scrollAxes uint8 // cached unconstrained scroll axes + container main axis (syncScrollAxes)
 
 	showsExpanded              bool
 	pointerNone, pointerTarget bool
@@ -2477,18 +2478,14 @@ func (t *Tree) mountInput(cx *Scope, parent *node, v Input) {
 	t.refreshBar(n)
 }
 
-// scrollDefaults lets a scroll view shrink below its content, as React
-// Native's ScrollView does; its content scrolls instead.
-var scrollDefaults = Style{FlexShrink: 1}
-
 func (t *Tree) mountScroll(cx *Scope, parent *node, v Scroll) {
 	n := t.newNode(driver.KindScroll, parent, cx)
 	t.setClasses(n, v.Class)
-	defaults := scrollDefaults
+	style := v.Style
 	if v.NoShrink {
-		defaults.FlexShrink = 0
+		style = Style{FlexShrink: NoShrink}.Merge(style)
 	}
-	t.bindStyle(cx, n, defaults.Merge(v.Style), v.StyleFunc)
+	t.bindStyle(cx, n, style, v.StyleFunc)
 	h := handlers{layout: v.OnLayout}
 	if on := v.OnScroll; on != nil {
 		h.scroll = func(p Point) { on(n.scrollEvent(p)) }

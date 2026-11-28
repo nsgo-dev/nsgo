@@ -69,14 +69,14 @@ func (r FormRow) Render(cx *core.Scope) core.Node {
 	var children []core.Node
 	width := r.leadingWidth()
 	if r.Leading != nil {
-		children = append(children, core.View{Style: core.Style{Width: core.Pt(width), FlexShrink: 0,
+		children = append(children, core.View{Style: core.Style{Width: core.Pt(width), FlexShrink: core.NoShrink,
 			AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter}, Children: []core.Node{r.Leading}})
 	} else if r.Icon != nil {
 		fill := colors.AccentFill
 		if r.Variant == FormRowDanger {
 			fill = colors.Danger
 		}
-		children = append(children, core.View{Style: core.Style{Width: core.Pt(width), Height: core.Pt(width), FlexShrink: 0,
+		children = append(children, core.View{Style: core.Style{Width: core.Pt(width), Height: core.Pt(width), FlexShrink: core.NoShrink,
 			CornerRadius: width / 4, BorderCurve: core.BorderCurveContinuous, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 			StyleFunc: Filled(fill), Children: []core.Node{Icon(r.Icon, width*14/formIconTile, colors.OnAccent)}})
 	}
@@ -92,14 +92,14 @@ func (r FormRow) Render(cx *core.Scope) core.Node {
 	if r.Below != nil {
 		texts = append(texts, r.Below)
 	}
-	children = append(children, core.View{Style: core.Style{Gap: 1, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}, Children: texts})
+	children = append(children, core.View{Style: core.Style{Gap: 1, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, Children: texts})
 	if r.Value != nil {
 		value := Textf(r.Value, 13, Regular, colors.Muted)
-		value.MaxLines, value.Style.FlexShrink, value.Style.MinWidth = 1, 1, core.Pt(0)
+		value.MaxLines, value.Style.FlexShrink, value.Style.MinWidth = 1, core.Shrink(1), core.Pt(0)
 		children = append(children, value)
 	}
 	if r.Control != nil {
-		children = append(children, core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{r.Control}})
+		children = append(children, core.View{Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{r.Control}})
 	}
 	if r.OnPress != nil && r.Role != core.RoleRadio && r.Variant == FormRowDefault {
 		children = append(children, Icon(lucide.ChevronRight, 13, colors.Faint))

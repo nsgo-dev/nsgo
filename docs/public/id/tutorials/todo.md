@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Simpan file tersebut dan aplikasi akan dimulai ulang. Ketik sebuah tugas, tekan 
 
 **Pembaruan mengganti slice.** `items.Update` mengembalikan slice baru, sehingga identitas daftar dan key baris yang menentukan apa yang tetap di layar. `nextID` memberi setiap todo sebuah ID, dan `Key` milik `core.List` menggunakannya; tanpa key yang stabil, baris akan menggunakan kembali sel-selnya untuk item lain.
 
-**Layar adalah pohon kotak.** `Root` mengembalikan sebuah `core.View` dengan padding, gap, dan inset safe area. `FlexGrow: 1` dan `FlexShrink: 1` membuatnya mengisi jendela dan tidak lebih, sehingga daftar yang panjang bergulir di dalamnya alih-alih melebarkannya melewati tepi jendela. Baris input mengatur `Direction: core.Row`; semua yang lain menggunakan kolom bawaan.
+**Layar adalah pohon kotak.** `Root` mengembalikan sebuah `core.View` dengan padding, gap, dan inset safe area. `FlexGrow: 1` dan `FlexShrink: core.Shrink(1)` membuatnya mengisi jendela dan tidak lebih, sehingga daftar yang panjang bergulir di dalamnya alih-alih melebarkannya melewati tepi jendela. Baris input mengatur `Direction: core.Row`; semua yang lain menggunakan kolom bawaan.
 
 **Input dikendalikan.** `draft.Get` adalah nilai field dan `draft.Set` menerima setiap perubahan. `OnSubmit` menambahkan tugas saat Return ditekan, dan `add` mengosongkan draft, sehingga field mengosongkan dirinya sendiri.
 

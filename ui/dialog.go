@@ -88,7 +88,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 				side := func(id string, justify core.Justify, children []core.Node) core.Node {
 					return core.View{TestID: id, Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, JustifyContent: justify, FlexGrow: 1, FlexBasis: core.Pt(0), MinWidth: core.AutoMinimum, Gap: 8}, Children: children}
 				}
-				title.Style = core.Style{FlexShrink: 1, TextAlign: core.TextAlignCenter}.Merge(title.Style)
+				title.Style = core.Style{FlexShrink: core.Shrink(1), TextAlign: core.TextAlignCenter}.Merge(title.Style)
 				head = append(head, core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, MinHeight: core.Pt(32), Gap: 8}, Children: []core.Node{
 					side("dialog-title-leading", core.JustifyStart, d.Leading), title, side("dialog-title-trailing", core.JustifyEnd, d.Trailing),
 				}})
@@ -144,7 +144,7 @@ func (d Dialog) Render(cx *core.Scope) core.Node {
 			window, inset := cx.Env().Window(), dialogInset(cx, d.Inset)
 			finish := FinOf(cx).Dialog()
 			return d.surfaceStyle(finish.Over(dialogShape.Merge(core.Style{Background: Alpha(finish.Background, 0.96), Color: colors.Text(),
-				MaxWidth: core.Pt(max(0, window.Width-2*inset)), MaxHeight: core.Pt(max(0, window.Height-2*inset)), FlexShrink: 0})))
+				MaxWidth: core.Pt(max(0, window.Width-2*inset)), MaxHeight: core.Pt(max(0, window.Height-2*inset)), FlexShrink: core.NoShrink})))
 		},
 		LayerStyle: core.Style{JustifyContent: core.JustifyStart}, Before: []core.Node{spacer(above, func(f float32) float32 { return f })},
 		After:    []core.Node{spacer(below, func(f float32) float32 { return 1 - f }), dialogDragStrip(cx)},

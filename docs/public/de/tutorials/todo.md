@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Speichern Sie die Datei, und die App startet neu. Geben Sie eine Aufgabe ein, dr
 
 **Aktualisierungen ersetzen den Slice.** `items.Update` gibt einen neuen Slice zurück, daher entscheiden die Identität der Liste und die Schlüssel der Zeilen, was auf dem Bildschirm bleibt. `nextID` gibt jedem Todo eine ID, und `Key` von `core.List` verwendet sie; ohne stabilen Schlüssel würden Zeilen ihre Zellen für andere Einträge wiederverwenden.
 
-**Der Bildschirm ist ein Baum aus Boxen.** `Root` gibt einen `core.View` mit Innenabstand, einem Abstand zwischen den Kindern und den Einzügen des sicheren Bereichs zurück. `FlexGrow: 1` und `FlexShrink: 1` lassen ihn das Fenster ausfüllen, aber nicht mehr, sodass eine lange Liste in ihm scrollt, statt ihn über den Fensterrand hinaus zu dehnen. Die Eingabezeile setzt `Direction: core.Row`; alles andere ist die Standardspalte.
+**Der Bildschirm ist ein Baum aus Boxen.** `Root` gibt einen `core.View` mit Innenabstand, einem Abstand zwischen den Kindern und den Einzügen des sicheren Bereichs zurück. `FlexGrow: 1` und `FlexShrink: core.Shrink(1)` lassen ihn das Fenster ausfüllen, aber nicht mehr, sodass eine lange Liste in ihm scrollt, statt ihn über den Fensterrand hinaus zu dehnen. Die Eingabezeile setzt `Direction: core.Row`; alles andere ist die Standardspalte.
 
 **Die Eingabe ist kontrolliert.** `draft.Get` ist der Wert des Feldes, und `draft.Set` erhält jede Änderung. `OnSubmit` fügt eine Aufgabe hinzu, wenn die Eingabetaste gedrückt wird, und `add` leert den Entwurf, sodass sich das Feld selbst leert.
 

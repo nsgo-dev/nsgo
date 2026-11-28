@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Dosyayı kaydedin, uygulama yeniden başlar. Bir görev yazın, **Add** düğmes
 
 **Güncellemeler dilimi değiştirir.** `items.Update` yeni bir dilim döndürür; bu yüzden ekranda neyin kalacağına listenin kimliği ve satır anahtarları karar verir. `nextID` her yapılacak öğeye bir kimlik verir ve `core.List`'in `Key`'i onu kullanır; kararlı bir anahtar olmasaydı satırlar hücrelerini başka öğeler için yeniden kullanırdı.
 
-**Ekran bir kutu ağacıdır.** `Root`, dolgu, boşluk ve güvenli alanın iç boşluklarına sahip bir `core.View` döndürür. `FlexGrow: 1` ve `FlexShrink: 1` onun pencereyi doldurmasını ve fazlasını almamasını sağlar; böylece uzun bir liste onu pencerenin kenarının ötesine uzatmak yerine içinde kaydırılır. Giriş satırı `Direction: core.Row` ayarlar; geri kalan her şey varsayılan sütundur.
+**Ekran bir kutu ağacıdır.** `Root`, dolgu, boşluk ve güvenli alanın iç boşluklarına sahip bir `core.View` döndürür. `FlexGrow: 1` ve `FlexShrink: core.Shrink(1)` onun pencereyi doldurmasını ve fazlasını almamasını sağlar; böylece uzun bir liste onu pencerenin kenarının ötesine uzatmak yerine içinde kaydırılır. Giriş satırı `Direction: core.Row` ayarlar; geri kalan her şey varsayılan sütundur.
 
 **Giriş denetimlidir.** `draft.Get` alanın değeridir ve `draft.Set` her değişikliği alır. `OnSubmit` Return tuşuna basıldığında bir görev ekler, `add` ise taslağı temizler; böylece alan kendiliğinden boşalır.
 

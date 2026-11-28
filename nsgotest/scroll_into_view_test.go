@@ -138,8 +138,8 @@ func TestScrollIntoViewNestedScrollViews(t *testing.T) {
 						Horizontal: true,
 						Style:      core.Style{Width: core.Pt(200), Height: core.Pt(80), MinHeight: core.Pt(80)},
 						Children: []core.Node{
-							core.View{Style: core.Style{Width: core.Pt(500), Height: core.Pt(80), FlexShrink: 0}},
-							core.View{TestID: "h-item", Style: core.Style{Width: core.Pt(60), Height: core.Pt(80), FlexShrink: 0}},
+							core.View{Style: core.Style{Width: core.Pt(500), Height: core.Pt(80), FlexShrink: core.NoShrink}},
+							core.View{TestID: "h-item", Style: core.Style{Width: core.Pt(60), Height: core.Pt(80), FlexShrink: core.NoShrink}},
 						},
 					},
 					core.View{Style: core.Style{Height: core.Pt(800)}},
@@ -318,9 +318,9 @@ func TestScrollIntoViewHorizontalAndContentInsets(t *testing.T) {
 				Behavior:      core.ScrollBehavior{ContentInset: core.Edges{Left: 30, Right: 20}},
 				Style:         core.Style{Width: core.Pt(250), Height: core.Pt(100)},
 				Children: []core.Node{
-					core.View{TestID: "start", Style: core.Style{Width: core.Pt(40), Height: core.Pt(60), FlexShrink: 0}},
-					core.View{Style: core.Style{Width: core.Pt(500), Height: core.Pt(60), FlexShrink: 0}},
-					core.View{TestID: "end", Style: core.Style{Width: core.Pt(60), Height: core.Pt(60), FlexShrink: 0}},
+					core.View{TestID: "start", Style: core.Style{Width: core.Pt(40), Height: core.Pt(60), FlexShrink: core.NoShrink}},
+					core.View{Style: core.Style{Width: core.Pt(500), Height: core.Pt(60), FlexShrink: core.NoShrink}},
+					core.View{TestID: "end", Style: core.Style{Width: core.Pt(60), Height: core.Pt(60), FlexShrink: core.NoShrink}},
 				},
 			}
 		}, Size(300, 120))

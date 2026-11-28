@@ -559,7 +559,7 @@ func demoRow(cx *core.Scope, d demo, first bool, open func()) core.Node {
 			return core.Style{BorderColors: core.EdgeColors{Top: colors.Line()}}
 		}, Children: []core.Node{
 			IconTile{Icon: d.icon, Size: 38},
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 				ui.Text(d.title(tr), 16, ui.Medium, colors.Text),
 				core.Text{Content: d.detail(tr), MaxLines: 2, Style: core.Style{FontSize: 13, LineHeight: 18}, StyleFunc: ui.Colored(colors.Muted)},
 			}},
@@ -660,7 +660,7 @@ func (g *gallery) demoTitle() core.Node {
 			group := ui.Text(groupOf(tr, name), 13, ui.Bold, colors.Text)
 			group.MaxLines = 1
 			title := ui.Text(d.title(tr), 13, ui.Bold, colors.Text)
-			title.MaxLines, title.Role, title.TestID, title.Style.FlexShrink = 1, core.RoleHeader, "title", 1
+			title.MaxLines, title.Role, title.TestID, title.Style.FlexShrink = 1, core.RoleHeader, "title", core.Shrink(1)
 			return ui.HStack{Gap: 4, Children: []core.Node{group, ui.Text("/", 13, ui.Bold, colors.Text), title}}
 		})
 	})

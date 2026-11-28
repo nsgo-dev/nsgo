@@ -7,7 +7,7 @@ order: 51
 
 ## ボックス
 
-すべての要素はエンジンによってレイアウトされるボックスです。デフォルトは React Native と同じで、縦方向（column）のフレックスボックス、伸長・縮小の指定がない限りサイズを維持する子要素、交差軸方向に引き伸ばされるアイテム、そしてパディングとボーダーを含むサイズ計算になっています。
+すべての要素はエンジンによってレイアウトされるボックスです。デフォルトはおおむね React Native と同じで、縦方向（column）のフレックスボックス、伸長・縮小の指定がない限りサイズを維持する子要素、交差軸方向に引き伸ばされるアイテム、自動の最小サイズなし、そしてパディングとボーダーを含むサイズ計算になっています。React Native と異なり、伸長するボックスは縮小もし、スクロールビューとそれを囲むボックスも同様です。
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## サイズ
 
-`Width`、`Height`、`MinWidth`、`MaxWidth`、`FlexBasis` には、ポイント単位の `core.Pt` または親要素に対する割合の `core.Pct` を指定します。`FlexGrow` は余白を分配し、`FlexShrink` はボックスがスペースを譲って縮小できるようにします。どちらも指定しないボックスは元のサイズを保ちます。`AspectRatio` は幅を高さで割った比率です。`AutoMargin` は指定した辺の余白をすべて吸収するため、片側に指定するとボックスを反対側へ押し寄せます。
+`Width`、`Height`、`MinWidth`、`MaxWidth`、`FlexBasis` には、ポイント単位の `core.Pt` または親要素に対する割合の `core.Pct` を指定します。`FlexGrow` は余白を分配し、`FlexShrink` はスペースが足りないときにその一部を譲ります。未指定の `FlexShrink` は、伸長するボックス、スクロール軸方向の `core.Scroll` と `core.List`、そしてそれらを囲みその軸にサイズを指定しない各ボックスでは 1、`core.Scroll` のコンテンツを含むそれ以外では 0 です。`core.Shrink(n)` で係数を指定し、`core.NoShrink` でボックスのサイズを保ちます。`AspectRatio` は幅を高さで割った比率です。`AutoMargin` は指定した辺の余白をすべて吸収するため、片側に指定するとボックスを反対側へ押し寄せます。
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-幅や高さが別途指定されない限り、ボックスのサイズはコンテンツによって決まります。`core.MinContent`、`core.MaxContent`、`core.FitContent` は CSS と同名のサイズ指定で、たとえばテキストの min-content 幅は最も幅の広い単語の幅になります。行（row）内のテキストは `FlexShrink: 1` を指定したときのみ縮小して折り返し、残りのスペースを埋める必要がある場合は `FlexGrow: 1` も追加します。最小値が未設定のときは React Native と同様にすでに 0 であるため、`MinWidth: core.Pt(0)` を指定しても何も変わらず、行の幅が最も長い単語より狭い場合、縮小中のテキストは単語の途中でも改行されます。`MinWidth: core.AutoMinimum` を指定すると、CSS の自動最小サイズ（automatic minimum）と同様に、最も幅の広い単語の幅で縮小が止まります。
+幅や高さが別途指定されない限り、ボックスのサイズはコンテンツによって決まります。`core.MinContent`、`core.MaxContent`、`core.FitContent` は CSS と同名のサイズ指定で、たとえばテキストの min-content 幅は最も幅の広い単語の幅になります。行（row）内のテキストは `FlexGrow: 1` または `FlexShrink: core.Shrink(1)` を指定すると縮小して折り返します。最小値が未設定のときは React Native と同様にすでに 0 であるため、`MinWidth: core.Pt(0)` を指定しても何も変わらず、行の幅が最も長い単語より狭い場合、縮小中のテキストは単語の途中でも改行されます。`MinWidth: core.AutoMinimum` を指定すると、CSS の自動最小サイズ（automatic minimum）と同様に、最も幅の広い単語の幅で縮小が止まります。
 
-ウィンドウ全体を満たす画面には `FlexGrow: 1` と `FlexShrink: 1` を指定します。また、その画面とスクロールさせるリストやスクロールビューの間にある各ボックスにも同様に指定します。`FlexGrow` だけを指定すると、ボックスはコンテンツに合わせて伸びてしまうため、長いリストがスクロールせずにウィンドウを超えて引き伸ばされてしまいます。
+そのため、リストやスクロールビューはどれほど深くにあっても、それを囲むボックスに何も指定せずにスクロールし、隣にあるヘッダー、タブ、ツールバーはサイズを保ちます。ウィンドウ全体を満たす画面には `FlexGrow: 1` を指定します。
 
 ## グリッド
 

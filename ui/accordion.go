@@ -61,7 +61,7 @@ func (a Accordion) Render(cx *core.Scope) core.Node {
 			Children: []core.Node{
 				base.AccordionHeader{Children: []core.Node{base.AccordionTrigger{Label: item.Text, Style: face,
 					StyleFunc: func() core.Style { return core.Style{Color: colors.Text(), FocusVisible: FocusRing(cx, -4)} },
-					Children:  []core.Node{line(item.Text, TypeLabel.Merge(core.Style{FlexGrow: 1, FlexShrink: 1}), 0), turn}}}},
+					Children:  []core.Node{line(item.Text, TypeLabel.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}), 0), turn}}}},
 				base.AccordionPanel{Label: item.Text, Reveal: reveal,
 					Children: []core.Node{core.View{Style: core.Style{Padding: core.Edges{Left: 12, Right: 12, Bottom: 12}, Gap: 8}, Children: []core.Node{item.Content}}}},
 			}}

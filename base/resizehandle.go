@@ -52,7 +52,7 @@ const (
 // track the pointer over it.
 func handleBandNode(h handleBandSpec) core.Node {
 	zero := core.Pt(0)
-	band := core.Style{Group: handleGroup, ZIndex: 1, FlexShrink: 0,
+	band := core.Style{Group: handleGroup, ZIndex: 1, FlexShrink: core.NoShrink,
 		AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter}
 	line := core.Style{}
 	// The thumb is centered by alignment on a point of the line in its

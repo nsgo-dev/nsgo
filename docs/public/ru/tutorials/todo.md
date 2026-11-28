@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ func Root(cx *core.Scope) core.Node {
 
 **Обновления заменяют срез.** `items.Update` возвращает новый срез, поэтому то, что остаётся на экране, определяют идентичность списка и ключи строк. `nextID` выдаёт каждой задаче ID, и `Key` у `core.List` использует его; без стабильного ключа строки повторно использовали бы свои ячейки для других элементов.
 
-**Экран — это дерево блоков.** `Root` возвращает `core.View` с внутренними отступами, промежутком и отступами безопасной области. `FlexGrow: 1` и `FlexShrink: 1` заставляют его заполнять окно, но не больше, поэтому длинный список прокручивается внутри него, а не растягивает его за край окна. Строка ввода задаёт `Direction: core.Row`; всё остальное — это колонка по умолчанию.
+**Экран — это дерево блоков.** `Root` возвращает `core.View` с внутренними отступами, промежутком и отступами безопасной области. `FlexGrow: 1` и `FlexShrink: core.Shrink(1)` заставляют его заполнять окно, но не больше, поэтому длинный список прокручивается внутри него, а не растягивает его за край окна. Строка ввода задаёт `Direction: core.Row`; всё остальное — это колонка по умолчанию.
 
 **Поле ввода контролируемое.** `draft.Get` — значение поля, а `draft.Set` получает каждое изменение. `OnSubmit` добавляет задачу при нажатии Return, а `add` очищает черновик, так что поле очищается само.
 

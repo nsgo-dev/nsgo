@@ -55,7 +55,7 @@ func shellHeader(cx *core.Scope, testID string, lead func() core.Points, trail b
 		if trail {
 			p.Right += desktop.TitleBar(cx).Right + safe.Right
 		}
-		return core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, FlexShrink: 0,
+		return core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, FlexShrink: core.NoShrink,
 			Height: core.Pt(ShellHeaderHeight(cx) + safe.Top), Padding: p, Background: fill()}
 	}}
 }

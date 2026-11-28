@@ -165,10 +165,10 @@ func main() { nsgo.Run(Root) }
 
 ## Layout and styles
 
-- Layout is flexbox with React Native's defaults (a column, children keep their size) plus CSS grid. Sizes take `core.Pt` or `core.Pct`; text shrinks and wraps in a row only with `FlexShrink: 1`, an unset minimum being 0 already (`core.AutoMinimum` is CSS's automatic minimum).
-- A screen that fills the window takes `FlexGrow: 1, FlexShrink: 1`, as does every box between it and a list or scroll view that should scroll; with `FlexGrow` alone a long list stretches past the window instead of scrolling.
+- Layout is flexbox with React Native's defaults (a column, children keep their size) plus CSS grid, except that a box that grows also shrinks, as do `core.Scroll`, `core.List` and the boxes around them that set no size on their scroll axis. `core.Shrink(n)` sets a shrink factor and `core.NoShrink` keeps a box at its size. Sizes take `core.Pt` or `core.Pct`; text shrinks and wraps in a row with `FlexGrow: 1` or `FlexShrink: core.Shrink(1)`, an unset minimum being 0 already (`core.AutoMinimum` is CSS's automatic minimum).
+- A screen that fills the window takes `FlexGrow: 1`; a list or scroll view inside it scrolls however deep it sits, and its content keeps its size.
 - Let a scroll view fill its container and put the padding on its content, so the scroll bar stays against the edge. Scroll only through `core.Scroll`, `core.List` or `ui`'s scroll views, never by stepping offsets from pointer or wheel events; they keep native inertia and edges.
-- Set `core.Scroll.NoShrink` when a scroll view must keep its requested size while a sibling shrinks.
+- Set `FlexShrink: core.NoShrink` (or `core.Scroll.NoShrink`) when a view or scroll view must keep its requested size while a sibling shrinks.
 - Highlight text with a span’s `Background`, `CornerRadius`, `BackgroundInsetTop` and `BackgroundInsetBottom`, including HarmonyOS and mini programs; insets change only paint ([text](https://nsgo.dev/docs/text.md)).
 - Use `core.Span.Attachment` to place a view in a line of text. Its first text line supplies the default baseline.
 - Keep content clear of the notch and the keyboard with `PaddingEnv: core.EnvEdges{Top: core.EnvSafeArea, Bottom: core.EnvKeyboard}` rather than fixed insets.

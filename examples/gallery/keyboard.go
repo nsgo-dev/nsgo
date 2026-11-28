@@ -60,7 +60,7 @@ func keyboardDemo(cx *core.Scope) core.Node {
 			core.Scroll{Style: core.Style{FlexGrow: 1}, Behavior: core.ScrollBehavior{KeyboardDismissMode: core.KeyboardDismissInteractive}, Children: []core.Node{
 				core.View{Style: core.Style{Padding: core.Edges{Top: 16, Right: 16, Bottom: 40, Left: 16}, Gap: 16}, Children: []core.Node{
 					core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, Padding: core.Edges{Top: 8, Left: 4}}, Children: []core.Node{
-						core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+						core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 							core.Text{Content: tr.FormASheet(), Style: core.Style{FontSize: 24, FontWeight: ui.Bold, LetterSpacing: -0.4}, StyleFunc: ui.Colored(colors.Text)},
 							ui.Text(tr.FormItsInputsStayAboveThe(), 13, ui.Regular, colors.Muted),
 						}},
@@ -122,7 +122,7 @@ func messageBar(cx *core.Scope) base.NavPage {
 			base.Input{Value: draft.Get, OnChange: draft.Set, OnSubmit: func(string) { send() }, SubmitBehavior: core.SubmitBehaviorSubmit,
 				Placeholder: tr.FormMessage(), ReturnKeyType: core.ReturnKeySend, TestID: "message",
 				StyleFunc: func() core.Style {
-					return fin.Inset().Over(core.Style{PlaceholderColor: colors.Faint(), SelectionColor: colors.Accent(), FlexGrow: 1, FlexShrink: 1, Height: core.Pt(44),
+					return fin.Inset().Over(core.Style{PlaceholderColor: colors.Faint(), SelectionColor: colors.Accent(), FlexGrow: 1, FlexShrink: core.Shrink(1), Height: core.Pt(44),
 						Padding: core.Symmetric(0, 16), FontSize: 13, Color: colors.Text(), Background: colors.Inset(), BorderWidth: 1, BorderColor: colors.Border(), CornerRadius: 22})
 				}},
 			ui.IconButton{Variant: ui.IconButtonPrimary, Icon: lucide.ArrowUp, Label: tr.FormSend(), OnPress: send},

@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Salve o arquivo e o app reinicia. Digite uma tarefa, pressione **Add** e marque-
 
 **As atualizações substituem a slice.** `items.Update` retorna uma nova slice, então a identidade da lista e as chaves das linhas decidem o que permanece na tela. `nextID` dá um ID a cada tarefa, e o `Key` de `core.List` o usa; sem uma chave estável, as linhas reaproveitariam suas células para outros itens.
 
-**A tela é uma árvore de caixas.** `Root` retorna um `core.View` com padding, um espaçamento e as margens da área segura. `FlexGrow: 1` e `FlexShrink: 1` fazem com que ele preencha a janela e nada além disso, de modo que uma lista longa rola dentro dele em vez de esticá-lo além da borda da janela. A linha de entrada define `Direction: core.Row`; todo o resto usa a coluna padrão.
+**A tela é uma árvore de caixas.** `Root` retorna um `core.View` com padding, um espaçamento e as margens da área segura. `FlexGrow: 1` e `FlexShrink: core.Shrink(1)` fazem com que ele preencha a janela e nada além disso, de modo que uma lista longa rola dentro dele em vez de esticá-lo além da borda da janela. A linha de entrada define `Direction: core.Row`; todo o resto usa a coluna padrão.
 
 **A entrada é controlada.** `draft.Get` é o valor do campo e `draft.Set` recebe cada alteração. `OnSubmit` adiciona uma tarefa quando Return é pressionado, e `add` limpa o rascunho, de modo que o campo se esvazia sozinho.
 

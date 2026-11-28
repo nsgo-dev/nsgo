@@ -91,7 +91,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -126,7 +126,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "删除", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -146,7 +146,7 @@ func Root(cx *core.Scope) core.Node {
 
 **更新会替换切片。** `items.Update` 返回一个新切片，列表的身份和行的 key 决定哪些内容留在屏幕上。`nextID` 给每个待办一个 ID，`core.List` 的 `Key` 使用它；没有稳定的 key，行会把自己的单元格复用给其他条目。
 
-**屏幕是一棵盒子树。** `Root` 返回一个 `core.View`，带内边距、间距和安全区域内边距。`FlexGrow: 1` 和 `FlexShrink: 1` 让它恰好填满窗口，所以长列表会在其中滚动，而不是把它撑出窗口边缘。输入行设置 `Direction: core.Row`，其余部分使用默认的纵向排列。
+**屏幕是一棵盒子树。** `Root` 返回一个 `core.View`，带内边距、间距和安全区域内边距。`FlexGrow: 1` 和 `FlexShrink: core.Shrink(1)` 让它恰好填满窗口，所以长列表会在其中滚动，而不是把它撑出窗口边缘。输入行设置 `Direction: core.Row`，其余部分使用默认的纵向排列。
 
 **输入框是受控的。** `draft.Get` 是输入框的值，`draft.Set` 接收每次变化。按下回车时 `OnSubmit` 添加任务，`add` 清空草稿，因此输入框会自己清空。
 

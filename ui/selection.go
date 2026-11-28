@@ -25,7 +25,7 @@ func selectionLabel(cx *core.Scope, content string, contentFunc func() string, c
 		content = ""
 	}
 	colors := ColorsOf(cx)
-	return []core.Node{core.Text{Content: content, ContentFunc: contentFunc, Style: TypeBody.Merge(core.Style{FlexShrink: 1}), StyleFunc: func() core.Style {
+	return []core.Node{core.Text{Content: content, ContentFunc: contentFunc, Style: TypeBody.Merge(core.Style{FlexShrink: core.Shrink(1)}), StyleFunc: func() core.Style {
 		return core.Style{Color: colors.Text(), GroupStyle: &core.GroupStyle{Name: selectionGroup, Disabled: &core.Style{Color: colors.Faint()}}}
 	}}}
 }

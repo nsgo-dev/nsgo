@@ -94,7 +94,7 @@ var colorRow = core.Style{Direction: core.Row, Gap: 8}
 
 // colorShare has a field take a part of its row.
 func colorShare(part float32) core.Style {
-	return core.Style{Width: core.Pt(0), MinWidth: core.Pt(0), FlexGrow: part, FlexShrink: 1}
+	return core.Style{Width: core.Pt(0), MinWidth: core.Pt(0), FlexGrow: part, FlexShrink: core.Shrink(1)}
 }
 
 // colorTools are the row of the notation's menu, the eyedropper and the
@@ -145,7 +145,7 @@ func colorHexField(cx *core.Scope) core.Node {
 			core.View{Style: core.Style{AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, MinWidth: core.Pt(ButtonHeight - 6), Padding: core.Edges{Left: 8}},
 				Children: []core.Node{core.Text{Content: "#", MaxLines: 1, Style: TypeLabel, StyleFunc: Colored(colors.Muted)}}},
 			base.ColorField{Digits: true, Label: locales.ColorHex(cx), Field: func(in core.Input) core.Node {
-				in.Style = TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(32), Padding: core.Edges{Left: 4, Right: 10}})
+				in.Style = TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(32), Padding: core.Edges{Left: 4, Right: 10}})
 				in.StyleFunc = func() core.Style {
 					return core.Style{Color: colors.Text(), PlaceholderColor: colors.Faint(), SelectionColor: colors.Now().Selection, CaretColor: colors.Accent()}
 				}

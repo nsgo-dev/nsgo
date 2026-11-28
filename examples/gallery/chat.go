@@ -820,7 +820,7 @@ func chatDemo(cx *core.Scope) core.Node {
 					}, Children: []core.Node{
 						core.View{Style: core.Style{Width: core.Pt(28), Height: core.Pt(28), CornerRadius: 14, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 							StyleFunc: ui.Filled(func() core.Color { return t.Tint(cx) }), Children: []core.Node{ui.Icon(name, 15, t.Shade(cx))}},
-						core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 1}, Children: []core.Node{ui.Text(title, 13, ui.Semibold, colors.Text), ui.Text(detail, 13, ui.Regular, colors.Muted)}},
+						core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 1}, Children: []core.Node{ui.Text(title, 13, ui.Semibold, colors.Text), ui.Text(detail, 13, ui.Regular, colors.Muted)}},
 					}}
 				}),
 			}},

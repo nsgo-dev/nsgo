@@ -2233,3 +2233,25 @@ func TestTextViewDiagram(t *testing.T) {
 	app.Scroll("id:page", 700)
 	app.Screenshot("textview-diagram")
 }
+
+// TestListsTabsAndSidebarSearchKeepHeight keeps the sidebar's search and
+// the Lists demo's tabs at their own height beside a list that scrolls,
+// with no FlexShrink set on them.
+func TestListsTabsAndSidebarSearchKeepHeight(t *testing.T) {
+	app := startDesktop(t)
+	if got := app.Find("id:search").Frame.Size.Height; got < 32 {
+		t.Fatalf("sidebar search height = %v, want >= 32", got)
+	}
+	open(app, "Lists")
+	tablist := app.Find("id:demo-Lists >> role:tablist")
+	if got := tablist.Frame.Size.Height; got != 32 {
+		t.Fatalf("Lists tablist height = %v, want 32", got)
+	}
+	grid := app.Find("id:demo-Lists >> role:tab Grid").Frame
+	if grid.Origin.Y < 0 || grid.Origin.Y+grid.Size.Height > tablist.Frame.Size.Height {
+		t.Fatalf("Grid tab %v overflows tablist %v", grid, tablist.Frame)
+	}
+	if got := app.Find("id:grid").Frame.Size.Height; got < 300 {
+		t.Fatalf("Lists grid height = %v, want >= 300", got)
+	}
+}

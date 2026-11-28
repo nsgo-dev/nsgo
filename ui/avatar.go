@@ -55,7 +55,7 @@ func (a Avatar) render(cx *core.Scope, ring core.Points, lift bool) core.Node {
 	if label == "" {
 		label = a.Name
 	}
-	s := core.Style{Width: core.Pt(d), Height: core.Pt(d), FlexShrink: 0, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
+	s := core.Style{Width: core.Pt(d), Height: core.Pt(d), FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter,
 		CornerRadius: d / 2, BorderWidth: ring}
 	if ring > 0 {
 		s.Transition = quick

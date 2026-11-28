@@ -533,7 +533,7 @@ func (i Input) Render(*Scope) Node { return i }
 
 func (i Input) mountIn(t *Tree, cx *Scope, parent *node) { t.mountInput(cx, parent, i) }
 
-// Scroll scrolls its children, laid out as a column (or a row when Horizontal) as long as they need. Like React Native's ScrollView, it shrinks to fit its parent (FlexShrink 1) unless its style says else; NoShrink keeps it at its requested size when its parent is short.
+// Scroll scrolls its children, laid out as a column (or a row when Horizontal) as long as they need. Along its scroll axis, it and auto-sized wrappers around it shrink to fit their container unless their style sets FlexShrink: NoShrink; NoShrink is a shorthand for that on Scroll.
 type Scroll struct {
 	// Class is Tailwind CSS classes, as View's.
 	Class      string

@@ -111,7 +111,7 @@ func (g *gallery) page(cx *core.Scope, title, id string, content core.Node) base
 func (g *gallery) header(cx *core.Scope, title string) core.Node {
 	c := colorsOf(cx)
 	heading := text(title, 15, semibold, c.text)
-	heading.MaxLines, heading.Role, heading.Style.FlexGrow, heading.Style.FlexShrink = 1, core.RoleHeader, 1, 1
+	heading.MaxLines, heading.Role, heading.Style.FlexGrow, heading.Style.FlexShrink = 1, core.RoleHeader, 1, core.Shrink(1)
 	return core.View{Style: core.Style{Height: core.Pt(44), Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, Padding: core.Symmetric(0, 12), Borders: core.Edges{Bottom: 1}},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: c.background(), BorderColors: core.EdgeColors{Bottom: c.line()}}
@@ -165,7 +165,7 @@ func demoRow(cx *core.Scope, d demo, first bool, open func()) core.Node {
 		Children: []core.Node{core.View{Style: s, StyleFunc: func() core.Style { return core.Style{BorderColors: core.EdgeColors{Top: c.line()}} },
 			Children: []core.Node{
 				tile(cx, d.mark, 38),
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{text(d.name, 16, medium, c.text), detail}},
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{text(d.name, 16, medium, c.text), detail}},
 				text("›", 20, regular, c.faint),
 			}}}}
 }

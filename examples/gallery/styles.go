@@ -252,7 +252,7 @@ func layersCard(cx *core.Scope) core.Node {
 			core.View{Style: core.Style{Width: core.Pt(64), Height: core.Pt(64), CornerRadius: 14, BorderCurve: core.BorderCurveContinuous,
 				AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Animated: &core.AnimatedStyle{Opacity: opacity}}, StyleFunc: ui.Filled(colors.Info),
 				Children: []core.Node{ui.Textf(level.Get, 13, ui.Bold, onBlue)}},
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 8}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 8}, Children: []core.Node{
 				Caption{Label: tr.StylesOpacity(), Note: label(tr.StylesAnimatedNatively())},
 				ui.Tabs[string]{Equal: true, Options: []ui.Option[string]{{Value: "0.2", Label: "0.2"}, {Value: "0.45", Label: "0.45"}, {Value: "1", Label: "1"}}, Value: level.Get, OnChange: func(v string) {
 					level.Set(v)
@@ -361,14 +361,14 @@ func numeralsCard(cx *core.Scope) core.Node {
 		return t
 	}
 	column := func(head core.Node, v core.FontVariant) core.Node {
-		return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pct(0), Gap: 4}, Children: []core.Node{
+		return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pct(0), Gap: 4}, Children: []core.Node{
 			head, figure("1,111.11", v), figure("8,888.88", v)}}
 	}
 	tabular := ui.Text("tabular-nums", 12, ui.Regular, colors.Accent)
 	tabular.Style.FontFamily = ui.Mono
 	feature := func(label string, v core.FontVariant, name string) core.Node {
 		l := ui.Text(label, 18, ui.Regular, colors.Text)
-		l.Style.FontVariant, l.Style.FlexGrow, l.Style.FlexShrink = v, 1, 1
+		l.Style.FontVariant, l.Style.FlexGrow, l.Style.FlexShrink = v, 1, core.Shrink(1)
 		n := ui.Text(name, 13, ui.Regular, colors.Faint)
 		n.Style.FontFamily = ui.Mono
 		return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignBaseline, Gap: 8}, Children: []core.Node{l, n}}

@@ -142,9 +142,9 @@ func (v Conversation) Render(cx *core.Scope) core.Node {
 func chatTranscript(s *ConversationState, width core.Points, pad core.Edges, children []core.Node, clearance func() core.Style) core.Node {
 	column := []core.Node{core.View{Style: chatColumn(width).Merge(core.Style{Gap: 48}), Children: children}}
 	if clearance != nil {
-		column = append(column, core.View{Style: core.Style{FlexShrink: 0}, StyleFunc: clearance})
+		column = append(column, core.View{Style: core.Style{FlexShrink: core.NoShrink}, StyleFunc: clearance})
 	}
-	return core.View{OnLayout: s.grown, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: 0, AlignItems: core.AlignCenter, Padding: pad}, Children: column}
+	return core.View{OnLayout: s.grown, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, Padding: pad}, Children: column}
 }
 
 // chatColumn is a reading column's style: the full width, capped at width

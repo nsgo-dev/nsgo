@@ -44,7 +44,7 @@ func (l SuggestList) Render(cx *core.Scope) core.Node {
 					children = append(children, lead)
 				}
 			}
-			children = append(children, core.View{Style: core.Style{MinWidth: core.Pt(0), FlexGrow: 1, FlexShrink: 1, Padding: core.Symmetric(4, 0)}, Children: text})
+			children = append(children, core.View{Style: core.Style{MinWidth: core.Pt(0), FlexGrow: 1, FlexShrink: core.Shrink(1), Padding: core.Symmetric(4, 0)}, Children: text})
 			return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, FlexGrow: 1}, Children: children}
 		}}
 }

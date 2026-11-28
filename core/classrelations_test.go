@@ -35,7 +35,7 @@ func TestRelationalIconClasses(t *testing.T) {
 				continue
 			}
 			n := h.find(id)
-			if n.style.Width != Pt(16) || n.style.Height != Pt(16) || n.style.FlexShrink != 0 {
+			if n.style.Width != Pt(16) || n.style.Height != Pt(16) || n.style.FlexShrink != NoShrink {
 				t.Fatalf("%s style=%+v", id, n.style)
 			}
 		}

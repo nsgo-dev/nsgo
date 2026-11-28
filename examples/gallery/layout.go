@@ -71,7 +71,7 @@ func layoutDemo(cx *core.Scope) core.Node {
 		tr := locales.For(cx)
 		return Section{Title: tr.LayoutGrowAndShrink(), Note: "FlexGrow · FlexShrink · AutoMargin", Children: []core.Node{
 			frame(core.Style{Direction: core.Row}, box("1", core.Style{FlexGrow: 1}), box("2", core.Style{FlexGrow: 2}), box("3", core.Style{FlexGrow: 3})),
-			frame(core.Style{Direction: core.Row}, box(tr.LayoutFixed120(), core.Style{Width: core.Pt(120)}), box(tr.Layout900WideShrinksToFit(), core.Style{Width: core.Pt(900), FlexShrink: 1})),
+			frame(core.Style{Direction: core.Row}, box(tr.LayoutFixed120(), core.Style{Width: core.Pt(120)}), box(tr.Layout900WideShrinksToFit(), core.Style{Width: core.Pt(900), FlexShrink: core.Shrink(1)})),
 			frame(core.Style{Direction: core.Row}, box(tr.LayoutStart(), core.Style{}), box(tr.LayoutPushedToTheEnd(), core.Style{AutoMargin: core.SideLeft})),
 		}}
 	}

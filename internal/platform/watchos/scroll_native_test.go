@@ -25,7 +25,7 @@ func TestScrollBelowTheScreensTopRestsAtZero(t *testing.T) {
 		defer mu.Unlock()
 		return at, events
 	}
-	fill := core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0)}
+	fill := core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0)}
 	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
 		var rows []core.Node
 		for i := range 20 {

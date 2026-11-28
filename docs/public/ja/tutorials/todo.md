@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ func Root(cx *core.Scope) core.Node {
 
 **更新ではスライスを置き換えます。** `items.Update` は新しいスライスを返すため、リストの識別情報と行のキーによって画面上に残るものが決まります。`nextID` は各 Todo に ID を割り当て、`core.List` の `Key` がそれを使用します。安定したキーがないと、行は別の項目に対してセルを再利用してしまいます。
 
-**画面はボックスのツリーです。** `Root` は、パディング、ギャップ、セーフエリアのインセットを持つ `core.View` を返します。`FlexGrow: 1` と `FlexShrink: 1` によりウィンドウいっぱいに広がりつつそれ以上は大きくならないため、長いリストがウィンドウの端を超えて引き伸ばされるのではなく、その中でスクロールするようになります。入力行には `Direction: core.Row` を設定しており、それ以外はすべてデフォルトの縦方向（column）です。
+**画面はボックスのツリーです。** `Root` は、パディング、ギャップ、セーフエリアのインセットを持つ `core.View` を返します。`FlexGrow: 1` と `FlexShrink: core.Shrink(1)` によりウィンドウいっぱいに広がりつつそれ以上は大きくならないため、長いリストがウィンドウの端を超えて引き伸ばされるのではなく、その中でスクロールするようになります。入力行には `Direction: core.Row` を設定しており、それ以外はすべてデフォルトの縦方向（column）です。
 
 **入力は制御されています。** `draft.Get` がフィールドの値となり、`draft.Set` が変更を受け取ります。Return キーが押されると `OnSubmit` がタスクを追加し、`add` が下書きをクリアするため、フィールドは自動的に空になります。
 

@@ -215,7 +215,14 @@ func (t *Tree) relayoutBoundaries() bool {
 		}
 		// Moved or restyled since, it is no longer one on its own.
 		origin, ok := t.layoutOrigin(b)
-		if !ok || !t.boundary(b) || !layout.Relayout(b) {
+		if !ok || !t.boundary(b) {
+			if p := b.nativeParent(); p != nil {
+				t.markLayout(p)
+			}
+			continue
+		}
+		syncScrollAxes(b)
+		if !layout.Relayout(b) {
 			if p := b.nativeParent(); p != nil {
 				t.markLayout(p)
 			}
@@ -297,7 +304,7 @@ func (n *node) layoutStyle() layout.Style {
 		l.FlexWrap = layout.WrapReverse
 	}
 	l.FlexGrow = s.FlexGrow
-	l.FlexShrink = layout.Some(s.FlexShrink)
+	l.FlexShrink = layout.Some(n.defaultFlexShrink())
 	l.FlexBasis = sizeLayout(s.FlexBasis)
 
 	l.Size = layout.Size[layout.Length]{Width: sizeLayout(s.Width), Height: sizeLayout(s.Height)}
@@ -621,6 +628,7 @@ func (t *Tree) layoutRoot(root *node, space Size, fill bool) {
 		root.lstyle = nil
 		root.lstate.Invalidate()
 	}
+	syncScrollAxes(root)
 	layout.Compute(root, layout.Size[layout.AvailableSpace]{
 		Width:  layout.Definite(float32(space.Width)),
 		Height: layout.Definite(float32(space.Height)),
@@ -759,6 +767,129 @@ func (t *Tree) setRTL(rtl bool) {
 		}
 	}
 	t.relayoutAll()
+}
+
+const (
+	scrollAxisX     uint8 = 1 << iota // subtree has an unconstrained horizontal Scroll
+	scrollAxisY                       // subtree has an unconstrained vertical Scroll
+	scrollParentRow                   // container's flex main axis was horizontal on last sync
+	scrollSynced                      // scrollAxes has been synced at least once
+)
+
+// flexMainIsRow reports whether flex container n's main axis is horizontal.
+func (n *node) flexMainIsRow() bool {
+	if n.scroll != nil && n.scroll.config.Horizontal {
+		return true
+	}
+	d := n.style.Direction
+	if d == 0 && n.style.RowByDefault {
+		return true
+	}
+	return d.row()
+}
+
+// syncScrollAxes refreshes n's cached scrollAxes bitmask across dirty nodes
+// before layout runs, dropping lstyle where a node's propagated scroll axes or
+// its container's main axis changed. It returns the unconstrained scroll axes
+// (scrollAxisX / scrollAxisY) that n exposes to its parent.
+func syncScrollAxes(n *node) uint8 {
+	if !n.layoutDirty {
+		return n.scrollAxes & (scrollAxisX | scrollAxisY)
+	}
+	row := n.flexMainIsRow()
+	wasSynced := n.scrollAxes&scrollSynced != 0
+	wasRow := n.scrollAxes&scrollParentRow != 0
+	axisFlipped := wasSynced && row != wasRow
+
+	var childAxes uint8
+	for _, c := range n.flatChildren() {
+		if axisFlipped && !c.style.FlexShrink.set && c.lstyle != nil {
+			c.lstyle = nil
+			c.lstate.Invalidate()
+		}
+		childAxes |= syncScrollAxes(c)
+	}
+
+	var own uint8
+	s := n.style
+	inFlow := (s.Display != DisplayNone || n.covered) &&
+		s.Position != Absolute && s.Position != Fixed &&
+		n.hoist == nil && n.attach == nil && n.accessory == nil && n.pip == nil
+	if inFlow {
+		own = childAxes
+		if n.scroll != nil {
+			if n.scroll.config.Horizontal {
+				own |= scrollAxisX
+			} else {
+				own |= scrollAxisY
+			}
+		}
+		if !s.Width.IsAuto() {
+			own &^= scrollAxisX
+		}
+		if !s.Height.IsAuto() {
+			own &^= scrollAxisY
+		}
+	}
+
+	next := own | scrollSynced
+	if row {
+		next |= scrollParentRow
+	}
+	if prev := n.scrollAxes & (scrollAxisX | scrollAxisY); prev != own {
+		n.lstyle = nil
+		n.lstate.Invalidate()
+	}
+	n.scrollAxes = next
+	return own
+}
+
+// defaultFlexShrink resolves n's flex-shrink factor: explicit values always
+// win; direct children of a Scroll along its scroll axis default to 0 so
+// scrollable content keeps its size; growing items, Scroll views along their
+// scroll axis, and auto-sized wrappers around them default to 1; everything
+// else defaults to 0.
+func (n *node) defaultFlexShrink() float32 {
+	s := n.style
+	if s.FlexShrink.set {
+		return s.FlexShrink.value
+	}
+	p := n.nativeParent()
+	if p != nil && p.scroll != nil {
+		if p.scroll.config.Horizontal == p.flexMainIsRow() {
+			return 0
+		}
+	}
+	if s.FlexGrow > 0 {
+		return 1
+	}
+	if p == nil {
+		return 0
+	}
+	if p.flexMainIsRow() {
+		if (n.scroll != nil && n.scroll.config.Horizontal) || n.scrollAxes&scrollAxisX != 0 {
+			return 1
+		}
+	} else {
+		if (n.scroll != nil && !n.scroll.config.Horizontal) || n.scrollAxes&scrollAxisY != 0 {
+			return 1
+		}
+	}
+	return 0
+}
+
+// dropLayoutStyles clears cached layout styles on n (or its direct native
+// children when n is a region) after reparenting, since default shrink depends
+// on the parent's main axis and whether it is a scroll view.
+func dropLayoutStyles(n *node) {
+	if n.kind != 0 {
+		n.lstyle = nil
+		n.lstate.Invalidate()
+		return
+	}
+	for _, c := range n.children {
+		dropLayoutStyles(c)
+	}
 }
 
 // relayoutAll drops every node's layout and lays the tree out again.

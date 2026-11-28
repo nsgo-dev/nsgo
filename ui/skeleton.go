@@ -24,7 +24,7 @@ type SkeletonBlock struct {
 func (b SkeletonBlock) Render(cx *core.Scope) core.Node {
 	s := core.Style{Width: b.Width, Height: b.Height, CornerRadius: RadiusSmall}
 	if b.Round {
-		s.CornerRadius, s.FlexShrink = RadiusFull, 0
+		s.CornerRadius, s.FlexShrink = RadiusFull, core.NoShrink
 	}
 	if !ReduceMotion(cx) {
 		s.Animation = core.KeyframeAnimation{Keyframes: core.KeyframesPulse, Delay: time.Duration(b.Index) * skeletonStagger}
@@ -70,7 +70,7 @@ func (s Skeleton) Render(*core.Scope) core.Node {
 		}
 		bars = append(bars, SkeletonBlock{Width: width, Height: height, Index: index + i})
 	}
-	children = append(children, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 10,
+	children = append(children, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Gap: 10,
 		Padding: core.Edges{Top: 4}}, Children: bars})
 	return core.View{TestID: s.TestID, Accessible: true, Label: s.Label,
 		Style: core.Style{Direction: core.Row, AlignItems: core.AlignStart, Gap: 16}.Merge(s.Style), Children: children}

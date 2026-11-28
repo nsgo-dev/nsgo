@@ -58,7 +58,7 @@ func environmentCard(cx *core.Scope) core.Node {
 	}
 	return Card{Title: tr.SystemEnvironment(), Description: tr.SystemUpdatesWhenTheWindowInsets(), Actions: []core.Node{ui.Badge{Text: tr.SystemLive(), Variant: ui.BadgeSuccess}}, Children: []core.Node{
 		core.View{Style: core.Style{Direction: core.Row, Gap: 16, AlignItems: core.AlignCenter}, Children: []core.Node{
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 12}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 12}, Children: []core.Node{
 				core.View{Style: core.Style{Gap: 2}, Children: []core.Node{
 					ui.Text(tr.SystemWindow(), 12, ui.Regular, colors.Muted),
 					Figure{Value: func() string { w := env.Window(); return fmt.Sprintf("%d × %d", int(w.Width+0.5), int(w.Height+0.5)) }, Unit: "pt"},
@@ -131,7 +131,7 @@ func statusBarCard(cx *core.Scope) core.Node {
 	return Card{Title: tr.SystemStatusBar(), Description: tr.SystemADialogSStatusbarOver(), Children: []core.Node{
 		ui.Tabs[core.StatusBarStyle]{Equal: true, Options: []ui.Option[core.StatusBarStyle]{{Value: core.StatusBarLight, Label: tr.SystemLight()}, {Value: core.StatusBarDark, Label: tr.SystemDark()}, {Value: core.StatusBarAuto, Label: tr.SystemAuto()}}, Value: foreground, OnChange: pick},
 		Row{Children: []core.Node{
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 				ui.Text(tr.SystemHidden(), 13, ui.Regular, colors.Text),
 				core.Text{ContentFunc: func() string { return fmt.Sprintf("Foreground: %s", names[foreground()]) }, Style: core.Style{FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Muted)},
 			}},
@@ -183,7 +183,7 @@ func actionRow(cx *core.Scope, first bool, name func() *core.SVG, tint func() co
 				return fin.Raised().Over(core.Style{Width: core.Pt(34), Height: core.Pt(34), CornerRadius: 10, BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Raised(),
 					AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter})
 			}, Children: []core.Node{ui.Icon(name, 17, tint)}},
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 1, Padding: core.Symmetric(8, 0)}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 1, Padding: core.Symmetric(8, 0)}, Children: []core.Node{
 				ui.Text(title, 13, ui.Regular, colors.Text), ui.Text(detail, 12, ui.Regular, colors.Muted)}},
 			ui.Icon(lucide.ChevronRight, 14, colors.Faint),
 		}},
@@ -365,7 +365,7 @@ func shortcuts(cx *core.Scope) core.Node {
 	for i, k := range keys {
 		rows = append(rows, Row{First: i == 0, Children: []core.Node{
 			core.Text{Content: k[0], Style: core.Style{Width: core.Pt(120), FontSize: 13, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Accent)},
-			core.Text{Content: k[1], Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
+			core.Text{Content: k[1], Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 		}})
 	}
 	return Card{Title: tr.SystemKeyboardShortcuts(), Description: tr.SystemScopeOnkeyDesktopsAndHardware(), Children: []core.Node{
@@ -447,7 +447,7 @@ func networkCard(cx *core.Scope) core.Node {
 			for i, p := range ps {
 				rows = append(rows, Appear{Index: i, Children: []core.Node{Row{First: i == 0, Children: []core.Node{
 					ui.Text(fmt.Sprintf("#%d", p.ID), 13, ui.Regular, colors.Accent),
-					core.Text{Content: p.Title, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
+					core.Text{Content: p.Title, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 				}}}})
 			}
 			return core.View{Children: rows}
@@ -462,7 +462,7 @@ func networkCard(cx *core.Scope) core.Node {
 			}
 			return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{
 				core.View{Style: core.Style{Width: core.Pt(7), Height: core.Pt(7), CornerRadius: 3.5}, StyleFunc: ui.Filled(t.Shade(cx))},
-				core.Text{Content: line, MaxLines: 2, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(t.Shade(cx))},
+				core.Text{Content: line, MaxLines: 2, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(t.Shade(cx))},
 			}}
 		}),
 		core.View{Style: core.Style{Direction: core.Row, Gap: 8}, Children: []core.Node{

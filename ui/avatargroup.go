@@ -87,7 +87,7 @@ func (g AvatarGroup) Render(cx *core.Scope) core.Node {
 		Children: []core.Node{core.Text{Content: count, MaxLines: 1,
 			Style: core.Style{FontSize: size - 1, LineHeight: size + 1, FontWeight: Medium}}}}
 	return base.AvatarGroup{Limit: limit, Overflow: chip, OverflowStyle: slot(shown), TestID: g.TestID, Label: g.Label,
-		Style: core.Style{Direction: core.Row, AlignSelf: core.AlignStart, FlexShrink: 0, Padding: core.Edges{Left: overlap},
+		Style: core.Style{Direction: core.Row, AlignSelf: core.AlignStart, FlexShrink: core.NoShrink, Padding: core.Edges{Left: overlap},
 			Group: avatarGroupName}.Merge(g.Style),
 		Children: children}
 }
