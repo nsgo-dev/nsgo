@@ -24,11 +24,14 @@
 
 ## Verification
 
-<!-- The commands you ran and on which targets, and what you could not run. -->
+<!-- Run the checks on the commit you push, and replace every value below, keeping the local-ci line: pr-triage.yml reads the block and labels this pull request. Give each command's exit code as → N; the commands may also be a nested list. A missing or incomplete block, a head that is not this pull request's head, or a pass with a non-zero exit code is labelled local-ci-skipped for a maintainer to audit. -->
 
-- [ ] `go tool nsgo check`
-- [ ] `go tool nsgo test`
-- [ ] `go tool nsgo test -target <target>` on the targets above
+<!-- local-ci -->
+- head: `SHA the checks ran on`
+- base: `the main commit the branch was based on`
+- commands: `each command with its exit code, such as go tool nsgo check → 0`
+- result: `pass | fail | skipped`
+- not covered: `what a local run cannot cover, such as the Android emulator, Windows, Linux or the browser jobs`
 
 ## Checklist
 

@@ -30,6 +30,8 @@ go tool nsgo test    # 运行所有包的测试
 
 标题使用 Conventional Commits 格式，例如 `fix(linux): keep the caret after a paste`：squash 合并时标题会成为提交信息，格式不对时检查会失败。模板会要求写明改动涉及的目标平台、可见改动的前后截图，以及实际跑过的检查。
 
+在你推送的提交上运行 `go tool nsgo check` 和 `go tool nsgo test`，然后填写模板里的 `Local CI` 块：这个提交、它所基于的 `main` 提交、每条命令与退出码（写成 `→ N`，可以写在一行，也可以写成嵌套列表）、结果，以及本地跑不了的部分。`pr-triage.yml` 按该块给 pull request 打标签：`local-ci-pass`、`local-ci-fail`，或者在块声明跳过了检查，或块缺失、不完整、写的是另一个提交、声明 `pass` 却有非零退出码时打 `local-ci-skipped`；机器人评论会列出块无效的原因，被打 `local-ci-skipped` 或 `local-ci-fail` 的 pull request 由维护者在合并前审计。Dependabot 等机器人的 pull request 不打这个标签。声明是承诺，不是证据：能否合入仍由必需的检查决定。
+
 ## 文档与更新日志
 
 - 更新事实发生变化的文档：NSGo 如何工作写在 `docs/architecture/` 的专题里，应用和组件如何使用它写在 `docs/public/` 的页面里（[文档与网站](docs.md)）。
