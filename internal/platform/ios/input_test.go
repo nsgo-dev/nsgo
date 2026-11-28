@@ -93,6 +93,31 @@ func TestMultilineInputTakesTheLineHeight(t *testing.T) {
 	}
 }
 
+// TestSingleLineInputKeepsOneLine checks that a single-line input whose value, or placeholder, is longer than it draws one line while it is not being edited, as a UITextField with a word-wrapping paragraph style draws as many as the text makes, cut off by its height.
+func TestSingleLineInputKeepsOneLine(t *testing.T) {
+	const wait = 5 * time.Second
+	const long = "https://example.com/a/very/long/path/that/does/not/fit/in/the/field"
+	style := core.Style{Width: core.Pt(200), Height: core.Pt(50), FontSize: 16, Color: core.RGB(0x000000), PlaceholderColor: core.RGB(0x000000), Background: core.RGB(0xffffff)}
+	app := nsgotest.Start(t, func(cx *core.Scope) core.Node {
+		return core.View{Style: core.Style{FlexGrow: 1, Background: core.RGB(0xffffff)}, Children: []core.Node{
+			core.Input{TestID: "value", DefaultValue: long, Style: style},
+			core.Input{TestID: "placeholder", Placeholder: long, Style: style},
+		}}
+	})
+	for _, id := range []string{"value", "placeholder"} {
+		app.WaitFor("id:"+id, wait)
+		var got []float64
+		app.WaitUntil(wait, func() bool {
+			var ok bool
+			got, _, ok = ios.InputBaselinesForTest(id)
+			return ok && len(got) > 0
+		})
+		if len(got) != 1 {
+			t.Errorf("%s: drew %d lines (baselines %v), want 1", id, len(got), got)
+		}
+	}
+}
+
 // TestMultilinePlaceholderAccessibility checks that a multiline UITextView exposes its current placeholder as its accessibilityHint (updating, clearing, hiding while text is entered, and composing with an explicit AccessibilityDescription) while its drawn UILabel stays out of VoiceOver (#1595).
 func TestMultilinePlaceholderAccessibility(t *testing.T) {
 	const wait = 5 * time.Second
