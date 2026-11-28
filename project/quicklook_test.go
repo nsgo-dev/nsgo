@@ -123,3 +123,50 @@ func TestLoadQuickLookValidationErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadQuickLookThumbnail(t *testing.T) {
+	dir := t.TempDir()
+	writeYAML(t, dir, `name: Scenra
+id: dev.example.scenra
+file_types:
+  - name: Scenra Scene
+    extensions: [scenra]
+quicklook:
+  main: ./cmd/quicklook
+quicklook_thumbnail:
+  main: ./cmd/thumbnail
+sign:
+  quicklook_thumbnail_profile: certs/Thumbnail.provisionprofile
+`)
+	cfg, err := project.Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	th := cfg.QuickLookThumbnail
+	if th == nil || th.Main != "./cmd/thumbnail" || th.ID != "dev.example.scenra.thumbnail" {
+		t.Fatalf("QuickLookThumbnail = %+v", th)
+	}
+	if want := []string{"dev.example.scenra.scenra"}; !slices.Equal(th.Types, want) {
+		t.Errorf("QuickLookThumbnail.Types = %v, want %v", th.Types, want)
+	}
+	if want := filepath.Join(dir, "certs/Thumbnail.provisionprofile"); cfg.Sign.QuickLookThumbnailProfile != want {
+		t.Errorf("Sign.QuickLookThumbnailProfile = %q, want %q", cfg.Sign.QuickLookThumbnailProfile, want)
+	}
+}
+
+func TestLoadQuickLookThumbnailValidationErrors(t *testing.T) {
+	for _, tc := range []struct{ name, yaml, want string }{
+		{"missing main", "name: App\nid: dev.example.app\nquicklook_thumbnail:\n  types: [dev.example.app.doc]\n", "quicklook_thumbnail.main"},
+		{"id outside app id", "name: App\nid: dev.example.app\nquicklook_thumbnail:\n  main: ./t\n  id: com.other.thumbnail\n  types: [dev.example.app.doc]\n", "quicklook_thumbnail.id"},
+		{"no types", "name: App\nid: dev.example.app\nquicklook_thumbnail:\n  main: ./t\n", "quicklook_thumbnail needs types or file_types"},
+		{"collides with preview", "name: App\nid: dev.example.app\nquicklook:\n  main: ./q\n  types: [dev.example.app.doc]\nquicklook_thumbnail:\n  main: ./t\n  id: dev.example.app.quicklook\n  types: [dev.example.app.doc]\n", "collides with the QuickLook preview"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeYAML(t, dir, tc.yaml)
+			if _, err := project.Load(dir); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Load error = %v, want substring %q", err, tc.want)
+			}
+		})
+	}
+}

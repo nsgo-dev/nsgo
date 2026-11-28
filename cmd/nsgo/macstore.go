@@ -78,8 +78,10 @@ func signMacStoreApp(ctx context.Context, p *project, app string) (string, error
 	if len(p.Widgets) > 0 && (p.Sign.MacOSProfile == "" || p.Sign.WidgetsProfile == "") {
 		return "", fmt.Errorf("sandboxed widgets need sign.macos_profile and sign.widgets_profile granting app group %s", p.appGroup())
 	}
-	if p.QuickLook != nil && p.Sign.MacOSProfile != "" && p.Sign.QuickLookProfile == "" {
-		return "", fmt.Errorf("sandboxed QuickLook extension %s needs sign.quicklook_profile", p.QuickLook.ID)
+	for _, ext := range p.quickLookExtensions() {
+		if p.Sign.MacOSProfile != "" && ext.profile == "" {
+			return "", fmt.Errorf("sandboxed QuickLook extension %s needs sign.%s", ext.ID, ext.profileKey)
+		}
 	}
 	if !p.Game && p.MacOSCategory() == "" {
 		detailIn(ctx, "set macos.category, which the Mac App Store requires, such as public.app-category.productivity")
@@ -94,10 +96,8 @@ func signMacStoreApp(ctx context.Context, p *project, app string) (string, error
 		if p.cloudEnabled() {
 			warnIn(ctx, "iCloud is left out: macOS grants it only with sign.macos_profile")
 		}
-		if p.QuickLook != nil {
-			if err := signMacQuickLook(ctx, p, macQuickLookAppex(app), "-"); err != nil {
-				return "", err
-			}
+		if err := signMacQuickLooks(ctx, p, app, "-"); err != nil {
+			return "", err
 		}
 	} else {
 		data, err := os.ReadFile(p.Sign.MacOSProfile)
@@ -137,8 +137,8 @@ func signMacStoreApp(ctx context.Context, p *project, app string) (string, error
 				return "", err
 			}
 		}
-		if p.QuickLook != nil {
-			if err := signMacStoreQuickLook(ctx, p, app, team); err != nil {
+		for _, ext := range p.quickLookExtensions() {
+			if err := signMacStoreQuickLook(ctx, ext, app, team); err != nil {
 				return "", err
 			}
 		}

@@ -119,6 +119,9 @@ type Config struct {
 	// QuickLook is the app's macOS QuickLook Preview Extension
 	// (com.apple.quicklook.preview), embedded in Contents/PlugIns.
 	QuickLook *QuickLook `yaml:"quicklook"`
+	// QuickLookThumbnail is the app's macOS QuickLook Thumbnail Extension
+	// (com.apple.quicklook.thumbnail), embedded in Contents/PlugIns.
+	QuickLookThumbnail *QuickLook `yaml:"quicklook_thumbnail"`
 	// Android is the Android target's configuration.
 	Android    AndroidConfig   `yaml:"android"`
 	Compliance StoreCompliance `yaml:"compliance"`
@@ -371,15 +374,19 @@ type AppClip struct {
 	Location      bool     `yaml:"location"`
 }
 
-// QuickLook is nsgo.yaml's quicklook section: a macOS QuickLook Preview
-// Extension (com.apple.quicklook.preview) embedded in Contents/PlugIns.
+// QuickLook is nsgo.yaml's quicklook and quicklook_thumbnail sections: a
+// macOS QuickLook Preview Extension (com.apple.quicklook.preview) or
+// Thumbnail Extension (com.apple.quicklook.thumbnail) embedded in
+// Contents/PlugIns.
 type QuickLook struct {
-	// Main is the Go main package path of the QuickLook preview extension,
-	// such as ./cmd/quicklook.
+	// Main is the Go main package path of the extension, such as
+	// ./cmd/quicklook.
 	Main string `yaml:"main"`
-	// ID is the extension's bundle identifier: <app id>.quicklook by default.
+	// ID is the extension's bundle identifier: <app id>.quicklook for the
+	// preview and <app id>.thumbnail for the thumbnail by default.
 	ID string `yaml:"id"`
-	// Types are the UTIs the extension previews (QLSupportedContentTypes).
+	// Types are the UTIs the extension previews or draws thumbnails of
+	// (QLSupportedContentTypes).
 	// When omitted, all UTIs declared in file_types are used.
 	Types []string `yaml:"types"`
 }
@@ -538,14 +545,16 @@ type Signing struct {
 	AssetPacksProfile string `yaml:"asset_packs_profile"`
 	ClipProfile       string `yaml:"clip_profile"`
 	QuickLookProfile  string `yaml:"quicklook_profile"`
-	MacOSProfile      string `yaml:"macos_profile"`
-	Installer         string `yaml:"installer"`
-	Keystore          string `yaml:"keystore"`
-	KeyAlias          string `yaml:"key_alias"`
-	Notarize          string `yaml:"notarize"`
-	Certificate       string `yaml:"certificate"`
-	SignCommand       string `yaml:"sign_command"`
-	TimestampURL      string `yaml:"timestamp_url"`
+	// QuickLookThumbnailProfile signs the Mac App Store QuickLook thumbnail extension.
+	QuickLookThumbnailProfile string `yaml:"quicklook_thumbnail_profile"`
+	MacOSProfile              string `yaml:"macos_profile"`
+	Installer                 string `yaml:"installer"`
+	Keystore                  string `yaml:"keystore"`
+	KeyAlias                  string `yaml:"key_alias"`
+	Notarize                  string `yaml:"notarize"`
+	Certificate               string `yaml:"certificate"`
+	SignCommand               string `yaml:"sign_command"`
+	TimestampURL              string `yaml:"timestamp_url"`
 }
 
 // BuildConfig is nsgo.yaml's build section.
@@ -750,7 +759,7 @@ func (c *Config) Validate() error {
 	}
 	for _, path := range []*string{
 		&c.Sign.Profile, &c.Sign.WatchProfile, &c.Sign.WidgetsProfile, &c.Sign.ShareProfile,
-		&c.Sign.AssetPacksProfile, &c.Sign.ClipProfile, &c.Sign.QuickLookProfile, &c.Sign.MacOSProfile,
+		&c.Sign.AssetPacksProfile, &c.Sign.ClipProfile, &c.Sign.QuickLookProfile, &c.Sign.QuickLookThumbnailProfile, &c.Sign.MacOSProfile,
 		&c.Sign.Keystore, &c.Sign.Certificate,
 	} {
 		if *path != "" {

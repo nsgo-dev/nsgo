@@ -29,3 +29,25 @@ func RunQuickLook(preview func(cx *core.Scope, path string) core.Node, o Options
 		Appearance: o.Appearance,
 	})
 }
+
+// RunQuickLookThumbnail runs a macOS QuickLook Thumbnail Extension drawing
+// thumbnail.
+func RunQuickLookThumbnail(thumbnail func(cx *core.Scope, path string, size core.Size) core.Node, o Options, h engine.HostOptions) {
+	macos.RunQuickLookThumbnail(func(req macos.QuickLookThumbnailRequest) (engine.App, engine.HostOptions) {
+		size := req.Size
+		host := core.NewHost()
+		host.SetParams(map[string]any{"path": req.Path, "url": req.URL, "width": float64(size.Width), "height": float64(size.Height), "scale": req.Scale})
+		ho := h
+		ho.Channel = host
+		ho.Settings = &engine.HostSettings{}
+		return func(cx *core.Scope) core.Node {
+			return thumbnail(cx, req.Path, size)
+		}, ho
+	}, macos.Options{
+		Title:      name,
+		ID:         id,
+		Components: o.Components,
+		Fonts:      o.Fonts,
+		Appearance: o.Appearance,
+	})
+}

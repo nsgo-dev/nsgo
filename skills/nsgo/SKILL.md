@@ -180,7 +180,7 @@ func main() { nsgo.Run(Root) }
 
 For sandboxed Mac App Store widgets, provide `sign.macos_profile` and a macOS `sign.widgets_profile` for the app and `<id>.widgets`, from the same team granting `apple.app_group` (default `group.<id>`). Both timelines and images use the shared container; `-installers=false` still signs the bundles. [Widgets](https://nsgo.dev/docs/widgets.md)
 
-For macOS QuickLook document previews, set `quicklook.main` in `nsgo.yaml` (defaulting `types` to `file_types` UTIs) and call `nsgo.RunQuickLook` in that main package; provisioned Mac App Store builds also take `sign.quicklook_profile`. [QuickLook previews](https://nsgo.dev/docs/building.md#quicklook-previews)
+For macOS QuickLook document previews, set `quicklook.main` in `nsgo.yaml` (defaulting `types` to `file_types` UTIs) and call `nsgo.RunQuickLook` in that main package; for Finder's thumbnails of them, set `quicklook_thumbnail.main` and call `nsgo.RunQuickLookThumbnail`. Provisioned Mac App Store builds also take `sign.quicklook_profile` and `sign.quicklook_thumbnail_profile`. [QuickLook previews](https://nsgo.dev/docs/building.md#quicklook-previews)
 
 ## App Clips
 

@@ -9,3 +9,7 @@ import (
 
 // RunQuickLook is a no-op outside macOS.
 func RunQuickLook(func(cx *core.Scope, path string) core.Node, Options, engine.HostOptions) {}
+
+// RunQuickLookThumbnail is a no-op outside macOS.
+func RunQuickLookThumbnail(func(cx *core.Scope, path string, size core.Size) core.Node, Options, engine.HostOptions) {
+}

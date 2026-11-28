@@ -654,10 +654,8 @@ func signUniversalAdHoc(ctx context.Context, p *project, app string) error {
 			return err
 		}
 	}
-	if appex := macQuickLookAppex(app); p.QuickLook != nil {
-		if err := signMacQuickLook(ctx, p, appex, "-"); err != nil {
-			return err
-		}
+	if err := signMacQuickLooks(ctx, p, app, "-"); err != nil {
+		return err
 	}
 	err := filepath.WalkDir(filepath.Join(app, "Contents"), func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil || entry.IsDir() || !strings.HasSuffix(path, ".dylib") {

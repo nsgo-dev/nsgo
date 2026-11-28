@@ -98,6 +98,77 @@ quicklook:
 	}
 }
 
+func TestBuildMacAppEmbedsQuickLookThumbnailExtension(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS .app bundle build needs darwin codesign")
+	}
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"go.mod": "module qlthumb\n\ngo 1.26\n",
+		"nsgo.yaml": `name: Scenra
+id: dev.example.scenra
+version: 1.2.3
+file_types:
+  - name: Scenra Scene
+    extensions: [scenra]
+quicklook_thumbnail:
+  main: ./cmd/thumbnail
+`,
+		"main.go":               "package main\nfunc main() {}\n",
+		"cmd/thumbnail/main.go": "package main\nfunc main() {}\n",
+	})
+	p, err := load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, err := buildMacApp(t.Context(), p, t.TempDir(), runtime.GOARCH)
+	if err != nil {
+		t.Fatalf("buildMacApp: %v", err)
+	}
+	if _, err := os.Stat(macQuickLookAppex(app)); !os.IsNotExist(err) {
+		t.Errorf("a thumbnail-only app has a preview extension: %v", err)
+	}
+	appex := macQuickLookThumbnailAppex(app)
+	if fi, err := os.Stat(filepath.Join(appex, "Contents", "MacOS", quickLookThumbnailExec)); err != nil || fi.IsDir() {
+		t.Fatalf("thumbnail executable missing: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(appex, "Contents", "Info.plist"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := decodePlist(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := v.(map[string]any)
+	if info["CFBundleIdentifier"] != "dev.example.scenra.thumbnail" || info["CFBundleExecutable"] != quickLookThumbnailExec {
+		t.Errorf("CFBundleIdentifier = %v, CFBundleExecutable = %v", info["CFBundleIdentifier"], info["CFBundleExecutable"])
+	}
+	ext, _ := info["NSExtension"].(map[string]any)
+	if ext["NSExtensionPointIdentifier"] != "com.apple.quicklook.thumbnail" || ext["NSExtensionPrincipalClass"] != quickLookThumbnailPrincipalClass {
+		t.Errorf("NSExtension = %#v", ext)
+	}
+	attrs, _ := ext["NSExtensionAttributes"].(map[string]any)
+	if types, _ := attrs["QLSupportedContentTypes"].([]any); !slices.Equal(types, []any{"dev.example.scenra.scenra"}) {
+		t.Errorf("QLSupportedContentTypes = %#v", types)
+	}
+	if attrs["QLThumbnailMinimumDimension"] != int64(0) {
+		t.Errorf("QLThumbnailMinimumDimension = %#v, want 0", attrs["QLThumbnailMinimumDimension"])
+	}
+	if _, ok := attrs["QLIsDataBasedPreview"]; ok {
+		t.Errorf("the thumbnail extension declares QLIsDataBasedPreview: %#v", attrs)
+	}
+	for _, bundle := range []string{appex, app} {
+		if err := run(t.Context(), "codesign", "--verify", "--strict", bundle); err != nil {
+			t.Fatalf("verify %s: %v", bundle, err)
+		}
+	}
+	ents, err := exec.Command("codesign", "-d", "--entitlements", ":-", appex).Output()
+	if err != nil || !strings.Contains(string(ents), "com.apple.security.app-sandbox") {
+		t.Errorf("thumbnail entitlements lack app-sandbox (%v):\n%s", err, ents)
+	}
+}
+
 func TestBuildMacUniversalEmbedsUniversalQuickLookExtension(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("macOS universal build needs darwin lipo and codesign")
@@ -115,9 +186,12 @@ file_types:
     extensions: [scenra]
 quicklook:
   main: ./cmd/quicklook
+quicklook_thumbnail:
+  main: ./cmd/thumbnail
 `,
 		"main.go":               "package main\nfunc main() {}\n",
 		"cmd/quicklook/main.go": "package main\nfunc main() {}\n",
+		"cmd/thumbnail/main.go": "package main\nfunc main() {}\n",
 	})
 	p, err := load(dir)
 	if err != nil {
@@ -129,17 +203,18 @@ quicklook:
 		t.Fatalf("buildMacUniversal: %v", err)
 	}
 	app := filepath.Join(outDir, "Scenra.app")
-	appex := macQuickLookAppex(app)
-	bin := filepath.Join(appex, "Contents", "MacOS", quickLookExec)
-	lipoOut, err := exec.Command("lipo", "-info", bin).Output()
-	if err != nil {
-		t.Fatalf("lipo -info: %v", err)
-	}
-	if !strings.Contains(string(lipoOut), "arm64") || !strings.Contains(string(lipoOut), "x86_64") {
-		t.Errorf("QuickLook binary is not universal: %s", lipoOut)
-	}
-	if err := run(t.Context(), "codesign", "--verify", "--strict", appex); err != nil {
-		t.Fatalf("verify universal appex signature: %v", err)
+	for appex, exe := range map[string]string{macQuickLookAppex(app): quickLookExec, macQuickLookThumbnailAppex(app): quickLookThumbnailExec} {
+		bin := filepath.Join(appex, "Contents", "MacOS", exe)
+		lipoOut, err := exec.Command("lipo", "-info", bin).Output()
+		if err != nil {
+			t.Fatalf("lipo -info: %v", err)
+		}
+		if !strings.Contains(string(lipoOut), "arm64") || !strings.Contains(string(lipoOut), "x86_64") {
+			t.Errorf("%s binary is not universal: %s", exe, lipoOut)
+		}
+		if err := run(t.Context(), "codesign", "--verify", "--strict", appex); err != nil {
+			t.Fatalf("verify universal %s signature: %v", exe, err)
+		}
 	}
 	if err := run(t.Context(), "codesign", "--verify", "--strict", app); err != nil {
 		t.Fatalf("verify universal host app signature: %v", err)
@@ -154,13 +229,16 @@ func TestSignMacAppSignsQuickLookBeforeBundle(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			app := filepath.Join(t.TempDir(), "Fixture.app")
-			appex := macQuickLookAppex(app)
-			if err := os.MkdirAll(filepath.Join(appex, "Contents"), 0o755); err != nil {
-				t.Fatal(err)
+			appex, thumbnail := macQuickLookAppex(app), macQuickLookThumbnailAppex(app)
+			for _, bundle := range []string{appex, thumbnail} {
+				if err := os.MkdirAll(filepath.Join(bundle, "Contents"), 0o755); err != nil {
+					t.Fatal(err)
+				}
 			}
 			p := &project{Config: projectcfg.Config{
-				ID:        "dev.example.fixture",
-				QuickLook: &projectcfg.QuickLook{Main: "./ql", ID: "dev.example.fixture.quicklook", Types: []string{"dev.example.fixture.doc"}},
+				ID:                 "dev.example.fixture",
+				QuickLook:          &projectcfg.QuickLook{Main: "./ql", ID: "dev.example.fixture.quicklook", Types: []string{"dev.example.fixture.doc"}},
+				QuickLookThumbnail: &projectcfg.QuickLook{Main: "./thumb", ID: "dev.example.fixture.thumbnail", Types: []string{"dev.example.fixture.doc"}},
 			}}
 			p.Sign.Identity = "Developer ID Application: Example (ABCDE12345)"
 			if notarize {
@@ -174,7 +252,7 @@ func TestSignMacAppSignsQuickLookBeforeBundle(t *testing.T) {
 				}
 				target := cmd.args[len(cmd.args)-1]
 				signed = append(signed, target)
-				if target == appex {
+				if target == appex || target == thumbnail {
 					i := slices.Index(cmd.args, "--entitlements")
 					if i < 0 {
 						t.Fatalf("QuickLook appex signed without entitlements: %q", cmd.args)
@@ -201,8 +279,8 @@ func TestSignMacAppSignsQuickLookBeforeBundle(t *testing.T) {
 			if err := signMacApp(ctx, p, app); err != nil {
 				t.Fatalf("signMacApp: %v", err)
 			}
-			if !slices.Equal(signed, []string{appex, app}) {
-				t.Fatalf("signed order = %v, want [%s %s]", signed, appex, app)
+			if !slices.Equal(signed, []string{appex, thumbnail, app}) {
+				t.Fatalf("signed order = %v, want [%s %s %s]", signed, appex, thumbnail, app)
 			}
 		})
 	}
@@ -211,20 +289,24 @@ func TestSignMacAppSignsQuickLookBeforeBundle(t *testing.T) {
 func TestMacStoreQuickLookProvisioning(t *testing.T) {
 	const team = "ABCDE12345"
 	for _, tc := range []struct {
-		name, qlID, qlTeam, wantError string
-		missingProfile                bool
+		name, qlID, qlTeam, thumbID, wantError string
+		missingProfile, missingThumbProfile    bool
 	}{
-		{"valid profile", "dev.example.app.quicklook", team, "", false},
-		{"missing profile", "dev.example.app.quicklook", team, "needs sign.quicklook_profile", true},
-		{"ID mismatch", "dev.example.other.quicklook", team, "not dev.example.app.quicklook", false},
-		{"team mismatch", "dev.example.app.quicklook", "ZZZZZ12345", "must belong", false},
+		{"valid profile", "dev.example.app.quicklook", team, "dev.example.app.thumbnail", "", false, false},
+		{"missing profile", "dev.example.app.quicklook", team, "dev.example.app.thumbnail", "needs sign.quicklook_profile", true, false},
+		{"missing thumbnail profile", "dev.example.app.quicklook", team, "dev.example.app.thumbnail", "needs sign.quicklook_thumbnail_profile", false, true},
+		{"ID mismatch", "dev.example.other.quicklook", team, "dev.example.app.thumbnail", "not dev.example.app.quicklook", false, false},
+		{"thumbnail ID mismatch", "dev.example.app.quicklook", team, "dev.example.app.quicklook", "sign.quicklook_thumbnail_profile is for", false, false},
+		{"team mismatch", "dev.example.app.quicklook", "ZZZZZ12345", "dev.example.app.thumbnail", "must belong", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			app := filepath.Join(dir, "Fixture.app")
-			appex := macQuickLookAppex(app)
-			if err := os.MkdirAll(filepath.Join(appex, "Contents"), 0o755); err != nil {
-				t.Fatal(err)
+			appex, thumbnail := macQuickLookAppex(app), macQuickLookThumbnailAppex(app)
+			for _, bundle := range []string{appex, thumbnail} {
+				if err := os.MkdirAll(filepath.Join(bundle, "Contents"), 0o755); err != nil {
+					t.Fatal(err)
+				}
 			}
 			cert := []byte("fixture certificate")
 			sum := sha1.Sum(cert)
@@ -239,8 +321,9 @@ func TestMacStoreQuickLookProvisioning(t *testing.T) {
 				})
 			}
 			p := &project{Config: projectcfg.Config{
-				ID:        "dev.example.app",
-				QuickLook: &projectcfg.QuickLook{Main: "./ql", ID: "dev.example.app.quicklook", Types: []string{"dev.example.app.doc"}},
+				ID:                 "dev.example.app",
+				QuickLook:          &projectcfg.QuickLook{Main: "./ql", ID: "dev.example.app.quicklook", Types: []string{"dev.example.app.doc"}},
+				QuickLookThumbnail: &projectcfg.QuickLook{Main: "./thumb", ID: "dev.example.app.thumbnail", Types: []string{"dev.example.app.doc"}},
 			}}
 			p.Updates.Channel = channelStore
 			p.Release = true
@@ -248,12 +331,20 @@ func TestMacStoreQuickLookProvisioning(t *testing.T) {
 			if !tc.missingProfile {
 				p.Sign.QuickLookProfile = filepath.Join(dir, "ql.profile")
 			}
+			if !tc.missingThumbProfile {
+				p.Sign.QuickLookThumbnailProfile = filepath.Join(dir, "thumb.profile")
+			}
 			p.Sign.Installer = "fixture installer"
 			if err := os.WriteFile(p.Sign.MacOSProfile, profile(p.ID, team), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			if !tc.missingProfile {
 				if err := os.WriteFile(p.Sign.QuickLookProfile, profile(tc.qlID, tc.qlTeam), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !tc.missingThumbProfile {
+				if err := os.WriteFile(p.Sign.QuickLookThumbnailProfile, profile(tc.thumbID, team), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -283,7 +374,7 @@ func TestMacStoreQuickLookProvisioning(t *testing.T) {
 					signed = append(signed, cmd.args[len(cmd.args)-1])
 					return nil, nil
 				case "productbuild":
-					if !slices.Equal(signed, []string{appex, app}) {
+					if !slices.Equal(signed, []string{appex, thumbnail, app}) {
 						t.Fatalf("packaged before extension/app signatures: %v", signed)
 					}
 					packaged = true
@@ -303,7 +394,7 @@ func TestMacStoreQuickLookProvisioning(t *testing.T) {
 			if err != nil || !packaged {
 				t.Fatalf("packaged=%v, error=%v", packaged, err)
 			}
-			for _, bundle := range []string{app, appex} {
+			for _, bundle := range []string{app, appex, thumbnail} {
 				if _, err := os.Stat(filepath.Join(bundle, "Contents", "embedded.provisionprofile")); err != nil {
 					t.Fatal(err)
 				}

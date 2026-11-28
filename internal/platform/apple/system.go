@@ -107,6 +107,12 @@ func runMain() {
 // withPool runs fn on one OS thread inside an autorelease pool, for
 // Objective-C calls off the main thread.
 func withPool(fn func()) {
+	WithPool(fn)
+}
+
+// WithPool runs fn on one OS thread inside an autorelease pool, for
+// Objective-C calls off the main thread.
+func WithPool(fn func()) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	pool := poolPush()

@@ -806,9 +806,10 @@ sign:
   # share_profile: assets/Share.mobileprovision      # signs the IPA's share extension
   # clip_profile: assets/Clip.mobileprovision        # signs the IPA's App Clip
   # quicklook_profile: assets/QuickLook.provisionprofile  # signs the Mac App Store QuickLook preview extension
+  # quicklook_thumbnail_profile: assets/Thumbnail.provisionprofile  # signs the Mac App Store QuickLook thumbnail extension
 ```
 
-The keystore's passwords come from `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD`. `-team` signs the iPhone's package. `-profile`, `-watch-profile`, `-widgets-profile`, `-share-profile`, `-clip-profile`, `-quicklook-profile` and `-macos-profile` replace the app's, the watch app's, the widget extension's, the share extension's, the App Clip's, the Mac App Store QuickLook extension's and the Mac App Store's provisioning profiles from the command line. `-installer` replaces the Mac Installer Distribution identity.
+The keystore's passwords come from `NSGO_KEYSTORE_PASSWORD` and `NSGO_KEY_PASSWORD`. `-team` signs the iPhone's package. `-profile`, `-watch-profile`, `-widgets-profile`, `-share-profile`, `-clip-profile`, `-quicklook-profile`, `-quicklook-thumbnail-profile` and `-macos-profile` replace the app's, the watch app's, the widget extension's, the share extension's, the App Clip's, the Mac App Store QuickLook preview and thumbnail extensions' and the Mac App Store's provisioning profiles from the command line. `-installer` replaces the Mac Installer Distribution identity.
 
 For `-target watchos`, `nsgo build` keeps the standalone `<name>.app` for `-run` device installs and writes `<name>.ipa` (copied to `dist/releases` as `<slug>-<version>-watchos.ipa`) containing Xcode's watch-only iOS stub (`ITSWatchOnlyContainer`), the nested watchOS app (`<id>.watchkitapp`) and `WatchKitSupport2/WK`. For App Store Connect, set `sign.profile` for `<id>` and `sign.watch_profile` for `<id>.watchkitapp` from the same team (or a single wildcard `sign.profile` covering both); the build validates both profiles and signs inside-out.
 
@@ -855,16 +856,22 @@ sign:
 
 ## QuickLook previews
 
-On macOS, `quicklook` embeds a QuickLook Preview Extension (`Contents/PlugIns/QuickLookPreview.appex`) so Finder previews the app's documents with an NSGo view:
+On macOS, `quicklook` embeds a QuickLook Preview Extension (`Contents/PlugIns/QuickLookPreview.appex`) so Finder previews the app's documents with an NSGo view, and `quicklook_thumbnail` a Thumbnail Extension (`Contents/PlugIns/QuickLookThumbnail.appex`) so Finder's icons, Cover Flow and Dock stacks show them drawn by NSGo; an app may have either or both:
 
 ```yaml
 quicklook:
   main: ./cmd/quicklook      # Go main package calling nsgo.RunQuickLook
   # id: dev.example.app.quicklook  # <id>.quicklook by default
   # types: [dev.example.app.doc]   # defaults to all UTIs declared in file_types
+quicklook_thumbnail:
+  main: ./cmd/thumbnail      # Go main package calling nsgo.RunQuickLookThumbnail
+  # id: dev.example.app.thumbnail  # <id>.thumbnail by default
+  # types: [dev.example.app.doc]   # defaults to all UTIs declared in file_types
 ```
 
-The entry package calls `nsgo.RunQuickLook(Preview)` (accepting `nsgo.WindowSize` for the preview's preferred content size, `nsgo.Fonts`, `nsgo.Appearance`, `nsgo.Component`, `nsgo.DataDir` and `nsgo.OnError`). `Preview` receives the selected file's path directly, and `"path"` and `"url"` are also available in `cx.HostParams()`. macOS runs the extension inside App Sandbox with read access granted only to the selected file URL. `build` signs the `.appex` with `com.apple.security.app-sandbox` before signing the app — ad hoc for local builds and `dev` (which registers it with `pluginkit -a`), with `sign.identity` and hardened runtime/timestamp when notarizing, and with `sign.quicklook_profile` (`-quicklook-profile`) from the same team for provisioned Mac App Store builds — and `macos_universal` joins its binary with `lipo`.
+The preview's entry package calls `nsgo.RunQuickLook(Preview)` (accepting `nsgo.WindowSize` for the preview's preferred content size, `nsgo.Fonts`, `nsgo.Appearance`, `nsgo.Component`, `nsgo.DataDir` and `nsgo.OnError`). `Preview` receives the selected file's path directly, and `"path"` and `"url"` are also available in `cx.HostParams()`. The thumbnail's entry package calls `nsgo.RunQuickLookThumbnail(Thumbnail)` (accepting `nsgo.Fonts`, `nsgo.Appearance`, `nsgo.Component`, `nsgo.DataDir` and `nsgo.OnError`). `Thumbnail` receives the file's path and the largest size in points Finder asks for, which its root fills; `"path"`, `"url"`, `"width"`, `"height"` and `"scale"` are also in `cx.HostParams()`. Each thumbnail renders in a window that never shows and is drawn off the screen at the request's scale, without what only the GPU draws: GPU and shader views, video, web pages, backdrop blur and glass. Finder asks for many at once; four render together, and one not drawn within ten seconds, or whose view draws nothing, fails, so Finder keeps the file's icon.
+
+macOS runs both extensions inside App Sandbox with read access granted only to the requested file URL. `build` signs each `.appex` with `com.apple.security.app-sandbox` before signing the app — ad hoc for local builds and `dev` (which registers it with `pluginkit -a`), with `sign.identity` and hardened runtime/timestamp when notarizing, and for provisioned Mac App Store builds with `sign.quicklook_profile` (`-quicklook-profile`) for the preview and `sign.quicklook_thumbnail_profile` (`-quicklook-thumbnail-profile`) for the thumbnail, from the same team — and `macos_universal` joins their binaries with `lipo`.
 
 ## Android App Links
 

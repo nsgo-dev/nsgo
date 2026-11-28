@@ -27,7 +27,7 @@ type macDevBundle struct {
 func (b *macDevBundle) build(ctx context.Context, p *project, dir, arch string) (inPlace bool, err error) {
 	bundleInputs := macBundleInputs(p)
 	app := filepath.Join(dir, p.Name+".app")
-	if len(p.Commands) == 0 && p.QuickLook == nil &&
+	if len(p.Commands) == 0 && len(p.quickLookExtensions()) == 0 &&
 		b.dir == dir && b.name == p.Name && b.id == p.ID && b.arch == arch &&
 		b.bundleInputs == bundleInputs &&
 		macAppBundleReady(app, p.Name) {
@@ -50,8 +50,8 @@ func (b *macDevBundle) build(ctx context.Context, p *project, dir, arch string) 
 			return false, err
 		}
 	}
-	if p.QuickLook != nil {
-		if err := run(ctx, "pluginkit", "-a", macQuickLookAppex(builtApp)); err != nil {
+	for _, ext := range p.quickLookExtensions() {
+		if err := run(ctx, "pluginkit", "-a", ext.appex(builtApp)); err != nil {
 			*b = macDevBundle{}
 			return false, err
 		}

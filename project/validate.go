@@ -554,21 +554,35 @@ func (c *Config) validateAppClip() error {
 }
 
 func (c *Config) validateQuickLook() error {
-	ql := c.QuickLook
+	if err := c.validateQuickLookExtension(c.QuickLook, "quicklook", "quicklook"); err != nil {
+		return err
+	}
+	if err := c.validateQuickLookExtension(c.QuickLookThumbnail, "quicklook_thumbnail", "thumbnail"); err != nil {
+		return err
+	}
+	if c.QuickLook != nil && c.QuickLookThumbnail != nil && c.QuickLook.ID == c.QuickLookThumbnail.ID {
+		return fmt.Errorf("quicklook_thumbnail.id %q collides with the QuickLook preview extension's bundle ID", c.QuickLookThumbnail.ID)
+	}
+	return nil
+}
+
+// validateQuickLookExtension checks the QuickLook extension of nsgo.yaml's
+// key, whose bundle ID is <app id>.<suffix> by default.
+func (c *Config) validateQuickLookExtension(ql *QuickLook, key, suffix string) error {
 	if ql == nil {
 		return nil
 	}
 	if ql.Main == "" || strings.HasPrefix(ql.Main, "-") || strings.Contains(ql.Main, "...") || strings.ContainsAny(ql.Main, " \t\r\n") {
-		return fmt.Errorf("quicklook.main %q is not one Go package's path", ql.Main)
+		return fmt.Errorf("%s.main %q is not one Go package's path", key, ql.Main)
 	}
 	if ql.ID == "" {
-		ql.ID = c.ID + ".quicklook"
+		ql.ID = c.ID + "." + suffix
 	}
 	if !strings.HasPrefix(ql.ID, c.ID+".") || !utiPattern.MatchString(ql.ID) {
-		return fmt.Errorf("quicklook.id %q is not under the app's ID, as %s.quicklook", ql.ID, c.ID)
+		return fmt.Errorf("%s.id %q is not under the app's ID, as %s.%s", key, ql.ID, c.ID, suffix)
 	}
 	if len(c.Widgets) > 0 && ql.ID == c.ID+".widgets" {
-		return fmt.Errorf("quicklook.id %q collides with the widget extension's bundle ID", ql.ID)
+		return fmt.Errorf("%s.id %q collides with the widget extension's bundle ID", key, ql.ID)
 	}
 	if len(ql.Types) == 0 {
 		for _, f := range c.FileTypes {
@@ -576,15 +590,15 @@ func (c *Config) validateQuickLook() error {
 		}
 	}
 	if len(ql.Types) == 0 {
-		return fmt.Errorf("quicklook needs types or file_types")
+		return fmt.Errorf("%s needs types or file_types", key)
 	}
 	seen := make(map[string]bool, len(ql.Types))
 	for i, uti := range ql.Types {
 		if !utiPattern.MatchString(uti) {
-			return fmt.Errorf("quicklook.types[%d]: %q is not a uniform type identifier, as %s.doc", i, uti, c.ID)
+			return fmt.Errorf("%s.types[%d]: %q is not a uniform type identifier, as %s.doc", key, i, uti, c.ID)
 		}
 		if seen[uti] {
-			return fmt.Errorf("quicklook.types[%d]: the type %q is listed twice", i, uti)
+			return fmt.Errorf("%s.types[%d]: the type %q is listed twice", key, i, uti)
 		}
 		seen[uti] = true
 	}
