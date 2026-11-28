@@ -715,6 +715,14 @@ func (t *Tree) syncContent(n *node) bool {
 		}
 	case n.scroll != nil:
 		c := Size{Width: Points(l.Size.Width + l.ScrollWidth()), Height: Points(l.Size.Height + l.ScrollHeight())}
+		if n.scroll.config.Zooms() && n.scroll.config.CenterContent && !n.hidden {
+			c = Size{}
+			for _, child := range n.flatChildren() {
+				bounds := child.lstate.Rounded.ScrollableBounds(child.Style())
+				c.Width = max(c.Width, Points(bounds.Right+l.Padding.Right+l.Border.Right))
+				c.Height = max(c.Height, Points(bounds.Bottom+l.Padding.Bottom+l.Border.Bottom))
+			}
+		}
 		if end := Points(l.ScrollableOverflow.Bottom); c != n.scroll.content || end != n.scroll.contentEnd {
 			n.scroll.content, n.scroll.contentEnd = c, end
 			t.mark(n)

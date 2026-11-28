@@ -186,6 +186,11 @@ type Layout struct {
 	Margin        Rect[float32]
 }
 
+// ScrollableBounds is the child's box and visible overflow reachable from a scroll container.
+func (l *Layout) ScrollableBounds(style *Style) Rect[float32] {
+	return scrollableOverflowContribution(l.Location, l.Size, l.ScrollableOverflow, style.Overflow, style.Contain, true)
+}
+
 // ContentBoxSize is the size inside the padding and border.
 func (l *Layout) ContentBoxSize() Size[float32] {
 	return Size[float32]{

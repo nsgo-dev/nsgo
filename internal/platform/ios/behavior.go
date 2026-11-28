@@ -333,6 +333,9 @@ func (s *surface) pullBackResizedScrolls() {
 			(objc.Send[bool](n, sel("respondsToSelector:"), sel("isZoomAnimating")) && objc.Send[bool](n, sel("isZoomAnimating"))) {
 			continue
 		}
+		if v.sc.zoom != 0 {
+			v.layoutZoom()
+		}
 		_, end := scrollLimits(n)
 		at := objc.Send[apple.CGPoint](n, selContentOffset)
 		if to := (apple.CGPoint{X: min(at.X, end.X), Y: min(at.Y, end.Y)}); to != at {

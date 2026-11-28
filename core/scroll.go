@@ -56,7 +56,7 @@ type scrollSpec struct {
 }
 
 // fittedContent returns the content size scroll view n sends under config c.
-// Layout's is at least the view's, but platforms scroll a content's insets
+// Ordinary scroll layout is at least the view's, but platforms scroll content insets
 // with it, so content that fits between a vertical view's insets stops at
 // them, or the view would scroll with nothing to show.
 func (n *node) fittedContent(c *driver.ScrollConfig) Size {

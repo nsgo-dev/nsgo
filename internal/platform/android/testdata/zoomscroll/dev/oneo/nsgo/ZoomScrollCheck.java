@@ -88,6 +88,7 @@ public final class ZoomScrollCheck {
     }
 
     public static void main(String[] args) {
+        imageBoundsAndCancelledDrag();
         Context ctx = new Context();
         FrameLayout parent = new FrameLayout(ctx);
         Recorder host = new Recorder();
@@ -258,5 +259,32 @@ public final class ZoomScrollCheck {
         scroll.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 100, 150, 1500));
         scroll.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_UP, 100, 150, 1520));
         check(content.downs == downsBefore + 1 && content.ups == upsBefore + 1, "noScroll blocked child press");
+    }
+
+    static void imageBoundsAndCancelledDrag() {
+        Context ctx = new Context();
+        Recorder host = new Recorder();
+        View content = new View(ctx);
+        content.setSize(180, 600);
+        Scrolling.ZoomScroll scroll = new Scrolling.ZoomScroll(ctx, host, 1f, content);
+        scroll.addView(content);
+        scroll.setSize(300, 600);
+        Scrolling.Config config = new Scrolling.Config();
+        config.minZoom = config.zoom = 1;
+        config.maxZoom = 4;
+        config.centerContent = true;
+        scroll.configure(config);
+        scroll.zoomTo(2, false, 0, 0, false);
+        scroll.scrollToPoints(1000, 1000, false);
+        check(scroll.getScrollX() == 60 && scroll.getScrollY() == 600, "zoom included space outside the image");
+        scroll.scrollToPoints(0, 0, false);
+        host.events.clear();
+        scroll.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 100, 300, 3000));
+        scroll.onTouchEvent(new MotionEvent(MotionEvent.ACTION_MOVE, 100, 260, 3016));
+        scroll.onTouchEvent(new MotionEvent(MotionEvent.ACTION_MOVE, 100, 180, 3032));
+        scroll.onTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 100, 100, 3048));
+        int y = scroll.getScrollY();
+        for (int i = 0; i < 12; i++) scroll.computeScroll();
+        check(scroll.getScrollY() == y && count(host.events, Protocol.EVENT_MOMENTUM_START) == 0, "a cancelled drag started a fling");
     }
 }

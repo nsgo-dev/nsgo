@@ -1267,7 +1267,9 @@ final class Scrolling {
                     if (dragging) {
                         dragging = false;
                         event(Protocol.EVENT_SCROLL_DRAG_END);
-                        flinger.fling(getScrollX(), getScrollY(), -Math.round(vx), -Math.round(vy), 0, maxX(), 0, maxY());
+                        if (e.getActionMasked() == MotionEvent.ACTION_UP) {
+                            flinger.fling(getScrollX(), getScrollY(), -Math.round(vx), -Math.round(vy), 0, maxX(), 0, maxY());
+                        }
                         if (!flinger.isFinished()) {
                             momentum = true;
                             event(Protocol.EVENT_MOMENTUM_START);
