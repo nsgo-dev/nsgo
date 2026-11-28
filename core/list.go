@@ -680,7 +680,8 @@ func (t *Tree) updateList(v *node) bool {
 	by, to, re := st.followPin(anchor)
 	anchor += by
 	if re {
-		retarget = &to
+		// The new target is in the sizes just measured, so the anchoring scroll is already in it: sent too, it would move the target by as much, since a scroll by joins a scroll to sent in the same batch (emitScrollBy).
+		retarget, anchor = &to, 0
 	}
 
 	// Scroll commands, now that sizes are known: the window follows a

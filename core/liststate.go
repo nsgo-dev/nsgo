@@ -535,10 +535,9 @@ func (s *listState) movedTo(at Points, settled bool) {
 	}
 }
 
-// followPin is how a pinned list follows its target after measurements:
-// by is a scroll to add to the anchoring one, to an animated scroll's
-// new target. The pin ends once the list is there and every item in the
-// viewport is measured.
+// followPin is how a pinned list follows its target after measurements: by is a scroll to add to the anchoring one, to an animated scroll's new target, which replaces the anchoring scroll. The pin ends once the list is there and every item in the viewport is measured.
+//
+// An animated scroll is sent its target again whenever the list anchors, even when the target is where it was: the platform eases to an absolute offset, and a scroll by on the way lands only where the platform carries the ease along with it. Sent as a new target, the anchoring is in the offset the ease ends at on every platform (#2719).
 func (s *listState) followPin(anchored Points) (by Points, to Points, retarget bool) {
 	p := s.pin
 	if p == nil || s.viewport <= 0 {
@@ -546,8 +545,7 @@ func (s *listState) followPin(anchored Points) (by Points, to Points, retarget b
 	}
 	target := s.targetOffset(p)
 	if p.animating {
-		p.at += anchored
-		if abs32(target-p.at) > pinSlack {
+		if anchored != 0 || abs32(target-p.at) > pinSlack {
 			p.at = target
 			return 0, target, true
 		}
