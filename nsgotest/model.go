@@ -42,9 +42,10 @@ type View struct {
 	Content driver.Size  // a scroll view's content
 	Offset  driver.Point // and its offset
 	// Applied counts the ItemScrollTo and ItemScrollBy items the scroll
-	// view applied, which its reports carry; Sticky are its sticky
-	// cells.
+	// view applied, which its reports carry, and Scrolls are those
+	// items, oldest first; Sticky are its sticky cells.
 	Applied uint32
+	Scrolls []ScrollCommand
 	Sticky  []StickyCell
 	// Scroll is a scroll view's configuration, and ZoomScale its zoom
 	// (0 until it zooms).
@@ -208,6 +209,14 @@ func (a *App) CanvasScale(selector string) float32 {
 type NativeCommand struct {
 	Name string
 	Args any
+}
+
+// ScrollCommand is a scroll an app asked a scroll view for: to Point, or
+// by it when By, animated or not.
+type ScrollCommand struct {
+	Point    driver.Point
+	By       bool
+	Animated bool
 }
 
 // WebCommandKind identifies an action recorded in View.WebCommands.
@@ -896,6 +905,7 @@ func (a *App) apply(b *driver.MountBatch) {
 				a.syncInputContent(v)
 			}
 			v.Applied++
+			v.Scrolls = append(v.Scrolls, ScrollCommand{Point: it.Point, By: it.Kind == driver.ItemScrollBy, Animated: it.Animated})
 			if it.Kind == driver.ItemScrollBy {
 				v.Offset.X += it.Point.X
 				v.Offset.Y += it.Point.Y
