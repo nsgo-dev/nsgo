@@ -61,7 +61,7 @@ func (g *gallery) languageSelect(cx *core.Scope) core.Node {
 					Active: &core.Style{Background: colors.Pressed()}}
 			},
 			Children: []core.Node{
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}, Children: []core.Node{name}},
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, Children: []core.Node{name}},
 				ui.Icon(lucide.ChevronDown, 14, colors.Faint),
 			}},
 		Children: items}

@@ -21,7 +21,7 @@ func bigRows(t *testing.T, ref *Ref) *host {
 				}
 				cells[j] = v
 			}
-			rows[i] = View{Style: Style{Height: Pt(50), FlexShrink: 0}, TestID: "row " + strconv.Itoa(i), Children: cells}
+			rows[i] = View{Style: Style{Height: Pt(50), FlexShrink: NoShrink}, TestID: "row " + strconv.Itoa(i), Children: cells}
 		}
 		beside := make([]Node, 40)
 		for i := range beside {

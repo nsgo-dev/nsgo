@@ -153,7 +153,7 @@ func (tr Tree) Render(cx *core.Scope) core.Node {
 		chevron := base.Button{Label: tr.ToggleLabel, NoFocus: true, Expanded: item.Expanded,
 			AccessibilityElementsHidden: func() bool { return !item.Branch() },
 			OnPress:                     func(core.PressEvent) { r.Toggle() },
-			Style: core.Style{Width: core.Pt(iconSize), Height: core.Pt(iconSize), FlexShrink: 0, CornerRadius: RadiusSmall,
+			Style: core.Style{Width: core.Pt(iconSize), Height: core.Pt(iconSize), FlexShrink: core.NoShrink, CornerRadius: RadiusSmall,
 				AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 			StyleFunc: func() core.Style {
 				s := core.Style{Color: colors.Muted()}

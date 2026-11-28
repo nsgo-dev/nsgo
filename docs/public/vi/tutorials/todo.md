@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Lưu tệp và ứng dụng sẽ khởi động lại. Gõ một việc cần l�
 
 **Cập nhật thay thế slice.** `items.Update` trả về một slice mới, nên danh tính của danh sách và khóa của các hàng quyết định những gì còn lại trên màn hình. `nextID` cấp cho mỗi việc cần làm một ID, và `Key` của `core.List` dùng ID đó; nếu không có khóa ổn định, các hàng sẽ dùng lại ô của chúng cho những mục khác.
 
-**Màn hình là một cây các hộp.** `Root` trả về một `core.View` có padding, khoảng cách (gap) và phần lề của vùng an toàn. `FlexGrow: 1` và `FlexShrink: 1` khiến nó lấp đầy cửa sổ và không hơn, nên một danh sách dài sẽ cuộn bên trong nó thay vì kéo giãn nó ra ngoài mép cửa sổ. Hàng nhập liệu đặt `Direction: core.Row`; mọi thứ khác là cột mặc định.
+**Màn hình là một cây các hộp.** `Root` trả về một `core.View` có padding, khoảng cách (gap) và phần lề của vùng an toàn. `FlexGrow: 1` và `FlexShrink: core.Shrink(1)` khiến nó lấp đầy cửa sổ và không hơn, nên một danh sách dài sẽ cuộn bên trong nó thay vì kéo giãn nó ra ngoài mép cửa sổ. Hàng nhập liệu đặt `Direction: core.Row`; mọi thứ khác là cột mặc định.
 
 **Ô nhập liệu được kiểm soát.** `draft.Get` là giá trị của trường và `draft.Set` nhận mỗi thay đổi. `OnSubmit` thêm một việc khi nhấn Return, và `add` xóa bản nháp, nên trường tự làm trống.
 

@@ -32,7 +32,7 @@ func specimenRow(cx *core.Scope, lbl, codeText string, first bool, children ...c
 	if !first {
 		s.Padding, s.Borders = core.Edges{Top: 12}, core.Edges{Top: 1}
 	}
-	head := []core.Node{core.Text{Content: lbl, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)}}
+	head := []core.Node{core.Text{Content: lbl, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)}}
 	if codeText != "" {
 		head = append(head, core.Text{Content: codeText, MaxLines: 1, Style: core.Style{FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Faint)})
 	}

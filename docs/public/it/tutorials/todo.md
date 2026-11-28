@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Salva il file e l'app si riavvia. Scrivi un'attività, premi **Add** e spuntala.
 
 **Gli aggiornamenti sostituiscono la slice.** `items.Update` restituisce una nuova slice, quindi sono l'identità della lista e le chiavi delle righe a decidere cosa resta sullo schermo. `nextID` assegna un ID a ogni attività, e il `Key` di `core.List` lo usa; senza una chiave stabile, le righe riutilizzerebbero le proprie celle per altri elementi.
 
-**Lo schermo è un albero di riquadri.** `Root` restituisce una `core.View` con padding, una spaziatura e i margini dell'area sicura. `FlexGrow: 1` e `FlexShrink: 1` le fanno riempire la finestra e niente di più, così una lista lunga scorre al suo interno invece di allungarla oltre il bordo della finestra. La riga dell'input imposta `Direction: core.Row`; tutto il resto è la colonna predefinita.
+**Lo schermo è un albero di riquadri.** `Root` restituisce una `core.View` con padding, una spaziatura e i margini dell'area sicura. `FlexGrow: 1` e `FlexShrink: core.Shrink(1)` le fanno riempire la finestra e niente di più, così una lista lunga scorre al suo interno invece di allungarla oltre il bordo della finestra. La riga dell'input imposta `Direction: core.Row`; tutto il resto è la colonna predefinita.
 
 **L'input è controllato.** `draft.Get` è il valore del campo e `draft.Set` riceve ogni modifica. `OnSubmit` aggiunge un'attività quando si preme Invio, e `add` svuota la bozza, così il campo si svuota da solo.
 

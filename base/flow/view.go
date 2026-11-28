@@ -228,7 +228,7 @@ func (v *view) diagram(cx *core.Scope, items *core.Memo[[]nodeItem]) core.Node {
 	return core.View{Role: core.RoleGroup, LabelFunc: label, PointerEvents: core.PointerEventsBoxNone,
 		StyleFunc: func() core.Style {
 			v.laidOut.Get()
-			s := core.Style{Width: core.Pt(core.Points(v.result.width)), Height: core.Pt(core.Points(v.result.height)), FlexShrink: 0}
+			s := core.Style{Width: core.Pt(core.Points(v.result.width)), Height: core.Pt(core.Points(v.result.height)), FlexShrink: core.NoShrink}
 			if !v.ready.Get() {
 				s.Opacity = core.Alpha(0)
 			}

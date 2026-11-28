@@ -107,14 +107,14 @@ func Root(cx *core.Scope) core.Node {
 		}
 		return ui.NavPage(cx, base.NavPage{
 			TitleFunc: func() string { return find(id).title() },
-			Children: []core.Node{core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(16)}, Children: []core.Node{
+			Children: []core.Node{core.View{Style: core.Style{FlexGrow: 1, Padding: core.All(16)}, Children: []core.Node{
 				ui.Input{
 					Multiline:   true,
 					Value:       func() string { return find(id).Text },
 					OnChange:    func(text string) { edit(id, text) },
 					Placeholder: "Write something",
 					TestID:      "editor",
-					Style:       core.Style{FlexGrow: 1, FlexShrink: 1},
+					Style:       core.Style{FlexGrow: 1},
 				},
 			}}},
 		}, ui.NavHeader{

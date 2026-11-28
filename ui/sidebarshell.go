@@ -189,12 +189,12 @@ func (s SidebarShell) Render(cx *core.Scope) core.Node {
 		clearOfSides(FillRest, func() core.EnvEdges { return core.EnvEdges{Left: core.EnvSafeArea} }, core.View{Style: FillRest, Children: s.Sidebar}),
 	}
 	if s.SidebarFooter != nil {
-		sidebar = append(sidebar, clearOfSides(core.Style{FlexShrink: 0}, func() core.EnvEdges { return core.EnvEdges{Left: core.EnvSafeArea} },
+		sidebar = append(sidebar, clearOfSides(core.Style{FlexShrink: core.NoShrink}, func() core.EnvEdges { return core.EnvEdges{Left: core.EnvSafeArea} },
 			core.View{TestID: "sidebar-footer", Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 4, Padding: core.All(8)}, Children: s.SidebarFooter}))
 	}
 	// The slot narrows over the sidebar, which keeps its width.
 	slot := core.View{TestID: "sidebar-slot", StyleFunc: func() core.Style {
-		return core.Style{Width: core.Pt(width() * reveal()), FlexShrink: 0, Overflow: core.Hidden}
+		return core.Style{Width: core.Pt(width() * reveal()), FlexShrink: core.NoShrink, Overflow: core.Hidden}
 	}, Children: []core.Node{core.View{TestID: "sidebar-panel", Disabled: closed, Children: sidebar, StyleFunc: func() core.Style {
 		st := core.Style{Width: core.Pt(width()), Height: core.Pct(100), MinHeight: core.Pt(0)}
 		if !shown.Get() {
@@ -208,7 +208,7 @@ func (s SidebarShell) Render(cx *core.Scope) core.Node {
 		right, rightHandle = s.rightPanel(cx)
 	}
 	head := []core.Node{core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8,
-		FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Height: core.Pct(100), Overflow: core.Hidden}, Children: s.Header}}
+		FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Height: core.Pct(100), Overflow: core.Hidden}, Children: s.Header}}
 	headerFill := colors.Background
 	if inset {
 		headerFill = func() core.Color { return 0 }
@@ -510,11 +510,11 @@ func (s SidebarShell) rightPanel(cx *core.Scope) (panel, handle core.Node) {
 		if s.rightOpen() {
 			w = width()
 		}
-		return core.Style{Width: core.Pt(w), FlexShrink: 0, Height: core.Pct(100), AlignItems: core.AlignEnd, Overflow: core.Hidden}
+		return core.Style{Width: core.Pt(w), FlexShrink: core.NoShrink, Height: core.Pct(100), AlignItems: core.AlignEnd, Overflow: core.Hidden}
 	}, Children: []core.Node{core.Show{When: shown.Get, Then: func(cx *core.Scope) core.Node {
 		head := []core.Node{shellHeader(cx, "right-header", func() core.Points { return 0 }, false, func() core.Color { return 0 }, s.RightHeader)}
 		return core.View{TestID: "right-panel", Disabled: closed, StyleFunc: func() core.Style {
-			return core.Style{Width: core.Pt(width()), FlexShrink: 0, Height: core.Pct(100), MinHeight: core.Pt(0), Background: Alpha(colors.Background(), 0.8), Color: colors.Text()}
+			return core.Style{Width: core.Pt(width()), FlexShrink: core.NoShrink, Height: core.Pct(100), MinHeight: core.Pt(0), Background: Alpha(colors.Background(), 0.8), Color: colors.Text()}
 		}, Children: append(head, clearOfSides(FillRest, func() core.EnvEdges { return core.EnvEdges{Right: core.EnvSafeArea} }, core.View{Style: FillRest, Children: s.Right}))}
 	}}}}
 	handle = core.View{TestID: "right-resize", Disabled: closed, StyleFunc: func() core.Style {

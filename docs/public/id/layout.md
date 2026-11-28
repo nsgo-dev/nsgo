@@ -7,7 +7,7 @@ order: 51
 
 ## Kotak
 
-Setiap elemen adalah sebuah kotak yang ditata oleh mesin tata letak. Nilai default-nya mengikuti React Native: flexbox kolom, anak mempertahankan ukurannya kecuali jika tumbuh atau menyusut, item diregangkan melintasi sumbu silang (*cross axis*), dan ukuran sudah mencakup padding serta border.
+Setiap elemen adalah sebuah kotak yang ditata oleh mesin tata letak. Nilai default-nya sebagian besar mengikuti React Native: flexbox kolom, anak mempertahankan ukurannya kecuali jika tumbuh atau menyusut, item diregangkan melintasi sumbu silang (*cross axis*), tanpa ukuran minimum otomatis, dan ukuran sudah mencakup padding serta border. Berbeda dengan React Native, kotak yang tumbuh juga menyusut, begitu pula scroll view dan kotak di sekitarnya.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Ukuran
 
-`Width`, `Height`, `MinWidth`, `MaxWidth`, dan `FlexBasis` menerima `core.Pt` untuk satuan poin atau `core.Pct` untuk persentase dari induknya. `FlexGrow` membagi ruang kosong dan `FlexShrink` membiarkan kotak menyusut saat ruang sempit; kotak tanpa keduanya mempertahankan ukurannya. `AspectRatio` adalah lebar dibagi tinggi. `AutoMargin` mengambil ruang kosong pada sisi yang disebutkannya, sehingga satu sisi dapat mendorong kotak ke sisi lain.
+`Width`, `Height`, `MinWidth`, `MaxWidth`, dan `FlexBasis` menerima `core.Pt` untuk satuan poin atau `core.Pct` untuk persentase dari induknya. `FlexGrow` membagi ruang kosong dan `FlexShrink` mengembalikan sebagian saat ruang tidak cukup. Jika tidak diatur, `FlexShrink` bernilai 1 untuk kotak yang tumbuh, untuk `core.Scroll` atau `core.List` di sepanjang sumbu gulirnya, dan untuk setiap kotak di sekitarnya yang tidak mengatur ukuran pada sumbu itu, serta 0 untuk sisanya, termasuk konten `core.Scroll`; `core.Shrink(n)` mengatur faktornya dan `core.NoShrink` menahan kotak pada ukurannya. `AspectRatio` adalah lebar dibagi tinggi. `AutoMargin` mengambil ruang kosong pada sisi yang disebutkannya, sehingga satu sisi dapat mendorong kotak ke sisi lain.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-Konten kotak menentukan ukurannya sampai lebar atau tinggi menyatakan sebaliknya. `core.MinContent`, `core.MaxContent`, dan `core.FitContent` mengambil ukuran sebagaimana definisi CSS: lebar min-content sebuah teks adalah kata terlebarnya. Teks di dalam baris hanya menyusut dan membungkus baris (*wrap*) jika memiliki `FlexShrink: 1`; tambahkan `FlexGrow: 1` bila teks harus mengambil sisa ruang yang ada. Nilai minimum yang tidak diatur sudah bernilai 0, seperti di React Native, sehingga `MinWidth: core.Pt(0)` tidak mengubah apa pun dan teks yang menyusut akan memutus kata ketika baris lebih sempit daripada kata terlebarnya. `MinWidth: core.AutoMinimum` menahannya pada kata terlebarnya, sebagaimana nilai minimum otomatis pada CSS.
+Konten kotak menentukan ukurannya sampai lebar atau tinggi menyatakan sebaliknya. `core.MinContent`, `core.MaxContent`, dan `core.FitContent` mengambil ukuran sebagaimana definisi CSS: lebar min-content sebuah teks adalah kata terlebarnya. Teks di dalam baris menyusut dan membungkus baris (*wrap*) jika mengatur `FlexGrow: 1` atau `FlexShrink: core.Shrink(1)`; nilai minimum yang tidak diatur sudah bernilai 0, seperti di React Native, sehingga `MinWidth: core.Pt(0)` tidak mengubah apa pun dan teks yang menyusut akan memutus kata ketika baris lebih sempit daripada kata terlebarnya. `MinWidth: core.AutoMinimum` menahannya pada kata terlebarnya, sebagaimana nilai minimum otomatis pada CSS.
 
-Layar yang memenuhi jendela menggunakan `FlexGrow: 1` dan `FlexShrink: 1`, begitu pula setiap kotak di antara layar tersebut dan daftar atau scroll view yang harus menggulir. Dengan `FlexGrow` saja, sebuah kotak akan membesar mengikuti kontennya, sehingga daftar yang panjang akan meregangkannya melewati jendela alih-alih menggulir.
+Jadi, daftar atau scroll view tetap menggulir sedalam apa pun letaknya, tanpa perlu mengatur apa pun pada kotak di sekitarnya, sementara header, tab, dan toolbar di sebelahnya mempertahankan ukurannya. Layar yang memenuhi jendela menggunakan `FlexGrow: 1`.
 
 ## Grid
 

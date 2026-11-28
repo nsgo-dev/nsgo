@@ -729,7 +729,7 @@ func (c *carouselCtl) runway(i int) core.Node {
 	return core.View{PointerEvents: core.PointerEventsNone, AccessibilityElementsHidden: func() bool { return true },
 		OnLayout: func(b core.Bounds) { c.placeRunway(i, b) },
 		StyleFunc: func() core.Style {
-			s := core.Style{FlexGrow: 0, FlexShrink: 0}
+			s := core.Style{FlexGrow: 0, FlexShrink: core.NoShrink}
 			r := c.track.Get().runway
 			switch {
 			case r <= 0:

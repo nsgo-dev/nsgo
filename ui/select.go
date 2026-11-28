@@ -76,7 +76,7 @@ func optionRow[T comparable](cx *core.Scope, o Option[T], id string) core.Node {
 	if o.Leading != nil {
 		children = append(children, o.Leading)
 	}
-	children = append(children, core.Text{ContentFunc: o.label, MaxLines: 1, Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: 1}), StyleFunc: Colored(colors.Text)})
+	children = append(children, core.Text{ContentFunc: o.label, MaxLines: 1, Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}), StyleFunc: Colored(colors.Text)})
 	if o.Trailing != nil {
 		children = append(children, o.Trailing)
 	}

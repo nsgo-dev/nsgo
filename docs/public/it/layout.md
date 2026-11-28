@@ -7,7 +7,7 @@ order: 51
 
 ## Riquadri
 
-Ogni elemento è un riquadro disposto dal motore. I valori predefiniti sono quelli di React Native: un flexbox a colonna, figli che mantengono le proprie dimensioni a meno che non crescano o si restringano, elementi allungati lungo l'asse trasversale e dimensioni che includono padding e bordi.
+Ogni elemento è un riquadro disposto dal motore. I valori predefiniti sono per lo più quelli di React Native: un flexbox a colonna, figli che mantengono le proprie dimensioni a meno che non crescano o si restringano, elementi allungati lungo l'asse trasversale, nessuna dimensione minima automatica e dimensioni che includono padding e bordi. A differenza di React Native, un riquadro che cresce si restringe anche, come le viste a scorrimento e i riquadri che le contengono.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Dimensioni
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` e `FlexBasis` accettano `core.Pt` per i punti o `core.Pct` per una percentuale del genitore. `FlexGrow` ripartisce lo spazio libero e `FlexShrink` permette a un riquadro di cederne una parte; un riquadro senza nessuno dei due mantiene le proprie dimensioni. `AspectRatio` è la larghezza divisa per l'altezza. `AutoMargin` prende lo spazio libero sui lati che indica, così un lato spinge il riquadro verso l'altro.
+`Width`, `Height`, `MinWidth`, `MaxWidth` e `FlexBasis` accettano `core.Pt` per i punti o `core.Pct` per una percentuale del genitore. `FlexGrow` ripartisce lo spazio libero e `FlexShrink` ne restituisce una parte quando è troppo poco. Se non impostato, `FlexShrink` vale 1 per un riquadro che cresce, per un `core.Scroll` o una `core.List` lungo il proprio asse di scorrimento e per ogni riquadro che li contiene senza impostare una dimensione su quell'asse, e 0 per il resto, compreso il contenuto di un `core.Scroll`; `core.Shrink(n)` imposta un fattore e `core.NoShrink` mantiene un riquadro alle sue dimensioni. `AspectRatio` è la larghezza divisa per l'altezza. `AutoMargin` prende lo spazio libero sui lati che indica, così un lato spinge il riquadro verso l'altro.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-È il contenuto di un riquadro a determinarne le dimensioni, finché una larghezza o un'altezza non dice altrimenti. `core.MinContent`, `core.MaxContent` e `core.FitContent` corrispondono alle dimensioni definite dal CSS: la larghezza min-content di un testo è la sua parola più larga. Un testo all'interno di una riga si restringe e va a capo solo con `FlexShrink: 1`; aggiungi `FlexGrow: 1` quando deve occupare lo spazio rimanente. Un minimo non impostato vale già 0, come in React Native, quindi `MinWidth: core.Pt(0)` non cambia nulla e un testo che si restringe spezza le parole quando la riga è più stretta della sua parola più larga. `MinWidth: core.AutoMinimum` lo ferma alla sua parola più larga, come fa il minimo automatico del CSS.
+È il contenuto di un riquadro a determinarne le dimensioni, finché una larghezza o un'altezza non dice altrimenti. `core.MinContent`, `core.MaxContent` e `core.FitContent` corrispondono alle dimensioni definite dal CSS: la larghezza min-content di un testo è la sua parola più larga. Un testo all'interno di una riga si restringe e va a capo quando imposta `FlexGrow: 1` o `FlexShrink: core.Shrink(1)`; un minimo non impostato vale già 0, come in React Native, quindi `MinWidth: core.Pt(0)` non cambia nulla e un testo che si restringe spezza le parole quando la riga è più stretta della sua parola più larga. `MinWidth: core.AutoMinimum` lo ferma alla sua parola più larga, come fa il minimo automatico del CSS.
 
-Una schermata che riempie la finestra usa `FlexGrow: 1` e `FlexShrink: 1`, così come ogni riquadro tra essa e una lista o una vista a scorrimento che deve scorrere. Con il solo `FlexGrow`, un riquadro cresce fino al suo contenuto, per cui una lista lunga lo allunga oltre la finestra invece di scorrere.
+Così una lista o una vista a scorrimento scorre a qualunque profondità si trovi, senza nulla da impostare sui riquadri che la contengono, mentre intestazioni, schede e barre degli strumenti accanto a essa mantengono le proprie dimensioni. Una schermata che riempie la finestra usa `FlexGrow: 1`.
 
 ## Grid
 

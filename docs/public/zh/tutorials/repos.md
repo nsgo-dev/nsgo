@@ -83,7 +83,7 @@ func Root(cx *core.Scope) core.Node {
 	colors := ui.ColorsOf(cx)
 
 	return core.View{
-		Style:     core.Style{FlexGrow: 1, FlexShrink: 1, PaddingEnv: core.EnvAll(core.EnvSafeArea)},
+		Style:     core.Style{FlexGrow: 1, PaddingEnv: core.EnvAll(core.EnvSafeArea)},
 		StyleFunc: func() core.Style { return core.Style{Background: colors.Background()} },
 		Children: []core.Node{
 			core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, Padding: core.All(16)}, Children: []core.Node{

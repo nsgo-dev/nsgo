@@ -258,7 +258,7 @@ func menusDemo(cx *core.Scope) core.Node {
 										}
 										return ui.Icon(lucide.Type, 16, colors.Muted)
 									}),
-									core.Text{ContentFunc: func() string { return file().name }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
+									core.Text{ContentFunc: func() string { return file().name }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 									ui.Menu{Align: core.AlignEnd, Label: tr.MenusActionsFor() + core.Untracked(cx, file).name,
 										Face: core.View{Tooltip: core.Text{Content: tr.MenusMoreActions()}, HitSlop: core.All(8),
 											Style:    core.Style{Padding: core.Symmetric(0, 8), Height: core.Pt(28), JustifyContent: core.JustifyCenter, Active: &core.Style{Opacity: core.Alpha(0.5)}},

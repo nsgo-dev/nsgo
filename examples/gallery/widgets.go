@@ -383,7 +383,7 @@ func widgetsDemo(cx *core.Scope) core.Node {
 					}
 					return ui.Icon(lucide.Check, 14, colors.Up)
 				}),
-				core.Text{ContentFunc: status.Get, TestID: "widgets-status", Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 12}, StyleFunc: ui.Colored(colors.Muted)},
+				core.Text{ContentFunc: status.Get, TestID: "widgets-status", Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 12}, StyleFunc: ui.Colored(colors.Muted)},
 			}},
 			ui.Text(tr.WidgetsHowToAdd(), 12, ui.Regular, colors.Faint),
 		}}
@@ -408,7 +408,7 @@ func widgetsDemo(cx *core.Scope) core.Node {
 		rows := make([]core.Node, len(families))
 		for i, f := range families {
 			rows[i] = Row{First: i == 0, Children: []core.Node{
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 					core.View{Style: core.Style{Direction: core.Row, Gap: 6, AlignItems: core.AlignCenter}, Children: []core.Node{
 						ui.Text(f.kind, 13, ui.Medium, colors.Text), Code{Text: f.family},
 					}},

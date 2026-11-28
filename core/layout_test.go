@@ -568,16 +568,16 @@ func TestColumnFitsHeightAtItsItemsUsedWidth(t *testing.T) {
 	}
 }
 
-// TestATextShrinksInARowWithFlexShrink is the Sizes section of layout.md (#308): a text in a row shrinks below its one-line width and wraps only with FlexShrink, an unset minimum being 0 already, so MinWidth: Pt(0) alone leaves it overflowing the row. With an unset minimum it shrinks into less than its widest word and breaks its words; AutoMinimum stops it at its widest word, as CSS's automatic minimum does.
+// TestATextShrinksInARowWithFlexShrink is the Sizes section of layout.md (#308): a growing text in a row shrinks below its one-line width and wraps by default, an unset minimum being 0 already. With FlexShrink: NoShrink it keeps its one-line width and overflows; AutoMinimum stops it at its widest word, as CSS's automatic minimum does.
 func TestATextShrinksInARowWithFlexShrink(t *testing.T) {
 	for _, c := range []struct {
 		name  string
 		style Style
 		want  Size
 	}{
-		{"FlexShrink", Style{FlexGrow: 1, FlexShrink: 1}, Size{Width: 20, Height: 96}},
-		{"MinWidth 0 alone", Style{FlexGrow: 1, MinWidth: Pt(0)}, Size{Width: 114, Height: 12}},
-		{"AutoMinimum", Style{FlexGrow: 1, FlexShrink: 1, MinWidth: AutoMinimum}, Size{Width: 24, Height: 48}},
+		{"default", Style{FlexGrow: 1}, Size{Width: 20, Height: 96}},
+		{"NoShrink", Style{FlexGrow: 1, FlexShrink: NoShrink}, Size{Width: 114, Height: 12}},
+		{"AutoMinimum", Style{FlexGrow: 1, MinWidth: AutoMinimum}, Size{Width: 24, Height: 48}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
@@ -592,4 +592,253 @@ func TestATextShrinksInARowWithFlexShrink(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNestedScrollAndListShrinkInsidePlainAndGrowingViews(t *testing.T) {
+	t.Run("scroll inside plain and FlexGrow wrappers leaves sibling headers intact", func(t *testing.T) {
+		h := newHost(t, Size{Width: 300, Height: 400}, func(cx *Scope) Node {
+			return View{Children: []Node{
+				// No FlexShrink: NoShrink needed on header or footer.
+				View{TestID: "header", Style: Style{Padding: Symmetric(10, 0)}, Children: []Node{
+					View{TestID: "tabs", Style: Style{Height: Pt(36)}},
+				}},
+				View{TestID: "outer", Style: Style{FlexGrow: 1}, Children: []Node{
+					View{TestID: "inner", Children: []Node{
+						Scroll{TestID: "scroll", Style: Style{FlexGrow: 1}, Children: []Node{
+							View{Style: Style{Height: Pt(1200)}},
+						}},
+					}},
+				}},
+				View{TestID: "footer", Style: Style{Height: Pt(44)}},
+			}}
+		})
+		h.commit()
+		if got := h.find("header").frame.Size.Height; got != 56 {
+			t.Fatalf("header height = %v, want 56", got)
+		}
+		if got := h.find("tabs").frame.Size.Height; got != 36 {
+			t.Fatalf("tabs height = %v, want 36", got)
+		}
+		if got := h.find("footer").frame.Size.Height; got != 44 {
+			t.Fatalf("footer height = %v, want 44", got)
+		}
+		s := h.find("scroll")
+		if got := s.frame.Size.Height; got != 300 {
+			t.Fatalf("scroll viewport height = %v, want 300", got)
+		}
+		if got := s.scroll.content.Height; got != 1200 {
+			t.Fatalf("scroll content height = %v, want 1200", got)
+		}
+	})
+
+	t.Run("plain View wrapper without FlexGrow shrinks around Scroll", func(t *testing.T) {
+		h := newHost(t, Size{Width: 300, Height: 400}, func(cx *Scope) Node {
+			return View{Children: []Node{
+				View{TestID: "header", Style: Style{Height: Pt(50)}},
+				View{TestID: "wrap1", Children: []Node{
+					View{TestID: "wrap2", Children: []Node{
+						Scroll{TestID: "scroll", Children: []Node{
+							View{Style: Style{Height: Pt(1200)}},
+						}},
+					}},
+				}},
+			}}
+		})
+		h.commit()
+		if got := h.find("header").frame.Size.Height; got != 50 {
+			t.Fatalf("header height = %v, want 50", got)
+		}
+		s := h.find("scroll")
+		if got := s.frame.Size.Height; got != 350 {
+			t.Fatalf("scroll viewport height = %v, want 350", got)
+		}
+		if got := s.scroll.content.Height; got != 1200 {
+			t.Fatalf("scroll content height = %v, want 1200", got)
+		}
+	})
+
+	t.Run("list inside FlexGrow wrapper keeps unshrunk sibling tabs and footer", func(t *testing.T) {
+		h := newHost(t, Size{Width: 300, Height: 240}, func(cx *Scope) Node {
+			return View{Style: Style{FlexGrow: 1}, Children: []Node{
+				View{TestID: "head", Style: Style{Padding: Symmetric(4, 0)}, Children: []Node{
+					View{TestID: "bar", Style: Style{Height: Pt(32)}},
+				}},
+				View{Style: Style{FlexGrow: 1}, Children: []Node{
+					List{
+						TestID:        "list",
+						Count:         func() int { return 100 },
+						EstimatedSize: 40,
+						Style:         Style{FlexGrow: 1},
+						Row: func(cx *Scope, r ListRow) Node {
+							return View{Style: Style{Height: Pt(40)}}
+						},
+					},
+				}},
+				View{TestID: "footer", Style: Style{Height: Pt(40)}},
+			}}
+		})
+		h.commit()
+		if got := h.find("head").frame.Size.Height; got != 40 {
+			t.Fatalf("head height = %v, want 40", got)
+		}
+		if got := h.find("bar").frame.Size.Height; got != 32 {
+			t.Fatalf("bar height = %v, want 32", got)
+		}
+		l := h.find("list")
+		if got := l.frame.Size.Height; got != 160 {
+			t.Fatalf("list viewport height = %v, want 160", got)
+		}
+		if got := l.scroll.content.Height; got != 4000 {
+			t.Fatalf("list content height = %v, want 4000", got)
+		}
+		if got := h.find("footer").frame.Origin.Y; got != 200 {
+			t.Fatalf("footer y = %v, want 200", got)
+		}
+	})
+
+	t.Run("scroll axis does not cause cross-axis shrinking in Row or Column", func(t *testing.T) {
+		h := newHost(t, Size{Width: 400, Height: 300}, func(cx *Scope) Node {
+			return View{Style: Style{Direction: Row}, Children: []Node{
+				// Fixed-width sidebar containing a vertical Scroll stays 200pt wide.
+				View{TestID: "sidebar", Style: Style{Width: Pt(200)}, Children: []Node{
+					Scroll{TestID: "side-scroll", Children: []Node{View{Style: Style{Height: Pt(900)}}}},
+				}},
+				// Main column with a horizontal Scroll bar above a vertical Scroll.
+				View{Style: Style{FlexGrow: 1}, Children: []Node{
+					Scroll{TestID: "chips", Horizontal: true, Style: Style{Height: Pt(36)}, Children: []Node{
+						View{Style: Style{Width: Pt(800), Height: Pt(36)}},
+					}},
+					Scroll{TestID: "main-scroll", Children: []Node{View{Style: Style{Width: Pt(800), Height: Pt(900)}}}},
+				}},
+			}}
+		})
+		h.commit()
+		if got := h.find("sidebar").frame.Size.Width; got != 200 {
+			t.Fatalf("sidebar width = %v, want 200", got)
+		}
+		if got := h.find("side-scroll").frame.Size.Height; got != 300 {
+			t.Fatalf("side-scroll height = %v, want 300", got)
+		}
+		if got := h.find("chips").frame.Size.Height; got != 36 {
+			t.Fatalf("chips height = %v, want 36", got)
+		}
+		if got := h.find("main-scroll").frame.Size.Height; got != 264 {
+			t.Fatalf("main-scroll height = %v, want 264", got)
+		}
+	})
+
+	t.Run("dynamic Scroll mount inside plain wrapper updates ancestor shrink", func(t *testing.T) {
+		var show *Signal[bool]
+		h := newHost(t, Size{Width: 300, Height: 200}, func(cx *Scope) Node {
+			show = NewSignal(cx, false)
+			return View{Children: []Node{
+				View{TestID: "head", Style: Style{Height: Pt(40)}},
+				View{TestID: "wrap", Children: []Node{
+					Show{When: show.Get, Then: func(*Scope) Node {
+						return Scroll{TestID: "scroll", Children: []Node{View{Style: Style{Height: Pt(800)}}}}
+					}},
+				}},
+			}}
+		})
+		h.commit()
+		show.Set(true)
+		h.commit()
+		if got := h.find("head").frame.Size.Height; got != 40 {
+			t.Fatalf("head height = %v, want 40", got)
+		}
+		if got := h.find("scroll").frame.Size.Height; got != 160 {
+			t.Fatalf("scroll height = %v, want 160", got)
+		}
+		if got := h.find("scroll").scroll.content.Height; got != 800 {
+			t.Fatalf("scroll content height = %v, want 800", got)
+		}
+	})
+
+	t.Run("direct children of Scroll keep natural size unless opting in to shrink", func(t *testing.T) {
+		h := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+			return Scroll{TestID: "scroll", Style: Style{Height: Pt(100)}, Children: []Node{
+				View{TestID: "a", Style: Style{Height: Pt(80)}},
+				View{TestID: "b", Style: Style{Height: Pt(80), FlexGrow: 1}},
+			}}
+		})
+		h.commit()
+		if got := h.find("a").frame.Size.Height; got != 80 {
+			t.Fatalf("child a height = %v, want 80", got)
+		}
+		if got := h.find("b").frame.Size.Height; got != 80 {
+			t.Fatalf("child b height = %v, want 80", got)
+		}
+		if got := h.find("scroll").scroll.content.Height; got != 160 {
+			t.Fatalf("scroll content height = %v, want 160", got)
+		}
+
+		h2 := newHost(t, Size{Width: 200, Height: 100}, func(cx *Scope) Node {
+			return Scroll{TestID: "scroll", Style: Style{Height: Pt(100)}, Children: []Node{
+				View{TestID: "a", Style: Style{Height: Pt(80), FlexShrink: Shrink(1)}},
+				View{TestID: "b", Style: Style{Height: Pt(80), FlexShrink: Shrink(1)}},
+			}}
+		})
+		h2.commit()
+		if got := h2.find("a").frame.Size.Height; got != 50 {
+			t.Fatalf("explicitly shrinking child height = %v, want 50", got)
+		}
+	})
+
+	t.Run("FlexShrink merge and style NoShrink on Scroll", func(t *testing.T) {
+		if (FlexShrink{}).IsSet() || (FlexShrink{}).Value() != 0 || !NoShrink.IsSet() || NoShrink.Value() != 0 || Shrink(-2) != NoShrink || Shrink(2).Value() != 2 {
+			t.Fatalf("unexpected FlexShrink values")
+		}
+		if got := (Style{FlexShrink: NoShrink}).Merge(Style{Width: Pt(10)}).FlexShrink; got != NoShrink {
+			t.Fatalf("unset FlexShrink overwrote NoShrink: %+v", got)
+		}
+		if got := (Style{FlexShrink: Shrink(1)}).Merge(Style{FlexShrink: NoShrink}).FlexShrink; got != NoShrink {
+			t.Fatalf("NoShrink did not override Shrink(1): %+v", got)
+		}
+		if got := (Style{FlexShrink: NoShrink}).Merge(Style{FlexShrink: Shrink(1)}).FlexShrink; got != Shrink(1) {
+			t.Fatalf("Shrink(1) did not override NoShrink: %+v", got)
+		}
+		h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+			return View{Style: Style{Height: Pt(100)}, Children: []Node{
+				Scroll{TestID: "by-style", Style: Style{Height: Pt(60), FlexShrink: NoShrink}, Children: []Node{View{Style: Style{Height: Pt(200)}}}},
+				View{TestID: "sibling", Style: Style{Height: Pt(80), FlexShrink: Shrink(1)}},
+			}}
+		})
+		h.commit()
+		if got := h.find("by-style").frame.Size.Height; got != 60 {
+			t.Fatalf("by-style height = %v, want 60", got)
+		}
+		if got := h.find("sibling").frame.Size.Height; got != 40 {
+			t.Fatalf("sibling height = %v, want 40", got)
+		}
+	})
+
+	t.Run("Holder reparenting between Scroll and View updates default shrink", func(t *testing.T) {
+		var inScroll *Signal[bool]
+		h := newHost(t, Size{Width: 100, Height: 100}, func(cx *Scope) Node {
+			inScroll = NewSignal(cx, true)
+			held := NewHolder(cx, func(*Scope) Node {
+				return View{TestID: "held", Style: Style{Height: Pt(160), FlexGrow: 1}}
+			})
+			return View{Style: Style{Height: Pt(100)}, Children: []Node{
+				Show{
+					When: inScroll.Get,
+					Then: func(*Scope) Node {
+						return Scroll{TestID: "scroll", Style: Style{Height: Pt(100)}, Children: []Node{held.Place()}}
+					},
+					Else: func(*Scope) Node {
+						return View{TestID: "box", Style: Style{Height: Pt(100)}, Children: []Node{held.Place()}}
+					},
+				},
+			}}
+		})
+		h.commit()
+		if got := h.find("held").frame.Size.Height; got != 160 {
+			t.Fatalf("in Scroll: held height = %v, want 160", got)
+		}
+		inScroll.Set(false)
+		h.commit()
+		if got := h.find("held").frame.Size.Height; got != 100 {
+			t.Fatalf("in View: held height = %v, want 100", got)
+		}
+	})
 }

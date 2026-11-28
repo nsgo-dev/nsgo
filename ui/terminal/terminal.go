@@ -81,7 +81,7 @@ func keyBarStyle(cx *core.Scope) core.Style {
 		BorderColors: core.EdgeColors{Top: colors.Line()},
 		Background:   colors.Raised(),
 		Padding:      core.Symmetric(6, 6),
-		FlexShrink:   0,
+		FlexShrink:   core.NoShrink,
 	}
 }
 

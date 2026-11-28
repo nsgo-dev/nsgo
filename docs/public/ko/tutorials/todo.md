@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ func Root(cx *core.Scope) core.Node {
 
 **업데이트는 슬라이스를 교체합니다.** `items.Update`는 새 슬라이스를 반환하므로 리스트의 식별성과 행 키가 화면에 무엇이 유지될지를 결정합니다. `nextID`는 각 할 일에 ID를 부여하고 `core.List`의 `Key`가 이를 사용합니다. 안정적인 키가 없으면 행이 다른 항목에 대해 기존 셀을 재사용하게 됩니다.
 
-**화면은 상자들의 트리입니다.** `Root`는 패딩, 간격(gap), 안전 영역(safe area) 인셋이 지정된 `core.View`를 반환합니다. `FlexGrow: 1`과 `FlexShrink: 1`은 뷰가 창을 넘치지 않고 딱 맞게 채우도록 하므로, 긴 리스트가 창 가장자리를 넘어 늘어나지 않고 내부에서 스크롤됩니다. 입력 행은 `Direction: core.Row`를 설정하며, 그 외의 모든 요소는 기본값인 세로 방향(column)입니다.
+**화면은 상자들의 트리입니다.** `Root`는 패딩, 간격(gap), 안전 영역(safe area) 인셋이 지정된 `core.View`를 반환합니다. `FlexGrow: 1`과 `FlexShrink: core.Shrink(1)`은 뷰가 창을 넘치지 않고 딱 맞게 채우도록 하므로, 긴 리스트가 창 가장자리를 넘어 늘어나지 않고 내부에서 스크롤됩니다. 입력 행은 `Direction: core.Row`를 설정하며, 그 외의 모든 요소는 기본값인 세로 방향(column)입니다.
 
 **입력 필드는 제어(controlled) 모드입니다.** `draft.Get`이 필드의 값이며 `draft.Set`이 각 변경 사항을 수신합니다. Return 키를 누르면 `OnSubmit`이 할 일을 추가하고, `add`가 `draft`를 비우므로 입력 필드가 자동으로 비워집니다.
 

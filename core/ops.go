@@ -139,6 +139,7 @@ func (t *Tree) place(c, p, at *node) {
 		addChild(p, c)
 	}
 	c.parent = p
+	dropLayoutStyles(c)
 	t.childrenChanged(p)
 	// It inherits from its new parent, and brings its marks.
 	t.carry(c)
@@ -310,11 +311,10 @@ func (t *Tree) setText(cx *Scope, n *node, v Text) {
 // setScroll sets scroll view n's parts from v, reading its functions
 // once.
 func (t *Tree) setScroll(n *node, v Scroll) {
-	defaults := scrollDefaults
+	base := v.Style
 	if v.NoShrink {
-		defaults.FlexShrink = 0
+		base = Style{FlexShrink: NoShrink}.Merge(base)
 	}
-	base := defaults.Merge(v.Style)
 	if v.StyleFunc != nil {
 		base = base.Merge(v.StyleFunc())
 	}

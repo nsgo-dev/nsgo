@@ -29,7 +29,7 @@ type CommandDialog struct {
 func (d CommandDialog) Render(cx *core.Scope) core.Node {
 	c := d.Command
 	c.AutoFocus = true
-	c.Style = core.Style{FlexGrow: 1, FlexShrink: 1, Height: core.Pt(440)}.Merge(c.Style)
+	c.Style = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Height: core.Pt(440)}.Merge(c.Style)
 	cancel := c.OnCancel
 	c.OnCancel = func() {
 		if d.OnOpenChange != nil {

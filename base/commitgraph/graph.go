@@ -78,7 +78,7 @@ func (g Graph) Render(cx *core.Scope) core.Node {
 		}
 		return locales.CollapseMerge(cx)
 	}
-	return core.View{Class: g.Class, Style: core.Style{Height: core.Pt(height), FlexShrink: 0, Overflow: core.Hidden}.Merge(g.Style),
+	return core.View{Class: g.Class, Style: core.Style{Height: core.Pt(height), FlexShrink: core.NoShrink, Overflow: core.Hidden}.Merge(g.Style),
 		StyleFunc: func() core.Style {
 			s := core.Style{Width: core.Pt(core.Points(max(item().Row.Columns-1, 0))*lane + 2*inset)}
 			if g.StyleFunc != nil {

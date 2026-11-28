@@ -48,12 +48,12 @@ func TestStyleKeysSetTheirFields(t *testing.T) {
 		`{position: "sticky"}`:                           func(s core.Style) bool { return s.Position == core.Sticky },
 		`{flexDirection: "row-reverse"}`:                 func(s core.Style) bool { return s.Direction == core.RowReverse },
 		`{flexWrap: "wrap-reverse"}`:                     func(s core.Style) bool { return s.Wrap == core.WrapReverse },
-		`{flex: 2}`:                                      func(s core.Style) bool { return s.FlexGrow == 2 && s.FlexShrink == 1 && s.FlexBasis == core.Pt(0) },
-		`{flex: "none"}`:                                 func(s core.Style) bool { return s.FlexGrow == 0 && s.FlexShrink == 0 && s.FlexBasis == core.Length{} },
-		`{flex: "auto"}`:                                 func(s core.Style) bool { return s.FlexGrow == 1 && s.FlexShrink == 1 },
-		`{flex: "initial"}`:                              func(s core.Style) bool { return s.FlexGrow == 0 && s.FlexShrink == 1 },
-		`{flex: "2 3 10px"}`:                             func(s core.Style) bool { return s.FlexGrow == 2 && s.FlexShrink == 3 && s.FlexBasis == core.Pt(10) },
-		`{flexGrow: 2, flexShrink: 3, flexBasis: "50%"}`: func(s core.Style) bool { return s.FlexGrow == 2 && s.FlexShrink == 3 && s.FlexBasis == core.Pct(50) },
+		`{flex: 2}`:                                      func(s core.Style) bool { return s.FlexGrow == 2 && s.FlexShrink == core.Shrink(1) && s.FlexBasis == core.Pt(0) },
+		`{flex: "none"}`:                                 func(s core.Style) bool { return s.FlexGrow == 0 && s.FlexShrink == core.NoShrink && s.FlexBasis == core.Length{} },
+		`{flex: "auto"}`:                                 func(s core.Style) bool { return s.FlexGrow == 1 && s.FlexShrink == core.Shrink(1) },
+		`{flex: "initial"}`:                              func(s core.Style) bool { return s.FlexGrow == 0 && s.FlexShrink == core.Shrink(1) },
+		`{flex: "2 3 10px"}`:                             func(s core.Style) bool { return s.FlexGrow == 2 && s.FlexShrink == core.Shrink(3) && s.FlexBasis == core.Pt(10) },
+		`{flexGrow: 2, flexShrink: 3, flexBasis: "50%"}`: func(s core.Style) bool { return s.FlexGrow == 2 && s.FlexShrink == core.Shrink(3) && s.FlexBasis == core.Pct(50) },
 		`{alignSelf: "center", alignContent: "center", justifyItems: "center", justifySelf: "center"}`: func(s core.Style) bool {
 			return s.AlignSelf != 0 && s.AlignSelf == s.AlignContent && s.JustifyItems == s.JustifySelf && s.AlignSelf == s.JustifySelf
 		},

@@ -426,7 +426,7 @@ func (g *calendarGrid) keys(changed func(DateValue)) core.Node {
 }
 
 // grow shares a row equally.
-var calendarGrow = core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0)}
+var calendarGrow = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0)}
 
 var calendarRow = core.Style{Direction: core.Row}
 

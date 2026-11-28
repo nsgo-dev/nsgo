@@ -235,7 +235,7 @@ func touchPad(cx *core.Scope) core.Node {
 				}
 				rows = append(rows, core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignBaseline, Gap: 8}, Children: []core.Node{
 					core.Text{Content: e.name, Style: core.Style{Width: core.Pt(52), FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(n)},
-					core.Text{Content: e.text, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(c)},
+					core.Text{Content: e.text, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(c)},
 				}})
 			}
 			return core.Group(rows)
@@ -482,7 +482,7 @@ func accessibleRows(cx *core.Scope) core.Node {
 					}
 					return IconTile{Icon: it.icon, Size: 34}
 				}),
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 1}, Children: []core.Node{ui.Text(it.label, 13, ui.Regular, colors.Text), ui.Text(it.hint, 12, ui.Regular, colors.Muted)}},
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 1}, Children: []core.Node{ui.Text(it.label, 13, ui.Regular, colors.Text), ui.Text(it.hint, 12, ui.Regular, colors.Muted)}},
 				core.Text{Content: "button", Style: core.Style{FontSize: 11, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Faint)},
 			}}}})
 	}

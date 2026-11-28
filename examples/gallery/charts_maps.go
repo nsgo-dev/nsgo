@@ -838,7 +838,7 @@ func watchlistCard(cx *core.Scope) core.Node {
 				tone := func() core.Color { return upDown(change()).Color(cx) }
 				return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, Height: core.Pt(watchRow), Borders: core.Edges{Bottom: 1}},
 					StyleFunc: func() core.Style { return core.Style{BorderColors: core.EdgeColors{Bottom: colors.Line()}} }, Children: []core.Node{
-						core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+						core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 							core.Text{ContentFunc: func() string { return w().symbol }, Style: core.Style{FontSize: 13, FontWeight: ui.Semibold, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Text)},
 							core.Text{ContentFunc: func() string { return w().name }, Style: core.Style{NumberOfLines: 1, FontSize: 11.5}, StyleFunc: ui.Colored(colors.Faint)},
 						}},

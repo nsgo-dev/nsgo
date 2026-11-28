@@ -31,7 +31,7 @@ func TestPressAtFindsZoomedScrollContent(t *testing.T) {
 			app := nsgotest.Start(t, func(*core.Scope) core.Node {
 				var bands []core.Node
 				for index := range 3 {
-					bands = append(bands, core.View{TestID: []string{"first", "middle", "last"}[index], Style: core.Style{Width: core.Pt(120), Height: core.Pt(80), FlexShrink: 0, Background: core.RGB([]uint32{0xffff00, 0x00ffff, 0xff00ff}[index])}, OnPress: func(core.PressEvent) { pressed = index }})
+					bands = append(bands, core.View{TestID: []string{"first", "middle", "last"}[index], Style: core.Style{Width: core.Pt(120), Height: core.Pt(80), FlexShrink: core.NoShrink, Background: core.RGB([]uint32{0xffff00, 0x00ffff, 0xff00ff}[index])}, OnPress: func(core.PressEvent) { pressed = index }})
 				}
 				direction := core.Column
 				if c.horizontal {

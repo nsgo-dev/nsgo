@@ -133,7 +133,7 @@ func (i MenuItem) Render(cx *core.Scope) core.Node {
 	if i.TextFunc != nil {
 		text = ""
 	}
-	children = append(children, core.Text{Content: text, ContentFunc: i.TextFunc, MaxLines: 1, Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: 1}),
+	children = append(children, core.Text{Content: text, ContentFunc: i.TextFunc, MaxLines: 1, Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}),
 		StyleFunc: Colored(fg)})
 	if i.Shortcut != "" && !base.OnSheet(cx) {
 		children = append(children, core.Text{Content: cx.KeyLabel(i.Shortcut), MaxLines: 1,
@@ -192,7 +192,7 @@ func menuLeading(cx *core.Scope, icon func() *core.SVG, checked func() bool) []c
 	size := menuIconSize(cx)
 	var out []core.Node
 	if checked != nil {
-		out = append(out, core.View{Style: core.Style{FlexShrink: 0}, StyleFunc: func() core.Style {
+		out = append(out, core.View{Style: core.Style{FlexShrink: core.NoShrink}, StyleFunc: func() core.Style {
 			if !checked() {
 				return core.Style{Opacity: core.Alpha(0)}
 			}

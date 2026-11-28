@@ -215,7 +215,7 @@ func (spec View) Render(cx *core.Scope) core.Node {
 		Children: []core.Node{content}}
 	children := append([]core.Node{v.pointerLayer(plane)}, spec.Children...)
 	return core.View{Role: core.RoleGroup, Label: spec.Label, LabelFunc: spec.LabelFunc, Class: spec.Class, TestID: spec.TestID,
-		Style:     core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), MinHeight: core.Pt(0), Overflow: core.Hidden}.Merge(spec.Style),
+		Style:     core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), MinHeight: core.Pt(0), Overflow: core.Hidden}.Merge(spec.Style),
 		StyleFunc: spec.StyleFunc,
 		OnLayout:  func(b core.Bounds) { v.resize(float64(b.Size.Width), float64(b.Size.Height)) },
 		Children:  children}

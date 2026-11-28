@@ -419,7 +419,7 @@ func editorDemo(cx *core.Scope) core.Node {
 	// source is the editor of the sample shown: switching remounts it, so
 	// each keeps its undo history out of the others'.
 	source := core.View{StyleFunc: func() core.Style {
-		return ui.FinOf(cx).Card().Over(core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), CornerRadius: ui.RadiusInset,
+		return ui.FinOf(cx).Card().Over(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), CornerRadius: ui.RadiusInset,
 			BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Surface(), Overflow: core.Hidden})
 	}, Children: []core.Node{
 		core.Dynamic(func(cx *core.Scope) core.Node {
@@ -579,7 +579,7 @@ func editorDemo(cx *core.Scope) core.Node {
 			children = append(children, core.View{Style: core.Style{Gap: 6}, Children: []core.Node{
 				core.View{Style: core.Style{Direction: core.Row, Gap: 8}, Children: []core.Node{
 					dot(d.Severity),
-					core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+					core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 						core.Text{Content: d.Message, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 						core.View{Style: core.Style{Direction: core.Row, Wrap: core.Wrap, AlignItems: core.AlignCenter, Gap: 4}, Children: meta},
 					}},

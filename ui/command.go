@@ -79,10 +79,10 @@ func (c Command) Render(cx *core.Scope) core.Node {
 		Placeholder: placeholder, SearchLabel: searchLabel, AutoFocus: c.AutoFocus, Ref: c.Ref, OnSelect: c.OnSelect, OnHighlightChange: c.OnHighlightChange,
 		OnCancel: c.OnCancel, ExpandOnSearch: c.ExpandOnSearch, ExpandedStyle: expanded, Loading: c.Loading, Error: c.Error,
 		InputSource: c.InputSource, KeepInputSource: c.KeepInputSource, Label: label, TestID: c.TestID, Style: style,
-		SearchBarStyle: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10, Padding: core.All(18), FlexShrink: 0},
+		SearchBarStyle: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10, Padding: core.All(18), FlexShrink: core.NoShrink},
 		SearchPrefix:   Icon(lucide.Search, 20, colors.Muted),
 		SearchField: func(in core.Input) core.Node {
-			in.Style = in.Style.Merge(core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 15, Padding: core.All(0), BorderWidth: 0, Background: core.Transparent})
+			in.Style = in.Style.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 15, Padding: core.All(0), BorderWidth: 0, Background: core.Transparent})
 			in.StyleFunc = func() core.Style {
 				return core.Style{Color: colors.Text(), PlaceholderColor: colors.Faint(), CaretColor: colors.Accent(), SelectionColor: cx.Palette().Selection}
 			}
@@ -112,21 +112,21 @@ func commandRow(cx *core.Scope, e base.CommandEntry) core.Node {
 	var children []core.Node
 	switch {
 	case e.Leading != nil:
-		children = append(children, core.View{Style: core.Style{Width: core.Pt(20), Height: core.Pt(20), FlexShrink: 0, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
+		children = append(children, core.View{Style: core.Style{Width: core.Pt(20), Height: core.Pt(20), FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 			Children: []core.Node{e.Leading}})
 	case e.Icon != nil:
-		children = append(children, core.Icon{SVG: e.Icon, Style: core.Style{Width: core.Pt(20), Height: core.Pt(20), FlexShrink: 0}, StyleFunc: Colored(colors.Text)})
+		children = append(children, core.Icon{SVG: e.Icon, Style: core.Style{Width: core.Pt(20), Height: core.Pt(20), FlexShrink: core.NoShrink}, StyleFunc: Colored(colors.Text)})
 	}
 	text := []core.Node{core.Text{Content: e.Label, MaxLines: 1, Style: TypeBody, StyleFunc: Colored(colors.Text)}}
 	if e.Description != "" {
 		text = append(text, core.Text{Content: e.Description, MaxLines: 1, Style: TypeCaption, StyleFunc: Colored(colors.Muted)})
 	}
-	children = append(children, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}, Children: text})
+	children = append(children, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, Children: text})
 	if e.Trailing != nil {
 		children = append(children, e.Trailing)
 	}
 	if e.ShortcutLabel != "" {
-		children = append(children, core.Text{Content: e.ShortcutLabel, MaxLines: 1, Style: TypeCaption.Merge(core.Style{FlexShrink: 0}), StyleFunc: Colored(colors.Muted)})
+		children = append(children, core.Text{Content: e.ShortcutLabel, MaxLines: 1, Style: TypeCaption.Merge(core.Style{FlexShrink: core.NoShrink}), StyleFunc: Colored(colors.Muted)})
 	}
-	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}, Children: children}
+	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, Children: children}
 }

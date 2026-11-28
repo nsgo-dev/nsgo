@@ -96,7 +96,7 @@ func (p EffortPicker) Render(cx *core.Scope) core.Node {
 		return c
 	}
 	chip := Chip{TextFunc: level, Caret: true, Active: open.Get, Leading: func(cx *core.Scope, size core.Points) core.Node {
-		return core.View{Style: core.Style{Width: core.Pt(size), Height: core.Pt(size), FlexShrink: 0, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter}, Children: []core.Node{
+		return core.View{Style: core.Style{Width: core.Pt(size), Height: core.Pt(size), FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter}, Children: []core.Node{
 			core.Shader{Program: chatEffortIcon(), Style: core.Style{Position: core.Absolute, Top: core.Pt(-8), Left: core.Pt(-8), Width: core.Pt(30), Height: core.Pt(30)},
 				Uniforms: core.Uniforms{"Strength": motion.strength, "Clock": core.Sub(motion.clock, core.Mod(motion.clock, core.Constant(chatEffortFrame))), "Lively": motion.lively()}},
 			ui.Icon(p.Icon, 12, ink),
@@ -204,7 +204,7 @@ func (p EffortPicker) panel(cx *core.Scope, motion *chatEffortMotion, selected f
 		Children:     []core.Node{slider}}
 	label := ui.Text(p.Label, 12.5, ui.Regular, colors.Text)
 	label.MaxLines = 1
-	label.Style.FlexGrow, label.Style.FlexShrink, label.Style.MinWidth = 1, 1, core.Pt(0)
+	label.Style.FlexGrow, label.Style.FlexShrink, label.Style.MinWidth = 1, core.Shrink(1), core.Pt(0)
 	value := ui.Textf(func() string { return p.Levels[selected()].Label }, 12.5, ui.Semibold, func() core.Color {
 		s := float32(chatEffortStrength(selected(), n, p.Off))
 		if p.Off && selected() == 0 {
@@ -212,7 +212,7 @@ func (p EffortPicker) panel(cx *core.Scope, motion *chatEffortMotion, selected f
 		}
 		return chatEffortInk(cx, s)
 	})
-	value.Style.FlexShrink = 0
+	value.Style.FlexShrink = core.NoShrink
 	// The panel covers the popup's border, so the turning border meets the
 	// glass's edge.
 	return core.View{Style: core.Style{Width: core.Pt(width), Margin: core.All(-1), Padding: core.All(chatEffortPadding), Gap: 10, CornerRadius: ui.RadiusCard, Overflow: core.Hidden}, Children: []core.Node{

@@ -701,7 +701,7 @@ func TestRowGrowsShrinksAndCenters(t *testing.T) {
 		return View{Style: Style{Direction: Row, Height: Pt(50), AlignItems: AlignCenter}, Children: []Node{
 			View{Style: Style{Width: Pt(30), Height: Pt(20)}, TestID: "fixed"},
 			View{Style: Style{FlexGrow: 1, Height: Pt(10)}, TestID: "grow"},
-			View{Style: Style{Width: Pt(90), FlexShrink: 1, Height: Pt(10), MinWidth: Pt(40)}, TestID: "shrink"},
+			View{Style: Style{Width: Pt(90), FlexShrink: Shrink(1), Height: Pt(10), MinWidth: Pt(40)}, TestID: "shrink"},
 		}}
 	})
 	h.commit()
@@ -1068,7 +1068,7 @@ func TestScrollNoShrinkKeepsItsRequestedSize(t *testing.T) {
 			Scroll{TestID: "strip", NoShrink: true, Style: Style{Height: Pt(60)}, Children: []Node{
 				Text{Content: "Lines Words Notes Parts"},
 			}},
-			View{TestID: "sibling", Style: Style{Height: Pt(80), FlexShrink: 1}},
+			View{TestID: "sibling", Style: Style{Height: Pt(80), FlexShrink: Shrink(1)}},
 		}}
 	})
 	h.commit()

@@ -39,8 +39,8 @@ func (k Knob) Render(cx *core.Scope) core.Node {
 		align = core.AlignEnd
 	}
 	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, MinHeight: core.Pt(28)}, Children: []core.Node{
-		core.View{Style: core.Style{FlexShrink: 0, MinWidth: core.Pt(88)}, Children: []core.Node{API{Text: k.Name}}},
-		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), AlignItems: align}, Children: []core.Node{k.Control}},
+		core.View{Style: core.Style{FlexShrink: core.NoShrink, MinWidth: core.Pt(88)}, Children: []core.Node{API{Text: k.Name}}},
+		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), AlignItems: align}, Children: []core.Node{k.Control}},
 	}}
 }
 
@@ -68,7 +68,7 @@ func numberKnob(name string, s *core.Signal[float64], lo, hi, step float64) core
 		value.Style.TextAlign = core.TextAlignEnd
 		return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, MaxWidth: core.Pct(100)}, Children: []core.Node{
 			ui.Tabular(value),
-			ui.Slider{Label: name, Min: lo, Max: hi, Step: step, Value: s.Get, OnChange: s.Set, Style: core.Style{Width: core.Pt(knobSliderWidth), FlexShrink: 1}},
+			ui.Slider{Label: name, Min: lo, Max: hi, Step: step, Value: s.Get, OnChange: s.Set, Style: core.Style{Width: core.Pt(knobSliderWidth), FlexShrink: core.Shrink(1)}},
 		}}
 	})}
 }
@@ -230,7 +230,7 @@ func eventLine(cx *core.Scope, last func() string) core.Node {
 				return e
 			}
 			return "—"
-		}, Style: core.Style{FlexShrink: 1, FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Text)},
+		}, Style: core.Style{FlexShrink: core.Shrink(1), FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Text)},
 	}}
 }
 
@@ -262,13 +262,13 @@ func stagePage(cx *core.Scope, stage core.Node, panel ...core.Node) core.Node {
 			if shell.wideStage() {
 				margin = core.Edges{Top: 16, Bottom: 16, Left: 16}
 			}
-			return core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0), MinHeight: core.Pt(240), MinWidth: core.Pt(0), Margin: margin}
+			return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0), MinHeight: core.Pt(240), MinWidth: core.Pt(0), Margin: margin}
 		}, Children: []core.Node{stage}},
 		core.Scroll{TestID: "stage-panel", StyleFunc: func() core.Style {
 			if shell.wideStage() {
-				return core.Style{Width: core.Pt(332), FlexShrink: 0}
+				return core.Style{Width: core.Pt(332), FlexShrink: core.NoShrink}
 			}
-			return core.Style{MaxHeight: core.Pt(312), FlexShrink: 0}
+			return core.Style{MaxHeight: core.Pt(312), FlexShrink: core.NoShrink}
 		}, Children: []core.Node{core.View{Style: core.Style{Padding: core.All(16), Gap: 12}, Children: panel}}},
 	}}
 }
@@ -278,7 +278,7 @@ func statusLine(cx *core.Scope, label, id string, value func() string) core.Node
 	colors := ui.ColorsOf(cx)
 	return core.View{Style: core.Style{Direction: core.Row, Gap: 8, Padding: core.Symmetric(4, 0)}, Children: []core.Node{
 		ui.Text(label, 12, ui.Regular, colors.Muted),
-		core.Text{ContentFunc: value, TestID: id, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 12, FontFamily: ui.Mono, TextAlign: core.TextAlignEnd},
+		core.Text{ContentFunc: value, TestID: id, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 12, FontFamily: ui.Mono, TextAlign: core.TextAlignEnd},
 			StyleFunc: ui.Colored(colors.Text)},
 	}}
 }

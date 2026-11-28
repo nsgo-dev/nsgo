@@ -45,7 +45,7 @@ func pickerField(cx *core.Scope, own core.Style, leading, text core.Node, mark f
 // Style, sets another.
 func pickerText(cx *core.Scope, own core.Style, value func() string, placeholder string) core.Text {
 	colors := ColorsOf(cx)
-	return core.Text{MaxLines: 1, Style: TypeBody.Merge(core.Style{FontSize: own.FontSize, LineHeight: own.LineHeight, FlexGrow: 1, FlexShrink: 1}),
+	return core.Text{MaxLines: 1, Style: TypeBody.Merge(core.Style{FontSize: own.FontSize, LineHeight: own.LineHeight, FlexGrow: 1, FlexShrink: core.Shrink(1)}),
 		ContentFunc: func() string {
 			if v := value(); v != "" {
 				return v

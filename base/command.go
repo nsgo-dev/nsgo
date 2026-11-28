@@ -668,7 +668,7 @@ func (c Command) Render(cx *core.Scope) core.Node {
 		ViewabilityConfig:     core.ViewabilityConfig{ItemVisiblePercentThreshold: listInView},
 		OnViewableItemsChange: p.viewable}
 	children = append(children, core.Scroll{Role: core.RoleListbox, Label: c.Label, Busy: c.Loading, Class: c.ListClass,
-		Style: core.Style{FlexShrink: 1, MinHeight: core.Pt(0)}.Merge(c.ListStyle),
+		Style: core.Style{FlexShrink: core.Shrink(1), MinHeight: core.Pt(0)}.Merge(c.ListStyle),
 		StyleFunc: func() core.Style {
 			if len(p.shown.Get().rows) == 0 {
 				return core.Style{Display: core.DisplayNone}

@@ -7,7 +7,7 @@ order: 51
 
 ## Cuadros
 
-Cada elemento es un cuadro dispuesto por el motor. Los valores predeterminados son los de React Native: un flexbox en columna, hijos que conservan su tamaño salvo que crezcan o se encojan, elementos estirados a lo ancho del eje transversal y tamaños que incluyen el relleno (`padding`) y los bordes.
+Cada elemento es un cuadro dispuesto por el motor. Los valores predeterminados son en su mayoría los de React Native: un flexbox en columna, hijos que conservan su tamaño salvo que crezcan o se encojan, elementos estirados a lo ancho del eje transversal, ningún tamaño mínimo automático y tamaños que incluyen el relleno (`padding`) y los bordes. A diferencia de React Native, un cuadro que crece también se encoge, igual que las vistas desplazables y los cuadros que las rodean.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Tamaños
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` y `FlexBasis` aceptan `core.Pt` para puntos o `core.Pct` para un porcentaje del padre. `FlexGrow` reparte el espacio libre y `FlexShrink` permite que un cuadro ceda parte del suyo; un cuadro sin ninguno de los dos conserva su tamaño. `AspectRatio` es el ancho dividido entre el alto. `AutoMargin` toma el espacio libre en los lados que nombra, de modo que un lado empuja el cuadro hacia el otro.
+`Width`, `Height`, `MinWidth`, `MaxWidth` y `FlexBasis` aceptan `core.Pt` para puntos o `core.Pct` para un porcentaje del padre. `FlexGrow` reparte el espacio libre y `FlexShrink` cede parte cuando falta. Sin configurar, `FlexShrink` es 1 para un cuadro que crece, para un `core.Scroll` o una `core.List` en su eje de desplazamiento y para cada cuadro a su alrededor que no fija un tamaño en ese eje, y 0 para el resto, incluido el contenido de un `core.Scroll`; `core.Shrink(n)` fija un factor y `core.NoShrink` mantiene un cuadro en su tamaño. `AspectRatio` es el ancho dividido entre el alto. `AutoMargin` toma el espacio libre en los lados que nombra, de modo que un lado empuja el cuadro hacia el otro.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-El contenido de un cuadro le da su tamaño hasta que un ancho o un alto indiquen lo contrario. `core.MinContent`, `core.MaxContent` y `core.FitContent` adoptan los tamaños que CSS define con esos nombres: el ancho `min-content` de un texto es su palabra más ancha. Un texto dentro de una fila solo se encoge y hace salto de línea con `FlexShrink: 1`; agrega `FlexGrow: 1` cuando deba ocupar el espacio restante. Un mínimo sin configurar ya es 0, como en React Native, así que `MinWidth: core.Pt(0)` no cambia nada y un texto que se encoge parte sus palabras cuando la fila es más estrecha que su palabra más ancha. `MinWidth: core.AutoMinimum` lo detiene en su palabra más ancha, tal como hace el mínimo automático de CSS.
+El contenido de un cuadro le da su tamaño hasta que un ancho o un alto indiquen lo contrario. `core.MinContent`, `core.MaxContent` y `core.FitContent` adoptan los tamaños que CSS define con esos nombres: el ancho `min-content` de un texto es su palabra más ancha. Un texto dentro de una fila se encoge y hace salto de línea cuando fija `FlexGrow: 1` o `FlexShrink: core.Shrink(1)`; un mínimo sin configurar ya es 0, como en React Native, así que `MinWidth: core.Pt(0)` no cambia nada y un texto que se encoge parte sus palabras cuando la fila es más estrecha que su palabra más ancha. `MinWidth: core.AutoMinimum` lo detiene en su palabra más ancha, tal como hace el mínimo automático de CSS.
 
-Una pantalla que llena la ventana lleva `FlexGrow: 1` y `FlexShrink: 1`, igual que cada cuadro entre ella y una lista o vista desplazable que deba desplazarse. Solo con `FlexGrow`, un cuadro crece hasta el tamaño de su contenido, de modo que una lista larga lo estira más allá de la ventana en lugar de desplazarse.
+Así, una lista o vista desplazable se desplaza a cualquier profundidad, sin nada que configurar en los cuadros que la rodean, mientras los encabezados, pestañas y barras de herramientas junto a ella conservan su tamaño. Una pantalla que llena la ventana lleva `FlexGrow: 1`.
 
 ## Cuadrícula
 

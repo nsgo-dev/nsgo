@@ -742,7 +742,7 @@ func (t Tree) Render(cx *core.Scope) core.Node {
 				scrollTo(r)
 			}
 		}}
-	listStyle := core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0)}.Merge(t.ListStyle)
+	listStyle := core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0)}.Merge(t.ListStyle)
 	return core.View{Ref: root, Class: t.Class, Style: t.Style, StyleFunc: t.StyleFunc, Role: core.RoleTree, Label: t.Label, TestID: t.TestID, OnLayout: t.OnLayout, Tooltip: t.Tooltip,
 		Disabled: t.Disabled, Invalid: t.Invalid,
 		Focusable: func() bool { return !is(t.Disabled) },

@@ -75,7 +75,7 @@ func (s Spinner) Render(cx *core.Scope) core.Node {
 		}
 	}
 	return base.Progress{TestID: s.TestID, Label: s.Label, LabelFunc: s.LabelFunc, Indeterminate: func() bool { return true }, TrackStyle: core.Style{Display: core.DisplayNone},
-		Style:     core.Style{Width: core.Pt(size), Height: core.Pt(size), FlexShrink: 0}.Merge(s.Style),
+		Style:     core.Style{Width: core.Pt(size), Height: core.Pt(size), FlexShrink: core.NoShrink}.Merge(s.Style),
 		StyleFunc: func() core.Style { return core.Style{Animated: &core.AnimatedStyle{Rotate: turn}} },
 		Children:  []core.Node{core.Canvas{Draw: draw, Style: core.Style{FlexGrow: 1}}}}
 }

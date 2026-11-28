@@ -159,7 +159,7 @@ func (t Turn) Render(cx *core.Scope) core.Node {
 			return core.View{Style: core.Style{Direction: core.Row, Wrap: core.Wrap, Gap: 4}, Children: []core.Node{core.Func(t.Actions)}}
 		}})
 	}
-	return core.View{TestID: t.TestID, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: 0, Gap: 16}, Children: children}
+	return core.View{TestID: t.TestID, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: core.NoShrink, Gap: 16}, Children: children}
 }
 
 // chatFoldRow is the divider-centered summary of a completed turn.
@@ -232,13 +232,13 @@ func chatWaveDots(cx *core.Scope) core.Node {
 		}
 		dots = append(dots, core.View{Style: s, StyleFunc: ui.Filled(colors.Muted)})
 	}
-	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 2, Width: core.Pt(18), Height: core.Pt(6), FlexShrink: 0}, Children: dots}
+	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 2, Width: core.Pt(18), Height: core.Pt(6), FlexShrink: core.NoShrink}, Children: dots}
 }
 
 // chatPulseDot is the accent's dot of a running activity, breathing once a
 // second.
 func chatPulseDot(cx *core.Scope) core.Node {
-	s := core.Style{Width: core.Pt(5), Height: core.Pt(5), CornerRadius: 2.5, FlexShrink: 0}
+	s := core.Style{Width: core.Pt(5), Height: core.Pt(5), CornerRadius: 2.5, FlexShrink: core.NoShrink}
 	if !ui.ReduceMotion(cx) {
 		v := core.NewAnimatedValue(cx, 1)
 		cx.StartAnimation(core.AtFrameRate(core.ValueKeyframes(v, core.KeyframeTiming{Duration: time.Second, Iterations: core.Forever},
@@ -284,7 +284,7 @@ func chatActivityGroup(cx *core.Scope, s func() Step, live func() bool, conversa
 			Style:     core.Style{Group: "chat-group", Direction: core.Row, AlignItems: core.AlignCenter, Height: core.Pt(26), Gap: 6, MinWidth: core.Pt(0)},
 			StyleFunc: func() core.Style { return core.Style{FocusVisible: ui.FocusRing(cx, 2)} },
 			Children: []core.Node{
-				core.Text{ContentFunc: title, MaxLines: 1, Style: core.Style{FontSize: 12.5, FontWeight: ui.Medium, MinWidth: core.Pt(0), FlexShrink: 1}, StyleFunc: func() core.Style {
+				core.Text{ContentFunc: title, MaxLines: 1, Style: core.Style{FontSize: 12.5, FontWeight: ui.Medium, MinWidth: core.Pt(0), FlexShrink: core.Shrink(1)}, StyleFunc: func() core.Style {
 					return core.Style{Color: colors.chatSecondary(), GroupStyle: &core.GroupStyle{Name: "chat-group", Hover: &core.Style{Color: colors.Text()}, Focus: &core.Style{Color: colors.Text()}}}
 				}},
 				ui.IconOf(chatDisclosure(open), 10, colors.Muted),
@@ -321,8 +321,8 @@ func (r ActivityRow) Render(cx *core.Scope) core.Node {
 			}
 			return lucide.Wrench()
 		}, 12, colors.Muted),
-		core.Text{ContentFunc: func() string { return a().Action }, MaxLines: 1, Style: core.Style{FontSize: 12.5, FontWeight: ui.Semibold, FlexShrink: 0}, StyleFunc: ui.Colored(colors.chatSecondary)},
-		core.Text{ContentFunc: func() string { return a().Detail }, MaxLines: 1, Style: core.Style{FontSize: 12.5, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}, StyleFunc: ui.Colored(colors.chatSecondary)},
+		core.Text{ContentFunc: func() string { return a().Action }, MaxLines: 1, Style: core.Style{FontSize: 12.5, FontWeight: ui.Semibold, FlexShrink: core.NoShrink}, StyleFunc: ui.Colored(colors.chatSecondary)},
+		core.Text{ContentFunc: func() string { return a().Detail }, MaxLines: 1, Style: core.Style{FontSize: 12.5, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, StyleFunc: ui.Colored(colors.chatSecondary)},
 		core.Show{When: func() bool { return a().Status == Failed }, Then: func(*core.Scope) core.Node { return ui.Icon(lucide.X, 10, colors.Danger) }},
 		core.Show{When: func() bool { return a().Status == Running && !detail.Get() }, Then: func(cx *core.Scope) core.Node { return chatPulseDot(cx) }},
 		core.Show{When: detail.Get, Then: func(*core.Scope) core.Node { return ui.IconOf(chatDisclosure(open), 10, colors.Muted) }},
@@ -365,7 +365,7 @@ func chatActivityDetail(cx *core.Scope, a func() Activity) core.Node {
 		body.FontFamily, body.FontSize = ui.Mono, 12
 	}
 	following := true
-	return core.Scroll{Ref: scroll, Style: core.Style{MaxHeight: core.Pt(height), Borders: core.Edges{Top: 1}, FlexShrink: 1},
+	return core.Scroll{Ref: scroll, Style: core.Style{MaxHeight: core.Pt(height), Borders: core.Edges{Top: 1}, FlexShrink: core.Shrink(1)},
 		StyleFunc: func() core.Style { return core.Style{BorderColors: core.EdgeColors{Top: colors.chatStrongBorder()}} },
 		OnScroll:  func(e core.ScrollEvent) { following = e.Offset.Y+e.Size.Height >= e.ContentSize.Height-2 },
 		Children: []core.Node{core.View{Style: body, StyleFunc: ui.Colored(colors.chatSecondary),
@@ -400,7 +400,7 @@ type Message struct {
 
 // Render implements core.Node.
 func (m Message) Render(*core.Scope) core.Node {
-	s := core.Style{MinWidth: core.Pt(0), FlexShrink: 0}
+	s := core.Style{MinWidth: core.Pt(0), FlexShrink: core.NoShrink}
 	if m.Outgoing {
 		s.AlignItems = core.AlignEnd
 	}

@@ -138,7 +138,7 @@ func storageDemo(cx *core.Scope) core.Node {
 							colors := ui.ColorsOf(cx)
 							return core.Dynamic(func(*core.Scope) core.Node {
 								return Row{First: i() == 0, Children: []core.Node{
-									core.Text{ContentFunc: func() string { return e().key }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Text)},
+									core.Text{ContentFunc: func() string { return e().key }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Text)},
 									core.Text{ContentFunc: func() string { return tr.StorageChars(e().length) }, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 								}}
 							})

@@ -195,9 +195,9 @@ func (s Settings) layout(cx *core.Scope, narrow bool) core.Node {
 		}
 		side = append(side, core.View{Style: FillRest, Children: []core.Node{s.sidebar(cx)}})
 		children = append([]core.Node{
-			core.View{TestID: "settings-sidebar", Style: core.Style{Width: core.Pt(216), FlexShrink: 0},
+			core.View{TestID: "settings-sidebar", Style: core.Style{Width: core.Pt(216), FlexShrink: core.NoShrink},
 				StyleFunc: func() core.Style { return core.Style{Background: Alpha(colors.Text(), 0.035)} }, Children: side},
-			core.View{Style: core.Style{Width: core.Pt(1), FlexShrink: 0}, StyleFunc: Filled(colors.Border)},
+			core.View{Style: core.Style{Width: core.Pt(1), FlexShrink: core.NoShrink}, StyleFunc: Filled(colors.Border)},
 		}, children...)
 	}
 	return core.View{TestID: s.TestID, Style: FillRest.Merge(core.Style{Direction: core.Row}), Children: children}
@@ -207,7 +207,7 @@ func (s Settings) layout(cx *core.Scope, narrow bool) core.Node {
 func (s Settings) heading(cx *core.Scope, title func() string, close bool) core.Node {
 	colors := ColorsOf(cx)
 	text := Textf(title, 13, Bold, colors.Text)
-	text.Role, text.MaxLines, text.Style.FlexGrow, text.Style.FlexShrink = core.RoleHeader, 1, 1, 1
+	text.Role, text.MaxLines, text.Style.FlexGrow, text.Style.FlexShrink = core.RoleHeader, 1, 1, core.Shrink(1)
 	children := []core.Node{text}
 	if close && s.HeaderActions != nil {
 		children = append(children, s.HeaderActions(cx))
@@ -215,7 +215,7 @@ func (s Settings) heading(cx *core.Scope, title func() string, close bool) core.
 	if close && s.OnClose != nil {
 		children = append(children, IconButton{Icon: lucide.X, Label: s.CloseLabel, OnPress: s.OnClose, TestID: "settings-close"})
 	}
-	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, MinHeight: core.Pt(56), FlexShrink: 0,
+	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, MinHeight: core.Pt(56), FlexShrink: core.NoShrink,
 		Padding: core.Symmetric(12, 16)}, Children: children}
 }
 
@@ -229,7 +229,7 @@ func (s Settings) search(cx *core.Scope) core.Node {
 	}, Children: []core.Node{
 		Icon(lucide.Search, 14, colors.Faint),
 		base.Input{Value: s.Query.Get, OnChange: s.Query.Set, Placeholder: s.SearchPlaceholder, Label: s.SearchLabel, TestID: "settings-search",
-			Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), FontSize: 13},
+			Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), FontSize: 13},
 			StyleFunc: func() core.Style {
 				return core.Style{Color: colors.Text(), PlaceholderColor: colors.Faint(), SelectionColor: colors.Accent()}
 			}},
@@ -326,7 +326,7 @@ func (s Settings) rows(cx *core.Scope, narrow bool, results []SettingsResult, se
 			sectionTitle = group.Title
 		case group.Title != "" || group.Actions != nil:
 			title := Text(group.Title, 13, Regular, colors.Text)
-			title.Style.FlexGrow, title.Style.FlexShrink = 1, 1
+			title.Style.FlexGrow, title.Style.FlexShrink = 1, core.Shrink(1)
 			heading := core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12},
 				Children: append([]core.Node{title}, group.Actions...)}
 			if !narrow {
@@ -372,14 +372,14 @@ func (s Settings) row(cx *core.Scope, item SettingsItem, stacked bool, testID st
 		d.Style.LineHeight = 16
 		texts = append(texts, d)
 	}
-	var text core.Node = core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 4}, Children: texts}
+	var text core.Node = core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Gap: 4}, Children: texts}
 	if item.Leading != nil {
-		text = core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)},
-			Children: []core.Node{core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{item.Leading}}, text}}
+		text = core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)},
+			Children: []core.Node{core.View{Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{item.Leading}}, text}}
 	}
 	children := []core.Node{text}
 	if item.Control != nil {
-		children = append(children, core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{item.Control}})
+		children = append(children, core.View{Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{item.Control}})
 	}
 	style := core.Style{Gap: 12}
 	if !stacked {
@@ -424,6 +424,6 @@ func (d SettingsDialog) Render(cx *core.Scope) core.Node {
 	}
 	return Dialog{Open: d.Open, OnOpenChange: d.OnOpenChange, OnClose: d.OnClose, Inset: d.Inset, Bare: true, Label: d.Label, TestID: d.TestID,
 		Children: []core.Node{core.View{StyleFunc: func() core.Style {
-			return core.Style{Width: core.Pt(width()), Height: core.Pt(min(720, env.Window().Height*.85)), MinHeight: core.Pt(0), FlexShrink: 1}
+			return core.Style{Width: core.Pt(width()), Height: core.Pt(min(720, env.Window().Height*.85)), MinHeight: core.Pt(0), FlexShrink: core.Shrink(1)}
 		}, Children: []core.Node{d.Content(func() bool { return width() < 680 })}}}}
 }

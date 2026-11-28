@@ -69,7 +69,7 @@ func (c Card) Render(cx *core.Scope) core.Node {
 		if body != nil {
 			inner = []core.Node{body}
 		}
-		main = append(main, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 2}, Children: inner})
+		main = append(main, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Gap: 2}, Children: inner})
 		if c.Trailing != nil {
 			main = append(main, c.Trailing)
 		}

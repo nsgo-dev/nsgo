@@ -384,7 +384,7 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 	}
 	leading := core.Dynamic(func(*core.Scope) core.Node {
 		if lead := toastLeading(content.Get()); lead != nil {
-			return core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{lead}}
+			return core.View{Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{lead}}
 		}
 		return nil
 	})
@@ -415,7 +415,7 @@ func (ts Toasts) item(cx *core.Scope, e func() toastEntry) core.Node {
 		if c.Description != "" {
 			texts = append(texts, core.Text{Content: c.Description, Style: TypeCaption, StyleFunc: Colored(detailColor)})
 		}
-		return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 2}, Children: texts}
+		return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Gap: 2}, Children: texts}
 	})
 	action := core.Dynamic(func(*core.Scope) core.Node {
 		c := content.Get()

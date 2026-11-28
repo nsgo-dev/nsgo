@@ -55,10 +55,10 @@ func (p Editor) Render(cx *core.Scope) core.Node {
 	e := newEd(cx, p)
 	text := e.textArea()
 	if !p.SoftWrap {
-		text = core.Scroll{Horizontal: true, Ref: e.hs, Style: core.Style{FlexGrow: 1, FlexShrink: 1},
+		text = core.Scroll{Horizontal: true, Ref: e.hs, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)},
 			OnScroll: func(ev core.ScrollEvent) { e.scrollX.Set(ev.Offset.X) }, Children: []core.Node{text}}
 	} else {
-		text = core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}, Children: []core.Node{text}}
+		text = core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}, Children: []core.Node{text}}
 	}
 	styleFunc := p.StyleFunc
 	if e.autoHeight() {
@@ -148,7 +148,7 @@ func (e *ed) gutter() core.Node {
 		Class: c.Gutter,
 		StyleFunc: func() core.Style {
 			e.textRev.Get()
-			return merge(core.Style{Width: core.Pt(core.Points(e.gutterWidth())), FlexShrink: 0}, s().Gutter)
+			return merge(core.Style{Width: core.Pt(core.Points(e.gutterWidth())), FlexShrink: core.NoShrink}, s().Gutter)
 		},
 		Children: []core.Node{core.Each(e.rows, func(r int) int { return r }, func(cx *core.Scope, row func() int, _ func() int) core.Node {
 			line := func() int {
@@ -925,7 +925,7 @@ func (e *ed) completionList() core.Node {
 				Children: []core.Node{
 					core.Text{ContentFunc: func() string { it, _ := item(); return string(it.Kind) }, MaxLines: 1, Class: c.CompletionKind,
 						StyleFunc: func() core.Style { return s().CompletionKind }},
-					core.Text{MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1}, SpansFunc: func() []core.Span {
+					core.Text{MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}, SpansFunc: func() []core.Span {
 						it, hits := item()
 						return matchSpans(it.Label, hits, s().CompletionMatch, c.CompletionMatch)
 					}},

@@ -49,7 +49,7 @@ func Touch(cx *core.Scope) bool {
 const RowHeight core.Points = 36
 
 // FillRest grows to fill its container.
-var FillRest = core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), MinHeight: core.Pt(0)}
+var FillRest = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), MinHeight: core.Pt(0)}
 
 // transparent is no color that is set, unlike 0: a border kept for its
 // width, a fill a state replaces.
@@ -150,7 +150,7 @@ func sheetContent(cx *core.Scope, side core.Placement, children []core.Node, noG
 	case core.PlaceRight:
 		safe = core.EnvEdges{Top: core.EnvSafeArea, Right: core.EnvSafeArea, Bottom: core.EnvSafeArea}
 	}
-	contentStyle := core.Style{Padding: pad, PaddingEnv: safe, Gap: 12, FlexShrink: 1}.Merge(style)
+	contentStyle := core.Style{Padding: pad, PaddingEnv: safe, Gap: 12, FlexShrink: core.Shrink(1)}.Merge(style)
 	return []core.Node{core.View{Style: contentStyle, StyleFunc: styleFunc,
 		Children: append(out, children...)}}
 }

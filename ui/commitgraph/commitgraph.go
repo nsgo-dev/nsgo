@@ -110,7 +110,7 @@ func (v View) Render(cx *core.Scope) core.Node {
 		activate = func(i int) { v.OnActivate(core.Untracked(cx, func() Commit { return at(i) })) }
 	}
 	wide := core.NewSignal(cx, true)
-	return core.View{TestID: v.TestID, Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), MinHeight: core.Pt(0)}.Merge(v.Style),
+	return core.View{TestID: v.TestID, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), MinHeight: core.Pt(0)}.Merge(v.Style),
 		OnLayout: func(b core.Bounds) { wide.Set(b.Size.Width >= narrowWidth) },
 		Children: []core.Node{ui.List{Label: v.Label, Ref: v.Ref, Selection: v.Selection, Count: history.Len, OnActivate: activate,
 			OnLoadMore: v.OnLoadMore, Empty: v.Empty, EstimatedSize: commitgraph.RowHeight,
@@ -121,7 +121,7 @@ func (v View) Render(cx *core.Scope) core.Node {
 				return commitRow{history: history, item: func() commitgraph.Item { return history.At(row.Index()) },
 					commit: func() Commit { return at(row.Index()) }, wide: wide.Get}
 			},
-			Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0)}}}}
+			Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0)}}}}
 }
 
 // commitRow is one row's graph, refs, subject, author, hash and date.
@@ -136,12 +136,12 @@ type commitRow struct {
 func (r commitRow) Render(cx *core.Scope) core.Node {
 	colors := ui.ColorsOf(cx)
 	refs := core.NewMemoFunc(cx, func() []Ref { return r.commit().Refs }, slices.Equal[[]Ref])
-	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}, Children: []core.Node{
+	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, Children: []core.Node{
 		commitgraph.Graph{History: r.history, Item: r.item, Color: lineColor,
 			MergeStyleFunc: func() core.Style {
 				return core.Style{Hover: &core.Style{Background: ui.Alpha(lineColor(r.item().Row.Line), 0.22)}}
 			}},
-		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0), MinWidth: core.Pt(0),
+		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0), MinWidth: core.Pt(0),
 			Gap: 6, Padding: core.Edges{Left: 4}}, Children: []core.Node{
 			core.Show{When: func() bool { return len(refs.Get()) > 0 }, Then: func(cx *core.Scope) core.Node {
 				// Refs give way to the subject rather than hiding it.
@@ -149,8 +149,8 @@ func (r commitRow) Render(cx *core.Scope) core.Node {
 					return refPills{refs: refs.Get(), column: func() int { return r.item().Row.Column }}
 				})
 			}},
-			core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: 1, FlexBasis: core.Pt(0), MinWidth: core.Pt(120), Gap: 4}, Children: []core.Node{
-				core.Text{ContentFunc: func() string { return r.commit().Subject }, MaxLines: 1, Style: core.Style{FontSize: 13, FlexShrink: 1, MinWidth: core.Pt(0)},
+			core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: core.Pt(0), MinWidth: core.Pt(120), Gap: 4}, Children: []core.Node{
+				core.Text{ContentFunc: func() string { return r.commit().Subject }, MaxLines: 1, Style: core.Style{FontSize: 13, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)},
 					StyleFunc: func() core.Style {
 						s := core.Style{Color: colors.Text()}
 						if r.commit().Head {
@@ -186,13 +186,13 @@ func (r commitRow) details(cx *core.Scope) core.Node {
 	colors := ui.ColorsOf(cx)
 	muted := func(fn func() string, width core.Points, style core.Style) core.Node {
 		return core.Text{ContentFunc: fn, MaxLines: 1, StyleFunc: ui.Colored(colors.Muted),
-			Style: core.Style{FontSize: 12, Width: core.Pt(width), FlexShrink: 0}.Merge(style)}
+			Style: core.Style{FontSize: 12, Width: core.Pt(width), FlexShrink: core.NoShrink}.Merge(style)}
 	}
 	return core.Group{
-		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Width: core.Pt(140), FlexShrink: 0, Gap: 6}, Children: []core.Node{
+		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Width: core.Pt(140), FlexShrink: core.NoShrink, Gap: 6}, Children: []core.Node{
 			r.avatar(cx),
 			core.Text{ContentFunc: func() string { return r.commit().Author }, MaxLines: 1, StyleFunc: ui.Colored(colors.Muted),
-				Style: core.Style{FontSize: 12, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}},
+				Style: core.Style{FontSize: 12, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}},
 		}},
 		muted(func() string { return shortHash(r.commit()) }, 76, core.Style{FontFamily: ui.Mono}),
 		muted(func() string { return commitgraph.FormatDate(cx, r.commit().Date) }, 124, core.Style{TextAlign: core.TextAlignEnd, FontVariant: core.FontTabularNums}),
@@ -224,7 +224,7 @@ func (p refPills) Render(cx *core.Scope) core.Node {
 		if ref.Current || ref.Kind == RefHead {
 			weight = ui.Bold
 		}
-		pills[i] = core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Height: core.Pt(18), FlexShrink: 0, Gap: 4,
+		pills[i] = core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Height: core.Pt(18), FlexShrink: core.NoShrink, Gap: 4,
 			Padding: core.Symmetric(0, 6), CornerRadius: 5, BorderWidth: 1},
 			StyleFunc: func() core.Style {
 				border, background := refColors(p.column(), cx.Dark())
@@ -235,7 +235,7 @@ func (p refPills) Render(cx *core.Scope) core.Node {
 			},
 			Children: []core.Node{ui.Icon(refIcon(ref.Kind), 11, colors.Text), ui.Text(ref.Name, 11, weight, colors.Text)}}
 	}
-	return core.View{Children: pills, Style: core.Style{Direction: core.Row, FlexShrink: 1, MinWidth: core.Pt(0), MaxWidth: core.Pt(320), Gap: 4, Overflow: core.Hidden}}
+	return core.View{Children: pills, Style: core.Style{Direction: core.Row, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), MaxWidth: core.Pt(320), Gap: 4, Overflow: core.Hidden}}
 }
 
 // refIcon leads a ref's label.

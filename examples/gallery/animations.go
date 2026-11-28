@@ -269,7 +269,7 @@ func easingRace(cx *core.Scope) core.Node {
 	tones := motionTones(cx)
 	var rows []core.Node
 	for i, c := range easingCurves {
-		lane := core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Height: core.Pt(12), JustifyContent: core.JustifyCenter}, Children: []core.Node{
+		lane := core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Height: core.Pt(12), JustifyContent: core.JustifyCenter}, Children: []core.Node{
 			core.View{Style: core.Style{Height: core.Pt(2), CornerRadius: 1}, StyleFunc: ui.Filled(colors.Raised)},
 			core.View{StyleFunc: func() core.Style {
 				return core.Style{Position: core.Absolute, Left: core.Pt(0), Top: core.Pt(0), Width: core.Pt(12), Height: core.Pt(12), CornerRadius: 6,
@@ -702,7 +702,7 @@ func transitions(cx *core.Scope) core.Node {
 	for _, c := range curves {
 		lanes = append(lanes, core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10, Height: core.Pt(24)}, Children: []core.Node{
 			core.Text{Content: c.name, Style: core.Style{Width: core.Pt(76), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Height: core.Pt(12), JustifyContent: core.JustifyCenter}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Height: core.Pt(12), JustifyContent: core.JustifyCenter}, Children: []core.Node{
 				core.View{Style: core.Style{Height: core.Pt(2), CornerRadius: 1}, StyleFunc: ui.Filled(colors.Raised)},
 				core.View{StyleFunc: func() core.Style {
 					s := core.Style{Position: core.Absolute, Top: core.Pt(0), Left: core.Pt(0), Width: core.Pt(12), Height: core.Pt(12), CornerRadius: 6, Background: colors.Accent(),

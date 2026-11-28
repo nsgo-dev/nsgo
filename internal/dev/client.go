@@ -187,12 +187,12 @@ func devOverlay(cx *core.Scope, f devFailure, dismiss, reload func()) core.Node 
 			Style: core.Style{FlexGrow: 1, Padding: core.Symmetric(48, 24), JustifyContent: core.JustifyCenter, AlignItems: core.AlignCenter,
 				Background: core.RGBA(0x111111, 0.6)},
 			Children: []core.Node{core.View{
-				Style: core.Style{Width: core.Pct(100), MaxWidth: core.Pt(720), MaxHeight: core.Pct(100), FlexShrink: 1, Padding: core.All(20), Gap: 16,
+				Style: core.Style{Width: core.Pct(100), MaxWidth: core.Pt(720), MaxHeight: core.Pct(100), FlexShrink: core.Shrink(1), Padding: core.All(20), Gap: 16,
 					CornerRadius: 12, Background: core.RGB(0x1c1c1c), BorderWidth: 1, BorderColor: core.RGBA(0xffffff, 0.1)},
 				Children: []core.Node{
 					core.Text{ContentFunc: title, Style: core.Style{Color: core.RGB(0xff5c5c), FontSize: 18, FontWeight: core.FontWeightBold}},
-					core.View{Style: core.Style{MaxHeight: core.Pt(360), FlexShrink: 1, CornerRadius: 8, Background: core.RGBA(0x000000, 0.35)},
-						Children: []core.Node{core.Scroll{Style: core.Style{FlexShrink: 1}, Children: []core.Node{
+					core.View{Style: core.Style{MaxHeight: core.Pt(360), FlexShrink: core.Shrink(1), CornerRadius: 8, Background: core.RGBA(0x000000, 0.35)},
+						Children: []core.Node{core.Scroll{Style: core.Style{FlexShrink: core.Shrink(1)}, Children: []core.Node{
 							core.View{Style: core.Style{Padding: core.All(12)}, Children: []core.Node{
 								core.Text{Content: f.Text, Style: core.Style{Color: label.Color, FontSize: 12, FontFamily: core.FontMonospace}},
 							}},

@@ -53,7 +53,7 @@ func toolBody(cx *core.Scope, t func() chatTool) core.Node {
 					core.View{Style: core.Style{Width: core.Pt(24), Height: core.Pt(24), CornerRadius: 6, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 						StyleFunc: ui.Filled(func() core.Color { return s.tone.Tint(cx) }),
 						Children:  []core.Node{ui.Text(strings.ToUpper(s.site[:1]), 12, ui.Bold, s.tone.Shade(cx))}},
-					core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 1}, Children: []core.Node{
+					core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 1}, Children: []core.Node{
 						core.Text{Content: s.title, MaxLines: 1, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 						ui.Text(s.site, 12, ui.Regular, colors.Faint),
 					}},
@@ -122,7 +122,7 @@ func errorRow(cx *core.Scope, message func() string, onRetry func()) core.Node {
 			Background: ToneDanger.Tint(cx), BorderWidth: 1, BorderColor: ui.Alpha(colors.Danger(), 0.32)}
 	}, Children: []core.Node{
 		ui.Icon(lucide.CircleAlert, 18, colors.Danger),
-		core.Text{ContentFunc: message, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13, LineHeight: 19}, StyleFunc: ui.Colored(colors.Text)},
+		core.Text{ContentFunc: message, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13, LineHeight: 19}, StyleFunc: ui.Colored(colors.Text)},
 		ui.Press{OnPress: onRetry, Label: tr.ChatRetry(), Children: []core.Node{core.View{StyleFunc: func() core.Style {
 			return fin.Light().Over(core.Style{Height: core.Pt(36), Padding: core.Symmetric(0, 14), CornerRadius: 18,
 				Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, Background: colors.Light()})

@@ -150,9 +150,9 @@ func (c Card) Render(cx *core.Scope) core.Node {
 			description.MaxLines = 2
 			titles = append(titles, description)
 		}
-		nodes := []core.Node{core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: titles}}
+		nodes := []core.Node{core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: titles}}
 		if c.UIOnly {
-			nodes = append(nodes, core.View{TestID: "ui-only-" + c.Title, Style: core.Style{FlexShrink: 0}, Children: []core.Node{
+			nodes = append(nodes, core.View{TestID: "ui-only-" + c.Title, Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{
 				ui.Badge{Text: locales.For(cx).UiOnly(), Variant: ui.BadgeNeutral}}})
 		}
 		head = core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignEnd, Gap: 10, Padding: core.Symmetric(0, 2)}, Children: append(nodes, c.Actions...)}
@@ -180,7 +180,7 @@ func (a Appear) Render(cx *core.Scope) core.Node {
 	ui.Timing(cx, t, 1, c)
 	s := core.Style{Animated: &core.AnimatedStyle{Opacity: t, TranslateY: ui.Lerp(t, 14, 0)}}
 	if a.Flex {
-		s = core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), MinWidth: core.Pt(0)}.Merge(s)
+		s = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), MinWidth: core.Pt(0)}.Merge(s)
 	}
 	return core.View{Style: s, Children: a.Children}
 }
@@ -221,7 +221,7 @@ func (s Section) Render(cx *core.Scope) core.Node {
 		note = constant(s.Note)
 	}
 	heading := ui.Text(s.Title, 13, ui.Bold, colors.Text)
-	heading.Role, heading.Style.FlexGrow, heading.Style.FlexShrink = core.RoleHeader, 1, 1
+	heading.Role, heading.Style.FlexGrow, heading.Style.FlexShrink = core.RoleHeader, 1, core.Shrink(1)
 	head := core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignBaseline, Gap: 8, Padding: core.Symmetric(0, 2)},
 		Children: []core.Node{heading, ui.Textf(note, 12, ui.Regular, colors.Faint)}}
 	return Panel{TestID: "section-" + s.Title, Head: head, Children: s.Children}
@@ -246,7 +246,7 @@ func (c Caption) Render(cx *core.Scope) core.Node {
 	if c.Note == nil && c.LabelFunc != nil {
 		return l
 	}
-	l.Style.FlexGrow, l.Style.FlexShrink = 1, 1
+	l.Style.FlexGrow, l.Style.FlexShrink = 1, core.Shrink(1)
 	children := []core.Node{l}
 	if c.Note != nil {
 		children = append(children, ui.Textf(c.Note, 12, ui.Regular, colors.Faint))
@@ -375,7 +375,7 @@ type APILine struct{ Label, Names string }
 func (a APILine) Render(cx *core.Scope) core.Node {
 	colors := ui.ColorsOf(cx)
 	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignBaseline, Gap: 8}, Children: []core.Node{
-		core.Text{Content: a.Label, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+		core.Text{Content: a.Label, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 		API{Text: a.Names},
 	}}
 }
@@ -399,7 +399,7 @@ func (r SwitchRow) Render(cx *core.Scope) core.Node {
 		titles = append(titles, ui.Text(r.Note, 12, ui.Regular, colors.Muted))
 	}
 	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 12, MinHeight: core.Pt(ui.RowHeight)}, Children: []core.Node{
-		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: titles},
+		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: titles},
 		ui.Switch{Checked: r.Checked, OnChange: r.OnChange, Label: r.Label},
 	}}
 }
@@ -420,7 +420,7 @@ func (r LinkRow) Render(cx *core.Scope) core.Node {
 		core.View{Style: core.Style{MinHeight: core.Pt(44), Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10, Padding: core.Symmetric(6, 8), CornerRadius: ui.RadiusControl},
 			Children: []core.Node{
 				IconTile{Icon: r.Icon, Size: 28},
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 2}, Children: []core.Node{
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 2}, Children: []core.Node{
 					ui.Text(r.Title, 13, ui.Medium, colors.Text),
 					core.Text{Content: r.Note, MaxLines: 1, Style: core.Style{FontSize: 12, FontFamily: ui.Mono}, StyleFunc: ui.Colored(colors.Faint)},
 				}},

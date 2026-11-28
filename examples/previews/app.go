@@ -42,7 +42,7 @@ func stage(id string) func(cx *core.Scope) core.Node {
 				return ui.Text("No preview "+id, 13, ui.Regular, colors.Muted)
 			}
 		}
-		style := core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter}
+		style := core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Padding: core.All(24), AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter}
 		if fill[id] {
 			style.AlignItems, style.JustifyContent, style.Padding = core.AlignStretch, core.JustifyStart, core.Edges{}
 		}
@@ -63,7 +63,7 @@ func picker(cx *core.Scope) core.Node {
 	}
 	picked := core.NewSignal(cx, ids[0])
 	colors := ui.ColorsOf(cx)
-	return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, PaddingEnv: core.EnvAll(core.EnvSafeArea)},
+	return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), PaddingEnv: core.EnvAll(core.EnvSafeArea)},
 		StyleFunc: func() core.Style { return core.Style{Background: colors.Background()} },
 		Children: []core.Node{
 			core.View{Style: core.Style{Padding: core.All(12), Borders: core.Edges{Bottom: 1}},

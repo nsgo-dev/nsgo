@@ -93,6 +93,7 @@ func (h *Holder) show() {
 	}
 	h.root.parent = at
 	at.children = append(at.children, h.root)
+	dropLayoutStyles(h.root)
 	t.childrenChanged(at)
 	h.t.keysChanged, h.t.changed = true, true
 	// It inherits from its new place, and brings its marks.

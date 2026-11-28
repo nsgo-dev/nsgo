@@ -41,7 +41,7 @@ func resizableDemo(cx *core.Scope) core.Node {
 	shown := core.NewSignal(cx, true)
 	return stagePage(cx,
 		core.View{StyleFunc: func() core.Style {
-			return core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), Overflow: core.Hidden, CornerRadius: 8, BorderWidth: 1, BorderColor: colors.Border(),
+			return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), Overflow: core.Hidden, CornerRadius: 8, BorderWidth: 1, BorderColor: colors.Border(),
 				Background: colors.Background()}
 		}, Children: []core.Node{
 			base.ResizablePanelGroup{TestID: "panels", HandleStyleFunc: ui.HandleLine(cx), HandleThumbStyle: ui.HandleThumb(cx), HandleThumbStyleFunc: ui.HandleThumbColor(cx), HandleLabel: tr.ResizableResizeTheSidebar(),

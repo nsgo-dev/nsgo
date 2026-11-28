@@ -7,7 +7,7 @@ order: 51
 
 ## Caixas
 
-Todo elemento é uma caixa posicionada pelo motor. Os padrões são os mesmos do React Native: um flexbox em coluna, filhos que mantêm seu tamanho a menos que cresçam ou encolham, itens esticados ao longo do eixo transversal e tamanhos que incluem padding e bordas.
+Todo elemento é uma caixa posicionada pelo motor. Os padrões são, em sua maioria, os do React Native: um flexbox em coluna, filhos que mantêm seu tamanho a menos que cresçam ou encolham, itens esticados ao longo do eixo transversal, nenhum tamanho mínimo automático e tamanhos que incluem padding e bordas. Ao contrário do React Native, uma caixa que cresce também encolhe, assim como as scroll views e as caixas ao redor delas.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Tamanhos
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` e `FlexBasis` aceitam `core.Pt` para pontos ou `core.Pct` para uma porcentagem do pai. `FlexGrow` distribui o espaço livre e `FlexShrink` permite que uma caixa ceda espaço; uma caixa sem nenhum dos dois mantém seu tamanho. `AspectRatio` é a largura dividida pela altura. `AutoMargin` absorve o espaço livre nos lados que especifica, de modo que um lado empurra a caixa para o outro.
+`Width`, `Height`, `MinWidth`, `MaxWidth` e `FlexBasis` aceitam `core.Pt` para pontos ou `core.Pct` para uma porcentagem do pai. `FlexGrow` distribui o espaço livre e `FlexShrink` cede parte dele quando falta espaço. Sem definição, `FlexShrink` é 1 para uma caixa que cresce, para um `core.Scroll` ou `core.List` ao longo do seu eixo de rolagem e para cada caixa ao redor dele que não define tamanho nesse eixo, e 0 para o resto, incluindo o conteúdo de um `core.Scroll`; `core.Shrink(n)` define um fator e `core.NoShrink` mantém uma caixa em seu tamanho. `AspectRatio` é a largura dividida pela altura. `AutoMargin` absorve o espaço livre nos lados que especifica, de modo que um lado empurra a caixa para o outro.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-O conteúdo de uma caixa determina seu tamanho até que uma largura ou altura indique o contrário. `core.MinContent`, `core.MaxContent` e `core.FitContent` assumem os tamanhos homônimos do CSS: a largura `min-content` de um texto é sua palavra mais larga. Um texto dentro de uma linha só encolhe e quebra linha com `FlexShrink: 1`; adicione `FlexGrow: 1` quando ele precisar ocupar o espaço restante. Um mínimo não definido já é 0, como no React Native, então `MinWidth: core.Pt(0)` não muda nada e um texto que encolhe quebra suas palavras quando a linha fica mais estreita do que sua palavra mais larga. `MinWidth: core.AutoMinimum` interrompe o encolhimento na palavra mais larga, como faz o mínimo automático do CSS.
+O conteúdo de uma caixa determina seu tamanho até que uma largura ou altura indique o contrário. `core.MinContent`, `core.MaxContent` e `core.FitContent` assumem os tamanhos homônimos do CSS: a largura `min-content` de um texto é sua palavra mais larga. Um texto dentro de uma linha encolhe e quebra linha quando define `FlexGrow: 1` ou `FlexShrink: core.Shrink(1)`; um mínimo não definido já é 0, como no React Native, então `MinWidth: core.Pt(0)` não muda nada e um texto que encolhe quebra suas palavras quando a linha fica mais estreita do que sua palavra mais larga. `MinWidth: core.AutoMinimum` interrompe o encolhimento na palavra mais larga, como faz o mínimo automático do CSS.
 
-Uma tela que preenche a janela usa `FlexGrow: 1` e `FlexShrink: 1`, assim como cada caixa entre ela e uma lista ou scroll view que deva rolar. Apenas com `FlexGrow`, a caixa cresce até o tamanho do conteúdo, fazendo uma lista longa esticar além da janela em vez de rolar.
+Assim, uma lista ou scroll view rola em qualquer profundidade, sem nada a definir nas caixas ao redor dela, enquanto cabeçalhos, abas e barras de ferramentas ao lado mantêm seu tamanho. Uma tela que preenche a janela usa `FlexGrow: 1`.
 
 ## Grid
 

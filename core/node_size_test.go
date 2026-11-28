@@ -372,6 +372,8 @@ func setNonZero(t *testing.T, v reflect.Value) {
 			v.Set(reflect.ValueOf(Pt(1)))
 		case reflect.TypeOf(Opacity{}):
 			v.Set(reflect.ValueOf(Alpha(0.5)))
+		case reflect.TypeOf(FlexShrink{}):
+			v.Set(reflect.ValueOf(NoShrink))
 		case reflect.TypeOf(GridPlacement{}):
 			v.Set(reflect.ValueOf(GridLine(1)))
 		case reflect.TypeOf(Paint{}):

@@ -251,8 +251,8 @@ func (p Dialog) Render(cx *core.Scope) core.Node {
 	}
 	children := []core.Node{p.header(cx, closeIt), divider(cx),
 		core.View{Style: core.Style{Direction: core.Row, FlexGrow: 1, MinHeight: core.Pt(0)}, Children: []core.Node{
-			core.View{Style: core.Style{Width: core.Pt(s.width.GetUntracked()), FlexShrink: 0, Height: core.Pct(100)}, Children: []core.Node{p.places(cx)}},
-			core.View{Style: core.Style{Width: core.Pt(1), Height: core.Pct(100), FlexShrink: 0}, StyleFunc: ui.Filled(ui.ColorsOf(cx).Border)},
+			core.View{Style: core.Style{Width: core.Pt(s.width.GetUntracked()), FlexShrink: core.NoShrink, Height: core.Pct(100)}, Children: []core.Node{p.places(cx)}},
+			core.View{Style: core.Style{Width: core.Pt(1), Height: core.Pct(100), FlexShrink: core.NoShrink}, StyleFunc: ui.Filled(ui.ColorsOf(cx).Border)},
 			p.content(cx, choose),
 		}}}
 	if p.Choose != nil {
@@ -266,7 +266,7 @@ func (p Dialog) Render(cx *core.Scope) core.Node {
 }
 
 func divider(cx *core.Scope) core.Node {
-	return core.View{Style: core.Style{Height: core.Pt(1), FlexShrink: 0}, StyleFunc: ui.Filled(ui.ColorsOf(cx).Border)}
+	return core.View{Style: core.Style{Height: core.Pt(1), FlexShrink: core.NoShrink}, StyleFunc: ui.Filled(ui.ColorsOf(cx).Border)}
 }
 
 // footer shows the hint beside Cancel and Choose.
@@ -274,7 +274,7 @@ func (p Dialog) footer(cx *core.Scope, closeIt func(), choose func(string)) core
 	colors := ui.ColorsOf(cx)
 	hint := ui.Text(p.Hint, 12, ui.Regular, colors.Muted)
 	hint.MaxLines = 1
-	hint.Style.FlexGrow, hint.Style.FlexShrink, hint.Style.MinWidth = 1, 1, core.Pt(0)
+	hint.Style.FlexGrow, hint.Style.FlexShrink, hint.Style.MinWidth = 1, core.Shrink(1), core.Pt(0)
 	return core.View{Style: core.Style{Direction: core.Row, Padding: core.Symmetric(12, 16), Gap: 8, AlignItems: core.AlignCenter}, Children: []core.Node{
 		hint,
 		ui.Button{Text: p.Labels.Cancel, Variant: ui.ButtonSecondary, OnPress: closeIt},
@@ -302,7 +302,7 @@ func (p Dialog) header(cx *core.Scope, closeIt func()) core.Node {
 		return ui.IconButton{Icon: icon, Label: label, Size: 28, Selected: func() bool { return s.view.Get() == mode }, OnPress: func() { s.view.Set(mode) }}
 	}
 	children := []core.Node{
-		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Margin: core.Edges{Right: 4}}, Children: []core.Node{address}},
+		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Margin: core.Edges{Right: 4}}, Children: []core.Node{address}},
 		ui.IconButton{Icon: lucide.Eye, Label: p.Labels.Hidden, Size: 28, Selected: s.hidden.Get, OnPress: func() { s.hidden.Set(!s.hidden.GetUntracked()) }},
 		views(Icons, lucide.LayoutGrid, p.Labels.Icons), views(List, lucide.List, p.Labels.List),
 	}
@@ -340,7 +340,7 @@ func (p Dialog) crumbs(cx *core.Scope) core.Node {
 			}
 			t := ui.Text(name, 12, ui.Regular, colors.Muted)
 			t.MaxLines = 1
-			nodes = append(nodes, base.Button{Label: name, OnPress: func(core.PressEvent) { open() }, Style: core.Style{FlexShrink: 0}, Children: []core.Node{t}})
+			nodes = append(nodes, base.Button{Label: name, OnPress: func(core.PressEvent) { open() }, Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{t}})
 		}
 		if p.Device != "" {
 			add(p.Device, func() { s.Open("") })
@@ -439,7 +439,7 @@ func (p Dialog) content(cx *core.Scope, choose func(string)) core.Node {
 		}
 		return p.iconView(cx, entries, activate)
 	})
-	return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), MinHeight: core.Pt(0)}, Children: []core.Node{p.copyMenu(cx, s.copied, body)}}
+	return core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), MinHeight: core.Pt(0)}, Children: []core.Node{p.copyMenu(cx, s.copied, body)}}
 }
 
 // copyMenu offers to copy a path, when the app names the item.
@@ -486,9 +486,9 @@ func (p Dialog) listView(cx *core.Scope, entries []Entry, activate func(Entry)) 
 	colors := ui.ColorsOf(cx)
 	row := func(name, date, size core.Node) []core.Node {
 		return []core.Node{
-			core.View{Style: core.Style{Direction: core.Row, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 8, AlignItems: core.AlignCenter}, Children: []core.Node{name}},
-			core.View{Style: core.Style{Width: core.Pt(160), FlexShrink: 0}, Children: []core.Node{date}},
-			core.View{Style: core.Style{Width: core.Pt(80), FlexShrink: 0, AlignItems: core.AlignEnd}, Children: []core.Node{size}},
+			core.View{Style: core.Style{Direction: core.Row, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Gap: 8, AlignItems: core.AlignCenter}, Children: []core.Node{name}},
+			core.View{Style: core.Style{Width: core.Pt(160), FlexShrink: core.NoShrink}, Children: []core.Node{date}},
+			core.View{Style: core.Style{Width: core.Pt(80), FlexShrink: core.NoShrink, AlignItems: core.AlignEnd}, Children: []core.Node{size}},
 		}
 	}
 	head := func(s string) core.Node { return ui.Text(s, 11.5, ui.Regular, colors.Muted) }
@@ -508,7 +508,7 @@ func (p Dialog) listView(cx *core.Scope, entries []Entry, activate func(Entry)) 
 				ui.Text(date, 12, ui.Regular, colors.Muted), ui.Text(size, 12, ui.Regular, colors.Muted))}
 	}
 	return core.View{Style: core.Style{FlexGrow: 1, MinHeight: core.Pt(0)}, Children: []core.Node{
-		core.View{Style: core.Style{Direction: core.Row, Gap: 12, Padding: core.Symmetric(8, 20), FlexShrink: 0}, Children: row(head(p.Labels.Name), head(p.Labels.Modified), head(p.Labels.Size))},
+		core.View{Style: core.Style{Direction: core.Row, Gap: 12, Padding: core.Symmetric(8, 20), FlexShrink: core.NoShrink}, Children: row(head(p.Labels.Name), head(p.Labels.Modified), head(p.Labels.Size))},
 		p.entryList(cx, entries, activate, 1, core.Style{Padding: core.Symmetric(6, 8)}, entry),
 	}}
 }

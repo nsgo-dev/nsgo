@@ -357,7 +357,7 @@ func dataTableDemo(cx *core.Scope) core.Node {
 	status := func(fn func() string, c func() core.Color) core.Node {
 		return core.Text{ContentFunc: fn, Style: core.Style{FontFamily: ui.Mono, FontSize: 12}, StyleFunc: ui.Colored(c)}
 	}
-	return stagePage(cx, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0)}, Children: []core.Node{
+	return stagePage(cx, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0)}, Children: []core.Node{
 		datatable.DataTable{
 			Ref: table, TestID: "table", Label: tr.TableStocks(),
 			Columns:  columnsNow,
@@ -375,7 +375,7 @@ func dataTableDemo(cx *core.Scope) core.Node {
 			Sort:       sort.Get,
 			StylesFunc: tableStyles(cx),
 			StyleFunc: func() core.Style {
-				return core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), CornerRadius: 8, BorderWidth: 1,
+				return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), CornerRadius: 8, BorderWidth: 1,
 					BorderColor: colors.Border(), Background: colors.Background(), Color: colors.Text()}
 			},
 			OnSortChange: func(next datatable.Sort) {
@@ -426,7 +426,7 @@ func tableCard(cx *core.Scope) core.Node {
 	cell := func(i int, head, end bool, s string) core.Node {
 		st := core.Style{Padding: core.Symmetric(10, 12)}
 		if i == 1 {
-			st.FlexGrow, st.FlexShrink = 1, 1
+			st.FlexGrow, st.FlexShrink = 1, core.Shrink(1)
 		} else {
 			st.Width = widths[i]
 		}

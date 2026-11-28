@@ -100,7 +100,7 @@ func (p ProgressRing) Render(cx *core.Scope) core.Node {
 	return base.Progress{TestID: p.TestID, Label: p.Label, LabelFunc: p.LabelFunc, Value: value, Indeterminate: p.Indeterminate,
 		ValueText:  func(v float32) string { return fmt.Sprintf("%d%%", int(v+0.5)) },
 		TrackStyle: core.Style{Display: core.DisplayNone},
-		Style:      core.Style{Width: core.Pt(size), Height: core.Pt(size), FlexShrink: 0}.Merge(p.Style),
+		Style:      core.Style{Width: core.Pt(size), Height: core.Pt(size), FlexShrink: core.NoShrink}.Merge(p.Style),
 		StyleFunc: func() core.Style {
 			if !is(p.Indeterminate) {
 				return core.Style{}

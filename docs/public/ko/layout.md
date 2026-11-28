@@ -7,7 +7,7 @@ order: 51
 
 ## 박스
 
-모든 엘리먼트는 엔진이 배치하는 박스입니다. 기본값은 React Native와 동일합니다. 열(column) 방향 flexbox, 늘어나거나(grow) 줄어들도록(shrink) 지정하지 않는 한 자신의 크기를 유지하는 자식, 교차축(cross axis)으로 늘어나는 아이템, 그리고 패딩과 테두리를 포함하는 크기 기준을 따릅니다.
+모든 엘리먼트는 엔진이 배치하는 박스입니다. 기본값은 대부분 React Native와 동일합니다. 열(column) 방향 flexbox, 늘어나거나(grow) 줄어들도록(shrink) 지정하지 않는 한 자신의 크기를 유지하는 자식, 교차축(cross axis)으로 늘어나는 아이템, 자동 최소 크기 없음, 그리고 패딩과 테두리를 포함하는 크기 기준을 따릅니다. React Native와 달리 늘어나는 박스는 줄어들기도 하며, 스크롤 뷰와 이를 감싸는 박스도 마찬가지입니다.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## 크기
 
-`Width`, `Height`, `MinWidth`, `MaxWidth`, `FlexBasis`는 포인트 단위의 `core.Pt` 또는 부모 대비 백분율인 `core.Pct`를 받습니다. `FlexGrow`는 남은 공간을 나누어 가지며 `FlexShrink`는 박스가 공간을 양보할 수 있게 합니다. 둘 다 없는 박스는 자신의 크기를 유지합니다. `AspectRatio`는 너비를 높이로 나눈 값입니다. `AutoMargin`은 지정한 방향의 남은 공간을 차지하므로, 한쪽에 지정하면 박스를 반대쪽으로 밀어냅니다.
+`Width`, `Height`, `MinWidth`, `MaxWidth`, `FlexBasis`는 포인트 단위의 `core.Pt` 또는 부모 대비 백분율인 `core.Pct`를 받습니다. `FlexGrow`는 남은 공간을 나누어 가지며 `FlexShrink`는 공간이 부족할 때 일부를 양보합니다. 설정하지 않으면 `FlexShrink`는 늘어나는 박스, 스크롤 축 방향의 `core.Scroll`이나 `core.List`, 그리고 이를 감싸면서 그 축에 크기를 지정하지 않은 각 박스에서 1이고, `core.Scroll`의 콘텐츠를 포함한 나머지에서는 0입니다. `core.Shrink(n)`은 계수를 지정하고 `core.NoShrink`는 박스를 자신의 크기로 유지합니다. `AspectRatio`는 너비를 높이로 나눈 값입니다. `AutoMargin`은 지정한 방향의 남은 공간을 차지하므로, 한쪽에 지정하면 박스를 반대쪽으로 밀어냅니다.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-너비나 높이가 별도로 지정되지 않는 한 박스의 크기는 콘텐츠에 의해 결정됩니다. `core.MinContent`, `core.MaxContent`, `core.FitContent`은 CSS가 정의한 크기 값을 사용합니다(예: 텍스트의 min-content 너비는 가장 넓은 단어의 너비입니다). 행(row) 안의 텍스트는 `FlexShrink: 1`이 있어야만 줄어들고 줄바꿈되며, 남은 공간을 차지해야 할 때는 `FlexGrow: 1`을 추가합니다. React Native와 마찬가지로 설정되지 않은 최솟값은 이미 0이므로 `MinWidth: core.Pt(0)`은 아무것도 바꾸지 않으며, 행이 가장 넓은 단어보다 좁아지면 줄어드는 텍스트가 단어 중간에서 줄바꿈됩니다. `MinWidth: core.AutoMinimum`은 CSS의 자동 최솟값(automatic minimum)처럼 가장 넓은 단어 너비에서 멈추게 합니다.
+너비나 높이가 별도로 지정되지 않는 한 박스의 크기는 콘텐츠에 의해 결정됩니다. `core.MinContent`, `core.MaxContent`, `core.FitContent`은 CSS가 정의한 크기 값을 사용합니다(예: 텍스트의 min-content 너비는 가장 넓은 단어의 너비입니다). 행(row) 안의 텍스트는 `FlexGrow: 1` 또는 `FlexShrink: core.Shrink(1)`을 지정하면 줄어들고 줄바꿈됩니다. React Native와 마찬가지로 설정되지 않은 최솟값은 이미 0이므로 `MinWidth: core.Pt(0)`은 아무것도 바꾸지 않으며, 행이 가장 넓은 단어보다 좁아지면 줄어드는 텍스트가 단어 중간에서 줄바꿈됩니다. `MinWidth: core.AutoMinimum`은 CSS의 자동 최솟값(automatic minimum)처럼 가장 넓은 단어 너비에서 멈추게 합니다.
 
-창을 채우는 화면에는 `FlexGrow: 1`과 `FlexShrink: 1`을 지정하며, 그 화면과 스크롤되어야 하는 목록 또는 스크롤 뷰 사이에 있는 각 박스에도 동일하게 지정합니다. `FlexGrow`만 지정하면 박스가 콘텐츠 크기에 맞춰 커지므로 긴 목록이 스크롤되는 대신 창 밖으로 넘쳐 늘어나게 됩니다.
+따라서 목록이나 스크롤 뷰는 아무리 깊이 있어도 이를 감싸는 박스에 아무것도 지정하지 않고 스크롤되며, 그 옆의 헤더, 탭, 툴바는 자신의 크기를 유지합니다. 창을 채우는 화면에는 `FlexGrow: 1`을 지정합니다.
 
 ## 그리드
 

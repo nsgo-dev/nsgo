@@ -7,7 +7,7 @@ order: 51
 
 ## Kutular
 
-Her öğe, motor tarafından yerleştirilen bir kutudur. Varsayılanlar React Native'inkilerdir: sütun yönlü bir flexbox, büyümedikçe veya küçülmedikçe boyutunu koruyan alt öğeler, çapraz eksen boyunca gerilen öğeler ve dolgu ile kenarlıkları içeren boyutlar.
+Her öğe, motor tarafından yerleştirilen bir kutudur. Varsayılanlar çoğunlukla React Native'inkilerdir: sütun yönlü bir flexbox, büyümedikçe veya küçülmedikçe boyutunu koruyan alt öğeler, çapraz eksen boyunca gerilen öğeler, otomatik minimum boyutların olmaması ve dolgu ile kenarlıkları içeren boyutlar. React Native'den farklı olarak büyüyen bir kutu küçülür de; kaydırma görünümleri ve onları saran kutular da öyle.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Boyutlar
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` ve `FlexBasis`, nokta için `core.Pt` veya üst öğenin yüzdesi için `core.Pct` alır. `FlexGrow` boş alanı paylaştırır, `FlexShrink` ise bir kutunun bir kısmını geri vermesine izin verir; ikisi de olmayan bir kutu boyutunu korur. `AspectRatio` genişliğin yüksekliğe bölümüdür. `AutoMargin` adlandırdığı kenarlardaki boş alanı alır; böylece bir kenar, kutuyu diğer kenara iter.
+`Width`, `Height`, `MinWidth`, `MaxWidth` ve `FlexBasis`, nokta için `core.Pt` veya üst öğenin yüzdesi için `core.Pct` alır. `FlexGrow` boş alanı paylaştırır, `FlexShrink` ise alan yetmediğinde bir kısmını geri verir. Ayarlanmadığında `FlexShrink`; büyüyen bir kutu, kaydırma ekseni boyunca bir `core.Scroll` veya `core.List` ve bunları saran, o eksende boyut belirlemeyen her kutu için 1, bir `core.Scroll`'un içeriği dahil geri kalanlar için 0'dır; `core.Shrink(n)` bir katsayı belirler, `core.NoShrink` ise bir kutuyu boyutunda tutar. `AspectRatio` genişliğin yüksekliğe bölümüdür. `AutoMargin` adlandırdığı kenarlardaki boş alanı alır; böylece bir kenar, kutuyu diğer kenara iter.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-Bir genişlik veya yükseklik aksini söyleyene kadar kutunun boyutunu içeriği belirler. `core.MinContent`, `core.MaxContent` ve `core.FitContent`, CSS'in adlandırdığı boyutları alır: bir metnin min-content genişliği en geniş sözcüğüdür. Bir satır içindeki metin yalnızca `FlexShrink: 1` ile küçülür ve kaydırılır; kalan alanı alması gerektiğinde `FlexGrow: 1` ekleyin. Ayarlanmamış bir minimum, React Native'de olduğu gibi zaten 0'dır; bu nedenle `MinWidth: core.Pt(0)` hiçbir şeyi değiştirmez ve küçülen bir metin, satır en geniş sözcüğünden dar olduğunda sözcüklerini böler. `MinWidth: core.AutoMinimum`, CSS'in otomatik minimumunun yaptığı gibi onu en geniş sözcüğünde durdurur.
+Bir genişlik veya yükseklik aksini söyleyene kadar kutunun boyutunu içeriği belirler. `core.MinContent`, `core.MaxContent` ve `core.FitContent`, CSS'in adlandırdığı boyutları alır: bir metnin min-content genişliği en geniş sözcüğüdür. Bir satır içindeki metin `FlexGrow: 1` veya `FlexShrink: core.Shrink(1)` ayarladığında küçülür ve kaydırılır; ayarlanmamış bir minimum, React Native'de olduğu gibi zaten 0'dır; bu nedenle `MinWidth: core.Pt(0)` hiçbir şeyi değiştirmez ve küçülen bir metin, satır en geniş sözcüğünden dar olduğunda sözcüklerini böler. `MinWidth: core.AutoMinimum`, CSS'in otomatik minimumunun yaptığı gibi onu en geniş sözcüğünde durdurur.
 
-Pencereyi dolduran bir ekran, `FlexGrow: 1` ve `FlexShrink: 1` alır; onunla kaydırılması gereken bir liste veya kaydırma görünümü arasındaki her kutu da öyle. Yalnızca `FlexGrow` ile bir kutu içeriği kadar büyür; bu yüzden uzun bir liste kaydırmak yerine onu pencerenin ötesine uzatır.
+Böylece bir liste veya kaydırma görünümü, ne kadar derinde olursa olsun ve onu saran kutularda hiçbir şey ayarlanmadan kayar; yanındaki başlıklar, sekmeler ve araç çubukları ise boyutlarını korur. Pencereyi dolduran bir ekran `FlexGrow: 1` alır.
 
 ## Grid
 

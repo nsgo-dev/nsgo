@@ -178,7 +178,7 @@ func (p View) Render(cx *core.Scope) core.Node {
 			core.View{StyleFunc: func() core.Style {
 				return core.Style{Position: core.Absolute, Left: core.Pt(0), Top: core.Pt(0), Right: core.Pt(0), Bottom: core.Pt(v.keyboardOverlap())}
 			}, Children: []core.Node{
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), Position: core.Relative, Overflow: core.Hidden}, Children: []core.Node{
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), Position: core.Relative, Overflow: core.Hidden}, Children: []core.Node{
 					core.Canvas{Style: fill, Draw: v.draw},
 					core.Scroll{
 						Ref: v.scrollRef, Style: fill, TestID: v.testID("scroll"), OnScroll: v.scrolled, Behavior: keepKeyboard,

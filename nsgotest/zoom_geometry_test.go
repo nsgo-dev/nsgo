@@ -14,7 +14,7 @@ func TestZoomedScrollPressAtReachesVisibleContent(t *testing.T) {
 	app := Start(t, func(*core.Scope) core.Node {
 		var children []core.Node
 		for index := range 3 {
-			children = append(children, core.View{TestID: []string{"first", "middle", "last"}[index], Style: core.Style{Width: core.Pt(120), Height: core.Pt(80), FlexShrink: 0}, OnPress: func(core.PressEvent) { pressed = index }})
+			children = append(children, core.View{TestID: []string{"first", "middle", "last"}[index], Style: core.Style{Width: core.Pt(120), Height: core.Pt(80), FlexShrink: core.NoShrink}, OnPress: func(core.PressEvent) { pressed = index }})
 		}
 		return core.Scroll{TestID: "scroll", Ref: &scroll, MaxZoomScale: 2, Style: core.Style{Width: core.Pt(120), Height: core.Pt(80)}, Children: children}
 	}, Size(300, 260))

@@ -69,7 +69,7 @@ func readingParts(cx *core.Scope) textview.Styles {
 		textview.PartTaskMarker:        {Width: core.Pt(16), Height: core.Pt(16), CornerRadius: 4, BorderWidth: 1, BorderColor: colors.FieldBorder, Background: colors.Field, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Margin: core.Edges{Top: 3}},
 		textview.PartTaskMarkerChecked: {Background: colors.AccentFill, BorderColor: colors.AccentFill, Color: colors.OnAccent, FontSize: 11},
 		textview.PartTaskDone:          {Color: colors.Muted},
-		textview.PartListItemContent:   {FlexGrow: 1, FlexShrink: 1, Gap: 4},
+		textview.PartListItemContent:   {FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 4},
 		textview.PartCodeBlock:         {Background: colors.Inset, CornerRadius: ui.RadiusControl, BorderWidth: 1, BorderColor: colors.Line},
 		textview.PartCodeBlockScroll:   {Padding: core.Symmetric(10, 12)},
 		textview.PartCodeBlockCode:     codeFont.Merge(core.Style{LineHeight: 19, Color: colors.Code}),
@@ -309,7 +309,7 @@ func selectionAreaCard(cx *core.Scope) core.Node {
 			textview.TextView{Markdown: tvAnswer, StyleOf: readingStyles(cx)},
 			core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignBaseline, Gap: 8}, Children: []core.Node{
 				core.Text{Content: tr.TextviewNotSelectable(), Selectable: core.SelectableOff, Style: core.Style{FontSize: 13}, StyleFunc: ui.Colored(colors.Faint)},
-				core.Text{Content: tr.TextviewAPlainTextJoinsThe(), Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
+				core.Text{Content: tr.TextviewAPlainTextJoinsThe(), Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Text)},
 			}},
 		}},
 		Caption{Label: Hint(cx, tr.TextviewLongPressThenMoveThe(), tr.TextviewDragFromTheQuestionInto())},

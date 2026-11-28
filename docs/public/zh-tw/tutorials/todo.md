@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ func Root(cx *core.Scope) core.Node {
 
 **更新會替換切片。**`items.Update` 會回傳一個新的切片，因此由清單的識別與列鍵（row key）決定畫面上保留哪些內容。`nextID` 會為每個待辦事項賦予一個 ID，並供 `core.List` 的 `Key` 使用；若沒有穩定的鍵值，列位會將其儲存格重複使用於其他項目。
 
-**畫面是一棵由方框組成的樹。**`Root` 會回傳一個帶有內距（padding）、間距（gap）與安全區域內縮（inset）的 `core.View`。`FlexGrow: 1` 與 `FlexShrink: 1` 使其剛好填滿視窗而不會超出，因此長清單會在其中捲動，而不會將視窗撐出邊緣。輸入列設定了 `Direction: core.Row`；其餘部分皆為預設的垂直欄（column）排列。
+**畫面是一棵由方框組成的樹。**`Root` 會回傳一個帶有內距（padding）、間距（gap）與安全區域內縮（inset）的 `core.View`。`FlexGrow: 1` 與 `FlexShrink: core.Shrink(1)` 使其剛好填滿視窗而不會超出，因此長清單會在其中捲動，而不會將視窗撐出邊緣。輸入列設定了 `Direction: core.Row`；其餘部分皆為預設的垂直欄（column）排列。
 
 **輸入框是受控的。**`draft.Get` 是欄位的值，而 `draft.Set` 會接收每次變更。按下 Return 時 `OnSubmit` 會新增任務，接著 `add` 會清除草稿，讓欄位自動清空。
 

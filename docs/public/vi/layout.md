@@ -7,7 +7,7 @@ order: 51
 
 ## Khung
 
-Mọi phần tử là một khung được engine bố trí. Các giá trị mặc định giống React Native: flexbox theo cột, các phần tử con giữ kích thước trừ khi chúng giãn ra hoặc co lại, các mục được kéo giãn theo trục chéo, và kích thước bao gồm cả padding và viền.
+Mọi phần tử là một khung được engine bố trí. Các giá trị mặc định phần lớn giống React Native: flexbox theo cột, các phần tử con giữ kích thước trừ khi chúng giãn ra hoặc co lại, các mục được kéo giãn theo trục chéo, không có kích thước tối thiểu tự động, và kích thước bao gồm cả padding và viền. Khác với React Native, một khung giãn ra thì cũng co lại, các scroll view và những khung bao quanh chúng cũng vậy.
 
 ```go
 core.View{
@@ -23,18 +23,18 @@ core.View{
 
 ## Kích thước
 
-`Width`, `Height`, `MinWidth`, `MaxWidth` và `FlexBasis` nhận `core.Pt` cho đơn vị điểm hoặc `core.Pct` cho phần trăm của phần tử cha. `FlexGrow` chia sẻ không gian trống và `FlexShrink` cho phép một khung nhường lại một phần; một khung không có cả hai sẽ giữ nguyên kích thước. `AspectRatio` là chiều rộng chia cho chiều cao. `AutoMargin` chiếm không gian trống ở các cạnh mà nó chỉ định, nên một cạnh sẽ đẩy khung về phía cạnh còn lại.
+`Width`, `Height`, `MinWidth`, `MaxWidth` và `FlexBasis` nhận `core.Pt` cho đơn vị điểm hoặc `core.Pct` cho phần trăm của phần tử cha. `FlexGrow` chia sẻ không gian trống và `FlexShrink` nhường lại một phần khi không đủ chỗ. Khi chưa đặt, `FlexShrink` là 1 cho một khung giãn ra, cho một `core.Scroll` hoặc `core.List` theo trục cuộn của nó và cho mỗi khung bao quanh chúng mà không đặt kích thước trên trục đó, và là 0 cho phần còn lại, kể cả nội dung của một `core.Scroll`; `core.Shrink(n)` đặt một hệ số và `core.NoShrink` giữ một khung ở kích thước của nó. `AspectRatio` là chiều rộng chia cho chiều cao. `AutoMargin` chiếm không gian trống ở các cạnh mà nó chỉ định, nên một cạnh sẽ đẩy khung về phía cạnh còn lại.
 
 ```go
 core.View{Style: core.Style{Direction: core.Row, Gap: 16}, Children: []core.Node{
-	core.View{Style: core.Style{Width: core.Pt(220), FlexShrink: 0}},
-	core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}},
+	core.View{Style: core.Style{Width: core.Pt(220)}},
+	core.View{Style: core.Style{FlexGrow: 1}},
 }}
 ```
 
-Nội dung của một khung quyết định kích thước của nó cho đến khi chiều rộng hoặc chiều cao nói khác. `core.MinContent`, `core.MaxContent` và `core.FitContent` nhận các kích thước mà CSS đặt tên: chiều rộng min-content của một văn bản là từ dài nhất của nó. Một văn bản trong một hàng chỉ co lại và xuống dòng khi có `FlexShrink: 1`; thêm `FlexGrow: 1` khi nó cần chiếm phần không gian còn lại. Giá trị tối thiểu chưa đặt vốn đã là 0, như trong React Native, nên `MinWidth: core.Pt(0)` không thay đổi gì và một văn bản đang co lại sẽ ngắt giữa các từ khi hàng hẹp hơn từ dài nhất của nó. `MinWidth: core.AutoMinimum` dừng nó ở từ dài nhất, giống như giá trị tối thiểu tự động của CSS.
+Nội dung của một khung quyết định kích thước của nó cho đến khi chiều rộng hoặc chiều cao nói khác. `core.MinContent`, `core.MaxContent` và `core.FitContent` nhận các kích thước mà CSS đặt tên: chiều rộng min-content của một văn bản là từ dài nhất của nó. Một văn bản trong một hàng co lại và xuống dòng khi nó đặt `FlexGrow: 1` hoặc `FlexShrink: core.Shrink(1)`; giá trị tối thiểu chưa đặt vốn đã là 0, như trong React Native, nên `MinWidth: core.Pt(0)` không thay đổi gì và một văn bản đang co lại sẽ ngắt giữa các từ khi hàng hẹp hơn từ dài nhất của nó. `MinWidth: core.AutoMinimum` dừng nó ở từ dài nhất, giống như giá trị tối thiểu tự động của CSS.
 
-Một màn hình lấp đầy cửa sổ dùng `FlexGrow: 1` và `FlexShrink: 1`, và mỗi khung nằm giữa nó với một danh sách hay scroll view cần cuộn cũng vậy. Chỉ với `FlexGrow`, một khung sẽ giãn theo nội dung của nó, nên một danh sách dài sẽ kéo giãn nó vượt quá cửa sổ thay vì cuộn.
+Nhờ vậy, một danh sách hay scroll view vẫn cuộn dù nằm sâu đến đâu, không cần đặt gì trên các khung bao quanh nó, trong khi header, tab và thanh công cụ bên cạnh giữ nguyên kích thước. Một màn hình lấp đầy cửa sổ dùng `FlexGrow: 1`.
 
 ## Grid
 

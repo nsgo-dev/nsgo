@@ -91,7 +91,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -126,7 +126,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -146,7 +146,7 @@ Save the file and the app restarts. Type a task, press **Add** and check it off.
 
 **Updates replace the slice.** `items.Update` returns a new slice, so the list's identity and the row keys decide what stays on screen. `nextID` gives each todo an ID, and `core.List`'s `Key` uses it; without a stable key, rows would reuse their cells for other items.
 
-**The screen is a tree of boxes.** `Root` returns a `core.View` with padding, a gap and the safe area's insets. `FlexGrow: 1` and `FlexShrink: 1` make it fill the window and no more, so a long list scrolls inside it instead of stretching it past the window's edge. The input row sets `Direction: core.Row`; everything else is the default column.
+**The screen is a tree of boxes.** `Root` returns a `core.View` with padding, a gap and the safe area's insets. `FlexGrow: 1` and `FlexShrink: core.Shrink(1)` make it fill the window and no more, so a long list scrolls inside it instead of stretching it past the window's edge. The input row sets `Direction: core.Row`; everything else is the default column.
 
 **The input is controlled.** `draft.Get` is the field's value and `draft.Set` receives each change. `OnSubmit` adds a task when Return is pressed, and `add` clears the draft, so the field empties itself.
 

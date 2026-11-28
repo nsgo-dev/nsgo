@@ -933,7 +933,7 @@ func (v *dv) side(side int) core.Node {
 		Class: v.p.Classes.Gutter,
 		StyleFunc: func() core.Style {
 			v.rev.Get()
-			return merge(core.Style{Width: core.Pt(core.Points(v.gutterWidth())), FlexShrink: 0}, v.styles().Gutter)
+			return merge(core.Style{Width: core.Pt(core.Points(v.gutterWidth())), FlexShrink: core.NoShrink}, v.styles().Gutter)
 		},
 		Children: []core.Node{v.rowsOf(func(i int, r row) core.Node { return v.gutterPiece(i, r, side) })},
 	}
@@ -956,11 +956,11 @@ func (v *dv) side(side int) core.Node {
 	}
 	var text core.Node
 	if v.p.SoftWrap {
-		text = core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}, Children: []core.Node{rows}}
+		text = core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}, Children: []core.Node{rows}}
 	} else {
 		ref := &core.Ref{}
 		v.hs = append(v.hs, ref)
-		text = core.Scroll{Horizontal: true, Ref: ref, Style: core.Style{FlexGrow: 1, FlexShrink: 1},
+		text = core.Scroll{Horizontal: true, Ref: ref, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)},
 			OnScroll: func(e core.ScrollEvent) { v.scrolledX(ref, float32(e.Offset.X)) }, Children: []core.Node{rows}}
 	}
 	return core.View{

@@ -51,7 +51,7 @@ func (h NavHeader) Render(cx *core.Scope) core.Node {
 	}
 	children = append(children, h.Leading...)
 	children = append(children, core.Text{Content: h.Title, ContentFunc: h.TitleFunc, MaxLines: 1, Role: core.RoleHeader,
-		Style: TypeTitle.Merge(core.Style{FlexGrow: 1, FlexShrink: 1}), StyleFunc: Colored(colors.Text)})
+		Style: TypeTitle.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}), StyleFunc: Colored(colors.Text)})
 	children = append(children, h.Trailing...)
 	return core.View{TestID: h.TestID, Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8,
 		MinHeight: core.Pt(44), Padding: core.Symmetric(0, 12), PaddingEnv: core.EnvEdges{Left: core.EnvSafeArea, Right: core.EnvSafeArea}, Borders: core.Edges{Bottom: 1}},

@@ -141,7 +141,7 @@ func (r Reasoning) Render(cx *core.Scope) core.Node {
 			Style:     core.Style{Group: "chat-reasoning", Direction: core.Row, AlignItems: core.AlignCenter, Height: core.Pt(24), Gap: 5, MinWidth: core.Pt(0)},
 			StyleFunc: func() core.Style { return core.Style{FocusVisible: ui.FocusRing(cx, 2)} },
 			Children: []core.Node{
-				core.Text{ContentFunc: label, MaxLines: 1, Style: core.Style{FontSize: 12.5, FontWeight: ui.Medium, MinWidth: core.Pt(0), FlexShrink: 1},
+				core.Text{ContentFunc: label, MaxLines: 1, Style: core.Style{FontSize: 12.5, FontWeight: ui.Medium, MinWidth: core.Pt(0), FlexShrink: core.Shrink(1)},
 					StyleFunc: func() core.Style {
 						return core.Style{Color: colors.chatSecondary(), GroupStyle: &core.GroupStyle{Name: "chat-reasoning",
 							Hover: &core.Style{Color: colors.Text()}, Focus: &core.Style{Color: colors.Text()}}}
@@ -158,7 +158,7 @@ func (r Reasoning) Render(cx *core.Scope) core.Node {
 			Children: []core.Node{core.Func(body)}}
 	}}
 	return core.Show{When: reasoned, Then: func(*core.Scope) core.Node {
-		return core.View{TestID: r.TestID, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: 0, Gap: 4},
+		return core.View{TestID: r.TestID, Style: core.Style{MinWidth: core.Pt(0), FlexShrink: core.NoShrink, Gap: 4},
 			Children: []core.Node{row, detail}}
 	}}
 }

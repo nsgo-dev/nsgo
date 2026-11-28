@@ -82,11 +82,11 @@ func (in TagInput) Render(cx *core.Scope) core.Node {
 				set(slices.DeleteFunc(slices.Clone(core.Untracked(cx, tags)), func(s string) bool { return s == gone }))
 			}, Children: []core.Node{Icon(lucide.X, TypeCaption.FontSize, Inherited)}}
 		return core.View{Style: TypeBody.Merge(core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 2, Height: core.Pt(chipSize),
-			Padding: core.Edges{Left: 8, Right: 2}, CornerRadius: RadiusSmall, BorderWidth: 1, MinWidth: core.Pt(0), FlexShrink: 1, Cursor: core.CursorDefault}),
+			Padding: core.Edges{Left: 8, Right: 2}, CornerRadius: RadiusSmall, BorderWidth: 1, MinWidth: core.Pt(0), FlexShrink: core.Shrink(1), Cursor: core.CursorDefault}),
 			StyleFunc: func() core.Style {
 				return core.Style{BorderColor: colors.Border(), Background: colors.Raised(), Color: colors.Text()}
 			},
-			Children: []core.Node{core.Text{ContentFunc: tag, MaxLines: 1, Style: core.Style{FlexShrink: 1}}, remove}}
+			Children: []core.Node{core.Text{ContentFunc: tag, MaxLines: 1, Style: core.Style{FlexShrink: core.Shrink(1)}}, remove}}
 	}
 	field := base.Input{Value: draft.Get, Placeholder: in.Placeholder, Disabled: in.Disabled, Label: in.Label,
 		Style: TypeBody.Merge(core.Style{FlexGrow: 1, FlexBasis: core.Pt(80), MinWidth: core.Pt(80), Height: core.Pt(chipSize),

@@ -94,7 +94,7 @@ func Root(cx *core.Scope) core.Node {
 	}
 
 	return core.View{
-		Style: core.Style{FlexGrow: 1, FlexShrink: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
+		Style: core.Style{FlexGrow: 1, Padding: core.All(24), PaddingEnv: core.EnvAll(core.EnvSafeArea), Gap: 16},
 		StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Background()}
 		},
@@ -129,7 +129,7 @@ func Root(cx *core.Scope) core.Node {
 								OnChange: func(done bool) { setDone(it.id, done) },
 								Text:     it.text,
 								TestID:   fmt.Sprintf("todo-%d", it.id),
-								Style:    core.Style{FlexGrow: 1, FlexShrink: 1},
+								Style:    core.Style{FlexGrow: 1},
 							},
 							ui.IconButton{Icon: lucide.Trash, Label: "Delete", Variant: ui.IconButtonGhost,
 								TestID: fmt.Sprintf("delete-%d", it.id), OnPress: func() { remove(it.id) }},
@@ -149,7 +149,7 @@ Enregistrez le fichier et l’application redémarre. Saisissez une tâche, appu
 
 **Les mises à jour remplacent la tranche.** `items.Update` retourne une nouvelle tranche, de sorte que l’identité de la liste et les clés de ligne décident de ce qui reste à l’écran. `nextID` attribue un identifiant à chaque tâche, et `Key` de `core.List` l’utilise ; sans clé stable, les lignes réutiliseraient leurs cellules pour d’autres éléments.
 
-**L’écran est un arbre de boîtes.** `Root` retourne une `core.View` avec du remplissage interne, un espacement et les marges de la zone de sécurité. `FlexGrow: 1` et `FlexShrink: 1` lui font remplir la fenêtre sans la dépasser, afin qu’une longue liste défile à l’intérieur au lieu de l’étirer au-delà du bord de la fenêtre. La ligne de saisie définit `Direction: core.Row` ; tout le reste utilise la disposition en colonne par défaut.
+**L’écran est un arbre de boîtes.** `Root` retourne une `core.View` avec du remplissage interne, un espacement et les marges de la zone de sécurité. `FlexGrow: 1` et `FlexShrink: core.Shrink(1)` lui font remplir la fenêtre sans la dépasser, afin qu’une longue liste défile à l’intérieur au lieu de l’étirer au-delà du bord de la fenêtre. La ligne de saisie définit `Direction: core.Row` ; tout le reste utilise la disposition en colonne par défaut.
 
 **Le champ de saisie est contrôlé.** `draft.Get` est la valeur du champ et `draft.Set` reçoit chaque modification. `OnSubmit` ajoute une tâche lorsque la touche Entrée est pressée, et `add` efface le brouillon, de sorte que le champ se vide de lui-même.
 

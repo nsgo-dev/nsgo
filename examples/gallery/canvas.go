@@ -502,7 +502,7 @@ func clock(cx *core.Scope) core.Node {
 	return Card{Title: tr.CanvasTransforms(), Description: tr.CanvasTranslateRotateSaveRestore(), Children: []core.Node{
 		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 16}, Children: []core.Node{
 			core.Canvas{Style: core.Style{Width: core.Pt(150), Height: core.Pt(150)}, Draw: draw, Label: tr.CanvasClock()},
-			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 8}, Children: []core.Node{
+			core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 8}, Children: []core.Node{
 				Caption{Label: tr.CanvasTicks(), Note: label(tr.Canvas60Rotations())}, Caption{Label: tr.CanvasHands(), Note: label(tr.CanvasSaveRestore())}, Caption{Label: tr.CanvasSecondHand(), Note: label(tr.CanvasALoop())},
 			}},
 		}},

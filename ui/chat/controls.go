@@ -41,7 +41,7 @@ func (a AttachmentPreview) Render(cx *core.Scope) core.Node {
 			},
 			Children: []core.Node{ui.Icon(lucide.X, 11, colors.Text)}})
 	}
-	return ui.Tooltip{Text: a.Label, Trigger: core.View{Style: core.Style{Width: core.Pt(64), Height: core.Pt(64), FlexShrink: 0, CornerRadius: 8, Overflow: core.Hidden, BorderWidth: 1},
+	return ui.Tooltip{Text: a.Label, Trigger: core.View{Style: core.Style{Width: core.Pt(64), Height: core.Pt(64), FlexShrink: core.NoShrink, CornerRadius: 8, Overflow: core.Hidden, BorderWidth: 1},
 		StyleFunc: func() core.Style {
 			return core.Style{BorderColor: colors.chatStrongBorder(), Background: colors.Surface()}
 		}, Children: children}}
@@ -64,29 +64,29 @@ func (a Attachment) Render(cx *core.Scope) core.Node {
 	colors := tonesOf(cx)
 	var children []core.Node
 	if hasImage(a.Image) {
-		children = append(children, core.Image{Source: a.Image, ResizeMode: core.Cover, Style: core.Style{Width: core.Pt(22), Height: core.Pt(22), CornerRadius: 4, FlexShrink: 0}})
+		children = append(children, core.Image{Source: a.Image, ResizeMode: core.Cover, Style: core.Style{Width: core.Pt(22), Height: core.Pt(22), CornerRadius: 4, FlexShrink: core.NoShrink}})
 	} else {
 		name := a.Icon
 		if name == nil {
 			name = lucide.FileText
 		}
-		children = append(children, core.View{Style: core.Style{Width: core.Pt(22), Height: core.Pt(22), FlexShrink: 0, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
+		children = append(children, core.View{Style: core.Style{Width: core.Pt(22), Height: core.Pt(22), FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 			Children: []core.Node{ui.Icon(name, 13, colors.Muted)}})
 	}
 	label := ui.Text(a.Label, 12.5, ui.Regular, colors.chatSecondary)
 	label.MaxLines = 1
-	label.Style.MinWidth, label.Style.FlexShrink = core.Pt(0), 1
+	label.Style.MinWidth, label.Style.FlexShrink = core.Pt(0), core.Shrink(1)
 	children = append(children, label)
 	if a.Detail != "" {
 		detail := ui.Text(a.Detail, 11.5, ui.Regular, colors.Muted)
-		detail.Style.FlexShrink = 0
+		detail.Style.FlexShrink = core.NoShrink
 		children = append(children, detail)
 	}
 	if a.RemoveLabel == "" {
 		children = append(children, core.View{Style: core.Style{Width: core.Pt(2)}})
 	} else {
 		children = append(children, base.Button{Label: a.RemoveLabel, OnPress: chatPress(a.OnRemove),
-			Style: core.Style{Group: "chat-remove", Width: core.Pt(18), Height: core.Pt(18), FlexShrink: 0, CornerRadius: 4, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
+			Style: core.Style{Group: "chat-remove", Width: core.Pt(18), Height: core.Pt(18), FlexShrink: core.NoShrink, CornerRadius: 4, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 			StyleFunc: func() core.Style {
 				return core.Style{Hover: &core.Style{Background: colors.chatOverlayStrong()}, FocusVisible: ui.FocusRing(cx, 2)}
 			},
@@ -146,19 +146,19 @@ func (p Chip) face(cx *core.Scope) []core.Node {
 	case p.Leading != nil:
 		children = append(children, p.Leading(cx, 14))
 	case hasImage(p.Image):
-		children = append(children, core.Image{Source: p.Image, ResizeMode: core.Contain, Style: core.Style{Width: core.Pt(14), Height: core.Pt(14), CornerRadius: 3, FlexShrink: 0}})
+		children = append(children, core.Image{Source: p.Image, ResizeMode: core.Contain, Style: core.Style{Width: core.Pt(14), Height: core.Pt(14), CornerRadius: 3, FlexShrink: core.NoShrink}})
 	case p.Icon != nil:
-		children = append(children, core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{ui.Icon(p.Icon, 12, colors.Muted)}})
+		children = append(children, core.View{Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{ui.Icon(p.Icon, 12, colors.Muted)}})
 	}
 	label := ui.Textf(p.text(), 12.5, ui.Regular, colors.chatSecondary)
 	label.MaxLines = 1
-	label.Style.MinWidth, label.Style.FlexShrink = core.Pt(0), 1
+	label.Style.MinWidth, label.Style.FlexShrink = core.Pt(0), core.Shrink(1)
 	if p.Yield {
 		label.EllipsizeMode = core.EllipsizeHead
 	}
 	children = append(children, label)
 	if p.Caret {
-		children = append(children, core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{
+		children = append(children, core.View{Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{
 			ui.Icon(lucide.ChevronDown, 10.5, func() core.Color { return ui.Alpha(colors.Muted(), 0.7) })}})
 	}
 	return children
@@ -174,7 +174,7 @@ func (p Chip) shape(cx *core.Scope) (core.Style, func() core.Style) {
 	if p.Yield {
 		shrink = chipYieldShrink
 	}
-	return core.Style{Direction: core.Row, Height: core.Pt(26), MinWidth: core.Pt(0), FlexShrink: shrink, Padding: core.Symmetric(0, 7), CornerRadius: 6, AlignItems: core.AlignCenter, Gap: 6,
+	return core.Style{Direction: core.Row, Height: core.Pt(26), MinWidth: core.Pt(0), FlexShrink: core.Shrink(shrink), Padding: core.Symmetric(0, 7), CornerRadius: 6, AlignItems: core.AlignCenter, Gap: 6,
 			Disabled: &core.Style{Opacity: core.Alpha(0.7)}},
 		func() core.Style {
 			return chatTriggerStates(cx, is(p.Active))
@@ -184,7 +184,7 @@ func (p Chip) shape(cx *core.Scope) (core.Style, func() core.Style) {
 // Render implements core.Node.
 func (p Chip) Render(cx *core.Scope) core.Node {
 	if p.OnPress == nil {
-		return core.View{TestID: p.TestID, Label: p.Text, Style: core.Style{Direction: core.Row, Height: core.Pt(26), FlexShrink: 0, Padding: core.Symmetric(0, 7), AlignItems: core.AlignCenter, Gap: 6},
+		return core.View{TestID: p.TestID, Label: p.Text, Style: core.Style{Direction: core.Row, Height: core.Pt(26), FlexShrink: core.NoShrink, Padding: core.Symmetric(0, 7), AlignItems: core.AlignCenter, Gap: 6},
 			Children: p.face(cx)}
 	}
 	style, states := p.shape(cx)
@@ -282,7 +282,7 @@ func (p Picker) Render(cx *core.Scope) core.Node {
 				}
 			}))
 		}
-		return core.Scroll{Style: core.Style{MaxHeight: core.Pt(348), FlexShrink: 1}, Children: []core.Node{core.View{Style: core.Style{Padding: core.All(4), Gap: 1}, Children: rows}}}
+		return core.Scroll{Style: core.Style{MaxHeight: core.Pt(348), FlexShrink: core.Shrink(1)}, Children: []core.Node{core.View{Style: core.Style{Padding: core.All(4), Gap: 1}, Children: rows}}}
 	}))
 	return base.Popover{Open: open.Get, OnOpenChange: func(v bool, _ base.Reason) { open.Set(v); query.Set("") }, Placement: core.PlaceTop, Align: core.AlignStart, Offset: 4, Margin: 8,
 		Style: style, StyleFunc: states, Trigger: core.Group(chip.face(cx)), Label: core.Untracked(cx, p.Label), TestID: p.TestID,
@@ -307,12 +307,12 @@ func chatPickerRow(cx *core.Scope, o Option, leading bool, selected func() bool,
 	case o.Leading != nil:
 		children = append(children, o.Leading(cx, 16))
 	case hasImage(o.Image):
-		children = append(children, core.Image{Source: o.Image, ResizeMode: core.Contain, Style: core.Style{Width: core.Pt(16), Height: core.Pt(16), CornerRadius: 3, FlexShrink: 0}})
+		children = append(children, core.Image{Source: o.Image, ResizeMode: core.Contain, Style: core.Style{Width: core.Pt(16), Height: core.Pt(16), CornerRadius: 3, FlexShrink: core.NoShrink}})
 	case o.Icon != nil:
-		children = append(children, core.View{Style: core.Style{Width: core.Pt(16), Height: core.Pt(16), FlexShrink: 0, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
+		children = append(children, core.View{Style: core.Style{Width: core.Pt(16), Height: core.Pt(16), FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 			Children: []core.Node{ui.Icon(o.Icon, 13, colors.chatSecondary)}})
 	case leading:
-		children = append(children, core.View{Style: core.Style{Width: core.Pt(16), Height: core.Pt(16), FlexShrink: 0}})
+		children = append(children, core.View{Style: core.Style{Width: core.Pt(16), Height: core.Pt(16), FlexShrink: core.NoShrink}})
 	}
 	label := ui.Text(o.Label, 13, ui.Regular, colors.Text)
 	label.MaxLines = 1
@@ -320,13 +320,13 @@ func chatPickerRow(cx *core.Scope, o Option, leading bool, selected func() bool,
 	if o.Description != "" {
 		text = append(text, ui.Text(o.Description, 11.5, ui.Regular, colors.Muted))
 	}
-	children = append(children, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 1}, Children: text})
+	children = append(children, core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Gap: 1}, Children: text})
 	if o.Detail != "" {
 		detail := ui.Text(o.Detail, 11.5, ui.Regular, colors.Muted)
-		detail.Style.FlexShrink = 0
+		detail.Style.FlexShrink = core.NoShrink
 		children = append(children, detail)
 	}
-	children = append(children, core.View{Style: core.Style{Width: core.Pt(12), Height: core.Pt(12), FlexShrink: 0}, Children: []core.Node{
+	children = append(children, core.View{Style: core.Style{Width: core.Pt(12), Height: core.Pt(12), FlexShrink: core.NoShrink}, Children: []core.Node{
 		core.Show{When: selected, Then: func(*core.Scope) core.Node { return ui.Icon(lucide.Check, 12, colors.Accent) }},
 	}})
 	return base.Button{Label: o.Label, Selected: selected, OnPress: chatPress(choose),
@@ -357,11 +357,11 @@ func (m ContextMeter) Render(cx *core.Scope) core.Node {
 	fill := func() core.Color { return chatMeterColor(cx, m.Fraction()) }
 	head := ui.Text(m.Title, 12.5, ui.Regular, colors.Text)
 	head.MaxLines = 1
-	head.Style.FlexGrow, head.Style.FlexShrink, head.Style.MinWidth = 1, 1, core.Pt(0)
+	head.Style.FlexGrow, head.Style.FlexShrink, head.Style.MinWidth = 1, core.Shrink(1), core.Pt(0)
 	value := ui.Textf(m.Value, 12.5, ui.Regular, colors.Muted)
-	value.Style.FlexShrink = 0
+	value.Style.FlexShrink = core.NoShrink
 	trigger := base.Popover{Open: open.Get, OnOpenChange: func(v bool, _ base.Reason) { open.Set(v) }, Placement: core.PlaceTop, Align: core.AlignEnd, Offset: 4, Margin: 8,
-		Style:     core.Style{Height: core.Pt(20), Padding: core.Symmetric(0, 5), CornerRadius: 5, FlexShrink: 0, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
+		Style:     core.Style{Height: core.Pt(20), Padding: core.Symmetric(0, 5), CornerRadius: 5, FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter},
 		StyleFunc: chatMeterStates(cx, open.Get), Label: m.Label, TestID: m.TestID, PopupStyleFunc: chatPopup(cx),
 		PopupStyle: core.Style{Width: core.Pt(320), MaxWidth: core.Pct(100), Padding: core.All(14), Gap: 7},
 		Trigger:    chatGauge(cx, m.Fraction, fill),
@@ -419,7 +419,7 @@ func chatMeterColor(cx *core.Scope, fraction float64) core.Color {
 // chatBar is a track filled to fraction, negative for the track alone.
 func chatBar(cx *core.Scope, fraction func() float64, fill func() core.Color, s core.Style) core.Node {
 	colors := tonesOf(cx)
-	return core.View{Style: core.Style{FlexShrink: 0, Overflow: core.Hidden, CornerRadius: 3}.Merge(s), StyleFunc: ui.Filled(colors.Border), Children: []core.Node{
+	return core.View{Style: core.Style{FlexShrink: core.NoShrink, Overflow: core.Hidden, CornerRadius: 3}.Merge(s), StyleFunc: ui.Filled(colors.Border), Children: []core.Node{
 		core.View{Style: core.Style{Height: core.Pct(100), CornerRadius: 3}, StyleFunc: func() core.Style {
 			return core.Style{Width: core.Pct(float32(100 * min(max(fraction(), 0), 1))), Background: fill()}
 		}},
@@ -433,7 +433,7 @@ func chatPaced(cx *core.Scope, pace float64, bar core.Node) core.Node {
 		return bar
 	}
 	colors := tonesOf(cx)
-	return core.View{Style: core.Style{FlexShrink: 0}, Children: []core.Node{bar,
+	return core.View{Style: core.Style{FlexShrink: core.NoShrink}, Children: []core.Node{bar,
 		core.Canvas{Style: core.Style{Position: core.Absolute, Top: core.Pt(-2), Bottom: core.Pt(-2), Left: core.Pt(0), Right: core.Pt(0)}, Draw: func(d *core.Drawing, s core.Size) {
 			const width = 2
 			w := float32(s.Width)
@@ -446,7 +446,7 @@ func chatPaced(cx *core.Scope, pace float64, bar core.Node) core.Node {
 // chatGauge is a ring on the theme's border, clockwise from twelve o'clock.
 func chatGauge(cx *core.Scope, fraction func() float64, fill func() core.Color) core.Node {
 	colors := tonesOf(cx)
-	return core.Canvas{Style: core.Style{Width: core.Pt(13), Height: core.Pt(13), FlexShrink: 0}, Draw: func(d *core.Drawing, s core.Size) {
+	return core.Canvas{Style: core.Style{Width: core.Pt(13), Height: core.Pt(13), FlexShrink: core.NoShrink}, Draw: func(d *core.Drawing, s core.Size) {
 		const stroke = 2.5
 		r := (float32(s.Width) - stroke) / 2
 		x, y := float32(s.Width)/2, float32(s.Height)/2
@@ -496,12 +496,12 @@ func (q Quota) Render(cx *core.Scope) core.Node {
 	}
 	title := ui.Text(q.Title, 12.5, ui.Regular, colors.Muted)
 	title.MaxLines = 1
-	title.Style.FlexGrow, title.Style.FlexShrink, title.Style.MinWidth = 1, 1, core.Pt(0)
+	title.Style.FlexGrow, title.Style.FlexShrink, title.Style.MinWidth = 1, core.Shrink(1), core.Pt(0)
 	head = append(head, title)
 	if q.Countdown != nil {
 		countdown := ui.Tabular(ui.Textf(q.Countdown, 11.5, ui.Regular, colors.Muted))
 		countdown.MaxLines = 1
-		countdown.Style.FlexShrink = 0
+		countdown.Style.FlexShrink = core.NoShrink
 		head = append(head, countdown)
 	}
 	if q.RefreshLabel != "" {
@@ -544,17 +544,17 @@ func chatQuotaRow(cx *core.Scope, row QuotaRow) core.Node {
 	colors := tonesOf(cx)
 	label := ui.Text(row.Label, 12.5, ui.Regular, colors.Text)
 	label.MaxLines = 1
-	label.Style.MinWidth, label.Style.FlexShrink = core.Pt(0), 1
+	label.Style.MinWidth, label.Style.FlexShrink = core.Pt(0), core.Shrink(1)
 	left := []core.Node{label}
 	if row.Detail != "" {
 		detail := ui.Text(row.Detail, 11.5, ui.Regular, colors.Muted)
-		detail.Style.FlexShrink = 0
+		detail.Style.FlexShrink = core.NoShrink
 		left = append(left, detail)
 	}
 	value := ui.Text(row.Value, 12.5, ui.Regular, colors.chatSecondary)
-	value.Style.FlexShrink = 0
+	value.Style.FlexShrink = core.NoShrink
 	children := []core.Node{core.View{Style: core.Style{Direction: core.Row, MinWidth: core.Pt(0), AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{
-		core.View{Style: core.Style{Direction: core.Row, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), AlignItems: core.AlignCenter, Gap: 6}, Children: left},
+		core.View{Style: core.Style{Direction: core.Row, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), AlignItems: core.AlignCenter, Gap: 6}, Children: left},
 		value,
 	}}}
 	if row.Fraction >= 0 {
@@ -567,7 +567,7 @@ func chatQuotaRow(cx *core.Scope, row QuotaRow) core.Node {
 func chatQuotaAction(cx *core.Scope, label string, icon func() *core.SVG, disabled func() bool, press func()) core.Node {
 	colors := tonesOf(cx)
 	return ui.Tooltip{Text: label, Trigger: base.Button{Label: label, Disabled: disabled, OnPress: chatPress(press),
-		Style: core.Style{Width: core.Pt(20), Height: core.Pt(20), FlexShrink: 0, CornerRadius: 4, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Disabled: ui.Dimmed()},
+		Style: core.Style{Width: core.Pt(20), Height: core.Pt(20), FlexShrink: core.NoShrink, CornerRadius: 4, AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Disabled: ui.Dimmed()},
 		StyleFunc: func() core.Style {
 			return core.Style{Hover: &core.Style{Background: colors.chatOverlay()}, FocusVisible: ui.FocusRing(cx, 2)}
 		},
@@ -618,7 +618,7 @@ func (q QuotaSummary) Render(cx *core.Scope) core.Node {
 		panel = append(panel, quota)
 	}
 	trigger := base.Popover{Open: open.Get, OnOpenChange: func(v bool, _ base.Reason) { open.Set(v) }, Placement: core.PlaceTop, Align: core.AlignEnd, Offset: 4, Margin: 8,
-		Style:     core.Style{Direction: core.Row, Height: core.Pt(20), Padding: core.Symmetric(0, 5), CornerRadius: 5, FlexShrink: 0, AlignItems: core.AlignCenter, Gap: 6},
+		Style:     core.Style{Direction: core.Row, Height: core.Pt(20), Padding: core.Symmetric(0, 5), CornerRadius: 5, FlexShrink: core.NoShrink, AlignItems: core.AlignCenter, Gap: 6},
 		StyleFunc: chatMeterStates(cx, open.Get), Label: q.Label, TestID: q.TestID, Trigger: face, PopupStyleFunc: chatPopup(cx),
 		PopupStyle: core.Style{Width: core.Pt(320), MaxWidth: core.Pct(100), Padding: core.All(14), Gap: 14}, Children: panel}
 	if q.Tooltip != nil {
@@ -662,7 +662,7 @@ func (r ResultSummary) Render(cx *core.Scope) core.Node {
 	}
 	head := []core.Node{
 		ui.Icon(lucide.Files, 20, colors.Muted),
-		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), Gap: 4}, Children: titles},
+		core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Gap: 4}, Children: titles},
 	}
 	if r.ActionLabel != "" {
 		head = append(head, ui.Button{Text: r.ActionLabel, Variant: ui.ButtonOutline, OnPress: r.OnAction})
@@ -670,13 +670,13 @@ func (r ResultSummary) Render(cx *core.Scope) core.Node {
 	row := func(i SummaryItem) core.Node {
 		label := ui.Text(i.Label, 13, ui.Regular, colors.Text)
 		label.MaxLines = 1
-		label.Style.FlexGrow, label.Style.FlexShrink, label.Style.MinWidth = 1, 1, core.Pt(0)
+		label.Style.FlexGrow, label.Style.FlexShrink, label.Style.MinWidth = 1, core.Shrink(1), core.Pt(0)
 		var trailing core.Node
 		if i.Metadata != nil {
-			trailing = core.View{Style: core.Style{Direction: core.Row, Gap: 8, FlexShrink: 0}, Children: []core.Node{core.Func(i.Metadata)}}
+			trailing = core.View{Style: core.Style{Direction: core.Row, Gap: 8, FlexShrink: core.NoShrink}, Children: []core.Node{core.Func(i.Metadata)}}
 		} else {
 			detail := ui.Text(i.Detail, 13, ui.Regular, colors.Muted)
-			detail.Style.FlexShrink = 0
+			detail.Style.FlexShrink = core.NoShrink
 			trailing = detail
 		}
 		return base.Button{Label: i.Label, OnPress: func(core.PressEvent) {
@@ -717,7 +717,7 @@ func (r ResultSummary) Render(cx *core.Scope) core.Node {
 				return r.MoreLabel
 			}, 13, ui.Regular, colors.Text)}})
 	}
-	return core.View{Style: core.Style{MinWidth: core.Pt(0), FlexShrink: 0, CornerRadius: 12, BorderWidth: 1, Overflow: core.Hidden},
+	return core.View{Style: core.Style{MinWidth: core.Pt(0), FlexShrink: core.NoShrink, CornerRadius: 12, BorderWidth: 1, Overflow: core.Hidden},
 		StyleFunc: func() core.Style {
 			return core.Style{BorderColor: colors.Border(), Background: ui.Alpha(colors.Text(), 0.035)}
 		}, Children: children}
@@ -751,7 +751,7 @@ func (s Shimmer) Render(cx *core.Scope) core.Node {
 	if s.Highlight == nil {
 		s.Highlight = colors.Text
 	}
-	base := core.Text{ContentFunc: s.Text, MaxLines: 1, Style: core.Style{FontSize: s.Size, FlexShrink: 1, MinWidth: core.Pt(0)}, StyleFunc: ui.Colored(color)}
+	base := core.Text{ContentFunc: s.Text, MaxLines: 1, Style: core.Style{FontSize: s.Size, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}, StyleFunc: ui.Colored(color)}
 	if ui.ReduceMotion(cx) {
 		base.Style = base.Style.Merge(s.Style)
 		return base
@@ -776,7 +776,7 @@ func (s Shimmer) Render(cx *core.Scope) core.Node {
 				StyleFunc: ui.Colored(func() core.Color { return ui.Mix(color(), s.Highlight(), 0.75) })},
 		}}
 	})
-	return core.View{OnLayout: func(b core.Bounds) { width.Set(b.Size.Width) }, Style: core.Style{FlexShrink: 1, MinWidth: core.Pt(0), Overflow: core.Hidden}.Merge(s.Style),
+	return core.View{OnLayout: func(b core.Bounds) { width.Set(b.Size.Width) }, Style: core.Style{FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), Overflow: core.Hidden}.Merge(s.Style),
 		Children: []core.Node{base, sweep}}
 }
 

@@ -58,7 +58,7 @@ func photoRow(cx *core.Scope, p func() photo) core.Node {
 						BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Raised()})
 				}},
 			core.View{StyleFunc: func() core.Style {
-				return core.Style{FlexGrow: 1, FlexShrink: 1, Gap: 4, AlignSelf: core.AlignStretch, JustifyContent: core.JustifyCenter,
+				return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Gap: 4, AlignSelf: core.AlignStretch, JustifyContent: core.JustifyCenter,
 					Borders: core.Edges{Bottom: 1}, BorderColors: core.EdgeColors{Bottom: colors.Line()}}
 			}, Children: []core.Node{
 				core.Text{ContentFunc: func() string { return p().title }, MaxLines: 1, Style: core.Style{FontSize: 13, FontWeight: ui.Semibold}, StyleFunc: ui.Colored(colors.Text)},
@@ -99,7 +99,7 @@ func photoTile(cx *core.Scope, p func() photo) core.Node {
 				}},
 			core.View{Style: core.Style{Gap: 3, Padding: core.Edges{Right: 4, Bottom: 4, Left: 4}}, Children: []core.Node{
 				core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignBaseline, Gap: 8}, Children: []core.Node{
-					core.Text{ContentFunc: func() string { return p().title }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13, FontWeight: ui.Semibold}, StyleFunc: ui.Colored(colors.Text)},
+					core.Text{ContentFunc: func() string { return p().title }, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13, FontWeight: ui.Semibold}, StyleFunc: ui.Colored(colors.Text)},
 					ui.Textf(func() string { return fmt.Sprintf("#%d", p().id) }, 12, ui.Regular, colors.Faint),
 				}},
 				photoByline(cx, p, 12),
@@ -167,14 +167,14 @@ func photosDemo(cx *core.Scope) core.Node {
 		core.View{Style: core.Style{Position: core.Absolute, Left: core.Pt(gutter), Right: core.Pt(gutter), Bottom: core.Pt(photosBar),
 			Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, Animated: &core.AnimatedStyle{Opacity: lerp(collapsed, [2]float64{0, 0.5}, [2]float64{1, 0})}},
 			Children: []core.Node{
-				core.Text{Content: tr.PhotosARecycledListOfRemote(), MaxLines: 1, Style: core.Style{FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+				core.Text{Content: tr.PhotosARecycledListOfRemote(), MaxLines: 1, Style: core.Style{FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 				ui.Badge{Text: tr.PhotosRemote(), Variant: ui.BadgeAccent},
 			}},
 		// The bar: the title, which shrinks into it around its left edge,
 		// and the count, which fades in.
 		core.View{Style: core.Style{Position: core.Absolute, Left: core.Pt(gutter), Right: core.Pt(gutter), Bottom: core.Pt(0), Height: core.Pt(photosBar),
 			Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{
-			core.Text{Content: tr.PhotosPhotoStream(), Role: core.RoleHeader, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 26, FontWeight: ui.Bold,
+			core.Text{Content: tr.PhotosPhotoStream(), Role: core.RoleHeader, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 26, FontWeight: ui.Bold,
 				TransformOrigin: core.ObjectPosition{X: core.PositionStart, Y: core.PositionCenter},
 				Animated:        &core.AnimatedStyle{Scale: lerp(collapsed, [2]float64{0, 1}, [2]float64{1, 0.58})}}, StyleFunc: ui.Colored(colors.Text)},
 			core.View{Style: core.Style{Animated: &core.AnimatedStyle{Opacity: lerp(collapsed, [2]float64{0.6, 1}, [2]float64{0, 1})}}, Children: []core.Node{
@@ -194,7 +194,7 @@ func photosDemo(cx *core.Scope) core.Node {
 				hintText = refreshKey + tr.PhotosRefreshes() + hintText
 			}
 		}
-		foot := []core.Node{ui.Icon(lucide.ArrowDown, 14, colors.Faint), core.Text{Content: hintText, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Faint)}}
+		foot := []core.Node{ui.Icon(lucide.ArrowDown, 14, colors.Faint), core.Text{Content: hintText, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Faint)}}
 		// The mouse does not pull scroll views down: desktops refresh here.
 		if desktopIdiom {
 			foot = append(foot, core.Dynamic(func(*core.Scope) core.Node {

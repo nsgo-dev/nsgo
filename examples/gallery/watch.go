@@ -61,7 +61,7 @@ func (g *gallery) watchIndex(cx *core.Scope) core.Node {
 				continue
 			}
 			title := ui.Text(d.title(tr), 15, ui.Medium, colors.Text)
-			title.MaxLines, title.Style.FlexShrink = 1, 1
+			title.MaxLines, title.Style.FlexShrink = 1, core.Shrink(1)
 			demos = append(demos, core.View{OnPress: func(core.PressEvent) { g.nav.Push(route{demo: d.name}) }, Role: core.RoleButton, Label: d.title(tr), TestID: "nav-" + d.name,
 				Style:     core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8, MinHeight: core.Pt(40), Padding: core.Symmetric(6, 10), CornerRadius: 12},
 				StyleFunc: ui.Filled(colors.Inset), Children: []core.Node{ui.Icon(d.icon, 18, colors.Accent), title}})

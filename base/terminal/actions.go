@@ -158,7 +158,7 @@ func (v *view) withContextMenu(children []core.Node) []core.Node {
 				itemChildren = append(itemChildren, lead)
 			}
 		}
-		itemChildren = append(itemChildren, core.Text{ContentFunc: label, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1}})
+		itemChildren = append(itemChildren, core.Text{ContentFunc: label, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}})
 		return base.MenuItem{TestID: v.testID("menu-" + id), LabelFunc: label, Disabled: disabled,
 			Class: p.MenuItemClass, Style: p.MenuItemStyle, StyleFunc: p.MenuItemStyleFunc,
 			OnSelect: func() { v.perform(action, 0) },

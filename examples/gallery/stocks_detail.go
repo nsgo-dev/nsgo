@@ -48,7 +48,7 @@ func dayRange(cx *core.Scope, s *stock) core.Node {
 	return core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 10}, Children: []core.Node{
 		ui.Tabular(ui.Textf(func() string { return "L " + p(q().low) }, 12, ui.Regular, colors.Muted)),
 		core.View{OnLayout: func(b core.Bounds) { width = b.Size.Width; place() }, LabelFunc: func() string { return tr.StocksDayRange(p(q().low), p(q().high)) },
-			Style: core.Style{FlexGrow: 1, FlexShrink: 1, Height: core.Pt(16), JustifyContent: core.JustifyCenter}, Children: []core.Node{
+			Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Height: core.Pt(16), JustifyContent: core.JustifyCenter}, Children: []core.Node{
 				core.View{Style: core.Style{Height: core.Pt(4), CornerRadius: 2}, StyleFunc: ui.Filled(colors.Raised)},
 				core.View{StyleFunc: func() core.Style {
 					l, h := at(q().low), at(q().high)
@@ -116,7 +116,7 @@ func quoteBlock(cx *core.Scope, m *market, s *stock) core.Node {
 	w := core.Pct(25)
 	return core.View{Style: core.Style{Padding: core.Edges{Top: 12, Right: 16, Bottom: 14, Left: 16}, Gap: 10}, Children: []core.Node{
 		core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 8}, Children: []core.Node{
-			core.Text{Content: s.name, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
+			core.Text{Content: s.name, MaxLines: 1, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13}, StyleFunc: ui.Colored(colors.Muted)},
 			ui.Text(sectorName, 13, ui.Regular, colors.Faint),
 			liveDot(cx, m.running.Get, 6),
 			ui.Tabular(ui.Textf(func() string { return marketTime(float64(m.clock.Get()), true) }, 12, ui.Regular, colors.Muted)),
@@ -315,7 +315,7 @@ func stockView(cx *core.Scope, m *market, s *stock, wide bool, split func() bool
 			}, Children: []core.Node{
 				core.View{StyleFunc: func() core.Style {
 					if split() {
-						return core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}
+						return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}
 					}
 					return core.Style{}
 				}, Children: []core.Node{

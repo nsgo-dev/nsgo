@@ -588,7 +588,7 @@ func (r *renderer) details(cx *core.Scope, d Details, depth int, at TextRef) cor
 						}
 						return "▸"
 					}, Class: r.class(PartSummaryMarker), StyleFunc: func() core.Style { return r.style(PartSummaryMarker) }, SelectionBlock: selectionIgnore}),
-					r.inlineText(cx, at.child(-1), d.Summary, nil, false, core.SelectionBlock{Kind: core.SelectionBlockSummary}, core.Text{Style: core.Style{FlexGrow: 1, FlexShrink: 1}}),
+					r.inlineText(cx, at.child(-1), d.Summary, nil, false, core.SelectionBlock{Kind: core.SelectionBlockSummary}, core.Text{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}}),
 				}},
 			core.Show{When: open.Get, Then: func(cx *core.Scope) core.Node {
 				return core.Group(r.blocks(cx, d.Children, depth, at))
@@ -867,7 +867,7 @@ func (r *renderer) footnotes(cx *core.Scope, notes []Footnote) core.Node {
 			SelectionBlock: &core.SelectionBlock{Kind: core.SelectionBlockFootnote, Label: f.Label, Index: f.Index},
 			Children: []core.Node{
 				r.selectable(core.Text{Content: strconv.Itoa(f.Index) + ".", Class: r.class(PartFootnoteLabel), StyleFunc: func() core.Style { return r.style(PartFootnoteLabel) }, SelectionBlock: selectionIgnore}),
-				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: 1}, Children: r.blocks(cx, f.Children, 0, in)},
+				core.View{Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1)}, Children: r.blocks(cx, f.Children, 0, in)},
 			}}
 	}
 	return core.View{Class: r.class(PartFootnotes), StyleFunc: func() core.Style { return r.style(PartFootnotes) }, Children: rows}

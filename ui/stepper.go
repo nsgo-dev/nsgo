@@ -216,7 +216,7 @@ func (s Stepper) head(cx *core.Scope, i int, status func(int) StepStatus, delay 
 	}}
 	switch {
 	case s.Vertical:
-		text.Style.FlexGrow, text.Style.FlexShrink, text.Style.Padding = 1, 1, core.Edges{Top: 4}
+		text.Style.FlexGrow, text.Style.FlexShrink, text.Style.Padding = 1, core.Shrink(1), core.Edges{Top: 4}
 		if !last {
 			text.Style.Padding.Bottom = 20
 		}
@@ -234,9 +234,9 @@ func (s Stepper) item(cx *core.Scope, i int, status func(int) StepStatus, delay 
 	case s.Vertical && !last && s.Compact:
 		item.Style.Padding = core.Edges{Bottom: 24}
 	case !s.Vertical && !last:
-		item.Style.FlexGrow, item.Style.FlexShrink, item.Style.FlexBasis = 1, 1, core.Pt(0)
+		item.Style.FlexGrow, item.Style.FlexShrink, item.Style.FlexBasis = 1, core.Shrink(1), core.Pt(0)
 	case !s.Vertical:
-		item.Style.FlexShrink = 0
+		item.Style.FlexShrink = core.NoShrink
 	}
 	if !last {
 		item.Children = append(item.Children, s.connector(cx, i, status, delay))
@@ -350,7 +350,7 @@ func (s Stepper) marker(cx *core.Scope, i int, status func(int) StepStatus, dela
 				Children: []core.Node{Icon(lucide.Check, 14, ink)}},
 			core.View{Style: layer, StyleFunc: func() core.Style { return shown(glyph(StepFailed), 0.5, delay(i)) }, Children: []core.Node{alert}},
 		}}
-	return core.View{Style: core.Style{Width: core.Pt(stepMarker), Height: core.Pt(stepMarker), FlexShrink: 0}, Children: []core.Node{ring, disc}}
+	return core.View{Style: core.Style{Width: core.Pt(stepMarker), Height: core.Pt(stepMarker), FlexShrink: core.NoShrink}, Children: []core.Node{ring, disc}}
 }
 
 // caption names the current step under a compact row of markers, and

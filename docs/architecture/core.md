@@ -99,7 +99,7 @@ A component is any type whose `Render(cx) Node` returns its nodes, like `http.Ha
 
 Layout is incremental, as NSH's layout tree:
 
-- A change stops at a relayout boundary (`layout.Boundary`): an in-flow flex item of fixed points both ways that does not shrink, has an auto basis and is not aligned by its baseline, or an absolute view of fixed points both ways placed by an inset on each axis. A size its containing block stretches is none: laid out on its own it would keep the block's last size.
+- A change stops at a relayout boundary (`layout.Boundary`): an in-flow flex item of fixed points both ways that either does not shrink or has fixed minimum and non-intrinsic maximum sizes (so its content never sets an automatic minimum), has an auto basis and is not aligned by its baseline, or an absolute view of fixed points both ways placed by an inset on each axis. A size its containing block stretches is none: laid out on its own it would keep the block's last size.
 - A boundary is laid out again on its own with what its parent gave it last, and its parent only when its size, baselines or overflow changed (`layout.Relayout`); the overflow of a view that clips both ways never reaches its parent.
 - The deepest boundaries go first: an outer one laid out from its caches would leave an inner one's subtree as it was and clear its mark.
 - A restyled view is no boundary, and overlays and modals always mark the root's layout, which places them.
@@ -110,9 +110,9 @@ Layout is incremental, as NSH's layout tree:
 
 Tests keep the marks honest: with `RootOptions.CheckCommits`, which `nsgotest` and the core's tests enable for their own graphs, each commit is followed by one that lays every node out anew and compares every node, and panics on what the first missed. An engine passes this setting to every surface it opens; a performance measurement disables only its own engine's checks.
 
-`layout.go` maps styles with React Native's defaults, as NSH does:
+`layout.go` maps styles with React Native's defaults, extending shrink defaults so nested scroll views do not lock:
 
-- Column direction, no shrinking and no automatic minimum sizes.
+- Column direction and no automatic minimum sizes. Ordinary items keep their size (`FlexShrink` unset is 0), while growing items (`FlexGrow > 0`), `Scroll` views along their scroll axis, and auto-sized wrapper ancestors along that same axis default to 1 so nested `View` wrappers around `Scroll` and `List` shrink to fit their parent instead of locking scrolling, without compressing non-growing siblings like headers, tabs or fixed sidebars. Direct children of a `Scroll` along its scroll axis default to 0 so scrollable content keeps its natural size; `FlexShrink` (`core.NoShrink`, `core.Shrink(n)`) overrides any default. `syncScrollAxes` maintains a cached per-node scroll-axis bitmask across dirty nodes before layout runs.
 - `flex-start` content alignment outside grids.
 - Left and right swapped where the subtree lays out right to left.
 

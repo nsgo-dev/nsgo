@@ -191,4 +191,4 @@ func times(verb, none string, n int) string {
 func itoa(n int) string { return strconv.Itoa(n) }
 
 // fillPage grows to fill its container.
-var fillPage = core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), MinWidth: core.Pt(0)}
+var fillPage = core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), MinWidth: core.Pt(0)}

@@ -36,9 +36,13 @@ func Boundary(n Node, parent *Style) bool {
 		return false
 	}
 	s := n.Style()
+	limit := func(l Length) bool { return l.Unit <= UnitAuto || l.Unit == UnitPx }
+	noAutoMin := (s.FlexShrink.Valid && s.FlexShrink.Value == 0) ||
+		(s.MinSize.Width.Unit == UnitPx && s.MinSize.Height.Unit == UnitPx &&
+			limit(s.MaxSize.Width) && limit(s.MaxSize.Height))
 	return s.Display != DisplayNone && s.Position == PositionRelative &&
 		s.Size.Width.Unit == UnitPx && s.Size.Height.Unit == UnitPx &&
-		s.FlexShrink.Valid && s.FlexShrink.Value == 0 && s.FlexBasis.IsAuto() &&
+		noAutoMin && s.FlexBasis.IsAuto() &&
 		s.AlignSelf.Keyword != AlignBaseline
 }
 

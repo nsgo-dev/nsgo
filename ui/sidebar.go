@@ -150,7 +150,7 @@ func (s Sidebar) Render(cx *core.Scope) core.Node {
 		children := []core.Node{it.Content}
 		if it.Content == nil {
 			label := Text(it.Text, 13, Regular, colors.Text)
-			label.MaxLines, label.Style.FlexGrow, label.Style.FlexShrink = 1, 1, 1
+			label.MaxLines, label.Style.FlexGrow, label.Style.FlexShrink = 1, 1, core.Shrink(1)
 			children = []core.Node{Icon(it.Icon, 16, colors.Accent), label}
 		}
 		row := core.View{Ref: ref, Role: core.RoleButton, Label: it.Text, Selected: on, Expanded: it.Expanded, NoFocus: true, TestID: it.TestID,
@@ -188,14 +188,14 @@ func (s Sidebar) Render(cx *core.Scope) core.Node {
 			title := Text(sec.Title, 11, Bold, colors.Muted)
 			title.Role, title.MaxLines = core.RoleHeader, 1
 			title.Style.Padding = core.Symmetric(3, 8)
-			title.Style.FlexGrow, title.Style.FlexShrink = 1, 1
-			heading = core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)},
+			title.Style.FlexGrow, title.Style.FlexShrink = 1, core.Shrink(1)
+			heading = core.View{Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)},
 				Children: []core.Node{title, sidebarTrailing(cx, trailing, nil)}}
 			if sec.Collapsible {
 				title.Role = core.RoleNone
 				title.Style.Padding.Right = 4
 				heading = base.Button{Label: sec.Title, Expanded: open, OnPress: func(core.PressEvent) { take(); hold(); toggle() },
-					Style:     core.Style{Group: sidebarTitle, Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0), CornerRadius: 8, Cursor: core.CursorDefault},
+					Style:     core.Style{Group: sidebarTitle, Direction: core.Row, AlignItems: core.AlignCenter, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0), CornerRadius: 8, Cursor: core.CursorDefault},
 					StyleFunc: func() core.Style { return core.Style{FocusVisible: FocusRing(cx, -2)} },
 					Children:  []core.Node{title, sidebarTrailing(cx, trailing, held), sidebarArrow(cx, open, held)}}
 			}
@@ -335,7 +335,7 @@ func sidebarArrow(cx *core.Scope, open, held func() bool) core.Node {
 // arrow shows, or, on touch screens, where the arrow always shows, stands
 // before it.
 func sidebarTrailing(cx *core.Scope, node core.Node, held func() bool) core.Node {
-	s := core.Style{Direction: core.Row, AlignItems: core.AlignCenter, JustifyContent: core.JustifyEnd, FlexShrink: 0, Padding: core.Edges{Top: 2, Right: 8}, PointerEvents: core.PointerEventsNone}
+	s := core.Style{Direction: core.Row, AlignItems: core.AlignCenter, JustifyContent: core.JustifyEnd, FlexShrink: core.NoShrink, Padding: core.Edges{Top: 2, Right: 8}, PointerEvents: core.PointerEventsNone}
 	var style func() core.Style
 	if held != nil {
 		s.MinWidth = core.Pt(8 + iconSize)

@@ -107,7 +107,7 @@ func permissionsCard(cx *core.Scope) core.Node {
 		}
 		return core.Show{When: func() bool { return st.Get() != core.PermissionUnavailable }, Then: func(*core.Scope) core.Node {
 			label := ui.Textf(func() string { return permissionTitle(tr, p) }, 13, ui.Regular, colors.Muted)
-			label.Style.FlexGrow, label.Style.FlexShrink = 1, 1
+			label.Style.FlexGrow, label.Style.FlexShrink = 1, core.Shrink(1)
 			status := core.Text{ContentFunc: func() string { return st.Get().String() }, TestID: "permission-" + key,
 				Style: core.Style{FontSize: 12}, StyleFunc: ui.Colored(colors.Faint)}
 			return core.View{Style: core.Style{Gap: 6}, Children: []core.Node{

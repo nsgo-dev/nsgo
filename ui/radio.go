@@ -31,7 +31,7 @@ func (r Radio) Render(cx *core.Scope) core.Node {
 	dot := core.View{Style: core.Style{Width: core.Pt(iconSize * 3 / 8), Height: core.Pt(iconSize * 3 / 8), CornerRadius: RadiusFull,
 		Display: core.DisplayNone, GroupStyle: &core.GroupStyle{Name: selectionGroup, Checked: &core.Style{Display: core.DisplayFlex}}},
 		StyleFunc: Filled(colors.OnAccent)}
-	ring := core.View{Style: core.Style{Width: core.Pt(iconSize), Height: core.Pt(iconSize), CornerRadius: RadiusFull, BorderWidth: 1, FlexShrink: 0,
+	ring := core.View{Style: core.Style{Width: core.Pt(iconSize), Height: core.Pt(iconSize), CornerRadius: RadiusFull, BorderWidth: 1, FlexShrink: core.NoShrink,
 		AlignItems: core.AlignCenter, JustifyContent: core.JustifyCenter, Transition: quick},
 		StyleFunc: func() core.Style {
 			return core.Style{BorderColor: colors.FieldBorder(), Background: colors.Field(), Shadows: FinOf(cx).Raised().Shadows,

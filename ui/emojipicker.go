@@ -92,7 +92,7 @@ func (p EmojiPicker) Render(cx *core.Scope) core.Node {
 					AlignItems:     core.AlignCenter,
 					JustifyContent: core.JustifyCenter,
 					CornerRadius:   RadiusControl - 2,
-					FlexShrink:     0,
+					FlexShrink:     core.NoShrink,
 				},
 				StyleFunc: func() core.Style {
 					return core.Style{
@@ -174,7 +174,7 @@ func (p EmojiPicker) Render(cx *core.Scope) core.Node {
 			Padding:      core.Symmetric(0, 8),
 			CornerRadius: RadiusControl,
 			BorderWidth:  1,
-			FlexShrink:   0,
+			FlexShrink:   core.NoShrink,
 			Transition:   quick,
 		},
 		SearchBarStyleFunc: func() core.Style {
@@ -190,7 +190,7 @@ func (p EmojiPicker) Render(cx *core.Scope) core.Node {
 		SearchField: func(in core.Input) core.Node {
 			in.Style = TypeBody.Merge(core.Style{
 				FlexGrow:    1,
-				FlexShrink:  1,
+				FlexShrink:  core.Shrink(1),
 				MinWidth:    core.Pt(0),
 				Padding:     core.All(0),
 				BorderWidth: 0,
@@ -210,7 +210,7 @@ func (p EmojiPicker) Render(cx *core.Scope) core.Node {
 		CategoriesStyle: core.Style{
 			Padding:    core.Symmetric(4, 8),
 			Borders:    core.Edges{Bottom: 1},
-			FlexShrink: 0,
+			FlexShrink: core.NoShrink,
 		},
 		CategoriesStyleFunc: func() core.Style {
 			return core.Style{BorderColors: core.EdgeColors{Bottom: colors.Line()}}
@@ -295,7 +295,7 @@ func (p EmojiPicker) Render(cx *core.Scope) core.Node {
 			Gap:        8,
 			Padding:    core.Symmetric(6, 10),
 			Borders:    core.Edges{Top: 1},
-			FlexShrink: 0,
+			FlexShrink: core.NoShrink,
 		},
 		FooterBarStyleFunc: func() core.Style {
 			return core.Style{BorderColors: core.EdgeColors{Top: colors.Line()}}
@@ -304,14 +304,14 @@ func (p EmojiPicker) Render(cx *core.Scope) core.Node {
 			Direction:  core.Row,
 			AlignItems: core.AlignCenter,
 			FlexGrow:   1,
-			FlexShrink: 1,
+			FlexShrink: core.Shrink(1),
 			MinWidth:   core.Pt(0),
 		},
 		SkinToneBarStyle: core.Style{
 			Direction:  core.Row,
 			AlignItems: core.AlignCenter,
 			Gap:        4,
-			FlexShrink: 0,
+			FlexShrink: core.NoShrink,
 		},
 		SkinToneStyle: core.Style{
 			Width:          core.Pt(emojiSwatchSize + 4),
@@ -347,10 +347,10 @@ func (p EmojiPicker) Render(cx *core.Scope) core.Node {
 				return core.View{Style: core.Style{Height: core.Pt(22)}}
 			}
 			return core.View{
-				Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)},
+				Style: core.Style{Direction: core.Row, AlignItems: core.AlignCenter, Gap: 6, FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)},
 				Children: []core.Node{
-					core.Text{Content: e.Emoji, Style: core.Style{FontSize: 18, LineHeight: 22, FlexShrink: 0}},
-					core.Text{Content: e.Name, MaxLines: 1, Style: TypeCaption.Merge(core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: core.Pt(0)}), StyleFunc: Colored(colors.Muted)},
+					core.Text{Content: e.Emoji, Style: core.Style{FontSize: 18, LineHeight: 22, FlexShrink: core.NoShrink}},
+					core.Text{Content: e.Name, MaxLines: 1, Style: TypeCaption.Merge(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: core.Pt(0)}), StyleFunc: Colored(colors.Muted)},
 				},
 			}
 		}

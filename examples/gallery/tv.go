@@ -38,7 +38,7 @@ func (g *gallery) tv(cx *core.Scope) core.Node {
 	colors := ui.ColorsOf(cx)
 	env := cx.Env()
 	return core.View{Style: fillPage.Merge(core.Style{Direction: core.Row}), Children: []core.Node{
-		core.View{Style: core.Style{Width: core.Pt(tvSidebarWidth), FlexShrink: 0, Borders: core.Edges{Right: 1}}, StyleFunc: func() core.Style {
+		core.View{Style: core.Style{Width: core.Pt(tvSidebarWidth), FlexShrink: core.NoShrink, Borders: core.Edges{Right: 1}}, StyleFunc: func() core.Style {
 			return core.Style{Background: colors.Surface(), BorderColors: core.EdgeColors{Right: colors.Line()}}
 		}, Children: []core.Node{g.tvSidebar(cx)}},
 		// The demo keeps clear of the screen's right edge, which a TV may not show.
@@ -87,7 +87,7 @@ func (g *gallery) tvSidebar(cx *core.Scope) core.Node {
 					}
 					return s
 				},
-				Children: []core.Node{ui.Icon(d.icon, 28, ui.Inherited), core.Text{Content: d.title(tr), MaxLines: 1, Style: core.Style{FontSize: 28, FontWeight: ui.Medium, FlexShrink: 1}}}})
+				Children: []core.Node{ui.Icon(d.icon, 28, ui.Inherited), core.Text{Content: d.title(tr), MaxLines: 1, Style: core.Style{FontSize: 28, FontWeight: ui.Medium, FlexShrink: core.Shrink(1)}}}})
 		}
 		if len(rows) == 0 {
 			continue

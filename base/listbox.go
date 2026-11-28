@@ -683,7 +683,7 @@ func (lb *listbox) content(onSheet bool, p listParts, h listHooks) []core.Node {
 		Row:                   func(cx *core.Scope, r core.ListRow) core.Node { return lb.row(cx, r, p, h) },
 		ViewabilityConfig:     core.ViewabilityConfig{ItemVisiblePercentThreshold: listInView},
 		OnViewableItemsChange: lb.viewable}
-	listStyle := core.Style{FlexShrink: 1, MinHeight: core.Pt(0)}.Merge(p.list.Style)
+	listStyle := core.Style{FlexShrink: core.Shrink(1), MinHeight: core.Pt(0)}.Merge(p.list.Style)
 	nodes = append(nodes, core.Scroll{Role: core.RoleListbox, Label: p.listLabel, Behavior: core.ScrollBehavior{KeyboardShouldPersistTaps: p.keyboardTaps},
 		Class: p.list.Class, Style: listStyle, StyleFunc: p.list.Fn, Children: []core.Node{rows}})
 	if p.empty != nil {

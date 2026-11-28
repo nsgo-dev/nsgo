@@ -15,8 +15,9 @@ import (
 // parent as in CSS. A style with nothing set draws nothing: NSGo has no
 // look of its own.
 type Style struct {
-	// Layout, with React Native's defaults: a column flexbox, items that
-	// do not shrink and stretch on the cross axis, border-box sizes, no
+	// Layout: a column flexbox whose ordinary items keep their size while
+	// growing items and scroll views (and their auto-sized wrappers) shrink
+	// to fit, stretching on the cross axis, with border-box sizes and no
 	// automatic minimum sizes. Grid and block layout are CSS's.
 	Display        Display
 	Position       Position
@@ -31,7 +32,7 @@ type Style struct {
 	JustifyItems Align
 	JustifySelf  Align
 	FlexGrow     float32
-	FlexShrink   float32
+	FlexShrink   FlexShrink
 	FlexBasis    Length
 
 	Width, Height       Length
@@ -578,6 +579,39 @@ const (
 	// CSS's overflow: scroll, and clips it; only Scroll views scroll.
 	OverflowScroll
 )
+
+// FlexShrink is a flex item's shrink factor. Its zero value is unset:
+// ordinary items do not shrink (0), while growing items (FlexGrow > 0),
+// scroll views along their scroll axis, and auto-sized wrappers around
+// them shrink to fit (1). Direct children of a Scroll along its scroll
+// axis default to 0. Make an explicit factor with Shrink, or use NoShrink
+// for 0.
+type FlexShrink struct {
+	value float32
+	set   bool
+}
+
+// NoShrink keeps a flex item from shrinking (a shrink factor of 0).
+var NoShrink = Shrink(0)
+
+// Shrink returns a flex shrink factor, clamped to at least 0.
+func Shrink(factor float32) FlexShrink {
+	if factor <= 0 || factor != factor {
+		factor = 0
+	}
+	return FlexShrink{value: factor, set: true}
+}
+
+// IsSet reports whether the shrink factor was set explicitly.
+func (f FlexShrink) IsSet() bool { return f.set }
+
+// Value returns the shrink factor, 0 when unset.
+func (f FlexShrink) Value() float32 {
+	if !f.set {
+		return 0
+	}
+	return f.value
+}
 
 // Opacity is a node's opacity from 0 to 1. Its zero value is unset,
 // which is opaque; make one with Alpha.

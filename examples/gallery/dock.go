@@ -197,11 +197,11 @@ func dockDemo(cx *core.Scope) core.Node {
 	}
 	return stagePage(cx,
 		core.View{StyleFunc: func() core.Style {
-			return fin.Card().Over(core.Style{FlexGrow: 1, FlexShrink: 1, MinHeight: core.Pt(0), BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Surface(),
+			return fin.Card().Over(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinHeight: core.Pt(0), BorderWidth: 1, BorderColor: colors.Border(), Background: colors.Surface(),
 				CornerRadius: ui.RadiusCard, BorderCurve: core.BorderCurveContinuous, Padding: core.All(5), Gap: 5})
 		}, Children: []core.Node{
 			core.View{StyleFunc: func() core.Style {
-				return fin.Inset().Over(core.Style{FlexGrow: 1, FlexShrink: 1, Overflow: core.Hidden, BorderWidth: 1, BorderColor: colors.Line(), Background: colors.Inset(),
+				return fin.Inset().Over(core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), Overflow: core.Hidden, BorderWidth: 1, BorderColor: colors.Line(), Background: colors.Inset(),
 					CornerRadius: ui.RadiusInset, BorderCurve: core.BorderCurveContinuous})
 			}, Children: []core.Node{core.Dynamic(func(cx *core.Scope) core.Node {
 				panels := map[string]dock.PanelOptions{}

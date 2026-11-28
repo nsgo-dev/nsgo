@@ -31,7 +31,7 @@ func formField(p fieldProps, in base.Input) core.Node {
 		} else if in.ReturnKeyType == 0 {
 			in.ReturnKeyType = core.ReturnKeyDone
 		}
-		head := []core.Node{core.Text{Content: p.label, Style: core.Style{FlexGrow: 1, FlexShrink: 1, FontSize: 13, FontWeight: ui.Medium}, StyleFunc: ui.Colored(colors.Muted)}}
+		head := []core.Node{core.Text{Content: p.label, Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FontSize: 13, FontWeight: ui.Medium}, StyleFunc: ui.Colored(colors.Muted)}}
 		if p.api != "" {
 			head = append(head, API{Text: p.api})
 		}

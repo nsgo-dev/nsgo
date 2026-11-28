@@ -852,7 +852,7 @@ func (t *dataTable) cell(cx *core.Scope, row, def *core.Memo[int], which tableRe
 		case AlignEndColumn:
 			align = core.TextAlignEnd
 		}
-		return core.Style{FlexGrow: 1, FlexShrink: 1, FlexBasis: px(0), MinWidth: px(0), TextAlign: align}
+		return core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), FlexBasis: px(0), MinWidth: px(0), TextAlign: align}
 	}}
 	tooltip := func() string { return "" }
 	if t.p.CellTooltip != nil {
@@ -1184,7 +1184,7 @@ func (t *dataTable) titleCell(cx *core.Scope, def int, which tableRegion, w tabl
 		// column's cells, and passes hits through to the header cell or
 		// the resize handle's touch slop.
 		label = core.Text{Content: col.title(), MaxLines: 1, PointerEvents: core.PointerEventsNone,
-			Style: core.Style{FlexGrow: 1, FlexShrink: 1, MinWidth: px(0), TextAlign: align}}
+			Style: core.Style{FlexGrow: 1, FlexShrink: core.Shrink(1), MinWidth: px(0), TextAlign: align}}
 	}
 	content := []core.Node{label}
 	if col.Sortable {
@@ -1297,7 +1297,7 @@ func (t *dataTable) sortButton(def int, sorted *core.Memo[Sort]) core.Node {
 	}
 	return core.View{
 		Role: core.RoleButton, LabelFunc: func() string { return locales.SortBy(t.cx, t.title(def)) }, TestID: "sort:" + t.column(def).Key, NoFocus: true,
-		Style: core.Style{FlexShrink: 0, Width: px(sortWidth), Height: px(sortWidth), AlignItems: core.AlignCenter,
+		Style: core.Style{FlexShrink: core.NoShrink, Width: px(sortWidth), Height: px(sortWidth), AlignItems: core.AlignCenter,
 			JustifyContent: core.JustifyCenter},
 		Class:     t.p.Classes.SortIndicator,
 		StyleFunc: func() core.Style { return t.styles().SortIndicator },
