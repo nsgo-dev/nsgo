@@ -27,21 +27,68 @@ jobs:
     name: Apple changes
     uses: ./.github/workflows/apple-changes.yml
   gallery:
-    name: Gallery (${{ matrix.target }}, shard ${{ matrix.shard }})
+    name: Gallery (web, shard ${{ matrix.shard }})
     needs: changes
-    # The web shards stand behind the required check Gallery (web), so they run even when the changes job fails; macOS joins them unless the change cannot affect Apple's targets and all-jobs is unset.
+    # The web shards stand behind the required check Gallery (web), so they run even when the changes job fails.
     if: ${{ !cancelled() }}
-    # Each web shard reports its own success under its own name, so the gallery-web job can tell the web shards from the macOS ones.
+    # Each shard reports its own success, so the gallery-web job can require both.
     outputs:
       web_shard_1: ${{ steps.passed.outputs.web_shard_1 }}
       web_shard_2: ${{ steps.passed.outputs.web_shard_2 }}
     strategy:
       fail-fast: false
       matrix:
-        target: ${{ fromJSON(!inputs.all-jobs && needs.changes.outputs.apple == 'false' && '["web"]' || '["web","macos"]') }}
         # The gallery's tests run in one long step, so two runners take half the list each: names TestA…TestM and TestN…TestZ.
         shard: [1, 2]
-    runs-on: ${{ matrix.target == 'macos' && 'depot-macos-26' || 'depot-ubuntu-24.04-4' }}
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test gallery on the target
+        env:
+          GALLERY_TESTS: ${{ matrix.shard == 1 && '^Test[A-M]' || '^Test[N-Z]' }}
+        run: go tool nsgo test -target web -run "$GALLERY_TESTS" -junit "$RUNNER_TEMP/gallery.xml" -screenshots gallery-screenshots ./examples/gallery
+      - name: Test formula layout and display wrapping
+        if: matrix.shard == 1
+        run: go tool nsgo test -target web -screenshots formula-screenshots ./base/formula
+      - name: Run the many-sprite and mesh canvas scenarios
+        if: matrix.shard == 1
+        env:
+          NSGO_GALLERY_PERF: '1'
+          NSGO_GALLERY_PERF_SECONDS: '3'
+        run: go tool nsgo test -target web -fps -env NSGO_GALLERY_PERF=1 -env NSGO_GALLERY_PERF_SECONDS=3 -run '^TestPerfCanvas(Sprites|Mesh)' ./examples/gallery
+      - name: Record that the shard passed
+        id: passed
+        run: echo "web_shard_${{ matrix.shard }}=success" >> "$GITHUB_OUTPUT"
+      - name: Keep results and screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-web-shard-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/gallery.xml
+            gallery-screenshots
+            formula-screenshots
+          if-no-files-found: warn
+  gallery-apple:
+    name: Gallery (macos, shard ${{ matrix.shard }})
+    needs: changes
+    # Its two shards take two of the three depot-macos-26 jobs a pull request needs, and that pool holds about two runners, so a shard can wait 17 minutes for one. Never behind the required check, which must report without the mac queue; a release still runs it through all-jobs.
+    if: ${{ !cancelled() && (inputs.all-jobs || needs.changes.outputs.apple != 'false') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The gallery's tests run in one long step, so two runners take half the list each: names TestA…TestM and TestN…TestZ.
+        shard: [1, 2]
+    runs-on: depot-macos-26
     timeout-minutes: 30
     steps:
       - name: Check out
@@ -54,35 +101,30 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Grant the runner the microphone
-        if: matrix.target == 'macos'
         run: .github/scripts/grant-microphone.sh
       - name: Select Xcode with Icon Composer
-        if: matrix.target == 'macos'
         run: echo "DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer" >> "$GITHUB_ENV"
-      - name: Test gallery on the target
+      - name: Test gallery on macOS
         env:
           GALLERY_TESTS: ${{ matrix.shard == 1 && '^Test[A-M]' || '^Test[N-Z]' }}
-        run: go tool nsgo test -target ${{ matrix.target }} -run "$GALLERY_TESTS" -junit "$RUNNER_TEMP/gallery.xml" -screenshots gallery-screenshots ./examples/gallery
+        run: go tool nsgo test -target macos -run "$GALLERY_TESTS" -junit "$RUNNER_TEMP/gallery.xml" -screenshots gallery-screenshots ./examples/gallery
       - name: Test formula layout and display wrapping
         if: matrix.shard == 1
-        run: go tool nsgo test -target ${{ matrix.target }} -screenshots formula-screenshots ./base/formula
+        run: go tool nsgo test -target macos -screenshots formula-screenshots ./base/formula
       - name: Test terminal actions on macOS
-        if: matrix.target == 'macos' && matrix.shard == 1
+        if: matrix.shard == 1
         run: go tool nsgo test -target macos -run '^TestTerminal(KeybindOverridesZoomAndFocus|DefaultContextMenuActionsAndLanguage|SecondaryClickPolicyAndCustomMenu)$' -screenshots terminal-actions-screenshots ./base/terminal -- -count=1
       - name: Run the many-sprite and mesh canvas scenarios
         if: matrix.shard == 1
         env:
           NSGO_GALLERY_PERF: '1'
           NSGO_GALLERY_PERF_SECONDS: '3'
-        run: go tool nsgo test -target ${{ matrix.target }} -fps -env NSGO_GALLERY_PERF=1 -env NSGO_GALLERY_PERF_SECONDS=3 -run '^TestPerfCanvas(Sprites|Mesh)' ./examples/gallery
-      - name: Record that the shard passed
-        id: passed
-        run: echo "${{ matrix.target }}_shard_${{ matrix.shard }}=success" >> "$GITHUB_OUTPUT"
+        run: go tool nsgo test -target macos -fps -env NSGO_GALLERY_PERF=1 -env NSGO_GALLERY_PERF_SECONDS=3 -run '^TestPerfCanvas(Sprites|Mesh)' ./examples/gallery
       - name: Keep results and screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: gallery-${{ matrix.target }}-shard-${{ matrix.shard }}
+          name: gallery-macos-shard-${{ matrix.shard }}
           path: |
             ${{ runner.temp }}/gallery.xml
             gallery-screenshots
@@ -90,7 +132,7 @@ jobs:
             terminal-actions-screenshots
           if-no-files-found: warn
   gallery-web:
-    # The required check: it passes only when every web shard of the gallery job passed, so the merge queue keeps gating on the whole gallery on the web. It runs whatever happened before it, as a skipped required check would count as passed, except in a cancelled run, where it ends cancelled with the shards instead of failing. A shard that runs out of time ends cancelled too, but the run goes on, so this job still runs and fails.
+    # The required check: it passes only when every web shard of the gallery passed, so the merge queue keeps gating on the whole gallery on the web. It runs whatever happened before it, as a skipped required check would count as passed, except in a cancelled run, where it ends cancelled with the shards instead of failing. A shard that runs out of time ends cancelled too, but the run goes on, so this job still runs and fails. It does not wait for gallery-apple: the mac queue is the slow part and the required check must report without it.
     name: Gallery (web)
     needs: gallery
     if: ${{ !cancelled() }}
