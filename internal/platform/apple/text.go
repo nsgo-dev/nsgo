@@ -876,9 +876,13 @@ func (p *prepared) measure(maxWidth driver.Points) driver.Size {
 	w := float64(unbounded)
 	if !maxWidth.IsAuto() {
 		w = float64(maxWidth)
+		if w > 0 {
+			// Wrapped where Layout wraps a box this wide: a line that fits only in the slack would otherwise measure on two lines and draw on one (#2733).
+			w += wrapSlack
+		}
 	}
 	if p.fitsOneLine(w) {
-		return driver.Size{Width: driver.Points(p.lineWidth), Height: driver.Points(p.lineHeight)}
+		return driver.Size{Width: withinSlack(p.lineWidth, maxWidth), Height: driver.Points(p.lineHeight)}
 	}
 	frameW := w
 	if frameW <= 0 && p.maxLines <= 0 {
@@ -897,7 +901,18 @@ func (p *prepared) measure(maxWidth driver.Points) driver.Size {
 		return p.limitedSize(frame, lines, maxWidth)
 	}
 	_, _, _, height, width := stackFrameLines(frame, lines, n, tall, p.strut)
-	return driver.Size{Width: driver.Points(width), Height: driver.Points(height)}
+	return driver.Size{Width: withinSlack(width, maxWidth), Height: driver.Points(height)}
+}
+
+// wrapSlack is how much wider than its box Layout wraps a text, so that a box sized to a measured width rounding left a hair short still holds the lines measured. Measure wraps a bounded width there too, or a line only the slack fits would measure on two lines and draw on one.
+const wrapSlack = 0.5
+
+// withinSlack is width, a measure at maxWidth, kept to maxWidth where only the slack let it past.
+func withinSlack(width float64, maxWidth driver.Points) driver.Points {
+	if !maxWidth.IsAuto() && width > float64(maxWidth) && width <= float64(maxWidth)+wrapSlack {
+		return maxWidth
+	}
+	return driver.Points(width)
 }
 
 // framedHeight rounds a height measured outside a framesetter up to a whole point, as a framesetter sizes a frame: CoreText puts lines on whole points, so its heights are whole points while its widths keep their fractions, which the core rounds up to a device pixel. A text cut to its line limit is then as tall as its lines uncut.
@@ -966,7 +981,7 @@ func (p *prepared) layout(size driver.Size) *Layout {
 		return l
 	}
 	// A pixel of slack keeps the last line, which rounding could drop.
-	if width := float64(size.Width) + 0.5; p.fitsOneLine(width) {
+	if width := float64(size.Width) + wrapSlack; p.fitsOneLine(width) {
 		// Drawn as the last line of a limited text is, where a frame of
 		// that width puts it.
 		l.truncated, l.shown = cfRetain(p.line), 1
@@ -974,7 +989,7 @@ func (p *prepared) layout(size driver.Size) *Layout {
 		l.metrics = []lineMetrics{{ascent: p.ascent, descent: p.descent}}
 		return l
 	}
-	box := CGSize{Width: float64(size.Width) + 0.5, Height: float64(size.Height) + 1}
+	box := CGSize{Width: float64(size.Width) + wrapSlack, Height: float64(size.Height) + 1}
 	if p.maxLines <= 0 && len(p.decos) == 0 && len(p.atts) == 0 {
 		// Drawing or reading it makes its frame: a long transcript's texts
 		// wrap again at each width of a drag, off the screen too.

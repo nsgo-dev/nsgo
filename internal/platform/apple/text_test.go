@@ -496,3 +496,44 @@ func TestHiddenSpansSkipped(t *testing.T) {
 		t.Errorf("hidden span with underline and shadow drew %d dark and %d red pixels", d, r)
 	}
 }
+
+// TestTextWrapsWhereItMeasures checks that a text measured at a width draws on as many lines as it measured there, where a line of it is a little wider than the box but within the half point Layout wraps past it (#2733).
+func TestTextWrapsWhereItMeasures(t *testing.T) {
+	base := driver.TextStyle{Font: driver.Font{Size: 16}, Color: driver.RGB(0), LineHeight: 23}
+	heavy := base
+	heavy.Font.Weight = 900
+	// A line with a heavy, backgrounded word, twice: the box is a hair narrower than the line, which Layout fits twice and Measure, without the same slack, fits a character fewer of on each of three lines.
+	line := "この俺を差し置いた剣聖の名を目指す者は全て弓矢"
+	a, b := len("この俺を"), len("この俺を差し置いた")
+	mark := func(at int) driver.TextSpan {
+		return driver.TextSpan{Start: at + a, End: at + b, Style: heavy, Background: driver.TextBackground{Color: driver.RGB(0xffd60a), Radius: 3}}
+	}
+	for _, tc := range []struct {
+		name       string
+		line, text driver.AttributedText
+	}{
+		{"framed", driver.AttributedText{Text: line, Style: base, Spans: []driver.TextSpan{mark(0)}},
+			driver.AttributedText{Text: line + line, Style: base, Spans: []driver.TextSpan{mark(0), mark(len(line))}}},
+		{"one line", driver.AttributedText{Text: "Earth Science Weekly", Style: driver.TextStyle{Font: driver.Font{Size: 13}, Color: driver.RGB(0)}},
+			driver.AttributedText{Text: "Earth Science Weekly", Style: driver.TextStyle{Font: driver.Font{Size: 13}, Color: driver.RGB(0)}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			one := TextEngine{}.Prepare(&tc.line)
+			width := one.Measure(driver.Auto).Width - 0.25
+			one.Release()
+			p := TextEngine{}.Prepare(&tc.text)
+			defer p.Release()
+			size := p.Measure(width)
+			l := p.Layout(driver.Size{Width: width, Height: size.Height}).(*Layout)
+			defer l.Release()
+			lines := l.TextLines()
+			last := lines[len(lines)-1].Bounds
+			if bottom := last.Origin.Y + last.Size.Height; bottom < size.Height-1 {
+				t.Errorf("measures %v at width %v, draws %d lines ending at %v", size, width, len(lines), bottom)
+			}
+			if size.Width > width {
+				t.Errorf("measures %v wide at width %v", size.Width, width)
+			}
+		})
+	}
+}
