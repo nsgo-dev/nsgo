@@ -34,3 +34,9 @@ func LayerImage(layer objc.ID, w, h, scale float64) uintptr {
 
 // DrawImage draws image into ctx's rectangle r.
 func DrawImage(ctx uintptr, r CGRect, image uintptr) { cgContextDrawImage(ctx, r, image) }
+
+// DrawImageFilling draws image over ctx's clip bounds, whether ctx's user
+// space is in points or in pixels.
+func DrawImageFilling(ctx uintptr, image uintptr) {
+	cgContextDrawImage(ctx, cgContextGetClipBoundingBox(ctx), image)
+}

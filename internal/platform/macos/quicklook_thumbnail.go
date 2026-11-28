@@ -314,11 +314,11 @@ func replyQuickLookThumbnail(handler objc.ID, image uintptr, scale float64, err 
 		return
 	}
 	w, h := apple.ImageSize(image)
-	// The reply's context is in points, scale pixels each; the image's
-	// pixels fill it.
+	// The reply's size is in points, scale pixels each, but the context
+	// QuickLook draws into may be in pixels: the image fills its bounds.
 	size := apple.CGSize{Width: float64(w) / scale, Height: float64(h) / scale}
 	drawing := objcblock.NewWithCleanup(func(_ objc.Block, ctx uintptr) bool {
-		apple.DrawImage(ctx, apple.Rect(0, 0, size.Width, size.Height), image)
+		apple.DrawImageFilling(ctx, image)
 		return true
 	}, func() { apple.Release(image) })
 	reply := objc.ID(apple.Class("QLThumbnailReply")).Send(sel("replyWithContextSize:drawingBlock:"), size, drawing)
