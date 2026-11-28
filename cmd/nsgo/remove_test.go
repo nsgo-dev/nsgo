@@ -550,11 +550,11 @@ func TestParseRemoveRequests(t *testing.T) {
 	}
 }
 
-// Delegation refuses remove in a module pinning a release before v0.3.5 (#2465).
+// Delegation refuses remove in a module pinning a release before v0.4.0 (#2465).
 func TestDelegationOfRemove(t *testing.T) {
 	path, env := goEnv(t, nsgoProxy(t, "v0.9.0"))
 	out, code := runNsgo(t, pinnedModule(t, "v0.3.4", ""), path, env, "remove", "example.com/lib")
-	if want := "nsgo remove needs NSGo v0.3.5 or later; this module pins v0.3.4: go get github.com/nsgo-dev/nsgo@v0.3.5\n"; code != 1 || !strings.Contains(out, want) || strings.Contains(out, "fake nsgo") {
+	if want := "nsgo remove needs NSGo v0.4.0 or later; this module pins v0.3.4: go get github.com/nsgo-dev/nsgo@v0.4.0\n"; code != 1 || !strings.Contains(out, want) || strings.Contains(out, "fake nsgo") {
 		t.Fatalf("exit %d, output %s; want %q and exit 1", code, out, want)
 	}
 }

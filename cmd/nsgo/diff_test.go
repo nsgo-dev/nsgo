@@ -676,7 +676,7 @@ func TestDiffBuiltinWinsOverExtensionAndDelegation(t *testing.T) {
 	// Module pinning NSGo v0.3.4 is refused before delegation.
 	path, env := goEnv(t, nsgoProxy(t, "v0.9.0"))
 	out, code = runNsgo(t, pinnedModule(t, "v0.3.4", ""), path, env, "diff", "field")
-	want := "nsgo diff needs NSGo v0.3.5 or later; this module pins v0.3.4: go get github.com/nsgo-dev/nsgo@v0.3.5\n"
+	want := "nsgo diff needs NSGo v0.4.0 or later; this module pins v0.3.4: go get github.com/nsgo-dev/nsgo@v0.4.0\n"
 	if code != 1 || !strings.Contains(out, want) || strings.Contains(out, "fake nsgo") {
 		t.Fatalf("exit %d, output %s; want %q and exit 1", code, out, want)
 	}
