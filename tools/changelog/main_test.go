@@ -65,9 +65,10 @@ func TestParseFragment(t *testing.T) {
 	}
 	for data, want := range map[string]string{
 		"- No heading.\n":                      "under a ### heading",
-		"### Improved\n- Something.\n":         "one of Added",
-		"## Fixed\n- Something.\n":             "one of Added",
-		"### Fixed\n- One line\n  continued\n": "only ### headings",
+		"### Improved\n- Something.\n":         "one of Breaking, Added",
+		"## Fixed\n- Something.\n":             "one of Breaking, Added",
+		"### Fixed\n- One line\n  continued\n": "only a Breaking bullet",
+		"### Breaking\n  Not after a bullet.\n": "only ### headings",
 		"### Fixed\n":                          "no bullets",
 		"### Fixed\n-\n":                       "only ### headings",
 		"":                                     "no bullets",
@@ -75,6 +76,23 @@ func TestParseFragment(t *testing.T) {
 		if _, err := parseFragment("x.md", []byte(data)); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%q: %v, want an error containing %q", data, err, want)
 		}
+	}
+}
+
+// A Breaking bullet goes on in indented lines, such as a code block of the new form, blank lines among them kept and those after it dropped.
+func TestParseBreakingFragment(t *testing.T) {
+	f, err := parseFragment("x.md", []byte("### Breaking\n\n- Rename `A` to `B`: replace\n\n  ```go\n  B()\n  ```\n\n- Drop `C`.\n\n### Fixed\n- Fix one.\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(f.bullets[kindIndex("Breaking")], "|"), "- Rename `A` to `B`: replace\n\n  ```go\n  B()\n  ```|- Drop `C`."; got != want {
+		t.Errorf("breaking bullets %q, want %q", got, want)
+	}
+	if got := strings.Join(f.bullets[kindIndex("Fixed")], "|"); got != "- Fix one." {
+		t.Errorf("fixed bullets %q", got)
+	}
+	if _, err := parseFragment("x.md", []byte("### Breaking\n- Drop `C`.\n\n### Fixed\n  Not a Breaking bullet's.\n")); err == nil || !strings.Contains(err.Error(), "only ### headings") {
+		t.Errorf("an indented line under a new heading: %v", err)
 	}
 }
 
@@ -237,6 +255,24 @@ func TestReleaseGroupsNotes(t *testing.T) {
 
 - Add x.
 `
+	if got := read(t, filepath.Join(root, changelogFile)); got != want {
+		t.Errorf("changelog:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+// A release opens its notes with its breaking changes in full, each with how to update, above Highlights.
+func TestReleaseLeadsWithBreakingChanges(t *testing.T) {
+	root := repo(t, "# Changelog\n\n## [Unreleased]\n\n## [0.2.0] - 2026-11-19\n\n- Add x.\n", map[string]string{
+		"a.md": "### Fixed\n- Fix a.\n\n### Breaking\n- Rename `A` to `B`: replace\n\n  ```go\n  B()\n  ```\n",
+		"b.md": "### Breaking\n- Drop `C`: use `D` instead.\n",
+	})
+	if err := run(root, []string{"release", "-no-runtime", "-date", "2026-12-01", "0.3.0"}, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	want := "# Changelog\n\n## [Unreleased]\n\n## [0.3.0] - 2026-12-01\n\n" +
+		"### Breaking changes\n\n- Rename `A` to `B`: replace\n\n  ```go\n  B()\n  ```\n- Drop `C`: use `D` instead.\n\n" +
+		"### Highlights\n\n### Bug fixes\n\n<details>\n<summary>More changes</summary>\n\n#### Bug fixes\n\n- Fix a.\n\n</details>\n\n" +
+		"## [0.2.0] - 2026-11-19\n\n- Add x.\n"
 	if got := read(t, filepath.Join(root, changelogFile)); got != want {
 		t.Errorf("changelog:\n%s\nwant:\n%s", got, want)
 	}

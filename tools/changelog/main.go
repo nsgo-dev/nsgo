@@ -34,21 +34,26 @@ const (
 	unreleasedHeading = "## [Unreleased]"
 )
 
-// kinds are Keep a Changelog's types, in the order a release lists their bullets. `Unreleased` has no heading per type: it is bullets ordered by type, and a release puts them under its notes' headings (releaseGroups).
-var kinds = []string{"Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"}
+// kinds are Keep a Changelog's types, after Breaking, NSGo's own for a change that breaks apps, in the order a release lists their bullets. `Unreleased` has no heading per type: it is bullets ordered by type, and a release puts them under its notes' headings (releaseGroups).
+var kinds = []string{"Breaking", "Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"}
+
+// breaking is the kind whose bullets say what breaks and how an app updates, and the only one whose bullets may go on in indented lines, such as a code block of the new form.
+const breaking = "Breaking"
 
 // highlightsHeading heads the few bullets a maintainer writes at the top of a release's notes; release leaves it empty for them.
 const highlightsHeading = "### Highlights"
 
-// releaseGroups are the groups of a release's notes, each with the kinds it holds; lines already in `Unreleased`, which have no kind, go in the first. A folded group's bullets wait in the closing "More changes" block, under its heading one level down, for a maintainer to move the notable ones up under its own heading; the others show in full.
+// releaseGroups are the groups of a release's notes, each with the kinds it holds; lines already in `Unreleased`, which have no kind, go in Features. A lead group shows in full above Highlights, so a reader learns what to update first; a folded group's bullets wait in the closing "More changes" block, under its heading one level down, for a maintainer to move the notable ones up under its own heading; the others show in full.
 var releaseGroups = []struct {
 	title  string
 	kinds  []string
+	lead   bool
 	folded bool
 }{
-	{"Features", []string{"Added", "Changed", "Deprecated", "Removed"}, true},
-	{"Bug fixes", []string{"Fixed"}, true},
-	{"Security", []string{"Security"}, false},
+	{"Breaking changes", []string{breaking}, true, false},
+	{"Features", []string{"Added", "Changed", "Deprecated", "Removed"}, false, true},
+	{"Bug fixes", []string{"Fixed"}, false, true},
+	{"Security", []string{"Security"}, false, false},
 }
 
 var (
@@ -56,7 +61,7 @@ var (
 	versionRE    = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
 )
 
-// fragment is one file of changelog.d: its bullets by kind, each a whole line starting with "- ".
+// fragment is one file of changelog.d: its bullets by kind, each a whole line starting with "- ", which a Breaking bullet's indented lines follow.
 type fragment struct {
 	name    string
 	bullets [][]string
@@ -132,14 +137,25 @@ func kindIndex(name string) int {
 	return slices.IndexFunc(kinds, func(k string) bool { return strings.EqualFold(k, name) })
 }
 
-// parseFragment reads a fragment: "### Kind" headings, each followed by one-line bullets.
+// parseFragment reads a fragment: "### Kind" headings, each followed by one-line bullets; a Breaking bullet may go on in lines indented by two spaces, blank lines among them kept.
 func parseFragment(name string, data []byte) (fragment, error) {
 	f := fragment{name: name, bullets: make([][]string, len(kinds))}
-	kind, count := -1, 0
+	kind, count, blanks := -1, 0, 0
+	open := false // the last line belongs to a Breaking bullet, which an indented line goes on
 	for i, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimRight(line, " \t\r")
+		if line == "" {
+			blanks++
+			continue
+		}
+		gap := blanks
+		blanks = 0
 		switch {
-		case line == "":
+		case strings.HasPrefix(line, "  ") && open:
+			b := f.bullets[kind]
+			b[len(b)-1] += strings.Repeat("\n", gap+1) + line
+		case strings.HasPrefix(line, "  ") && kind >= 0 && len(f.bullets[kind]) > 0:
+			return f, fmt.Errorf("%s:%d: only a %s bullet goes on in indented lines; write the others in one line", name, i+1, breaking)
 		case strings.HasPrefix(line, "#"):
 			title, ok := strings.CutPrefix(line, "### ")
 			kind = kindIndex(strings.TrimSpace(title))
@@ -155,6 +171,7 @@ func parseFragment(name string, data []byte) (fragment, error) {
 		default:
 			return f, fmt.Errorf("%s:%d: a fragment holds only ### headings and one-line \"- \" bullets", name, i+1)
 		}
+		open = kind >= 0 && kinds[kind] == breaking && len(f.bullets[kind]) > 0 && !strings.HasPrefix(line, "#")
 	}
 	if count == 0 {
 		return f, fmt.Errorf("%s: no bullets", name)
@@ -284,18 +301,17 @@ func removeFragments(root string, frags []fragment) error {
 	return nil
 }
 
-// releaseNotes writes the notes of a release from `Unreleased`'s lines and the fragments' bullets, by kind and then by fragment name: an empty Highlights, the heading of each folded group that has bullets, the groups shown in full, then the folded groups' bullets in one closing <details> block.
+// releaseNotes writes the notes of a release from `Unreleased`'s lines and the fragments' bullets, by kind and then by fragment name: the lead groups in full, an empty Highlights, the heading of each folded group that has bullets, the other groups shown in full, then the folded groups' bullets in one closing <details> block.
 func releaseNotes(body []string, frags []fragment) (notes []string, bullets int) {
-	notes = []string{highlightsHeading}
-	var more []string
-	for i, g := range releaseGroups {
+	var lead, more []string
+	for _, g := range releaseGroups {
 		var lines []string
 		for _, k := range g.kinds {
 			for _, f := range frags {
 				lines = append(lines, f.bullets[kindIndex(k)]...)
 			}
 		}
-		if i == 0 {
+		if g.title == "Features" {
 			for _, l := range body {
 				if strings.TrimSpace(l) != "" {
 					lines = append(lines, l)
@@ -306,6 +322,12 @@ func releaseNotes(body []string, frags []fragment) (notes []string, bullets int)
 			continue
 		}
 		bullets += len(lines)
+		if g.lead {
+			lead = append(lead, "### "+g.title, "")
+			lead = append(lead, lines...)
+			lead = append(lead, "")
+			continue
+		}
 		notes = append(notes, "", "### "+g.title)
 		if g.folded {
 			more = append(more, "", "#### "+g.title, "")
@@ -320,7 +342,7 @@ func releaseNotes(body []string, frags []fragment) (notes []string, bullets int)
 		notes = append(notes, more...)
 		notes = append(notes, "", "</details>")
 	}
-	return notes, bullets
+	return append(append(lead, highlightsHeading), notes...), bullets
 }
 
 // cut turns `Unreleased` and the fragments into the version's section, its bullets grouped by releaseNotes, above a fresh, empty `Unreleased`.

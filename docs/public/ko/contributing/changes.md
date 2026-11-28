@@ -35,3 +35,4 @@ Go 파일은 `go.mod`에 지정된 Go 버전의 `gofmt`로 포맷하세요. `gof
 - 사실 관계가 바뀐 문서를 업데이트하세요. NSGo의 내부 동작 방식은 `docs/architecture/`의 해당 주제에, 앱과 컴포넌트의 사용법은 `docs/public/`의 해당 페이지에 반영합니다([문서와 웹사이트](docs.md)).
 - `README.md`와 `README.zh-CN.md`의 내용을 동일하게 유지하세요. 그 외의 문서는 영어를 기본으로 하며 중국어 페이지는 `docs/public/zh/`에 있습니다.
 - 사용자에게 보이는 변경 사항은 `CHANGELOG.md`에 직접 적지 말고(`CHANGELOG.md`는 릴리스 시 채워짐), `changelog.d/` 아래 별도의 파일에 `### Fixed` 같은 유형 제목 아래 `(#12 by @you)`와 같은 참조를 포함한 한 줄로 기록하세요([형식](https://github.com/nsgo-dev/nsgo/blob/main/changelog.d/README.md)).
+- 앱이 코드, `nsgo.yaml` 또는 명령을 고쳐야 하는 변경은 `### Breaking` 아래에 업데이트 방법과 함께, 도움이 되면 새 형태의 코드 블록을 붙여 기록하세요. 릴리스 노트의 맨 앞에 실립니다.

@@ -35,3 +35,4 @@ go tool nsgo test    # 运行所有包的测试
 - 更新事实发生变化的文档：NSGo 如何工作写在 `docs/architecture/` 的专题里，应用和组件如何使用它写在 `docs/public/` 的页面里（[文档与网站](docs.md)）。
 - `README.md` 和 `README.zh-CN.md` 保持一致；其余内容都用英文，中文页面位于 `docs/public/zh/`。
 - 用户能看到的改动记一行，并附上引用，例如 `(#12 by @you)`，写在 `changelog.d/` 下单独的文件里、所属类型的标题下（例如 `### Fixed`），不要直接改 `CHANGELOG.md`：发版时由这些文件生成（[格式](https://github.com/nsgo-dev/nsgo/blob/main/changelog.d/README.md)）。
+- 让应用必须改代码、`nsgo.yaml` 或命令的改动写在 `### Breaking` 下，说明如何更新，必要时附上新写法的代码块：发版说明会把它们列在最前面。

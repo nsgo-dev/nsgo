@@ -35,3 +35,4 @@ Title it as a Conventional Commit, such as `fix(linux): keep the caret after a p
 - Update the document whose facts change: a subject in `docs/architecture/` for how NSGo works, a page in `docs/public/` for how apps and components use it ([Docs and the website](docs.md)).
 - Keep `README.md` and `README.zh-CN.md` equivalent; everything else is in English, with Chinese pages in `docs/public/zh/`.
 - Record a change users can see as one line, with a reference such as `(#12 by @you)`, in a file of its own in `changelog.d/` under its type's heading, such as `### Fixed`, rather than in `CHANGELOG.md`, which a release fills from those files ([format](https://github.com/nsgo-dev/nsgo/blob/main/changelog.d/README.md)).
+- Record a change that makes apps edit their code, `nsgo.yaml` or commands under `### Breaking`, saying how to update, with a code block of the new form where it helps: a release lists these first in its notes.
