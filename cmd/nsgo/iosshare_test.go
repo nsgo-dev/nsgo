@@ -247,3 +247,59 @@ func TestIOSShareProfileMustGrantItsBundleAndGroup(t *testing.T) {
 		})
 	}
 }
+
+// The extension links Go's archive whole, as an app extension, with NSExtensionMain as its entry point (#2718).
+func TestIOSShareLinksNSExtensionMainAsEntryPoint(t *testing.T) {
+	cc := envValue([]string{"CC=cc", "CC=/xcode/clang -isysroot /sdk -target arm64-apple-ios16.0"}, "CC")
+	if !slices.Equal(cc, []string{"/xcode/clang", "-isysroot", "/sdk", "-target", "arm64-apple-ios16.0"}) {
+		t.Fatalf("CC = %q", cc)
+	}
+	args := shareLinkArgs(cc[1:], "/tmp/share.a", "/app/PlugIns/NSGoShare.appex/NSGoShare")
+	for _, want := range []string{"-target", "-fapplication-extension", "-Wl,-application_extension", "-Wl,-e,_NSExtensionMain", "-Wl,-force_load,/tmp/share.a", "UIKit", "Foundation"} {
+		if !slices.Contains(args, want) {
+			t.Errorf("link lacks %s: %q", want, args)
+		}
+	}
+	if i := slices.Index(args, "-o"); i < 0 || args[i+1] != "/app/PlugIns/NSGoShare.appex/NSGoShare" {
+		t.Errorf("link output: %q", args)
+	}
+	if !strings.Contains(shareMain, "func init() { shareextension.Register() }") || !strings.Contains(shareMain, `import "C"`) {
+		t.Errorf("main package does not register the principal class from a static library's init:\n%s", shareMain)
+	}
+}
+
+// The build refuses an extension whose entry point is not NSExtensionMain's stub, as a Go executable's is.
+func TestIOSShareChecksTheEntryPoint(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("needs a Mach-O executable and Xcode's linker")
+	}
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkShareEntry(self); err == nil || !strings.Contains(err.Error(), "_NSExtensionMain") {
+		t.Fatalf("a Go executable passed: %v", err)
+	}
+	if err := checkShareEntry(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Fatal("a missing executable passed")
+	}
+	sdk, err := output(t.Context(), "xcrun", "--sdk", "macosx", "--show-sdk-path")
+	if err != nil {
+		t.Skip("no Xcode:", err)
+	}
+	link := func(entry string) string {
+		out := filepath.Join(t.TempDir(), "entry")
+		if err := run(t.Context(), "xcrun", "ld", "-arch", "arm64", "-platform_version", "macos", "13.0", "13.0", "-syslibroot", sdk,
+			"-e", entry, "-framework", "Foundation", "-framework", "AppKit", "-lSystem", "-o", out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if err := checkShareEntry(link(shareEntry)); err != nil {
+		t.Fatal(err)
+	}
+	err = checkShareEntry(link("_NSApplicationMain"))
+	if err == nil || !strings.Contains(err.Error(), "_NSApplicationMain") {
+		t.Fatalf("NSApplicationMain passed: %v", err)
+	}
+}
