@@ -1,1 +1,6 @@
 tabBadgeNew: 有新内容
+shareSaved: "已保存。打开{app}即可继续。"
+shareFailed: "{app}没能收到这些内容，请再分享一次。"
+shareTooLarge: "一次分享的内容太多。请分享更少或更小的项目。"
+shareDone: 完成
+shareCancel: 取消

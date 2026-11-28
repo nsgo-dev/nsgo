@@ -247,3 +247,116 @@ func TestIOSShareProfileMustGrantItsBundleAndGroup(t *testing.T) {
 		})
 	}
 }
+
+// The extension links Go's archive whole, as an app extension, with NSExtensionMain as its entry point (#2718).
+func TestIOSShareLinksNSExtensionMainAsEntryPoint(t *testing.T) {
+	cc := envValue([]string{"CC=cc", "CC=/xcode/clang -isysroot /sdk -target arm64-apple-ios16.0"}, "CC")
+	if !slices.Equal(cc, []string{"/xcode/clang", "-isysroot", "/sdk", "-target", "arm64-apple-ios16.0"}) {
+		t.Fatalf("CC = %q", cc)
+	}
+	args := shareLinkArgs(cc[1:], "/tmp/share.a", "/app/PlugIns/NSGoShare.appex/NSGoShare")
+	for _, want := range []string{"-target", "-fapplication-extension", "-Wl,-application_extension", "-Wl,-e,_NSExtensionMain", "-Wl,-force_load,/tmp/share.a", "UIKit", "Foundation"} {
+		if !slices.Contains(args, want) {
+			t.Errorf("link lacks %s: %q", want, args)
+		}
+	}
+	if i := slices.Index(args, "-o"); i < 0 || args[i+1] != "/app/PlugIns/NSGoShare.appex/NSGoShare" {
+		t.Errorf("link output: %q", args)
+	}
+	if !strings.Contains(shareMain, "func init() { shareextension.Register() }") || !strings.Contains(shareMain, `import "C"`) {
+		t.Errorf("main package does not register the principal class from a static library's init:\n%s", shareMain)
+	}
+}
+
+// The build refuses an extension whose entry point is not NSExtensionMain's stub, as a Go executable's is.
+func TestIOSShareChecksTheEntryPoint(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("needs a Mach-O executable and Xcode's linker")
+	}
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkShareEntry(self); err == nil || !strings.Contains(err.Error(), "_NSExtensionMain") {
+		t.Fatalf("a Go executable passed: %v", err)
+	}
+	if err := checkShareEntry(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Fatal("a missing executable passed")
+	}
+	sdk, err := output(t.Context(), "xcrun", "--sdk", "macosx", "--show-sdk-path")
+	if err != nil {
+		t.Skip("no Xcode:", err)
+	}
+	link := func(entry string) string {
+		out := filepath.Join(t.TempDir(), "entry")
+		if err := run(t.Context(), "xcrun", "ld", "-arch", "arm64", "-platform_version", "macos", "13.0", "13.0", "-syslibroot", sdk,
+			"-e", entry, "-framework", "Foundation", "-framework", "AppKit", "-lSystem", "-o", out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if err := checkShareEntry(link(shareEntry)); err != nil {
+		t.Fatal(err)
+	}
+	err = checkShareEntry(link("_NSApplicationMain"))
+	if err == nil || !strings.Contains(err.Error(), "_NSApplicationMain") {
+		t.Fatalf("NSApplicationMain passed: %v", err)
+	}
+}
+
+// The share extension says mobile/locales' words in each language the app shows, with the app's name in it, unless the app's catalogs supply them; a language mobile/locales lacks falls back to its source, as the app's code does.
+func TestIOSShareStringsFollowTheAppsCatalogs(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"en.yaml":      "appName: Clips\n",
+		"zh-Hans.yaml": "appName: 剪辑\n",
+		"ja.yaml":      "appName: クリップ\n" + shareCatalog + ":\n  shareSaved: \"保存しました。{app}を開いて続けます。\"\n  shareDone: 完了\n",
+		"ko.yaml":      "appName: 클립\n",
+	})
+	p := &project{Config: projectcfg.Config{ID: "dev.example.clips", Name: "Clips"}}
+	p.I18n.Dir, p.I18n.Source = dir, "en"
+	appex := t.TempDir()
+	region, err := writeShareStrings(p, appex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if region != "en" {
+		t.Errorf("development region %q, want the source's", region)
+	}
+	for lang, want := range map[string][]string{
+		"en":      {`"appName" = "Clips";`, `"shareSaved" = "Saved. Open Clips to continue.";`, `"shareDone" = "Done";`, `"shareTooLarge" = "This is too much`},
+		"zh-Hans": {`"appName" = "剪辑";`, `"shareSaved" = "已保存。打开剪辑即可继续。";`, `"shareCancel" = "取消";`, `"shareFailed" = "剪辑没能收到`},
+		"ja":      {`"appName" = "クリップ";`, `"shareSaved" = "保存しました。クリップを開いて続けます。";`, `"shareDone" = "完了";`, `"shareCancel" = "Cancel";`},
+		"ko":      {`"appName" = "클립";`, `"shareSaved" = "Saved. Open 클립 to continue.";`},
+	} {
+		data, err := os.ReadFile(filepath.Join(appex, lang+".lproj", "Localizable.strings"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range want {
+			if !strings.Contains(string(data), line) {
+				t.Errorf("%s lacks %s:\n%s", lang, line, data)
+			}
+		}
+	}
+
+	// Without catalogs, the extension speaks the source language alone, naming the app by nsgo.yaml.
+	p.I18n.Dir = ""
+	appex = t.TempDir()
+	if _, err := writeShareStrings(p, appex); err != nil {
+		t.Fatal(err)
+	}
+	if dirs, _ := filepath.Glob(filepath.Join(appex, "*.lproj")); len(dirs) != 1 || filepath.Base(dirs[0]) != "en.lproj" {
+		t.Fatalf("lproj directories %v, want en.lproj alone", dirs)
+	}
+	if data, _ := os.ReadFile(filepath.Join(appex, "en.lproj", "Localizable.strings")); !strings.Contains(string(data), `"shareSaved" = "Saved. Open Clips to continue.";`) {
+		t.Fatalf("strings without catalogs:\n%s", data)
+	}
+
+	// A supplied message may use only {app}.
+	writeFiles(t, dir, map[string]string{"ja.yaml": "appName: クリップ\n" + shareCatalog + ":\n  shareSaved: \"{count, plural, other {#}} {app}\"\n"})
+	p.I18n.Dir = dir
+	if _, err := writeShareStrings(p, t.TempDir()); err == nil {
+		t.Fatal("a supplied message with a plural was written")
+	}
+}

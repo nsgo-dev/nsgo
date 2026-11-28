@@ -1,3 +1,18 @@
 tabBadgeNew:
   message: New
   description: What assistive technology announces for a tab's dot badge.
+shareSaved:
+  message: "Saved. Open {app} to continue."
+  description: The iOS share extension's sheet, once what was shared waits for the app; {app} is the app's name.
+shareFailed:
+  message: "{app} couldn't receive this. Try sharing it again."
+  description: The iOS share extension's sheet, when copying what was shared failed; {app} is the app's name.
+shareTooLarge:
+  message: "This is too much to share at once. Share fewer or smaller items."
+  description: The iOS share extension's sheet, when what was shared is over 128 items or 512 MB.
+shareDone:
+  message: Done
+  description: The iOS share extension's button that closes its sheet once it shows the result.
+shareCancel:
+  message: Cancel
+  description: The iOS share extension's button that stops receiving and closes its sheet.

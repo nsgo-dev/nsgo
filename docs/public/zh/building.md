@@ -655,7 +655,7 @@ sign:
 
 工具将 Go 实现的 `<id>.share` 扩展打包进应用。真机运行时由 Xcode 为应用和扩展签名并注册 App Group；构建 IPA 时，`sign.profile` 与 `sign.share_profile` 必须为两者授予同一个 App Group。App Clip、tvOS 和 watchOS 不包含分享扩展。
 
-扩展把每批最多 128 项、512 MiB 的文件复制到 App Group 后结束分享。`mobile.OnShared` 在应用处于活动状态或用户下次打开时接收这些批次；在交付之前，应用或扩展退出不会丢失批次。iOS 没有支持 Share 扩展自动启动或切到主应用的公开 API，因此此流程不会自动打开应用。
+扩展在把每批最多 128 项、512 MiB 的文件复制到 App Group 时显示应用的图标和名称，然后提示已保存、打开应用即可继续，或说明失败原因，再关闭分享面板。这些文字是 `github.com/nsgo-dev/nsgo/mobile/locales` 的 `shareSaved`、`shareFailed`、`shareTooLarge`、`shareDone` 和 `shareCancel`，按应用目录中最符合用户语言的那种显示；应用的目录可以在这个导入路径下[提供](localization.md#nsgo-自己的文案)它们，用 `{app}` 表示应用名。`mobile.OnShared` 在应用处于活动状态或用户下次打开时接收这些批次；在交付之前，应用或扩展退出不会丢失批次。iOS 没有支持 Share 扩展自动启动或切到主应用的公开 API，因此此流程不会自动打开应用。
 
 ## 小程序
 

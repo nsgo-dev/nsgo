@@ -140,10 +140,9 @@ var layers = []struct {
 	{"examples/", []string{"", "audio", "cloud", "automation", "core", "base/", "ui/", "gpu", "mobile", "desktop", "desktop/locales", "web", "gamepad", "gameservices", "i18n", "icons/", "nsgotest", "tsx/", "updater", "widget", "examples/"}},
 	{"project", []string{"targets", "tsx/pkg"}},
 	{"targets", nil},
-	// The nsgo tool links no component or runtime, so changing them does
-	// not build it again; it writes TSX declarations by running the app.
+	// The nsgo tool links no component or runtime, so changing them does not build it again; it writes TSX declarations by running the app. It links mobile/locales' generated messages, which it writes into the iOS share extension's bundle, as a vendored module has their code but not their YAML.
 	{"cmd/nsgo/shareextension", []string{"internal/platform/objcblock", "internal/platform/shareinbox"}},
-	{"cmd/", []string{"core", "cmd/", "i18n", "project", "targets", "internal/automation", "internal/appstartup", "internal/mimeinfo", "internal/platform/android/runtime", "tsx/bundler", "tsx/pkg", "tsx/websrc"}},
+	{"cmd/", []string{"core", "cmd/", "i18n", "project", "targets", "internal/automation", "internal/appstartup", "internal/mimeinfo", "internal/platform/android/runtime", "mobile/locales", "tsx/bundler", "tsx/pkg", "tsx/websrc"}},
 	{"tools/", []string{"core"}},
 }
 
