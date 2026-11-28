@@ -118,6 +118,8 @@ build:
 
 `icon.windows` 与 `icon.linux` 分别指定用于应用包、安装程序和商店图标的正方形 PNG。默认读取 `assets/IconWindows.png`、`assets/IconLinux.png`，再回退到 `icon.png`；`dev.icon` 接受相同设置和带 `-dev` 的默认文件。`icon.android.png` 独立指定 Android 位图，也可以不配置自适应层。其他目标仍使用共享的 `icon.png` 回退。
 
+macOS 上的 Icon Composer `.icon` 需要 Xcode 26 或更新版本。使用较旧的 Xcode 时，NSGo 优先使用同名的 `.icns`，再回退到所选的 `icon.png`（`dev` 有 `Icon-dev.png` 时使用它），并提示分层图标不可用。
+
 Apple TV 的图标不是方形，而是一张分层卡片：`tvos` 取 Xcode 的 `.brandassets`（其中的 `App Icon` 堆栈和顶部横幅），或一张如 1280×768 的宽图，工具用它的边缘色铺底、让图铺满卡片，并居中生成顶部横幅；两者都没有时，`png` 按卡片高度的四分之三居中。Apple Watch 会把图标裁成圆形，所以 `watchos` 取按 watchOS 圆形绘制的 `.icon` 或一张方图；没有它时依次用 `apple` 和 `png`。两者与 `apple`、`png` 一样默认取 `assets/AppIconTV.*` 和 `assets/AppIconWatch.*`。
 
 在 Android 上，`icon.android.foreground` 与 `background` 让启动图标成为自适应图标，启动器按自己的形状裁剪、按需移动它，而不是把 `png` 缩小放在启动器自己的底板上。每个图层是 108 dp 的方形，PNG 缩放到 432 像素；启动器显示中央 72 dp（288 像素），并用一个可能裁到中央 66 dp（264 像素）以外任何部分的形状遮罩它，所以标志要放在这个圆内，背景铺满整个方形。`background` 是一张 PNG，或 `"#1F1F1F"` 这样的颜色。`monochrome` 是一个只看透明度的形状，用户打开主题图标时，Android 13 及以后的版本给它着色；没有它时，图标在那里保持原色。安装包仍保留 `icon.android.png`（没有时用 `icon.png`）作为普通位图图标，但 Android 9（NSGo 支持的最低版本）及以后的启动器都会选用自适应图标；没有 `png` 时，工具用前景叠在背景上画出它。不配置自适应层时，启动器显示 Android 位图，没有时用共享的 `png`。

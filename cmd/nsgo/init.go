@@ -263,10 +263,11 @@ var initYAML = template.Must(template.New("yaml").Parse(`name: {{.Name}}
 id: {{.ID}}
 version: 0.1.0
 
-# macOS and iOS use assets/AppIcon.icon, or assets/AppIcon.icns on macOS; the
-# other targets, and Apple ones without those, use assets/Icon.png. An Apple
-# TV's icon is a wide layered card and an Apple Watch's is drawn in circles,
-# so each takes files of its own; name them here:
+# macOS and iOS use assets/AppIcon.icon with Xcode 26 or later. macOS also
+# accepts assets/AppIcon.icns; with older Xcode it uses that .icns, then
+# assets/Icon.png. The other targets, and Apple ones without those, use the
+# PNG. An Apple TV's icon is a wide layered card and an Apple Watch's is drawn
+# in circles, so each takes files of its own; name them here:
 # icon:
 #   apple: assets/AppIcon.icon  # an Icon Composer .icon; macOS also takes .icns
 #   png: assets/Icon.png        # a square PNG, 1024 pixels wide

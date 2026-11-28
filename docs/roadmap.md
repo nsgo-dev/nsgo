@@ -403,6 +403,7 @@ These items wait for community contributions, and a change to one backend record
 
 | Item | NSH reference | Done when |
 | --- | --- | --- |
+| Icon Composer icons on older Xcode | `cmd/nsgo/icon.go`, `cmd/nsgo/watchos.go` | iOS and watchOS fall back to PNG artwork when `actool` predates Xcode 26, as macOS now does; iOS launch-screen catalogs and watchOS's inherited app icon need the same toolchain gate |
 | Disk space on remaining targets | [#1078](https://github.com/nsgo-dev/nsgo/issues/1078), [disk space](architecture/services.md#disk-space) | Read the app storage capacity on HarmonyOS and mini programs where their hosts can report it; both currently answer `ErrDiskSpaceUnavailable` |
 | Network state on HarmonyOS and mini programs | [#268](https://github.com/nsgo-dev/nsgo/issues/268), [network state](architecture/services.md#network-state) | `Env.Network` follows system connectivity on HarmonyOS and in mini programs, which currently use the online and unmetered fallback |
 | Badges on iOS header symbols | [#1076](https://github.com/nsgo-dev/nsgo/issues/1076) | iOS 26 header symbols can show the same text and dot badges as tab items. |

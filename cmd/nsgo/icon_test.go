@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"debug/pe"
 	"encoding/binary"
+	"errors"
 	projectcfg "github.com/nsgo-dev/nsgo/project"
 	"image"
 	"image/color"
@@ -53,6 +55,242 @@ func TestICNS(t *testing.T) {
 	}
 	if len(kinds) != len(icnsTypes) {
 		t.Errorf("got entries %v", kinds)
+	}
+}
+
+func actoolVersionPlist(version string) []byte {
+	return encodePlist(map[string]any{
+		"com.apple.actool.version": map[string]any{
+			"bundle-version":       "23727",
+			"short-bundle-version": version,
+		},
+	})
+}
+
+func TestActoolSupportsIconComposer(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		version []byte
+		want    bool
+		wantErr bool
+	}{
+		{"16.4", actoolVersionPlist("16.4"), false, false},
+		{"25.9", actoolVersionPlist("25.9"), false, false},
+		{"26", actoolVersionPlist("26"), true, false},
+		{"26.0", actoolVersionPlist("26.0"), true, false},
+		{"26.0.1", actoolVersionPlist("26.0.1"), true, false},
+		{"26.3", actoolVersionPlist("26.3"), true, false},
+		{"27.0", actoolVersionPlist("27.0"), true, false},
+		{"missing key", encodePlist(map[string]any{}), false, true},
+		{"nonnumeric", actoolVersionPlist("twenty-six"), false, true},
+		{"malformed", []byte("<plist>"), false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := actoolSupportsIconComposer(string(tc.version))
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("actoolSupportsIconComposer() = %v, want an error", got)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Errorf("actoolSupportsIconComposer() = %v, %v, want %v", got, err, tc.want)
+			}
+		})
+	}
+}
+
+func legacyActoolContext(t *testing.T, version string) context.Context {
+	t.Helper()
+	return withProcessRunner(t, func(_ context.Context, cmd processCommand) ([]byte, error) {
+		if cmd.name != "xcrun" || strings.Join(cmd.args, " ") != "actool --version" {
+			t.Fatalf("legacy actool ran %s %q", cmd.name, cmd.args)
+		}
+		return actoolVersionPlist(version), nil
+	})
+}
+
+func isolateIconCache(t *testing.T) {
+	t.Helper()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+}
+
+func writeTestIconPNG(t *testing.T, path string) {
+	t.Helper()
+	var data bytes.Buffer
+	if err := png.Encode(&data, testIcon(64)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteMacIconLegacyActoolPNG(t *testing.T) {
+	ctx := legacyActoolContext(t, "16.4")
+	dir := t.TempDir()
+	icon := filepath.Join(dir, "AppIcon.icon")
+	if err := os.Mkdir(icon, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pngPath := filepath.Join(dir, "Icon.png")
+	writeTestIconPNG(t, pngPath)
+	p := &project{}
+	p.Icon.Apple = icon
+	p.Icon.PNG = pngPath
+	resources := t.TempDir()
+	plist, err := writeMacIcon(ctx, p, resources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plist != iconFilePlist {
+		t.Errorf("plist = %q, want %q", plist, iconFilePlist)
+	}
+	data, err := os.ReadFile(filepath.Join(resources, "AppIcon.icns"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := icns(testIcon(64)); !bytes.Equal(data, want) {
+		t.Error("fallback is not the PNG icon encoded as an icns")
+	}
+}
+
+func TestWriteMacIconLegacyActoolICNS(t *testing.T) {
+	ctx := legacyActoolContext(t, "16.4")
+	dir := t.TempDir()
+	icon := filepath.Join(dir, "AppIcon.icon")
+	if err := os.Mkdir(icon, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fallback := strings.TrimSuffix(icon, ".icon") + ".icns"
+	want := []byte("icns fallback")
+	if err := os.WriteFile(fallback, want, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pngPath := filepath.Join(dir, "Icon.png")
+	writeTestIconPNG(t, pngPath)
+	p := &project{}
+	p.Icon.Apple = icon
+	p.Icon.PNG = pngPath
+	resources := t.TempDir()
+	if _, err := writeMacIcon(ctx, p, resources); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(resources, "AppIcon.icns"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, want) {
+		t.Errorf("fallback = %q, want %q", data, want)
+	}
+}
+
+func TestWriteMacIconLegacyActoolNeedsFallback(t *testing.T) {
+	ctx := legacyActoolContext(t, "16.4")
+	icon := filepath.Join(t.TempDir(), "AppIcon.icon")
+	if err := os.Mkdir(icon, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p := &project{}
+	p.Icon.Apple = icon
+	if _, err := writeMacIcon(ctx, p, t.TempDir()); err == nil || !strings.Contains(err.Error(), "Xcode 26") {
+		t.Errorf("error = %v, want an Xcode 26 requirement", err)
+	}
+}
+
+func actoolArg(args []string, flag string) string {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == flag {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+func TestWriteMacIconModernActoolDoesNotFallback(t *testing.T) {
+	isolateIconCache(t)
+	ctx := withProcessRunner(t, func(_ context.Context, cmd processCommand) ([]byte, error) {
+		if strings.Join(cmd.args, " ") == "actool --version" {
+			return actoolVersionPlist("26.0"), nil
+		}
+		if len(cmd.args) >= 2 && cmd.args[0] == "actool" && cmd.args[1] == "--compile" {
+			return nil, errors.New("compile failed")
+		}
+		t.Fatalf("unexpected xcrun args: %q", cmd.args)
+		return nil, nil
+	})
+	dir := t.TempDir()
+	icon := filepath.Join(dir, "AppIcon.icon")
+	if err := os.Mkdir(icon, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(icon, "icon.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestIconPNG(t, filepath.Join(dir, "Icon.png"))
+	p := &project{}
+	p.Icon.Apple = icon
+	p.Icon.PNG = filepath.Join(dir, "Icon.png")
+	resources := t.TempDir()
+	if _, err := writeMacIcon(ctx, p, resources); err == nil || !strings.Contains(err.Error(), "asset catalog needs Xcode's actool") {
+		t.Fatalf("modern actool error = %v, want the actool failure rather than a PNG fallback", err)
+	}
+	if _, err := os.Stat(filepath.Join(resources, "AppIcon.icns")); !os.IsNotExist(err) {
+		t.Errorf("fallback icon exists: %v", err)
+	}
+}
+
+func TestWriteMacIconModernActoolCompilesIcon(t *testing.T) {
+	isolateIconCache(t)
+	want := []byte("compiled icon")
+	ctx := withProcessRunner(t, func(_ context.Context, cmd processCommand) ([]byte, error) {
+		if strings.Join(cmd.args, " ") == "actool --version" {
+			return actoolVersionPlist("26.0"), nil
+		}
+		if len(cmd.args) < 2 || cmd.args[0] != "actool" || cmd.args[1] != "--compile" {
+			t.Fatalf("unexpected xcrun args: %q", cmd.args)
+		}
+		files := actoolArg(cmd.args, "--compile")
+		partial := actoolArg(cmd.args, "--output-partial-info-plist")
+		if files == "" || partial == "" {
+			t.Fatalf("actool args name no output: %q", cmd.args)
+		}
+		if err := os.WriteFile(filepath.Join(files, "AppIcon.icns"), want, 0o644); err != nil {
+			return nil, err
+		}
+		return nil, os.WriteFile(partial, encodePlist(map[string]any{"CFBundleIconFile": "AppIcon"}), 0o644)
+	})
+	dir := t.TempDir()
+	icon := filepath.Join(dir, "AppIcon.icon")
+	if err := os.Mkdir(icon, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(icon, "icon.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(icon, ".icon")+".icns", []byte("sibling icon"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeTestIconPNG(t, filepath.Join(dir, "Icon.png"))
+	p := &project{}
+	p.Icon.Apple = icon
+	p.Icon.PNG = filepath.Join(dir, "Icon.png")
+	resources := t.TempDir()
+	plist, err := writeMacIcon(ctx, p, resources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plist, "CFBundleIconFile") {
+		t.Errorf("actool named no icon: %q", plist)
+	}
+	data, err := os.ReadFile(filepath.Join(resources, "AppIcon.icns"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, want) {
+		t.Errorf("compiled icon = %q, want %q", data, want)
 	}
 }
 

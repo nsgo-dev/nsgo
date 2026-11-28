@@ -210,7 +210,8 @@ func scaledTo(img image.Image, w, h int) *image.NRGBA {
 
 // writeMacIcon puts the app's icon into a macOS bundle's Resources and
 // returns the Info.plist entries naming it. An Icon Composer .icon
-// compiles with actool, an .icns is copied, and a PNG becomes an .icns.
+// compiles with actool on Xcode 26 or later; older Xcode uses a sibling
+// .icns or the PNG. An .icns is copied, and a PNG becomes an .icns.
 func writeMacIcon(ctx context.Context, p *project, resources string) (string, error) {
 	minimum, err := p.appleMinimum(nil)
 	if err != nil {
@@ -218,7 +219,33 @@ func writeMacIcon(ctx context.Context, p *project, resources string) (string, er
 	}
 	switch filepath.Ext(p.Icon.Apple) {
 	case ".icon":
-		return compileIcon(ctx, p.Icon.Apple, resources, "macosx", minimum, nil)
+		version, err := output(ctx, "xcrun", "actool", "--version")
+		if err != nil {
+			return "", fmt.Errorf("the asset catalog needs Xcode's actool: %w", err)
+		}
+		supported, err := actoolSupportsIconComposer(version)
+		if err != nil {
+			return "", err
+		}
+		if supported {
+			return compileIcon(ctx, p.Icon.Apple, resources, "macosx", minimum, nil)
+		}
+		fallback := strings.TrimSuffix(p.Icon.Apple, ".icon") + ".icns"
+		if data, err := os.ReadFile(fallback); err == nil {
+			warnIn(ctx, "Xcode's actool does not support Icon Composer icons; using %s instead of %s", rel(fallback), rel(p.Icon.Apple))
+			return iconFilePlist, os.WriteFile(filepath.Join(resources, "AppIcon.icns"), data, 0o644)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		img, err := p.iconImage()
+		if err != nil {
+			return "", err
+		}
+		if img == nil {
+			return "", fmt.Errorf("the Icon Composer app icon needs Xcode 26 or later; provide %s or a PNG icon", rel(fallback))
+		}
+		warnIn(ctx, "Xcode's actool does not support Icon Composer icons; using %s instead of %s", rel(p.Icon.PNG), rel(p.Icon.Apple))
+		return iconFilePlist, os.WriteFile(filepath.Join(resources, "AppIcon.icns"), icns(img), 0o644)
 	case ".icns":
 		data, err := os.ReadFile(p.Icon.Apple)
 		if err != nil {
@@ -549,6 +576,32 @@ func iconAssetName(input string) string {
 // holding AppIcon and returns the Info.plist entries naming the icon.
 func compileIcon(ctx context.Context, input, out, platform, minimum string, idioms []string) (string, error) {
 	return compileAssets(ctx, []string{input}, iconAssetName(input), out, platform, minimum, idioms)
+}
+
+// actoolSupportsIconComposer reports whether actool's Xcode can compile
+// Icon Composer .icon files, introduced in Xcode 26.
+func actoolSupportsIconComposer(version string) (bool, error) {
+	value, err := decodePlist([]byte(version))
+	if err != nil {
+		return false, fmt.Errorf("read actool version: %w", err)
+	}
+	root, ok := value.(map[string]any)
+	if !ok {
+		return false, errors.New("read actool version: expected a dictionary")
+	}
+	info, ok := root["com.apple.actool.version"].(map[string]any)
+	if !ok {
+		return false, errors.New("read actool version: missing com.apple.actool.version")
+	}
+	short, ok := info["short-bundle-version"].(string)
+	if !ok {
+		return false, errors.New("read actool version: missing short-bundle-version")
+	}
+	parsed, valid := appleVersion(short)
+	if !valid {
+		return false, fmt.Errorf("read actool version: invalid short-bundle-version %q", short)
+	}
+	return parsed[0] >= 26, nil
 }
 
 // compileAssets writes actool's output to out and caches it by tool version, arguments and source files. name is empty for catalogs without an icon.
