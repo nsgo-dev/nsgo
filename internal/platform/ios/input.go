@@ -644,7 +644,7 @@ func styleLines(tv, font, color objc.ID, lineHeight driver.Points, align int, la
 	para.Send(selRelease)
 }
 
-// setFieldAttributes sets a UITextField's defaultTextAttributes so both existing and typed text carry the field's font, color, language and letter spacing.
+// setFieldAttributes sets a UITextField's defaultTextAttributes so both existing and typed text carry the field's font, color, language and letter spacing. Its paragraph clips the line as macOS's field cell does (macos/input.go): a paragraph style breaks by word by default, and a UITextField draws a value too long for it on as many lines as that makes while it is not being edited, cut off by its height.
 func setFieldAttributes(f, font, color objc.ID, align int, language string, kern driver.Points, rtl bool) {
 	a := textAttrs()
 	if f == 0 || font == 0 || color == 0 || a.font == 0 || a.color == 0 {
@@ -655,6 +655,7 @@ func setFieldAttributes(f, font, color objc.ID, align int, language string, kern
 	attrs.Send(sel("setObject:forKey:"), color, a.color)
 	if a.paragraph != 0 {
 		para := newParagraph(0, align, language, rtl)
+		para.Send(sel("setLineBreakMode:"), nsLineBreakByClipping)
 		attrs.Send(sel("setObject:forKey:"), para, a.paragraph)
 		para.Send(selRelease)
 	}
@@ -895,3 +896,6 @@ func (v *view) scrollInputTo(p driver.Point, animated bool) {
 		in.reportScroll(true)
 	}
 }
+
+// nsLineBreakByClipping is NSLineBreakByClipping.
+const nsLineBreakByClipping = 2
