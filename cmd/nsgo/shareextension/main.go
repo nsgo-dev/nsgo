@@ -1,6 +1,6 @@
 //go:build ios
 
-// The iOS share extension is a Go executable with a runtime-registered UIKit principal class. It calls only extension-safe public APIs, through purego.
+// The iOS share extension is Go's code as a static library in an executable that enters NSExtensionMain, with a runtime-registered UIKit principal class. It calls only extension-safe public APIs, through purego.
 package shareextension
 
 import (
@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
-	"unsafe"
 
 	"github.com/ebitengine/purego"
 	"github.com/ebitengine/purego/objc"
@@ -28,33 +26,17 @@ var loadTypes = sync.OnceFunc(func() {
 	}
 })
 
-// Run starts the extension host after the generated entry point locks the main thread.
-func Run() {
-	lib, err := purego.Dlopen("/System/Library/Frameworks/Foundation.framework/Foundation", purego.RTLD_NOW|purego.RTLD_GLOBAL)
-	if err != nil {
-		panic(err)
-	}
-	if _, err = purego.Dlopen("/System/Library/Frameworks/UIKit.framework/UIKit", purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
+// Register registers the extension's principal class, NSGoShareController. The extension's executable is this code as a static library linked with _NSExtensionMain as its entry point, as App Store Connect requires (#2718): Go's runtime starts from the library's initializer on a thread of its own while the main thread enters NSExtensionMain, and the generated main package's init calls Register, before UIKit looks the class up for the host's first request.
+func Register() {
+	if _, err := purego.Dlopen("/System/Library/Frameworks/UIKit.framework/UIKit", purego.RTLD_NOW|purego.RTLD_GLOBAL); err != nil {
 		panic(err)
 	}
 	loadTypes()
-	_, err = objc.RegisterClass("NSGoShareController", objc.GetClass("UIViewController"), []*objc.Protocol{}, []objc.FieldDef{}, []objc.MethodDef{
+	if _, err := objc.RegisterClass("NSGoShareController", objc.GetClass("UIViewController"), []*objc.Protocol{}, []objc.FieldDef{}, []objc.MethodDef{
 		{Cmd: sel("viewDidLoad"), Fn: loaded},
-	})
-	if err != nil {
+	}); err != nil {
 		panic(err)
 	}
-	var extensionMain func(int, unsafe.Pointer) int
-	purego.RegisterLibFunc(&extensionMain, lib, "NSExtensionMain")
-	argv := make([]*byte, 0, len(os.Args)+1)
-	for _, arg := range os.Args {
-		b := append([]byte(arg), 0)
-		argv = append(argv, &b[0])
-	}
-	argv = append(argv, nil)
-	code := extensionMain(len(os.Args), unsafe.Pointer(&argv[0]))
-	runtime.KeepAlive(argv)
-	os.Exit(code)
 }
 
 func loaded(self objc.ID, _ objc.SEL) {
