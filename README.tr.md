@@ -8,6 +8,17 @@
 <p align="center">
   <a href="README.md">English</a> |
   <a href="README.zh-CN.md">简体中文</a> |
+  <a href="README.zh-TW.md">繁體中文</a> |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.es.md">Español</a> |
+  <a href="README.fr.md">Français</a> |
+  <a href="README.de.md">Deutsch</a> |
+  <a href="README.pt.md">Português</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.id.md">Bahasa Indonesia</a> |
   <strong>Türkçe</strong>
 </p>
 
@@ -125,7 +136,7 @@ NSGo henüz erken aşamadadır ve API'si henüz kararlı değildir. [Releases](h
 
 ## Belgeler
 
-[Belgeler](https://nsgo.dev/docs/) bileşenler ve durum, yerleşim, stiller, gezinme, bileşen referansı, TSX uygulamaları, yerelleştirme, test, gömme, derleme ve dağıtımı kapsar; [canlı demo](https://nsgo.dev/gallery/) galeriyi tarayıcıda çalıştırır.
+[Belgeler](https://nsgo.dev/tr/docs/) bileşenler ve durum, yerleşim, stiller, gezinme, bileşen referansı, TSX uygulamaları, yerelleştirme, test, gömme, derleme ve dağıtımı kapsar; [canlı demo](https://nsgo.dev/gallery/) galeriyi tarayıcıda çalıştırır.
 
 Kodlama ajanları NSGo'yu `bunx skills add nsgo-dev/nsgo` becerisinden öğrenir ve belgeleri [llms.txt](https://nsgo.dev/llms.txt) üzerinden Markdown olarak okur.
 
@@ -137,7 +148,7 @@ go tool nsgo check                  # tüm paketleri denetle
 go tool nsgo test                   # tüm paketlerin testlerini çalıştır
 ```
 
-Kurulumun geri kalanı [Katkıda Bulunma](https://nsgo.dev/docs/contributing/) sayfasındadır. Kod değiştirmeden önce [ARCHITECTURE.md](ARCHITECTURE.md) ve [AGENTS.md](AGENTS.md) dosyalarını, son sürümden beri değişenler için [CHANGELOG.md](CHANGELOG.md) dosyasını okuyun.
+Kurulumun geri kalanı [Katkıda Bulunma](https://nsgo.dev/tr/docs/contributing/) sayfasındadır. Kod değiştirmeden önce [ARCHITECTURE.md](ARCHITECTURE.md) ve [AGENTS.md](AGENTS.md) dosyalarını, son sürümden beri değişenler için [CHANGELOG.md](CHANGELOG.md) dosyasını okuyun.
 
 ## Topluluk
 
