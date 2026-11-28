@@ -244,8 +244,11 @@ func (t *testSurface) dragNativeHID(path []driver.Point) bool {
 	var (
 		seq    uint64
 		posted bool
+		before driver.Point
+		under  bool
 	)
 	onMainSync(func() {
+		before, under = scrollOffsetUnder(steps[0])
 		seq = s.inputGate.beginNativeTouch()
 		posted = postWatchHIDTouchOnMain(steps[0], watchHIDDown)
 	})
@@ -273,7 +276,10 @@ func (t *testSurface) dragNativeHID(path []driver.Point) bool {
 		})
 		time.Sleep(16 * time.Millisecond)
 	}
+	var panActive, blocked bool
 	onMainSync(func() {
+		panActive = s.touch.panning
+		blocked = len(s.blocked) > 0
 		posted = postWatchHIDTouchOnMain(last, watchHIDUp)
 	})
 	if !posted {
@@ -287,7 +293,48 @@ func (t *testSurface) dragNativeHID(path []driver.Point) bool {
 		watchHIDBroken.Store(true)
 		return false
 	}
+	// Some simulator runtimes deliver the touches but leave SwiftUI's ScrollView where it was, so a drag no view took scrolls it the scripted way.
+	if delta, ok := resolveWatchDragFallback(panActive, blocked, steps[0], last); ok && under {
+		time.Sleep(100 * time.Millisecond)
+		var after driver.Point
+		onMainSync(func() { after, _ = scrollOffsetUnder(steps[0]) })
+		if math.Abs(float64(after.X-before.X)) < 0.5 && math.Abs(float64(after.Y-before.Y)) < 0.5 {
+			scrollUnderBy(steps[0], delta)
+		}
+	}
 	return true
+}
+
+// scrollOffsetUnder returns the offset of the scroll view under at, and whether there is one. Must be called on the main thread.
+func scrollOffsetUnder(at driver.Point) (driver.Point, bool) {
+	root := s.view(s.root)
+	if root == nil {
+		return driver.Point{}, false
+	}
+	v := hit(root, at, func(v *view) bool { return v.kind == driver.KindScroll && !v.scroll.Behavior.NoScroll })
+	if v == nil {
+		return driver.Point{}, false
+	}
+	return v.offset, true
+}
+
+// scrollUnderBy scrolls the scroll view under at by delta through opScrollTo, as a drag no view took does.
+func scrollUnderBy(at, delta driver.Point) {
+	scriptedOnMain(func() {
+		root := s.view(s.root)
+		if root == nil {
+			return
+		}
+		if v := hit(root, at, func(v *view) bool { return v.kind == driver.KindScroll && !v.scroll.Behavior.NoScroll }); v != nil {
+			to := clampOffset(v, driver.Point{X: v.offset.X + delta.X, Y: v.offset.Y + delta.Y})
+			s.inputGate.expectScroll(uint32(v.hostID))
+			s.w.op(opScrollTo, v.hostID)
+			s.w.f64(float64(to.X), float64(to.Y))
+			s.w.flag(false)
+			s.flush()
+		}
+	})
+	time.Sleep(100 * time.Millisecond)
 }
 
 func (t *testSurface) dragFallback(path []driver.Point) {
@@ -313,21 +360,7 @@ func (t *testSurface) dragFallback(path []driver.Point) {
 	})
 	touchAt(touchEnded, last)
 	if delta, ok := resolveWatchDragFallback(panActive, blocked, steps[0], last); ok {
-		scriptedOnMain(func() {
-			root := s.view(s.root)
-			if root == nil {
-				return
-			}
-			if v := hit(root, steps[0], func(v *view) bool { return v.kind == driver.KindScroll && !v.scroll.Behavior.NoScroll }); v != nil {
-				to := clampOffset(v, driver.Point{X: v.offset.X + delta.X, Y: v.offset.Y + delta.Y})
-				s.inputGate.expectScroll(uint32(v.hostID))
-				s.w.op(opScrollTo, v.hostID)
-				s.w.f64(float64(to.X), float64(to.Y))
-				s.w.flag(false)
-				s.flush()
-			}
-		})
-		time.Sleep(100 * time.Millisecond)
+		scrollUnderBy(steps[0], delta)
 	}
 }
 
@@ -424,8 +457,9 @@ func (t *testSurface) Scroll(at driver.Point, delta driver.Point) error {
 			if math.Abs(float64(after.X-wantOffset.X)) <= 2 && math.Abs(float64(after.Y-wantOffset.Y)) <= 2 {
 				return nil
 			}
+			// A drag that left the scroll view where it was did not reach SwiftUI's ScrollView, so the rest scrolls the scripted way.
 			if math.Abs(float64(after.X-before.X)) < 0.5 && math.Abs(float64(after.Y-before.Y)) < 0.5 {
-				return nil
+				return t.scrollFallback(scrollID, wantOffset)
 			}
 		}
 		return nil
