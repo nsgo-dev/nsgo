@@ -35,3 +35,4 @@ Go ファイルは `go.mod` に記載された Go バージョンの `gofmt` で
 - 仕様が変わったドキュメントを更新してください。NSGo の内部仕組みについては `docs/architecture/` の該当トピックを、アプリやコンポーネントからの使い方については `docs/public/` のページを更新します（[ドキュメントとウェブサイト](docs.md)）。
 - `README.md` と `README.zh-CN.md` の内容を揃えてください。その他のドキュメントは英語が基準で、中国語ページは `docs/public/zh/` に置きます。
 - ユーザーから見える変更は `CHANGELOG.md` に直接書くのではなく、`changelog.d/` 内に専用のファイルを作り、`### Fixed` のような種別見出しの下に `(#12 by @you)` のような参照付きで1行で記録してください。リリース時にこれらのファイルから `CHANGELOG.md` が生成されます（[形式](https://github.com/nsgo-dev/nsgo/blob/main/changelog.d/README.md)）。
+- アプリがコード、`nsgo.yaml`、コマンドを書き換える必要がある変更は `### Breaking` の下に、更新方法と、役立つ場合は新しい書き方のコードブロックを添えて記録してください。リリースノートの先頭に載ります。

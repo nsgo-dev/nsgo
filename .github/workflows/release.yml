@@ -1,6 +1,6 @@
 name: Release
 
-# Tags and publishes a release, only once every check has passed. A maintainer decides the version: `go run ./tools/changelog release X.Y.Z` folds changelog.d's fragments into CHANGELOG.md and turns its `## [Unreleased]` into `## [X.Y.Z] - YYYY-MM-DD` above a fresh `## [Unreleased]`; they merge that to main, then run this workflow on main with that version (`gh workflow run release.yml -f version=X.Y.Z`).
+# Tags and publishes a release, only once every check has passed. A maintainer decides the version: `go run ./tools/changelog release X.Y.Z` turns CHANGELOG.md's `## [Unreleased]` and changelog.d's fragments into `## [X.Y.Z] - YYYY-MM-DD` above a fresh `## [Unreleased]`, grouped for the notes with breaking changes first; they write its highlights, merge that to main, then run this workflow on main with that version (`gh workflow run release.yml -f version=X.Y.Z`).
 #
 # The run refuses a malformed version, a ref other than main, a commit that is no longer main's tip, a tag that already exists and a version the Go module proxy already serves. It then refuses fragments left uncollected, a missing changelog section and an Android runtime not built from its Java, and runs every job of test.yml, the Apple jobs pull requests skip included. Beside the tests it builds the prebuilt nsgo binaries from the tested commit (release-assets.yml): an archive per platform and checksums.txt. Only after all of that passes does it create the annotated tag vX.Y.Z on the tested commit, publish the section as the release's notes with those archives attached (a prerelease for a version with a suffix such as -rc.1) and ask the proxy for the version so pkg.go.dev lists it. A tag created with GITHUB_TOKEN starts no workflow, so this same run publishes it.
 #
@@ -122,6 +122,11 @@ jobs:
           ' CHANGELOG.md > notes.md
           if ! grep -q '[^[:space:]]' notes.md; then
             echo "::error::CHANGELOG.md has no '## [$VERSION]' section with notes. Add it on main before releasing."
+            exit 1
+          fi
+          # tools/changelog release leaves the highlights for a maintainer to write.
+          if ! awk '/^### Highlights/ { h = 1; next } h && /^#/ { exit } h && /^- / { found = 1 } END { exit !found }' notes.md; then
+            echo "::error::The '## [$VERSION]' section of CHANGELOG.md has no bullet under '### Highlights'. Write its highlights on main before releasing."
             exit 1
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

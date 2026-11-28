@@ -35,3 +35,4 @@ go tool nsgo test    # every package's tests
 - 更新因你的變更而不再準確的文件：若涉及 NSGo 內部運作方式請更新 `docs/architecture/` 中的主題文件，若涉及應用程式與元件的使用方式請更新 `docs/public/` 中的頁面（參閱[文件與網站](docs.md)）。
 - 保持 `README.md` 與 `README.zh-CN.md` 內容一致；其餘文件以英文為主，中文頁面置於 `docs/public/zh/`。
 - 將使用者可見的變更寫成一行，附上例如 `(#12 by @you)` 的參照，並存放在 `changelog.d/` 內一個獨立檔案中、歸類於對應的標題（例如 `### Fixed`）之下，而不要直接修改 `CHANGELOG.md`——發佈流程會自動彙整這些檔案填入 `CHANGELOG.md`（參閱[格式說明](https://github.com/nsgo-dev/nsgo/blob/main/changelog.d/README.md)）。
+- 讓應用程式必須修改程式碼、`nsgo.yaml` 或指令的變更寫在 `### Breaking` 之下，說明如何更新，必要時附上新寫法的程式碼區塊：發佈說明會把它們列在最前面。
