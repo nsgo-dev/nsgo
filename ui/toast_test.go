@@ -506,12 +506,12 @@ func TestToastsMotionAndReduceMotion(t *testing.T) {
 	toaster.Show(ToastContent{ID: "live", Title: "Live", Duration: -1})
 	app.Advance(time.Second)
 	app.SetEnvironment(core.Environment{ReduceMotion: true})
-	if got := app.Find("live").Style.Transition.Duration; got != 0 {
+	if got := app.Find("id:live").Style.Transition.Duration; got != 0 {
 		t.Fatalf("transition under ReduceMotion = %v, want 0", got)
 	}
 	toaster.Dismiss("live")
 	app.Advance(100 * time.Millisecond)
-	if app.Exists("live") {
+	if app.Exists("id:live") {
 		t.Fatal("toast waited for ExitDuration under ReduceMotion")
 	}
 
