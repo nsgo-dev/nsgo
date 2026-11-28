@@ -428,8 +428,11 @@ func open(app engine.App, opts Options, test *testOpen) *surface {
 	host := doc.Get("body")
 	if opts.Mount != "" {
 		host = doc.Call("querySelector", opts.Mount)
+		setStyle(host, map[string]string{"position": "relative", "overflow": "hidden"})
+	} else {
+		setStyle(doc.Get("documentElement"), map[string]string{"width": "100%", "height": "100%"})
+		setStyle(host, map[string]string{"position": "relative", "overflow": "hidden", "margin": "0", "width": "100%", "height": "100%"})
 	}
-	setStyle(host, map[string]string{"position": "relative", "overflow": "hidden"})
 	if doc.Call("getElementById", "nsgo-base").IsNull() {
 		base := doc.Call("createElement", "style")
 		base.Set("id", "nsgo-base")
