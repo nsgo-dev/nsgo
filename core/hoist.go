@@ -890,39 +890,59 @@ func (t *Tree) back() {
 	t.changed = true
 }
 
-// backPreview returns the screen back pops, as back routes it, when
-// nothing takes it first: no overlay listening for cancel, no modal's
-// OnRequestClose, no Scope.OnBackPress handler and no NoPopOnBack.
-func (t *Tree) backPreview() driver.NodeID {
+// backPreview returns what a back gesture moves, as back routes it: the
+// screen back pops when nothing takes it first (no overlay listening for
+// cancel, no modal's OnRequestClose, no Scope.OnBackPress handler and no
+// NoPopOnBack), or the views the handler back goes to names with
+// BackOptions.Preview, the second the one the first uncovers.
+func (t *Tree) backPreview() (moving, uncovered, scrim driver.NodeID) {
 	if t.topmostCancel(t.view) != nil {
-		return 0
+		return 0, 0, 0
 	}
 	host := t.view
 	for top := topModal(host); top != nil; top = topModal(host) {
 		host = top
 	}
 	if t.topOverlay(host) != nil || t.framedCancel(host) != nil {
-		return 0
+		return 0, 0, 0
 	}
 	if host.kind != driver.KindModal {
 		places := t.keyPlaces()
-		for _, b := range t.backs {
-			if !b.owner.disposed && places.shows(b.owner, true) && t.focusWithin(b.within) {
-				return 0
+		for i := len(t.backs) - 1; i >= 0; i-- {
+			if b := t.backs[i]; !b.owner.disposed && places.shows(b.owner, true) && t.focusWithin(b.within) {
+				return t.handlerPreview(b)
 			}
 		}
 	}
 	stack := t.innerStack(host)
 	if stack == nil {
-		return 0
+		return 0, 0, 0
 	}
 	screens := stack.screens()
 	top := screens[len(screens)-1]
 	if s := top.screen.screen; s.NoPopOnBack || s.NoPopOnSwipe {
-		return 0
+		return 0, 0, 0
 	}
 	t.peek(stack, screens[len(screens)-2])
-	return top.id
+	return top.id, 0, 0
+}
+
+// handlerPreview returns the views back handler b's Preview names, the
+// moving and uncovered ones shown, or none; a scrim not shown is left out.
+func (t *Tree) handlerPreview(b *backHandler) (moving, uncovered, scrim driver.NodeID) {
+	if b.preview == nil {
+		return 0, 0, 0
+	}
+	var m, u, sc *Ref
+	t.within(b.owner, func() { m, u, sc = b.preview() })
+	if !m.placed() || !u.placed() {
+		return 0, 0, 0
+	}
+	t.previewing, t.previewed = b, m.n.id
+	if sc.placed() {
+		scrim = sc.n.id
+	}
+	return m.n.id, u.n.id, scrim
 }
 
 // peek lays screen below out under stack's top one for a back gesture, or

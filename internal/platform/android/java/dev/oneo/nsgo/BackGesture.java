@@ -16,7 +16,7 @@ final class BackGesture implements OnBackAnimationCallback {
 
     @Override
     public void onBackStarted(BackEvent event) {
-        view.backStarted(event.getProgress());
+        view.backStarted(event.getProgress(), event.getSwipeEdge() == BackEvent.EDGE_RIGHT);
     }
 
     @Override

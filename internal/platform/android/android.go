@@ -1762,6 +1762,11 @@ func encode(w *writer, b *driver.MountBatch, first bool, requests []uint32, nati
 			writeLayoutTransition(w, it.Transition)
 		case driver.ItemMatch:
 			w.u32(uint32(it.Before))
+		case driver.ItemHistory:
+			w.flags(it.BackTaken)
+		case driver.ItemBackPreview:
+			w.u32(uint32(it.Uncovered))
+			w.u32(uint32(it.Scrim))
 		case driver.ItemViewStyle:
 			writeViewStyle(w, it.ViewStyle)
 		case driver.ItemText:

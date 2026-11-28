@@ -37,7 +37,7 @@ A custom `HeaderTitle` replaces only the compact title on Android; `Title` remai
 
 Give a page its own `Header` to replace `ui.NavHeader`. On iOS and Android it becomes the system header's title view, in place of `HeaderTitle`, beside the page's `HeaderLeft`, `HeaderRight` and the back button; it fills the room between those ends when its views grow or take a percentage width, such as a search field, and takes its content's size otherwise. Elsewhere it is drawn above the content. `ui.NavHeader.Scroll` still connects an iOS or Android page's scrolling to its header's blur.
 
-`NoPopOnBack` keeps a page when back is pressed, `OnBackPress` hears the press and `NoPopOnSwipe` turns off iOS's swipe back. `cx.OnBackPress(func() bool)` gives the app a handler before the stack, for unsaved changes. `OnDismiss` reports that the user popped the page, and the stack removes it.
+`NoPopOnBack` keeps a page when back is pressed, `OnBackPress` hears the press and `NoPopOnSwipe` turns off iOS's swipe back. `cx.OnBackPress(func() bool)` gives the app a handler before the stack, for unsaved changes. An app that moves its own pages instead of a stack's screens passes `core.BackOptions` to `cx.OnBackPressWith`: `Preview` names the page Android's predictive back gesture moves, the one it uncovers and an optional scrim, `Previewed` drops the page once the gesture finished moving it off, and `Takes` says when the handler leaves back alone, so that Android shows its own preview of leaving the app. `OnDismiss` reports that the user popped the page, and the stack removes it.
 
 ## Immersive full screen
 

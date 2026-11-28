@@ -302,13 +302,28 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * The predictive back gesture, on the UI thread: whether one runs, its
      * progress, the screen following it and the one it uncovers, their
      * translations and visibility before it, how far off the screen is and
-     * the animation settling it.
+     * the animation settling it. backLayers says the two are views of the
+     * app's own stack (BackOptions.Preview), which follow the gesture whole.
      */
-    private boolean backGesture;
+    private boolean backGesture, backLayers;
+    /** The back gesture comes from the screen's right edge. */
+    private boolean backFromRight;
+    /** The scrim over the uncovered layer, which fades with the gesture, and its opacity before it. */
+    private Node backScrim;
+    private float backScrimAlpha;
+    /** The moving layer's outline before a back gesture of the app's own layers rounded it. */
+    private android.view.ViewOutlineProvider backOutline;
+    private boolean backClip;
+    private float backCorner;
     private float backProgress, backBase, backBelowBase, backAt;
     private Node backScreen, backBelow;
     private int backBelowVisibility;
     private ValueAnimator backMove;
+    /**
+     * Whether the app takes back now (ITEM_HISTORY): while it does not, the
+     * view leaves back to the system, which previews leaving the app.
+     */
+    private boolean backTaken;
     /** The OnBackInvokedDispatcher and OnBackInvokedCallback of back on API 33 and later. */
     private Object backDispatcher, backCallback;
     /** The keymap's bindings, oldest first: each key with its flags (1 fires in text, 2 repeats). */
@@ -2857,8 +2872,21 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         return true;
     }
 
+    /** Follows whether the app takes back, holding back's callback only while it does. */
+    private void backTaken(boolean taken) {
+        if (taken == backTaken) return;
+        backTaken = taken;
+        if (Build.VERSION.SDK_INT < 33 || primary != null) return;
+        if (!taken) {
+            unregisterBack();
+        } else if (backCallback == null && isAttachedToWindow() && attached) {
+            registerBack();
+        }
+    }
+
     /** Takes back on API 33 and later, where predictive back skips Activity.onBackPressed. */
     private void registerBack() {
+        if (!backTaken) return;
         OnBackInvokedDispatcher dispatcher = findOnBackInvokedDispatcher();
         if (dispatcher == null) return;
         OnBackInvokedCallback callback = Build.VERSION.SDK_INT >= 34 ? new BackGesture(this) : this::back;
@@ -2871,9 +2899,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
      * A predictive back gesture began: the engine answers which screen it
      * pops (ITEM_BACK_PREVIEW), which then follows the gesture.
      */
-    void backStarted(float progress) {
+    void backStarted(float progress, boolean fromRight) {
         if (!inputGate.allowInput()) return;
         backGesture = true;
+        backFromRight = fromRight;
         backProgress = progress;
         event(Protocol.EVENT_BACK_STARTED, 0, 0, 0, 0, "");
     }
@@ -2902,9 +2931,34 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
     }
 
-    /** How far off its screen the gesture's progress moves: part of the way, as Android's own does. */
-    private static float backDrag(float progress) {
-        return progress * 0.4f;
+    /** How far off its screen the gesture's progress moves: part of the way, as Android's own does; the app's own layers take it whole (placeLayers). */
+    private float backDrag(float progress) {
+        return backLayers ? progress : progress * 0.4f;
+    }
+
+    /**
+     * Answers backStarted with the app's own layer n and the one below it,
+     * which slides from where it lies back to its place as n goes.
+     */
+    private void previewLayers(Node n, Node below, Node scrim) {
+        if (!backGesture || n == null || below == null || backScreen != null || backMove != null) return;
+        backLayers = true;
+        backScreen = n;
+        backBelow = below;
+        backBase = n.view.getTranslationX();
+        backBelowBase = below.view.getTranslationX();
+        backScrim = scrim;
+        if (scrim != null) backScrimAlpha = scrim.view.getAlpha();
+        backOutline = n.view.getOutlineProvider();
+        backClip = n.view.getClipToOutline();
+        n.view.setOutlineProvider(new android.view.ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, android.graphics.Outline outline) {
+                outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), backCorner);
+            }
+        });
+        n.view.setClipToOutline(true);
+        placeBack(backDrag(backProgress));
     }
 
     /** Answers backStarted with screen n, or null when back goes elsewhere first. */
@@ -2936,6 +2990,10 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
     /** Moves the screen a fraction t of the way off, and the one below from a quarter of the way in. */
     private void placeBack(float t) {
         backAt = t;
+        if (backLayers) {
+            placeLayers(t);
+            return;
+        }
         float w = backScreen.view.getWidth();
         if (getLayoutDirection() == LAYOUT_DIRECTION_RTL) w = -w;
         backScreen.view.setTranslationX(backBase + t * w);
@@ -2946,8 +3004,92 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
         }
     }
 
+    /**
+     * Places the app's own layers a fraction t into a back gesture, as
+     * Android's predictive back draws a page going back: the layer shrinks
+     * to 90%, its corners round to 32dp and it leans away from the edge the
+     * gesture comes from, by a twentieth of its width less 8dp, over the
+     * layer below, which comes back from where it lies to its place.
+     */
+    private void placeLayers(float t) {
+        View v = backScreen.view;
+        float lean = backLean(v);
+        v.setScaleX(1 - 0.1f * t);
+        v.setScaleY(1 - 0.1f * t);
+        v.setTranslationX(backBase + t * lean);
+        backCorner = 32 * density * t;
+        v.invalidateOutline();
+        backBelow.view.setTranslationX(backBelowBase * (1 - t));
+        if (backScrim != null) backScrim.view.setAlpha(backScrimAlpha * (1 - t));
+    }
+
+    /** How far layer v leans in a back gesture, away from the edge it comes from. */
+    private float backLean(View v) {
+        float reach = Math.max(v.getWidth() / 20f - 8 * density, 0);
+        return backFromRight ? -reach : reach;
+    }
+
+    /**
+     * Ends a back gesture of the app's own layers: back in place, or, as
+     * Android's own pages go, the layer goes on from where the gesture left
+     * it, shrinking a little more and leaning on as it fades out, the one
+     * below settles in place, and the app hears back, which takes the layer
+     * away. Either way the layer gets its own scale, outline and opacity
+     * again.
+     */
+    private void settleLayers(boolean pop) {
+        Node screen = backScreen, below = backBelow;
+        View v = screen.view;
+        float from = v.getTranslationX(), belowFrom = below.view.getTranslationX(), scale = v.getScaleX();
+        float lean = backLean(v);
+        float at = backAt;
+        Node scrim = backScrim;
+        float scrimFrom = scrim != null ? scrim.view.getAlpha() : 0;
+        ValueAnimator a = ValueAnimator.ofFloat(0, 1);
+        a.setDuration(pop ? 200 : Math.round(200 * Math.max(at, 0.2f)));
+        a.setInterpolator(new DecelerateInterpolator(1.5f));
+        a.addUpdateListener(x -> {
+            float k = (float) x.getAnimatedValue();
+            if (pop) {
+                v.setScaleX(scale - 0.05f * k);
+                v.setScaleY(scale - 0.05f * k);
+                v.setTranslationX(from + lean * k);
+                v.setAlpha(1 - k);
+                below.view.setTranslationX(belowFrom * (1 - k));
+                if (scrim != null) scrim.view.setAlpha(scrimFrom * (1 - k));
+            } else {
+                placeLayers(at * (1 - k));
+            }
+        });
+        a.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                backMove = null;
+                backScreen = backBelow = backScrim = null;
+                backLayers = false;
+                v.setScaleX(1);
+                v.setScaleY(1);
+                v.setAlpha(1);
+                v.setOutlineProvider(backOutline);
+                v.setClipToOutline(backClip);
+                backOutline = null;
+                if (pop) {
+                    // Until the app takes it away (BackOptions.Previewed).
+                    v.setVisibility(GONE);
+                    event(Protocol.EVENT_BACK, screen.id, 0, 0, 0, "");
+                }
+            }
+        });
+        backMove = a;
+        a.start();
+    }
+
     /** Ends the gesture's motion: off, reporting the back, or back in place. */
     private void settleBack(boolean pop) {
+        if (backLayers) {
+            settleLayers(pop);
+            return;
+        }
         Node screen = backScreen, below = backBelow;
         float base = backBase, belowBase = backBelowBase;
         int belowVisibility = backBelowVisibility;
@@ -4358,12 +4500,20 @@ public class NsgoView extends FrameLayout implements NsgoEngine.Listener {
                 break;
             }
             case Protocol.ITEM_MENU:
+                // Desktop menus; Go writes no fields.
+                break;
             case Protocol.ITEM_HISTORY:
-                // Desktop menus and the web's history; Go writes no fields.
+                backTaken(Protocol.flag(in.readUnsignedByte(), 0));
                 break;
-            case Protocol.ITEM_BACK_PREVIEW:
-                previewBack(n);
+            case Protocol.ITEM_BACK_PREVIEW: {
+                int uncovered = in.readInt(), scrim = in.readInt();
+                if (uncovered != 0) {
+                    previewLayers(n, nodes.get(uncovered), scrim != 0 ? nodes.get(scrim) : null);
+                } else {
+                    previewBack(n);
+                }
                 break;
+            }
             case Protocol.ITEM_BACK_UNHANDLED: {
                 // As the system's back does from API 31: a task's root
                 // activity goes to the background, keeping the app; any

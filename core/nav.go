@@ -578,16 +578,44 @@ func (t *Tree) historyDepth() int {
 	return depth
 }
 
+// backTaken reports whether something besides the stacks' screens and the
+// modals takes back now: an overlay hearing cancel, or a back handler shown
+// whose BackOptions.Takes does not say no.
+func (t *Tree) backTaken() bool {
+	if t.topmostCancel(t.view) != nil || t.topOverlay(t.view) != nil || t.framedCancel(t.view) != nil {
+		return true
+	}
+	if len(t.backs) == 0 {
+		return false
+	}
+	places := t.keyPlaces()
+	for _, b := range t.backs {
+		if b.owner.disposed || !places.shows(b.owner, true) || !t.focusWithin(b.within) {
+			continue
+		}
+		if b.takes == nil {
+			return true
+		}
+		takes := false
+		t.within(b.owner, func() { takes = Untracked(b.owner, b.takes) })
+		if takes {
+			return true
+		}
+	}
+	return false
+}
+
 // emitHistory commits navigation depth and the application address together.
 func (t *Tree) emitHistory() {
 	depth := t.historyDepth()
+	taken := depth > 0 || t.backTaken()
 	a := t.rt.address
 	addressed := a != nil && a.tree == t && a.page != ""
-	if depth == t.history && !t.historyAgain && (!addressed || a.pending == nil) {
+	if depth == t.history && taken == t.historyTaken && !t.historyAgain && (!addressed || a.pending == nil) {
 		return
 	}
-	t.history, t.historyAgain = depth, false
-	item := driver.MountItem{Kind: driver.ItemHistory, Count: uint32(depth)}
+	t.history, t.historyTaken, t.historyAgain = depth, taken, false
+	item := driver.MountItem{Kind: driver.ItemHistory, Count: uint32(depth), BackTaken: taken}
 	if addressed {
 		item.Address = a.pending
 		if item.Address == nil {

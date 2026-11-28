@@ -389,6 +389,88 @@ func TestBackPreviewNamesTheScreenBackPops(t *testing.T) {
 	}
 }
 
+func TestBackPreviewNamesAHandlersViews(t *testing.T) {
+	var page, below, shade Ref
+	var viewing *Signal[bool]
+	var backs, previewed int
+	h := newPhone(t, phone, func(cx *Scope) Node {
+		viewing = NewSignal(cx, false)
+		cx.OnBackPressWith(func() bool { backs++; return true }, BackOptions{
+			Preview:   func() (moving, uncovered, scrim *Ref) { return &page, &below, &shade },
+			Previewed: func() { previewed++ },
+		})
+		return View{Style: Style{FlexGrow: 1}, Children: []Node{
+			View{Ref: &below, TestID: "below", Style: Style{FlexGrow: 1}, Children: []Node{View{Ref: &shade, TestID: "shade"}}},
+			View{Ref: &page, TestID: "page", Style: Style{FlexGrow: 1}},
+			Show{When: viewing.Get, Then: func(cx *Scope) Node {
+				cx.OnBackPress(func() bool { return true })
+				return View{}
+			}},
+		}}
+	})
+	h.commit()
+	preview := func() driver.MountItem {
+		h.tree.Dispatch(driver.Event{Kind: driver.EventBackStarted})
+		for _, it := range h.commit().Items {
+			if it.Kind == driver.ItemBackPreview {
+				return it
+			}
+		}
+		t.Fatal("no ItemBackPreview")
+		return driver.MountItem{}
+	}
+	if it := preview(); it.ID != h.find("page").id || it.Uncovered != h.find("below").id || it.Scrim != h.find("shade").id {
+		t.Errorf("preview = %v over %v under %v, want the handler's page over the view below and its scrim", it.ID, it.Uncovered, it.Scrim)
+	}
+	// The finished gesture takes the page away through Previewed; a later
+	// back, as a button's, goes to the handler.
+	h.tree.Dispatch(driver.Event{Kind: driver.EventBack, ID: h.find("page").id})
+	h.tree.Dispatch(driver.Event{Kind: driver.EventBack})
+	if previewed != 1 || backs != 1 {
+		t.Errorf("after a finished gesture and a back: Previewed ran %d times, the handler %d; want 1 and 1", previewed, backs)
+	}
+	// A newer handler without a preview takes back first.
+	viewing.Set(true)
+	if it := preview(); it.ID != 0 || it.Uncovered != 0 {
+		t.Errorf("preview = %v over %v under a newer handler, want none", it.ID, it.Uncovered)
+	}
+}
+
+func TestBackOptionsTakesReportsItemHistory(t *testing.T) {
+	var takes *Signal[bool]
+	h := newPhone(t, phone, func(cx *Scope) Node {
+		takes = NewSignal(cx, false)
+		cx.OnBackPressWith(func() bool { return takes.GetUntracked() }, BackOptions{
+			Takes: takes.Get,
+		})
+		return Text{ContentFunc: func() string {
+			if takes.Get() {
+				return "taken"
+			}
+			return "root"
+		}}
+	})
+	historyItem := func(b *driver.MountBatch) (driver.MountItem, bool) {
+		for _, it := range b.Items {
+			if it.Kind == driver.ItemHistory {
+				return it, true
+			}
+		}
+		return driver.MountItem{}, false
+	}
+	if it, ok := historyItem(h.commit()); ok {
+		t.Fatalf("initial commit with Takes=false sent ItemHistory %+v, want none", it)
+	}
+	takes.Set(true)
+	if it, ok := historyItem(h.commit()); !ok || !it.BackTaken {
+		t.Fatalf("after Takes=true: ok=%v BackTaken=%v, want true", ok, it.BackTaken)
+	}
+	takes.Set(false)
+	if it, ok := historyItem(h.commit()); !ok || it.BackTaken {
+		t.Fatalf("after Takes=false: ok=%v BackTaken=%v, want false", ok, it.BackTaken)
+	}
+}
+
 func TestScreenHeaderSystemItem(t *testing.T) {
 	h := newPhone(t, phone, func(cx *Scope) Node {
 		return Stack{Style: Style{FlexGrow: 1}, Children: []Node{

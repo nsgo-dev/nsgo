@@ -205,7 +205,8 @@ const (
 	ItemQuit
 	// ItemBackPreview answers EventBackStarted with the screen a back now
 	// pops (ID), for the platform to move it with the gesture; 0 when back
-	// goes elsewhere first or nothing pops.
+	// goes elsewhere first or nothing pops. With Uncovered, ID is a view of
+	// the app's own stack and Uncovered the one it uncovers.
 	ItemBackPreview
 	// ItemHistory is how many entries back can go through (Count): the
 	// screens above each stack's first and the modals shown. The web
@@ -591,6 +592,17 @@ type MountItem struct {
 	// Transition, when set, moves an ItemFrame's view from where it shows
 	// to Frame, as a batch's LayoutAnimation Update does, which wins.
 	Transition *LayoutTransition
+	// Uncovered is ItemBackPreview's: the view its ID uncovers, which an
+	// app's own back preview names (core.BackOptions.Preview), or 0 for a
+	// screen of a stack.
+	Uncovered NodeID
+	// Scrim is ItemBackPreview's view over Uncovered that fades out with
+	// the gesture, or 0.
+	Scrim NodeID
+	// BackTaken is ItemHistory's: whether the app takes back now, rather
+	// than leave it to the system. Android hands back to the system while
+	// it does not, which shows its predictive back to the home screen.
+	BackTaken bool
 	// Point and Animated are ItemScrollTo's.
 	Point    Point
 	Animated bool

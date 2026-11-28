@@ -125,9 +125,14 @@ type Tree struct {
 	regions map[*node]struct{}
 	// peeking is the screen a back gesture may uncover (Tree.peek).
 	peeking *node
+	// previewing is the back handler whose BackOptions.Preview a back
+	// gesture moves, and previewed the view it moves, until the gesture ends.
+	previewing *backHandler
+	previewed  NodeID
 	// history is the depth ItemHistory last sent, which historyAgain
-	// sends again.
+	// sends again, and historyTaken its BackTaken.
 	history      int
+	historyTaken bool
 	historyAgain bool
 	alertID      uint32
 	menuActions  map[uint32]menuAction
@@ -2638,6 +2643,16 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		t.inputModality(ev.Count)
 		return
 	case driver.EventBack:
+		if h := t.previewing; h != nil && ev.ID != 0 && ev.ID == t.previewed {
+			// The gesture moved the handler's views: it takes the moving one away.
+			t.previewing, t.previewed = nil, 0
+			if !h.owner.disposed {
+				t.within(h.owner, h.previewed)
+				t.changed = true
+				return
+			}
+		}
+		t.previewing, t.previewed = nil, 0
 		n := t.node(ev.ID)
 		// Escape on a view of an overlay is that overlay's, a confined owner's only while the focus is within it.
 		var overlay *node
@@ -2661,10 +2676,12 @@ func (t *Tree) Dispatch(ev driver.Event) {
 		t.changed = true
 		return
 	case driver.EventBackCancelled:
+		t.previewing, t.previewed = nil, 0
 		t.peek(nil, nil)
 		return
 	case driver.EventBackStarted:
-		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemBackPreview, ID: t.backPreview()})
+		moving, uncovered, scrim := t.backPreview()
+		t.commands = append(t.commands, driver.MountItem{Kind: driver.ItemBackPreview, ID: moving, Uncovered: uncovered, Scrim: scrim})
 		t.changed = true
 		return
 	case driver.EventScreenHeader:

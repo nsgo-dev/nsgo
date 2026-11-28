@@ -353,6 +353,9 @@ func (t *Tree) removeKeyBinding(b *keyBinding) {
 type backHandler struct {
 	owner, within *Scope
 	fn            func() bool
+	preview       func() (moving, uncovered, scrim *Ref)
+	previewed     func()
+	takes         func() bool
 }
 
 // confineKey is where Confine marks an owner.
@@ -435,13 +438,43 @@ func (t *Tree) focusKeys() bool {
 }
 
 // OnBackPress runs fn when back is pressed (Escape, the back button or gesture, the browser's back) while the current owner lives and the user can see what it shows, as for OnKey: after the overlays and modals, which take it first, and before the navigation stacks, the newest handler first. fn returns true to take it; when none does, the top stack pops, else the platform goes back itself.
-func (cx *Scope) OnBackPress(fn func() bool) {
+func (cx *Scope) OnBackPress(fn func() bool) { cx.OnBackPressWith(fn, BackOptions{}) }
+
+// BackOptions are how a back handler of OnBackPressWith takes back.
+type BackOptions struct {
+	// Preview, when set, names what a predictive back gesture (Android 14
+	// and later) moves while the handler is the one back goes to: the view
+	// that slides off to the right as the gesture goes on, the one it
+	// uncovers, which slides back from where it lies to its place, and an
+	// optional scrim over the uncovered one, which fades out with it. They
+	// follow the gesture on the platform's thread; a cancelled gesture puts
+	// them back, and a finished one leaves the moving view off the screen
+	// and the uncovered one in place, and runs Previewed in place of the
+	// handler. A nil view, or one not shown, leaves the gesture without a
+	// preview, as a handler without Preview does.
+	Preview func() (moving, uncovered, scrim *Ref)
+	// Previewed takes the view Preview named as moving away at once, as a
+	// gesture finished moving it off the screen: animating it again would
+	// show it twice. It must be set with Preview.
+	Previewed func()
+	// Takes, when set, says whether the handler takes back now: where it
+	// says no and nothing else would, Android leaves back to the system,
+	// which previews its way out of the app. Without it the handler is
+	// taken to take back whenever it is shown.
+	Takes func() bool
+}
+
+// OnBackPressWith is OnBackPress taking back as opts say.
+func (cx *Scope) OnBackPressWith(fn func() bool, opts BackOptions) {
 	t := cx.tree()
 	if t == nil {
 		return
 	}
 	owner := cx.current()
-	b := &backHandler{owner: owner, within: confinement(owner), fn: fn}
+	if (opts.Preview == nil) != (opts.Previewed == nil) {
+		panic("core: BackOptions needs Preview and Previewed together")
+	}
+	b := &backHandler{owner: owner, within: confinement(owner), fn: fn, preview: opts.Preview, previewed: opts.Previewed, takes: opts.Takes}
 	t.backs = append(t.backs, b)
 	b.owner.addCleanup(func() { t.backs = slices.DeleteFunc(t.backs, func(o *backHandler) bool { return o == b }) })
 }
