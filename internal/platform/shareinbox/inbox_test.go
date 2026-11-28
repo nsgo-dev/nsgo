@@ -1,6 +1,7 @@
 package shareinbox
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,16 +185,16 @@ func TestShareLimitsRejectOversizedTextAndExtraItems(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer batch.Abort()
-	if err := batch.Text(strings.Repeat("x", MaxTextBytes+1), "text/plain"); err == nil {
-		t.Fatal("oversized text was accepted")
+	if err := batch.Text(strings.Repeat("x", MaxTextBytes+1), "text/plain"); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("oversized text: %v, want ErrTooLarge", err)
 	}
 	for range maxItems {
 		if err := batch.Text("item", "text/plain"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := batch.Text("one too many", "text/plain"); err == nil {
-		t.Fatal("extra item was accepted")
+	if err := batch.Text("one too many", "text/plain"); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("extra item: %v, want ErrTooLarge", err)
 	}
 	if err := batch.Commit(); err != nil {
 		t.Fatal(err)
@@ -212,8 +213,8 @@ func TestOversizedManifestNeverBecomesVisible(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := batch.Commit(); err == nil {
-		t.Fatal("oversized manifest was committed")
+	if err := batch.Commit(); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("oversized manifest: %v, want ErrTooLarge", err)
 	}
 	if err := NewReader(group, t.TempDir()).Drain(func([]driver.SharedItem, func() error) { t.Fatal("invalid manifest was delivered") }); err != nil {
 		t.Fatal(err)

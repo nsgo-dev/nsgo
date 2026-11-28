@@ -4,9 +4,11 @@ package shareextension
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +17,7 @@ import (
 	_ "github.com/nsgo-dev/nsgo" // Register the UIKit test host for this library package.
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/internal/platform/apple"
+	"github.com/nsgo-dev/nsgo/internal/platform/objcblock"
 	"github.com/nsgo-dev/nsgo/internal/platform/shareinbox"
 	"github.com/nsgo-dev/nsgo/mobile"
 	"github.com/nsgo-dev/nsgo/nsgotest"
@@ -156,24 +159,77 @@ func TestNativeUTF8DataIsDeliveredAsText(t *testing.T) {
 	}
 }
 
+// cancelled is a request the extension cancelled, with its NSError's code and description.
+type cancelled struct {
+	code int
+	text string
+}
+
+func (c cancelled) Error() string { return fmt.Sprintf("cancelled (%d): %s", c.code, c.text) }
+
+func registerContext() {
+	contextOnce.Do(func() {
+		var err error
+		contextClass, err = objc.RegisterClass("NSGoShareTestContext", objc.GetClass("NSObject"), []*objc.Protocol{}, []objc.FieldDef{}, []objc.MethodDef{
+			{Cmd: sel("inputItems"), Fn: func(self objc.ID, _ objc.SEL) objc.ID { return contexts[self].items }},
+			{Cmd: sel("completeRequestReturningItems:completionHandler:"), Fn: func(self objc.ID, _ objc.SEL, _, _ objc.ID) { contexts[self].done <- nil }},
+			{Cmd: sel("cancelRequestWithError:"), Fn: func(self objc.ID, _ objc.SEL, failure objc.ID) {
+				contexts[self].done <- cancelled{code: objc.Send[int](failure, sel("code")), text: text(failure.Send(sel("userInfo")).Send(sel("objectForKey:"), ns("NSDebugDescription")))}
+			}},
+		})
+		if err != nil {
+			panic(err)
+		}
+	})
+}
+
+// newContext is a fake NSExtensionContext holding providers, whose completion or cancellation it sends to done. It has one retain for finish to release, and t's cleanup releases the rest.
+func newContext(t *testing.T, providers []objc.ID, done chan error) objc.ID {
+	var context objc.ID
+	mainThread(func() {
+		registerContext()
+		array := objc.ID(objc.GetClass("NSMutableArray")).Send(sel("array"))
+		for _, provider := range providers {
+			array.Send(sel("addObject:"), provider)
+		}
+		item := objc.ID(objc.GetClass("NSExtensionItem")).Send(sel("new"))
+		item.Send(sel("setAttachments:"), array)
+		items := objc.ID(objc.GetClass("NSArray")).Send(sel("arrayWithObject:"), item)
+		items.Send(sel("retain"))
+		item.Send(sel("release"))
+		context = objc.ID(contextClass).Send(sel("new"))
+		contexts[context] = inputContext{items: items, done: done}
+		context.Send(sel("retain"))
+	})
+	t.Cleanup(func() {
+		mainThread(func() {
+			contexts[context].items.Send(sel("release"))
+			delete(contexts, context)
+			context.Send(sel("release"))
+		})
+	})
+	return context
+}
+
+// acceptedTypes are the test extension's apple.share_types.
+func acceptedTypes() objc.ID {
+	types := objc.ID(objc.GetClass("NSMutableArray")).Send(sel("array"))
+	for _, uti := range []string{"public.url", "public.plain-text", "public.data"} {
+		types.Send(sel("addObject:"), ns(uti))
+	}
+	return types
+}
+
+// finishing completes or cancels context with the import's result, as a request does once its view has appeared.
+func finishing(context objc.ID) func(error) { return func(err error) { finish(context, err) } }
+
+func running() bool { return false }
+
 func importProviders(t *testing.T, file, group string) {
 	t.Helper()
 	done := make(chan error, 1)
-	var context objc.ID
+	var providers []objc.ID
 	mainThread(func() {
-		contextOnce.Do(func() {
-			var err error
-			contextClass, err = objc.RegisterClass("NSGoShareTestContext", objc.GetClass("NSObject"), []*objc.Protocol{}, []objc.FieldDef{}, []objc.MethodDef{
-				{Cmd: sel("inputItems"), Fn: func(self objc.ID, _ objc.SEL) objc.ID { return contexts[self].items }},
-				{Cmd: sel("completeRequestReturningItems:completionHandler:"), Fn: func(self objc.ID, _ objc.SEL, _, _ objc.ID) { contexts[self].done <- nil }},
-				{Cmd: sel("cancelRequestWithError:"), Fn: func(self objc.ID, _ objc.SEL, failure objc.ID) {
-					contexts[self].done <- errors.New(text(failure.Send(sel("userInfo")).Send(sel("objectForKey:"), ns("NSDebugDescription"))))
-				}},
-			})
-			if err != nil {
-				panic(err)
-			}
-		})
 		array := objc.ID(objc.GetClass("NSMutableArray")).Send(sel("array"))
 		for _, url := range []objc.ID{
 			objc.ID(objc.GetClass("NSURL")).Send(sel("URLWithString:"), ns("https://example.com/shared")),
@@ -192,30 +248,19 @@ func importProviders(t *testing.T, file, group string) {
 		plain := objc.ID(objc.GetClass("NSItemProvider")).Send(sel("alloc")).Send(sel("initWithObject:"), ns("https://example.com/plain-text"))
 		array.Send(sel("addObject:"), plain)
 		plain.Send(sel("release"))
-		item := objc.ID(objc.GetClass("NSExtensionItem")).Send(sel("new"))
-		item.Send(sel("setAttachments:"), array)
-		items := objc.ID(objc.GetClass("NSArray")).Send(sel("arrayWithObject:"), item)
-		items.Send(sel("retain"))
-		item.Send(sel("release"))
-		context = objc.ID(contextClass).Send(sel("new"))
-		contexts[context] = inputContext{items: items, done: done}
-		context.Send(sel("retain")) // receive transfers one retain to finish.
-		if group == "" {
-			receive(context)
-		} else {
-			types := objc.ID(objc.GetClass("NSMutableArray")).Send(sel("array"))
-			for _, uti := range []string{"public.url", "public.plain-text", "public.data"} {
-				types.Send(sel("addObject:"), ns(uti))
-			}
-			receiveInto(context, group, types)
+		array.Send(sel("retain"))
+		for i := range objc.Send[uint](array, sel("count")) {
+			providers = append(providers, array.Send(sel("objectAtIndex:"), i))
 		}
+		t.Cleanup(func() { mainThread(func() { array.Send(sel("release")) }) })
 	})
-	t.Cleanup(func() {
-		mainThread(func() {
-			contexts[context].items.Send(sel("release"))
-			delete(contexts, context)
-			context.Send(sel("release"))
-		})
+	context := newContext(t, providers, done)
+	mainThread(func() {
+		if group == "" {
+			receive(context, finishing(context), running)
+		} else {
+			receiveInto(context, group, acceptedTypes(), finishing(context), running)
+		}
 	})
 	select {
 	case err := <-done:
@@ -274,5 +319,98 @@ func TestNativeReceiveShareSimulation(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("iOS test host did not deliver the simulated share")
+	}
+}
+
+// TestNativeSilentProviderTimesOut gives the extension a provider that never answers, which before kept the share sheet on its spinner until the host was killed: the import fails after loadTimeout, the request is cancelled with an error, and nothing reaches the inbox.
+func TestNativeSilentProviderTimesOut(t *testing.T) {
+	defer func(d time.Duration) { loadTimeout = d }(loadTimeout)
+	loadTimeout = 300 * time.Millisecond
+	group, cache := t.TempDir(), t.TempDir()
+	var provider objc.ID
+	mainThread(func() {
+		provider = objc.ID(objc.GetClass("NSItemProvider")).Send(sel("new"))
+		silent := objcblock.New(func(_ objc.Block, _, _, _ objc.ID) {})
+		provider.Send(sel("registerItemForTypeIdentifier:loadHandler:"), ns("public.plain-text"), silent)
+		silent.Release()
+	})
+	done := make(chan error, 1)
+	context := newContext(t, []objc.ID{provider}, done)
+	mainThread(func() {
+		provider.Send(sel("release"))
+		receiveInto(context, group, acceptedTypes(), finishing(context), running)
+	})
+	select {
+	case err := <-done:
+		var c cancelled
+		if !errors.As(err, &c) || c.code != 256 || !strings.Contains(c.text, errTimedOut.Error()) {
+			t.Fatalf("request ended with %v, want a cancellation for the provider's timeout", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a provider that never answers left the request open")
+	}
+	if err := shareinbox.NewReader(group, cache).Drain(func([]mobile.SharedItem, func() error) { t.Fatal("a timed-out import was delivered") }); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestNativeTooLargeShareIsCancelled shares text over the inbox's limit: the request is cancelled with the error, which the sheet shows as too large.
+func TestNativeTooLargeShareIsCancelled(t *testing.T) {
+	var provider objc.ID
+	mainThread(func() {
+		provider = objc.ID(objc.GetClass("NSItemProvider")).Send(sel("alloc")).Send(sel("initWithObject:"), ns(strings.Repeat("x", shareinbox.MaxTextBytes+1)))
+	})
+	done := make(chan error, 1)
+	context := newContext(t, []objc.ID{provider}, done)
+	var result error
+	mainThread(func() {
+		provider.Send(sel("release"))
+		receiveInto(context, t.TempDir(), acceptedTypes(), func(err error) { result = err; finish(context, err) }, running)
+	})
+	select {
+	case err := <-done:
+		var c cancelled
+		if !errors.As(err, &c) || c.code != 256 {
+			t.Fatalf("request ended with %v, want a cancellation", err)
+		}
+		if !errors.Is(result, shareinbox.ErrTooLarge) {
+			t.Fatalf("import failed with %v, want ErrTooLarge", result)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the request did not end")
+	}
+}
+
+// TestNativeStoppedImportSavesNothing stops the request before its provider answers, as the user's Cancel does: the import neither reports nor commits.
+func TestNativeStoppedImportSavesNothing(t *testing.T) {
+	group, cache := t.TempDir(), t.TempDir()
+	var provider objc.ID
+	mainThread(func() {
+		provider = objc.ID(objc.GetClass("NSItemProvider")).Send(sel("alloc")).Send(sel("initWithObject:"), ns("https://example.com/cancelled"))
+	})
+	done := make(chan error, 1)
+	context := newContext(t, []objc.ID{provider}, done)
+	reported := make(chan error, 1)
+	mainThread(func() {
+		provider.Send(sel("release"))
+		receiveInto(context, group, acceptedTypes(), func(err error) { reported <- err }, func() bool { return true })
+	})
+	select {
+	case err := <-reported:
+		t.Fatalf("a stopped import reported %v", err)
+	case <-time.After(time.Second):
+	}
+	if err := shareinbox.NewReader(group, cache).Drain(func([]mobile.SharedItem, func() error) { t.Fatal("a stopped import was delivered") }); err != nil {
+		t.Fatal(err)
+	}
+	finish(context, errCancelled)
+	select {
+	case err := <-done:
+		var c cancelled
+		if !errors.As(err, &c) || c.code != 3072 {
+			t.Fatalf("request ended with %v, want NSUserCancelledError", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the request did not end")
 	}
 }

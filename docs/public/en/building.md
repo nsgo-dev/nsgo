@@ -728,7 +728,7 @@ sign:
 
 `build` and `dev` package a Go share extension, `<id>.share`, with the app. Xcode signs it and registers its App Group for device runs. For an IPA, enable the same App Group for `<id>` and `<id>.share`; `sign.profile` and `sign.share_profile` must grant it. App Clips, tvOS and watchOS have no share extension.
 
-The extension copies up to 128 items and 512 MiB of files into the App Group, then completes the share sheet. `mobile.OnShared` receives those batches while the app is active or when the user next opens it; they survive the extension and app exiting before delivery. iOS provides no supported API for a Share extension to foreground or launch its containing app. This handoff therefore does not automatically open the app.
+The extension shows the app's icon and name while it copies up to 128 items and 512 MiB of files into the App Group, then says the share was saved and to open the app, or why it failed, and closes the share sheet. Its words are `github.com/nsgo-dev/nsgo/mobile/locales`' `shareSaved`, `shareFailed`, `shareTooLarge`, `shareDone` and `shareCancel`, in the language of the app's catalogs that suits the user's; the app's catalogs can [supply](localization.md#nsgos-own-words) them under that import path, with `{app}` for the app's name. `mobile.OnShared` receives those batches while the app is active or when the user next opens it; they survive the extension and app exiting before delivery. iOS provides no supported API for a Share extension to foreground or launch its containing app. This handoff therefore does not automatically open the app.
 
 ## Mini programs
 

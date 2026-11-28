@@ -116,7 +116,7 @@ Declare `url_schemes: [myapp]` for the app's own links and handle them with `des
 
 Set `android.share_types: [text/plain, 'image/*']` to receive those MIME types from the Android share sheet. Register `mobile.OnShared` for the text and cache-backed files, including what launched the app. [Building](https://nsgo.dev/docs/building.md#incoming-shares-on-android)
 
-Set `apple.share_types: [public.url, public.image]` for the UTIs an iOS share extension accepts. It keeps each share in an App Group inbox until the app is next active, and cannot launch the app. Device runs use Xcode signing; IPA builds need `sign.share_profile` for `<id>.share`, granting the same `apple.app_group` as the app. [Building](https://nsgo.dev/docs/building.md#incoming-shares-on-ios)
+Set `apple.share_types: [public.url, public.image]` for the UTIs an iOS share extension accepts. It keeps each share in an App Group inbox until the app is next active, and cannot launch the app; its sheet says the share was saved and to open the app, in words from `github.com/nsgo-dev/nsgo/mobile/locales` that the app's catalogs can supply. Device runs use Xcode signing; IPA builds need `sign.share_profile` for `<id>.share`, granting the same `apple.app_group` as the app. [Building](https://nsgo.dev/docs/building.md#incoming-shares-on-ios)
 
 ## Secrets
 

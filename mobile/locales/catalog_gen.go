@@ -37,14 +37,19 @@ func For(cx *core.Scope) Messages {
 // Parameters names the parameters of each message that has some, by
 // its method, for the TSX declarations of the messages
 // (tsx.RegisterMessages).
-var Parameters = map[string][]string{}
+var Parameters = map[string][]string{
+	"ShareSaved":  {"app"},
+	"ShareFailed": {"app"},
+}
 
 // Translation is a language's messages another package supplies:
 // those without arguments in Texts, by key, and a function for each
 // of the others; a key or a field left out leaves the message to the
 // catalog.
 type Translation struct {
-	Texts map[string]string
+	Texts       map[string]string
+	ShareSaved  func(app string) string
+	ShareFailed func(app string) string
 }
 
 var supplied = map[string]Translation{}
@@ -52,6 +57,9 @@ var supplied = map[string]Translation{}
 // The indexes of the messages without arguments in the tables.
 const (
 	textTabBadgeNew = iota
+	textShareTooLarge
+	textShareDone
+	textShareCancel
 	numTexts
 )
 
@@ -59,20 +67,35 @@ const (
 // index, by which Supply reads a Translation's Texts.
 var keyOfText = [numTexts]string{
 	"tabBadgeNew",
+	"shareTooLarge",
+	"shareDone",
+	"shareCancel",
 }
 
 // textsEn are the messages without arguments in en.
 var textsEn = i18n.NewTexts(""+
-	"New",
+	"New"+
+	"This is too much to share at once. Share fewer or smaller items."+
+	"Done"+
+	"Cancel",
 	[]uint16{
 		3,
+		64,
+		4,
+		6,
 	})
 
 // textsZhHans are the messages without arguments in zh-Hans.
 var textsZhHans = i18n.NewTexts(""+
-	"有新内容",
+	"有新内容"+
+	"一次分享的内容太多。请分享更少或更小的项目。"+
+	"完成"+
+	"取消",
 	[]uint16{
 		12,
+		66,
+		6,
+		6,
 	})
 
 // texts returns the messages without arguments in lang, nil for a
@@ -128,7 +151,24 @@ func Supply(lang string, t Translation) {
 			}
 		}
 	}
+	s := supplied[lang]
+	if t.ShareSaved != nil {
+		s.ShareSaved = t.ShareSaved
+	}
+	if t.ShareFailed != nil {
+		s.ShareFailed = t.ShareFailed
+	}
+	supplied[lang] = s
 	Catalog.Add(lang)
+}
+
+// arg is what an argument wrote, marked in the source's message for a
+// pseudo locale.
+func (msgs Messages) arg(s string) string {
+	if msgs.mark {
+		return i18n.Arg(s)
+	}
+	return s
 }
 
 // TabBadgeNew says "New"
@@ -139,3 +179,78 @@ func TabBadgeNew(cx *core.Scope) string { return For(cx).TabBadgeNew() }
 
 // TabBadgeNew is the package's TabBadgeNew in the language of msgs.
 func (msgs Messages) TabBadgeNew() string { return msgs.text(textTabBadgeNew) }
+
+// ShareSaved says "Saved. Open {app} to continue."
+// in the language the app shows under cx.
+//
+// The iOS share extension's sheet, once what was shared waits for the app; {app} is the app's name.
+func ShareSaved(cx *core.Scope, app string) string { return For(cx).ShareSaved(app) }
+
+// ShareSaved is the package's ShareSaved in the language of msgs.
+func (msgs Messages) ShareSaved(app string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.ShareSaved(app))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].ShareSaved; f != nil {
+			return f(app)
+		}
+		switch lang {
+		case "", "en":
+			return "Saved. Open " + msgs.arg(app) + " to continue."
+		case "zh-Hans":
+			return "已保存。打开" + app + "即可继续。"
+		}
+	}
+}
+
+// ShareFailed says "{app} couldn't receive this. Try sharing it again."
+// in the language the app shows under cx.
+//
+// The iOS share extension's sheet, when copying what was shared failed; {app} is the app's name.
+func ShareFailed(cx *core.Scope, app string) string { return For(cx).ShareFailed(app) }
+
+// ShareFailed is the package's ShareFailed in the language of msgs.
+func (msgs Messages) ShareFailed(app string) string {
+	if i18n.IsPseudo(msgs.lang) {
+		return i18n.Pseudo(msgs.lang, Messages{lang: Source, mark: true}.ShareFailed(app))
+	}
+	for lang := msgs.lang; ; lang = i18n.Parent(lang) {
+		if f := supplied[lang].ShareFailed; f != nil {
+			return f(app)
+		}
+		switch lang {
+		case "", "en":
+			return msgs.arg(app) + " couldn't receive this. Try sharing it again."
+		case "zh-Hans":
+			return app + "没能收到这些内容，请再分享一次。"
+		}
+	}
+}
+
+// ShareTooLarge says "This is too much to share at once. Share fewer or smaller items."
+// in the language the app shows under cx.
+//
+// The iOS share extension's sheet, when what was shared is over 128 items or 512 MB.
+func ShareTooLarge(cx *core.Scope) string { return For(cx).ShareTooLarge() }
+
+// ShareTooLarge is the package's ShareTooLarge in the language of msgs.
+func (msgs Messages) ShareTooLarge() string { return msgs.text(textShareTooLarge) }
+
+// ShareDone says "Done"
+// in the language the app shows under cx.
+//
+// The iOS share extension's button that closes its sheet once it shows the result.
+func ShareDone(cx *core.Scope) string { return For(cx).ShareDone() }
+
+// ShareDone is the package's ShareDone in the language of msgs.
+func (msgs Messages) ShareDone() string { return msgs.text(textShareDone) }
+
+// ShareCancel says "Cancel"
+// in the language the app shows under cx.
+//
+// The iOS share extension's button that stops receiving and closes its sheet.
+func ShareCancel(cx *core.Scope) string { return For(cx).ShareCancel() }
+
+// ShareCancel is the package's ShareCancel in the language of msgs.
+func (msgs Messages) ShareCancel() string { return msgs.text(textShareCancel) }

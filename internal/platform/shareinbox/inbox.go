@@ -23,6 +23,9 @@ const maxItems = 128
 // MaxBytes bounds one incoming batch without loading its files into memory.
 const MaxBytes int64 = 512 << 20
 
+// ErrTooLarge is what a batch over the inbox's limits fails with: more than 128 items, 512 MiB of files or a 1 MiB manifest, or text over MaxTextBytes.
+var ErrTooLarge = errors.New("share exceeds the inbox's limits")
+
 type Batch struct {
 	dir   string
 	items []driver.SharedItem
@@ -48,7 +51,7 @@ func (b *Batch) Text(text, mime string) error {
 		return nil
 	}
 	if len(b.items) >= maxItems || len(text) > MaxTextBytes {
-		return errors.New("share exceeds the item limit")
+		return fmt.Errorf("%w: more than %d items or %d bytes of text", ErrTooLarge, maxItems, MaxTextBytes)
 	}
 	b.items = append(b.items, driver.SharedItem{Text: text, MIME: mime})
 	return nil
@@ -56,7 +59,7 @@ func (b *Batch) Text(text, mime string) error {
 
 func (b *Batch) File(path, name, mime string) error {
 	if len(b.items) >= maxItems {
-		return errors.New("share exceeds the item limit")
+		return fmt.Errorf("%w: more than %d items", ErrTooLarge, maxItems)
 	}
 	in, err := os.Open(path)
 	if err != nil {
@@ -71,7 +74,7 @@ func (b *Batch) File(path, name, mime string) error {
 		return errors.New("shared item is not a regular file")
 	}
 	if info.Size() > MaxBytes-b.bytes {
-		return errors.New("share exceeds 512 MiB")
+		return fmt.Errorf("%w: more than 512 MiB", ErrTooLarge)
 	}
 	rel := fmt.Sprintf("file-%03d", len(b.items))
 	n, err := copyFile(filepath.Join(b.dir, rel), io.LimitReader(in, MaxBytes-b.bytes+1))
@@ -80,7 +83,7 @@ func (b *Batch) File(path, name, mime string) error {
 	}
 	b.bytes += n
 	if b.bytes > MaxBytes {
-		return errors.New("share exceeds 512 MiB")
+		return fmt.Errorf("%w: more than 512 MiB", ErrTooLarge)
 	}
 	if name == "" {
 		name = filepath.Base(path)
@@ -98,7 +101,7 @@ func (b *Batch) Commit() error {
 		return err
 	}
 	if len(data) > maxManifest {
-		return errors.New("share manifest is too large")
+		return fmt.Errorf("%w: a manifest over 1 MiB", ErrTooLarge)
 	}
 	if err := os.WriteFile(filepath.Join(b.dir, "items.json"), data, 0o600); err != nil {
 		return err

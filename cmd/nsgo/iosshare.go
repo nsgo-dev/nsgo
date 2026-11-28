@@ -124,10 +124,16 @@ func addIOSShare(ctx context.Context, p *project, app string, env []string, simu
 	if simulator {
 		platform["DTPlatformName"] = "iphonesimulator"
 	}
-	if err := os.WriteFile(filepath.Join(appex, "Info.plist"), encodePlist(shareInfo(p, platform)), 0o644); err != nil {
+	if _, err := writeAppleNames(p, appex); err != nil {
 		return err
 	}
-	if _, err := writeAppleNames(p, appex); err != nil {
+	region, err := writeShareStrings(p, appex)
+	if err != nil {
+		return err
+	}
+	// A user whose languages the app lacks reads the extension in the app's source language, not English's .lproj, which an app written in another language lacks.
+	platform["CFBundleDevelopmentRegion"] = region
+	if err := os.WriteFile(filepath.Join(appex, "Info.plist"), encodePlist(shareInfo(p, platform)), 0o644); err != nil {
 		return err
 	}
 	if err := p.writePrivacyManifest(appex); err != nil {
